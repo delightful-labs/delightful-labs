@@ -91,3 +91,14 @@ export type {
 	WorkspaceSelectionReport,
 	WorkspaceSelectionOutput
 } from 'delightful-local-first/workspace/contracts'
+
+export { createWorkspaceCreationTransaction } from 'delightful-local-first/workspace/creation/workflow'
+export type {
+	WorkspaceCreationAttempt,
+	WorkspaceCreationAssessment,
+	WorkspaceCreationSettlement,
+	WorkspaceCreationOutcome,
+	WorkspaceCreationResult,
+	WorkspaceCreationEvent,
+	WorkspaceCreationTransactionCapability
+} from 'delightful-local-first/workspace/creation/contracts'
