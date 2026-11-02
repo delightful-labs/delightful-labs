@@ -37,6 +37,14 @@ package archives; this is not a claim of a published, stable npm release.
 | `workspace/contracts`, `workspace/workflow`                   | Host-observed selection leases, invalidation and exact drain acknowledgement        |
 | `workspace/creation/contracts`, `workspace/creation/workflow` | Explicit-attempt transaction ownership, local persistence and interruption outcomes |
 
+The `workspace` entry exports the pure WorkspaceSelector view and its typed message/view contract.
+`workspace/presentation` exports createWorkspaceSelectorView and its actor-free input type. The
+projection uses supplied local directory facts, supports a sole unselected choice and caller-localized
+duplicate-name labels, and never grants workspace access. The view emits requests while retaining
+the host-applied value until the host updates it. Missing observations remain distinct from an empty
+directory. No client, actor, route, global theme, translation singleton, or remote freshness query is
+created by presentation. Finance keeps its queries, existing labels and selection commands.
+
 Recovery presentation has a single Close action, with no saved-phrase acknowledgement checkbox.
 No subpath requires foundation-owned routes. Finance retains navigation, startup provenance,
 workspace creation forms/journals, financial permissions, bank credentials, and domain write ownership.

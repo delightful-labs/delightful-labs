@@ -11,6 +11,10 @@ work. See the [current contract map](specs/001-local-first-foundation/contracts/
 implemented subpath exports and the [workspace plan](specs/001-local-first-foundation/workspaces/plan.md)
 for selection and private-creation ownership and qualification.
 
+The workspace selector composes DUI with a controlled host-applied value and caller-localized text.
+Its local directory projection requires no client or actor. See the [composition plan](specs/001-local-first-foundation/workspaces/compositions/plan.md)
+for the package boundary and Finance adoption evidence. Creation-dialog composition remains separate.
+
 - [Foundation specification](specs/001-local-first-foundation/spec.md)
 - [Specification quality checklist](specs/001-local-first-foundation/checklists/requirements.md)
 

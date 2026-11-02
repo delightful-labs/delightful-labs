@@ -122,6 +122,15 @@
 		"./workspace/creation/workflow": {
 			"types": "./dist/machines/workspaces/creation-transaction.d.ts",
 			"default": "./dist/machines/workspaces/creation-transaction.js"
+		},
+		"./workspace": {
+			"types": "./dist/workspace.d.ts",
+			"svelte": "./dist/workspace.js",
+			"default": "./dist/workspace.js"
+		},
+		"./workspace/presentation": {
+			"types": "./dist/presentation/workspace-selector.d.ts",
+			"default": "./dist/presentation/workspace-selector.js"
 		}
 	},
 	"svelte": "./dist/index.js",

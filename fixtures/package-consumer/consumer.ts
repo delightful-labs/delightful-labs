@@ -102,3 +102,10 @@ export type {
 	WorkspaceCreationEvent,
 	WorkspaceCreationTransactionCapability
 } from 'delightful-local-first/workspace/creation/contracts'
+
+export type {
+	WorkspaceSelectorMessages,
+	WorkspaceSelectorView
+} from 'delightful-local-first/workspace'
+export { createWorkspaceSelectorView } from 'delightful-local-first/workspace/presentation'
+export type { WorkspaceSelectorInput } from 'delightful-local-first/workspace/presentation'
