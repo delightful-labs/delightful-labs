@@ -130,6 +130,16 @@ then verify dismissal, identity replacement, and resource cleanup.
 - Browser eviction, quota failure, unavailable runtime assets, and multiple tabs.
 - An SDK upgrade changing persistence, permissions, query behavior, or recovery semantics.
 
+## Delivery priority: finish existing Finance extraction
+
+The 2026-11-02 user direction is to extract all remaining reusable foundations already implemented
+in Finance before adding features missing from Finance. Follow [the extraction inventory and
+acceptance boundary](finance-extraction.md). This includes existing scoped operation/form ownership,
+typed data observations/mutations, initialization/provenance, remaining creation recovery and profile/
+identity integration. Financial rules and native schema mappings remain consumer-owned. Invitations
+and member administration remain MVP requirements, but are sequenced after this extraction milestone.
+The next app must not wait for new collaboration features or a complete Finance rewrite.
+
 ## Requirements
 
 ### Functional Requirements

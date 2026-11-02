@@ -139,6 +139,128 @@
 		"./workspace/naming/workflow": {
 			"types": "./dist/machines/workspaces/naming.d.ts",
 			"default": "./dist/machines/workspaces/naming.js"
+		},
+		"./forms/contracts": {
+			"types": "./dist/contracts/scoped-form.d.ts",
+			"default": "./dist/contracts/scoped-form.js"
+		},
+		"./forms/readiness": {
+			"types": "./dist/machines/forms/readiness.d.ts",
+			"default": "./dist/machines/forms/readiness.js"
+		},
+		"./forms/submission": {
+			"types": "./dist/machines/forms/submission.d.ts",
+			"default": "./dist/machines/forms/submission.js"
+		},
+		"./forms/write": {
+			"types": "./dist/machines/forms/write.d.ts",
+			"default": "./dist/machines/forms/write.js"
+		},
+		"./forms/workflow": {
+			"types": "./dist/machines/forms/scoped-form.d.ts",
+			"default": "./dist/machines/forms/scoped-form.js"
+		},
+		"./forms/feedback": {
+			"types": "./dist/machines/forms/feedback.d.ts",
+			"default": "./dist/machines/forms/feedback.js"
+		},
+		"./forms/lifecycle": {
+			"types": "./dist/machines/forms/lifecycle.d.ts",
+			"default": "./dist/machines/forms/lifecycle.js"
+		},
+		"./forms/svelte": {
+			"types": "./dist/integrations/forms/controller.svelte.d.ts",
+			"default": "./dist/integrations/forms/controller.svelte.js"
+		},
+		"./forms/policy": {
+			"types": "./dist/machines/forms/policy.d.ts",
+			"default": "./dist/machines/forms/policy.js"
+		},
+		"./workspace/journal": {
+			"types": "./dist/machines/workspaces/journal.d.ts",
+			"default": "./dist/machines/workspaces/journal.js"
+		},
+		"./workspace/initialization": {
+			"types": "./dist/machines/workspaces/initialization.d.ts",
+			"default": "./dist/machines/workspaces/initialization.js"
+		},
+		"./workspace/creation-owner": {
+			"types": "./dist/machines/workspaces/creation-owner.d.ts",
+			"default": "./dist/machines/workspaces/creation-owner.js"
+		},
+		"./workspace/creation-operation": {
+			"types": "./dist/machines/workspaces/creation-operation.d.ts",
+			"default": "./dist/machines/workspaces/creation-operation.js"
+		},
+		"./workspace/creation-persistence": {
+			"types": "./dist/machines/workspaces/creation-persistence.d.ts",
+			"default": "./dist/machines/workspaces/creation-persistence.js"
+		},
+		"./profile/contracts": {
+			"types": "./dist/contracts/profile.d.ts",
+			"default": "./dist/contracts/profile.js"
+		},
+		"./profile/avatar": {
+			"types": "./dist/machines/identity/profile-avatar.d.ts",
+			"default": "./dist/machines/identity/profile-avatar.js"
+		},
+		"./profile/workflow": {
+			"types": "./dist/machines/identity/profile.d.ts",
+			"default": "./dist/machines/identity/profile.js"
+		},
+		"./workspace/startup": {
+			"types": "./dist/machines/workspaces/startup.d.ts",
+			"default": "./dist/machines/workspaces/startup.js"
+		},
+		"./workspace/startup-contracts": {
+			"types": "./dist/contracts/workspace-startup.d.ts",
+			"default": "./dist/contracts/workspace-startup.js"
+		},
+		"./data/observations": {
+			"types": "./dist/contracts/observation.d.ts",
+			"default": "./dist/contracts/observation.js"
+		},
+		"./backend/jazz/data": {
+			"types": "./dist/backend/jazz/data.svelte.d.ts",
+			"default": "./dist/backend/jazz/data.svelte.js"
+		},
+		"./recovery/coordination": {
+			"types": "./dist/machines/identity/session-recovery.d.ts",
+			"default": "./dist/machines/identity/session-recovery.js"
+		},
+		"./forms/content": {
+			"types": "./dist/components/forms/FormContent.svelte.d.ts",
+			"svelte": "./dist/components/forms/FormContent.svelte",
+			"default": "./dist/components/forms/FormContent.svelte"
+		},
+		"./forms/feedback-view": {
+			"types": "./dist/components/forms/FormFeedback.svelte.d.ts",
+			"svelte": "./dist/components/forms/FormFeedback.svelte",
+			"default": "./dist/components/forms/FormFeedback.svelte"
+		},
+		"./forms/modal": {
+			"types": "./dist/components/forms/FormModal.svelte.d.ts",
+			"svelte": "./dist/components/forms/FormModal.svelte",
+			"default": "./dist/components/forms/FormModal.svelte"
+		},
+		"./profile/name-view": {
+			"types": "./dist/components/profile/ProfileNameForm.svelte.d.ts",
+			"svelte": "./dist/components/profile/ProfileNameForm.svelte",
+			"default": "./dist/components/profile/ProfileNameForm.svelte"
+		},
+		"./profile/avatar-view": {
+			"types": "./dist/components/profile/Avatar.svelte.d.ts",
+			"svelte": "./dist/components/profile/Avatar.svelte",
+			"default": "./dist/components/profile/Avatar.svelte"
+		},
+		"./profile/avatar-form": {
+			"types": "./dist/components/profile/ProfileAvatarForm.svelte.d.ts",
+			"svelte": "./dist/components/profile/ProfileAvatarForm.svelte",
+			"default": "./dist/components/profile/ProfileAvatarForm.svelte"
+		},
+		"./backend/jazz/startup": {
+			"types": "./dist/backend/jazz/startup.d.ts",
+			"default": "./dist/backend/jazz/startup.js"
 		}
 	},
 	"svelte": "./dist/index.js",

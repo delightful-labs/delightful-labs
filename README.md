@@ -82,4 +82,6 @@ overrides, catalog editing, and the current review/verification limits.
 See [owned recovery integration](docs/recovery-integration.md) for host scope observations,
 actor lifetime, Jazz module sharing, and adapter/integration coverage.
 
-Identity restoration is implemented and merged, with Finance retaining workspace draining and navigation. The next design review is [session startup and resume](specs/001-local-first-foundation/startup/plan.md), separating shared acquisition from application attachment.
+Identity restoration and session startup are implemented. Shared restoration coordination accepts host-owned draining and navigation capabilities; session acquisition stays retained across layout attachments.
+
+See [the next-app integration recipe](docs/next-app.md) for the extracted forms, data, initialization, creation, profile and session-lifetime APIs, and [the extraction audit](specs/001-local-first-foundation/finance-extraction.md) for Finance adoption and verification.

@@ -168,3 +168,16 @@ The [workspace lifecycle slice](workspaces/plan.md) now implements selection/swi
 Finance handoff. The [private-creation transaction slice](workspaces/creation/plan.md) is implemented
 and adopted in Finance with focused local-first qualification; reusable compositions remain next. Earlier first-slice proposals above are
 historical; current slice artifacts and shipped contracts govern implemented behavior.
+
+## Current priority after naming merge
+
+Library naming PR #9 and Finance PR #44 are merged (library ed96a79, Finance e04bdf4). Selector and
+creation-dialog compositions are also merged. Earlier text describing these as unbuilt is historical;
+the current exports and [contract map](contracts/foundation.md) govern shipped capabilities.
+
+The user now prioritizes [completing existing Finance extraction](finance-extraction.md) before
+implementing new collaboration behavior. Start with shared scoped operation/form contracts and
+readiness ownership; then progress through the audited data, initialization, creation recovery and
+profile/identity boundaries. Keep each implementation/adoption cycle focused and reviewed. New
+invitations/member administration and the full new-app MVP demonstration follow that milestone.
+This reordering does not authorize automatic commits or waive the implementation-before-tests gate.

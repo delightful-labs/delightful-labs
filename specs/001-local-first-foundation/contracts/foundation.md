@@ -37,7 +37,24 @@ package archives; this is not a claim of a published, stable npm release.
 | `workspace/contracts`, `workspace/workflow`                   | Host-observed selection leases, invalidation and exact drain acknowledgement        |
 | `workspace/creation/contracts`, `workspace/creation/workflow` | Explicit-attempt transaction ownership, local persistence and interruption outcomes |
 
-The `workspace` entry exports the pure WorkspaceSelector view and its typed message/view contract.
+The next extraction review adds `forms/contracts` for SDK-/actor-free scoped operation/view
+protocols and `forms/readiness` for the consumer-policy observer and one-shot assessment actor.
+The base view excludes Finance's translated feedback callbacks. These entry points are implemented
+on the extraction branch; shared coverage and Finance adoption are still pending review. See the
+[form ownership plan](../forms/plan.md).
+The next actor under review is `forms/submission`: caller-supplied parsing/issue normalization,
+correlated progress, operation invocation, interruption and result/payload ownership. It adds no
+schema-library or SDK dependency. See the [submission extraction plan](../forms/submission.md);
+shared coverage and Finance submission adoption are not yet qualified.
+
+`workspace/naming/contracts` and `workspace/naming/workflow` provide the scoped finite naming
+operation, interruption/settlement outcomes and opaque companion-settings capability. Finance adopts
+it beneath its existing form policy and preserves one atomic name/currency save.
+
+The `workspace` entry exports WorkspaceCreationDialog and its caller-localized message/view
+contracts as well as the pure WorkspaceSelector and its typed message/view contract. The dialog
+owns disclosure/draft/focus only; the host owns creation, retry/recovery and completion navigation.
+
 `workspace/presentation` exports createWorkspaceSelectorView and its actor-free input type. The
 projection uses supplied local directory facts, supports a sole unselected choice and caller-localized
 duplicate-name labels, and never grants workspace access. The view emits requests while retaining
@@ -47,7 +64,7 @@ created by presentation. Finance keeps its queries, existing labels and selectio
 
 Recovery presentation has a single Close action, with no saved-phrase acknowledgement checkbox.
 No subpath requires foundation-owned routes. Finance retains navigation, startup provenance,
-workspace creation forms/journals, financial permissions, bank credentials, and domain write ownership.
+workspace creation orchestration/journals, financial permissions, bank credentials, and domain write ownership.
 Additional-workspace creation delegates its transaction lifetime to the shared creation workflow.
 
 ## Workspace Selection and Resource Ownership
@@ -87,11 +104,16 @@ See [the creation plan and evidence](../workspaces/creation/plan.md).
 
 ## Remaining MVP Contracts
 
-Shared creation presentation, naming, automatic first-workspace provenance, invitations and
-authorized membership changes still require their own reviewed designs. Shared data access will be a modest typed boundary over concrete consumer
-operations, not a portable schema descriptor or general query language. Reactive observations must
-have explicit availability/error and disposal lifetimes. Operations must distinguish local
-persistence, later rejection and unknown settlement; uncertainty must not trigger blind replay.
+The immediate priority is [extracting existing Finance foundations](../finance-extraction.md):
+scoped operation/form ownership, typed data access and observations, first-workspace provenance,
+remaining creation recovery and reusable profile/identity integration. Shared creation presentation
+and naming are implemented and adopted. Invitations and authorized member administration are later
+work because Finance does not yet implement their complete product workflows.
+
+Shared data access remains a modest typed boundary over concrete consumer operations, not a portable
+schema descriptor or general query language. Reactive observations need explicit availability/error
+and disposal lifetimes. Operations distinguish local persistence, later rejection and unknown
+settlement; uncertainty must not trigger blind replay.
 
 App-required local atomicity and authority-validated transactions remain separately supported
 guarantees. Do not advertise unsupported storage protection or durability. Private/shared workspace
