@@ -1,7 +1,13 @@
+import type { FormFeedbackLabel } from '../machines/forms/feedback.js'
 /** SDK-, actor-, schema- and localization-free operation/view protocols.
  * Consumer feedback rendering may decorate these views without becoming a shared workflow input.
  */
 export type FormIssue = { path: readonly PropertyKey[]; code: string; message?: string }
+/** A validation leaf only; I/O/resource workflows belong in an invoked operation actor. */
+export type FormSchema<Values> = {
+	parseAsync: (value: unknown) => PromiseLike<Values>
+}
+
 export type FormSettlement =
 	| 'notStarted'
 	| 'locallyPersisted'
@@ -38,6 +44,7 @@ export type FormResult<Result, Reason> =
 	| FormOperationResult<Result, Reason>
 	| (FormRecovery & { outcome: 'invalid'; issues: readonly FormIssue[]; settlement: 'notStarted' })
 export type ScopedFormView<Result, Reason> = {
+	feedbackLabels?: readonly FormFeedbackLabel<Result, Reason>[]
 	readiness: FormReadiness<Reason> | { kind: 'observing' | 'failed' | 'closed' }
 	content: { kind: 'fields' } | { kind: 'success'; value: Result }
 	activity:

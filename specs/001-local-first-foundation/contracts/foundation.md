@@ -42,6 +42,10 @@ protocols and `forms/readiness` for the consumer-policy observer and one-shot as
 The base view excludes Finance's translated feedback callbacks. These entry points are implemented
 on the extraction branch; shared coverage and Finance adoption are still pending review. See the
 [form ownership plan](../forms/plan.md).
+The next actor under review is `forms/submission`: caller-supplied parsing/issue normalization,
+correlated progress, operation invocation, interruption and result/payload ownership. It adds no
+schema-library or SDK dependency. See the [submission extraction plan](../forms/submission.md);
+shared coverage and Finance submission adoption are not yet qualified.
 
 `workspace/naming/contracts` and `workspace/naming/workflow` provide the scoped finite naming
 operation, interruption/settlement outcomes and opaque companion-settings capability. Finance adopts

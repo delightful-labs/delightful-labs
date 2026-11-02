@@ -5,8 +5,8 @@
 The user directed on 2026-11-02: finish extracting reusable behavior already implemented in Finance
 so the next app can use it; implement features missing from Finance afterward. This changes delivery
 order, not the full MVP requirements. Invitations, member administration and other new product
-behavior must not gate the extraction milestone. Each implementation still follows focused review,
-then approved coverage and Finance adoption. No full Finance rewrite or schema conversion is needed.
+behavior must not gate the extraction milestone. On 2026-11-02 the user authorized completing all remaining extraction and verification in the
+current PRs without another per-slice handoff. No full Finance rewrite or schema conversion is needed.
 
 Audit baseline: library main ed96a79 and Finance main e04bdf4 after library PR #9 and Finance PR #44
 merged. Both working branches are feat/finance-foundation-extraction. Later slice branches may be
@@ -31,16 +31,9 @@ its application lifetime, local schemas, queries, permissions, navigation and fi
 | 5     | machines/identity/profile.ts and profile-avatar.ts; components/identity/ProfileNameForm.svelte, ProfileAvatarForm.svelte and Avatar.svelte; session-recovery.ts; runtime/jazz-session.ts | Existing reusable profile editing and remaining identity transition/lifecycle composition, using earlier shared form/data/session boundaries                                      | Profile storage mapping, app navigation and coordinated financial drains; generic image controls belong in DUI and require their own ownership review |
 | 6     | Existing Finance test harnesses, package consumers and adopted subpaths                                                                                                                  | Reconcile documentation, audit remaining SDK dependencies, provide next-app integration recipes and qualify the extracted paths independently of Finance models                   | Hosting routes, PWA/update policy, app deployment and product-specific defaults                                                                       |
 
-Rows are responsibility groups, not single giant implementation batches. Design contracts/statecharts
-first, inspect every leaf recursively, present small changes, then update fixtures and run only
-relevant checks after approval. Move working behavior rather than replacing it with a speculative
-framework. A generic wrapper that merely relocates SDK calls does not complete a boundary.
-
-The next implementation slice is the shared scoped-operation/form contract and its readiness
-ownership design. Finance's generic form machinery is a real dependency of naming, profile and
-ordinary data writes. Its feedback currently imports Finance Paraglide messages, so extraction must
-use caller-supplied descriptors/messages rather than copying catalogs or introducing a global locale.
-Actor shutdown is part of that ownership design, not an excuse to move all lifecycle code at once.
+The complete remaining batch is implemented on these branches. Existing behavior is parameterized
+behind typed inputs rather than replaced with a new framework. Finance remains a native Jazz
+consumer; its schemas do not migrate to a portable model.
 
 ## Local-first invariants
 
@@ -89,8 +82,59 @@ and remaining release qualification. Existing role/grant enforcement is extracti
 not proof that invitation or administration workflows already exist. Finance is not required to gain
 these product features before another app can consume the extracted foundations.
 
-## Current review boundary
+## Implemented extraction audit
 
-This audit updates delivery scope and the public contract inventory only. No implementation, test,
-localization, SDK dependency or Finance source changes are included. Do not interpret the inventory
-as evidence that these extractions are already implemented or that existing SDK access is portable.
+| Inventory group         | Public exports and Finance adoption                                                                                                                                                                                                                                                                                               | Consumer-owned remainder and reason                                                                                                                                                                                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Forms and shutdown      | `forms/contracts`, `readiness`, `submission`, `write`, `workflow`, `policy`, `svelte`, `lifecycle`, `feedback`; Finance's existing factories now delegate to these graphs. `forms/content`, `feedback-view`, `modal` replace duplicated presentation.                                                                             | Finance Zod validation and Paraglide callbacks, field snippets/icons and diagnostics are injected. No validator, catalog or global theme is imposed.                                                                                               |
+| Data                    | `data/observations` supplies row snapshots and a revisioned loading/failed/available contract. `backend/jazz/data` supplies typed subscriptions with explicit LocalFirst default, issue receipts and local settlement. Production Finance foreground subscriptions adopt this path; naming adopts the receipt/settlement helpers. | Native query/schema expressions and financial writes stay in their application integration. This is a named v1 SDK boundary, not a portable query compiler or all-record acquisition engine.                                                       |
+| Initialization          | `workspace/initialization`, `workspace/startup`, `workspace/startup-contracts`; Finance supplies native discovery/preparation, bootstrap transaction and seed actors.                                                                                                                                                             | Deterministic IDs, financial starter categories, permissions, sample-data policy and legacy schema migration remain Finance-specific. Readiness does not await optional seeding.                                                                   |
+| Creation/recovery       | `workspace/journal`, `creation-owner`, `creation-operation`, `creation-persistence` compose existing `workspace/creation/workflow`; Finance binds its payload parser and native reconciliation/transaction.                                                                                                                       | Complete organization/member/system-category matching and native staging map Finance's exact schema. Journal database name/store/version and payload remain unchanged. App projections map their attempt into the existing shared creation dialog. |
+| Profile/identity        | `profile/contracts`, `workflow`, `avatar`, `name-view`, `avatar-form`, `avatar-view`; `recovery/coordination`; `backend/jazz/startup`. Finance delegates profile policy/resource ownership, restoration coordination and retained session acquisition.                                                                            | Host-owned navigation/draining, image processing/cropper and native profile persistence are supplied capabilities. Generic image tooling belongs in DUI/platform integration.                                                                      |
+| Independent consumption | `docs/next-app.md`, built public type/import/Svelte consumer fixtures, domain-free initialization/profile/observation coverage and existing domain-free form/selection/naming/creation fixtures.                                                                                                                                  | No Finance imports, financial schema, catalogs or credentials are required to consume the library. Invitations/member administration remain the later phase above.                                                                                 |
+
+### Statechart and SDK audit
+
+The extracted graphs retain readiness assessment and revision correlation; validation/operation
+interruption drains before cleanup; write settlement distinguishes not-started, local, confirmed and
+unknown outcomes. Initialization reads local provenance first and only discovers authority when
+provenance is insufficient. Startup reports ready independently of optional seeding. Creation owns
+validation → preparation → durable journal → local reconciliation → persistence → journal cleanup;
+its transaction child owns commit/rollback/settlement. The journal owns IndexedDB open/acquire/read/
+stage/transaction completion/close. Profile owns image processing/byte validation/write/resource
+cleanup. Restoration coordinates validation, host drain, restoration and navigation facts. Supplied
+async capabilities remain leaf obligations, recursively reviewed at the consumer boundary.
+
+Shared machine/contracts/presentation modules contain no native Jazz imports. SDK access is named
+under `backend/jazz/*`; native schema/query building is intentionally consumer-owned for v1.
+Finance's direct SDK imports retained in foundation-adjacent code are native storage transaction
+adapters, schema-bound reconciliation and legacy attribution repair, explicit authority reads,
+getDb/session context binding and type-only signatures. `workspace-integrity*` specifically repairs
+Finance's historical profile/member attribution using its owner/admin/account-access policy;
+`workspace-navigation` and runtime readiness bind app URLs and selected ledger/bank resources. These
+are app integrations, not prerequisites for another app to consume the extracted workflows.
+
+### Verification
+
+Qualified on 2026-11-02 in isolated Finance storage/checkouts:
+
+- Library: 331 unit tests in 19 files pass; the final registry fixture refinement also passes its
+  focused two tests. Strict TypeScript/Svelte checks, lint, formatting, public declarations, publint,
+  built public consumer types/ESM execution/Svelte bundle and static Storybook build pass.
+- Finance: 1,761 unit tests in 126 files pass against the extracted workflows. After adding retained
+  registry ownership, its five Finance binding tests pass against the final vendored artifact.
+  Final source and test types pass with zero Svelte diagnostics.
+- Finance browser: all 16 focused form/profile/recovery/naming checks pass. Workspace coverage
+  exercises 73 scenarios: 72 passed initially; one account-form scenario exposed a helper returning
+  before async selection completed. The helper now awaits requested URL and selected value; the
+  unchanged account scenario passes with tracing. No timeout increase or assertion removal.
+- Final production artifact: both cold full-client-exit scenarios pass, offline and with an open
+  remote connection that never answers. Existing local data remains usable; locally acknowledged
+  saves, combined name/currency settings and selected workspace survive closing all clients and
+  reopening again. Ordinary use has no remote preflight.
+- Finance generated localization is byte-identical across original and isolated checkouts. No
+  catalog/config/generated localization edits or regeneration. The final vendored package excludes
+  tests, its lockfile integrity matches, and superseded library archives are removed.
+
+This completes extraction of the existing reusable Finance responsibilities listed above. The next
+phase is the product behavior not implemented in Finance, rather than more extraction prerequisites.

@@ -20,3 +20,7 @@ import './selector.js'
 import './naming.js'
 
 import './forms.js'
+
+import './submission.js'
+
+import './foundation.js'

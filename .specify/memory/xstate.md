@@ -80,3 +80,12 @@ Before implementation review, inspect the whole changed actor tree for hidden or
 reports, secret retention, duplicated classification, and cleanup bypasses. Identify affected unit
 and browser tests; add or run them only after implementation approval. Static checks do not prove races
 or cleanup. Inspect at existing actor boundaries without changing ownership or logging private data.
+
+## Extracted workflow dependencies
+
+Forms, workspace initialization/startup, durable explicit-creation ownership/recovery, profile
+editing and restoration coordination expose typed factories under documented public subpaths.
+Consumers inject policy/schema/storage capabilities rather than fork these statecharts.
+Caller-supplied promise capabilities still must be leaf operations; the factory boundary is not
+an exemption from recursive workflow review. Host application lifetime owns a Jazz startup
+registry, and layout attachments do not acquire competing sessions. See `docs/next-app.md`.

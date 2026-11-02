@@ -51,8 +51,8 @@ assistive technology.
 
 All visible text and accessible labels follow localization.md. Views translate descriptors and use
 consumer-compatible localized messages. Never show recovery secrets in announcements or diagnostics.
-Required recovery acknowledgement and dismissal are separate: users can leave without falsely
-recording a successful backup. Clear sensitive material on every terminal/scope-change path.
+Recovery disclosure does not require a saved-phrase acknowledgement. Keep the Close control at
+the bottom; dismissal never records a successful backup. Clear sensitive material on every terminal/scope-change path.
 
 ## Review and reference limits
 
@@ -62,3 +62,10 @@ pin and inspect actual exports before adoption. Generic missing behavior belongs
 not a duplicate library primitive. SDK/toolchain versions and detailed packaging require planning.
 Identify affected actor/view/browser tests at implementation review and add/run them only after
 approval. Follow this repository's Oxlint/Oxfmt policy, not copied reference-repo formatting commands.
+
+## Extracted Finance compositions
+
+Shared form/profile compositions accept typed views, callbacks, snippets and caller-translated
+labels. Their controllers and policy/resource machines are separate public imports. Finance
+retains its schema bindings, existing Paraglide callbacks, diagnostic sink, icons and cropper.
+Do not import Finance modules or its locale catalog into the library. See `docs/next-app.md`.
