@@ -115,3 +115,22 @@ The updated selector archive replaces the private-creation-only archive; package
 reference the reviewed snapshot. Source/Svelte types report zero errors/warnings, service-worker
 checking and focused formatting/diff checks pass in an isolated checkout without localization
 regeneration. Host runtime/SSR/browser verification remains pending implementation review.
+
+## Approved Finance selector qualification
+
+Implementation committed as library 78bb8f6 and Finance e0c77d6. After approval, five Finance adapter
+SSR cases and the focused query/navigation suite pass (43 cases). All 22 workspace/recovery browser
+scenarios pass, including explicit sole-workspace selection, synchronized drawer/settings values,
+unavailable targets, duplicate names and identity recovery. Both strengthened cold production cases
+pass: creating and selecting a new workspace works after a full browser/worker exit with retained
+local data, both offline and with an unanswered server, and selection survives reload.
+
+The complete Finance unit suite passes: 1,737 tests across 124 files, qualifying the Svelte package
+SSR-loading adjustment. Source/browser-test types, formatting and diff checks pass. Verification used
+existing generated localization with compiler writer hooks disabled only in temporary isolated test
+runners; the generated tree's content hash is unchanged. No message/config/generated source change,
+new query or online readiness gate was added to Finance.
+
+The isolated in-memory review app is http://127.0.0.1:5192. Coverage and final qualification docs remain
+uncommitted; no new PR/CI result or deployment is claimed. Creation dialog composition remains next,
+after this selector slice is reviewed and integrated.
