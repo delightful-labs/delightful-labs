@@ -16,3 +16,5 @@ import './workspace.js'
 import './creation.js'
 
 import './selector.js'
+
+import './naming.js'

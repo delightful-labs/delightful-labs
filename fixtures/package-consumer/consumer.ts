@@ -114,3 +114,14 @@ export type {
 	WorkspaceCreationDialogView,
 	WorkspaceCreationDialogMessages
 } from 'delightful-local-first/workspace'
+
+export { createWorkspaceNamingOperation } from 'delightful-local-first/workspace/naming/workflow'
+export type {
+	WorkspaceNamingRequest,
+	WorkspaceNamingAssessment,
+	WorkspaceNamingSettlement,
+	WorkspaceNamingOutcome,
+	WorkspaceNamingResult,
+	WorkspaceNamingEvent,
+	WorkspaceNamingCapability
+} from 'delightful-local-first/workspace/naming/contracts'

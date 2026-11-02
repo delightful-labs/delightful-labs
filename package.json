@@ -131,6 +131,14 @@
 		"./workspace/presentation": {
 			"types": "./dist/presentation/workspace-selector.d.ts",
 			"default": "./dist/presentation/workspace-selector.js"
+		},
+		"./workspace/naming/contracts": {
+			"types": "./dist/contracts/workspace-naming.d.ts",
+			"default": "./dist/contracts/workspace-naming.js"
+		},
+		"./workspace/naming/workflow": {
+			"types": "./dist/machines/workspaces/naming.d.ts",
+			"default": "./dist/machines/workspaces/naming.js"
 		}
 	},
 	"svelte": "./dist/index.js",
