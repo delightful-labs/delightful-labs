@@ -182,3 +182,18 @@ test('reopening a completed attempt requests a fresh host draft', async ({ page 
 	await expect(page.getByRole('status', { name: 'Host phase' })).toHaveText('editing')
 	await expect(page.getByRole('status', { name: 'Host attempt' })).toHaveText('')
 })
+
+test('host-controlled quiet progress remains announced without a duplicate visible paragraph', async ({
+	page
+}) => {
+	await page.goto(story('quiet-progress'))
+	await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
+	const dialog = page.getByRole('dialog')
+	await dialog.getByRole('textbox').fill('Quiet attempt')
+	await dialog.getByRole('button', { name: 'Create workspace', exact: true }).click()
+	await expect(dialog.getByRole('status')).toHaveText('Creating workspace')
+	await expect(dialog.locator('p').filter({ hasText: 'Creating workspace' })).toHaveCount(0)
+	await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeEnabled()
+	await observe(page, 'fail')
+	await expect(dialog.getByText('Creation failed', { exact: true }).last()).toBeVisible()
+})

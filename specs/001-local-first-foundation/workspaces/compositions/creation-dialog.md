@@ -76,3 +76,37 @@ No production correction was needed during these checks. Coverage does not yet q
 adapter or its durable creation workflow: Finance adoption is the next separate implementation
 review, with the existing local-first transaction and navigation owners retained. Nothing in this
 slice is committed or published yet.
+
+## Finance adoption refinement for review
+
+Finance's existing workspace browser contract explicitly keeps working feedback announced without
+an extra visible paragraph. Add optional feedback.visible (default true) to the pure view contract;
+false suppresses only the duplicate paragraph, never either mounted announcement region. Finance's
+own public projection supplies false for working. No actor, effect, localization or default story
+behavior changes. The optional input and actual Finance adapter await review and focused coverage;
+the earlier qualification predates this refinement. Library 9a95187 is committed; this refinement is
+not included in that commit or the earlier passing browser result.
+
+## Approved adoption regression coverage
+
+The user approved the Finance adaptation and the optional quiet-feedback input. Twelve shared
+browser cases pass, including quiet progress that stays in the mounted status region while omitting
+its duplicate paragraph. The synthetic locale host now rebuilds its supplied view as Finance does.
+Finance's new rejected-draft case found that observing view.draftRevision directly reran the reset
+when the view object changed. The component now observes a derived primitive revision, so an equal
+revision preserves the draft across new view objects. All twelve shared cases pass with this fix.
+The corrected archive is tracked in Finance with hash and host qualification in its adoption plan.
+The initial dialog commit remains 9a95187; these review-approved refinements are still uncommitted.
+
+## Finance qualification complete
+
+All 66 focused Finance machine/runtime/adapter unit cases and all 23 workspace/identity browser
+scenarios pass against the corrected archive. Seven production startup scenarios pass, including
+full-browser-exit creation/selection/reload while offline and with an unanswered remote connection.
+Finance's generated localization tree remains byte-identical. Source/Svelte/browser types,
+formatting and diff checks pass. No runtime owner, transaction protocol or startup network gate
+was added. The Finance adoption plan records the archive hash and detailed validation.
+
+Library validation includes four SSR cases, twelve shared-dialog browser cases, source/Svelte
+checking, lint, package/publint and public consumer verification. The final fixes and Finance
+adoption are uncommitted; nothing was pushed or published during this qualification.

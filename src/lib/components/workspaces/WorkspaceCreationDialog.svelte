@@ -27,6 +27,7 @@
 
 	const instanceId = $props.id()
 	const nameId = `${instanceId}-name`
+	const draftRevision = $derived(view.draftRevision)
 	let open = $state(false)
 	let name = $state('')
 	let feedback = $state<HTMLDivElement>()
@@ -39,7 +40,7 @@
 		name = ''
 	})
 	$effect(() => {
-		void view.draftRevision
+		void draftRevision
 		name = ''
 	})
 	$effect(() => {
@@ -105,7 +106,7 @@
 			/>
 		{/if}
 		<div bind:this={feedback} tabindex="-1" class="feedback">
-			{#if view.feedback.text}
+			{#if view.feedback.text && view.feedback.visible !== false}
 				<p>{view.feedback.text}</p>
 			{/if}
 			{#if view.attemptName && view.content !== 'complete'}<p>{view.attemptName}</p>{/if}

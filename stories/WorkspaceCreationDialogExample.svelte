@@ -3,7 +3,7 @@
 	import WorkspaceCreationDialog from '../src/lib/components/workspaces/WorkspaceCreationDialog.svelte'
 	import type { WorkspaceCreationDialogView } from '../src/lib/contracts/workspace-creation-dialog.js'
 
-	let { unavailable = false, heading = 'Create workspace' }: { unavailable?: boolean; heading?: string } = $props()
+	let { unavailable = false, heading = 'Create workspace', quietProgress = false }: { unavailable?: boolean; heading?: string; quietProgress?: boolean } = $props()
 	let phase = $state<'editing' | 'working' | 'complete' | 'failed'>('editing')
 	let scope = $state(0)
 	let revision = $state(0)
@@ -23,8 +23,11 @@
 		draftRevision: revision,
 		attemptName: submitted,
 		feedback: {
-			text: phase === 'working' ? 'Creating workspace' : phase === 'failed' ? 'Creation failed' : phase === 'complete' ? 'Workspace saved' : '',
-			priority: phase === 'failed' ? 'alert' : 'status'
+			text: translated
+				? ({ editing: '', working: 'Création en cours', failed: 'Échec de la création', complete: 'Espace enregistré' })[phase]
+				: ({ editing: '', working: 'Creating workspace', failed: 'Creation failed', complete: 'Workspace saved' })[phase],
+			priority: phase === 'failed' ? 'alert' : 'status',
+			visible: !quietProgress || phase !== 'working'
 		}
 	})
 	const messages = $derived({

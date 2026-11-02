@@ -12,3 +12,5 @@
 	<WorkspaceCreationDialogExample />
 	<WorkspaceCreationDialogExample heading="Create another workspace" />
 </Story>
+
+<Story name="Quiet progress" args={{ quietProgress: true }} />

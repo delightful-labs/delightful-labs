@@ -11,7 +11,12 @@ export type WorkspaceCreationDialogView = Readonly<{
 	draftRevision: string | number
 	/** A retained attempt name, distinct from the editable draft. */
 	attemptName: string
-	feedback: Readonly<{ text: string; priority: 'status' | 'alert' }>
+	feedback: Readonly<{
+		text: string
+		priority: 'status' | 'alert'
+		/** Announcements stay mounted even when the host omits duplicate visible progress. */
+		visible?: boolean
+	}>
 }>
 
 /** Supplied by the consumer's localization boundary, with no English fallback. */
