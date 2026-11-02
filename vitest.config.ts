@@ -9,6 +9,7 @@ export default defineConfig({
 		environment: 'node',
 		include: [
 			'src/lib/machines/**/*.test.ts',
+			'src/lib/presentation/**/*.test.ts',
 			'src/lib/localization/**/*.test.ts',
 			'src/lib/backend/**/*.test.ts',
 			'src/lib/integrations/**/*.test.ts'

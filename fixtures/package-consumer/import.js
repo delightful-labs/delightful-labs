@@ -14,3 +14,5 @@ import './session.js'
 import './workspace.js'
 
 import './creation.js'
+
+import './selector.js'

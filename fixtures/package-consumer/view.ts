@@ -2,3 +2,4 @@
 export { AccountRecovery } from 'delightful-local-first/recovery'
 export { createRecoveryMessages } from 'delightful-local-first/recovery/messages'
 export { default as RecoveryPhrase } from 'delightful-local-first/recovery/svelte'
+export { WorkspaceSelector } from 'delightful-local-first/workspace'
