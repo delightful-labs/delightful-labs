@@ -91,3 +91,29 @@ not a supported consumer protocol. The extracted statechart runtime is unchanged
 
 This is implementation-review evidence only. No unit/browser/consumer test was added or run, no
 Paraglide compilation was invoked and Finance still uses its original readiness implementation.
+
+## Approved shared coverage
+
+The user authorized the implementation commit and continuation. Implementation and the reviewed
+extraction roadmap are committed as f5dfed9. Sixteen focused cases pass: ready/blocked assessments
+preserve the original token and scope; watch reports carry the owner's generation; stale/future
+revisions and wrong/replaced bindings are rejected, including A -> B -> A; independent watchers stay
+separate; policy crashes/completion produce failed outcomes; throwing projections retain actor-error
+supervision; stopping the observer disposes its invoked policy source; interruption preserves
+notStarted/local/unknown settlement and recovery checkpoints without inventing rollback.
+
+TypeScript, focused lint/formatting and diff checks pass. Package/publint and the public consumer
+checks pass: NodeNext declarations resolve the public contracts/types; a domain-free Node consumer
+runs the one-shot readiness protocol without a Jazz client, Svelte or browser context; the existing
+public Svelte consumer still builds. No production correction was needed during coverage.
+
+These actor-only changes add no user-visible interaction or SDK storage behavior, so browser/Jazz
+qualification belongs to the subsequent Finance adoption. Finance remains unchanged on its fresh
+branch. Next, re-export the shared core contracts with Finance's optional feedback-label decoration
+and replace its readiness module with the public factory import; keep form/write owners, role/schema
+policies and existing integration lifetimes intact. Review that change before running its affected
+readiness/form/profile/permission coverage. The remaining form submission/write/controller extraction
+stays a later focused review rather than moving the whole framework at once.
+
+Coverage and this qualification note remain uncommitted. No catalog/generated localization change,
+server startup, branch push, PR or publication occurred in this continuation.
