@@ -3,12 +3,13 @@
 Shared local-first app foundation using Jazz for v1, informed by Delightful Finance and Delightful UI. Focused SDK boundaries leave room for future backend replacement.
 
 This repository contains the Jazz-only MVP specification, developer tooling, recovery presentation,
-identity restoration, session acquisition/readiness, and workspace-selection workflows. Recovery and
-session integrations are already adopted in Finance; the current workspace slice adds shared leases
-and coordinated resource drain. The full MVP and independent demonstration consumer remain future
+identity restoration, session acquisition/readiness, workspace-selection workflows, and explicit private-creation transaction ownership. Finance adopts
+these incrementally through its host session and schemas, retaining its routes, journals and domain
+records. Workspace selection coordinates leases/resource drain; explicit creation settles locally
+without waiting for server acceptance. The full MVP and independent demonstration consumer remain future
 work. See the [current contract map](specs/001-local-first-foundation/contracts/foundation.md) for
 implemented subpath exports and the [workspace plan](specs/001-local-first-foundation/workspaces/plan.md)
-for selection ownership and qualification.
+for selection and private-creation ownership and qualification.
 
 - [Foundation specification](specs/001-local-first-foundation/spec.md)
 - [Specification quality checklist](specs/001-local-first-foundation/checklists/requirements.md)

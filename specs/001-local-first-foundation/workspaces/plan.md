@@ -1,15 +1,14 @@
 # Workspace lifecycle: selection, then private creation
 
-Status: selection and Finance handoff are implemented. Cold-start qualification passes. The
-transfer-recovery blocker is corrected locally by the user-approved acyclic Finance insertion policy:
-new manual endpoints derive authority from existing account facts, and transfer insertion still
-validates both endpoint facts and both account grants. Authorized manual orphan markers are explicitly
-an application integrity boundary. The held-write recovery regression now passes with its records
-retained. All 102 full-policy cases and 21 focused browser scenarios pass, including
-creation/linking/deletion checks; source/service-worker and browser-test types pass. Refreshed green
-CI remains a merge gate. Private creation, schema/catalog changes, invitations and generic data operations remain
-outside this slice. Baselines: library main `9372e0a` (PR #4), Finance main `f83be67`
-(PR #39). Both feature branches: `plan/workspace-lifecycle`.
+Status: selection and Finance handoff merged through library PR #5 and Finance PR #40.
+Private creation continues on fresh `feat/private-workspace-creation` branches from library main
+`c0f9f63` and Finance main `48b0284`. The first local transaction-owner implementation is approved; 22 focused tests and built-package
+consumer checks pass. See [the creation plan](creation/plan.md). Finance adoption remains next.
+
+Merged Finance cold-start qualification was rerun before extraction: persisted reads, saves and
+reloads pass both offline and with an open unanswered remote. This is availability evidence, not
+an explanation or latency improvement for the reported startup slowdown. Finance retains conditional
+authoritative provenance/repair checks; ordinary local usability must remain independent of them.
 
 ## Scope and delivery order
 

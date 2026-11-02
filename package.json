@@ -114,6 +114,14 @@
 		"./workspace/workflow": {
 			"types": "./dist/machines/workspaces/selection.d.ts",
 			"default": "./dist/machines/workspaces/selection.js"
+		},
+		"./workspace/creation/contracts": {
+			"types": "./dist/contracts/workspace-creation.d.ts",
+			"default": "./dist/contracts/workspace-creation.js"
+		},
+		"./workspace/creation/workflow": {
+			"types": "./dist/machines/workspaces/creation-transaction.d.ts",
+			"default": "./dist/machines/workspaces/creation-transaction.js"
 		}
 	},
 	"svelte": "./dist/index.js",

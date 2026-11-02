@@ -23,22 +23,24 @@ without a full rewrite or schema migration.
 `package.json` is authoritative for exact exports and peer versions. These are available in built
 package archives; this is not a claim of a published, stable npm release.
 
-| Subpath                                                  | Responsibility                                                               |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `recovery`                                               | Pure recovery phrase view and actor-free contracts                           |
-| `recovery/workflow`                                      | Reveal/hide workflow and selected view                                       |
-| `recovery/messages`                                      | Owned message contract and English message factory                           |
-| `recovery/svelte`                                        | Optional recovery actor/view composition                                     |
-| `backend/jazz/recovery`                                  | Capability over the host account handle                                      |
-| `restoration/contracts`, `restoration/workflow`          | Explicit identity restoration lifetime and outcomes                          |
-| `backend/jazz/restoration`                               | Host-session restoration capability                                          |
-| `session/contracts`, `session/workflow`                  | Acquisition, attachment, observation and issued retry ownership              |
-| `backend/jazz/session`, `backend/jazz/session-readiness` | Jazz session acquisition and readiness adapters                              |
-| `workspace/contracts`, `workspace/workflow`              | Host-observed selection leases, invalidation and exact drain acknowledgement |
+| Subpath                                                       | Responsibility                                                                      |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `recovery`                                                    | Pure recovery phrase view and actor-free contracts                                  |
+| `recovery/workflow`                                           | Reveal/hide workflow and selected view                                              |
+| `recovery/messages`                                           | Owned message contract and English message factory                                  |
+| `recovery/svelte`                                             | Optional recovery actor/view composition                                            |
+| `backend/jazz/recovery`                                       | Capability over the host account handle                                             |
+| `restoration/contracts`, `restoration/workflow`               | Explicit identity restoration lifetime and outcomes                                 |
+| `backend/jazz/restoration`                                    | Host-session restoration capability                                                 |
+| `session/contracts`, `session/workflow`                       | Acquisition, attachment, observation and issued retry ownership                     |
+| `backend/jazz/session`, `backend/jazz/session-readiness`      | Jazz session acquisition and readiness adapters                                     |
+| `workspace/contracts`, `workspace/workflow`                   | Host-observed selection leases, invalidation and exact drain acknowledgement        |
+| `workspace/creation/contracts`, `workspace/creation/workflow` | Explicit-attempt transaction ownership, local persistence and interruption outcomes |
 
 Recovery presentation has a single Close action, with no saved-phrase acknowledgement checkbox.
 No subpath requires foundation-owned routes. Finance retains navigation, startup provenance,
-workspace creation, financial permissions, bank credentials, and domain write ownership.
+workspace creation forms/journals, financial permissions, bank credentials, and domain write ownership.
+Additional-workspace creation delegates its transaction lifetime to the shared creation workflow.
 
 ## Workspace Selection and Resource Ownership
 
@@ -56,10 +58,29 @@ Finance supplies the bank/integrity and transfer drain join. Those financial res
 are not library requirements. The library does not create workspaces, choose routes, or import
 Finance's models as part of the selection boundary.
 
+## Private Creation Transaction Ownership
+
+The host prepares and journals one explicit attempt with stable operation, workspace and membership
+IDs. Its named integration supplies mergeable transaction acquisition, local snapshot reads, pure
+eligibility, unconditional staging, commit, local persistence and rollback. The shared statechart
+owns their order and resource lifetime. No remote preflight, global wait, automatic selection,
+routing, or bootstrap-from-absence is part of this operation.
+
+Cancellation before commit rolls back after acquired operations settle. Once commit is issued,
+interruption retains its eventual local settlement. An uncertain outcome preserves attempt identity
+for host reconciliation before retry; successful rollback cannot certify that an uncertain commit
+never happened. Later authority rejection is distinct from local persistence.
+
+Finance supplies its organization, owner membership and starter-category bundle and retains its
+journal/reconciliation schema. Its explicit additional-workspace flow adopts this capability without
+changing automatic bootstrap or session startup. Focused full-policy and offline/cold browser tests
+qualify that integration; the generic capability alone is not a storage authorization guarantee.
+See [the creation plan and evidence](../workspaces/creation/plan.md).
+
 ## Remaining MVP Contracts
 
-Private workspace creation, naming, invitations and authorized membership changes require their own
-reviewed designs. Shared data access will be a modest typed boundary over concrete consumer
+Shared creation presentation, naming, automatic first-workspace provenance, invitations and
+authorized membership changes still require their own reviewed designs. Shared data access will be a modest typed boundary over concrete consumer
 operations, not a portable schema descriptor or general query language. Reactive observations must
 have explicit availability/error and disposal lifetimes. Operations must distinguish local
 persistence, later rejection and unknown settlement; uncertainty must not trigger blind replay.

@@ -12,3 +12,5 @@ import 'delightful-local-first/backend/jazz/restoration'
 import './session.js'
 
 import './workspace.js'
+
+import './creation.js'
