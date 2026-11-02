@@ -139,6 +139,14 @@
 		"./workspace/naming/workflow": {
 			"types": "./dist/machines/workspaces/naming.d.ts",
 			"default": "./dist/machines/workspaces/naming.js"
+		},
+		"./forms/contracts": {
+			"types": "./dist/contracts/scoped-form.d.ts",
+			"default": "./dist/contracts/scoped-form.js"
+		},
+		"./forms/readiness": {
+			"types": "./dist/machines/forms/readiness.d.ts",
+			"default": "./dist/machines/forms/readiness.js"
 		}
 	},
 	"svelte": "./dist/index.js",
