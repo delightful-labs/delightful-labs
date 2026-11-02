@@ -109,3 +109,8 @@ export type {
 } from 'delightful-local-first/workspace'
 export { createWorkspaceSelectorView } from 'delightful-local-first/workspace/presentation'
 export type { WorkspaceSelectorInput } from 'delightful-local-first/workspace/presentation'
+
+export type {
+	WorkspaceCreationDialogView,
+	WorkspaceCreationDialogMessages
+} from 'delightful-local-first/workspace'
