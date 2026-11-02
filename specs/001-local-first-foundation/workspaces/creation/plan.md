@@ -93,3 +93,29 @@ bootstrap stays native. The vendored snapshot replaces the selection-only archiv
 source checks and the app/service-worker build pass in an isolated checkout. Existing unit fixtures
 need factory import/mock migration after review; real-policy, offline, and recovery qualification
 remain pending. This is not a claim that the Finance adoption's full tests currently pass.
+
+## Approved Finance adoption coverage
+
+Library core committed as `00d558b`; Finance adoption implementation committed as `f57169d`.
+The user approved continuation with Finance tests. All 52 focused unit cases, three full-policy
+adapter cases, and 19 workspace browser scenarios pass. Both strengthened production cold-start
+cases pass: after a full browser/worker exit, explicit creation settles locally and survives reload
+fully offline and with an unanswered authority, while preserving the original selection. No global
+wait or permission-advice call was added to the application path. Full source/service-worker and
+browser-test types, formatting, and diff checks pass. The full-policy cases separately qualify
+server acceptance/privacy and atomic denial of forged ownership.
+
+Finance fixtures now use the database-bound factories; pending-fixture and unqualified-type-check
+notes above are historical. These focused results do not establish a startup latency improvement,
+full CI success, automatic-bootstrap extraction, shared UI composition, or general data operations.
+Finance's domain schema, starter records, journals, and reconciliation remain intentionally host-owned.
+
+## Full repository qualification
+
+Complete library pnpm verify passes: all 241 unit tests, static checks, packaging, public-consumer
+checks and Storybook build. All 16 Storybook browser cases pass. Finance's complete unit suite
+passes in one clean serial run: 1,732 tests across 123 files. An earlier overlapping run hit two
+existing provider-link permission deadlines; isolation and then the full uncontended run passed
+without changing code, deadlines or assertions. Finance e2e scope checks pass as well. These are
+local results; no new GitHub CI result, publication or deployment is claimed. Coverage and final
+contract/status documentation remain uncommitted for the next authorized commit/publication step.

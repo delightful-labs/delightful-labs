@@ -123,8 +123,9 @@ included. The scoped verification guide records acceptance and artifact handling
 The [current contract map](contracts/foundation.md) replaces the retired portable-schema/plugin
 proposal. Jazz alone is required for v1; no second-backend conformance gate applies. Implemented
 capability plans and package exports govern recovery, restoration, session ownership and selection.
-Private creation is next, followed by workspace compositions/access administration and concrete
-consumer data operations. An independent minimal consumer and broader MVP qualification remain.
+Explicit private-creation transaction ownership and its Finance adoption are implemented and
+qualified on feature branches. Shared workspace compositions, naming/access administration, and
+concrete consumer data operations remain. An independent minimal consumer and broader MVP qualification remain.
 Do not infer qualification of those unbuilt boundaries from Finance's focused adoption results.
 
 ## Progress and next review
@@ -164,5 +165,6 @@ invalidation; it passed three isolated cases with two workers. These are qualifi
 those tested paths, not proof of complete workspace extraction or universal offline query coverage.
 
 The [workspace lifecycle slice](workspaces/plan.md) now implements selection/switching and its
-Finance handoff. Private creation is the next implementation slice, then reusable compositions. Earlier first-slice proposals above are
+Finance handoff. The [private-creation transaction slice](workspaces/creation/plan.md) is implemented
+and adopted in Finance with focused local-first qualification; reusable compositions remain next. Earlier first-slice proposals above are
 historical; current slice artifacts and shipped contracts govern implemented behavior.
