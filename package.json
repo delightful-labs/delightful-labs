@@ -48,6 +48,10 @@
 	"version": "0.0.0",
 	"description": "Reusable local-first identity and workspace foundations for Delightful apps.",
 	"exports": {
+		"./backup/archive": {
+			"types": "./dist/backup/archive.d.ts",
+			"default": "./dist/backup/archive.js"
+		},
 		".": {
 			"types": "./dist/index.d.ts",
 			"svelte": "./dist/index.js",
@@ -310,5 +314,8 @@
 		"jazz-tools": {
 			"optional": true
 		}
+	},
+	"dependencies": {
+		"zod": "4.1.11"
 	}
 }

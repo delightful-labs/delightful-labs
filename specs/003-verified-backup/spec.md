@@ -129,3 +129,12 @@ As an application developer, I can use the same backup machinery with another ap
 ## Evidence and implementation investigation
 
 See [source findings and unresolved implementation work](research.md). Detailed contracts, archive encoding, cryptography parameters, consistency proof, and restore persistence must be resolved in planning before dependent implementation.
+
+## Zod follow-up TODOs
+
+The user selected Zod for internal archive schemas. Track the additional repository opportunities
+in [T011–T013](tasks.md#zod-follow-ups-from-repository-review): optional form-error adaptation,
+concrete persisted restore-journal schemas, and a bounded review of profile draft checks. Preserve
+library-neutral consumer contracts and simple workflow guards. Sign-in external-input/configuration
+validation is tracked in [its delivery TODOs](../002-shared-delightful-sign-in/delivery.md#zod-validation-todos).
+These follow-ups are not prerequisites for reviewing the current payload codec.

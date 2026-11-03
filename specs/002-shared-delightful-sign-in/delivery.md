@@ -133,3 +133,19 @@ schemas/private root app-owned. Public publishing follows separately.
 These are concrete implementation checks, not a publication requirement or claims already proven.
 Hosting/operator, ordinary logout scope and recovery for brand-new external users still need decisions;
 they do not prevent preparing the source build and existing-user preservation work.
+
+## Zod validation TODOs
+
+- [ ] ZOD-S01 — During sign-in backend implementation, use internal Zod schemas for application-owned
+      callback/route inputs and environment configuration. Validate explicit origins, callbacks and
+      environment-specific settings at their boundaries; keep secrets and raw input out of errors.
+      Schema validity does not establish trusted origin, issuer, DID control or callback intent.
+- [ ] ZOD-S02 — Define versioned schemas for app-owned persisted session/intent metadata and validate
+      it before reuse across requests or deployments. Continue using the official OAuth SDK’s
+      supported stores/serialization for SDK-owned state; do not duplicate its token verification,
+      PKCE/DPoP handling or credential formats. Preserve correlation, expiry, distributed locking
+      and unknown-outcome behavior in their existing owners; Zod checks do not replace those policies.
+
+These tasks apply when the corresponding backend slices are implemented. They do not expand the
+current archive implementation or require Zod-specific public consumer contracts. See the
+[related shared-library follow-ups](../003-verified-backup/tasks.md#zod-follow-ups-from-repository-review).
