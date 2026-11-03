@@ -9,6 +9,13 @@ The alpha.59 findings below are retained as the PR's prior pinned-package inspec
 reproduced in this continuation because no installed Jazz package was available in these worktrees.
 Current upstream APIs differ and do not silently replace this baseline.
 
+The subsequent [authentication feasibility investigation](auth-feasibility.md) **has** reproduced
+alpha.59 inspection using its integrity-verified registry tarball in temporary storage and inspected
+release-tagged Rust account/server source. It establishes concrete lookup, conflict and replay
+semantics at source level, identifies an external-selection/offline risk, and confirms newer backend
+authentication was not found in a published Jazz 2 release. Read that report before interpreting
+the historical “unverified” statements below. Deployed authority and end-to-end behavior remain unrun.
+
 ## Existing DLF contracts
 
 The baseline is [foundation spec](../001-local-first-foundation/spec.md), particularly FR-005–FR-011 and FR-021, plus the adopted [constitution](../../.specify/memory/constitution.md) and [workflow ownership rules](../../.specify/memory/xstate.md). Foundation FR-006 deferred automatic SSO. This new user request starts that work as a separate feature; the historical foundation scope is not rewritten.
