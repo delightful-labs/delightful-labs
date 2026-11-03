@@ -48,7 +48,13 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 	const resource = fromCallback<Command, IDBTransaction>(({ input: tx, receive, sendBack }) => {
 		tx.oncomplete = () => sendBack({ type: 'TX_COMPLETE' })
 		tx.onabort = () => sendBack({ type: 'TX_ABORTED' })
-		tx.onerror = () => sendBack({ type: 'TX_FAILED', error: tx.error })
+		tx.onerror = (event) => {
+			const requestError = event.target instanceof IDBRequest ? event.target.error : undefined
+			// Explicit abort rejects pending requests with AbortError but leaves tx.error null.
+			// Its native abort event supplies settlement; those request errors are not new failures.
+			if (requestError?.name === 'AbortError' && tx.error === null) return
+			sendBack({ type: 'TX_FAILED', error: tx.error ?? requestError })
+		}
 		receive((command) => {
 			try {
 				if (command.type === 'READ') {

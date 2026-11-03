@@ -57,3 +57,12 @@ const native = { id: 'note', title: 'before' }
 const snapshot = observeRow(native)
 native.title = 'after'
 if (snapshot?.title !== 'before') throw new Error('Packaged observation retained a mutable row')
+
+// The optional adapter is usable through the built public subpath.
+const { zodFormIssues } = await import('delightful-local-first/forms/zod')
+const { z } = await import('zod')
+const issues = zodFormIssues(
+	new z.ZodError([{ code: 'custom', path: ['name'], message: 'private-message' }])
+)
+if (JSON.stringify(issues) !== JSON.stringify([{ path: ['name'], code: 'custom' }]))
+	throw new Error('Packaged Zod adapter changed issue metadata')

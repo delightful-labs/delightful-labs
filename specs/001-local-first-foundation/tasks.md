@@ -21,41 +21,43 @@ below apply only to the stated boundary. The Jazz-only MVP is not complete.
 
 ## Architecture review follow-ups
 
-**Cleanup implementation status:** AR-01–AR-05 are implemented for review together on
-`fix/foundation-cleanup`; regression qualification follows implementation approval. See
-[review evidence, migration notes and remaining checks](cleanup-review.md). Checkboxes remain open
-until that qualification is complete.
+**Cleanup qualification status:** AR-01–AR-05 were implemented in merged PR #19. The user
+then authorized regression qualification on 2026-11-03. The follow-up adds 38 unit cases and five
+native Chromium IndexedDB cases, and fixes two reproduced retry/abort regressions in
+[PR #20](https://github.com/delightful-labs/delightful-local-first/pull/20). Implementation-head
+CI passed on `82cc5e4`; PR #20 is awaiting merge. No further scoped cleanup tasks remain before
+[backup T006](../003-verified-backup/tasks.md#current-handoff-2026-11-03). See
+[review evidence, migration notes and verification](cleanup-review.md#regression-qualification-completed).
+Checked items cover these shared contracts; deployed Finance adoption remains separate.
 
-These five open findings come from the repository architecture review of PR #12. They are static
-control-flow/contract findings, not newly reproduced failures. The duplicate supplemental journal was
-removed in that PR; evaluate Jazz and existing DLF capabilities before proposing any persistence
-replacement. Review implementations before adding their tests, following AGENTS.md.
+These findings came from the architecture review of PR #12. The duplicate supplemental journal
+was removed there; this follow-up retains the existing journal and SDK boundaries.
 
-- [ ] **AR-01 / P1 — Preserve unresolved creation outcomes during drain and binding replacement.**
+- [x] **AR-01 / P1 — Preserve unresolved creation outcomes during drain and binding replacement.**
       `src/lib/machines/workspaces/creation-owner.ts` discards child output/error in its closing and
       replacing branches before classifying settlement. Carry recovery facts and unresolved ownership
       to the supervisor; do not activate a replacement binding or imply clean shutdown on unknown
       settlement. Qualify both child completion and crash during replacement/shutdown, including
       pending commit and failed rollback, with no automatic replay or lost attempt identity.
-- [ ] **AR-02 / P1 — Keep incomplete absence distinct from mutation never started.**
+- [x] **AR-02 / P1 — Keep incomplete absence distinct from mutation never started.**
       `creation-operation.ts` classifies absent reconciliation as recovered/notStarted, and
       `creation-persistence.ts` transacts on absent. Define evidence needed to authorize a retry;
       retain unknown fate after an issued write when only local/incomplete absence is available.
       Qualify restart after issuance, incomplete/offline replicas, matching accepted records and
       deliberate retries with stable IDs. No absent row alone may prove non-commit or trigger replay.
-- [ ] **AR-03 / P1 — Report actual journal abort evidence.**
+- [x] **AR-03 / P1 — Report actual journal abort evidence.**
       `src/lib/machines/workspaces/journal.ts` sends TX_ABORTED when tx.abort() throws. Preserve
       cleanup failure/uncertainty instead; only a real abort event or separately proven transaction
       fate may establish release. Qualify throwing/refused abort, late completion, blocked open and
       shutdown, ensuring no fabricated cancellation acknowledgement or leaked acquisition.
-- [ ] **AR-04 / P2 — Remove Finance-specific structural requirements from shared creation.**
+- [x] **AR-04 / P2 — Remove Finance-specific structural requirements from shared creation.**
       `creation-owner.ts`, `creation-operation.ts`, `creation-persistence.ts`, `initialization.ts`
       and `journal.ts` require organizationId/profileId/workspace.ownerId or Finance-style profile
       provenance. Replace these with minimal opaque identity and host-supplied projections/policies;
       keep financial schemas and provenance rules consumer-owned. Demonstrate an independent app
       without Finance-shaped records while preserving existing consumer recovery, atomicity and
       locally usable offline behavior. Review compatibility and migration before changing exports.
-- [ ] **AR-05 / P2 — Make the single-write local-durability contract explicit.**
+- [x] **AR-05 / P2 — Make the single-write local-durability contract explicit.**
       `forms/policy.ts` labels successful generic write promises locallyPersisted; `identity/profile.ts`
       accepts saveName/saveAvatar returning Promise<unknown>. Require an explicit persistence guarantee
       or receipt/settlement boundary, and use Jazz's real local wait rather than mutation return.

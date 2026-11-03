@@ -18,7 +18,16 @@ their digests. No floating branch dependency, automatic SDK updates or second JW
 is required. Published packages can replace the build later after comparison; publication is not a
 prerequisite for implementation or adoption.
 
-## Current observations and missing inventory
+## Implementation handoff (2026-11-03)
+
+Backup work now has its own active [specification](../003-verified-backup/spec.md) and
+[task ledger](../003-verified-backup/tasks.md#current-handoff-2026-11-03). Archive codec, envelope
+and independent inspection are implemented; shared export/restore coordination is next (T006).
+The cleanup follow-up is PR #20, awaiting merge with implementation-head CI passing. Finance
+capture, isolated restore qualification and the authentication changes described here remain
+unimplemented. Resume from the backup task ledger rather than the historical research branch below.
+
+## Research-time observations and missing inventory
 
 - DLF's working branch is `research/atproto-jazz-auth`, based on merged spec PR #14 at `04e7659`.
   Research and this implementation direction are local changes, not deployed behavior.

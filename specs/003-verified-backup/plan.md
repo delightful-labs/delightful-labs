@@ -2,7 +2,13 @@
 
 **Branch**: `feat/verified-backup` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
 
-**Status**: Implementation started after merged PR #15. The first structural payload slice merged in PR #16. The envelope/integrity slice has implementation and functional verification; large-file browser memory/latency remains to be measured; no live export or verified restore exists yet. See [tasks](tasks.md) and [payload review notes](implementation-notes.md) and [envelope ownership/design](envelope-design.md).
+**Status**: Archive codec, envelope/integrity handling and independent inspector are implemented
+and functionally verified. Large-file browser memory/latency qualification remains. Shared-library
+cleanup implementation merged in PR #19; regression qualification and two reproduced fixes are in
+PR #20, awaiting merge with implementation-head CI passing. Resume shared export/restore lifecycle
+(T006) next; no live export or verified restore exists. See the [current handoff](tasks.md#current-handoff-2026-11-03),
+[payload review notes](implementation-notes.md), [envelope ownership/design](envelope-design.md)
+and [inspector design](inspector-design.md).
 
 ## Summary
 
