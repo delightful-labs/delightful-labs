@@ -367,6 +367,29 @@ Center a single translated startup message horizontally and vertically within a 
 
 Use `variant="error"` for a failed startup without a spinner. The message uses StatusMessage's status/alert semantics; the spinner is decorative. Native div attributes, class and style are forwarded. Set `--dui-loading-screen-min-height` for a contained area; content grows naturally for long text and small viewports. Width and internal padding have corresponding `--dui-loading-screen-*` tokens. It does not add a main landmark, focus trap, autofocus, overlay or state management.
 
+## LoadingContent
+
+```svelte
+<LoadingContent loading={pending} text={loadingMessage}>
+    <InputText label={draftLabel} bind:value={draft} />
+    <Button type="button" onclick={save}>{saveLabel}</Button>
+</LoadingContent>
+```
+
+Keeps child content mounted while `loading` is true (the default), preserving input state and
+content layout. Pending content is dimmed, inert, and hidden from the accessibility tree; the
+wrapper exposes `aria-busy`. A LoadingScreen shares a grid area with the retained content. When `loading` becomes false, the overlay is removed and the same controls become
+usable. Focus is not moved or restored automatically; the caller owns focus when starting work
+from inside the region. The region accommodates both retained content and feedback, so reserve sufficient space for
+longer loading messages when needed.
+
+Supply translated `text` and optionally `variant="error"`. The component does not fetch data,
+interpret query state, retry, or provide fallback strings. Avoid adding a live role to the wrapper:
+the overlay already supplies a status (or alert for errors). Without children, it renders a
+standalone LoadingScreen regardless of `loading`, preserving the startup/error composition.
+Native div attributes, callbacks, class, and style pass to the retained-content wrapper or the
+standalone screen. LoadingScreen CSS properties customize the standalone presentation.
+
 ## StatusMessage
 
 See the [Finance-driven component specification](docs/finance-component-spec.md) for requirements and proposed follow-up components.
@@ -529,7 +552,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, Table, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 
