@@ -26,6 +26,14 @@ function required<Value>(value: Value | undefined): Value {
 	return value
 }
 
+function matchesWorkspaceAccount(
+	record: { workspaceId: string; accountId: string },
+	workspaceId: string,
+	accountId: string
+): boolean {
+	return record.workspaceId === workspaceId && record.accountId === accountId
+}
+
 /** Server-only resource owner. The host receives and owns any unresolved transaction handoff. */
 export function createInvitationAuthorityMachine<Credentials, Transaction, Write, Role>(
 	capability: InvitationAuthorityCapability<Credentials, Transaction, Write, Role>
@@ -50,6 +58,9 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		write: Write | undefined
 		result: Result | undefined
 	}
+	const records = (context: Context) => required(context.records)
+	const invitation = (context: Context) => required(records(context).invitation ?? undefined)
+	const admitted = (context: Context) => required(context.admission)
 	const actors = {
 		admit: fromPromise(({ input }: { input: { credentials: Credentials } }) =>
 			effect(() => capability.admit(input.credentials))
@@ -134,15 +145,15 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 					settlement: {
 						kind: 'unknown',
 						retained: {
-							accountId: required(context.admission).accountId,
+							accountId: admitted(context).accountId,
 							transaction: required(context.transaction),
 							write: context.write,
 							access: {
-								confirm: required(context.admission).transactions.confirm.bind(
-									required(context.admission).transactions
+								confirm: admitted(context).transactions.confirm.bind(
+									admitted(context).transactions
 								),
-								rollback: required(context.admission).transactions.rollback.bind(
-									required(context.admission).transactions
+								rollback: admitted(context).transactions.rollback.bind(
+									admitted(context).transactions
 								)
 							}
 						}
@@ -177,7 +188,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		})
 	})
 	const transactionInput = ({ context }: { context: Context }) => ({
-		transactions: required(context.admission).transactions,
+		transactions: admitted(context).transactions,
 		transaction: required(context.transaction)
 	})
 	const interrupted = [
@@ -313,7 +324,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								invoke: {
 									src: 'open',
 									input: ({ context }) => ({
-										transactions: required(context.admission).transactions
+										transactions: admitted(context).transactions
 									}),
 									onDone: [
 										{
@@ -336,14 +347,14 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									input: ({ context }) => ({
 										transaction: required(context.transaction),
 										identity: context.identity,
-										accountId: required(context.admission).accountId
+										accountId: admitted(context).accountId
 									}),
 									onDone: [
 										{
 											guard: ({ event }) =>
 												event.output.outcome === 'succeeded' &&
 												event.output.value.outcome === 'observed',
-											target: 'checkingRead',
+											target: 'correlating',
 											actions: assign({
 												records: ({ event }) =>
 													event.output.outcome === 'succeeded' &&
@@ -357,24 +368,25 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									onError: { target: 'rollingBack', actions: failure }
 								}
 							},
-							checkingRead: { always: [...interrupted, { target: 'correlating' }] },
 							correlating: {
 								always: [
+									...interrupted,
 									{
 										guard: ({ context }) =>
-											required(context.records).invitation?.id !== context.identity.invitationId,
+											records(context).invitation?.id !== context.identity.invitationId,
 										target: 'rollingBack',
 										actions: decide({ outcome: 'invalid' })
 									},
 									{
 										guard: ({ context }) => {
-											const records = required(context.records),
-												invitation = required(records.invitation ?? undefined),
-												accountId = required(context.admission).accountId
-											return Boolean(
-												records.membership &&
-												(records.membership.workspaceId !== invitation.workspaceId ||
-													records.membership.accountId !== accountId)
+											const member = records(context).membership
+											return (
+												member !== null &&
+												!matchesWorkspaceAccount(
+													member,
+													invitation(context).workspaceId,
+													admitted(context).accountId
+												)
 											)
 										},
 										target: 'rollingBack',
@@ -382,15 +394,16 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									},
 									{
 										guard: ({ context }) => {
-											const records = required(context.records),
-												invitation = required(records.invitation ?? undefined),
-												evidence = records.evidence
-											return Boolean(
-												evidence &&
+											const evidence = records(context).evidence
+											return (
+												evidence !== null &&
 												(evidence.operationId !== context.identity.operationId ||
 													evidence.invitationId !== context.identity.invitationId ||
-													evidence.workspaceId !== invitation.workspaceId ||
-													evidence.accountId !== required(context.admission).accountId)
+													!matchesWorkspaceAccount(
+														evidence,
+														invitation(context).workspaceId,
+														admitted(context).accountId
+													))
 											)
 										},
 										target: 'rollingBack',
@@ -404,13 +417,13 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									src: 'verify',
 									input: ({ context }) => ({
 										code: required(context.request).code,
-										digest: required(required(context.records).invitation ?? undefined).codeDigest
+										digest: invitation(context).codeDigest
 									}),
 									onDone: [
 										{
 											guard: ({ event }) =>
 												event.output.outcome === 'succeeded' && event.output.value === true,
-											target: 'checkingVerification',
+											target: 'checkingEvidence',
 											actions: assign({ request: undefined })
 										},
 										{
@@ -426,22 +439,21 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									}
 								}
 							},
-							checkingVerification: { always: [...interrupted, { target: 'checkingEvidence' }] },
 							checkingEvidence: {
 								always: [
+									...interrupted,
 									{
 										guard: ({ context }) => {
-											const records = required(context.records)
+											const snapshot = records(context)
 											return (
-												records.evidence !== null &&
-												records.membership?.id === records.evidence.membershipId
+												snapshot.evidence !== null &&
+												snapshot.membership?.id === snapshot.evidence.membershipId
 											)
 										},
 										target: 'rollingBack',
 										actions: decide((context) => ({
 											outcome: 'joined',
-											membershipId: required(required(context.records).evidence ?? undefined)
-												.membershipId
+											membershipId: required(records(context).evidence ?? undefined).membershipId
 										}))
 									},
 									{
@@ -459,7 +471,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 										target: 'rollingBack',
 										actions: decide((context) => ({
 											outcome: 'alreadyMember',
-											membershipId: required(required(context.records).membership ?? undefined).id
+											membershipId: required(records(context).membership ?? undefined).id
 										}))
 									},
 									{ target: 'checkingRevocation' }
@@ -468,8 +480,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 							checkingRevocation: {
 								always: [
 									{
-										guard: ({ context }) =>
-											required(required(context.records).invitation ?? undefined).revoked,
+										guard: ({ context }) => invitation(context).revoked,
 										target: 'rollingBack',
 										actions: decide({ outcome: 'revoked' })
 									},
@@ -483,7 +494,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 										{
 											guard: ({ event }) =>
 												event.output.outcome === 'succeeded' && Number.isFinite(event.output.value),
-											target: 'checkingClock',
+											target: 'checkingExpiry',
 											actions: assign({
 												now: ({ event }) =>
 													event.output.outcome === 'succeeded' ? event.output.value : undefined
@@ -494,14 +505,12 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									onError: { target: 'rollingBack', actions: failure }
 								}
 							},
-							checkingClock: { always: [...interrupted, { target: 'checkingExpiry' }] },
 							checkingExpiry: {
 								always: [
+									...interrupted,
 									{
 										guard: ({ context }) => {
-											const expiresAt = required(
-												required(context.records).invitation ?? undefined
-											).expiresAt
+											const expiresAt = invitation(context).expiresAt
 											return expiresAt !== null && !Number.isFinite(expiresAt)
 										},
 										target: 'rollingBack',
@@ -509,9 +518,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									},
 									{
 										guard: ({ context }) => {
-											const expiresAt = required(
-												required(context.records).invitation ?? undefined
-											).expiresAt
+											const expiresAt = invitation(context).expiresAt
 											return expiresAt !== null && required(context.now) >= expiresAt
 										},
 										target: 'rollingBack',
@@ -523,8 +530,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 							checkingConsumption: {
 								always: [
 									{
-										guard: ({ context }) =>
-											required(required(context.records).invitation ?? undefined).consumed !== null,
+										guard: ({ context }) => invitation(context).consumed !== null,
 										target: 'rollingBack',
 										actions: decide({ outcome: 'used' })
 									},
@@ -535,23 +541,22 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								invoke: {
 									src: 'prepare',
 									onDone: [
+										...interrupted,
 										{
 											guard: ({ event }) =>
 												event.output.outcome === 'succeeded' && Boolean(event.output.value.trim()),
-											target: 'checkingPreparation',
+											target: 'staging',
 											actions: assign({
 												plan: ({ context, event }) => {
 													if (event.output.outcome !== 'succeeded')
 														throw new Error('Expected prepared membership identity')
-													const invitation = required(
-														required(context.records).invitation ?? undefined
-													)
+													const preparedInvitation = invitation(context)
 													return {
 														...context.identity,
-														accountId: required(context.admission).accountId,
-														workspaceId: invitation.workspaceId,
+														accountId: admitted(context).accountId,
+														workspaceId: preparedInvitation.workspaceId,
 														membershipId: event.output.value,
-														role: invitation.role,
+														role: preparedInvitation.role,
 														acceptedAt: required(context.now)
 													}
 												}
@@ -562,7 +567,6 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									onError: { target: 'rollingBack', actions: failure }
 								}
 							},
-							checkingPreparation: { always: [...interrupted, { target: 'staging' }] },
 							staging: {
 								invoke: {
 									src: 'stage',
@@ -571,9 +575,10 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 										plan: required(context.plan)
 									}),
 									onDone: [
+										...interrupted,
 										{
 											guard: ({ event }) => event.output.outcome === 'succeeded',
-											target: 'checkingStage',
+											target: 'committing',
 											actions: assign({
 												decision: ({ context }): InvitationDecision => ({
 													outcome: 'joined',
@@ -586,7 +591,6 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									onError: { target: 'rollingBack', actions: failure }
 								}
 							},
-							checkingStage: { always: [...interrupted, { target: 'committing' }] },
 							committing: {
 								invoke: {
 									src: 'commit',
@@ -611,7 +615,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								invoke: {
 									src: 'confirm',
 									input: ({ context }) => ({
-										transactions: required(context.admission).transactions,
+										transactions: admitted(context).transactions,
 										write: required(context.write)
 									}),
 									onDone: [

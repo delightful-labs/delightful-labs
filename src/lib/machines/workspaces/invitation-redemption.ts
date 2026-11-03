@@ -92,7 +92,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 				invitationId: input.request.invitationId,
 				scope: input.request.scope
 			},
-			request: input.request,
+			request: { ...input.request },
 			capability: input.capability,
 			settlement: { kind: 'notStarted' },
 			result: undefined
