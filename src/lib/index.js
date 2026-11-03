@@ -13,6 +13,7 @@ import Popover from './Components/Popover.svelte'
 import LoadingSpinner from './Components/LoadingSpinner.svelte'
 import StatusMessage from './Components/StatusMessage.svelte'
 import LoadingScreen from './Components/LoadingScreen.svelte'
+import LoadingContent from './Components/LoadingContent.svelte'
 import Table from './Components/Table.svelte'
 import Navigation from './Components/Navigation.svelte'
 import Stepper from './Components/Stepper.svelte'
@@ -66,6 +67,7 @@ export {
 	LoadingSpinner,
 	StatusMessage,
 	LoadingScreen,
+	LoadingContent,
 	Table,
 	Navigation,
 	Stepper,
