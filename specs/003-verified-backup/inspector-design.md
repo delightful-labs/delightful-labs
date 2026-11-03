@@ -18,7 +18,9 @@ cleanup -> transfer report -> complete
 ```
 
 File and password sources are bounded leaf capabilities observing AbortSignal, not hidden workflows.
-The machine owns stage transitions; the existing envelope machine remains a real invoked child.
+The machine owns I/O and resource stage transitions; the existing envelope machine remains a real
+invoked child. Exact profile lookup, synchronous validation and metadata report construction are one
+pure inspection leaf, without separate promise actors or stored intermediate validation state.
 CANCEL/SHUTDOWN abort pending reads, forward interruption to an active envelope child, wait for its
 native work to settle, and release all owned handles. Request.release() is abrupt-stop cleanup:
 abort reads, release any envelope request and checked/report resources, and discard/clear late bytes.
@@ -82,6 +84,16 @@ promises now produce the appropriate safe read-failure code. Regression tests co
 shared the caller’s storage, so cleanup could erase the envelope input. Opening now copies into
 an ordinary `Uint8Array`; regressions verify transferred inspector buffers and retained caller
 buffers have the intended ownership.
+
+Simplification review requested on 2026-11-03 removed two artificial asynchronous boundaries,
+the cached profile match and validation context, duplicate retention of the same child result,
+and envelope-request memoization for a single-use stage. Profile registration now reuses the
+payload's Zod profile schema, including UTF-8 byte bounds and reduced limits. The Node adapter
+uses one abort handler rather than both native and manual destruction, and trusts byte chunks
+from its own unencoded streams. No generic actor framework or additional fallback was introduced.
+Cancellation/drain, source byte bounds and the pre-handoff ownership hook remain because their
+existing tests reproduce those cases. A released envelope cannot call the synchronous checked
+output hook, so that hook no longer tests the parent release flag a second time.
 
 Local verification:
 

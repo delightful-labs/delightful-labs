@@ -5,8 +5,7 @@ import {
 	inspectionFailure,
 	inspectionOperation,
 	type ArchiveInspectionRequest,
-	type ArchiveInspectionResult,
-	type InspectionValidation
+	type ArchiveInspectionResult
 } from '../../backup/inspection.js'
 
 export type ArchiveInspectionInput = { request: ArchiveInspectionRequest }
@@ -15,7 +14,6 @@ type Context = ArchiveInspectionInput & {
 	envelope: ArchiveEnvelopeRequest | undefined
 	acquired: boolean
 	interruption: 'cancelled' | 'closed' | undefined
-	validation: InspectionValidation | undefined
 	result: ArchiveInspectionResult | undefined
 }
 function leaf<T>(run: (operation: ReturnType<typeof inspectionOperation>) => T | PromiseLike<T>) {
@@ -28,11 +26,9 @@ export function createArchiveInspectionMachine() {
 		claim: leaf((operation) => operation.claim()),
 		read: leaf((operation) => operation.readSource()),
 		password: leaf((operation) => operation.readPassword()),
-		prepare: leaf((operation) => operation.envelopeRequest()),
+		prepare: leaf((operation) => operation.prepareEnvelope()),
 		open: createArchiveEnvelopeMachine(),
-		match: leaf((operation) => operation.matchProfile()),
-		validate: leaf((operation) => operation.validateProfile()),
-		report: leaf((operation) => operation.makeReport()),
+		inspectProfile: leaf((operation) => operation.inspectProfile()),
 		cleanup: fromPromise<void, ArchiveInspectionInput & { keepReport: boolean }>(({ input }) => {
 			inspectionOperation(input.request).cleanup(input.keepReport)
 			return Promise.resolve()
@@ -74,7 +70,6 @@ export function createArchiveInspectionMachine() {
 			envelope: undefined,
 			acquired: false,
 			interruption: undefined,
-			validation: undefined,
 			result: undefined
 		}),
 		output: ({ context }) =>
@@ -155,15 +150,11 @@ export function createArchiveInspectionMachine() {
 					onDone: [
 						{
 							guard: 'interrupted',
-							target: 'cleaning',
-							actions: ({ context, event }) =>
-								inspectionOperation(context.request).acceptOpened(event.output)
+							target: 'cleaning'
 						},
 						{
 							guard: ({ event }) => event.output.outcome === 'integrityChecked',
-							target: 'matching',
-							actions: ({ context, event }) =>
-								inspectionOperation(context.request).acceptOpened(event.output)
+							target: 'inspectingProfile'
 						},
 						{
 							target: 'cleaning',
@@ -180,47 +171,13 @@ export function createArchiveInspectionMachine() {
 					onError: fail
 				}
 			},
-			matching: {
+			inspectingProfile: {
 				invoke: {
-					src: 'match',
+					src: 'inspectProfile',
 					input,
 					onDone: [
 						{ guard: 'interrupted', target: 'cleaning' },
-						{ guard: ({ event }) => event.output, target: 'validating' },
-						{
-							target: 'reporting',
-							actions: assign({ validation: 'integrityValidProfileUnsupported' })
-						}
-					],
-					onError: fail
-				}
-			},
-			validating: {
-				invoke: {
-					src: 'validate',
-					input,
-					onDone: [
-						{ guard: 'interrupted', target: 'cleaning' },
-						{ target: 'reporting', actions: assign({ validation: ({ event }) => event.output }) }
-					],
-					onError: fail
-				}
-			},
-			reporting: {
-				invoke: {
-					src: 'report',
-					input,
-					onDone: [
-						{ guard: 'interrupted', target: 'cleaning' },
-						{
-							target: 'cleaning',
-							actions: assign({
-								result: ({ context, event }): ArchiveInspectionResult =>
-									context.validation
-										? { outcome: context.validation, report: event.output }
-										: { outcome: 'failed', code: 'inspectionFailed' }
-							})
-						}
+						{ target: 'cleaning', actions: assign({ result: ({ event }) => event.output }) }
 					],
 					onError: fail
 				}

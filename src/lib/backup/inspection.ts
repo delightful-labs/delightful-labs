@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { createPayloadSchemas } from './schemas.js'
 import {
 	ArchiveEnvelopeError,
 	parseEnvelope,
@@ -9,7 +9,6 @@ import {
 	envelopeOperation,
 	prepareArchiveOpen,
 	type ArchiveEnvelopeRequest,
-	type ArchiveEnvelopeResult,
 	type IntegrityCheckedArchive
 } from './envelope-operation.js'
 import {
@@ -17,7 +16,8 @@ import {
 	resolvePayloadLimits,
 	type ArchivePayload,
 	type ArchivePayloadErrorCode,
-	type PayloadLimitOverrides
+	type PayloadLimitOverrides,
+	type PayloadLimits
 } from './types.js'
 
 export interface ArchiveInspectionSource {
@@ -103,7 +103,6 @@ class Inspection {
 	#checked: IntegrityCheckedArchive | undefined
 	#report: ArchiveInspectionReport | undefined
 	#profiles: readonly ArchiveProfileValidator[]
-	#matched: ArchiveProfileValidator | undefined
 	#abort = new AbortController()
 	#claimed = false
 	#released = false
@@ -113,12 +112,12 @@ class Inspection {
 		source: ArchiveInspectionSource,
 		password: ArchivePasswordSource | undefined,
 		profiles: readonly ArchiveProfileValidator[],
-		limits: PayloadLimitOverrides
+		limits: PayloadLimits
 	) {
 		this.#source = source
 		this.#passwordSource = password
 		this.#profiles = profiles
-		this.limits = resolvePayloadLimits(limits)
+		this.limits = limits
 	}
 	#open() {
 		if (this.#released) throw new ArchiveInspectionError('inspectionFailed')
@@ -177,47 +176,39 @@ class Inspection {
 				throw new ArchiveInspectionError('passwordReadFailed')
 			})
 	}
-	envelopeRequest(): ArchiveEnvelopeRequest {
+	prepareEnvelope(): ArchiveEnvelopeRequest {
 		this.#open()
-		if (!this.#envelope) {
-			this.#envelope = prepareArchiveOpen(required(this.#bytes), this.#password, this.limits)
-			envelopeOperation(this.#envelope).retainCheckedOutput((archive) => {
-				if (this.#released) archive.release()
-				else this.#checked = archive
-			})
-			this.#bytes?.fill(0)
-			this.#bytes = undefined
-			this.#password = undefined
-		}
-		return this.#envelope
+		const request = prepareArchiveOpen(required(this.#bytes), this.#password, this.limits)
+		this.#envelope = request
+		// buildChecked is synchronous and rejects released envelope requests before calling this hook.
+		envelopeOperation(request).retainCheckedOutput((archive) => {
+			this.#checked = archive
+		})
+		this.#bytes?.fill(0)
+		this.#bytes = undefined
+		this.#password = undefined
+		return request
 	}
-	acceptOpened(result: ArchiveEnvelopeResult) {
-		if (result.outcome === 'integrityChecked') {
-			if (this.#released) result.archive.release()
-			else this.#checked = result.archive
-		}
-	}
-	matchProfile(): boolean {
+	inspectProfile(): ArchiveInspectionResult {
 		this.#open()
-		const profile = required(this.#checked).readPayload().profile
-		this.#matched = this.#profiles.find(
-			(candidate) => candidate.id === profile.id && candidate.version === profile.version
+		const payload = required(this.#checked).readPayload()
+		const matched = this.#profiles.find(
+			(candidate) =>
+				candidate.id === payload.profile.id && candidate.version === payload.profile.version
 		)
-		return this.#matched !== undefined
-	}
-	validateProfile(): InspectionValidation {
-		this.#open()
-		try {
-			const result: unknown = required(this.#matched).validate(
-				required(this.#checked).readPayload()
-			)
-			if (typeof result !== 'boolean') throw new ArchiveInspectionError('profileValidationFailed')
-			return result ? 'profileValid' : 'profileInvalid'
-		} catch {
-			throw new ArchiveInspectionError('profileValidationFailed')
+		let outcome: InspectionValidation = 'integrityValidProfileUnsupported'
+		if (matched) {
+			try {
+				const valid: unknown = matched.validate(payload)
+				if (typeof valid !== 'boolean') throw new ArchiveInspectionError('profileValidationFailed')
+				outcome = valid ? 'profileValid' : 'profileInvalid'
+			} catch {
+				throw new ArchiveInspectionError('profileValidationFailed')
+			}
 		}
+		return { outcome, report: this.#makeReport() }
 	}
-	makeReport(): ArchiveInspectionReport {
+	#makeReport(): ArchiveInspectionReport {
 		this.#open()
 		const checked = required(this.#checked),
 			payload = checked.readPayload()
@@ -258,7 +249,6 @@ class Inspection {
 		this.#passwordSource = undefined
 		this.#source = undefined
 		this.#profiles = []
-		this.#matched = undefined
 	}
 }
 const inspections = new WeakMap<ArchiveInspectionRequest, Inspection>()
@@ -272,7 +262,8 @@ export function prepareArchiveInspection(options: {
 	limits?: PayloadLimitOverrides
 }): ArchiveInspectionRequest {
 	const profiles = options.profiles ?? []
-	const schema = z.strictObject({ id: z.string().min(1).max(256), version: z.int().positive() })
+	const limits = resolvePayloadLimits(options.limits)
+	const schema = createPayloadSchemas(limits).payload.unwrap().shape.profile
 	const known = new Map<string, Set<number>>()
 	for (const profile of profiles) {
 		if (
@@ -290,7 +281,7 @@ export function prepareArchiveInspection(options: {
 		options.source,
 		options.password,
 		profiles.map((profile) => Object.freeze({ ...profile })),
-		options.limits ?? {}
+		limits
 	)
 	const request: ArchiveInspectionRequest = Object.freeze({
 		release: () => operation.release(),

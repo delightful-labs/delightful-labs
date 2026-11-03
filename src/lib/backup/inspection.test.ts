@@ -156,6 +156,14 @@ describe('inspection scope and profile validation', () => {
 		expect(result.outcome).toBe('profileValid')
 		if ('report' in result) result.report.release()
 	})
+	it.each([
+		{ id: 'é'.repeat(129), limits: {} },
+		{ id: 'vector.notes', limits: { idBytes: 4 } }
+	])('uses archive profile byte limits for registration: %j', ({ id, limits }) => {
+		expect(() =>
+			prepareArchiveInspection({ source: source(), profiles: [{ ...profile(), id }], limits })
+		).toThrow('invalidInspectorConfiguration')
+	})
 	it('sanitizes validator exceptions and does not run validators on invalid integrity', async () => {
 		const result = await run(
 			prepareArchiveInspection({
@@ -264,34 +272,28 @@ describe('password and input boundaries', () => {
 })
 
 describe('inspection lifecycle', () => {
-	it.each([
-		'claiming',
-		'reading',
-		'preparingEnvelope',
-		'opening',
-		'matching',
-		'validating',
-		'reporting',
-		'cleaning'
-	])('cancels at %s with owned report cleanup', async (stage) => {
-		const request = prepareArchiveInspection({ source: source(), profiles: [profile()] })
-		const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
-		let reached = false
-		let report: ArchiveInspectionReport | undefined
-		actor.subscribe((snapshot) => {
-			if (snapshot.value === stage && !reached) {
-				reached = true
-				if (snapshot.context.result && 'report' in snapshot.context.result)
-					report = snapshot.context.result.report
-				actor.send({ type: 'CANCEL' })
-			}
-		})
-		actor.start()
-		expect(await toPromise(actor)).toEqual({ outcome: 'cancelled' })
-		expect(reached).toBe(true)
-		const acquired = report
-		if (acquired) expect(() => acquired.readSummary()).toThrow()
-	})
+	it.each(['claiming', 'reading', 'preparingEnvelope', 'opening', 'inspectingProfile', 'cleaning'])(
+		'cancels at %s with owned report cleanup',
+		async (stage) => {
+			const request = prepareArchiveInspection({ source: source(), profiles: [profile()] })
+			const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
+			let reached = false
+			let report: ArchiveInspectionReport | undefined
+			actor.subscribe((snapshot) => {
+				if (snapshot.value === stage && !reached) {
+					reached = true
+					if (snapshot.context.result && 'report' in snapshot.context.result)
+						report = snapshot.context.result.report
+					actor.send({ type: 'CANCEL' })
+				}
+			})
+			actor.start()
+			expect(await toPromise(actor)).toEqual({ outcome: 'cancelled' })
+			expect(reached).toBe(true)
+			const acquired = report
+			if (acquired) expect(() => acquired.readSummary()).toThrow()
+		}
+	)
 	it('aborts a pending file read and drains/clears bytes from a late provider', async () => {
 		const gate = deferred<Uint8Array>(),
 			owned = plain()

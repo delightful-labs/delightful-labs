@@ -51,13 +51,8 @@ function boundedRead(stream, maximum, signal, waitForClose) {
 			failure = new ArchiveInspectionError('fileReadFailed')
 			stream.destroy(failure)
 		}
-		/** @param {unknown} chunk */
+		/** @param {Uint8Array} chunk */
 		function data(chunk) {
-			if (!(chunk instanceof Uint8Array)) {
-				failure = new ArchiveInspectionError('fileReadFailed')
-				stream.destroy(failure)
-				return
-			}
 			if (failure) {
 				chunk.fill(0)
 				return
@@ -75,8 +70,7 @@ function boundedRead(stream, maximum, signal, waitForClose) {
 			ended = true
 			if (!waitForClose) finish()
 		}
-		/** @param {unknown} _error */
-		function error(_error) {
+		function error() {
 			failure ??= new ArchiveInspectionError('fileReadFailed')
 			if (!waitForClose) finish()
 		}
@@ -98,12 +92,7 @@ export function fileSource(path) {
 		read: (signal, maximum) => {
 			if (signal.aborted) return Promise.reject(new ArchiveInspectionError('fileReadFailed'))
 			// Inclusive end permits exactly one oversize detection byte; no unbounded readFile/stat race.
-			return boundedRead(
-				createReadStream(path, { start: 0, end: maximum, signal }),
-				maximum,
-				signal,
-				true
-			)
+			return boundedRead(createReadStream(path, { start: 0, end: maximum }), maximum, signal, true)
 		}
 	}
 }
