@@ -19,6 +19,44 @@ below apply only to the stated boundary. The Jazz-only MVP is not complete.
 - [x] Review and simplify shared workflow/types/data option handling; preserve avatar drafts on
       persisted updates and generate unique profile form control IDs (commit 83cb658).
 
+## Architecture review follow-ups
+
+These five open findings come from the repository architecture review of PR #12. They are static
+control-flow/contract findings, not newly reproduced failures. The duplicate supplemental journal was
+removed in that PR; evaluate Jazz and existing DLF capabilities before proposing any persistence
+replacement. Review implementations before adding their tests, following AGENTS.md.
+
+- [ ] **AR-01 / P1 — Preserve unresolved creation outcomes during drain and binding replacement.**
+      `src/lib/machines/workspaces/creation-owner.ts` discards child output/error in its closing and
+      replacing branches before classifying settlement. Carry recovery facts and unresolved ownership
+      to the supervisor; do not activate a replacement binding or imply clean shutdown on unknown
+      settlement. Qualify both child completion and crash during replacement/shutdown, including
+      pending commit and failed rollback, with no automatic replay or lost attempt identity.
+- [ ] **AR-02 / P1 — Keep incomplete absence distinct from mutation never started.**
+      `creation-operation.ts` classifies absent reconciliation as recovered/notStarted, and
+      `creation-persistence.ts` transacts on absent. Define evidence needed to authorize a retry;
+      retain unknown fate after an issued write when only local/incomplete absence is available.
+      Qualify restart after issuance, incomplete/offline replicas, matching accepted records and
+      deliberate retries with stable IDs. No absent row alone may prove non-commit or trigger replay.
+- [ ] **AR-03 / P1 — Report actual journal abort evidence.**
+      `src/lib/machines/workspaces/journal.ts` sends TX_ABORTED when tx.abort() throws. Preserve
+      cleanup failure/uncertainty instead; only a real abort event or separately proven transaction
+      fate may establish release. Qualify throwing/refused abort, late completion, blocked open and
+      shutdown, ensuring no fabricated cancellation acknowledgement or leaked acquisition.
+- [ ] **AR-04 / P2 — Remove Finance-specific structural requirements from shared creation.**
+      `creation-owner.ts`, `creation-operation.ts`, `creation-persistence.ts`, `initialization.ts`
+      and `journal.ts` require organizationId/profileId/workspace.ownerId or Finance-style profile
+      provenance. Replace these with minimal opaque identity and host-supplied projections/policies;
+      keep financial schemas and provenance rules consumer-owned. Demonstrate an independent app
+      without Finance-shaped records while preserving existing consumer recovery, atomicity and
+      locally usable offline behavior. Review compatibility and migration before changing exports.
+- [ ] **AR-05 / P2 — Make the single-write local-durability contract explicit.**
+      `forms/policy.ts` labels successful generic write promises locallyPersisted; `identity/profile.ts`
+      accepts saveName/saveAvatar returning Promise<unknown>. Require an explicit persistence guarantee
+      or receipt/settlement boundary, and use Jazz's real local wait rather than mutation return.
+      Qualify a returned SDK receipt before local settlement, delayed/failed local persistence and
+      interruption, so no Saved/local-durable result can appear early. Preserve distinct remote fate.
+
 ## Invitation redemption: next, in dependency order
 
 - [ ] Implement the exact native read/stage mapping against the disposable host schema; present

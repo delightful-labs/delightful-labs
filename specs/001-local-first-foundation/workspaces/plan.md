@@ -149,9 +149,8 @@ selection machine. A small synthetic consumer plus focused Finance adoption is t
 
 ## Subsequent private creation boundary
 
-Supplemental [private creation qualification](creation-qualification.md) exercises an isolated
-policy fixture and an internal browser journal. It does not replace the merged local-first creation
-contract, its existing journal or their consumer integrations.
+Supplemental [SDK qualification](creation-qualification.md) exercises an isolated Jazz policy fixture
+and process restart. It adds no persistence adapter or replacement for the existing creation stack.
 
 Private creation is explicit user intent and can be valid even for a recovered identity; automatic
 first-workspace creation additionally requires trustworthy new-identity provenance. Current startup
