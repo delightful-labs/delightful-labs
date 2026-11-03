@@ -15,10 +15,10 @@ database and synchronization authority; AT Protocol supplies a candidate externa
 an optional public publication destination. A PDS does not replace Jazz storage or its account
 registry. This is not a selection of a qualified authentication bridge, SDK upgrade or operator.
 
-| Consumer context | Identity use | Application storage | Publication boundary |
-| --- | --- | --- | --- |
-| Finance | May use verified AT Protocol identity for shared sign-in | Existing Jazz financial records and policies | No social publication requirement or repository-write grant; identity use must stand alone |
-| Clipper | May use the same verified AT Protocol DID through its own app mapping | Jazz-native notes, highlights and other app-owned records | User explicitly publishes selected notes/highlights as public records; app owns schemas and content rules |
+| Consumer context | Identity use                                                          | Application storage                                       | Publication boundary                                                                                      |
+| ---------------- | --------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Finance          | May use verified AT Protocol identity for shared sign-in              | Existing Jazz financial records and policies              | No social publication requirement or repository-write grant; identity use must stand alone                |
+| Clipper          | May use the same verified AT Protocol DID through its own app mapping | Jazz-native notes, highlights and other app-owned records | User explicitly publishes selected notes/highlights as public records; app owns schemas and content rules |
 
 Unpublished Clipper work stays in its existing app storage/access scope. “Keep in app” and
 “Publish publicly” are the MVP choices; unpublished does not mean encrypted from infrastructure
@@ -28,7 +28,7 @@ are deferred. This deferral does not remove existing Jazz private-workspace requ
 Public publication is independently adoptable and does not gate shared sign-in delivery. These
 consumer cases constrain the shared boundary; they do not authorize either app's implementation.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Preserve an existing local-first account (Priority: P1)
 
@@ -151,7 +151,7 @@ source and interrupt a later public write. Verify exact disclosed content and di
 - PDS accepts a write but Jazz cannot record its receipt; restart and another device must reconcile the same publication identity rather than blindly create a second record.
 - A previously published source is deleted or unpublished locally; third-party public copies may persist and must not be described as private again.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -192,7 +192,7 @@ source and interrupt a later public write. Verify exact disclosed content and di
 - **AT Protocol identity binding**: Verified DID and supported authentication-boundary mapping; mutable handle/PDS discovery is separate metadata, never a replacement identity key.
 - **Publication intent and receipt (consumer-owned)**: Explicitly selected source revision, approved public payload/destination, retained operation/record identity and observed public-write outcome. Contains no authentication secrets and is not a shared DLF domain schema.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 
@@ -214,13 +214,13 @@ source and interrupt a later public write. Verify exact disclosed content and di
 
 ## Responsibilities and capability boundaries
 
-| Owner | Responsibility | Boundary |
-| --- | --- | --- |
-| DLF | Reusable identity intent, safe linking/recovery orchestration, session lifecycle and typed outcomes; optional publication-capability separation | Reuse existing session owner; no second registry, credential transport or Clipper publication engine |
-| Consuming app | App ID/environment, routes, domain data/policies, disclosure integration and domain write settlement; Clipper's public payloads, consent, journal and reconciliation | No shared identity implies domain authorization or public disclosure; Finance needs no publication integration |
-| Jazz SDK and registry | Account handles, app-scoped assignments, link protocol, credential admission, runtime persistence/synchronization | Client source observations do not prove deployed registry behavior |
-| Identity provider | Authentication, provider session, supported credentials and provider recovery | No ownership of app domain policies; hosting/configuration remains undecided |
-| DUI | Generic accessible presentation | No identity policy or credential ownership |
+| Owner                 | Responsibility                                                                                                                                                       | Boundary                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| DLF                   | Reusable identity intent, safe linking/recovery orchestration, session lifecycle and typed outcomes; optional publication-capability separation                      | Reuse existing session owner; no second registry, credential transport or Clipper publication engine           |
+| Consuming app         | App ID/environment, routes, domain data/policies, disclosure integration and domain write settlement; Clipper's public payloads, consent, journal and reconciliation | No shared identity implies domain authorization or public disclosure; Finance needs no publication integration |
+| Jazz SDK and registry | Account handles, app-scoped assignments, link protocol, credential admission, runtime persistence/synchronization                                                    | Client source observations do not prove deployed registry behavior                                             |
+| Identity provider     | Authentication, provider session, supported credentials and provider recovery                                                                                        | No ownership of app domain policies; hosting/configuration remains undecided                                   |
+| DUI                   | Generic accessible presentation                                                                                                                                      | No identity policy or credential ownership                                                                     |
 
 Public DLF capabilities must distinguish sign-in, link-current-account, recover, cancel/reconcile and logout, with read-only readiness/outcome observations. Provider credential acquisition stays behind an explicit adapter boundary; raw secrets are not UI or actor snapshot fields. Exact interfaces and statecharts belong to a later approved design, after provider and registry qualification.
 
