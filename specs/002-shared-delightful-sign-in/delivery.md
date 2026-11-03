@@ -30,13 +30,24 @@ prerequisite for implementation or adoption.
   provide the new backend automatically. Select a supported server host as part of implementation.
 - Clipper's documented implementation has account/recovery plus a private library root; that document
   says it has no captured notes. This does not establish the contents of the user's current instance.
-- Actual user data location is pending: local development Finance, deployed Finance, or both, possibly
-  with distinct identities/data. Do not select a backup source or infer that all browser writes have
-  reached a server from repository configuration. No environment secrets or records were inspected.
+- The user confirmed that the important data is in deployed Finance. The actual deployed revision,
+  complete data scope, and pending local writes still require read-only verification. Repository
+  configuration alone does not establish that every browser write reached the server. No private
+  records were inspected during this investigation.
 
 ## Work sequence
 
-### 1. Pin and prepare the Jazz build
+### 1. Implement verified backup on the existing deployed stack
+
+The immediate feature is [verified workspace backup and restore](../003-verified-backup/spec.md),
+with its [implementation plan](../003-verified-backup/plan.md). Build the reusable archive capability
+in DLF and the Finance-owned capture/restore profile against the existing alpha.59 setup. Retain
+the actual deployed workspace backup and demonstrate exact recovery into an isolated new destination
+before changing deployed identity or storage. Independent archive work does not require a Jazz upgrade.
+An application archive does not preserve the complete engine history or account registry; any server
+transition below still needs its own supported preservation procedure.
+
+### 2. Pin and prepare the Jazz build
 
 The inspected upstream base is `daa5d1ce70525f2c990c7feeb735dd70928b867a`.
 PR [#4644](https://github.com/garden-co/jazz/pull/4644), head
@@ -50,7 +61,7 @@ server directories untouched. Keep the current alpha.59 artifact available. Pres
 adapter changes for the repository's normal focused implementation review; implementation tests
 are added/run only after that review, as required by existing agreements.
 
-### 2. Preserve and rehearse the user's storage transition
+### 3. Preserve and rehearse the user's storage transition
 
 First identify each real app origin, app ID, account and server/storage owner. Then:
 
@@ -71,7 +82,7 @@ First identify each real app origin, app ID, account and server/storage owner. T
 Failure or ambiguity preserves the original working instance while we fix the migration. It does
 not turn into automatic deletion, reset, account recreation or an indefinite release wait.
 
-### 3. Implement backend sign-in and DLF integration
+### 4. Implement backend sign-in and DLF integration
 
 Use a maintained AT Protocol OAuth client, identity-only `atproto` scope, and server-owned session
 storage/refresh coordination. Return the verified DID through Jazz's supported `authenticate`
@@ -88,7 +99,7 @@ Present a small related implementation slice at each review. Test it after imple
 Use disposable data for initial behavior checks, then repeat migration/read validation on the copied
 user dataset. This is preparation for real adoption, not a substitute deliverable or a new product.
 
-### 4. Adopt in the user's apps
+### 5. Adopt in the user's apps
 
 Finance adoption first proves identity-only sign-in, existing records, recovery, explicit local-first
 startup and offline cold restart on the new build. Use the preserved instance until the migrated
