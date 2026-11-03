@@ -269,6 +269,18 @@
 		"./workspace/invitations/workflow": {
 			"types": "./dist/machines/workspaces/invitation-redemption.d.ts",
 			"default": "./dist/machines/workspaces/invitation-redemption.js"
+		},
+		"./workspace/invitations/authority-contracts": {
+			"types": "./dist/contracts/workspace-invitation-authority.d.ts",
+			"default": "./dist/contracts/workspace-invitation-authority.js"
+		},
+		"./backend/jazz/invitation-authority": {
+			"types": "./dist/backend/jazz/invitation-authority.d.ts",
+			"default": "./dist/backend/jazz/invitation-authority.js"
+		},
+		"./workspace/invitations/authority-workflow": {
+			"types": "./dist/machines/workspaces/invitation-authority.d.ts",
+			"default": "./dist/machines/workspaces/invitation-authority.js"
 		}
 	},
 	"svelte": "./dist/index.js",

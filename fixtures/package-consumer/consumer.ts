@@ -194,3 +194,9 @@ export type {
 	InvitationResult,
 	InvitationSettlement
 } from 'delightful-local-first/workspace/invitations/contracts'
+
+export { createJazzInvitationAuthority } from 'delightful-local-first/backend/jazz/invitation-authority'
+export type {
+	InvitationAuthorityAdmission,
+	InvitationAuthorityTransactions
+} from 'delightful-local-first/workspace/invitations/authority-contracts'
