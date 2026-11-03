@@ -13,3 +13,5 @@ export { default as ProfileNameForm } from 'delightful-local-first/profile/name-
 export { default as Avatar } from 'delightful-local-first/profile/avatar-view'
 export { default as ProfileAvatarForm } from 'delightful-local-first/profile/avatar-form'
 export { QuerySubscription, QuerySubscriptionOne } from 'delightful-local-first/backend/jazz/data'
+
+export { encodeArchivePayload, parseArchivePayload } from 'delightful-local-first/backup/archive'

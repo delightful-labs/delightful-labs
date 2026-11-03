@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      zod:
+        specifier: 4.1.11
+        version: 4.1.11
     devDependencies:
       '@inlang/paraglide-js':
         specifier: 2.27.0
@@ -2515,6 +2519,9 @@ packages:
   zimmerframe@1.1.5:
     resolution: {integrity: sha512-msJxIvYDYcoNL+PJsu+7qmpDWsYmAxTY+2TNYXXF0hzBzBk0BMecOqDOG/EckUoKCuKwObfbugIl8QpqHDXeFA==}
 
+  zod@4.1.11:
+    resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
+
 snapshots:
 
   '@adobe/css-tools@4.5.0': {}
@@ -4513,3 +4520,5 @@ snapshots:
   zimmerframe@1.1.2: {}
 
   zimmerframe@1.1.5: {}
+
+  zod@4.1.11: {}
