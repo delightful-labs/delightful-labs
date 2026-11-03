@@ -149,6 +149,9 @@ selection machine. A small synthetic consumer plus focused Finance adoption is t
 
 ## Subsequent private creation boundary
 
+Supplemental [SDK qualification](creation-qualification.md) exercises an isolated Jazz policy fixture
+and process restart. It adds no persistence adapter or replacement for the existing creation stack.
+
 Private creation is explicit user intent and can be valid even for a recovered identity; automatic
 first-workspace creation additionally requires trustworthy new-identity provenance. Current startup
 acquisition/status reports do not provide that provenance. Until it is designed and evidenced, the

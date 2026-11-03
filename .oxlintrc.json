@@ -82,7 +82,15 @@
 			}
 		},
 		{
-			"files": ["fixtures/package-consumer/jazz.js", "tests/fixtures/invitations/schema.ts"],
+			"files": [
+				"fixtures/package-consumer/jazz.js",
+				"tests/fixtures/invitations/schema.ts",
+				"fixtures/private-creation/schema.ts",
+				"fixtures/private-creation/permissions.ts",
+				"fixtures/private-creation/policy.test.ts",
+				"fixtures/private-creation/browser.ts",
+				"fixtures/private-creation/restart.test.ts"
+			],
 			"rules": {
 				"no-restricted-imports": [
 					"error",

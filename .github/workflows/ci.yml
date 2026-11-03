@@ -34,4 +34,6 @@ jobs:
       - run: pnpm check:consumer
       - run: pnpm build-storybook
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec tsc --project fixtures/private-creation/tsconfig.json
+      - run: pnpm exec vitest run --config fixtures/private-creation/vitest.config.ts
       - run: pnpm test:storybook
