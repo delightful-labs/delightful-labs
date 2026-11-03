@@ -13,6 +13,8 @@
 		"./backup.js",
 		"./backup-envelope.js",
 		"./envelope-browser.ts",
+		"./journal-browser.ts",
+		"./journal.vite.config.ts",
 		"./import.js",
 		"./view.ts",
 		"./vite.config.ts",

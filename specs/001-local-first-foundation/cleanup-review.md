@@ -130,3 +130,41 @@ no notStarted proof enters unresolved settlement explicitly; interruption remain
 with unresolved settlement. Persistence routes its completed work through the same explicit decision,
 using its issuance evidence. No new effects, async boundaries, stored phase flags or native resources
 are introduced. Existing cancellation/drain behavior stays with the invoked children.
+
+## Regression qualification completed
+
+The user reviewed/merged PR #19 and authorized the testing follow-up on 2026-11-03. On
+`test/foundation-cleanup`, local verification passes:
+
+- 31 creation/owner/persistence/initialization cases exercise the actual composed machines with
+  controlled leaf completion. They cover replacement/shutdown completion and crash, retained
+  original binding/record, rejected retries under another binding, known-settlement replacement,
+  known notStarted retry, absent/verified recovery, late journal results, read errors, cancellation
+  before issuance and drain through each reported settlement. Terminal context, state and output
+  agree. A notebook-shaped bootstrap uses the host ID projection without Finance fields.
+- Seven form/Zod cases cover explicit local/confirmed host guarantees, delayed host promises for
+  name/avatar removal, exact save arguments, and issue paths/codes without values/messages.
+  Local wait uses the existing persistLocal adapter. Confirmed tests verify declared host-result
+  propagation, not native remote confirmation. The Node consumer also imports forms/zod publicly.
+- Five real Chromium cases use the packaged journal factory and native IndexedDB, each with a
+  unique disposable database that is deleted afterward. They prove persistence/read/selected-clear,
+  real cancellation rollback, refused abort during native commit followed by completion, native
+  VersionError on open, and an actual ConstraintError with rollback. Native-handler observation
+  records events before the adapter reports them; no fake abort/complete events are injected.
+  The browser bundle builds during check:consumer, and the cases run in the normal browser suite.
+- All 677 unit tests across 29 files and the 11 separate-process backup reader cases pass. Formatting,
+  Oxlint, Svelte/TypeScript, package/strict Publint, consumer declarations/bundles and Storybook build
+  pass. Final-head GitHub CI is checked before reporting completion.
+
+The tests reproduced and fixed two production-code defects:
+
+1. An unresolved owner's guarded RETRY rejected a different binding but then fell through to the
+   root RETRY handler. An explicit unguarded no-op alternative now consumes that rejected event.
+2. Explicit IndexedDB abort rejects pending requests with AbortError while transaction.error is
+   null. The native adapter was treating those consequences as a new failed transaction. It now
+   waits for the native abort event for settlement, while retaining actual request/transaction
+   errors. The native ConstraintError case verifies those real failures are still reported.
+
+No storage format, consumer dependency, deployment or user data changes are included. These checks
+close the scoped shared-library cleanup findings; they do not claim production Finance migration,
+all-browser qualification or a completed backup/restore feature. T006 remains the next feature.

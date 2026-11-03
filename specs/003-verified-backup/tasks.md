@@ -51,7 +51,7 @@ not be described as an encrypted archive, verified backup, source-completeness p
 These are scoped follow-ups recorded at the user’s request, not a requirement to replace every
 runtime guard or to finish unrelated refactors before backup work continues.
 
-- [ ] T011 — **Implemented for review on `fix/foundation-cleanup`; regression qualification pending approval.** Add an optional Zod-to-`FormIssue` adapter for the shared form boundary. Preserve the
+- [x] T011 — **Implemented in PR #19; three adapter cases and the built public-subpath check pass.** Add an optional Zod-to-`FormIssue` adapter for the shared form boundary. Preserve the
       existing `parseAsync` and injected `validationIssues` contracts so consumers may use other
       validators. Map issue paths/codes without copying input values or automatically exposing raw
       Zod messages; localization stays consumer-owned. Review the implementation before tests.

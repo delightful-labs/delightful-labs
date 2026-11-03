@@ -261,18 +261,21 @@ export function createWorkspaceCreationOwner<
 				on: {
 					REEVALUATE: {},
 					SHUTDOWN: {},
-					RETRY: {
-						guard: ({ context }) =>
-							context.binding !== undefined && context.binding.key === context.operation?.key,
-						target: 'operating',
-						actions: assign({
-							request: ({ context }): CreationRequest => {
-								return context.record
-									? { mode: 'retry', record: context.record, settlement: 'unresolved' }
-									: { mode: 'load' }
-							}
-						})
-					}
+					RETRY: [
+						{
+							guard: ({ context }) =>
+								context.binding !== undefined && context.binding.key === context.operation?.key,
+							target: 'operating',
+							actions: assign({
+								request: ({ context }): CreationRequest => {
+									return context.record
+										? { mode: 'retry', record: context.record, settlement: 'unresolved' }
+										: { mode: 'load' }
+								}
+							})
+						},
+						{}
+					]
 				}
 			},
 			closed: { type: 'final', on: { OBSERVED: {}, REEVALUATE: {}, RETRY: {}, SHUTDOWN: {} } }
