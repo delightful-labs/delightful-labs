@@ -281,6 +281,10 @@
 		"./workspace/invitations/authority-workflow": {
 			"types": "./dist/machines/workspaces/invitation-authority.d.ts",
 			"default": "./dist/machines/workspaces/invitation-authority.js"
+		},
+		"./diagnostics/logger": {
+			"types": "./dist/diagnostics/logger.d.ts",
+			"default": "./dist/diagnostics/logger.js"
 		}
 	},
 	"svelte": "./dist/index.js",

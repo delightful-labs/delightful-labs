@@ -11,6 +11,7 @@ export default defineConfig({
 			'src/lib/machines/**/*.test.ts',
 			'src/lib/presentation/**/*.test.ts',
 			'src/lib/localization/**/*.test.ts',
+			'src/lib/diagnostics/**/*.test.ts',
 			'src/lib/backend/**/*.test.ts',
 			'src/lib/integrations/**/*.test.ts'
 		],

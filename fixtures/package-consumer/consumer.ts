@@ -212,3 +212,12 @@ export type {
 	InvitationAuthoritySettlement,
 	InvitationAuthorityEvent
 } from 'delightful-local-first/workspace/invitations/authority-contracts'
+
+export { createLogger } from 'delightful-local-first/diagnostics/logger'
+export type {
+	DebugValue,
+	LogDetails,
+	LogSink,
+	Logger,
+	LoggerOptions
+} from 'delightful-local-first/diagnostics/logger'
