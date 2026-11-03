@@ -3,7 +3,16 @@ import { resolve } from 'node:path'
 
 declare global {
 	interface Window {
-		DLFBackup: typeof import('../../fixtures/package-consumer/envelope-browser.js')
+		// Root checks precede packaging. Type from source; the executed IIFE still consumes public exports.
+		DLFBackup: Pick<
+			typeof import('../../src/lib/backup/envelope-api.js'),
+			'prepareArchiveSeal' | 'prepareArchiveOpen'
+		> &
+			Pick<
+				typeof import('../../src/lib/machines/backup/envelope.js'),
+				'createArchiveEnvelopeMachine'
+			> &
+			Pick<typeof import('xstate'), 'createActor' | 'toPromise'>
 	}
 }
 
