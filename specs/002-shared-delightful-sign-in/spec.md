@@ -8,6 +8,15 @@
 
 **Input**: One Delightful identity can sign into independently deployed apps, initially Finance and Clipper, while preserving each app's existing accounts, ownership, recovery and domain policies. Explore Jazz-native application storage with AT Protocol identity and independently optional, explicit social publication. This task authorizes specification and research only.
 
+**Subsequent direction — 2026-11-03**: The user currently operates these apps for themselves and
+requests proceeding with a working, data-preserving implementation. Target Jazz's merged
+backend-owned authentication with AT Protocol identity. A reproducible pinned source build is
+acceptable; do not require a published Jazz release before implementation or consumer adoption.
+Follow [the implementation and data-preservation sequence](delivery.md). Existing focused-review,
+implementation-before-tests, commit/publish authorization and live-data protection agreements remain.
+The original specification-only authorization above records history, not a prohibition overriding
+this later instruction. Publication of Clipper content remains a separate consumer slice.
+
 ## Direction and MVP boundary
 
 The 2026-11-03 continuation selects an architecture to explore: Jazz remains the application
@@ -231,14 +240,20 @@ Future access requires explicit authorization for a named requesting app, granti
 Explicit public publication is a separate consumer-owned export, not a private cross-app data grant.
 Its opt-in boundary is specified above; it does not authorize another app to read the Jazz source.
 
-## Dependencies and decision gates
+## Implementation decisions and sequence
 
 See [research](research.md) for pinned SDK evidence and provider candidates,
 [AT Protocol integration research](atproto-research.md) for current code/spec findings and version
-limits, and [qualification](qualification.md) for required evidence. Provider/bridge choice,
+limits, [authentication feasibility](auth-feasibility.md) for the published-version comparison,
+registry evidence and conditional recommendation, and [qualification](qualification.md) for required evidence. Provider/bridge choice,
 hosting/operator, required methods, domains/callbacks, stable DID-to-Jazz mapping, supported Jazz
 admission, recovery availability and logout scope must be resolved before identity implementation
 planning claims readiness. Publication additionally needs a separately reviewed Clipper design for
 public Lexicons, exact source eligibility, consent, durable operation ownership, reconciliation and
 removal. No public Lexicon or Bluesky feed integration is selected here. Provider compromise/migration
 and unlinking require an explicit later recovery design; no unlink/delete/merge capability is implied.
+
+The [single-user delivery direction](delivery.md) supersedes research recommendations to wait for
+a published release or choose a separate JWT-provider bridge by default. Exact source/artifact
+pinning, existing-data preservation and supported backend integration are implementation work to
+complete and demonstrate. They are not reasons to defer the project awaiting upstream publication.

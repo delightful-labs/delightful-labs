@@ -5,6 +5,12 @@ This continues PR #14. No SDK upgrade, authentication service, publication imple
 consumer migration is authorized. Product requirements are in [spec.md](spec.md); exercises remain
 unrun in [qualification.md](qualification.md).
 
+Follow-up: [version and authentication feasibility](auth-feasibility.md) now reproduces the exact
+published alpha.59 package inspection, identifies its release-tagged registry source, and compares
+it with upstream main. No newer published Jazz 2 release was found. That investigation supersedes
+the package-availability limitation below and narrows the outstanding integration decisions; no
+runtime qualification or provider/backend selection is implied.
+
 ## Selected exploration and consumer constraints
 
 The user selected Jazz-native application storage, AT Protocol identity, and explicit social
@@ -39,10 +45,12 @@ Living specifications/announcements were reviewed on the research date and can c
 ### Critical version boundary
 
 DLF's declared Jazz peer remains `2.0.0-alpha.59`. The earlier [research](research.md) records
-inspection of that installed version and its JWT linking flow. This continuation had no local
-installed Jazz package in the DLF or Finance worktree to reproduce that inspection; it read
-upstream source at the explicit commit instead. No dependency installation or version change was
-made. Upstream backend authentication findings are **not** a qualification receipt for alpha.59.
+inspection of that installed version and its JWT linking flow. The PR #14 continuation had no local
+installed Jazz package in the DLF or Finance worktree and read upstream source instead. The follow-up
+[feasibility investigation](auth-feasibility.md) has now reproduced alpha.59 inspection from its
+integrity-verified published tarball in temporary storage. No project dependency installation or
+version change was made. Upstream backend authentication findings are **not** a qualification receipt
+for alpha.59 or evidence that those APIs have been published.
 
 Before design selects an API, compare a reproducibly installed alpha.59 with the chosen release
 and establish its supported public authentication surface. Evaluate a maintained external identity

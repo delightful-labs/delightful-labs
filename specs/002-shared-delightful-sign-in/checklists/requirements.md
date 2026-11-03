@@ -2,6 +2,10 @@
 
 Reviewed: 2026-11-03. Scope: static document review only.
 
+Later direction: proceed with single-user implementation and preserved existing data using a pinned
+Jazz source build if necessary. No published-release prerequisite applies. See [delivery](../delivery.md).
+Historical readiness statements below do not prohibit that work or assert that it is already verified.
+
 ## Content quality
 
 - [x] User journeys explain value and independently assessable outcomes.
@@ -30,6 +34,8 @@ Reviewed: 2026-11-03. Scope: static document review only.
 - [x] Explicit revision/destination consent, separate Jazz/PDS outcomes, unknown-write reconciliation and public-removal limits are specified.
 - [x] Publication remains Clipper-owned and independently adoptable; no generic DLF social platform or Finance data export is introduced.
 - [x] Fresh upstream code findings are pinned and distinguished from the prior alpha.59 inspection; no SDK upgrade is presumed.
+- [x] Follow-up reproduces the published alpha.59 package, records exact integrity/tag provenance, and distinguishes source-resolved registry behavior from unrun deployment qualification.
+- [x] Published-version availability, supported admission alternatives, link recovery limits and post-link offline resumption risks are documented in [authentication feasibility](../auth-feasibility.md).
 
 Next phase: qualify the supported AT Protocol-to-Jazz identity path/version and resolve pending
 identity decisions before implementation planning. Clipper publication design/qualification follows
