@@ -251,3 +251,5 @@ export type {
 	ArchiveProfileValidator
 } from 'delightful-local-first/backup/inspection'
 export { createArchiveInspectionMachine } from 'delightful-local-first/backup/inspection/workflow'
+
+export { zodFormIssues } from 'delightful-local-first/forms/zod'

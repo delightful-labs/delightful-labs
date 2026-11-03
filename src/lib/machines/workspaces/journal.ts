@@ -7,18 +7,18 @@ export type WorkspaceJournalResult<Record> =
 	| { outcome: 'succeeded'; record: Record | undefined }
 	| { outcome: 'conflict' | 'cancelled' }
 	| { outcome: 'failed'; error: unknown }
-export function createWorkspaceJournal<
-	Record extends { key: string; attempt: { organizationId: string } }
->(options: {
+export type WorkspaceJournalInput<Record> = { key: string } & (
+	| { mode: 'read' }
+	| { mode: 'write'; record: Record }
+	| { mode: 'clear'; attemptId: string }
+)
+export function createWorkspaceJournal<Record extends { key: string }>(options: {
 	databaseName: string
+	attemptId: (record: Record) => string
 	schema: { safeParse: (value: unknown) => { success: boolean }; parse: (value: unknown) => Record }
 }) {
 	type WorkspaceJournalRecord = Record
-	type Input = { key: string } & (
-		| { mode: 'read' }
-		| { mode: 'write'; record: WorkspaceJournalRecord }
-		| { mode: 'clear'; organizationId: string }
-	)
+	type Input = WorkspaceJournalInput<Record>
 	type JournalResult = WorkspaceJournalResult<Record>
 	type Command =
 		| { type: 'READ'; key: string }
@@ -67,10 +67,11 @@ export function createWorkspaceJournal<
 				tx.abort()
 			} catch (error) {
 				sendBack({ type: 'TX_FAILED', error })
+				if (command.type === 'ABORT') return
 				try {
 					tx.abort()
-				} catch {
-					sendBack({ type: 'TX_ABORTED' })
+				} catch (abortError) {
+					sendBack({ type: 'TX_FAILED', error: abortError })
 				}
 			}
 		})
@@ -192,16 +193,28 @@ export function createWorkspaceJournal<
 											})
 										})
 									},
-									TX_ABORTED: {
-										target: 'closingDatabase',
-										actions: assign({
-											result: ({ context }): JournalResult =>
-												context.result?.outcome === 'conflict' ||
-												context.result?.outcome === 'failed'
-													? context.result
-													: { outcome: 'failed', error: new Error('Journal transaction aborted') }
-										})
-									},
+									TX_ABORTED: [
+										{
+											guard: 'closing',
+											target: 'closingDatabase',
+											actions: assign({
+												result: ({ context }): JournalResult =>
+													context.result?.outcome === 'failed'
+														? context.result
+														: { outcome: 'cancelled' }
+											})
+										},
+										{
+											target: 'closingDatabase',
+											actions: assign({
+												result: ({ context }): JournalResult =>
+													context.result?.outcome === 'conflict' ||
+													context.result?.outcome === 'failed'
+														? context.result
+														: { outcome: 'failed', error: new Error('Journal transaction aborted') }
+											})
+										}
+									],
 									TX_COMPLETE: { target: 'closingDatabase' }
 								},
 								initial: 'checking',
@@ -287,7 +300,8 @@ export function createWorkspaceJournal<
 											{
 												guard: ({ context }) =>
 													context.request.mode === 'clear' &&
-													context.record?.attempt.organizationId === context.request.organizationId,
+													context.record !== undefined &&
+													options.attemptId(context.record) === context.request.attemptId,
 												target: 'removing'
 											},
 											{ target: 'conflicting' }
@@ -349,6 +363,10 @@ export function createWorkspaceJournal<
 							},
 							finishing: {
 								always: [
+									{
+										guard: ({ context }) => context.result?.outcome === 'failed',
+										target: '#workspace-creation-journal.failed'
+									},
 									{ guard: 'closing', target: '#workspace-creation-journal.cancelled' },
 									{
 										guard: ({ context }) => context.result?.outcome === 'succeeded',

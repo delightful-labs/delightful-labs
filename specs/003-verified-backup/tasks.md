@@ -51,7 +51,7 @@ not be described as an encrypted archive, verified backup, source-completeness p
 These are scoped follow-ups recorded at the user’s request, not a requirement to replace every
 runtime guard or to finish unrelated refactors before backup work continues.
 
-- [ ] T011 — Add an optional Zod-to-`FormIssue` adapter for the shared form boundary. Preserve the
+- [ ] T011 — **Implemented for review on `fix/foundation-cleanup`; regression qualification pending approval.** Add an optional Zod-to-`FormIssue` adapter for the shared form boundary. Preserve the
       existing `parseAsync` and injected `validationIssues` contracts so consumers may use other
       validators. Map issue paths/codes without copying input values or automatically exposing raw
       Zod messages; localization stays consumer-owned. Review the implementation before tests.
@@ -61,7 +61,7 @@ runtime guard or to finish unrelated refactors before backup work continues.
       operation or replaying unknown writes. Reuse existing schema-injection boundaries; do not
       require generic workspace journal callers to adopt Zod. Coordinate the generic/Finance-owned
       fields without moving financial models into DLF.
-- [ ] T013 — Review the profile form’s handwritten draft-shape checks for a small reusable Zod
+- [x] T013 — **Reviewed: retain the simple draft checks; conversion does not improve clarity.** See [cleanup review](../001-local-first-foundation/cleanup-review.md#profile-draft-review-t013). Review the profile form’s handwritten draft-shape checks for a small reusable Zod
       schema only if it improves clarity. Keep dirty-state comparison distinct from submission
       validation; preserve name normalization and upload/remove semantics. Do not apply submission
       transformations or reject partially edited drafts merely to compute whether a form changed.

@@ -1,20 +1,20 @@
 import { assign, fromPromise, sendTo, setup, type ActorLogic, type Snapshot } from 'xstate'
 export type InitializationEvent = { type: 'CANCEL' } | { type: 'SHUTDOWN' }
 export type InitializationRecords = {
-	profiles: readonly { id: string; initialWorkspaceId?: string | null | undefined }[]
-	organizations: readonly unknown[]
+	identities: readonly { id: string; initialWorkspaceId?: string | null | undefined }[]
+	workspaces: readonly unknown[]
 	serverConfigured: boolean
 }
 export type InitializationOutcome<Persistence> =
 	| Persistence
-	| { outcome: 'ready'; profileId: string; organizationId: string }
+	| { outcome: 'ready'; identityId: string; workspaceId: string }
 	| {
 			outcome: 'unavailable'
 			reason:
 				| 'authorityUnavailable'
 				| 'initializationMissing'
-				| 'profileMissing'
-				| 'duplicateProfiles'
+				| 'identityMissing'
+				| 'duplicateIdentities'
 	  }
 	| { outcome: 'failed'; settlement: 'notStarted' | 'unresolved'; error: unknown }
 	| { outcome: 'closed' | 'cancelled'; settlement: 'notStarted' }
@@ -26,13 +26,14 @@ export type BootstrapLogic<Db, Attempt, S extends Snapshot<unknown>> = ActorLogi
 export function createWorkspaceInitialization<
 	Db,
 	Tier,
-	Attempt extends { profileId: string; organizationId: string },
+	Attempt,
 	Persistence extends { outcome: string },
 	S extends Snapshot<Persistence>
 >(options: {
 	tiers: { local: Tier; authority: Tier }
 	discover: (input: { db: Db; userId: string; tier: Tier }) => Promise<InitializationRecords>
 	prepareInitial: (input: { db: Db; userId: string }) => Promise<Attempt>
+	selectReady: (attempt: Attempt) => { identityId: string; workspaceId: string }
 	transaction: BootstrapLogic<Db, Attempt, S>
 }) {
 	type Input = { db: Db; userId: string }
@@ -102,7 +103,7 @@ export function createWorkspaceInitialization<
 						tier: options.tiers.local
 					}),
 					onDone: {
-						target: 'checkingProfiles',
+						target: 'checkingIdentities',
 						actions: assign({ records: ({ event }) => event.output })
 					},
 					onError: {
@@ -117,11 +118,11 @@ export function createWorkspaceInitialization<
 					}
 				}
 			},
-			checkingProfiles: {
+			checkingIdentities: {
 				always: [
 					{
-						guard: ({ context }) => (context.records?.profiles.length ?? 0) > 1,
-						target: 'duplicateProfiles'
+						guard: ({ context }) => (context.records?.identities.length ?? 0) > 1,
+						target: 'duplicateIdentities'
 					},
 					{ target: 'checkingInitialization' }
 				]
@@ -129,7 +130,7 @@ export function createWorkspaceInitialization<
 			checkingInitialization: {
 				always: [
 					{
-						guard: ({ context }) => context.records?.profiles[0]?.initialWorkspaceId != null,
+						guard: ({ context }) => context.records?.identities[0]?.initialWorkspaceId != null,
 						target: 'ready'
 					},
 					{ target: 'checkingAuthority' }
@@ -154,7 +155,7 @@ export function createWorkspaceInitialization<
 						tier: options.tiers.authority
 					}),
 					onDone: {
-						target: 'checkingAuthoritativeProfiles',
+						target: 'checkingAuthoritativeIdentities',
 						actions: assign({ records: ({ event }) => event.output })
 					},
 					onError: {
@@ -169,23 +170,23 @@ export function createWorkspaceInitialization<
 					}
 				}
 			},
-			checkingAuthoritativeProfiles: {
+			checkingAuthoritativeIdentities: {
 				always: [
 					{
-						guard: ({ context }) => (context.records?.profiles.length ?? 0) > 1,
-						target: 'duplicateProfiles'
+						guard: ({ context }) => (context.records?.identities.length ?? 0) > 1,
+						target: 'duplicateIdentities'
 					},
 					{
-						guard: ({ context }) => context.records?.profiles[0]?.initialWorkspaceId != null,
+						guard: ({ context }) => context.records?.identities[0]?.initialWorkspaceId != null,
 						target: 'ready'
 					},
 					{
-						guard: ({ context }) => context.records?.profiles.length === 1,
+						guard: ({ context }) => context.records?.identities.length === 1,
 						target: 'initializationMissing'
 					},
 					{
-						guard: ({ context }) => (context.records?.organizations.length ?? 0) > 0,
-						target: 'profileMissing'
+						guard: ({ context }) => (context.records?.workspaces.length ?? 0) > 0,
+						target: 'identityMissing'
 					},
 					{ target: 'preparingInitial' }
 				]
@@ -247,28 +248,32 @@ export function createWorkspaceInitialization<
 				entry: assign({
 					result: ({ context }): WorkspaceInitializationResult => ({
 						outcome: 'ready',
-						profileId: context.attempt?.profileId ?? required(context.records?.profiles[0]).id,
-						organizationId:
-							context.attempt?.organizationId ??
-							required(required(context.records?.profiles[0]).initialWorkspaceId ?? undefined)
+						...(context.attempt !== undefined
+							? options.selectReady(context.attempt)
+							: {
+									identityId: required(context.records?.identities[0]).id,
+									workspaceId: required(
+										required(context.records?.identities[0]).initialWorkspaceId ?? undefined
+									)
+								})
 					})
 				})
 			},
-			duplicateProfiles: {
+			duplicateIdentities: {
 				type: 'final',
 				entry: assign({
 					result: (): WorkspaceInitializationResult => ({
 						outcome: 'unavailable',
-						reason: 'duplicateProfiles'
+						reason: 'duplicateIdentities'
 					})
 				})
 			},
-			profileMissing: {
+			identityMissing: {
 				type: 'final',
 				entry: assign({
 					result: (): WorkspaceInitializationResult => ({
 						outcome: 'unavailable',
-						reason: 'profileMissing'
+						reason: 'identityMissing'
 					})
 				})
 			},

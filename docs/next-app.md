@@ -125,3 +125,11 @@ locally acknowledged saves after closing every page/worker and reopening offline
 unanswered remote connection. Existing local records must remain usable while provenance, optional
 seeding, reconciliation and remote freshness are unresolved. This milestone does not promise that
 all records are downloaded, provide background acquisition, or add invitations/member management.
+
+## Cleanup API changes
+
+The extracted creation/initialization APIs now take host projections instead of Finance record
+shapes, and single-write/profile form factories require explicit persistence guarantees. See
+[the source migration guide](../specs/001-local-first-foundation/cleanup-review.md#compatibility-and-consumer-migration)
+before updating a pinned consumer. `forms/zod` optionally supplies `zodFormIssues` to the existing
+`validationIssues` callback; core form contracts remain validator-neutral.
