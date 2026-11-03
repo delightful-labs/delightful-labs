@@ -120,3 +120,13 @@ No new regression tests were added or run before this implementation review. Exi
 examples/assertions were mechanically adapted to the renamed contract. Static Svelte/TypeScript,
 Oxlint, formatting, package/strict Publint and public consumer declaration checks are run locally;
 the PR's normal CI runs the pre-existing suite. Passing that suite does not replace these new cases.
+
+## Settlement statechart revision
+
+Review found settlement policy hidden in operation/persistence output callbacks. Output now only
+reads the result prepared by transitions. Operation finishing first applies closing/cancelling,
+then checks settlement evidence, then classifies the final outcome. An unknown prior attempt with
+no notStarted proof enters unresolved settlement explicitly; interruption remains closed/cancelled
+with unresolved settlement. Persistence routes its completed work through the same explicit decision,
+using its issuance evidence. No new effects, async boundaries, stored phase flags or native resources
+are introduced. Existing cancellation/drain behavior stays with the invoked children.

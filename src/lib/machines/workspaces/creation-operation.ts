@@ -96,7 +96,12 @@ export function createWorkspaceCreationOperation<
 		typeof actors,
 		{},
 		{},
-		{ closing: undefined; cancelling: undefined },
+		{
+			closing: undefined
+			cancelling: undefined
+			hasSettlementEvidence: undefined
+			recoveringUnknownAttempt: undefined
+		},
 		never,
 		string,
 		Input,
@@ -105,7 +110,15 @@ export function createWorkspaceCreationOperation<
 		actors,
 		guards: {
 			closing: stateIn({ running: { control: 'closing' } }),
-			cancelling: stateIn({ running: { control: 'cancelling' } })
+			cancelling: stateIn({ running: { control: 'cancelling' } }),
+			hasSettlementEvidence: ({ context }) =>
+				context.result.settlement !== 'notStarted' ||
+				context.reconciliation?.outcome === 'notStarted' ||
+				context.persistence?.settlement === 'notStarted',
+			recoveringUnknownAttempt: ({ context }) =>
+				context.record !== undefined &&
+				(context.request.mode === 'load' ||
+					(context.request.mode === 'retry' && context.request.settlement === 'unresolved'))
 		}
 	})
 	const forward = (type: Event['type']) =>
@@ -133,32 +146,7 @@ export function createWorkspaceCreationOperation<
 			persistence: undefined,
 			result: { outcome: 'editing', record: undefined, settlement: 'notStarted' }
 		}),
-		output: ({ context }): CreationResult => {
-			const recovering =
-				(context.request.mode === 'load' ||
-					(context.request.mode === 'retry' && context.request.settlement === 'unresolved')) &&
-				context.record !== undefined
-			if (
-				recovering &&
-				context.result.settlement === 'notStarted' &&
-				context.reconciliation?.outcome !== 'notStarted' &&
-				context.persistence?.settlement !== 'notStarted'
-			) {
-				if (context.result.outcome === 'cancelled' || context.result.outcome === 'closed') {
-					return { ...context.result, record: context.record, settlement: 'unresolved' }
-				}
-				return {
-					outcome: 'unresolved',
-					record: context.record,
-					settlement: 'unresolved',
-					error:
-						context.result.outcome === 'failed'
-							? context.result.error
-							: new Error('Prior creation issuance is unknown')
-				}
-			}
-			return context.result
-		},
+		output: ({ context }) => context.result,
 		states: {
 			running: {
 				type: 'parallel',
@@ -597,38 +585,94 @@ export function createWorkspaceCreationOperation<
 							},
 							finishing: {
 								always: [
-									{ guard: 'closing', target: '#workspace-creation-operation.closed' },
-									{ guard: 'cancelling', target: '#workspace-creation-operation.cancelled' },
-									{
-										guard: ({ context }) => context.result.outcome === 'complete',
-										target: '#workspace-creation-operation.complete'
-									},
-									{
-										guard: ({ context }) => context.result.outcome === 'editing',
-										target: '#workspace-creation-operation.editing'
-									},
-									{
-										guard: ({ context }) => context.result.outcome === 'invalid',
-										target: '#workspace-creation-operation.invalid'
-									},
-									{
-										guard: ({ context }) => context.result.outcome === 'recovered',
-										target: '#workspace-creation-operation.recovered'
-									},
-									{
-										guard: ({ context }) => context.result.outcome === 'conflict',
-										target: '#workspace-creation-operation.conflict'
-									},
-									{
-										guard: ({ context }) => context.result.outcome === 'unresolved',
-										target: '#workspace-creation-operation.unresolved'
-									},
-									{ target: '#workspace-creation-operation.failed' }
+									{ guard: 'closing', target: '#workspace-creation-operation.closing' },
+									{ guard: 'cancelling', target: '#workspace-creation-operation.cancelling' },
+									{ target: '#workspace-creation-operation.checkingSettlement' }
 								]
 							}
 						}
 					}
 				}
+			},
+			closing: {
+				entry: assign({
+					result: ({ context }): CreationResult => ({
+						outcome: 'closed',
+						record: context.record,
+						settlement: context.persistence?.settlement ?? context.result.settlement
+					})
+				}),
+				always: 'checkingSettlement'
+			},
+			cancelling: {
+				entry: assign({
+					result: ({ context }): CreationResult => ({
+						outcome: 'cancelled',
+						record: context.record,
+						settlement: context.persistence?.settlement ?? context.result.settlement
+					})
+				}),
+				always: 'checkingSettlement'
+			},
+			checkingSettlement: {
+				always: [
+					{ guard: 'hasSettlementEvidence', target: 'classifyingOutcome' },
+					{ guard: 'recoveringUnknownAttempt', target: 'unresolvedSettlement' },
+					{ target: 'classifyingOutcome' }
+				]
+			},
+			unresolvedSettlement: {
+				always: [
+					{
+						guard: ({ context }) => context.result.outcome === 'closed',
+						target: 'closed',
+						actions: assign({
+							result: ({ context }): CreationResult => ({
+								outcome: 'closed',
+								record: context.record,
+								settlement: 'unresolved'
+							})
+						})
+					},
+					{
+						guard: ({ context }) => context.result.outcome === 'cancelled',
+						target: 'cancelled',
+						actions: assign({
+							result: ({ context }): CreationResult => ({
+								outcome: 'cancelled',
+								record: context.record,
+								settlement: 'unresolved'
+							})
+						})
+					},
+					{
+						target: 'unresolved',
+						actions: assign({
+							result: ({ context }): CreationResult => ({
+								outcome: 'unresolved',
+								record: context.record,
+								settlement: 'unresolved',
+								error:
+									context.result.outcome === 'failed'
+										? context.result.error
+										: new Error('Prior creation issuance is unknown')
+							})
+						})
+					}
+				]
+			},
+			classifyingOutcome: {
+				always: [
+					{ guard: ({ context }) => context.result.outcome === 'closed', target: 'closed' },
+					{ guard: ({ context }) => context.result.outcome === 'cancelled', target: 'cancelled' },
+					{ guard: ({ context }) => context.result.outcome === 'complete', target: 'complete' },
+					{ guard: ({ context }) => context.result.outcome === 'editing', target: 'editing' },
+					{ guard: ({ context }) => context.result.outcome === 'invalid', target: 'invalid' },
+					{ guard: ({ context }) => context.result.outcome === 'recovered', target: 'recovered' },
+					{ guard: ({ context }) => context.result.outcome === 'conflict', target: 'conflict' },
+					{ guard: ({ context }) => context.result.outcome === 'unresolved', target: 'unresolved' },
+					{ target: 'failed' }
+				]
 			},
 			complete: { type: 'final' },
 			editing: { type: 'final' },
@@ -637,26 +681,8 @@ export function createWorkspaceCreationOperation<
 			conflict: { type: 'final' },
 			unresolved: { type: 'final' },
 			failed: { type: 'final' },
-			closed: {
-				type: 'final',
-				entry: assign({
-					result: ({ context }): CreationResult => ({
-						outcome: 'closed',
-						record: context.record,
-						settlement: context.persistence?.settlement ?? context.result.settlement
-					})
-				})
-			},
-			cancelled: {
-				type: 'final',
-				entry: assign({
-					result: ({ context }): CreationResult => ({
-						outcome: 'cancelled',
-						record: context.record,
-						settlement: context.persistence?.settlement ?? context.result.settlement
-					})
-				})
-			}
+			closed: { type: 'final' },
+			cancelled: { type: 'final' }
 		}
 	})
 }

@@ -54,21 +54,9 @@ export function createWorkspacePersistence<
 		initial: 'validating',
 		output: ({ context }) => {
 			if (!context.result) throw new Error('Missing workspace persistence outcome')
-			if (context.issuance === 'unknown' && context.result.settlement === 'notStarted') {
-				if (context.result.outcome === 'cancelled' || context.result.outcome === 'closed')
-					return {
-						...context.result,
-						settlement: 'unresolved'
-					} satisfies WorkspacePersistenceResult
-				return {
-					outcome: 'failed',
-					settlement: 'unresolved',
-					error: new Error('Prior creation issuance is unknown')
-				} satisfies WorkspacePersistenceResult
-			}
 			return context.result
 		},
-		on: { CANCEL: '.cancelled', SHUTDOWN: '.closed' },
+		on: { CANCEL: '.cancelling', SHUTDOWN: '.closing' },
 		states: {
 			validating: {
 				invoke: {
@@ -79,7 +67,7 @@ export function createWorkspacePersistence<
 						actions: assign({ attempt: ({ event }) => event.output })
 					},
 					onError: {
-						target: 'failed',
+						target: 'settling',
 						actions: assign({
 							result: ({ event }): WorkspacePersistenceResult => ({
 								outcome: 'failed',
@@ -104,7 +92,7 @@ export function createWorkspacePersistence<
 						},
 						{
 							guard: ({ event }) => event.output?.outcome === 'absent',
-							target: 'completed',
+							target: 'settling',
 							actions: assign({
 								result: (): WorkspacePersistenceResult => ({
 									outcome: 'failed',
@@ -115,7 +103,7 @@ export function createWorkspacePersistence<
 						},
 						{
 							guard: ({ event }) => event.output?.outcome === 'matching',
-							target: 'completed',
+							target: 'settling',
 							actions: assign({
 								result: ({ event }): WorkspacePersistenceResult => {
 									if (event.output?.outcome !== 'matching')
@@ -130,18 +118,18 @@ export function createWorkspacePersistence<
 						},
 						{
 							guard: ({ event }) => event.output?.outcome === 'profileUnavailable',
-							target: 'completed',
+							target: 'settling',
 							actions: assign({
 								result: { outcome: 'profileUnavailable', settlement: 'notStarted' }
 							})
 						},
 						{
-							target: 'completed',
+							target: 'settling',
 							actions: assign({ result: { outcome: 'conflict', settlement: 'notStarted' } })
 						}
 					],
 					onError: {
-						target: 'failed',
+						target: 'settling',
 						actions: assign({
 							result: ({ event }): WorkspacePersistenceResult => ({
 								outcome: 'failed',
@@ -162,9 +150,9 @@ export function createWorkspacePersistence<
 					id: 'transaction',
 					src: 'transaction',
 					input: ({ context }) => context,
-					onDone: { target: 'completed', actions: assign({ result: ({ event }) => event.output }) },
+					onDone: { target: 'settling', actions: assign({ result: ({ event }) => event.output }) },
 					onError: {
-						target: 'failed',
+						target: 'settling',
 						actions: assign({
 							result: ({ event }): WorkspacePersistenceResult => ({
 								outcome: 'failed',
@@ -175,8 +163,8 @@ export function createWorkspacePersistence<
 					}
 				}
 			},
-			cancelled: {
-				type: 'final',
+			cancelling: {
+				always: 'settling',
 				entry: assign({
 					result: (): WorkspacePersistenceResult => ({
 						outcome: 'cancelled',
@@ -184,8 +172,8 @@ export function createWorkspacePersistence<
 					})
 				})
 			},
-			closed: {
-				type: 'final',
+			closing: {
+				always: 'settling',
 				entry: assign({
 					result: (): WorkspacePersistenceResult => ({
 						outcome: 'closed',
@@ -193,6 +181,55 @@ export function createWorkspacePersistence<
 					})
 				})
 			},
+			settling: {
+				always: [
+					{
+						guard: ({ context }) =>
+							context.issuance === 'unknown' && context.result?.settlement === 'notStarted',
+						target: 'unresolvedSettlement'
+					},
+					{ guard: ({ context }) => context.result?.outcome === 'closed', target: 'closed' },
+					{ guard: ({ context }) => context.result?.outcome === 'cancelled', target: 'cancelled' },
+					{ guard: ({ context }) => context.result?.outcome === 'failed', target: 'failed' },
+					{ target: 'completed' }
+				]
+			},
+			unresolvedSettlement: {
+				always: [
+					{
+						guard: ({ context }) => context.result?.outcome === 'closed',
+						target: 'closed',
+						actions: assign({
+							result: (): WorkspacePersistenceResult => ({
+								outcome: 'closed',
+								settlement: 'unresolved'
+							})
+						})
+					},
+					{
+						guard: ({ context }) => context.result?.outcome === 'cancelled',
+						target: 'cancelled',
+						actions: assign({
+							result: (): WorkspacePersistenceResult => ({
+								outcome: 'cancelled',
+								settlement: 'unresolved'
+							})
+						})
+					},
+					{
+						target: 'failed',
+						actions: assign({
+							result: (): WorkspacePersistenceResult => ({
+								outcome: 'failed',
+								settlement: 'unresolved',
+								error: new Error('Prior creation issuance is unknown')
+							})
+						})
+					}
+				]
+			},
+			closed: { type: 'final' },
+			cancelled: { type: 'final' },
 			completed: { type: 'final' },
 			failed: { type: 'final' }
 		}
