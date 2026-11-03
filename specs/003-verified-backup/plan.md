@@ -5,8 +5,9 @@
 **Status**: Archive codec, envelope/integrity handling and independent inspector are implemented
 and functionally verified. Large-file browser memory/latency qualification remains. Shared-library
 cleanup implementation merged in PR #19; regression qualification and two reproduced fixes are in
-PR #20, awaiting merge with implementation-head CI passing. Resume shared export/restore lifecycle
-(T006) next; no live export or verified restore exists. See the [current handoff](tasks.md#current-handoff-2026-11-03),
+merged PR #20. Shared capture/export actors and a disposable notebook source are implemented and
+locally qualified in T006. Restore and its persisted journal remain unimplemented; no deployed
+consumer export or verified restore is qualified. See the [current handoff](tasks.md#current-handoff-2026-11-03),
 [payload review notes](implementation-notes.md), [envelope ownership/design](envelope-design.md)
 and [inspector design](inspector-design.md).
 

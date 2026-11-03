@@ -1,3 +1,5 @@
 export { prepareArchiveSeal, prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
 export { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
+export { prepareArchiveExport } from 'delightful-local-first/backup/export'
+export { createArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'
 export { createActor, toPromise } from 'xstate'

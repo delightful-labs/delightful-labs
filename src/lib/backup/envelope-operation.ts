@@ -114,6 +114,7 @@ class Operation {
 	#digest: string | undefined
 	#output: EnvelopeSuccess | undefined
 	#checkedOwner: ((archive: IntegrityCheckedArchive) => void) | undefined
+	#sealedOwner: ((archive: SealedArchive) => void) | undefined
 	#cursor = 0
 	#pending = 0
 	#released = false
@@ -146,6 +147,13 @@ class Operation {
 		if (this.#claimed || this.#checkedOwner || !this.mode.startsWith('open'))
 			throw new ArchiveEnvelopeError('operationInUse')
 		this.#checkedOwner = retain
+	}
+	/** Internal parent ownership hook, before the sealing child's done event can be discarded. */
+	retainSealedOutput(retain: (archive: SealedArchive) => void) {
+		this.#open()
+		if (this.#claimed || this.#sealedOwner || !this.mode.startsWith('seal'))
+			throw new ArchiveEnvelopeError('operationInUse')
+		this.#sealedOwner = retain
 	}
 
 	prepare(): EnvelopeMode {
@@ -315,6 +323,7 @@ class Operation {
 						sha256: required(this.#digest)
 					})
 		this.#output = { outcome: 'sealed', archive: new SealedResource(bytes) }
+		this.#sealedOwner?.(this.#output.archive)
 		return this.#output
 	}
 	buildChecked(): EnvelopeSuccess {
@@ -356,6 +365,7 @@ class Operation {
 		this.#digest = undefined
 		this.#expectedDigest = undefined
 		this.#checkedOwner = undefined
+		this.#sealedOwner = undefined
 	}
 }
 

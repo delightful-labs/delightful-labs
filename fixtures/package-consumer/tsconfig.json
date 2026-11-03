@@ -8,11 +8,14 @@
 		"exactOptionalPropertyTypes": false
 	},
 	"include": [
+		"../backup-notebook/export.ts",
 		"./consumer.ts",
 		"./cleanup.ts",
 		"./backup.js",
 		"./backup-envelope.js",
 		"./envelope-browser.ts",
+		"./notebook-browser.ts",
+		"./notebook.vite.config.ts",
 		"./journal-browser.ts",
 		"./journal.vite.config.ts",
 		"./import.js",

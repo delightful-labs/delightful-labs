@@ -9,15 +9,25 @@ added/run only after review approval of the implementation they cover.
 Archive/inspector implementation is complete through T005, except T004's large-file measurements.
 The cleanup interruption is complete: PR #19 merged the implementation; [PR #20](https://github.com/delightful-labs/delightful-local-first/pull/20)
 adds regression qualification and two reproduced retry/IndexedDB cancellation fixes. Its implementation
-head `82cc5e4` passed GitHub CI, including unit, package/consumer and browser checks. PR #20 is awaiting
-merge; this documentation update does not imply that it has merged. See the
+head `82cc5e4` passed GitHub CI, including unit, package/consumer and browser checks. PR #20 merged
+on 2026-11-03 as `afc92fd`. See the
 [cleanup evidence](../001-local-first-foundation/cleanup-review.md#regression-qualification-completed).
 
-**Next implementation task: T006.** Read the [workflow contract](contracts/workflow.md) and existing
-archive/envelope/inspection ownership notes before designing the shared lifecycle. Present the
-implementation for review before adding/running its tests. No additional general cleanup is required
-before resuming this task. Finance inventory/adoption (T007–T010), concrete journal validation (T012)
-and sign-in delivery remain outstanding. No deployed data or identity/storage configuration changed.
+**Current implementation task: T006.** Shared capture/export and the notebook profile/source are
+implemented and locally verified after the user authorized continuing from implementation review.
+See the [lifecycle design and qualification evidence](lifecycle-design.md#export-qualification).
+Public export subpaths are `backup/export` and `backup/export/workflow`. New verification includes
+51 export unit cases, 13 notebook/public-package cases (with independent retained-file inspection)
+and three Chromium cases. Tests are included in normal unit, consumer and browser checks.
+
+**Next implementation slice: restore/write owners and concrete journal validation (T012).** Read
+the [workflow contract](contracts/workflow.md) and lifecycle ownership notes. Restore actors, persisted
+journal/storage, isolated destination and content round-trip remain unimplemented. Present that
+implementation for review before its tests. No additional general cleanup is required. Finance
+inventory/adoption (T007–T010), T004 large-file measurements and sign-in delivery remain outstanding.
+No deployed data or identity/storage configuration changed. The user authorized committing this
+capture/export slice and opening a PR targeting `main`; restore remains subsequent work and merge
+requires separate authorization.
 
 ## Archive core
 
@@ -42,7 +52,7 @@ and sign-in delivery remain outstanding. No deployed data or identity/storage co
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **Next; not started.** Implement shared export/restore actor protocols and a small
+- [ ] T006 — **In progress: capture/export and notebook source locally qualified; restore remains unimplemented.** Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,
