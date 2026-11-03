@@ -221,3 +221,16 @@ export type {
 	Logger,
 	LoggerOptions
 } from 'delightful-local-first/diagnostics/logger'
+
+export {
+	encodeArchivePayload,
+	parseArchivePayload,
+	ArchivePayloadError
+} from 'delightful-local-first/backup/archive'
+export type {
+	ArchivePayload,
+	ArchiveRecord,
+	ArchiveValue,
+	ArchiveAttachment,
+	PayloadLimitOverrides
+} from 'delightful-local-first/backup/archive'

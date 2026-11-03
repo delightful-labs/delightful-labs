@@ -103,14 +103,15 @@ export function parsePayloadJson(source: string, limits: PayloadLimits): unknown
 				return result
 			}
 		}
-		// Numeric JSON fields are metadata counts/versions, never domain financial values.
+		// Metadata counts/versions use canonical safe integer tokens. Reject fractions/exponents
+		// before Number conversion can round them into an apparently valid integer.
 		const start = position
 		while (position < source.length && /[0-9eE+.-]/.test(source[position] ?? '')) position += 1
 		if (start === position) return fail()
 		const token = source.slice(start, position)
-		if (!/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/.test(token)) return fail()
+		if (!/^(?:0|-?[1-9][0-9]*)$/.test(token)) return fail()
 		const result = Number(token)
-		if (!Number.isFinite(result)) return fail()
+		if (!Number.isSafeInteger(result)) return fail()
 		return result
 	}
 

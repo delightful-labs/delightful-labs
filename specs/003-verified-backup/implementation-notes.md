@@ -68,9 +68,30 @@ capture, not evidence produced by this codec.
 
 ## Review and verification
 
-Implementation tests have not been added or run, per repository agreement. Static verification for the Zod refactor includes repository Oxlint, full Svelte/TypeScript checks, formatting, and package build/strict Publint validation. These checks do not execute archive behavior. Earlier standalone checks covered the initial handwritten slice; current public declarations are checked through the repository and package builds. Required post-review cases are captured in T002: malformed/trailing
-JSON, escaped duplicate and prototype-named keys, exact integer/date/Unicode boundaries, invalid and
-noncanonical base64, byte/count/depth limits, dangling/duplicate identities, inert references, stable
-serialization including numeric keys, detached immutability and standalone package imports.
+The user authorized proceeding with implementation review and tests on 2026-11-03. Review checked
+schema strictness and inferred types, duplicate-key handling, prototype-named fields, detachment,
+limits before schema processing, exact values, graph identity and public package boundaries.
 
-Static checks cannot establish parser security, runtime edge cases, memory use or backup safety.
+One correctness finding was fixed: converting an arbitrary numeric JSON token to JavaScript Number
+could round a long fractional version into an accepted integer. The parser now requires canonical
+safe-integer metadata tokens before conversion; fractional/exponent forms, negative zero and unsafe
+integers fail explicitly. Five regression cases cover this behavior.
+
+Verification completed locally:
+
+- 82 archive cases pass: independent literal wire data, all value variants, malformed/trailing JSON,
+  escaped duplicate keys, prototype-named fields, invalid UTF-8, exact integer/date/timestamp rules,
+  Unicode byte budgets, graph closure/identity collisions, canonical base64 and lengths, resource
+  limits, immutability, cyclic/sparse input, getters/toJSON rejection and safe errors.
+- All 556 repository unit tests pass across 25 files. The initial sandboxed full run could not bind
+  disposable Jazz test listeners; the permitted rerun passed without changing those tests.
+- Repository Oxlint, full Svelte/TypeScript checks, Oxfmt and Git whitespace checks pass.
+- Package build/strict Publint, declarations through public exports, standalone Node ESM codec use
+  and the browser consumer build pass. The consumer provides no Zod schema, Jazz or app session.
+- Archive tests are included in the normal Vitest/CI configuration. No live data, storage or schema
+  was accessed or changed. No encryption/digest/recovery readiness is implied.
+
+PR #16 receives these verification changes; its final-commit CI status is checked separately before
+reporting completion. Merge remains subject to the user’s explicit authorization.
+
+These checks do not establish universal parser security, browser peak-memory limits or end-to-end backup safety. Cryptography and actual source capture/restore remain subsequent slices.

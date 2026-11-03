@@ -2,7 +2,7 @@
 
 **Branch**: `feat/verified-backup` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
 
-**Status**: Implementation started after merged PR #15. The first structural payload slice is awaiting review; no live export or verified restore exists yet. See [tasks](tasks.md) and [implementation review notes](implementation-notes.md).
+**Status**: Implementation started after merged PR #15. The first structural payload slice has passed local verification and is in PR #16; no live export or verified restore exists yet. See [tasks](tasks.md) and [implementation review notes](implementation-notes.md).
 
 ## Summary
 
@@ -32,7 +32,7 @@ Pre-design and post-design checks pass for the proposed boundaries:
 - Pure archive transforms may be functions. Stateful operations use explicitly owned XState children; see [workflow contract](contracts/workflow.md).
 - Unknown writes retain durable operation identity and require authoritative reconciliation. Local acceptance and remote confirmation remain distinct.
 - No private/offline/platform guarantees exceed recorded evidence. File inspection can be independent; source completeness and destination recovery require qualification.
-- Implementation review precedes implementation tests. The current payload-codec slice is synchronous and awaits implementation review; no implementation tests have been added/run. Subsequent code follows focused review cycles.
+- Implementation review precedes implementation tests. The payload-codec slice is synchronous; the user authorized proceeding with review/tests and the implementation notes record passing verification. Subsequent code follows focused review cycles.
 - The user subsequently authorized beginning backup archive implementation after merging PR #15. No deployment, data migration, commit, or publication is implied by that instruction.
 
 Finance’s missing isolation and capture qualification are concrete required implementation work, not exceptions to these principles. Dependent consumer operations must not pretend those capabilities exist.

@@ -6,11 +6,13 @@ added/run only after review approval of the implementation they cover.
 
 ## Archive core
 
-- [ ] T001 — Implement and present the pure bounded payload codec for review. **Implemented locally;
-      awaiting review.** Includes internal Zod schemas/inferred types, exact values, strict JSON, limits, graph closure, attachment
+- [x] T001 — Implement and present the pure bounded payload codec for review. **Implemented and presented; user authorized proceeding to review/tests on 2026-11-03.** Includes internal Zod schemas/inferred types, exact values, strict JSON, limits, graph closure, attachment
       encoding/size checks, detached frozen results, and the public `./backup/archive` subpath.
-- [ ] T002 — After T001 implementation approval, add/run meaningful malformed-input, exact-value,
-      graph, canonical encoding, immutability, reduced-limit and package-consumer checks.
+- [x] T002 — After the user authorized verification, add/run meaningful malformed-input, exact-value,
+      graph, canonical encoding, immutability, reduced-limit and package-consumer checks. 82 archive
+      cases pass; all 556 repository unit tests, strict package validation, standalone Node import
+      and browser consumer build pass. Review additionally fixed unsafe/fractional JSON metadata
+      rounding before numeric conversion. See [implementation notes](implementation-notes.md).
 - [ ] T003 — Design resource ownership/statecharts and implement the envelope/crypto slice: strict
       envelope validation, independent password derivation, authenticated encryption, actual payload
       and attachment digests, and releasable immutable verified resources. Present for review.
