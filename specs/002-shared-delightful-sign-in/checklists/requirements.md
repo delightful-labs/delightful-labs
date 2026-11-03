@@ -15,7 +15,7 @@ Historical readiness statements below do not prohibit that work or assert that i
 
 ## Requirement completeness
 
-- [ ] Critical product questions resolved: AT Protocol identity is prioritized, but Q1 hosting/operator and additional methods, the supported authentication bridge/version, and Q2 logout scope remain pending.
+- [ ] Critical product questions resolved: AT Protocol identity is prioritized, but persistent backend operator/build qualification and Q2 logout scope remain pending. Netlify frontend retention, app-owned persistent backends, initial AT Protocol method and DLF/consumer repository ownership are now specified.
 - [x] Requirements have stable IDs and testable preservation, conflict, outage and isolation outcomes.
 - [x] Success criteria are measurable and user-focused.
 - [x] First sign-in, returning cross-app sign-in, safe linking, logout and recovery have acceptance scenarios.
@@ -40,3 +40,12 @@ Historical readiness statements below do not prohibit that work or assert that i
 Next phase: qualify the supported AT Protocol-to-Jazz identity path/version and resolve pending
 identity decisions before implementation planning. Clipper publication design/qualification follows
 as a separate consumer slice. No implementation readiness or passing runtime qualification is claimed.
+
+## Hosting and local-first continuation — 2026-11-03
+
+- [x] Netlify frontend and persistent application backend roles are explicit; OAuth-only hosting is distinguished from full Jazz sync hosting.
+- [x] DLF library ownership and consumer-owned server entry points avoid requiring a new login app/repository.
+- [x] Remote Core reuse is conditional on compatibility, not an implied data migration.
+- [x] FR-027–030 and Q-21–23 cover deployment, offline cold restart, durable edits, expired sessions, reconnect and partial local availability.
+- [x] Initial new-device sign-in/linking and public publication retain explicit online requirements.
+- [ ] Actual pinned-build/host/offline qualification passes. Not run in this documentation change.

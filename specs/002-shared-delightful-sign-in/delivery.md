@@ -27,13 +27,28 @@ prerequisite for implementation or adoption.
   on ports 5173/5174. Do not change the user's origin/endpoint as incidental setup or stop that server.
 - Finance's production Netlify build currently runs `deploy:jazz` before build. A move to backend-owned
   auth also changes hosting/build integration; the existing static-oriented build is not assumed to
-  provide the new backend automatically. Select a supported server host as part of implementation.
+  provide the new backend automatically. Retain Netlify for the frontend; select a qualified persistent
+  backend host for the combined authentication/sync boundary. The server entry point lives in the
+  consumer repository and imports reusable DLF helpers; no separate login app/repository is required.
 - Clipper's documented implementation has account/recovery plus a private library root; that document
   says it has no captured notes. This does not establish the contents of the user's current instance.
 - The user confirmed that the important data is in deployed Finance. The actual deployed revision,
   complete data scope, and pending local writes still require read-only verification. Repository
   configuration alone does not establish that every browser write reached the server. No private
   records were inspected during this investigation.
+
+## Deployment and local-first responsibilities
+
+Follow [the hosting direction](hosting.md): Netlify serves each frontend, a persistent app-owned
+service runs its authentication/Jazz sync boundary, and a compatible remote Core may continue to
+store data. OAuth sessions/state need durable server storage and cross-instance refresh coordination.
+No storage relocation is implied. DLF owns reusable library code, not a central deployed auth service.
+
+Post-link local reads and edits must not require a live backend session per operation. Demonstrate
+cold restart and durable offline edits with expired provider/backend sessions and separate outages,
+then reconnect without losing pending work. Initial sign-in/linking still require network access.
+Missing local attachments remain unavailable rather than being called fully offline. These are
+required outcomes on the selected build, not capabilities already established by investigation.
 
 ## Work sequence
 

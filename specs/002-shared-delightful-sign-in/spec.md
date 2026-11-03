@@ -1,6 +1,6 @@
 # Feature Specification: Shared Delightful sign-in
 
-**Feature Branch**: `spec/shared-delightful-sign-in`
+**Feature Branch**: `research/atproto-jazz-auth` (follow-up to merged PR #14)
 
 **Created**: 2026-11-03
 
@@ -22,7 +22,8 @@ this later instruction. Publication of Clipper content remains a separate consum
 The 2026-11-03 continuation selects an architecture to explore: Jazz remains the application
 database and synchronization authority; AT Protocol supplies a candidate external identity and
 an optional public publication destination. A PDS does not replace Jazz storage or its account
-registry. This is not a selection of a qualified authentication bridge, SDK upgrade or operator.
+registry. The selected implementation direction is app-owned backend authentication; its exact
+source build, hosting operator and deployed compatibility still require qualification.
 
 | Consumer context | Identity use                                                          | Application storage                                       | Publication boundary                                                                                      |
 | ---------------- | --------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -36,6 +37,56 @@ selected recipients through AT Protocol Spaces, private PDS backup, and a Jazz�
 are deferred. This deferral does not remove existing Jazz private-workspace requirements.
 Public publication is independently adoptable and does not gate shared sign-in delivery. These
 consumer cases constrain the shared boundary; they do not authorize either app's implementation.
+
+## Hosting and deployment direction
+
+Retain Finance and Clipper frontends on Netlify. Run each app’s backend-owned authentication and
+Jazz sync boundary as a persistent service alongside its frontend. Select the service operator
+through implementation qualification; no frontend move or new repository is required.
+
+DLF remains a reusable library: it supplies sign-in/linking lifecycle, recovery/session contracts,
+and reusable server integration helpers. Each consumer repository owns its server entry point,
+configuration, routes, secrets and deployment. Each app deploys its own backend integration and
+maintains independent sessions and Jazz permissions. A standalone login application, central DLF
+authentication service, cross-app cookie or new repository is not required for this scope.
+
+AT Protocol OAuth callbacks can use request-based Node hosting such as Netlify Functions, provided
+state/session storage is durable and refresh coordination works across instances. This does not
+qualify the entire Jazz sync backend for that host. The inspected Jazz implementation keeps HTTP
+stream sessions in process memory and explicitly requires one backend instance or sticky routing;
+ordinary stateless function routing is not assumed to satisfy that requirement. Prefer a persistent
+backend for the combined boundary rather than splitting OAuth into another deployment without need.
+See [hosting source evidence and limits](hosting.md).
+
+The application backend and Jazz Core storage are separate deployment roles. A remote Core may
+remain the storage authority if compatibility is demonstrated. Introducing the application backend
+MUST NOT implicitly move, reset or replace existing storage; preservation and any migration follow
+[the backup-first delivery sequence](delivery.md). No particular persistent service operator or
+compatibility with the currently hosted Core is claimed yet.
+
+## Required local-first behavior
+
+The backend establishes identity and supports authorized synchronization; it does not make every
+supported application read or edit an online request. After successful setup, a retained eligible
+local account MUST reopen with locally available data, accept supported offline edits, and preserve
+those edits across browser closure and restart. Reconnection synchronizes under existing domain
+policies, distinguishing local durability from remote acceptance and rejection.
+
+Initial external sign-in on a new device, new account linking and remote identity recovery require
+connectivity. Expired backend/provider sessions or a provider, backend or Core outage MUST NOT by
+themselves discard local data, create an empty replacement account, or prevent already-authorized
+supported local work. Local continuation does not assert fresh remote authentication or override a
+known account revocation, explicit logout or domain policy. Reauthentication can be required before
+remote operations resume; retained local recovery authority remains subject to the reviewed link policy.
+
+Local first is not a promise that every record or attachment has been downloaded. Consumers MUST
+distinguish locally available data, unavailable content, loading/failure, and true empty results.
+Public PDS publication is a separate explicit online operation; offline intent, local source saving
+and confirmed public acceptance remain distinct. Finance has no publication dependency.
+
+These are required outcomes, not claims already proven by source inspection. Qualify offline cold
+restart after linking, durable offline edits, expired sessions, separate service outages, reconnect,
+rejection/conflicts and recovery on the exact adopted build before calling the integration complete.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -96,6 +147,9 @@ A user can distinguish existing app recovery from provider recovery and retain s
 2. **Given** an external-only account, **When** recovery is requested, **Then** the supported provider recovery path and its limitations are disclosed; no local-first recovery phrase is fabricated or promised.
 3. **Given** a qualified retained local session and a provider or registry outage, **When** the app opens offline, **Then** supported local work remains available; fresh sign-in, linking and remote authority claims remain unavailable or pending rather than being reported successful.
 4. **Given** canceled sign-in, **When** provider work later completes, **Then** it cannot silently select another account. Already-issued registry work remains owned until its result can be reconciled.
+5. **Given** an existing linked account and locally available records, **When** backend/provider sessions expire and all remote services are unavailable, **Then** offline cold restart preserves the selected account, supported reads and edits; those edits survive another restart without fresh sign-in.
+6. **Given** durable offline edits, **When** connectivity returns and reauthentication is required, **Then** the app retains the edits while sign-in proceeds, synchronizes under the original account, and reports acceptance, rejection or conflicts separately without silent loss.
+7. **Given** a referenced attachment not retained locally, **When** it is opened offline, **Then** the app reports unavailable content rather than an empty attachment or complete offline availability.
 
 ### User Story 5 - Use identity without social publication (Priority: P1)
 
@@ -176,7 +230,7 @@ source and interrupt a later public write. Verify exact disclosed content and di
 - **FR-010**: Offline behavior MUST preserve only qualified existing local capabilities; it MUST NOT claim fresh remote authentication, linking acceptance, remote revocation or provider recovery while unavailable. Outages MUST NOT manufacture replacement identities.
 - **FR-011**: Recovery MUST distinguish provider recovery from existing local-first recovery and from data availability. Existing local-first secrets MUST stay transient and excluded from logs, URLs, persisted workflow snapshots and provider payloads. External-only accounts MUST disclose their actual recovery dependencies.
 - **FR-012**: Ordinary and broader logout semantics MUST be explicit, including which app, provider session and other devices are affected and what cannot be confirmed offline. [NEEDS CLARIFICATION: Q2 — is ordinary logout app-local with a separate broader action, or intended to sign out every Delightful app?]
-- **FR-013**: The first release MUST document its supported sign-in methods and provider/hosting ownership before implementation approval. AT Protocol identity is the first integration direction to evaluate. [NEEDS CLARIFICATION: Q1 — hosting/operator constraints and any required initial methods in addition to AT Protocol?] No qualified provider/bridge or SDK upgrade is selected by this draft.
+- **FR-013**: The first release MUST document its supported sign-in methods and provider/hosting ownership before implementation approval. AT Protocol identity is the first integration direction to evaluate. The selected direction retains Netlify frontends and uses persistent app backends. AT Protocol is the initial sign-in integration; existing local-first recovery remains. The persistent operator, exact source build and deployed integration must be qualified; additional external methods are deferred.
 - **FR-014**: Production, development and disposable previews MUST isolate provider trust configuration, app registrations, Jazz app IDs, registry/storage scope, callbacks and test identities. Untrusted previews MUST NOT receive production credentials or identity/data authority. Preview teardown MUST revoke/remove its configuration without deleting production identities. Wildcard trust for arbitrary preview origins is prohibited.
 - **FR-015**: DLF MUST expose reusable intent, lifecycle and typed outcome capabilities while delegating credential verification, registry assignment and persistence to supported SDK/provider boundaries. It MUST NOT create a duplicate identity registry, secret store or authentication protocol.
 - **FR-016**: Apps MUST retain domain authorization and pending-write/drain responsibilities; DUI MUST retain generic presentation. Library use MUST NOT require Finance schemas, Clipper schemas or app-owned routes. User-visible messages MUST remain localizable and interactions accessible under existing rules.
@@ -190,6 +244,11 @@ source and interrupt a later public write. Verify exact disclosed content and di
 - **FR-024**: Publication MUST be a deliberate snapshot rather than continuous replication. Source edits require explicit republishing. Removal from the publishing repository MUST be explicit and report actual acceptance separately from source deletion; no action may promise erasure of third-party copies or restoration of secrecy for already-public content.
 - **FR-025**: MVP publication MUST support remaining unpublished and explicit public publication without depending on AT Protocol Spaces. Restricted-audience publication, private PDS storage, end-to-end encrypted publication and bidirectional Jazz/PDS synchronization are deferred. Existing app storage permissions MUST remain enforceable; neither sign-in nor being unpublished is a new confidentiality guarantee.
 - **FR-026**: DLF MUST keep reusable verified-identity, session and consent/capability boundaries independently adoptable. Clipper owns public-content models, publication workflow, durable journal and retry/removal policy; Finance owns financial models and has no publishing workflow. Generic publication infrastructure MUST NOT be added to DLF without separately evidenced reuse and review.
+
+- **FR-027**: Frontends MUST be able to remain on Netlify while each consumer deploys its own persistent authentication/sync backend from its existing repository. DLF MUST provide reusable library boundaries without requiring a standalone login app, separate service repository or central shared credential service. Secrets and durable OAuth state/session storage remain server-side; refresh coordination MUST work across instances.
+- **FR-028**: The selected host MUST support the exact Jazz build’s sync transport and session lifetime/routing requirements. Netlify OAuth callback compatibility MUST NOT be described as qualification of the complete Jazz sync service. Remote Core reuse MUST be verified independently and MUST NOT imply storage migration or replacement.
+- **FR-029**: After setup and linking, supported offline reads and edits MUST use retained local data/authority without per-operation online authentication. Offline edits MUST survive browser closure and cold restart. Expired remote sessions and service outages MUST NOT alone erase local data, replace the selected account or discard edits; reconnect MUST preserve pending work and report remote outcomes separately. Fresh-device sign-in and new linking require connectivity; known revocation and explicit logout follow the qualified policy rather than being bypassed.
+- **FR-030**: Consumers MUST expose actual local record/attachment availability and MUST NOT equate local-first storage with a fully downloaded workspace. Qualification MUST exercise cold restart, durable offline edits, expired sessions, provider/backend/Core outages, reconnect and recovery on the exact adopted build before completion claims.
 
 ### Key Entities
 
@@ -214,6 +273,10 @@ source and interrupt a later public write. Verify exact disclosed content and di
 - **SC-007**: Every publication scenario discloses only the confirmed revision to the confirmed DID; source saves, edits, account changes and synchronization produce zero unconfirmed public writes.
 - **SC-008**: Every interrupted publication/removal scenario retains its original target and explicit outcome across restart; reconciliation creates zero duplicate records in the qualified scenarios and never claims deletion of third-party copies.
 
+- **SC-009**: Every qualified post-link offline cold-restart scenario retains the original account and locally available data; supported edits survive a second restart with zero discarded edits or replacement accounts, including expired remote sessions.
+- **SC-010**: Every reconnect scenario preserves original pending operations and reports actual remote acceptance, rejection or conflict; unavailable attachments are never reported as complete locally available content.
+- **SC-011**: Each consumer can deploy its backend integration from its existing repository while its frontend remains on Netlify; transport and cross-instance OAuth/session qualification is recorded without requiring a new central login application.
+
 ## Assumptions
 
 - This feature starts a separately authorized scope beyond foundation FR-006's deferral of automatic SSO. It does not reinterpret that historical scope as already implemented. Foundation recovery is app-scoped here; recovery material is never a shared-sign-in transport.
@@ -228,7 +291,7 @@ source and interrupt a later public write. Verify exact disclosed content and di
 | DLF                   | Reusable identity intent, safe linking/recovery orchestration, session lifecycle and typed outcomes; optional publication-capability separation                      | Reuse existing session owner; no second registry, credential transport or Clipper publication engine           |
 | Consuming app         | App ID/environment, routes, domain data/policies, disclosure integration and domain write settlement; Clipper's public payloads, consent, journal and reconciliation | No shared identity implies domain authorization or public disclosure; Finance needs no publication integration |
 | Jazz SDK and registry | Account handles, app-scoped assignments, link protocol, credential admission, runtime persistence/synchronization                                                    | Client source observations do not prove deployed registry behavior                                             |
-| Identity provider     | Authentication, provider session, supported credentials and provider recovery                                                                                        | No ownership of app domain policies; hosting/configuration remains undecided                                   |
+| Identity provider     | Authentication, provider session, supported credentials and provider recovery                                                                                        | No ownership of app domain policies; app session hosting is consumer-owned                                     |
 | DUI                   | Generic accessible presentation                                                                                                                                      | No identity policy or credential ownership                                                                     |
 
 Public DLF capabilities must distinguish sign-in, link-current-account, recover, cancel/reconcile and logout, with read-only readiness/outcome observations. Provider credential acquisition stays behind an explicit adapter boundary; raw secrets are not UI or actor snapshot fields. Exact interfaces and statecharts belong to a later approved design, after provider and registry qualification.
@@ -246,7 +309,7 @@ See [research](research.md) for pinned SDK evidence and provider candidates,
 [AT Protocol integration research](atproto-research.md) for current code/spec findings and version
 limits, [authentication feasibility](auth-feasibility.md) for the published-version comparison,
 registry evidence and conditional recommendation, and [qualification](qualification.md) for required evidence. Provider/bridge choice,
-hosting/operator, required methods, domains/callbacks, stable DID-to-Jazz mapping, supported Jazz
+persistent backend operator, domains/callbacks, stable DID-to-Jazz mapping, supported Jazz
 admission, recovery availability and logout scope must be resolved before identity implementation
 planning claims readiness. Publication additionally needs a separately reviewed Clipper design for
 public Lexicons, exact source eligibility, consent, durable operation ownership, reconciliation and
