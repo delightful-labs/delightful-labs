@@ -162,6 +162,10 @@
 			"types": "./dist/machines/workspaces/naming.d.ts",
 			"default": "./dist/machines/workspaces/naming.js"
 		},
+		"./forms/zod": {
+			"types": "./dist/validation/form-issues.d.ts",
+			"default": "./dist/validation/form-issues.js"
+		},
 		"./forms/contracts": {
 			"types": "./dist/contracts/scoped-form.d.ts",
 			"default": "./dist/contracts/scoped-form.js"

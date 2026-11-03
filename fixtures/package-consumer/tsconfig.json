@@ -9,6 +9,7 @@
 	},
 	"include": [
 		"./consumer.ts",
+		"./cleanup.ts",
 		"./backup.js",
 		"./backup-envelope.js",
 		"./envelope-browser.ts",

@@ -15,7 +15,7 @@ const transaction = setup<
 	string,
 	{
 		db: unknown
-		attempt: { profileId: string; organizationId: string }
+		attempt: { identityId: string; workspaceId: string }
 		purpose?: 'additional' | 'bootstrap'
 	},
 	{ outcome: string }
@@ -27,35 +27,37 @@ const transaction = setup<
 describe('domain-free extracted boundaries', () => {
 	it('uses initialized local provenance without requesting authority or preparing writes', async () => {
 		const discover = vi.fn(async () => ({
-			profiles: [{ id: 'person', initialWorkspaceId: 'notebook' }],
-			organizations: [],
+			identities: [{ id: 'person', initialWorkspaceId: 'notebook' }],
+			workspaces: [],
 			serverConfigured: true
 		}))
-		const prepareInitial = vi.fn(async () => ({ profileId: 'person', organizationId: 'notebook' }))
+		const prepareInitial = vi.fn(async () => ({ identityId: 'person', workspaceId: 'notebook' }))
 		const actor = createActor(
 			createWorkspaceInitialization({
 				tiers: { local: 'local', authority: 'authority' },
 				discover,
 				prepareInitial,
+				selectReady: (attempt) => attempt,
 				transaction
 			}),
 			{ input: { db: {}, userId: 'reader' } }
 		).start()
 		expect(await toPromise(actor)).toEqual({
 			outcome: 'ready',
-			profileId: 'person',
-			organizationId: 'notebook'
+			identityId: 'person',
+			workspaceId: 'notebook'
 		})
 		expect(discover).toHaveBeenCalledExactlyOnceWith({ db: {}, userId: 'reader', tier: 'local' })
 		expect(prepareInitial).not.toHaveBeenCalled()
 	})
 	it('does not bootstrap an empty offline replica', async () => {
-		const prepareInitial = vi.fn(async () => ({ profileId: 'person', organizationId: 'notebook' }))
+		const prepareInitial = vi.fn(async () => ({ identityId: 'person', workspaceId: 'notebook' }))
 		const actor = createActor(
 			createWorkspaceInitialization({
 				tiers: { local: 'local', authority: 'authority' },
-				discover: async () => ({ profiles: [], organizations: [], serverConfigured: false }),
+				discover: async () => ({ identities: [], workspaces: [], serverConfigured: false }),
 				prepareInitial,
+				selectReady: (attempt) => attempt,
 				transaction
 			}),
 			{ input: { db: {}, userId: 'reader' } }

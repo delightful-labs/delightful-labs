@@ -118,6 +118,8 @@ export function createProfileFormOptions<
 		bytes: Uint8Array
 		mimeType: string
 	}) => { success: true; data: ProfileAvatarValues } | { success: false }
+	/** Applies to both save callbacks; hosts await the backend's persistence receipt before resolving. */
+	saveSettlement: 'locallyPersisted' | 'confirmed'
 	saveName: (id: string, user: string, name: string | null) => Promise<unknown>
 	saveAvatar: (id: string, user: string, values: ProfileAvatarValues) => Promise<unknown>
 }) {
@@ -128,6 +130,7 @@ export function createProfileFormOptions<
 		scopeOf: profileScope,
 		sameScope: sameProfileScope,
 		observe: deps.observe,
+		settlement: deps.saveSettlement,
 		classifyBlocked: (): 'unavailable' => 'unavailable'
 	}
 	const name = createSingleWriteFormOptions<

@@ -8,7 +8,7 @@ import type {
 } from './creation-operation.js'
 export function createWorkspacePersistence<
 	Db,
-	Attempt extends { profileId: string; organizationId: string; workspace: { ownerId: string } },
+	Attempt,
 	Workspace,
 	RS extends Snapshot<CreationReconciliation<Workspace>>,
 	TS extends Snapshot<CreationPersistenceResult<Workspace>>
@@ -20,7 +20,7 @@ export function createWorkspacePersistence<
 }) {
 	type WorkspacePersistenceEvent = CreationEvent
 	type WorkspacePersistenceResult = CreationPersistenceResult<Workspace>
-	type Input = { attempt: Attempt }
+	type Input = { attempt: Attempt; issuance: 'new' | 'unknown' }
 	type Context = Input & { db: Db; result: WorkspacePersistenceResult | undefined }
 	const db = options.db
 	const transaction = options.transaction
@@ -54,6 +54,18 @@ export function createWorkspacePersistence<
 		initial: 'validating',
 		output: ({ context }) => {
 			if (!context.result) throw new Error('Missing workspace persistence outcome')
+			if (context.issuance === 'unknown' && context.result.settlement === 'notStarted') {
+				if (context.result.outcome === 'cancelled' || context.result.outcome === 'closed')
+					return {
+						...context.result,
+						settlement: 'unresolved'
+					} satisfies WorkspacePersistenceResult
+				return {
+					outcome: 'failed',
+					settlement: 'unresolved',
+					error: new Error('Prior creation issuance is unknown')
+				} satisfies WorkspacePersistenceResult
+			}
 			return context.result
 		},
 		on: { CANCEL: '.cancelled', SHUTDOWN: '.closed' },
@@ -83,7 +95,24 @@ export function createWorkspacePersistence<
 					src: 'reconcile',
 					input: ({ context }) => context,
 					onDone: [
-						{ guard: ({ event }) => event.output?.outcome === 'absent', target: 'transacting' },
+						{
+							guard: ({ context, event }) =>
+								event.output?.outcome === 'notStarted' ||
+								(event.output?.outcome === 'absent' && context.issuance === 'new'),
+							target: 'transacting',
+							actions: assign({ issuance: 'new' })
+						},
+						{
+							guard: ({ event }) => event.output?.outcome === 'absent',
+							target: 'completed',
+							actions: assign({
+								result: (): WorkspacePersistenceResult => ({
+									outcome: 'failed',
+									settlement: 'unresolved',
+									error: new Error('Prior creation issuance is unknown')
+								})
+							})
+						},
 						{
 							guard: ({ event }) => event.output?.outcome === 'matching',
 							target: 'completed',

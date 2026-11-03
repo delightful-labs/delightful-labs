@@ -1,13 +1,15 @@
 import { assign, raise, sendTo, setup, stateIn, type ActorLogic, type Snapshot } from 'xstate'
-export type CreationBinding = { key: string; userId: string; profileId: string }
+/** Host key includes every identity/profile/backend dimension that invalidates this operation. */
+export type CreationBinding = { key: string }
 export type CreationRecord = {
 	key: string
-	attempt: { organizationId: string; profileId: string; workspace: { ownerId: string } }
+	attempt: unknown
 }
 export type CreationRequest<Record> =
 	| { mode: 'load' }
 	| { mode: 'create'; name: string }
-	| { mode: 'retry' | 'clear'; record: Record }
+	| { mode: 'clear'; record: Record }
+	| { mode: 'retry'; record: Record; settlement: 'notStarted' | 'unresolved' }
 export type CreationResult<Record, Workspace> =
 	| { outcome: 'editing' | 'invalid'; record: undefined; settlement: 'notStarted' }
 	| { outcome: 'recovered'; record: Record; settlement: 'notStarted' }
@@ -36,31 +38,45 @@ export type CreationResult<Record, Workspace> =
 			settlement: 'notStarted' | 'locallyPersisted' | 'unresolved'
 	  }
 
-export type CreationOperationLogic<Record, S extends Snapshot<unknown>> = ActorLogic<
+export type CreationOperationLogic<
+	Record,
+	S extends Snapshot<unknown>,
+	Binding extends CreationBinding = CreationBinding
+> = ActorLogic<
 	S,
 	{ type: 'CANCEL' | 'SHUTDOWN' },
-	{ binding: CreationBinding; request: CreationRequest<Record> }
+	{ binding: Binding; request: CreationRequest<Record> }
 >
 export function createWorkspaceCreationOwner<
 	Record extends CreationRecord,
 	Workspace,
-	S extends Snapshot<CreationResult<Record, Workspace>>
->(operation: CreationOperationLogic<Record, S>) {
+	S extends Snapshot<CreationResult<Record, Workspace>>,
+	Binding extends CreationBinding = CreationBinding
+>(operation: CreationOperationLogic<Record, S, Binding>) {
 	type WorkspaceJournalRecord = Record
 	type CreationRequest = import('./creation-owner.js').CreationRequest<Record>
 	type Result = CreationResult<Record, Workspace>
 	type Context = {
 		draftRevision: number
-		binding: CreationBinding | undefined
-		operation: CreationBinding | undefined
+		binding: Binding | undefined
+		operation: Binding | undefined
 		request: CreationRequest
 		record: WorkspaceJournalRecord | undefined
 		result: Result | undefined
 	}
 	type Event =
-		| { type: 'OBSERVED'; binding: CreationBinding | undefined }
+		| { type: 'OBSERVED'; binding: Binding | undefined }
 		| { type: 'SUBMIT'; name: string }
 		| { type: 'REEVALUATE' | 'RETRY' | 'NEW' | 'CANCEL' | 'SHUTDOWN' }
+	function completed(output: Result | undefined, context: Context) {
+		const result: Result = output ?? {
+			outcome: 'unresolved',
+			settlement: 'unresolved',
+			record: context.record,
+			error: new Error('Creation operation returned no result')
+		}
+		return { result, record: result.record }
+	}
 	return setup<
 		Context,
 		Event,
@@ -70,13 +86,12 @@ export function createWorkspaceCreationOwner<
 		{ changed: undefined; replacing: undefined; closing: undefined },
 		never,
 		string,
-		{ binding: CreationBinding | undefined }
+		{ binding: Binding | undefined },
+		{ binding: Binding | undefined; result: Result | undefined }
 	>({
 		actors: { operation },
 		guards: {
-			changed: ({ context }) =>
-				context.binding?.key !== context.operation?.key ||
-				context.binding?.profileId !== context.operation?.profileId,
+			changed: ({ context }) => context.binding?.key !== context.operation?.key,
 			replacing: stateIn({ operating: 'replacing' }),
 			closing: stateIn({ operating: 'closing' })
 		}
@@ -91,6 +106,7 @@ export function createWorkspaceCreationOwner<
 			record: undefined,
 			result: undefined
 		}),
+		output: ({ context }) => ({ binding: context.operation, result: context.result }),
 		on: {
 			OBSERVED: {
 				actions: [assign({ binding: ({ event }) => event.binding }), raise({ type: 'REEVALUATE' })]
@@ -104,7 +120,12 @@ export function createWorkspaceCreationOwner<
 					actions: assign({
 						request: ({ context }): CreationRequest => {
 							if (!context.record) throw new Error('Missing retry attempt')
-							return { mode: 'retry', record: context.record }
+							return {
+								mode: 'retry',
+								record: context.record,
+								settlement:
+									context.result?.settlement === 'notStarted' ? 'notStarted' : 'unresolved'
+							}
 						}
 					})
 				},
@@ -165,21 +186,34 @@ export function createWorkspaceCreationOwner<
 						return { binding: context.operation, request: context.request }
 					},
 					onDone: [
-						{ guard: 'closing', target: 'closed' },
+						{
+							guard: ({ event }) =>
+								event.output === undefined || event.output.settlement === 'unresolved',
+							target: 'unresolved',
+							actions: assign(({ context, event }) => completed(event.output, context))
+						},
+						{
+							guard: 'closing',
+							target: 'closed',
+							actions: assign(({ context, event }) => completed(event.output, context))
+						},
 						{ guard: 'replacing', target: 'checking' },
 						{
 							target: 'classifying',
-							actions: assign({
-								result: ({ event }) => event.output,
-								record: ({ event }) => event.output?.record
-							})
+							actions: assign(({ context, event }) => completed(event.output, context))
 						}
 					],
-					onError: [
-						{ guard: 'closing', target: 'closed' },
-						{ guard: 'replacing', target: 'checking' },
-						{ target: 'unresolved' }
-					]
+					onError: {
+						target: 'unresolved',
+						actions: assign({
+							result: ({ context, event }): Result => ({
+								outcome: 'unresolved',
+								settlement: 'unresolved',
+								record: context.record,
+								error: event.error
+							})
+						})
+					}
 				}
 			},
 			classifying: {
@@ -223,7 +257,24 @@ export function createWorkspaceCreationOwner<
 			recovered: {},
 			conflict: { on: { RETRY: 'checking' } },
 			failed: {},
-			unresolved: {},
+			unresolved: {
+				on: {
+					REEVALUATE: {},
+					SHUTDOWN: {},
+					RETRY: {
+						guard: ({ context }) =>
+							context.binding !== undefined && context.binding.key === context.operation?.key,
+						target: 'operating',
+						actions: assign({
+							request: ({ context }): CreationRequest => {
+								return context.record
+									? { mode: 'retry', record: context.record, settlement: 'unresolved' }
+									: { mode: 'load' }
+							}
+						})
+					}
+				}
+			},
 			closed: { type: 'final', on: { OBSERVED: {}, REEVALUATE: {}, RETRY: {}, SHUTDOWN: {} } }
 		}
 	})

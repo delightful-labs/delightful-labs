@@ -25,6 +25,8 @@ export function createSingleWriteFormOptions<
 >(
 	options: {
 		schema: Schema
+		/** The write promise must settle only after this guarantee is met; mutation return is insufficient. */
+		settlement: 'locallyPersisted' | 'confirmed'
 		availability: ScopedFormAvailabilityLogic<AvailabilitySnapshot, Observation>
 		selectAvailability: (snapshot: AvailabilitySnapshot) => FormCapability<Scope, Reason>
 		scopeOf: (facts: Observation) => Scope
@@ -45,7 +47,7 @@ export function createSingleWriteFormOptions<
 		Observation,
 		AvailabilitySnapshot,
 		PersistenceSnapshot
-	>({ ...options, settlement: 'locallyPersisted' })
+	>(options)
 	const { write: _write, persistence: _persistence, ...formOptions } = options
 	return { ...formOptions, operation } satisfies ScopedFormOptions<
 		Values,

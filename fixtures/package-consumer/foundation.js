@@ -15,7 +15,7 @@ import 'delightful-local-first/profile/avatar'
 import 'delightful-local-first/recovery/coordination'
 import 'delightful-local-first/backend/jazz/startup'
 
-/** @type {{events?:import('delightful-local-first/workspace/initialization').InitializationEvent;input?:{db:object;attempt:{profileId:string;organizationId:string};purpose?:'additional'|'bootstrap'};output?:{outcome:'committed'}}} */
+/** @type {{events?:import('delightful-local-first/workspace/initialization').InitializationEvent;input?:{db:object;attempt:{identityId:string;workspaceId:string};purpose?:'additional'|'bootstrap'};output?:{outcome:'committed'}}} */
 const types = {}
 const transaction = setup({ types }).createMachine({
 	initial: 'complete',
@@ -29,14 +29,15 @@ const initialization = createWorkspaceInitialization({
 		reads++
 		if (tier !== 'cache') throw new Error('Unexpected remote preflight')
 		return {
-			profiles: [{ id: 'reader', initialWorkspaceId: 'notebook' }],
-			organizations: [],
+			identities: [{ id: 'reader', initialWorkspaceId: 'notebook' }],
+			workspaces: [],
 			serverConfigured: true
 		}
 	},
 	prepareInitial: async () => {
 		throw new Error('Existing notebook must not be replaced')
 	},
+	selectReady: (attempt) => attempt,
 	transaction
 })
 const actor = createActor(initialization, { input: { db: {}, userId: 'reader' } }).start()
@@ -44,8 +45,8 @@ try {
 	const result = await toPromise(actor)
 	if (
 		result.outcome !== 'ready' ||
-		!('organizationId' in result) ||
-		result.organizationId !== 'notebook' ||
+		!('workspaceId' in result) ||
+		result.workspaceId !== 'notebook' ||
 		reads !== 1
 	)
 		throw new Error('Packaged local provenance changed')

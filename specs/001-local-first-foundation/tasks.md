@@ -21,6 +21,11 @@ below apply only to the stated boundary. The Jazz-only MVP is not complete.
 
 ## Architecture review follow-ups
 
+**Cleanup implementation status:** AR-01–AR-05 are implemented for review together on
+`fix/foundation-cleanup`; regression qualification follows implementation approval. See
+[review evidence, migration notes and remaining checks](cleanup-review.md). Checkboxes remain open
+until that qualification is complete.
+
 These five open findings come from the repository architecture review of PR #12. They are static
 control-flow/contract findings, not newly reproduced failures. The duplicate supplemental journal was
 removed in that PR; evaluate Jazz and existing DLF capabilities before proposing any persistence
