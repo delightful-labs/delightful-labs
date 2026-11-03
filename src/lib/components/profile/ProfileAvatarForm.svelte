@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { Button, Dialog, Text, InputAvatar } from 'delightful-ui'
-	import type {Snippet} from 'svelte'
+	import { untrack, type Snippet } from 'svelte'
 	import type { ProfileView } from '../../contracts/profile.js'
 	import FormFeedback from '../forms/FormFeedback.svelte'
 	import FormContent from '../forms/FormContent.svelte'
+	const instanceId = $props.id()
+	const avatarId = `${instanceId}-avatar`
+	const helpId = `${instanceId}-avatar-help`
 	let {
 		labels,reasonText,validateFile,accept,cropper,
 		profileId,
@@ -40,22 +43,34 @@
 	let selectionError = $state(false)
 	const resetRevision = $derived(view.draftRevision)
 	const recordId = $derived(profileId)
+	const persistedFile = $derived(
+		avatarData && mimeType
+			? new File([Uint8Array.from(avatarData)], 'avatar', { type: mimeType })
+			: null
+	)
+	// Refresh the saved preview without replacing a selected draft or closing its cropper.
+	$effect(() => {
+		const file = persistedFile
+		untrack(() => {
+			if (selectedFile === savedFile) selectedFile = file
+			savedFile = file
+		})
+	})
+	// Only a new profile or an accepted workflow reset discards presentation drafts.
 	$effect(() => {
 		void recordId
 		void resetRevision
-		const file =
-			avatarData && mimeType
-				? new File([Uint8Array.from(avatarData)], 'avatar', { type: mimeType })
-				: null
-		savedFile = file
-		selectedFile = file
-		pendingFile = null
-		cropOpen = false
-		selectionError = false
+		untrack(() => {
+			savedFile = persistedFile
+			selectedFile = savedFile
+			pendingFile = null
+			cropOpen = false
+			selectionError = false
+		})
 	})
 </script>
 
-<Text id="avatar-help"
+<Text id={helpId}
 	>{labels.formats} {labels.maxSize} {labels.resize}</Text
 >
 <FormFeedback retryLabel={labels.retry}
@@ -103,10 +118,10 @@
 				removeLabel={selectedFile === savedFile
 					? labels.remove
 					: labels.clear}
-				id="profile-avatar"
+				id={avatarId}
 				name="file"
 				accept={accept}
-				aria-describedby="avatar-help"
+				aria-describedby={helpId}
 				required
 				disabled={!view.fieldsEditable}
 			>

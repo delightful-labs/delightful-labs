@@ -82,7 +82,7 @@
 			}
 		},
 		{
-			"files": ["fixtures/package-consumer/jazz.js"],
+			"files": ["fixtures/package-consumer/jazz.js", "tests/fixtures/invitations/schema.ts"],
 			"rules": {
 				"no-restricted-imports": [
 					"error",

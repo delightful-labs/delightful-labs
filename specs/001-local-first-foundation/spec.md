@@ -140,6 +140,12 @@ identity integration. Financial rules and native schema mappings remain consumer
 and member administration remain MVP requirements, but are sequenced after this extraction milestone.
 The next app must not wait for new collaboration features or a complete Finance rewrite.
 
+The Finance extraction milestone is now merged (library PR #10 and Finance PR #45). Invitation
+redemption is the active post-extraction slice. Its client/server workflow boundaries and disposable
+native permissions are qualified separately; native transactional reads, concurrent redemption and
+real bearer verification remain gates before an endpoint or UI. Track completion and outstanding
+MVP work in [tasks.md](tasks.md); this progress does not narrow FR-008.
+
 ## Requirements
 
 ### Functional Requirements

@@ -1,4 +1,3 @@
-import type { FormFeedbackInput, FeedbackMessage } from './feedback.js'
 import {
 	assign,
 	fromPromise,
@@ -10,6 +9,8 @@ import {
 	type SnapshotFrom
 } from 'xstate'
 import type {
+	FormFeedbackInput,
+	FeedbackMessage,
 	FormCapability,
 	FormSchema,
 	FormIssue,

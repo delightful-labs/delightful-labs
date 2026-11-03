@@ -24,3 +24,9 @@ import './forms.js'
 import './submission.js'
 
 import './foundation.js'
+
+import './invitations.js'
+
+import './invitation-authority.js'
+
+import './invitation-owner.js'

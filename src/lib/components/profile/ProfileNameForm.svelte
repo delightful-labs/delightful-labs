@@ -3,6 +3,8 @@
 	import type { ProfileView } from '../../contracts/profile.js'
 	import FormFeedback from '../forms/FormFeedback.svelte'
 	import FormContent from '../forms/FormContent.svelte'
+	const instanceId = $props.id()
+	const nameId = `${instanceId}-display-name`
 	let {
 		labels, reasonText,
 		profileId,
@@ -40,7 +42,7 @@
 		{#snippet fields(view)}
 			<InputText
 				label={labels.displayName}
-				id="profile-display-name"
+				id={nameId}
 				name="displayName"
 				value={displayName ?? ''}
 				disabled={!view.fieldsEditable}

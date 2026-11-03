@@ -182,3 +182,33 @@ export { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordina
 export { observeRow, observeRows } from 'delightful-local-first/data/observations'
 
 export { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/startup'
+
+export { createInvitationRedemptionMachine } from 'delightful-local-first/workspace/invitations/workflow'
+export type {
+	InvitationCapability,
+	InvitationDecision,
+	InvitationEvent,
+	InvitationIdentity,
+	InvitationReadiness,
+	InvitationRequest,
+	InvitationResult,
+	InvitationSettlement
+} from 'delightful-local-first/workspace/invitations/contracts'
+
+export { createJazzInvitationAuthority } from 'delightful-local-first/backend/jazz/invitation-authority'
+export type {
+	InvitationAuthorityAdmission,
+	InvitationAuthorityTransactions
+} from 'delightful-local-first/workspace/invitations/authority-contracts'
+
+export { createInvitationAuthorityMachine } from 'delightful-local-first/workspace/invitations/authority-workflow'
+export type {
+	InvitationAuthorityCapability,
+	InvitationAuthorityRequest,
+	InvitationAuthorityRecords,
+	InvitationAuthorityObservation,
+	InvitationAuthorityPlan,
+	InvitationAuthorityResult,
+	InvitationAuthoritySettlement,
+	InvitationAuthorityEvent
+} from 'delightful-local-first/workspace/invitations/authority-contracts'
