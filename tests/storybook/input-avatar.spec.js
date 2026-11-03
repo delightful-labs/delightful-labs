@@ -121,9 +121,8 @@ test('tile opens a preview with pointer and keyboard, with replacement inside th
 }) => {
 	await open(page)
 	const input = page.getByLabel('Avatar', { exact: true })
-	let picker = page.waitForEvent('filechooser')
-	await input.click()
-	await (await picker).setFiles(image())
+	// Seed the preview; the native chooser interaction under test is replacement below.
+	await input.setInputFiles(image())
 	const trigger = page.getByRole('button', {
 		name: 'File information: image.png',
 		exact: true
@@ -138,9 +137,11 @@ test('tile opens a preview with pointer and keyboard, with replacement inside th
 	await expect(trigger).toBeFocused()
 	await trigger.press('Space')
 	await expect(dialog).toBeVisible()
-	await input.focus()
-	picker = page.waitForEvent('filechooser')
-	await page.keyboard.press('Enter')
+	const replacement = dialog.getByLabel('Avatar', { exact: true })
+	await replacement.focus()
+	await expect(replacement).toBeFocused()
+	const picker = page.waitForEvent('filechooser')
+	await replacement.press('Enter')
 	await (await picker).setFiles(image('new-avatar.png'))
 	await expect(dialog).toBeHidden()
 	await expect(page.getByRole('status')).toHaveText('new-avatar.png')
