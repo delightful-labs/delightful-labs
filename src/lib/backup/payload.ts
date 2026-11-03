@@ -1,3 +1,4 @@
+import { base64Size } from './binary.js'
 import { checkPayloadBudget } from './budget.js'
 import { createPayloadSchemas } from './schemas.js'
 import { parsePayloadJson } from './json.js'
@@ -11,7 +12,6 @@ import {
 } from './types.js'
 
 const utf8 = new TextEncoder()
-const base64Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 function invalid(): never {
 	throw new ArchivePayloadError('invalidPayload')
@@ -27,22 +27,6 @@ function compare(left: string, right: string): number {
 
 function compareRecord(left: ArchiveRecord, right: ArchiveRecord): number {
 	return compare(left.type, right.type) || compare(left.id, right.id)
-}
-
-/** Checks canonical alphabet, padding and pad bits, and obtains byte size before decoding. */
-function base64Size(value: string, maximum: number): number {
-	if (value.length > Math.ceil(maximum / 3) * 4) throw new ArchivePayloadError('limitExceeded')
-	if (value.length % 4 !== 0) return invalid()
-	const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
-	const end = value.length - padding
-	for (let index = 0; index < end; index += 1) {
-		if (!base64Alphabet.includes(value.charAt(index))) return invalid()
-	}
-	const last = base64Alphabet.indexOf(value.charAt(end - 1))
-	if ((padding === 2 && last % 16 !== 0) || (padding === 1 && last % 4 !== 0)) return invalid()
-	const size = (value.length / 4) * 3 - padding
-	if (size > maximum) throw new ArchivePayloadError('limitExceeded')
-	return size
 }
 
 /** Validate and detach caller data. Hashes, domain policy and source completeness are NOT checked. */

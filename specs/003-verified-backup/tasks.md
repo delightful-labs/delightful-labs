@@ -13,11 +13,15 @@ added/run only after review approval of the implementation they cover.
       cases pass; all 556 repository unit tests, strict package validation, standalone Node import
       and browser consumer build pass. Review additionally fixed unsafe/fractional JSON metadata
       rounding before numeric conversion. See [implementation notes](implementation-notes.md).
-- [ ] T003 — Design resource ownership/statecharts and implement the envelope/crypto slice: strict
+- [x] T003 — **Implemented; the user authorized review and tests on 2026-11-03.** Design resource ownership/statecharts and implement the envelope/crypto slice: strict
       envelope validation, independent password derivation, authenticated encryption, actual payload
-      and attachment digests, and releasable immutable verified resources. Present for review.
-- [ ] T004 — After T003 approval, qualify known crypto vectors, corruption/wrong-password handling,
-      bounds, resource release, and browser memory/runtime behavior.
+      and attachment digests, and releasable immutable integrity-checked resources. See [envelope design/review notes](envelope-design.md). Present for review; profile validation and restore authority remain separate.
+- [ ] T004 — **Functional verification complete; large-file memory/latency qualification remains.**
+      After T003 approval, verify vectors/interoperability, corruption/wrong-password handling,
+      bounds and resource release. 52 envelope cases, fixed external v1 vector, independent Node
+      crypto interop and Chromium public-package encryption/opening pass. Measure peak memory and
+      large-file responsiveness against actual consumer sizes before broader limits/platform claims.
+      See [envelope verification evidence](envelope-design.md).
 
 ## Independent reading and lifecycle
 

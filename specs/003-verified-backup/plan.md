@@ -2,7 +2,7 @@
 
 **Branch**: `feat/verified-backup` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
 
-**Status**: Implementation started after merged PR #15. The first structural payload slice has passed local verification and is in PR #16; no live export or verified restore exists yet. See [tasks](tasks.md) and [implementation review notes](implementation-notes.md).
+**Status**: Implementation started after merged PR #15. The first structural payload slice merged in PR #16. The envelope/integrity slice has implementation and functional verification; large-file browser memory/latency remains to be measured; no live export or verified restore exists yet. See [tasks](tasks.md) and [payload review notes](implementation-notes.md) and [envelope ownership/design](envelope-design.md).
 
 ## Summary
 
