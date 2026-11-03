@@ -144,7 +144,12 @@ test('absolute panels align without shifting flow at desktop and narrow widths',
 				exact: true
 			})
 			await summary.scrollIntoViewIfNeeded()
-			const before = await control.boundingBox()
+			// Document coordinates distinguish layout movement from browser scrolling.
+			const documentTop = () =>
+				control.evaluate(
+					(element) => element.getBoundingClientRect().top + window.scrollY
+				)
+			const before = await documentTop()
 			await summary.click()
 			await expect(details).toHaveAttribute('open', '')
 			await expect(
@@ -164,10 +169,10 @@ test('absolute panels align without shifting flow at desktop and narrow widths',
 							: 'View button examples'
 				})
 				.boundingBox()
-			const after = await control.boundingBox()
-			if (!before || !trigger || !panel || !after)
+			const after = await documentTop()
+			if (!trigger || !panel)
 				throw new Error('Expected visible disclosure geometry')
-			expect(after.y).toBeCloseTo(before.y, 1)
+			expect(after).toBeCloseTo(before, 1)
 			expect(panel.y).toBeGreaterThanOrEqual(trigger.y + trigger.height)
 
 			expect(panel.x).toBeGreaterThanOrEqual(0)

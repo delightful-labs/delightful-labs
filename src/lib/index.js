@@ -1,3 +1,6 @@
+import DrawerSection from './Components/DrawerSection.svelte'
+import NavigationGroup from './Components/NavigationGroup.svelte'
+import NavigationLink from './Components/NavigationLink.svelte'
 import Text from './Components/Text.svelte'
 import Heading from './Components/Heading.svelte'
 import Button from './Components/Button.svelte'
@@ -34,6 +37,9 @@ import InputDate from './Components/Inputs/InputDate.svelte'
 import TagInput from './Components/Inputs/TagInput.svelte'
 
 export {
+	NavigationLink,
+	NavigationGroup,
+	DrawerSection,
 	Text,
 	Heading,
 	Button,
