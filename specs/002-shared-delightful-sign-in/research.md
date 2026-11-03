@@ -2,6 +2,13 @@
 
 Research date: 2026-11-03. Scope: source inspection and official documentation only; no authentication implementation, provisioning or runtime authentication qualification performed.
 
+Continuation: the user selected exploration of Jazz-native storage with AT Protocol identity and
+optional explicit public publication. See [AT Protocol integration research](atproto-research.md)
+for fresh code/spec evidence, Finance/Clipper boundaries and the newer Jazz backend-auth candidate.
+The alpha.59 findings below are retained as the PR's prior pinned-package inspection; they were not
+reproduced in this continuation because no installed Jazz package was available in these worktrees.
+Current upstream APIs differ and do not silently replace this baseline.
+
 ## Existing DLF contracts
 
 The baseline is [foundation spec](../001-local-first-foundation/spec.md), particularly FR-005–FR-011 and FR-021, plus the adopted [constitution](../../.specify/memory/constitution.md) and [workflow ownership rules](../../.specify/memory/xstate.md). Foundation FR-006 deferred automatic SSO. This new user request starts that work as a separate feature; the historical foundation scope is not rewritten.
@@ -47,7 +54,11 @@ Provider subject semantics also need qualification: the same person may receive 
 | Auth0 | Official [SSO documentation](https://auth0.com/docs/authenticate/single-sign-on) describes an authentication-domain session reused by independently registered apps, distinct from application sessions. | Managed tenant, app registrations, domain/callback configuration, service terms/cost evaluation and accepted JWT issuer/audience/subject behavior. No pinned Jazz-specific connector verified; assess the generic supported JWT boundary. |
 | Keycloak | Official [OIDC endpoint documentation](https://www.keycloak.org/securing-apps/oidc-layers) describes discovery, redirect authentication, tokens and logout. | Requires an operator or managed hosting, durable service storage, security updates, backups and recovery operations; app registrations and JWT compatibility remain to be verified. No pinned Jazz-specific connector verified. |
 
-These are evaluation candidates, not interchangeable promises. Required methods, existing infrastructure, operating responsibility and budget have not been supplied. Social providers are possible upstream methods of a selected provider, not proof of a shared Delightful identity model.
+These are evaluation candidates, not interchangeable promises. The continuation prioritizes AT
+Protocol identity; it does not select one of these providers or prove a supported AT Protocol
+connector for any of them. Additional required methods, existing infrastructure, operating
+responsibility and budget have not been supplied. AT Protocol may be integrated through a qualified
+provider or a supported Jazz backend boundary; no extra provider is assumed necessary in advance.
 
 [Better Auth security guidance](https://better-auth.com/docs/reference/security) describes host-only cookies by default and opt-in subdomain sharing. That does not solve independent-origin SSO. A supported provider-hosted authentication boundary must establish each app's session independently; this draft does not prescribe a token relay or custom exchange. Browser privacy restrictions mean third-party cookies or hidden iframes must not be the sole supported path.
 
@@ -55,7 +66,7 @@ Any later OAuth/OIDC integration must qualify exact callbacks, request/response 
 
 ## Decisions required before planning readiness
 
-1. **Q1, asked**: Existing identity provider/hosting constraints and required first-release methods. After that answer, evaluate candidates and obtain an explicit provider/hosting choice, operational owner, and recovery model.
+1. **Q1, partially narrowed**: AT Protocol identity is the first evaluation direction. Hosting/operator constraints and any additional required first-release methods remain open. Qualify a supported identity-to-Jazz path, obtain the provider/backend/version decision, and establish operator and recovery responsibilities before implementation.
 2. **Q2, asked**: App-local versus all-app ordinary logout. Distinguish requested scope from what online sessions, disconnected apps and provider APIs can actually confirm.
 3. **Deployment gate**: Real app domains, permitted callback origins, environment registrations, issuer/subject stability, Jazz admission configuration and credential refresh/key-rotation behavior need evidenced decisions. No production or preview services are provisioned here.
 4. **Recovery gate**: Document provider account loss, external-only account recovery and preservation of existing local-first recovery after linking. Unlinking, provider migration and account merge are not silently added to scope.

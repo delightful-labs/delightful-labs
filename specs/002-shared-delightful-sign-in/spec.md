@@ -6,7 +6,27 @@
 
 **Status**: Draft — product decisions and deployment qualification remain open
 
-**Input**: One Delightful identity can sign into independently deployed apps, initially Finance and Clipper, while preserving each app's existing accounts, ownership, recovery and domain policies. This task authorizes specification and research only.
+**Input**: One Delightful identity can sign into independently deployed apps, initially Finance and Clipper, while preserving each app's existing accounts, ownership, recovery and domain policies. Explore Jazz-native application storage with AT Protocol identity and independently optional, explicit social publication. This task authorizes specification and research only.
+
+## Direction and MVP boundary
+
+The 2026-11-03 continuation selects an architecture to explore: Jazz remains the application
+database and synchronization authority; AT Protocol supplies a candidate external identity and
+an optional public publication destination. A PDS does not replace Jazz storage or its account
+registry. This is not a selection of a qualified authentication bridge, SDK upgrade or operator.
+
+| Consumer context | Identity use | Application storage | Publication boundary |
+| --- | --- | --- | --- |
+| Finance | May use verified AT Protocol identity for shared sign-in | Existing Jazz financial records and policies | No social publication requirement or repository-write grant; identity use must stand alone |
+| Clipper | May use the same verified AT Protocol DID through its own app mapping | Jazz-native notes, highlights and other app-owned records | User explicitly publishes selected notes/highlights as public records; app owns schemas and content rules |
+
+Unpublished Clipper work stays in its existing app storage/access scope. “Keep in app” and
+“Publish publicly” are the MVP choices; unpublished does not mean encrypted from infrastructure
+operators or restricted from existing authorized workspace members. Permissioned publication to
+selected recipients through AT Protocol Spaces, private PDS backup, and a Jazz–PDS storage bridge
+are deferred. This deferral does not remove existing Jazz private-workspace requirements.
+Public publication is independently adoptable and does not gate shared sign-in delivery. These
+consumer cases constrain the shared boundary; they do not authorize either app's implementation.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -68,6 +88,53 @@ A user can distinguish existing app recovery from provider recovery and retain s
 3. **Given** a qualified retained local session and a provider or registry outage, **When** the app opens offline, **Then** supported local work remains available; fresh sign-in, linking and remote authority claims remain unavailable or pending rather than being reported successful.
 4. **Given** canceled sign-in, **When** provider work later completes, **Then** it cannot silently select another account. Already-issued registry work remains owned until its result can be reconciled.
 
+### User Story 5 - Use identity without social publication (Priority: P1)
+
+A Finance user signs in with AT Protocol identity without exposing financial records or granting
+the application authority to publish. A Clipper user can also sign in and keep all work unpublished.
+
+**Why this priority**: Authentication must be useful independently of social participation.
+
+**Independent Test**: Sign in to separate Finance and Clipper consumers without repository-write
+permission, then create private sentinel records and restart. Neither consumer publishes them.
+
+**Acceptance Scenarios**:
+
+1. **Given** a qualified AT Protocol sign-in path, **When** Finance authenticates a user, **Then**
+   it resolves its own Jazz account without requesting repository-write permission or writing
+   financial data to a PDS, public feed or social profile.
+2. **Given** a Clipper user who declines publication authorization, **When** they sign in and save
+   a note or highlight, **Then** supported Jazz use continues and nothing is published.
+3. **Given** the same verified DID with a changed handle or migrated PDS, **When** sign-in is
+   repeated through the qualified integration, **Then** identity continuity is preserved; neither
+   handle text nor hosting location creates a new app account. An unverified DID assertion fails.
+
+### User Story 6 - Publish selected Clipper work deliberately (Priority: P2)
+
+A Clipper user reviews a selected note or highlight, chooses public publication, and sees whether
+the public write was accepted independently of whether the source was saved in Jazz.
+
+**Why this priority**: Public sharing must not turn sign-in or ordinary editing into disclosure.
+
+**Independent Test**: Keep two items unpublished, publish only one selected revision, then edit its
+source and interrupt a later public write. Verify exact disclosed content and distinct outcomes.
+
+**Acceptance Scenarios**:
+
+1. **Given** an unpublished item, **When** the user confirms publication, **Then** they first see
+   the exact public content, attribution, destination DID and disclosure consequences. Only that
+   confirmed content is eligible for the public write under app-owned authorization rules.
+2. **Given** a published revision, **When** the Jazz source changes, **Then** the public revision
+   remains unchanged until another explicit publication action. A stale preview or changed
+   destination requires a new confirmation; saving or syncing never publishes automatically.
+3. **Given** Jazz persistence succeeds but PDS publication fails or its response is lost, **When**
+   the result is shown or the app restarts, **Then** source persistence and public acceptance have
+   separate statuses. Retained operation identity supports reconciliation without duplicate posts.
+4. **Given** a published item, **When** the user requests removal from the publishing repository,
+   **Then** the app reports that operation's confirmed, failed or unknown result and explains that
+   third-party copies may remain. Source deletion, logout and permission revocation alone do not
+   assert public removal, and removal does not delete the Jazz source.
+
 ### Edge Cases
 
 - Two tabs/devices race to link the same external identity to different accounts; only an authoritative accepted mapping wins, with an explicit conflict for the other account.
@@ -78,6 +145,11 @@ A user can distinguish existing app recovery from provider recovery and retain s
 - Storage eviction or an empty replica is not proof of an unmapped identity. Losing a provider account is not proof that app data is deleted.
 - Offline logout cannot promise global remote revocation or erase another device's retained data.
 - Preview origins, unexpected redirect destinations, wrong issuer/audience and malformed identity claims must not receive production authority.
+- A handle changes owner or an account migrates PDS; identity continuity follows the verified DID, not a cached handle or server URL.
+- Publication is declined, authorization expires, or PDS access fails while Jazz remains usable.
+- Source content, source access, destination DID or account binding changes during review/publication; stale intent must not disclose a new revision or write as another identity.
+- PDS accepts a write but Jazz cannot record its receipt; restart and another device must reconcile the same publication identity rather than blindly create a second record.
+- A previously published source is deleted or unpublished locally; third-party public copies may persist and must not be described as private again.
 
 ## Requirements *(mandatory)*
 
@@ -95,12 +167,20 @@ A user can distinguish existing app recovery from provider recovery and retain s
 - **FR-010**: Offline behavior MUST preserve only qualified existing local capabilities; it MUST NOT claim fresh remote authentication, linking acceptance, remote revocation or provider recovery while unavailable. Outages MUST NOT manufacture replacement identities.
 - **FR-011**: Recovery MUST distinguish provider recovery from existing local-first recovery and from data availability. Existing local-first secrets MUST stay transient and excluded from logs, URLs, persisted workflow snapshots and provider payloads. External-only accounts MUST disclose their actual recovery dependencies.
 - **FR-012**: Ordinary and broader logout semantics MUST be explicit, including which app, provider session and other devices are affected and what cannot be confirmed offline. [NEEDS CLARIFICATION: Q2 — is ordinary logout app-local with a separate broader action, or intended to sign out every Delightful app?]
-- **FR-013**: The first release MUST document its supported sign-in methods and provider/hosting ownership before implementation approval. [NEEDS CLARIFICATION: Q1 — existing provider or hosting constraints, and required initial sign-in methods?] No provider is selected by this draft.
+- **FR-013**: The first release MUST document its supported sign-in methods and provider/hosting ownership before implementation approval. AT Protocol identity is the first integration direction to evaluate. [NEEDS CLARIFICATION: Q1 — hosting/operator constraints and any required initial methods in addition to AT Protocol?] No qualified provider/bridge or SDK upgrade is selected by this draft.
 - **FR-014**: Production, development and disposable previews MUST isolate provider trust configuration, app registrations, Jazz app IDs, registry/storage scope, callbacks and test identities. Untrusted previews MUST NOT receive production credentials or identity/data authority. Preview teardown MUST revoke/remove its configuration without deleting production identities. Wildcard trust for arbitrary preview origins is prohibited.
 - **FR-015**: DLF MUST expose reusable intent, lifecycle and typed outcome capabilities while delegating credential verification, registry assignment and persistence to supported SDK/provider boundaries. It MUST NOT create a duplicate identity registry, secret store or authentication protocol.
 - **FR-016**: Apps MUST retain domain authorization and pending-write/drain responsibilities; DUI MUST retain generic presentation. Library use MUST NOT require Finance schemas, Clipper schemas or app-owned routes. User-visible messages MUST remain localizable and interactions accessible under existing rules.
 - **FR-017**: Shared sign-in MUST disclose provider dependency and cross-app identity correlation. It MUST NOT claim that authentication encrypts domain data from hosts or grants data access to another app.
 - **FR-018**: Qualification MUST use pinned SDK behavior and real registry/provider configuration; unsupported collision reconciliation, credential compatibility or durability MUST block the corresponding capability claim rather than introduce a custom exchange.
+- **FR-019**: Jazz MUST remain the application persistence/synchronization authority. AT Protocol identity and optional publication MUST NOT require mirroring private application records to a PDS, replacing Jazz synchronization, or treating PDS acceptance as Jazz acceptance. Supported local work MUST remain independent of publication availability.
+- **FR-020**: AT Protocol identity MUST derive from a verified OAuth flow and stable DID, with a documented mapping into the selected Jazz authentication boundary. Handle, PDS URL, browser-supplied DID or decoded access-token claims alone MUST NOT establish control. PDS migration MUST NOT change the logical app mapping. Raw AT Protocol credentials MUST NOT be assumed compatible with Jazz admission. A supported provider/backend integration and its operator must be qualified; DLF MUST NOT invent a token exchange or duplicate account registry.
+- **FR-021**: Authentication and publication authorization MUST be separate capabilities and user intents. Finance MUST require no publication permission; Clipper MUST remain usable without it. Publication authorization MUST be limited to the required collections/operations and obtained through a supported consent flow. Sign-in, account linking, recovery, ordinary saves and background synchronization MUST NOT themselves publish content.
+- **FR-022**: Clipper MUST own publication eligibility, public schemas, source attribution/references and content selection. Before issuing a public write it MUST bind explicit confirmation to an exact content revision, destination DID and current authorized app scope. Payloads MUST exclude unselected notes/highlights, surrounding private context, private workspace metadata, credentials and capability-bearing links. A source or destination change MUST invalidate unissued consent; issued writes retain their original owner until settlement.
+- **FR-023**: Public publication MUST have its own retained operation identity, selected source revision, target record identity and receipt/reconciliation facts. Local intent persistence, Jazz remote acceptance, PDS acceptance and later public discovery MUST remain distinct. Unknown writes MUST be reconciled at the original target before retry; no blanket exactly-once or cross-service atomicity claim is permitted. A later Jazz rejection MUST NOT be represented as undoing a public write. Exact issuance eligibility and multi-device coordination require consumer design and qualification.
+- **FR-024**: Publication MUST be a deliberate snapshot rather than continuous replication. Source edits require explicit republishing. Removal from the publishing repository MUST be explicit and report actual acceptance separately from source deletion; no action may promise erasure of third-party copies or restoration of secrecy for already-public content.
+- **FR-025**: MVP publication MUST support remaining unpublished and explicit public publication without depending on AT Protocol Spaces. Restricted-audience publication, private PDS storage, end-to-end encrypted publication and bidirectional Jazz/PDS synchronization are deferred. Existing app storage permissions MUST remain enforceable; neither sign-in nor being unpublished is a new confidentiality guarantee.
+- **FR-026**: DLF MUST keep reusable verified-identity, session and consent/capability boundaries independently adoptable. Clipper owns public-content models, publication workflow, durable journal and retry/removal policy; Finance owns financial models and has no publishing workflow. Generic publication infrastructure MUST NOT be added to DLF without separately evidenced reuse and review.
 
 ### Key Entities
 
@@ -109,6 +189,8 @@ A user can distinguish existing app recovery from provider recovery and retain s
 - **Session binding**: One selected app account, dependency configuration, resource owner and generation. A replacement creates a new scope even when returning to the same account ID.
 - **Transition outcome**: Confirmed success, failure, cancellation before issuance, conflict, partial completion or unknown acceptance; includes only nonsensitive correlation facts.
 - **Environment**: Explicit production, development or disposable-preview trust boundary, with its own permitted registrations and storage scope.
+- **AT Protocol identity binding**: Verified DID and supported authentication-boundary mapping; mutable handle/PDS discovery is separate metadata, never a replacement identity key.
+- **Publication intent and receipt (consumer-owned)**: Explicitly selected source revision, approved public payload/destination, retained operation/record identity and observed public-write outcome. Contains no authentication secrets and is not a shared DLF domain schema.
 
 ## Success Criteria *(mandatory)*
 
@@ -119,20 +201,23 @@ A user can distinguish existing app recovery from provider recovery and retain s
 - **SC-003**: Every conflict, cancellation, outage and unknown-outcome case in the qualification matrix produces an explicit bounded outcome; zero uncertain operations are blindly replayed.
 - **SC-004**: Every stale-generation and environment-isolation case rejects the obsolete or foreign authority; no secret appears in captured URLs, application diagnostics or persisted workflow snapshots.
 - **SC-005**: Every supported logout and recovery journey reports its actual scope and completion status, including partial failures and offline limitations.
+- **SC-006**: Every identity-only Finance and unpublished Clipper scenario performs zero PDS content writes and requires zero repository-write permissions while retaining qualified Jazz functionality.
+- **SC-007**: Every publication scenario discloses only the confirmed revision to the confirmed DID; source saves, edits, account changes and synchronization produce zero unconfirmed public writes.
+- **SC-008**: Every interrupted publication/removal scenario retains its original target and explicit outcome across restart; reconciliation creates zero duplicate records in the qualified scenarios and never claims deletion of third-party copies.
 
 ## Assumptions
 
 - This feature starts a separately authorized scope beyond foundation FR-006's deferral of automatic SSO. It does not reinterpret that historical scope as already implemented. Foundation recovery is app-scoped here; recovery material is never a shared-sign-in transport.
 - Initial consumers are browser apps on independent origins. Native applications require separate qualification before any support claim.
-- Shared sign-in and safe linking are the first implementation scope; no consuming-app change, authentication implementation or service provisioning is authorized by this specification task.
+- Shared sign-in and safe linking remain the first implementation scope. Explicit publication is an optional subsequent consumer slice; no consuming-app change, authentication/publication implementation, dependency upgrade or service provisioning is authorized by this specification task.
 - Existing foundation review findings remain outstanding. Transition safety depends on actual settlement evidence, not an assumption that those findings have been fixed.
 
 ## Responsibilities and capability boundaries
 
 | Owner | Responsibility | Boundary |
 | --- | --- | --- |
-| DLF | Reusable identity intent, safe linking/recovery orchestration, session lifecycle and typed outcomes | Reuse existing session owner; no second registry or credential transport |
-| Consuming app | App ID/environment, routes, domain data/policies, disclosure integration and domain write settlement | No shared identity implies domain authorization |
+| DLF | Reusable identity intent, safe linking/recovery orchestration, session lifecycle and typed outcomes; optional publication-capability separation | Reuse existing session owner; no second registry, credential transport or Clipper publication engine |
+| Consuming app | App ID/environment, routes, domain data/policies, disclosure integration and domain write settlement; Clipper's public payloads, consent, journal and reconciliation | No shared identity implies domain authorization or public disclosure; Finance needs no publication integration |
 | Jazz SDK and registry | Account handles, app-scoped assignments, link protocol, credential admission, runtime persistence/synchronization | Client source observations do not prove deployed registry behavior |
 | Identity provider | Authentication, provider session, supported credentials and provider recovery | No ownership of app domain policies; hosting/configuration remains undecided |
 | DUI | Generic accessible presentation | No identity policy or credential ownership |
@@ -143,6 +228,17 @@ Public DLF capabilities must distinguish sign-in, link-current-account, recover,
 
 Future access requires explicit authorization for a named requesting app, granting app/account, resource scope, operations, duration and revocation behavior. Identity correlation alone, matching email or a provider session is insufficient. App-owned policies must enforce least privilege and preserve auditability, consent withdrawal and offline revocation limitations. No cross-app grants, shared directory, data migration, account merging, token brokerage or speculative sharing platform is designed in this feature.
 
+Explicit public publication is a separate consumer-owned export, not a private cross-app data grant.
+Its opt-in boundary is specified above; it does not authorize another app to read the Jazz source.
+
 ## Dependencies and decision gates
 
-See [research](research.md) for pinned SDK evidence and provider candidates, and [qualification](qualification.md) for required evidence. Provider choice, hosting/operator, required methods, domains/callbacks, stable subject configuration, Jazz issuer/audience admission, recovery availability and logout scope must be resolved before implementation planning claims readiness. Provider compromise/migration and unlinking require an explicit later recovery design; no unlink/delete/merge capability is implied here.
+See [research](research.md) for pinned SDK evidence and provider candidates,
+[AT Protocol integration research](atproto-research.md) for current code/spec findings and version
+limits, and [qualification](qualification.md) for required evidence. Provider/bridge choice,
+hosting/operator, required methods, domains/callbacks, stable DID-to-Jazz mapping, supported Jazz
+admission, recovery availability and logout scope must be resolved before identity implementation
+planning claims readiness. Publication additionally needs a separately reviewed Clipper design for
+public Lexicons, exact source eligibility, consent, durable operation ownership, reconciliation and
+removal. No public Lexicon or Bluesky feed integration is selected here. Provider compromise/migration
+and unlinking require an explicit later recovery design; no unlink/delete/merge capability is implied.
