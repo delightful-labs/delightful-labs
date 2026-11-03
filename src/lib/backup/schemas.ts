@@ -4,7 +4,7 @@ import type { PayloadLimits } from './types.js'
 const utf8 = new TextEncoder()
 
 /** UTF-8 must not silently replace malformed UTF-16 with replacement characters. */
-function wellFormed(text: string): boolean {
+export function wellFormed(text: string): boolean {
 	for (let index = 0; index < text.length; index += 1) {
 		const code = text.charCodeAt(index)
 		if (code >= 0xd800 && code <= 0xdbff) {

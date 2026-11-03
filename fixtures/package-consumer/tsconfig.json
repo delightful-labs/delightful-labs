@@ -7,6 +7,15 @@
 		"skipLibCheck": false,
 		"exactOptionalPropertyTypes": false
 	},
-	"include": ["./consumer.ts", "./import.js", "./view.ts", "./vite.config.ts"],
+	"include": [
+		"./consumer.ts",
+		"./backup.js",
+		"./backup-envelope.js",
+		"./envelope-browser.ts",
+		"./import.js",
+		"./view.ts",
+		"./vite.config.ts",
+		"./envelope.vite.config.ts"
+	],
 	"exclude": []
 }

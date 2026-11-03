@@ -234,3 +234,12 @@ export type {
 	ArchiveAttachment,
 	PayloadLimitOverrides
 } from 'delightful-local-first/backup/archive'
+
+export { prepareArchiveSeal, prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
+export type {
+	ArchiveEnvelopeRequest,
+	ArchiveEnvelopeResult,
+	IntegrityCheckedArchive,
+	SealedArchive
+} from 'delightful-local-first/backup/envelope'
+export { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'

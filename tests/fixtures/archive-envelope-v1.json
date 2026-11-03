@@ -1,0 +1,18 @@
+{
+	"description": "Fixed DLF v1 vector generated using Node crypto without the DLF implementation; all credentials are public test constants.",
+	"password": "vector-password",
+	"payloadBase64": "eyJhcmNoaXZlSWQiOiIxMjM0NTY3OC0xMjM0LTQyMzQtODIzNC0xMjM0NTY3ODlhYmMiLCJwcm9maWxlIjp7ImlkIjoidmVjdG9yLm5vdGVzIiwidmVyc2lvbiI6MX0sInNvdXJjZSI6eyJhcHBsaWNhdGlvbklkIjoidmVjdG9yIiwid29ya3NwYWNlSWQiOiJ3b3Jrc3BhY2UifSwiY2FwdHVyZWRBdCI6IjIwMjYtMTEtMDNUMDA6MDA6MDAuMDAwWiIsImNvdmVyYWdlIjp7Im1vZGUiOiJjb21wbGV0ZS1zdXBwb3J0ZWQtZ3JhcGgiLCJyZWNvcmRUeXBlcyI6WyJub3RlIl0sImhpc3RvcnkiOiJjdXJyZW50LWRhdGEiLCJkZWxldGVkUmVjb3JkcyI6ImV4Y2x1ZGVkIiwiY29uc2lzdGVuY3kiOiJxdWllc2NlbnQtc2luZ2xlLXVzZXIifSwicmVjb3JkcyI6W10sImF0dGFjaG1lbnRzIjpbXSwicmVmZXJlbmNlcyI6W119",
+	"payloadSha256": "59d706e3e6185de34fb36dc97064d5574fc683c5657677a03a95aa561626c0c2",
+	"envelope": {
+		"magic": "DLF-BACKUP",
+		"version": 1,
+		"protection": "password",
+		"kdf": "PBKDF2-HMAC-SHA-256",
+		"iterations": 600000,
+		"salt": "AAECAwQFBgcICQoLDA0ODw==",
+		"cipher": "AES-256-GCM",
+		"iv": "EBESExQVFhcYGRob",
+		"tagBits": 128,
+		"payload": "eTYzIcnhTlH2RuVcGmp5lu/mUe+jnbvO0u9mzoPKI3/8C0T9ZDBI5XWimldiZRHm14UJ8vaAxej4bVHsY6VRovKk3pk+ZZFSS7AL+f8DACSfyZMCRG4qLQsOdUpT/YACenjn+akNjd8n+faTV0x01k7PnWoRRLeqMLp4CqQy1bQuPaCQEYit+mhh5krRFRXYZSegDvY/2FhqmSSAWmp+x9WGZqBR7GYH3EtZN7UFPHQ6+/bDu/2OZJfH9E8qv9iD6b9HUQ3hGOS81cCqw+HiPz5MhujdekE3cnwwHT9qfNrxSUOtCxxAEUSOEXCKg9c1xn1bM4/r+hxibFhi1tBdTP+NePVef9XtvYzulrgTnric5u0z9sqqJtu2rChE1lWK+Z1YfNT5Q37xAT070TR+bx6KNkqNdrxCIXNcIK5reCx8oEzw/lOSE/xp7194YD02qRHiG3PgdRUs/eJQGPO8jv2dLBZE6+al/Yn60mB1sAGqb0p8b9KY5IeiYASu4zwc1zDG7I0knUPVxVSrvy26FII5eXRCfwRxS3xaGzvg6NlGC/iHmw=="
+	}
+}

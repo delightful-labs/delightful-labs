@@ -1,6 +1,6 @@
 # Validation and recovery rehearsal guide
 
-**Current status**: structural payload codec and its local verification are implemented in PR #16. No executable complete-backup command or UI exists yet. This guide defines the future validation procedure rather than presenting nonexistent commands as runnable. Implementation PRs must replace the described entry points with actual commands and routes before feature completion.
+**Current status**: the structural payload codec merged in PR #16; envelope sealing/opening and integrity checks now have unit and Chromium verification on the next feature branch. No executable complete-backup command or UI exists yet. This guide defines the future validation procedure rather than presenting nonexistent commands as runnable. Implementation PRs must replace the described entry points with actual commands and routes before feature completion.
 
 ## Prerequisites
 
