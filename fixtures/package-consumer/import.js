@@ -24,3 +24,5 @@ import './forms.js'
 import './submission.js'
 
 import './foundation.js'
+
+import './invitations.js'

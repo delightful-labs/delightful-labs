@@ -1,10 +1,13 @@
 # Implementation Plan: Jazz-First Foundation
 
-**Current branch**: `plan/workspace-lifecycle` | **Spec**: [spec.md](spec.md)
-**Status**: Recovery, restoration, startup acquisition and acquired-session readiness are implemented
-and adopted in Finance. Shared workspace selection and its Finance handoff are implemented and
-under final slice qualification. The full Jazz-only MVP remains incomplete. Earlier planning steps
-below are historical; the current contract map and slice progress govern shipped behavior.
+**Current branch**: `feat/workspace-invitations` | **Spec**: [spec.md](spec.md)
+**Status**: The existing Finance extraction milestone is merged (library PR #10, Finance PR #45).
+Recovery/restoration, session lifetime, forms/data boundaries, workspace creation/initialization/
+selection/naming and profile editing are shared. The next focused slice is
+[invitation redemption](workspaces/invitations/plan.md): its public contract/client statechart are
+implemented for review; backend authority, issuance, invitation UX and member administration remain.
+The full Jazz-only MVP is incomplete. The original first-slice plan below is historical context;
+the slice-specific plans and extraction audit record current implementation.
 
 ## Summary
 
