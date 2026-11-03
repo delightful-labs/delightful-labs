@@ -200,3 +200,15 @@ export type {
 	InvitationAuthorityAdmission,
 	InvitationAuthorityTransactions
 } from 'delightful-local-first/workspace/invitations/authority-contracts'
+
+export { createInvitationAuthorityMachine } from 'delightful-local-first/workspace/invitations/authority-workflow'
+export type {
+	InvitationAuthorityCapability,
+	InvitationAuthorityRequest,
+	InvitationAuthorityRecords,
+	InvitationAuthorityObservation,
+	InvitationAuthorityPlan,
+	InvitationAuthorityResult,
+	InvitationAuthoritySettlement,
+	InvitationAuthorityEvent
+} from 'delightful-local-first/workspace/invitations/authority-contracts'

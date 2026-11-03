@@ -77,6 +77,29 @@ function assertCleared(
 }
 
 describe('invitation redemption', () => {
+	it('keeps the original issued identity and code when the caller mutates its request', async () => {
+		const f = fixture()
+		const request = { ...f.request }
+		const original = { ...request }
+		const actor = createActor(createInvitationRedemptionMachine<Scope>(), {
+			input: { request, capability: f.capability }
+		})
+		active.add(actor)
+		actor.start()
+		request.operationId = 'replacement-operation'
+		request.invitationId = 'replacement-invitation'
+		request.code = 'replacement-code'
+		const snapshot = await waitFor(actor, (value) => value.status === 'done', { timeout: 1000 })
+		expect(f.capability.redeem).toHaveBeenCalledExactlyOnceWith(original)
+		expect(snapshot.output).toMatchObject({
+			operationId: original.operationId,
+			invitationId: original.invitationId,
+			outcome: 'completed'
+		})
+		expect(snapshot.output?.scope).toBe(original.scope)
+		assertCleared(snapshot, original.code)
+	})
+
 	it.each(decisions)(
 		'retains the authority $outcome decision without interpreting refusal as membership',
 		async (decision) => {

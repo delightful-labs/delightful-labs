@@ -126,3 +126,24 @@ Strict TypeScript, focused lint/format, declaration packaging and strict publint
 added/run for this new owner before review. The existing 32 client and 18 adapter tests are separate
 prior evidence, not evidence for this new statechart or invitation policy. After review, qualify the
 owner, then bind and qualify the native storage mapping before exposing an endpoint.
+
+## Post-review qualification
+
+The owner and subsequent simplifications were reviewed and committed before adding these tests.
+The focused machine run passes 104 tests: 71 authority-owner tests and 33 client tests. Owner
+coverage includes policy ordering, correlated evidence and removed membership, expiry boundaries,
+interruption during every asynchronous effect, shutdown priority, rollback failures, uncertain
+commit/confirmation, retained-resource transfer and terminal secret-reference cleanup. The client
+suite now includes a regression proving caller mutation cannot change the captured redemption
+request or its reported operation identity.
+
+An independent package consumer imports the public authority workflow and contracts, executes a
+synthetic confirmed redemption, and checks the staged account, role, operation identity and cleanup.
+Strict source and consumer TypeScript, declaration packaging, consumer runtime, focused lint/format
+and strict publint pass. These checks required no further production-code changes.
+
+The consumer and owner tests use synthetic capabilities. They do not qualify native invitation
+permissions, real bearer verification, concurrent redemption, or exclusive read completeness.
+The earlier native transaction adapter tests remain separate evidence. Next, bind and qualify the
+native storage mapping and security boundaries before exposing an HTTP endpoint or UI. Invitation
+redemption remains an explicit operation; it adds no network dependency to ordinary app startup.
