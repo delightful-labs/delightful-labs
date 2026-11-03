@@ -420,6 +420,32 @@ The application owns visibility, loading/save state, translations, retry actions
 
 Children supply visually hidden supplementary text. Native span attributes pass through, including `id` for accessible description references. Keep interactive controls outside this component.
 
+## LinkedListRow
+
+```svelte
+<ul>
+    <LinkedListRow href={resolvedHref} label={destinationLabel}>
+        <Text as="span"><strong>{title}</strong></Text>
+        <Text as="span">{description}</Text>
+        {#snippet trailing()}<Text as="span">{formattedMetadata}</Text>{/snippet}
+    </LinkedListRow>
+</ul>
+```
+
+Renders a native `li` containing one anchor covering the row, with main content, optional trailing
+metadata, and a decorative chevron. Use it within `ul` or `ol`. The supplied translated `label`
+provides the link's accessible name; include the visible title in that name. Children and trailing
+content must be non-interactive: do not put other links, buttons, or form controls inside the row.
+The row has one native tab stop and retains normal browser link activation and context-menu behavior.
+
+The caller owns URL resolution, routing, query parameters, labels, formatting, and domain state.
+Native anchor attributes and callbacks (including class/style) apply to the anchor. A supplied
+`target` or `download` retains native behavior; labels for deliberate new-window navigation should
+communicate that behavior. The component does not synthesize clicks or manage application state.
+
+Customize `--dui-linked-list-row-gap`, `--dui-linked-list-row-padding`, and
+`--dui-linked-list-row-font-size`. Colors and focus treatment use the existing DUI theme.
+
 ## Table
 
 ```svelte
@@ -552,7 +578,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 
