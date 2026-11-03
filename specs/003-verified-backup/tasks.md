@@ -4,6 +4,21 @@ Implementation authorized 2026-11-03 after the user merged PR #15. Work proceeds
 and focused review cycles. No production deployment, commit or publication is implied. Tests are
 added/run only after review approval of the implementation they cover.
 
+## Current handoff (2026-11-03)
+
+Archive/inspector implementation is complete through T005, except T004's large-file measurements.
+The cleanup interruption is complete: PR #19 merged the implementation; [PR #20](https://github.com/delightful-labs/delightful-local-first/pull/20)
+adds regression qualification and two reproduced retry/IndexedDB cancellation fixes. Its implementation
+head `82cc5e4` passed GitHub CI, including unit, package/consumer and browser checks. PR #20 is awaiting
+merge; this documentation update does not imply that it has merged. See the
+[cleanup evidence](../001-local-first-foundation/cleanup-review.md#regression-qualification-completed).
+
+**Next implementation task: T006.** Read the [workflow contract](contracts/workflow.md) and existing
+archive/envelope/inspection ownership notes before designing the shared lifecycle. Present the
+implementation for review before adding/running its tests. No additional general cleanup is required
+before resuming this task. Finance inventory/adoption (T007–T010), concrete journal validation (T012)
+and sign-in delivery remain outstanding. No deployed data or identity/storage configuration changed.
+
 ## Archive core
 
 - [x] T001 — Implement and present the pure bounded payload codec for review. **Implemented and presented; user authorized proceeding to review/tests on 2026-11-03.** Includes internal Zod schemas/inferred types, exact values, strict JSON, limits, graph closure, attachment
@@ -27,8 +42,17 @@ added/run only after review approval of the implementation they cover.
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — Implement shared export/restore actor protocols and a small nonfinancial profile with
-      generation binding, cancellation/drain and unknown-write handling. Review, then verify.
+- [ ] T006 — **Next; not started.** Implement shared export/restore actor protocols and a small
+      nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
+      focused workflow boundaries; keep domain capture, authority and destination operations
+      consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,
+      explicit local versus remote settlement, and unknown-write recovery before effects. Include
+      relationships and a byte attachment so the profile demonstrates exact-content round-trip
+      behavior rather than only counts. Coordinate T012 for any concrete persisted restore journal;
+      do not reuse workspace creation unchanged as a restore protocol. Present for review, then
+      verify export → independently inspect → isolated restore/content comparison, interruption and
+      resume, stale binding rejection, and uncertain writes without duplicate replay. Notebook
+      qualification does not establish Finance completeness or production restore safety.
 
 ## Finance adoption
 

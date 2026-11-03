@@ -154,7 +154,9 @@ The user reviewed/merged PR #19 and authorized the testing follow-up on 2026-11-
   The browser bundle builds during check:consumer, and the cases run in the normal browser suite.
 - All 677 unit tests across 29 files and the 11 separate-process backup reader cases pass. Formatting,
   Oxlint, Svelte/TypeScript, package/strict Publint, consumer declarations/bundles and Storybook build
-  pass. Final-head GitHub CI is checked before reporting completion.
+  pass. GitHub CI passed on implementation head `82cc5e4` in
+  [PR #20](https://github.com/delightful-labs/delightful-local-first/pull/20), including the normal
+  browser suite. PR #20 remains awaiting merge at this handoff.
 
 The tests reproduced and fixed two production-code defects:
 

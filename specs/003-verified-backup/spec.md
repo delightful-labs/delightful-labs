@@ -4,7 +4,10 @@
 
 **Created**: 2026-11-03
 
-**Status**: Draft for review; not implemented
+**Status**: Implementation in progress. The bounded archive codec, envelope/integrity handling and
+independent file inspector are implemented and verified. Shared export/restore coordination (T006)
+and Finance adoption remain unbuilt; no live backup or successful restore is claimed. See
+[tasks and current handoff](tasks.md#current-handoff-2026-11-03).
 
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
 
