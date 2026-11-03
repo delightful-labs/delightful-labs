@@ -95,6 +95,29 @@ and `profile/avatar-view` provide presentation with caller-owned labels. Supply 
 and file validator to the avatar form. No Finance modules, messages, image processor or schema are
 required by these APIs.
 
+## Scoped diagnostics
+
+`diagnostics/logger` provides the scoped logger extracted from Finance:
+
+```ts
+import { createLogger } from 'delightful-local-first/diagnostics/logger'
+
+const logger = createLogger('workspace', { enabled: debugEnabled })
+logger.info('Selection changed', { generation: 2 })
+```
+
+The host supplies `debugEnabled` from its own configuration. Logging defaults to disabled, including
+errors; no development-mode or process-global flag is read by the library. Each logger captures its
+own enablement and optional `sink` with info/warn/error methods, supporting browser and server hosts.
+Messages retain Finance's `[scope] message` prefix and structured details object. Importing the module
+and creating a disabled logger produce no output. There is no log queue, store, remote exporter or
+Jazz transport. This utility does not configure or duplicate Jazz runtime telemetry.
+
+Callers select non-sensitive diagnostics. Never pass records, credentials, provider payloads,
+unfiltered URLs or raw errors/messages/stacks. `DebugValue` restricts the TypeScript shape; it neither
+redacts strings nor makes caller data safe. Sensitive actors must continue to exclude inspection.
+Finance's existing machine sanitizer, inspector and environment defaults are separate integrations.
+
 ## Qualification before shipping
 
 Test app-specific permissions and atomicity against the real backend. Confirm cold local reads and

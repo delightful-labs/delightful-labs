@@ -30,3 +30,5 @@ import './invitations.js'
 import './invitation-authority.js'
 
 import './invitation-owner.js'
+
+import './logger.js'
