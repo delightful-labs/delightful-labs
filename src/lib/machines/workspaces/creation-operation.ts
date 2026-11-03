@@ -461,8 +461,6 @@ export function createWorkspaceCreationOperation<
 							},
 							checkingReconciliation: {
 								always: [
-									{ guard: 'closing', target: 'finishing' },
-									{ guard: 'cancelling', target: 'finishing' },
 									{
 										guard: ({ context }) => context.reconciliation?.outcome === 'matching',
 										target: 'finishing',

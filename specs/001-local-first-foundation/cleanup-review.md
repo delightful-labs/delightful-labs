@@ -10,7 +10,9 @@ storage migration, new journal, new backend or broad validation rewrite is inclu
   Child errors also skip unresolved classification. Capture results first; unresolved settlement
   takes precedence over closing/replacement. Retain the original operation binding and record.
   An unresolved owner ignores replacement/restart commands; retry requires its original binding.
-  A closing owner only finishes after a known outcome. Its final output includes binding/result.
+  A closing owner only finishes after a known outcome. Reconciliation classifies its
+  completed read before applying interruption, so a matching result is not unnecessarily demoted
+  to unknown during cancellation. Its final output includes binding/result.
 - AR-02: Finance's current reconciliation uses `ReadTier.LocalFirst`; `absent` has no issuance
   evidence. Fresh creation may transact after absent because this invocation has not issued a
   write. Recovery/retry starts with unknown prior issuance. Absence cannot authorize another
