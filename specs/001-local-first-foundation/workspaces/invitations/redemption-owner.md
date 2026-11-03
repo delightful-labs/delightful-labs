@@ -1,5 +1,10 @@
 # Redemption transaction owner
 
+> Current status: client (33), adapter (18), owner (71), and native permission (15) tests pass.
+> These qualify distinct boundaries, not end-to-end invitation redemption. See
+> [native storage](native-storage.md) and [remaining tasks](../../tasks.md). Earlier review gates
+> below record the sequence of implementation and qualification.
+
 ## Scope and storage mapping
 
 Compose the reviewed admission/transaction boundary into one finite server-owned statechart. No

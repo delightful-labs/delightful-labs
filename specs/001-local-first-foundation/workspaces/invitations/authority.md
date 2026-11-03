@@ -1,5 +1,10 @@
 # Invitation authority: admission and native transaction boundary
 
+> Current status: client (33), adapter (18), owner (71), and native permission (15) tests pass.
+> These qualify distinct boundaries, not end-to-end invitation redemption. See
+> [native storage](native-storage.md) and [remaining tasks](../../tasks.md). Earlier review gates
+> below record the sequence of implementation and qualification.
+
 ## First backend review scope
 
 The client operation and 32 tests are committed as dabf818. This task adds authenticated admission

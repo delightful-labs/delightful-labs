@@ -1,5 +1,10 @@
 # Invitation redemption: first boundary
 
+> Current status: client (33), adapter (18), owner (71), and native permission (15) tests pass.
+> These qualify distinct boundaries, not end-to-end invitation redemption. See
+> [native storage](native-storage.md) and [remaining tasks](../../tasks.md). Earlier review gates
+> below record the sequence of implementation and qualification.
+
 Branch `feat/workspace-invitations` begins at merged library main 0582a9a. Finance's extraction is
 complete; this slice adds behavior that Finance has not implemented. No Finance migration is needed.
 
