@@ -1,5 +1,12 @@
 # Jazz private creation adapter mapping
 
+> Supplemental qualification and internal journal work. The merged local-first creation workflow
+> and extracted journal remain governed by [creation/plan.md](creation/plan.md), the
+> [current delivery ledger](../tasks.md), and their public package entries. This proposal does not
+> replace them, impose authority waits on ordinary creation, or authorize a consumer migration.
+> Design-history references below to an unbuilt owner concern this supplemental integration;
+> they are not the status of the already shipped creation capability.
+
 **Status**: Source mapping for Jazz 2.0.0-alpha.59, now complemented by ten isolated fixture tests.
 See [qualification results](creation-qualification.md#exclusive-and-browser-restart-result) for observed
 exclusive confirmation, collision and browser restart behavior. Reusable creation orchestration and
@@ -9,19 +16,19 @@ durable journal recovery remain unimplemented. Source-evidence limits below stil
 
 Inspected installed `jazz-tools` package version, root/runtime exports, `dist/runtime/db.{d.ts,js}` and `dist/runtime/client.{d.ts,js}` under `/Users/matt/Projects/delightful-finances/node_modules/jazz-tools`. Root exports the runtime entry point; package public exports, not arbitrary deep imports, govern implementation.
 
-| Contract responsibility | Observed SDK mapping | Limit |
-| --- | --- | --- |
-| Acquire mergeable resource | `db.beginTransaction()` | Eventually consistent; not cross-device uniqueness proof. |
-| Acquire exclusive resource | `db.beginExclusiveTransaction()` | Authority-validated mode when an authority is configured; deployment/policies still need qualification. |
-| Mutable resource identity | `transaction.openTransactionId()` | Mutable transaction identity differs from committed transaction ID. No inspected public API reopens it after restart. |
-| Read/check within resource | `transaction.one(query)` / `all(query)` | Reads must have the required completeness/freshness; null alone is not proven global absence. |
-| Stage stable identities | `transaction.insert(table, data, { id })`; scoped updates/upserts | Upsert is not automatically safe: it must not overwrite an existing workspace or another operation's marker. |
-| Commit once | `transaction.commit()` returns a commit handle with `txId` promise | Issuance precedes eventual transaction-ID availability; retain ownership across that gap. Pending reads can defer physical commit. |
-| Mergeable persistence | `handle.wait({ tier: 'local' })`, separately global | Immediate row/handle return is not durable completion. |
-| Exclusive confirmation | `handle.wait()` | Implementation chooses global when `serverUrl` or native upstream is configured, otherwise local. Never infer authority acceptance solely from resolved `wait()`. |
-| Precommit rollback | `transaction.rollback(): Promise<boolean>` | SDK docs say pending rows remain pending, and transaction cannot commit. Do not claim it erases every local trace. False/error/uncertainty require classification. |
-| Later rejection | `onMutationError` includes transaction record and rejection details | Event fallback is not an enumerated durable recovery log. Establish subscription lifecycle/disposal in the adapter before adoption. |
-| Restart reconciliation | App-owned stable operation/workspace records; supported read paths | Exported `TransactionFate`/`LocalTransactionRecord` types do not establish a public query API for historical fate. No such lookup was found in inspected Db/client declarations. |
+| Contract responsibility    | Observed SDK mapping                                                | Limit                                                                                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Acquire mergeable resource | `db.beginTransaction()`                                             | Eventually consistent; not cross-device uniqueness proof.                                                                                                                        |
+| Acquire exclusive resource | `db.beginExclusiveTransaction()`                                    | Authority-validated mode when an authority is configured; deployment/policies still need qualification.                                                                          |
+| Mutable resource identity  | `transaction.openTransactionId()`                                   | Mutable transaction identity differs from committed transaction ID. No inspected public API reopens it after restart.                                                            |
+| Read/check within resource | `transaction.one(query)` / `all(query)`                             | Reads must have the required completeness/freshness; null alone is not proven global absence.                                                                                    |
+| Stage stable identities    | `transaction.insert(table, data, { id })`; scoped updates/upserts   | Upsert is not automatically safe: it must not overwrite an existing workspace or another operation's marker.                                                                     |
+| Commit once                | `transaction.commit()` returns a commit handle with `txId` promise  | Issuance precedes eventual transaction-ID availability; retain ownership across that gap. Pending reads can defer physical commit.                                               |
+| Mergeable persistence      | `handle.wait({ tier: 'local' })`, separately global                 | Immediate row/handle return is not durable completion.                                                                                                                           |
+| Exclusive confirmation     | `handle.wait()`                                                     | Implementation chooses global when `serverUrl` or native upstream is configured, otherwise local. Never infer authority acceptance solely from resolved `wait()`.                |
+| Precommit rollback         | `transaction.rollback(): Promise<boolean>`                          | SDK docs say pending rows remain pending, and transaction cannot commit. Do not claim it erases every local trace. False/error/uncertainty require classification.               |
+| Later rejection            | `onMutationError` includes transaction record and rejection details | Event fallback is not an enumerated durable recovery log. Establish subscription lifecycle/disposal in the adapter before adoption.                                              |
+| Restart reconciliation     | App-owned stable operation/workspace records; supported read paths  | Exported `TransactionFate`/`LocalTransactionRecord` types do not establish a public query API for historical fate. No such lookup was found in inspected Db/client declarations. |
 
 Do not depend on `getRuntime()`, native internals, internal exclusive-wait helpers or private fields to manufacture a recovery contract. Do not cast serialized strings into SDK-branded transaction IDs without a supported decoding boundary.
 
@@ -35,15 +42,15 @@ The foundation returns workspace identity and evidenced outcome, leaving Clipper
 
 ## Recovery decision table
 
-| Observation | Allowed classification/action |
-| --- | --- |
-| Journal exists; mutation definitively never issued | Retry the same operation after current authorization/readiness checks. |
-| Same operation marker and workspace observed with required guarantee | Reconcile as existing result; do not create again. |
-| Known rejection with adequate bound evidence | Report rejected; retain recovery facts and domain drafts; new attempt requires deliberate retry policy. |
-| Marker/workspace missing on incomplete offline replica | Unresolved; do not infer absence or allocate replacement IDs. |
-| Commit issued; committed ID not journaled; outcome unknown | Reconcile stable intended IDs/marker; remain unresolved if evidence is insufficient. |
-| Positive authoritative evidence of no committed operation, with no pending issued owner | Adapter may authorize retry with the same identities; this evidence path still needs qualification. |
-| Mismatched marker/owner or partial required record set | Conflict/integrity failure; no automatic repair, ownership substitution or destructive cleanup. |
+| Observation                                                                             | Allowed classification/action                                                                           |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Journal exists; mutation definitively never issued                                      | Retry the same operation after current authorization/readiness checks.                                  |
+| Same operation marker and workspace observed with required guarantee                    | Reconcile as existing result; do not create again.                                                      |
+| Known rejection with adequate bound evidence                                            | Report rejected; retain recovery facts and domain drafts; new attempt requires deliberate retry policy. |
+| Marker/workspace missing on incomplete offline replica                                  | Unresolved; do not infer absence or allocate replacement IDs.                                           |
+| Commit issued; committed ID not journaled; outcome unknown                              | Reconcile stable intended IDs/marker; remain unresolved if evidence is insufficient.                    |
+| Positive authoritative evidence of no committed operation, with no pending issued owner | Adapter may authorize retry with the same identities; this evidence path still needs qualification.     |
+| Mismatched marker/owner or partial required record set                                  | Conflict/integrity failure; no automatic repair, ownership substitution or destructive cleanup.         |
 
 Bounded waiting may stop a foreground progress indicator, but cannot turn uncertainty into failure-before-commit. Preserve a recovery-required result for the host rather than blocking shutdown indefinitely or claiming successful cancellation.
 

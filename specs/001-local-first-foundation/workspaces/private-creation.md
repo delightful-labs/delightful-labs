@@ -1,7 +1,15 @@
 # Private workspace creation resource contract
 
+> Supplemental qualification and internal journal work. The merged local-first creation workflow
+> and extracted journal remain governed by [creation/plan.md](creation/plan.md), the
+> [current delivery ledger](../tasks.md), and their public package entries. This proposal does not
+> replace them, impose authority waits on ordinary creation, or authorize a consumer migration.
+> Design-history references below to an unbuilt owner concern this supplemental integration;
+> they are not the status of the already shipped creation capability.
+
 **Status**: Resource contract design with an implemented isolated qualification fixture. Ten fixture
-tests pass; reusable creation orchestration, public exports and consumer migration remain unbuilt.
+SDK tests and sixteen journal tests pass; reusable creation orchestration, public exports and
+consumer migration remain unbuilt.
 Complements the selection plan; does not supersede its implemented protocol.
 
 ## Scope and evidence
@@ -24,19 +32,19 @@ The creation owner also invokes finite journal operations. The transaction owner
 
 ## State-owned steps
 
-| State | Responsibility and next evidence |
-| --- | --- |
-| validating | Pure request/name/intent checks; failure issues no write. |
-| journaling | Persist account-bound operation identity and intended IDs; failure issues no database mutation. |
-| acquiring | Acquire transaction resource; a late result after cancellation is retained and cleaned up. |
-| assessing | Read required records inside the transaction; classify eligible, already-created, conflict, denied or unavailable. Empty cached enumeration is insufficient. |
-| staging | Stage workspace, ownership and required host records in the same transaction; recheck write-boundary invariants. |
-| committing | Issue commit once; retain handle and transaction ID. Cancellation cannot imply rollback once commit is issued. |
-| settling | Await the selected real guarantee; distinguish local persistence from authority acceptance. |
-| rollingBack | Roll back only an acquired, still-mutable transaction; false/rejected/unknown rollback is not successful cancellation. |
-| reconciling | Resolve journaled IDs and known transaction fate after interruption; incomplete observations cannot authorize replay. |
+| State            | Responsibility and next evidence                                                                                                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| validating       | Pure request/name/intent checks; failure issues no write.                                                                                                            |
+| journaling       | Persist account-bound operation identity and intended IDs; failure issues no database mutation.                                                                      |
+| acquiring        | Acquire transaction resource; a late result after cancellation is retained and cleaned up.                                                                           |
+| assessing        | Read required records inside the transaction; classify eligible, already-created, conflict, denied or unavailable. Empty cached enumeration is insufficient.         |
+| staging          | Stage workspace, ownership and required host records in the same transaction; recheck write-boundary invariants.                                                     |
+| committing       | Issue commit once; retain handle and transaction ID. Cancellation cannot imply rollback once commit is issued.                                                       |
+| settling         | Await the selected real guarantee; distinguish local persistence from authority acceptance.                                                                          |
+| rollingBack      | Roll back only an acquired, still-mutable transaction; false/rejected/unknown rollback is not successful cancellation.                                               |
+| reconciling      | Resolve journaled IDs and known transaction fate after interruption; incomplete observations cannot authorize replay.                                                |
 | recordingOutcome | Persist known result/recovery facts before releasing operation ownership. Journal failure after commit preserves committed evidence and a recovery-required outcome. |
-| releasing | Release adapter-owned resources; report cleanup failure or uncertainty explicitly. |
+| releasing        | Release adapter-owned resources; report cleanup failure or uncertainty explicitly.                                                                                   |
 
 These are responsibilities for a reviewed statechart, not a requirement to create an asynchronous boundary around each SDK expression. An adapter must expose real resource operations or a backend-specific child statechart. It must not hide all read/check/stage/commit/journal/reconcile behavior in a single promise leaf.
 
@@ -84,8 +92,17 @@ Stub-only scenarios cannot qualify storage authorization, offline durability or 
 
 ## Review result and next bounded task
 
-The design follows Jazz-only boundaries, strict typed variants, machine-owned resource lifetime and host-owned domain schemas. It does not introduce Finance invariants into the foundation. Remaining qualification decisions are the concrete Jazz transaction mode, deployed private policy and crash-safe reconciliation API; consequently no public API or implementation-ready claim is made.
+The design follows Jazz-only boundaries, strict typed variants, machine-owned resource lifetime and
+host-owned domain schemas. The isolated fixture now qualifies its concrete private policy, exclusive
+confirmation/collision behavior and specific browser restart paths. The internal browser journal has
+its own sixteen passing cases. These results do not establish a production creation workflow or a
+historical transaction-fate lookup API.
 
-Next: review the Jazz adapter mapping for this resource protocol using a minimal private-workspace record set, including the exact operation-marker and transaction-fate lookup path. Keep Finance creation unchanged and Clipper bootstrap gated until that evidence exists.
+Next: implement the reusable creation operation/resource owner against the reviewed journal contract,
+retaining pre-issuance persistence and unknown settlement. Keep production consumer adoption separate
+until that owner and its concrete integration receive review and their own qualification.
 
-The [qualification plan](creation-qualification.md) defines the proposed evidence cases and review artifact for that next task. It now records ten passing isolated authority/browser cases and their limits; durable journal orchestration remains separate work.
+The [qualification plan](creation-qualification.md) defines the proposed evidence cases and review artifact for that next task. It now records twenty-six passing isolated authority/browser/journal cases and their limits; creation orchestration remains separate work.
+
+The [workflow and durable journal boundary](creation-workflow.md) now defines the next internal
+contract and statechart, including the durable pre-issuance marker required to close the commit gap.

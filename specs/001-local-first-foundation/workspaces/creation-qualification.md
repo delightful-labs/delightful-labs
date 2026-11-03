@@ -1,7 +1,15 @@
 # Private creation qualification plan
 
-Status: ten focused tests pass: four local-authority policy cases and six Chromium exclusive/restart
-cases. Reusable creation orchestration and durable journal recovery remain unimplemented.
+> Supplemental qualification and internal journal work. The merged local-first creation workflow
+> and extracted journal remain governed by [creation/plan.md](creation/plan.md), the
+> [current delivery ledger](../tasks.md), and their public package entries. This proposal does not
+> replace them, impose authority waits on ordinary creation, or authorize a consumer migration.
+> Design-history references below to an unbuilt owner concern this supplemental integration;
+> they are not the status of the already shipped creation capability.
+
+Status: twenty-six focused tests pass: four local-authority policy cases, six Chromium SDK
+exclusive/restart cases, and sixteen Chromium journal cases. Reusable creation orchestration remains
+unimplemented; the internal journal adapter and its own restart coverage are now present.
 This is the next bounded task for the [resource contract](private-creation.md) and
 [Jazz mapping](jazz-creation-mapping.md). G1 remains open.
 
@@ -20,19 +28,19 @@ never use Finance financial rows or Clipper library records as universal foundat
 
 ## Evidence to collect after fixture review
 
-| Case | Required observation | Failure consequence |
-| --- | --- | --- |
-| Owner creation | All required records accepted together and readable by the owner | Block creation adapter |
-| Foreign identity | Reads denied; forged owner/parent insertion and ownership mutation rejected | Block private-workspace claim |
-| Atomic rejection | One invalid required record prevents acceptance of the complete set | Block atomic creation claim |
-| Same operation on two clients | Matching stable IDs reconcile without overwriting another operation | Keep retry unresolved |
-| Conflicting operation | Existing incompatible marker/workspace is reported as conflict | Prohibit upsert/replay |
-| Authority unavailable | Actual acquisition/commit/wait behavior recorded without relabeling local evidence | Retain unknown outcome |
-| Rollback | True, false and rejected rollback distinguished; resulting visibility inspected | No false cancellation claim |
-| Commit before journal update | Complete process restart recovers through stable IDs and marker | Block crash recovery claim |
-| Local persistence then restart | Exact rows survive full browser-process closure in the same profile | Block local durability claim |
-| Restored account | Independent profile reads the authority-accepted required set | Block cross-profile claim |
-| Account replacement | Old view invalidates immediately; issued resource drains with correlated outcome | Block consumer adoption |
+| Case                           | Required observation                                                               | Failure consequence           |
+| ------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------- |
+| Owner creation                 | All required records accepted together and readable by the owner                   | Block creation adapter        |
+| Foreign identity               | Reads denied; forged owner/parent insertion and ownership mutation rejected        | Block private-workspace claim |
+| Atomic rejection               | One invalid required record prevents acceptance of the complete set                | Block atomic creation claim   |
+| Same operation on two clients  | Matching stable IDs reconcile without overwriting another operation                | Keep retry unresolved         |
+| Conflicting operation          | Existing incompatible marker/workspace is reported as conflict                     | Prohibit upsert/replay        |
+| Authority unavailable          | Actual acquisition/commit/wait behavior recorded without relabeling local evidence | Retain unknown outcome        |
+| Rollback                       | True, false and rejected rollback distinguished; resulting visibility inspected    | No false cancellation claim   |
+| Commit before journal update   | Complete process restart recovers through stable IDs and marker                    | Block crash recovery claim    |
+| Local persistence then restart | Exact rows survive full browser-process closure in the same profile                | Block local durability claim  |
+| Restored account               | Independent profile reads the authority-accepted required set                      | Block cross-profile claim     |
+| Account replacement            | Old view invalidates immediately; issued resource drains with correlated outcome   | Block consumer adoption       |
 
 Storage authorization and durability require the real deployed boundary. Synthetic actor coverage
 can later qualify orchestration but cannot satisfy those rows.
@@ -70,9 +78,9 @@ credentials, schema deployment or browser profile. Deployment is a later explici
 
 Proposed fixture-only records:
 
-| Table | Fields beyond the stable row ID | Insert invariant |
-| --- | --- | --- |
-| workspaces | ownerId, creationOperationId | ownerId equals authenticated account; matching marker points back to this workspace and owner |
+| Table              | Fields beyond the stable row ID          | Insert invariant                                                                                 |
+| ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| workspaces         | ownerId, creationOperationId             | ownerId equals authenticated account; matching marker points back to this workspace and owner    |
 | creationOperations | ownerId, workspaceId, requestFingerprint | ownerId equals authenticated account; intended workspace and fingerprint fixed for the operation |
 
 Both IDs are allocated before journaling. The fingerprint identifies the normalized immutable
@@ -164,3 +172,18 @@ Commands, exact scenarios and limits are recorded in the
 [fixture README](../../../fixtures/private-creation/README.md). Fixture strict TypeScript, lint,
 formatting and diff checks accompany the runtime results. No external deployment or consumer change
 was needed. The next design task can use these observed guarantees while preserving unknown outcomes.
+
+## Browser journal result
+
+The separately reviewed internal journal adapter now passes sixteen native-IDB Chromium cases,
+bringing combined fixture qualification to twenty-six passing tests. These verify atomic
+compare-and-set, immutable identity/terminal evidence, corrupt/unsupported record preservation,
+failure and late-open cleanup, and journal contents surviving full-browser SIGKILL with networking
+offline. Blocked events and failure triggers are injected at the factory/native-operation seams;
+the actual persistence transactions, rollback and process restart are native. See the
+[workflow verification record](creation-workflow.md#approved-journal-verification) for scope.
+
+Durable journal storage is no longer unbuilt. It is not yet integrated with a creation operation
+owner, so pre-issuance ordering, evidence provenance, cancellation/drain and unknown-write
+reconciliation remain open. No automatic write replay, production schema or consumer adoption has
+been added by this coverage cycle.

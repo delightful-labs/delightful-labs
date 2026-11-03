@@ -21,6 +21,7 @@ beforeAll(async () => {
 	profile = await mkdtemp(join(tmpdir(), 'dlf-private-creation-'))
 	web = await createServer({
 		configFile: false,
+		cacheDir: resolve('node_modules/.vite/dlf-private-creation'),
 		root: resolve('fixtures/private-creation'),
 		plugins: [jazzPlugin({ server: false, appId: authority.appId, inspector: false })],
 		server: { host: '127.0.0.1', port: 6198, strictPort: true, fs: { allow: [process.cwd()] } }
