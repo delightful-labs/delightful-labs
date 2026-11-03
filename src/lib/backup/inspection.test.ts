@@ -104,6 +104,15 @@ describe('inspection scope and profile validation', () => {
 		result.report.release()
 		expect(() => result.report.readSummary()).toThrow()
 	})
+	it('accepts transferred Node Buffers without erasing the envelope child’s detached copy', async () => {
+		const owned = Buffer.from(plain())
+		const result = await run(
+			prepareArchiveInspection({ source: { read: () => Promise.resolve(owned) } })
+		)
+		expect(result.outcome).toBe('integrityValidProfileUnsupported')
+		expect(owned.every((byte) => byte === 0)).toBe(true)
+		if ('report' in result) result.report.release()
+	})
 	it.each([true, false])(
 		'runs an exact registered validator and reports validity %s',
 		async (valid) => {

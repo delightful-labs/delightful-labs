@@ -401,7 +401,8 @@ export function prepareArchiveOpen(
 ): ArchiveEnvelopeRequest {
 	if (bytes.byteLength > envelopeBytesLimit) throw new ArchivePayloadError('limitExceeded')
 	return request(
-		new Operation('openPlain', bytes.slice(), password, resolvePayloadLimits(overrides))
+		// Buffer.slice() is a shared view; always copy into an ordinary Uint8Array.
+		new Operation('openPlain', Uint8Array.from(bytes), password, resolvePayloadLimits(overrides))
 	)
 }
 export function envelopeFailure(error: unknown): ArchiveEnvelopeResult {

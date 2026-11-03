@@ -344,6 +344,18 @@ describe('tampering, parameters and input bounds', () => {
 })
 
 describe('operation ownership, interruption and safe snapshots', () => {
+	it('detaches Node Buffer inputs instead of retaining Buffer.slice views', async () => {
+		const input = Buffer.from(wire(externalPlain()))
+		const request = prepareArchiveOpen(input)
+		input.fill(0)
+		const result = await run(request)
+		expect(result.outcome).toBe('integrityChecked')
+		if (result.outcome === 'integrityChecked') result.archive.release()
+		const retained = Buffer.from(wire(externalPlain()))
+		const before = Buffer.from(retained)
+		prepareArchiveOpen(retained).release()
+		expect(retained).toEqual(before)
+	})
 	it('handles released and already claimed requests without disturbing their owner', async () => {
 		const discarded = prepareArchiveSeal(sample(), { kind: 'none' })
 		discarded.release()

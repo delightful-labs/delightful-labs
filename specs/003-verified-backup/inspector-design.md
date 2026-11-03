@@ -78,11 +78,14 @@ technical tool protocol; consumer-facing labels remain a later localized present
 
 The user authorized proceeding with review and tests on 2026-11-03. Review found that synchronous
 source/password exceptions bypassed the intended error classification; both throws and rejected
-promises now produce the appropriate safe read-failure code. Regression tests cover each.
+promises now produce the appropriate safe read-failure code. Regression tests cover each. Review also reproduced Node Buffer aliasing: `Buffer.slice()`
+shared the caller’s storage, so cleanup could erase the envelope input. Opening now copies into
+an ordinary `Uint8Array`; regressions verify transferred inspector buffers and retained caller
+buffers have the intended ownership.
 
 Local verification:
 
-- 29 inspector cases pass; all 637 repository unit tests pass across 27 files. Coverage includes
+- 30 inspector cases pass; all 639 repository unit tests pass across 27 files. Coverage includes
   unknown/exact profile versions, valid/invalid profiles, duplicate registration, frozen input,
   validator exceptions, passwords, reduced limits, opaque snapshots and report ownership. Every
   main actor stage is interrupted; late readers are drained/cleared; concurrent/reused requests
