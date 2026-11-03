@@ -1,0 +1,12 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"types": ["node"],
+		"skipLibCheck": false,
+		"exactOptionalPropertyTypes": false
+	},
+	"include": ["./*.mjs"],
+	"exclude": []
+}

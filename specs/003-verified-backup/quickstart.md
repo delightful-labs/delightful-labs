@@ -1,6 +1,6 @@
 # Validation and recovery rehearsal guide
 
-**Current status**: the structural payload codec merged in PR #16; envelope sealing/opening and integrity checks now have unit and Chromium verification on the next feature branch. No executable complete-backup command or UI exists yet. This guide defines the future validation procedure rather than presenting nonexistent commands as runnable. Implementation PRs must replace the described entry points with actual commands and routes before feature completion.
+**Current status**: the structural payload codec merged in PR #16; envelope sealing/opening and integrity checks merged in PR #17 with unit and Chromium verification. The independent reader now has local unit and separate-process runtime verification. No executable complete-backup command or UI exists yet. This guide defines the future validation procedure rather than presenting nonexistent commands as runnable. Implementation PRs must replace the described entry points with actual commands and routes before feature completion.
 
 ## Prerequisites
 
@@ -44,3 +44,20 @@ pnpm format:check
 ```
 
 The existing lint/type/package/test scripts become relevant to changed implementation slices later. Do not run the all-in-one `verify` before implementation approval because it includes tests. A specification formatting pass is not evidence of backup safety.
+
+## Retained-file inspector implementation
+
+After one-time installation and `pnpm package`, the independent command is:
+
+```sh
+pnpm backup:inspect ./retained-file.dlfbackup
+```
+
+The command performs no build or network access. Encrypted files require `--password-stdin` and the
+exact UTF-8 password through stdin, without newline removal. See [the reader guide](../../fixtures/backup-reader/README.md)
+for exit codes, privacy and bounds. The headless reader has passed retained-file, password, limit and signal tests without original app credentials or common network APIs; broader consumer adoption still requires its own evidence. No real backup is available
+until consumer capture is implemented. Generic integrity is explicitly distinguished from recognized
+profile validation, and neither establishes a verified restore.
+
+`pnpm check:backup-reader` is a static check after packaging; it does not execute inspection. The
+[inspector design](inspector-design.md) records ownership/state transitions and the post-review matrix.

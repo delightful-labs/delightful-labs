@@ -113,6 +113,7 @@ class Operation {
 	#expectedDigest: string | undefined
 	#digest: string | undefined
 	#output: EnvelopeSuccess | undefined
+	#checkedOwner: ((archive: IntegrityCheckedArchive) => void) | undefined
 	#cursor = 0
 	#pending = 0
 	#released = false
@@ -139,6 +140,14 @@ class Operation {
 		if (this.#claimed) throw new ArchiveEnvelopeError('operationInUse')
 		this.#claimed = true
 	}
+	/** Internal ownership hook: a parent retains a child's acquired result before its done event. */
+	retainCheckedOutput(retain: (archive: IntegrityCheckedArchive) => void) {
+		this.#open()
+		if (this.#claimed || this.#checkedOwner || !this.mode.startsWith('open'))
+			throw new ArchiveEnvelopeError('operationInUse')
+		this.#checkedOwner = retain
+	}
+
 	prepare(): EnvelopeMode {
 		this.#open()
 		if (this.mode.startsWith('seal')) {
@@ -319,6 +328,7 @@ class Operation {
 			)
 		}
 		this.#bytes = undefined // ownership moves to result; undelivered result remains cleanup-owned
+		this.#checkedOwner?.(this.#output.archive)
 		return this.#output
 	}
 	cleanup(keepOutput: boolean) {
@@ -345,6 +355,7 @@ class Operation {
 		this.#header = undefined
 		this.#digest = undefined
 		this.#expectedDigest = undefined
+		this.#checkedOwner = undefined
 	}
 }
 
@@ -390,7 +401,8 @@ export function prepareArchiveOpen(
 ): ArchiveEnvelopeRequest {
 	if (bytes.byteLength > envelopeBytesLimit) throw new ArchivePayloadError('limitExceeded')
 	return request(
-		new Operation('openPlain', bytes.slice(), password, resolvePayloadLimits(overrides))
+		// Buffer.slice() is a shared view; always copy into an ordinary Uint8Array.
+		new Operation('openPlain', Uint8Array.from(bytes), password, resolvePayloadLimits(overrides))
 	)
 }
 export function envelopeFailure(error: unknown): ArchiveEnvelopeResult {

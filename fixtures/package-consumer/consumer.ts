@@ -243,3 +243,11 @@ export type {
 	SealedArchive
 } from 'delightful-local-first/backup/envelope'
 export { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
+
+export { prepareArchiveInspection } from 'delightful-local-first/backup/inspection'
+export type {
+	ArchiveInspectionRequest,
+	ArchiveInspectionResult,
+	ArchiveProfileValidator
+} from 'delightful-local-first/backup/inspection'
+export { createArchiveInspectionMachine } from 'delightful-local-first/backup/inspection/workflow'
