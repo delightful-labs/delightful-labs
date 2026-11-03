@@ -149,6 +149,10 @@ selection machine. A small synthetic consumer plus focused Finance adoption is t
 
 ## Subsequent private creation boundary
 
+The [private creation resource contract](private-creation.md) now proposes operation ownership,
+state-owned steps, interruption outcomes and integration qualification. It remains design-only;
+the concrete Jazz adapter and creation entry point are not implemented.
+
 Private creation is explicit user intent and can be valid even for a recovered identity; automatic
 first-workspace creation additionally requires trustworthy new-identity provenance. Current startup
 acquisition/status reports do not provide that provenance. Until it is designed and evidenced, the

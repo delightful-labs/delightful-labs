@@ -24,3 +24,4 @@ project.inlang/*.sqlite*
 # Browser verification artifacts
 playwright-report/
 test-results/
+.pnpm-store/v10/
