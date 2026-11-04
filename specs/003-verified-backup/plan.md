@@ -22,6 +22,10 @@ permission. Historical per-slice journal/ownership review and qualification rema
 notes; the preparation evidence supersedes earlier blanket statements that no coordinator/control
 writer exists.
 
+The PR #23 lock-owner review correction is qualified after review: 924 units (41 focused cases),
+13 native Jazz/Chromium cases and package/consumer/static checks pass for the explicit lock chart
+and coordinator release handshake. Later stacked slices require requalification after propagation. See [lock design](restore-lock-design.md).
+
 ## Summary
 
 Start implementation with a standalone, bounded DLF archive codec and independent file inspector. It has no Jazz, Finance, login, or UI dependency. Add the stateful export/restore coordination separately, then Finance’s domain profile against its existing `jazz-tools@2.0.0-alpha.59` deployment. A newer Jazz release and AT Protocol sign-in are not prerequisites.

@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { assign, fromPromise, sendTo, setup } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
 import {
@@ -70,6 +70,11 @@ export function createRestorePreparationMachine<Transaction, Write>(
 		const child = self.getSnapshot().children.write
 		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
 	})
+	const shutdownWriter = model.enqueueActions(({ self, enqueue }) => {
+		const child = self.getSnapshot().children.write
+		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, { type: 'SHUTDOWN' })
+	})
+
 	return model.createMachine({
 		id: 'restore-preparation',
 		context: ({ input }) => ({
@@ -110,19 +115,42 @@ export function createRestorePreparationMachine<Transaction, Write>(
 			},
 			owned: {
 				initial: 'acquiring',
-				invoke: { src: 'lock', input, onError: 'complete' },
-				on: { LOCK_FAILED: '#restore-preparation.complete' },
+				invoke: {
+					id: 'lock',
+					src: 'lock',
+					input,
+					onDone: [
+						{
+							guard: ({ event }) => event.output === 'failed',
+							target: 'complete',
+							actions: assign({ outcome: 'incomplete', interruption: undefined })
+						},
+						{ target: 'complete' }
+					],
+					onError: {
+						target: 'complete',
+						actions: assign({ outcome: 'incomplete', interruption: undefined })
+					}
+				},
+				on: { LOCK_FAILED: { actions: [assign({ interruption: 'closed' }), shutdownWriter] } },
 				states: {
+					releasing: { id: 'release-preparation-lock', entry: sendTo('lock', { type: 'RELEASE' }) },
 					acquiring: {
 						on: {
 							LOCK_ACQUIRED: [
 								{
 									guard: 'interrupted',
-									target: '#restore-preparation.complete'
+									target: '#release-preparation-lock'
 								},
 								{ target: 'loading' }
 							],
-							LOCK_UNAVAILABLE: '#restore-preparation.complete'
+							CANCEL: { target: '#release-preparation-lock', actions: 'interrupt' },
+							SHUTDOWN: { target: '#release-preparation-lock', actions: 'interrupt' },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								target: '#release-preparation-lock',
+								actions: 'interrupt'
+							}
 						}
 					},
 					loading: {
@@ -136,7 +164,7 @@ export function createRestorePreparationMachine<Transaction, Write>(
 							onDone: [
 								{
 									guard: 'interrupted',
-									target: '#restore-preparation.complete',
+									target: '#release-preparation-lock',
 									actions: assign({ record: ({ event }) => event.output.record })
 								},
 								{
@@ -153,11 +181,12 @@ export function createRestorePreparationMachine<Transaction, Write>(
 								},
 								{
 									guard: ({ event }) => event.output.outcome === 'conflict',
-									target: '#restore-preparation.conflict'
+									target: '#release-preparation-lock',
+									actions: assign({ outcome: 'conflict' })
 								},
-								{ target: '#restore-preparation.complete' }
+								{ target: '#release-preparation-lock' }
 							],
-							onError: '#restore-preparation.complete'
+							onError: '#release-preparation-lock'
 						}
 					},
 					creatingIntent: {
@@ -180,19 +209,21 @@ export function createRestorePreparationMachine<Transaction, Write>(
 								},
 								{
 									guard: ({ event }) => event.output.outcome === 'conflict',
-									target: '#restore-preparation.conflict'
+									target: '#release-preparation-lock',
+									actions: assign({ outcome: 'conflict' })
 								},
-								{ target: '#restore-preparation.complete' }
+								{ target: '#release-preparation-lock' }
 							],
-							onError: '#restore-preparation.complete'
+							onError: '#release-preparation-lock'
 						}
 					},
 					admittingWrite: {
 						always: [
-							{ guard: 'interrupted', target: '#restore-preparation.complete' },
+							{ guard: 'interrupted', target: '#release-preparation-lock' },
 							{
 								guard: ({ context }) => context.record?.checkpoint.kind === 'conflict',
-								target: '#restore-preparation.conflict'
+								target: '#release-preparation-lock',
+								actions: assign({ outcome: 'conflict' })
 							},
 							{ target: 'writing' }
 						]
@@ -206,21 +237,20 @@ export function createRestorePreparationMachine<Transaction, Write>(
 								record: requirePreparationValue(context.record)
 							}),
 							onDone: {
-								target: '#restore-preparation.complete',
+								target: '#release-preparation-lock',
 								actions: assign({
 									outcome: ({ event }) => event.output.outcome,
 									record: ({ event }) => event.output.record
 								})
 							},
 							onError: {
-								target: '#restore-preparation.complete',
+								target: '#release-preparation-lock',
 								actions: assign({ outcome: 'incomplete' })
 							}
 						}
 					}
 				}
 			},
-			conflict: { type: 'final', entry: assign({ outcome: 'conflict' }) },
 			complete: { type: 'final' }
 		}
 	})

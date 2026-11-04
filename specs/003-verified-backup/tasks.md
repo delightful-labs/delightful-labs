@@ -6,6 +6,14 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**PR #23 operation-lock correction locally qualified after review.** `operationLock` is now an
+explicit acquisition/held/release/failure machine with a minimal Web Locks bridge. Preparation and
+batch coordinators drain work, explicitly release and await native settlement before returning.
+All 924 units (41 focused cases), 13 actual Jazz/Chromium cases, package/consumer and static checks
+pass. See [design and qualification](restore-lock-design.md). The browser harness correction from
+PR #24 is backported without weakening byte assertions. Propagation and qualification on #24/#25
+follow separately; their earlier totals do not qualify the new tree. No PR merge is authorized.
+
 **Current T006 slice locally qualified: one attachment batch.** Following implementation review,
 the user authorized qualification. All 914 units (31 focused write-owner cases), 13 real Jazz/Chromium
 preparation/attachment cases, package/consumer and static checks pass. The attachment root writes one
