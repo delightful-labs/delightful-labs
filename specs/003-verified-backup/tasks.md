@@ -6,11 +6,19 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**PR #23 operation-lock correction locally qualified after review.** `operationLock` is now an
+explicit acquisition/held/release/failure machine with a minimal Web Locks bridge. Preparation and
+batch coordinators drain work, explicitly release and await native settlement before returning.
+All 924 units (41 focused cases), 13 actual Jazz/Chromium cases, package/consumer and static checks
+pass. See [design and qualification](restore-lock-design.md). The browser harness correction from
+PR #24 is backported without weakening byte assertions. Propagation to #24 is now qualified by
+22 native browser cases; propagation to #25 passes all 30 browser cases and all 924 units. No PR merge is authorized.
+
 **Next stacked slice: one mapped note and relationships locally qualified.** The user explicitly
 authorized implementation and tests together while away. On `feat/notebook-restore-note` (stacked
-on PR #24 at `81ba2d6`), the concrete note writer reuses existing actors and stable mappings,
+on the updated PR #24), the concrete note writer reuses existing actors and stable mappings,
 preserves exact body/archive status, and links the mapped notebook and shared/nullable attachment.
-All 30 actual Jazz/Chromium cases pass (22 prior plus eight note cases), along with 914 units and
+All 30 actual Jazz/Chromium cases pass (22 prior plus eight note cases), along with 924 units and
 package/consumer/static checks. See [design, evidence and limits](restore-note-design.md).
 One explicit invocation writes one note; the final batch reaches comparing and remains incomplete.
 Fresh full-graph/relationship/attachment-byte comparison and activation are next, not implemented.
@@ -19,7 +27,7 @@ is authorized. The normal review-before-tests rule remains for later slices unle
 
 **PR #24 stacked on PR #23: one notebook-root batch locally qualified.** After implementation
 review, the user authorized qualification. All 22 actual Jazz/Chromium cases pass (13 prior regressions
-and nine notebook-root cases), alongside 914 units and package/consumer/static checks. Exact title,
+and nine notebook-root cases), alongside the 924-unit shared suite and package/consumer/static checks. Exact title,
 mapped IDs/prefix/reload, no step skipping, conflict, uncertain-write reconciliation, staged-write
 drain/rollback and actual notebook policy denials are covered. See
 [qualification and limits](restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).

@@ -561,3 +561,209 @@ describe('single batch ownership and retained journal prefix', () => {
 		expect(writer.readRemote).not.toHaveBeenCalled()
 	})
 })
+
+/** Native facts are independently gated: callback grant, hold resolution and request settlement. */
+function nativeLockFixture() {
+	const requested = deferred<{
+		name: string
+		callback: (lock: { name: string; mode: 'exclusive' } | null) => Promise<void>
+	}>()
+	let rejectRequest: (reason: unknown) => void = () => {
+		throw new Error('Missing request')
+	}
+	const finished = deferred<void>()
+	const settled = new Promise<void>((resolve, reject) => {
+		rejectRequest = reject
+		void finished.promise.then(resolve)
+	})
+	const request = vi.fn(
+		(
+			name: string,
+			options: unknown,
+			callback: (lock: { name: string; mode: 'exclusive' } | null) => Promise<void>
+		) => {
+			expect(options).toEqual({ mode: 'exclusive', ifAvailable: true })
+			requested.resolve({ name, callback })
+			return settled
+		}
+	)
+	vi.stubGlobal('navigator', { locks: { request } })
+	return {
+		request,
+		finish: () => finished.resolve(),
+		fail: () => rejectRequest(new Error('Native lock request failed')),
+		async offer(available = true) {
+			const { name, callback } = await requested.promise
+			return { hold: callback(available ? { name, mode: 'exclusive' } : null) }
+		},
+		requested: requested.promise
+	}
+}
+describe('operation lock actor and coordinator release ownership', () => {
+	it('does not complete preparation until native release is acknowledged', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const { hold } = await native.offer()
+		await waitFor(actor, (snapshot) => snapshot.matches({ owned: 'releasing' }))
+		await hold
+		expect(actor.getSnapshot().status).toBe('active')
+		expect(writer.commit).toHaveBeenCalledOnce()
+		native.finish()
+		expect((await toPromise(actor)).outcome).toBe('prepared')
+	})
+	it('cancels a delayed acquisition without admitting a late grant or touching the journal', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		await native.requested
+		actor.send({ type: 'CANCEL' })
+		expect(actor.getSnapshot().matches({ owned: 'releasing' })).toBe(true)
+		const { hold } = await native.offer()
+		await hold
+		expect(actor.getSnapshot().status).toBe('active')
+		expect(journal.commands).toEqual([])
+		expect(writer.readRemote).not.toHaveBeenCalled()
+		native.finish()
+		expect((await toPromise(actor)).outcome).toBe('cancelled')
+	})
+	it('releases a late browser callback even after abrupt owner disposal', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		await native.requested
+		actor.stop()
+		const { hold } = await native.offer()
+		await hold
+		native.finish()
+		expect(writer.open).not.toHaveBeenCalled()
+		expect(journal.commands).toEqual([])
+	})
+	it('waits for settlement of a refused native request without doing unlocked work', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const { hold } = await native.offer(false)
+		await hold
+		expect(actor.getSnapshot().status).toBe('active')
+		expect(journal.commands).toEqual([])
+		native.finish()
+		expect((await toPromise(actor)).outcome).toBe('unavailable')
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	it('reports native request rejection without acquiring or writing', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		await native.requested
+		native.fail()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(journal.commands).toEqual([])
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	it('captures a synchronous request error through the native leaf', async () => {
+		const { input, writer } = fixture()
+		vi.stubGlobal('navigator', {
+			locks: {
+				request: () => {
+					throw new Error('Native request throw')
+				}
+			}
+		})
+		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(writer.readRemote).not.toHaveBeenCalled()
+	})
+	it('retains completed evidence but reports incomplete when native release fails', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const { hold } = await native.offer()
+		await waitFor(actor, (snapshot) => snapshot.matches({ owned: 'releasing' }))
+		await hold
+		native.fail()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('incomplete')
+		expect(completed(result.record)).toHaveLength(1)
+		expect(writer.commit).toHaveBeenCalledOnce()
+	})
+	it('drains an issued stage and rolls back on lock loss before completing', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture(),
+			stage = deferred<void>(),
+			staged = deferred<void>()
+		const held = vi.fn()
+		const actor = createActor(
+			createRestorePreparationMachine({
+				...writer,
+				stage: () => {
+					staged.resolve()
+					return stage.promise
+				}
+			}),
+			{ input }
+		).start()
+		const { hold } = await native.offer()
+		void hold.then(held)
+		await staged.promise
+		native.fail()
+		await waitFor(actor, (snapshot) => snapshot.context.interruption === 'closed')
+		expect(actor.getSnapshot().status).toBe('active')
+		expect(writer.rollback).not.toHaveBeenCalled()
+		expect(held).not.toHaveBeenCalled()
+		stage.resolve()
+		const result = await toPromise(actor)
+		await hold
+		expect(result.outcome).toBe('incomplete')
+		expect(writer.rollback).toHaveBeenCalledOnce()
+		expect(writer.commit).not.toHaveBeenCalled()
+		expect(result.record?.checkpoint).toMatchObject({ current: { status: 'issued' } })
+	})
+	it('waits for native release after one batch, preserving the earlier prefix', async () => {
+		const { input, writer } = batchFixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestoreBatchMachine(writer), {
+			input: { ...input, writeId: 'batch-one' }
+		}).start()
+		const { hold } = await native.offer()
+		await waitFor(actor, (snapshot) => snapshot.matches({ owned: 'releasing' }))
+		await hold
+		expect(actor.getSnapshot().status).toBe('active')
+		expect(writer.commit).toHaveBeenCalledOnce()
+		native.finish()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('batchWritten')
+		expect(completed(result.record).slice(0, 1)).toEqual(completed(input.record))
+	})
+	it('keeps the lock through batch rollback and then waits for native release acknowledgement', async () => {
+		const { input, writer } = batchFixture(),
+			native = nativeLockFixture(),
+			rollback = deferred<boolean>(),
+			rollingBack = deferred<void>()
+		writer.readTransaction.mockResolvedValue('conflict')
+		const released = vi.fn()
+		const actor = createActor(
+			createRestoreBatchMachine({
+				...writer,
+				rollback: () => {
+					rollingBack.resolve()
+					return rollback.promise
+				}
+			}),
+			{ input: { ...input, writeId: 'batch-one' } }
+		).start()
+		const { hold } = await native.offer()
+		void hold.then(released)
+		await rollingBack.promise
+		expect(released).not.toHaveBeenCalled()
+		rollback.resolve(true)
+		await waitFor(actor, (snapshot) => snapshot.matches({ owned: 'releasing' }))
+		await hold
+		expect(actor.getSnapshot().status).toBe('active')
+		native.finish()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('conflict')
+		expect(completed(result.record)).toEqual(completed(input.record))
+		expect(writer.commit).not.toHaveBeenCalled()
+	})
+})

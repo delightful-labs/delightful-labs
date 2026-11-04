@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { assign, fromPromise, sendTo, setup } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
 import {
@@ -81,6 +81,11 @@ export function createRestoreBatchMachine<Transaction, Write>(
 		const child = self.getSnapshot().children.write
 		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
 	})
+	const shutdownWriter = model.enqueueActions(({ self, enqueue }) => {
+		const child = self.getSnapshot().children.write
+		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, { type: 'SHUTDOWN' })
+	})
+
 	return model.createMachine({
 		id: 'restore-batch',
 		context: ({ input }) => ({
@@ -120,19 +125,42 @@ export function createRestoreBatchMachine<Transaction, Write>(
 			},
 			owned: {
 				initial: 'acquiring',
-				invoke: { src: 'lock', input, onError: 'complete' },
-				on: { LOCK_FAILED: '#restore-batch.complete' },
+				invoke: {
+					id: 'lock',
+					src: 'lock',
+					input,
+					onDone: [
+						{
+							guard: ({ event }) => event.output === 'failed',
+							target: 'complete',
+							actions: assign({ outcome: 'incomplete', interruption: undefined })
+						},
+						{ target: 'complete' }
+					],
+					onError: {
+						target: 'complete',
+						actions: assign({ outcome: 'incomplete', interruption: undefined })
+					}
+				},
+				on: { LOCK_FAILED: { actions: [assign({ interruption: 'closed' }), shutdownWriter] } },
 				states: {
+					releasing: { id: 'release-batch-lock', entry: sendTo('lock', { type: 'RELEASE' }) },
 					acquiring: {
 						on: {
 							LOCK_ACQUIRED: [
 								{
 									guard: 'interrupted',
-									target: '#restore-batch.complete'
+									target: '#release-batch-lock'
 								},
 								{ target: 'loading' }
 							],
-							LOCK_UNAVAILABLE: '#restore-batch.complete'
+							CANCEL: { target: '#release-batch-lock', actions: 'interrupt' },
+							SHUTDOWN: { target: '#release-batch-lock', actions: 'interrupt' },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								target: '#release-batch-lock',
+								actions: 'interrupt'
+							}
 						}
 					},
 					loading: {
@@ -146,7 +174,7 @@ export function createRestoreBatchMachine<Transaction, Write>(
 							onDone: [
 								{
 									guard: 'interrupted',
-									target: '#restore-batch.complete',
+									target: '#release-batch-lock',
 									actions: assign({ record: ({ event }) => event.output.record })
 								},
 								{
@@ -160,25 +188,27 @@ export function createRestoreBatchMachine<Transaction, Write>(
 
 								{
 									guard: ({ event }) => event.output.outcome === 'conflict',
-									target: '#restore-batch.conflict'
+									target: '#release-batch-lock',
+									actions: assign({ outcome: 'conflict' })
 								},
-								{ target: '#restore-batch.complete' }
+								{ target: '#release-batch-lock' }
 							],
-							onError: '#restore-batch.complete'
+							onError: '#release-batch-lock'
 						}
 					},
 					admittingWrite: {
 						always: [
-							{ guard: 'interrupted', target: '#restore-batch.complete' },
+							{ guard: 'interrupted', target: '#release-batch-lock' },
 							{
 								guard: ({ context }) => context.record?.checkpoint.kind === 'conflict',
-								target: '#restore-batch.conflict'
+								target: '#release-batch-lock',
+								actions: assign({ outcome: 'conflict' })
 							},
 							{
 								guard: ({ context }) => requestedBatchIsCurrent(context.record, context.writeId),
 								target: 'writing'
 							},
-							{ target: '#restore-batch.complete', actions: assign({ outcome: 'incomplete' }) }
+							{ target: '#release-batch-lock', actions: assign({ outcome: 'incomplete' }) }
 						]
 					},
 					writing: {
@@ -191,21 +221,20 @@ export function createRestoreBatchMachine<Transaction, Write>(
 								writeId: context.writeId
 							}),
 							onDone: {
-								target: '#restore-batch.complete',
+								target: '#release-batch-lock',
 								actions: assign({
 									outcome: ({ event }) => event.output.outcome,
 									record: ({ event }) => event.output.record
 								})
 							},
 							onError: {
-								target: '#restore-batch.complete',
+								target: '#release-batch-lock',
 								actions: assign({ outcome: 'incomplete' })
 							}
 						}
 					}
 				}
 			},
-			conflict: { type: 'final', entry: assign({ outcome: 'conflict' }) },
 			complete: { type: 'final' }
 		}
 	})

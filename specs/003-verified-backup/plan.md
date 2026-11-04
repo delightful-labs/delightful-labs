@@ -10,7 +10,8 @@ The user approved replacing unusable browser permission advice with owner-bound 
 admission; actual server policy still enforces acceptance. Issued/uncertain attempts retain the
 existing reconciliation rules. Preparation leaves the destination incomplete.
 
-Current qualification passes all 914 unit cases, 30 real Jazz/Chromium preparation/attachment/notebook/note cases,
+Current qualification passes all 924 unit cases and 30 actual Jazz/Chromium
+preparation/attachment/notebook/note cases on the propagated stack.
 and package/consumer/static checks. See [attachment qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
 The one-attachment continuation and extracted owner/planner are qualified within that scope. No full
 restore is claimed. The one-notebook-root batch stacked in PR #24, extracted continuation and
@@ -24,6 +25,10 @@ Journal metadata alone supplies no destination authority, actual content evidenc
 permission. Historical per-slice journal/ownership review and qualification remain in their design
 notes; the preparation evidence supersedes earlier blanket statements that no coordinator/control
 writer exists.
+
+The PR #23 lock-owner review correction is qualified after review: 924 units (41 focused cases),
+13 native Jazz/Chromium cases and package/consumer/static checks pass for the explicit lock chart
+and coordinator release handshake. The propagated notebook-root tree passes all 22 browser cases, and the note tree passes all 30. See [lock design](restore-lock-design.md).
 
 ## Summary
 
