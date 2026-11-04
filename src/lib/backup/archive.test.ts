@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-	ArchivePayloadError,
+	isArchivePayloadError,
+	createArchivePayloadError,
 	encodeArchivePayload,
 	parseArchivePayload,
 	payloadLimits,
@@ -76,9 +77,11 @@ function sample(): ArchivePayload {
 }
 
 function rejects(input: unknown, overrides: PayloadLimitOverrides = {}) {
-	expect(() => encodeArchivePayload(input, overrides)).toThrow(ArchivePayloadError)
+	expect(() => encodeArchivePayload(input, overrides)).toThrow(
+		expect.objectContaining({ name: 'ArchivePayloadError' })
+	)
 	expect(() => parseArchivePayload(utf8.encode(JSON.stringify(input)), overrides)).toThrow(
-		ArchivePayloadError
+		expect.objectContaining({ name: 'ArchivePayloadError' })
 	)
 }
 
@@ -178,7 +181,9 @@ describe('strict JSON input', () => {
 		'{"a" 1}',
 		'{"a":undefined}'
 	])('rejects malformed/trailing JSON: %s', (wire) => {
-		expect(() => parseArchivePayload(utf8.encode(wire))).toThrow(ArchivePayloadError)
+		expect(() => parseArchivePayload(utf8.encode(wire))).toThrow(
+			expect.objectContaining({ name: 'ArchivePayloadError' })
+		)
 	})
 
 	it.each([
@@ -381,7 +386,9 @@ describe('resource limits and safe caller boundary', () => {
 		expect(() => encodeArchivePayload(cyclic)).toThrow('limitExceeded')
 		const sparse: unknown[] = []
 		sparse.length = 5
-		expect(() => encodeArchivePayload(sparse)).toThrow(ArchivePayloadError)
+		expect(() => encodeArchivePayload(sparse)).toThrow(
+			expect.objectContaining({ name: 'ArchivePayloadError' })
+		)
 		expect(() => encodeArchivePayload(new Date())).toThrow('invalidPayload')
 		expect(() => encodeArchivePayload(withField({ kind: 'integer', value: 1n }))).toThrow(
 			'invalidPayload'
@@ -394,10 +401,28 @@ describe('resource limits and safe caller boundary', () => {
 		} catch (caught) {
 			error = caught
 		}
-		expect(error).toBeInstanceOf(ArchivePayloadError)
-		if (!(error instanceof ArchivePayloadError)) throw new Error('Missing expected error')
+		expect(isArchivePayloadError(error)).toBe(true)
+		if (!isArchivePayloadError(error)) throw new Error('Missing expected error')
 		expect(error.message).toBe('invalidPayload')
 		expect(JSON.stringify(error)).not.toContain('sentinel')
 		expect(Object.hasOwn(error, 'cause')).toBe(false)
+	})
+})
+
+describe('payload error classification', () => {
+	it('classifies only recognized payload errors and keeps codes safe', () => {
+		const error = createArchivePayloadError('invalidPayload')
+		expect(isArchivePayloadError(error)).toBe(true)
+		expect(error).toBeInstanceOf(Error)
+		expect(error.message).toBe('invalidPayload')
+		expect(isArchivePayloadError(new Error('invalidPayload'))).toBe(false)
+		expect(
+			isArchivePayloadError(
+				Object.assign(new Error('private'), { name: 'ArchivePayloadError', code: 'private' })
+			)
+		).toBe(false)
+		expect(isArchivePayloadError({ name: 'ArchivePayloadError', code: 'invalidPayload' })).toBe(
+			false
+		)
 	})
 })

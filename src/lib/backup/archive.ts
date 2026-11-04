@@ -1,7 +1,8 @@
 /** Portable payload codec only. Envelope crypto and domain validation are separate steps. */
 export { encodeArchivePayload, parseArchivePayload } from './payload.js'
 export {
-	ArchivePayloadError,
+	createArchivePayloadError,
+	isArchivePayloadError,
 	payloadLimits,
 	type ArchiveAttachment,
 	type ArchivePayload,

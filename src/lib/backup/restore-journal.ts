@@ -1,6 +1,6 @@
 import { checkPayloadBudget } from './budget.js'
 import { parsePayloadJson } from './json.js'
-import { ArchivePayloadError, resolvePayloadLimits } from './types.js'
+import { isArchivePayloadError, resolvePayloadLimits } from './types.js'
 import {
 	restoreIntentSchema,
 	restoreJournalLimits,
@@ -56,7 +56,7 @@ function bounded<T>(run: () => T): T {
 		return run()
 	} catch (error) {
 		if (isRestoreJournalError(error)) throw error
-		if (error instanceof ArchivePayloadError && error.code === 'limitExceeded')
+		if (isArchivePayloadError(error) && error.code === 'limitExceeded')
 			throw createRestoreJournalError('journalLimitExceeded')
 		throw createRestoreJournalError('invalidJournal')
 	}
@@ -142,7 +142,7 @@ export function decodeRestoreJournalRecord(bytes: Uint8Array): RestoreJournalRec
 		raw = parsePayloadJson(text, limits)
 	} catch (error) {
 		if (isRestoreJournalError(error)) throw error
-		if (error instanceof ArchivePayloadError && error.code === 'limitExceeded')
+		if (isArchivePayloadError(error) && error.code === 'limitExceeded')
 			throw createRestoreJournalError('journalLimitExceeded')
 		throw createRestoreJournalError('invalidJournalEncoding')
 	}

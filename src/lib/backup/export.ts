@@ -11,7 +11,7 @@ import {
 import { isArchiveEnvelopeError, type EnvelopeErrorCode } from './envelope.js'
 import type { ArchiveProfileValidator } from './inspection.js'
 import {
-	ArchivePayloadError,
+	isArchivePayloadError,
 	resolvePayloadLimits,
 	type ArchivePayload,
 	type ArchivePayloadErrorCode,
@@ -324,11 +324,7 @@ export function exportFailure(error: unknown): {
 	outcome: 'failed'
 	code: ArchiveExportErrorCode | ArchivePayloadErrorCode | EnvelopeErrorCode
 } {
-	if (
-		isArchiveExportError(error) ||
-		error instanceof ArchivePayloadError ||
-		isArchiveEnvelopeError(error)
-	)
+	if (isArchiveExportError(error) || isArchivePayloadError(error) || isArchiveEnvelopeError(error))
 		return { outcome: 'failed', code: error.code }
 	return { outcome: 'failed', code: 'exportFailed' }
 }

@@ -6,6 +6,16 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**Current qualified correction: remaining error/SDK wrappers.** The user continued the final code
+cleanup. Payload error factory/guard replaces its subclass; subscription factories return native
+SDK instances rather than extending SDK classes. Callers, declarations and examples are migrated.
+All 321 distinct focused unit cases, 18 notebook/package cases, 11 reader cases, four Chromium cases,
+package/strict Publint, Svelte consumer bundling and static checks pass. See
+[qualification](implementation-notes.md#final-wrapper-cleanup-qualification-2026-11-04).
+No application-owned class declarations remain in src/fixtures. The original audit's code cleanup
+is addressed; restore-journal validation and full regression/PR checks still remain. These wrapper
+changes are uncommitted; workspace journal correction was committed as 75bee3a. No push/merge.
+
 **Current qualified correction: older workspace journal native disposal.** Notebook cleanup
 committed locally as 8e5efe0 at the user's request. The journal now has a fixed invoked database
 owner and transaction disposal that retains/clears handles across stop and late native delivery.
@@ -13,7 +23,7 @@ Policy and input/result contracts are unchanged; typed native reports are includ
 union. All 213 workspace unit cases and nine Chromium journal cases pass, with four new stop probes.
 Package/strict Publint and static/declaration/lint/format checks pass. See
 [qualification](../001-local-first-foundation/cleanup-review.md#workspace-journal-disposal-qualification-2026-11-04).
-This correction is uncommitted; no push/merge. Remaining audit cleanup is inert error/SDK wrappers;
+This workspace journal correction is now committed as 75bee3a; no push/merge. Inert error/SDK wrapper cleanup is qualified above;
 the backup restore-journal correction still requires separate review/qualification.
 
 **Current qualified correction: notebook source ownership.** Export/capture correction committed

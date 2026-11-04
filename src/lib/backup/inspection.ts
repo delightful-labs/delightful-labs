@@ -12,7 +12,8 @@ import {
 	type IntegrityCheckedArchive
 } from './envelope-operation.js'
 import {
-	ArchivePayloadError,
+	createArchivePayloadError,
+	isArchivePayloadError,
 	resolvePayloadLimits,
 	type ArchivePayload,
 	type ArchivePayloadErrorCode,
@@ -141,14 +142,14 @@ export function clearInspectionData(request: ArchiveInspectionRequest, keepRepor
 	data.input = undefined
 }
 function sourceBytes(value: unknown): Uint8Array {
-	if (!(value instanceof Uint8Array)) throw new ArchivePayloadError('limitExceeded')
+	if (!(value instanceof Uint8Array)) throw createArchivePayloadError('limitExceeded')
 	return value
 }
 /** Pure bounded header check. Routing the observed protection belongs to the chart. */
 export function inspectSourceHeader(request: ArchiveInspectionRequest): 'none' | 'password' {
 	const data = inspectionData(request)
 	const bytes = sourceBytes(data.bytes)
-	if (bytes.byteLength > envelopeBytesLimit) throw new ArchivePayloadError('limitExceeded')
+	if (bytes.byteLength > envelopeBytesLimit) throw createArchivePayloadError('limitExceeded')
 	return parseEnvelope(bytes, data.limits).protection
 }
 /** Synchronous construction and early ownership registration, not an envelope workflow. */
@@ -278,7 +279,7 @@ export function inspectionFailure(
 ): Extract<ArchiveInspectionResult, { outcome: 'failed' }> {
 	if (
 		isArchiveInspectionError(error) ||
-		error instanceof ArchivePayloadError ||
+		isArchivePayloadError(error) ||
 		isArchiveEnvelopeError(error)
 	)
 		return { outcome: 'failed', code: error.code }

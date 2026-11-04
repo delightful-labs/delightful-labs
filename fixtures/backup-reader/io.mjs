@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs'
-import { ArchivePayloadError } from 'delightful-local-first/backup/archive'
+import { createArchivePayloadError } from 'delightful-local-first/backup/archive'
 import { createArchiveInspectionError } from 'delightful-local-first/backup/inspection'
 
 /**
@@ -60,7 +60,7 @@ function boundedRead(stream, maximum, signal, waitForClose) {
 			total += chunk.length
 			if (total > maximum) {
 				chunk.fill(0)
-				failure = new ArchivePayloadError('limitExceeded')
+				failure = createArchivePayloadError('limitExceeded')
 				stream.destroy(failure)
 				return
 			}

@@ -11,7 +11,8 @@ import {
 } from './envelope.js'
 import { encodeArchivePayload } from './payload.js'
 import {
-	ArchivePayloadError,
+	createArchivePayloadError,
+	isArchivePayloadError,
 	resolvePayloadLimits,
 	type ArchivePayload,
 	type ArchivePayloadErrorCode,
@@ -269,13 +270,13 @@ export function prepareArchiveOpen(
 	password?: string,
 	overrides: PayloadLimitOverrides = {}
 ): ArchiveEnvelopeRequest {
-	if (bytes.byteLength > envelopeBytesLimit) throw new ArchivePayloadError('limitExceeded')
+	if (bytes.byteLength > envelopeBytesLimit) throw createArchivePayloadError('limitExceeded')
 	return prepare('openPlain', Uint8Array.from(bytes), password, resolvePayloadLimits(overrides))
 }
 export function envelopeFailure(
 	error: unknown
 ): Extract<ArchiveEnvelopeResult, { outcome: 'failed' }> {
-	return isArchiveEnvelopeError(error) || error instanceof ArchivePayloadError
+	return isArchiveEnvelopeError(error) || isArchivePayloadError(error)
 		? { outcome: 'failed', code: error.code }
 		: { outcome: 'failed', code: 'cryptoFailed' }
 }

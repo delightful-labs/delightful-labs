@@ -35,14 +35,24 @@ export type ArchivePayloadErrorCode =
 	| 'brokenReference'
 
 /** Codes are safe to log. Messages never interpolate input values, IDs or record content. */
-export class ArchivePayloadError extends Error {
-	readonly code: ArchivePayloadErrorCode
-
-	constructor(code: ArchivePayloadErrorCode) {
-		super(code)
-		this.name = 'ArchivePayloadError'
-		this.code = code
-	}
+export function createArchivePayloadError(code: ArchivePayloadErrorCode) {
+	return Object.assign(new Error(code), { name: 'ArchivePayloadError', code })
+}
+export function isArchivePayloadError(
+	error: unknown
+): error is ReturnType<typeof createArchivePayloadError> {
+	return (
+		error instanceof Error &&
+		error.name === 'ArchivePayloadError' &&
+		'code' in error &&
+		(error.code === 'limitExceeded' ||
+			error.code === 'invalidEncoding' ||
+			error.code === 'invalidJson' ||
+			error.code === 'duplicateKey' ||
+			error.code === 'invalidPayload' ||
+			error.code === 'duplicateIdentity' ||
+			error.code === 'brokenReference')
+	)
 }
 
 /** Consumers may reduce limits, never raise or disable the v1 bounds. */
@@ -50,7 +60,7 @@ export function resolvePayloadLimits(overrides: PayloadLimitOverrides = {}): Pay
 	function limit(value: number | undefined, maximum: number) {
 		if (value === undefined) return maximum
 		if (!z.int().min(1).max(maximum).safeParse(value).success)
-			throw new ArchivePayloadError('limitExceeded')
+			throw createArchivePayloadError('limitExceeded')
 		return value
 	}
 	return Object.freeze({

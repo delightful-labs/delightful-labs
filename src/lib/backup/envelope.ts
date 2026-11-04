@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { base64Size, decodeBase64, encodeBase64 } from './binary.js'
 import { parsePayloadJson } from './json.js'
-import { ArchivePayloadError, type PayloadLimits } from './types.js'
+import { createArchivePayloadError, type PayloadLimits } from './types.js'
 
 const utf8 = new TextEncoder()
 export const envelopeBytesLimit = 64 * 1024 * 1024
@@ -50,14 +50,14 @@ export function isArchiveEnvelopeError(
 }
 
 export function parseEnvelope(bytes: Uint8Array, limits: PayloadLimits) {
-	if (bytes.byteLength > envelopeBytesLimit) throw new ArchivePayloadError('limitExceeded')
+	if (bytes.byteLength > envelopeBytesLimit) throw createArchivePayloadError('limitExceeded')
 	let source: string
 	try {
 		source = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
 	} catch {
-		throw new ArchivePayloadError('invalidEncoding')
+		throw createArchivePayloadError('invalidEncoding')
 	}
-	if (source.charCodeAt(0) === 0xfeff) throw new ArchivePayloadError('invalidEncoding')
+	if (source.charCodeAt(0) === 0xfeff) throw createArchivePayloadError('invalidEncoding')
 	const schema = z.discriminatedUnion('protection', [
 		z
 			.strictObject({
@@ -127,8 +127,8 @@ export function gcmOptions(header: PasswordHeader): AesGcmParams {
 
 export function formatEnvelope(value: object): Uint8Array<ArrayBuffer> {
 	const text = JSON.stringify(value)
-	if (text.length > envelopeBytesLimit) throw new ArchivePayloadError('limitExceeded')
+	if (text.length > envelopeBytesLimit) throw createArchivePayloadError('limitExceeded')
 	const bytes = utf8.encode(text)
-	if (bytes.length > envelopeBytesLimit) throw new ArchivePayloadError('limitExceeded')
+	if (bytes.length > envelopeBytesLimit) throw createArchivePayloadError('limitExceeded')
 	return bytes
 }

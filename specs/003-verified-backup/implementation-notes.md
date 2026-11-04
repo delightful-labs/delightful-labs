@@ -430,3 +430,44 @@ This correction is uncommitted; no push/merge. It does not qualify the separate 
 correction or claim rollback after commit/browser-process crash. Remaining audit cleanup includes
 inert payload-error/SDK subscription wrappers; those do not warrant new lifecycle machines merely
 to remove inheritance. Restore-journal review/qualification remains separate.
+
+## Final class-wrapper cleanup — implementation boundary (2026-11-04)
+
+The user requested continuing the remaining cleanup after committing workspace journal disposal
+as 75bee3a. Replace ArchivePayloadError with createArchivePayloadError/isArchivePayloadError;
+keep safe codes/name/message and migrate constructor/instanceof/public-barrel callers. Replace
+DLF's two SDK subscription subclasses with createQuerySubscription/createQuerySubscriptionOne,
+which return the SDK-owned instance with the same lazy local-first options default and explicit-tier
+precedence. Component/Svelte/SDK subscription disposal remains native; no new lifecycle machine,
+application class, subscription cache or consumer domain migration is warranted. Update the app
+integration example and package fixtures. Continue the established implementation/test cleanup cycle
+with codec regressions, focused wrapper-boundary tests and package/consumer checks. This work does
+not qualify the separate restore-journal correction.
+
+### Final wrapper cleanup qualification (2026-11-04)
+
+Removed the last three application-owned class declarations. Payload errors retain their safe
+name/message/code through factory/guard functions. Codec, envelope, inspection/export and journal
+codec classifiers and the independent reader now use the guard; constructor/error assertions and
+public-package exports are migrated. The subscription factories return the native SDK objects,
+retain lazy local-first default options and preserve caller-provided static/reactive tiers. The
+next-app example and public Svelte consumer use factory calls rather than inheritance.
+
+All 232 focused archive/envelope/inspection/export/subscription-boundary units and 89 journal-codec
+units pass (321 distinct cases). Added one payload-error classification case and five mocked SDK
+constructor-boundary cases. Static checking caught and corrected a test's invalid tier constant to
+the installed SDK's ReadTier.Remote. A public consumer declaration check verifies inferred row fields
+for both factories without importing SDK types outside the permitted integration boundary. These
+mocked tests verify delegation/options, not native Jazz data/session behavior or Svelte disposal.
+
+Package/strict Publint, Svelte consumer bundling, standalone codec/envelope public consumers,
+18 notebook/package cases, 11 independent reader cases and four focused Chromium cases pass.
+Svelte/TypeScript, public consumer declarations, lint, formatting and whitespace checks pass. No
+full repository suite was run. A source/fixture declaration scan finds no remaining app-owned
+classes; SDK implementations/dependencies and TypeScript generic constraints are not app classes.
+No new machine, subscription owner, SDK implementation fork or live sibling consumer migration.
+
+This final wrapper cleanup is uncommitted. Prior workspace journal correction is in 75bee3a.
+No push/merge. The original code-cleanup audit items are addressed; separate restore-journal
+validation and full regression/PR qualification still remain, and cannot be inferred from these
+focused codec tests.

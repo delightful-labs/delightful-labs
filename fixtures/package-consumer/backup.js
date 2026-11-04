@@ -1,5 +1,10 @@
 // Standalone public ESM import: no Svelte/Jazz/browser session or Zod schema from the consumer.
-import { encodeArchivePayload, parseArchivePayload } from 'delightful-local-first/backup/archive'
+import {
+	encodeArchivePayload,
+	parseArchivePayload,
+	isArchivePayloadError,
+	createArchivePayloadError
+} from 'delightful-local-first/backup/archive'
 
 /** @type {import('delightful-local-first/backup/archive').ArchivePayload} */
 const source = {
@@ -24,4 +29,21 @@ const restored = parseArchivePayload(encodeArchivePayload(source))
 const field = restored.records[0]?.fields.exact
 if (field?.kind !== 'integer' || field.value !== '9007199254740993' || !Object.isFrozen(restored)) {
 	throw new Error('Packaged archive codec failed exact-value preservation or immutability')
+}
+
+let failure
+try {
+	encodeArchivePayload({})
+} catch (error) {
+	failure = error
+}
+if (
+	!isArchivePayloadError(failure) ||
+	failure.code !== 'invalidPayload' ||
+	failure.message !== 'invalidPayload'
+) {
+	throw new Error('Packaged codec error classification changed')
+}
+if (!isArchivePayloadError(createArchivePayloadError('limitExceeded'))) {
+	throw new Error('Packaged error factory/guard exports do not agree')
 }

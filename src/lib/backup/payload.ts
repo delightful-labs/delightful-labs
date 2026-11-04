@@ -3,7 +3,7 @@ import { checkPayloadBudget } from './budget.js'
 import { createPayloadSchemas } from './schemas.js'
 import { parsePayloadJson } from './json.js'
 import {
-	ArchivePayloadError,
+	createArchivePayloadError,
 	resolvePayloadLimits,
 	type ArchivePayload,
 	type ArchiveRecord,
@@ -14,7 +14,7 @@ import {
 const utf8 = new TextEncoder()
 
 function invalid(): never {
-	throw new ArchivePayloadError('invalidPayload')
+	throw createArchivePayloadError('invalidPayload')
 }
 
 function dictionary(value: unknown): value is Record<string, unknown> {
@@ -34,10 +34,10 @@ function normalize(input: unknown, limits: PayloadLimits): ArchivePayload {
 	checkPayloadBudget(input, limits)
 	const result = createPayloadSchemas(limits).payload.safeParse(input)
 	// Never expose Zod issues, paths or input values through public errors or logs.
-	if (!result.success) throw new ArchivePayloadError('invalidPayload')
+	if (!result.success) throw createArchivePayloadError('invalidPayload')
 	const payload = result.data
 	if (payload.records.length + payload.references.length > limits.records)
-		throw new ArchivePayloadError('limitExceeded')
+		throw createArchivePayloadError('limitExceeded')
 	const recordTypes = new Set(payload.coverage.recordTypes)
 	if (recordTypes.size !== payload.coverage.recordTypes.length) return invalid()
 	const identities = new Map<string, Set<string>>()
@@ -45,27 +45,27 @@ function normalize(input: unknown, limits: PayloadLimits): ArchivePayload {
 	for (const row of allRecords) {
 		if (!recordTypes.has(row.type)) return invalid()
 		const ids = identities.get(row.type) ?? new Set<string>()
-		if (ids.has(row.id)) throw new ArchivePayloadError('duplicateIdentity')
+		if (ids.has(row.id)) throw createArchivePayloadError('duplicateIdentity')
 		ids.add(row.id)
 		identities.set(row.type, ids)
 	}
 	let totalAttachmentBytes = 0
 	const attachmentIds = new Set<string>()
 	for (const file of payload.attachments) {
-		if (attachmentIds.has(file.id)) throw new ArchivePayloadError('duplicateIdentity')
+		if (attachmentIds.has(file.id)) throw createArchivePayloadError('duplicateIdentity')
 		attachmentIds.add(file.id)
 		const size = base64Size(file.data, limits.attachmentBytes)
 		if (size !== file.sizeBytes) return invalid()
 		totalAttachmentBytes += size
 		if (totalAttachmentBytes > limits.totalAttachmentBytes)
-			throw new ArchivePayloadError('limitExceeded')
+			throw createArchivePayloadError('limitExceeded')
 	}
 	for (const row of allRecords) {
 		for (const entry of Object.values(row.fields)) {
 			if (entry.kind === 'reference' && !identities.get(entry.type)?.has(entry.id))
-				throw new ArchivePayloadError('brokenReference')
+				throw createArchivePayloadError('brokenReference')
 			if (entry.kind === 'attachment' && !attachmentIds.has(entry.id))
-				throw new ArchivePayloadError('brokenReference')
+				throw createArchivePayloadError('brokenReference')
 		}
 	}
 	return Object.freeze({
@@ -89,13 +89,13 @@ function serialize(payload: ArchivePayload, limits: PayloadLimits): Uint8Array<A
 	let values = 0
 	function append(part: string) {
 		bytes += utf8.encode(part).length
-		if (bytes > limits.payloadBytes) throw new ArchivePayloadError('limitExceeded')
+		if (bytes > limits.payloadBytes) throw createArchivePayloadError('limitExceeded')
 		parts.push(part)
 	}
 	function visit(value: unknown, depth: number) {
 		values += 1
 		if (depth > limits.depth || values > limits.jsonValues)
-			throw new ArchivePayloadError('limitExceeded')
+			throw createArchivePayloadError('limitExceeded')
 		if (
 			value === null ||
 			typeof value === 'string' ||
@@ -136,14 +136,14 @@ export function parseArchivePayload(
 	overrides: PayloadLimitOverrides = {}
 ): ArchivePayload {
 	const limits = resolvePayloadLimits(overrides)
-	if (bytes.byteLength > limits.payloadBytes) throw new ArchivePayloadError('limitExceeded')
+	if (bytes.byteLength > limits.payloadBytes) throw createArchivePayloadError('limitExceeded')
 	let source: string
 	try {
 		source = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
 	} catch {
-		throw new ArchivePayloadError('invalidEncoding')
+		throw createArchivePayloadError('invalidEncoding')
 	}
-	if (source.charCodeAt(0) === 0xfeff) throw new ArchivePayloadError('invalidEncoding')
+	if (source.charCodeAt(0) === 0xfeff) throw createArchivePayloadError('invalidEncoding')
 	return normalize(parsePayloadJson(source, limits), limits)
 }
 
