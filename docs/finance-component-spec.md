@@ -2,6 +2,28 @@
 
 Finance's integration identified repeated presentation needs. This specification keeps their reusable interfaces independent of Jazz, Zod, XState, routing and currency persistence. Callers supply translated text. Use native semantics, existing theme tokens and gap for spacing between elements. Implement and review one component at a time.
 
+## Finance presentation extraction — complete (2026-11-03)
+
+The agreed extraction batch is merged in both repositories:
+
+| Shared presentation                            | DUI PR                                                          | Finance adoption PR                                                   |
+| ---------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| NavigationLink, NavigationGroup, DrawerSection | [#9](https://github.com/delightful-labs/delightful-ui/pull/9)   | [#47](https://github.com/delightful-labs/delightful-finances/pull/47) |
+| LoadingContent                                 | [#10](https://github.com/delightful-labs/delightful-ui/pull/10) | [#48](https://github.com/delightful-labs/delightful-finances/pull/48) |
+| LinkedListRow                                  | [#11](https://github.com/delightful-labs/delightful-ui/pull/11) | [#49](https://github.com/delightful-labs/delightful-finances/pull/49) |
+| FloatingActionLink, FloatingActionButton       | [#12](https://github.com/delightful-labs/delightful-ui/pull/12) | [#50](https://github.com/delightful-labs/delightful-finances/pull/50) |
+
+DUI owns generic presentation and native control behavior. Finance retains routing/query
+resolution, selected-route policy, localization, financial formatting, data and workflow state.
+Floating actions are separate native link and button components with native attributes and
+children; their shared presentation frame is private. No combined Omit/never link/button API
+is part of the accepted interface.
+
+The user closed this extraction batch. SplitRow, selectable legends, and photo-cropper/image-editor
+extraction are not planned tasks. Keep them in Finance and reconsider only when another app has
+a concrete need. The earlier app-specific candidate the user chose to skip remains excluded.
+This completion does not close unrelated historical review or accessibility-verification work.
+
 ## StatusMessage — reviewed and verified
 
 Expose a public Svelte 5 component with required string `text` and optional `variant`: `info` (default), `loading`, `success` or `error`. Forward native div attributes/events, class and style. Render visible text in all variants, with the existing compact LoadingSpinner only for loading. Use status semantics for info/loading/success and alert semantics for errors; allow an explicit native role override. The spinner is decorative, with no second announcement. LoadingSpinner renders hidden text only when supplied a nonempty text prop; omit it in this composition. Do not add state management, translations, retry actions, icons, timers or dismissal.
