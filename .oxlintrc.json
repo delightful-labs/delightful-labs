@@ -93,7 +93,8 @@
 				"fixtures/backup-notebook/restore-schema.ts",
 				"fixtures/backup-notebook/restore-writer.ts",
 				"fixtures/backup-notebook/restore-browser.ts",
-				"fixtures/backup-notebook/restore-browser.test.ts"
+				"fixtures/backup-notebook/restore-browser.test.ts",
+				"fixtures/backup-notebook/restore-attachment-writer.ts"
 			],
 			"rules": {
 				"no-restricted-imports": [

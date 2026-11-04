@@ -1,110 +1,55 @@
-import {
-	parseRestoreJournalRecord,
-	type RestoreJournalRecord,
-	type RestoreJournalReceipt,
-	type RestoreJournalCompletion
+import type {
+	RestoreJournalRecord,
+	RestoreJournalReceipt,
+	RestoreJournalCompletion
 } from './restore-journal.js'
+import {
+	writeStepPending,
+	writeStepNotIssued,
+	writeStepCompleted,
+	writeStepAttempt,
+	issueWriteStep,
+	observeWriteStep,
+	completeWriteStep,
+	writeStepCanReconcile,
+	reconcileWriteStep,
+	writeStepSettlementSatisfied
+} from './restore-write-step.js'
 
-export function preparationPending(record: RestoreJournalRecord): boolean {
-	return record.checkpoint.kind === 'writing' && record.checkpoint.completed.length === 0
+export function preparationPending(record: RestoreJournalRecord) {
+	return writeStepPending(record, record.intent.plan.preparation)
 }
-export function preparationNotIssued(record: RestoreJournalRecord): boolean {
-	return (
-		preparationPending(record) &&
-		record.checkpoint.kind === 'writing' &&
-		record.checkpoint.current.status === 'notIssued'
-	)
+export function preparationNotIssued(record: RestoreJournalRecord) {
+	return writeStepNotIssued(record, record.intent.plan.preparation)
 }
-export function preparationCompleted(record: RestoreJournalRecord): boolean {
-	return record.checkpoint.kind !== 'conflict' && record.checkpoint.completed.length > 0
+export function preparationCompleted(record: RestoreJournalRecord) {
+	return writeStepCompleted(record, record.intent.plan.preparation)
 }
-export function preparationAttempt(record: RestoreJournalRecord): RestoreJournalReceipt {
-	const checkpoint = record.checkpoint
-	if (
-		checkpoint.kind !== 'writing' ||
-		checkpoint.completed.length !== 0 ||
-		checkpoint.current.status !== 'issued'
-	)
-		throw new Error('Expected issued preparation')
-	const { status: _status, ...receipt } = checkpoint.current
-	return receipt
+export function preparationAttempt(record: RestoreJournalRecord) {
+	return writeStepAttempt(record, record.intent.plan.preparation)
 }
-export function issuePreparation(record: RestoreJournalRecord): RestoreJournalRecord {
-	if (!preparationNotIssued(record) || record.checkpoint.kind !== 'writing')
-		throw new Error('Expected unissued preparation')
-	return parseRestoreJournalRecord({
-		...record,
-		revision: record.revision + 1,
-		checkpoint: {
-			...record.checkpoint,
-			current: {
-				status: 'issued',
-				writeId: record.intent.plan.preparation.writeId,
-				issuance: record.checkpoint.current.issuance + 1,
-				transactionId: null,
-				settlement: { local: 'unobserved', remote: 'unobserved' }
-			}
-		}
-	})
+export function issuePreparation(record: RestoreJournalRecord) {
+	return issueWriteStep(record, record.intent.plan.preparation)
 }
 export function observePreparation(
 	record: RestoreJournalRecord,
 	transactionId: string,
 	settlement: RestoreJournalReceipt['settlement']
-): RestoreJournalRecord {
-	const receipt = preparationAttempt(record)
-	return parseRestoreJournalRecord({
-		...record,
-		revision: record.revision + 1,
-		checkpoint: {
-			kind: 'writing',
-			completed: [],
-			current: { status: 'issued', ...receipt, transactionId, settlement }
-		}
-	})
+) {
+	return observeWriteStep(record, record.intent.plan.preparation, transactionId, settlement)
 }
 export function completePreparation(
 	record: RestoreJournalRecord,
 	completion: RestoreJournalCompletion
-): RestoreJournalRecord {
-	const next = record.intent.plan.batches[0]
-	return parseRestoreJournalRecord({
-		...record,
-		revision: record.revision + 1,
-		checkpoint: next
-			? {
-					kind: 'writing',
-					completed: [completion],
-					current: { status: 'notIssued', writeId: next.writeId, issuance: 0 }
-				}
-			: { kind: 'comparing', completed: [completion] }
-	})
+) {
+	return completeWriteStep(record, record.intent.plan.preparation, completion)
 }
-export function preparationCanReconcile(record: RestoreJournalRecord): boolean {
-	if (!preparationPending(record) || preparationNotIssued(record)) return false
-	return (
-		record.intent.plan.requirements.local !== 'required' ||
-		preparationAttempt(record).settlement.local === 'persisted'
-	)
+export function preparationCanReconcile(record: RestoreJournalRecord) {
+	return writeStepCanReconcile(record, record.intent.plan.preparation)
 }
-export function reconciledPreparation(record: RestoreJournalRecord): RestoreJournalRecord {
-	const attempt = preparationAttempt(record)
-	return completePreparation(record, {
-		basis: 'remoteContentMatch',
-		writeId: attempt.writeId,
-		contentSha256: record.intent.plan.preparation.expectedContentSha256,
-		localPersistence: attempt.settlement.local === 'persisted' ? 'persisted' : 'unobserved',
-		attempt
-	})
+export function reconciledPreparation(record: RestoreJournalRecord) {
+	return reconcileWriteStep(record, record.intent.plan.preparation)
 }
-
-export function preparationSettlementSatisfied(record: RestoreJournalRecord): boolean {
-	const observation = preparationAttempt(record).settlement
-	const requirements = record.intent.plan.requirements
-	return (
-		observation.local !== 'rejected' &&
-		observation.remote !== 'rejected' &&
-		(requirements.local !== 'required' || observation.local === 'persisted') &&
-		(requirements.remote !== 'required' || observation.remote === 'accepted')
-	)
+export function preparationSettlementSatisfied(record: RestoreJournalRecord) {
+	return writeStepSettlementSatisfied(record, record.intent.plan.preparation)
 }

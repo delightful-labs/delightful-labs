@@ -9,6 +9,14 @@ import { createNotebookDataset } from './dataset.js'
 import { createNotebookRestorePreparationMachine, prepareNotebookRestore } from './restore.js'
 import { notebookRestoreApp, activeNotebookDestinations } from './restore-schema.js'
 import { createNotebookPreparationWriter } from './restore-writer.js'
+import {
+	createNotebookRestoreAttachmentMachine,
+	prepareNotebookAttachmentRestore
+} from './restore-attachment.js'
+import {
+	createNotebookAttachmentWriter,
+	createNotebookAttachmentRestore
+} from './restore-attachment-writer.js'
 
 type Writer = ReturnType<typeof createNotebookPreparationWriter>
 const config = new URLSearchParams(location.search)
@@ -26,19 +34,33 @@ const native = createNotebookPreparationWriter(db, (receipt) => {
 	detached.push(receipt)
 })
 let issued = 0
-const writer: Writer = {
-	...native,
-	commit: (transaction) => {
+const begin = db.beginTransaction.bind(db)
+db.beginTransaction = () => {
+	const transaction = begin()
+	const commit = transaction.commit.bind(transaction)
+	transaction.commit = () => {
 		issued++
-		return native.commit(transaction)
+		return commit()
 	}
+	return transaction
 }
+const writer: Writer = native
 const machine = createNotebookRestorePreparationMachine(writer)
 const pending: {
 	actor: ActorRefFrom<typeof machine> | undefined
 	cleanup: (() => void) | undefined
+	releaseAuthority?: () => void
 } = { actor: undefined, cleanup: undefined }
+const attachmentPending: {
+	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreAttachmentMachine>>
+	cleanup?: () => void
+} = {}
 const api = {
+	attachmentPending,
+	createNotebookAttachmentWriter,
+	createNotebookRestoreAttachmentMachine,
+	prepareNotebookAttachmentRestore,
+	createNotebookAttachmentRestore,
 	PersistedWriteRejectedError,
 	createActor,
 	toPromise,

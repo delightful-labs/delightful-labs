@@ -1,4 +1,4 @@
-import { assign, fromCallback, fromPromise, setup } from 'xstate'
+import { assign, fromPromise, setup } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
 import {
@@ -13,41 +13,7 @@ import {
 import { createRestoreJournalStepMachine } from './restore-journal-step.js'
 import { createRestorePreparationWriteMachine } from './restore-preparation-write.js'
 
-type LockEvent = { type: 'LOCK_ACQUIRED' | 'LOCK_UNAVAILABLE' | 'LOCK_FAILED' }
-/** Native lock callback holds one acquired resource. The enclosing state owns its lifetime. */
-const operationLock = fromCallback<{ type: string }, RestorePreparationInput>(
-	({ input, sendBack }) => {
-		let release: (() => void) | undefined
-		const held = new Promise<void>((resolve) => {
-			release = resolve
-		})
-		const key = JSON.stringify([
-			'dlf-restore',
-			input.binding.applicationId,
-			input.binding.environment,
-			input.binding.identityId,
-			input.binding.operationId
-		])
-		// Acquiring an unsupported browser primitive is an unavailable operation, never unlocked writes.
-		if (!globalThis.navigator?.locks) {
-			sendBack({ type: 'LOCK_UNAVAILABLE' })
-			return
-		}
-		void navigator.locks
-			.request(key, { mode: 'exclusive', ifAvailable: true }, (lock) => {
-				if (!lock) {
-					sendBack({ type: 'LOCK_UNAVAILABLE' })
-					return
-				}
-				sendBack({ type: 'LOCK_ACQUIRED' })
-				return held
-			})
-			.catch(() => sendBack({ type: 'LOCK_FAILED' }))
-		return () => {
-			release?.()
-		}
-	}
-)
+import { operationLock, type LockEvent } from './restore-operation-lock.js'
 
 /** Preparation only. A prepared destination remains incomplete and unavailable for ordinary use. */
 export function createRestorePreparationMachine<Transaction, Write>(

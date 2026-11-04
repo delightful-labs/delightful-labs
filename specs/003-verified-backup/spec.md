@@ -9,8 +9,9 @@ restore journal are implemented and locally qualified; PR #22 is merged. The bou
 preparation coordinator and concrete Jazz destination-control writer are now locally qualified:
 19 focused preparation unit cases and eight real Jazz/Chromium cases pass. This prepares an isolated
 incomplete destination with durable intent and mappings, separate settlement observations and
-same-browser reload reconciliation. Note/attachment writers, fresh full-content comparison and
-activation remain unimplemented. T006/T012 and Finance adoption remain incomplete; no successful
+same-browser reload reconciliation. A one-attachment continuation and the shared owner/planner are now locally qualified:
+914 unit tests and 13 real Jazz/Chromium preparation/attachment cases pass. Notebook/note writers, fresh full-content
+comparison and activation remain unimplemented. T006/T012 and Finance adoption remain incomplete; no successful
 full restore or production restore safety is claimed. See the
 [preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
 and [current handoff](tasks.md#current-handoff-2026-11-04).

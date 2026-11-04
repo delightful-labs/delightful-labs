@@ -114,3 +114,42 @@ Qualification found/fixed incompatible Web Locks options and a parent cancellati
 the active destination child before its drained result. Browser-process crash, offline restore,
 notes/attachment writing and full-content verification remain outside this evidence. See the
 [preparation qualification](../../specs/003-verified-backup/restore-preparation-design.md#preparation-qualification--completed).
+
+## One attachment batch — implementation review
+
+`createNotebookAttachmentRestore` in `restore-attachment-writer.ts` creates an unstarted root and a
+single-use request from `{ db, retainDetached, binding, databaseName, archive }`. The archive is a
+new immutable integrity-checked resource for the original file; ownership transfers to the request.
+Start the returned actor and await its finite output through XState. The host continues to own the
+SDK session and detached native receipts. The function does not initialize storage, create a
+replacement operation or start any child manually.
+
+The resume-only root rebuilds the entire expected intent, requires completed preparation, selects
+only the current attachment batch and rechecks the journal under exclusive operation ownership.
+A stale selection stops incomplete. The concrete writer inserts native bytes plus metadata in one
+transaction and compares actual returned bytes on reconciliation. `batchWritten` means one step
+was checkpointed; `noAttachmentStep` means this root cannot execute the current step. Neither result
+activates a destination or establishes a full restore.
+
+The common write owner and notebook planner are extracted from preparation for reuse. Consequently,
+the preceding preparation qualification is evidence for commit `bba5f49`, not this revised actor tree.
+This new slice awaits implementation review before tests. Static compilation/package checks do not
+prove runtime byte, checkpoint or cancellation behavior. The isolated SDK probes informed the design
+but do not qualify this implementation. See the
+[review notes](../../specs/003-verified-backup/restore-attachment-design.md#implementation-prepared-for-review).
+
+Send CANCEL/SHUTDOWN/scoped INVALIDATE and await completion before stopping. Pre-write SDK reads can
+delay graceful cancellation until their actual settlement; the owner keeps expected bytes until
+that drain. `request.release()` is abrupt reference revocation, not cancellation of issued native
+I/O. Unknown issued attempts still do not replay. Note/title writers, final full graph/relationship/
+byte comparison, activation and Finance adoption remain unimplemented.
+
+### Attachment qualification (2026-11-04)
+
+After user-authorized implementation review, 914 units (31 focused write-owner cases) and 13 actual
+Jazz/Chromium preparation/attachment cases pass, along with package/consumer and static checks.
+This supersedes the pending-review status above. Actual attachment tests cover exact bytes, empty
+and 1 MiB contents, Unicode filenames, conflicting bytes with matching declared digest, reload
+without replay and reconciliation of an uncertain attachment preserving its original attempt.
+See [qualification and material limits](../../specs/003-verified-backup/restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
+The destination remains incomplete; notebook/note writing, full comparison and activation are open.

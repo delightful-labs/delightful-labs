@@ -341,6 +341,14 @@
 		"./backup/restore/preparation/workflow": {
 			"types": "./dist/machines/backup/restore-preparation.d.ts",
 			"default": "./dist/machines/backup/restore-preparation.js"
+		},
+		"./backup/restore/batch": {
+			"types": "./dist/backup/restore-batch-api.d.ts",
+			"default": "./dist/backup/restore-batch-api.js"
+		},
+		"./backup/restore/batch/workflow": {
+			"types": "./dist/machines/backup/restore-batch.d.ts",
+			"default": "./dist/machines/backup/restore-batch.js"
 		}
 	},
 	"svelte": "./dist/index.js",

@@ -10,10 +10,11 @@ The user approved replacing unusable browser permission advice with owner-bound 
 admission; actual server policy still enforces acceptance. Issued/uncertain attempts retain the
 existing reconciliation rules. Preparation leaves the destination incomplete.
 
-All 902 unit cases, eight real Jazz/Chromium preparation cases and 14 existing native journal browser
-regressions pass, with package/consumer and static qualification recorded in the linked design.
-No full restore is claimed: note/attachment writers, fresh graph/relationship/byte comparison and
-activation remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
+Current qualification passes all 914 unit cases, 13 real Jazz/Chromium preparation/attachment cases,
+and package/consumer/static checks. See [attachment qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
+The one-attachment continuation and extracted owner/planner are qualified within that scope. No full
+restore is claimed: notebook/note writers, fresh graph/relationship/byte comparison and activation
+remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
 T007–T010 remain open. See the [current handoff](tasks.md#current-handoff-2026-11-04).
 
 Journal metadata alone supplies no destination authority, actual content evidence or replay

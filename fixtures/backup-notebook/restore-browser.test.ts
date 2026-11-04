@@ -40,8 +40,8 @@ async function open() {
 	await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
 	return page
 }
-async function sample(page: Page) {
-	return page.evaluate(async () => {
+async function sample(page: Page, size?: number) {
+	return page.evaluate(async (size) => {
 		const api = window.DLFRestoreQualification
 		const binding = {
 			applicationId: 'notebook-qualification',
@@ -55,7 +55,31 @@ async function sample(page: Page) {
 			applicationId: 'notebook-source',
 			workspaceId: 'original'
 		})
-		const request = api.prepareArchiveSeal(payload, { kind: 'none' })
+		const bytes =
+			size === undefined ? undefined : Uint8Array.from({ length: size }, (_, i) => i % 251)
+		const digest =
+			bytes === undefined
+				? undefined
+				: Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
+						byte.toString(16).padStart(2, '0')
+					).join('')
+		const customized =
+			bytes === undefined
+				? payload
+				: {
+						...payload,
+						attachments: [
+							{
+								id: 'binary',
+								mediaType: 'application/octet-stream',
+								fileName: 'Cafe\u0301 ☕.bin',
+								sizeBytes: bytes.length,
+								sha256: digest ?? '',
+								data: btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''))
+							}
+						]
+					}
+		const request = api.prepareArchiveSeal(customized, { kind: 'none' })
 		const actor = api
 			.createActor(api.createArchiveEnvelopeMachine(), { input: { request } })
 			.start()
@@ -66,7 +90,7 @@ async function sample(page: Page) {
 		request.release()
 		actor.stop()
 		return { binding, file, databaseName: 'notebook-restore-' + crypto.randomUUID() }
-	})
+	}, size)
 }
 type Sample = Awaited<ReturnType<typeof sample>>
 async function initialize(page: Page, sample: Sample) {
@@ -253,6 +277,7 @@ it('reconciles actual Jazz contents after local checkpoint/reload without fabric
 			actor = api.pending.actor
 		if (!actor) throw new Error('Missing pending preparation')
 		actor.send({ type: 'CANCEL' })
+		api.pending.releaseAuthority?.()
 		const output = await api.toPromise(actor)
 		api.pending.cleanup?.()
 		actor.stop()
@@ -413,7 +438,10 @@ it('holds one operation owner across tabs and releases ownership after cancellat
 	await initialize(page, value)
 	await page.evaluate(async (sample) => {
 		const api = window.DLFRestoreQualification
-		api.writer.checkAuthority = () => new Promise(() => {})
+		api.writer.checkAuthority = () =>
+			new Promise<boolean>((resolve) => {
+				api.pending.releaseAuthority = () => resolve(true)
+			})
 		const open = api.prepareArchiveOpen(new Uint8Array(sample.file))
 		const envelope = api
 			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
@@ -445,6 +473,7 @@ it('holds one operation owner across tabs and releases ownership after cancellat
 			actor = api.pending.actor
 		if (!actor) throw new Error('Missing pending preparation')
 		actor.send({ type: 'CANCEL' })
+		api.pending.releaseAuthority?.()
 		await api.toPromise(actor)
 		api.pending.cleanup?.()
 		actor.stop()
@@ -493,4 +522,201 @@ it('refuses first-write admission for a different restoring identity before tran
 	})
 	await deleteJournal(page, mismatched)
 	await page.context().close()
+})
+
+async function attachment(page: Page, value: Sample) {
+	return page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const request = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
+		const restore = api.createNotebookAttachmentRestore({
+			db: api.db,
+			retainDetached: () => {},
+			binding: value.binding,
+			databaseName: value.databaseName,
+			archive: checked.archive
+		})
+		restore.actor.start()
+		const output = await api.toPromise(restore.actor)
+		restore.request.release()
+		restore.actor.stop()
+		request.release()
+		envelope.stop()
+		const rows = await api.db.all(
+			api.notebookRestoreApp.restoreAttachments.where({ destinationId: value.binding.workspaceId }),
+			{ tier: 'remote' }
+		)
+		const destination = await api.db.one(
+			api.notebookRestoreApp.restoreDestinations.where({ id: value.binding.workspaceId }),
+			{ tier: 'remote' }
+		)
+		return {
+			output,
+			issued: api.issued(),
+			rows: rows.map((row) => ({ ...row, contents: Array.from(row.contents) })),
+			destination
+		}
+	}, value)
+}
+it('writes actual attachment bytes, preserves preparation evidence, and does not replay after reload', async () => {
+	const page = await open(),
+		value = await sample(page)
+	expect(await initialize(page, value)).toBe('initialized')
+	const prepared = await run(page, value, 'new')
+	expect(prepared.outcome).toBe('prepared')
+	const result = await attachment(page, value)
+	expect(result.output.outcome).toBe('batchWritten')
+	expect(result.issued).toBe(2)
+	expect(result.rows).toHaveLength(1)
+	expect(result.rows[0]?.contents).toEqual([0, 255, 128, 10])
+	expect(result.destination?.status).toBe('incomplete')
+	const before = prepared.record?.checkpoint,
+		after = result.output.record?.checkpoint
+	if (!before || before.kind !== 'writing' || !after || after.kind !== 'writing')
+		throw new Error('Expected journal prefix')
+	expect(after.completed).toHaveLength(2)
+	expect(after.completed[0]).toEqual(before.completed[0])
+	await page.reload()
+	await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
+	const resumed = await attachment(page, value)
+	expect(resumed.output.outcome).toBe('noAttachmentStep')
+	expect(resumed.issued).toBe(0)
+	expect(resumed.rows).toEqual(result.rows)
+	expect(resumed.output.record).toEqual(result.output.record)
+	await deleteJournal(page, value)
+})
+
+for (const size of [0, 1024 * 1024]) {
+	it(`restores and freshly reads ${size} attachment bytes through the actual root`, async () => {
+		const page = await open(),
+			value = await sample(page, size)
+		expect(await initialize(page, value)).toBe('initialized')
+		expect((await run(page, value, 'new')).outcome).toBe('prepared')
+		const result = await attachment(page, value)
+		expect(result.output.outcome).toBe('batchWritten')
+		expect(result.rows[0]?.contents).toEqual(Array.from({ length: size }, (_, i) => i % 251))
+		expect(result.rows[0]?.fileName).toBe('Cafe\u0301 ☕.bin')
+		expect(result.destination?.status).toBe('incomplete')
+		await deleteJournal(page, value)
+	})
+}
+it('rejects conflicting actual bytes despite a matching declared digest without overwriting or replay', async () => {
+	const page = await open(),
+		value = await sample(page)
+	expect(await initialize(page, value)).toBe('initialized')
+	const prepared = await run(page, value, 'new')
+	const mapping = prepared.record?.intent.plan.mappings.find(
+		(mapping) => mapping.kind === 'attachment'
+	)
+	if (!mapping) throw new Error('Missing attachment mapping')
+	await page.evaluate(
+		async ({ value, id }) => {
+			const api = window.DLFRestoreQualification
+			const tx = api.db.beginTransaction()
+			tx.insert(
+				api.notebookRestoreApp.restoreAttachments,
+				{
+					destinationId: value.binding.workspaceId,
+					ownerId: api.ownerId,
+					operationId: value.binding.operationId,
+					mediaType: 'application/octet-stream',
+					fileName: 'bytes.bin',
+					sizeBytes: 4,
+					sha256: '6d6f7836f1e146dc0204afb5133dae52fdc05603d8ac2dc793b481b0e0829fd1',
+					contents: new Uint8Array([0, 255, 128, 11])
+				},
+				{ id }
+			)
+			const write = tx.commit()
+			await write.wait({ tier: 'global' })
+		},
+		{ value, id: mapping.destinationId }
+	)
+	const result = await attachment(page, value)
+	expect(result.output.outcome).toBe('conflict')
+	expect(result.issued).toBe(2)
+	expect(result.rows[0]?.contents).toEqual([0, 255, 128, 11])
+	expect(result.output.record).toEqual(prepared.record)
+	await deleteJournal(page, value)
+})
+
+it('reconciles an uncertain attachment after reload using fresh bytes while preserving its original attempt', async () => {
+	const page = await open(),
+		value = await sample(page)
+	await initialize(page, value)
+	expect((await run(page, value, 'new')).outcome).toBe('prepared')
+	await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
+		const request = api.prepareNotebookAttachmentRestore({ ...value, archive: checked.archive })
+		const writer = api.createNotebookAttachmentWriter(api.db, request, () => {})
+		const machine = api.createNotebookRestoreAttachmentMachine({
+			...writer,
+			acceptRemote: () => new Promise(() => {})
+		})
+		api.attachmentPending.actor = api.createActor(machine, { input: { request } }).start()
+		api.attachmentPending.cleanup = () => {
+			request.release()
+			open.release()
+			envelope.stop()
+		}
+	}, value)
+	await expect
+		.poll(async () => (await discover(page, value)).record?.checkpoint)
+		.toMatchObject({
+			completed: [{ writeId: 'prepare' }],
+			current: { settlement: { local: 'persisted', remote: 'unobserved' } }
+		})
+	await expect
+		.poll(() =>
+			page.evaluate(async (id) => {
+				const api = window.DLFRestoreQualification
+				return (
+					await api.db.all(api.notebookRestoreApp.restoreAttachments.where({ destinationId: id }), {
+						tier: 'remote'
+					})
+				).length
+			}, value.binding.workspaceId)
+		)
+		.toBe(1)
+	const interrupted = await page.evaluate(async () => {
+		const api = window.DLFRestoreQualification,
+			actor = api.attachmentPending.actor
+		if (!actor) throw new Error('Missing attachment actor')
+		actor.send({ type: 'CANCEL' })
+		const output = await api.toPromise(actor)
+		api.attachmentPending.cleanup?.()
+		actor.stop()
+		return output
+	})
+	expect(interrupted.outcome).toBe('cancelled')
+	const previous = interrupted.record?.checkpoint
+	if (!previous || previous.kind !== 'writing' || previous.current.status !== 'issued')
+		throw new Error('Expected uncertain write')
+	await page.reload()
+	await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
+	const recovered = await attachment(page, value)
+	expect(recovered.output.outcome).toBe('batchWritten')
+	expect(recovered.issued).toBe(0)
+	const checkpoint = recovered.output.record?.checkpoint
+	if (!checkpoint || checkpoint.kind !== 'writing') throw new Error('Expected retained progress')
+	expect(checkpoint.completed[1]).toMatchObject({
+		basis: 'remoteContentMatch',
+		attempt: {
+			transactionId: previous.current.transactionId,
+			issuance: previous.current.issuance,
+			settlement: previous.current.settlement
+		}
+	})
+	expect(recovered.rows[0]?.contents).toEqual([0, 255, 128, 10])
+	await deleteJournal(page, value)
 })

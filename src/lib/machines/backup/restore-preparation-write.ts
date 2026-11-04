@@ -2,22 +2,23 @@ import { assign, fromPromise, setup } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
 import {
-	completePreparation,
-	issuePreparation,
-	observePreparation,
-	preparationAttempt,
-	preparationCanReconcile,
-	preparationCompleted,
-	preparationNotIssued,
-	preparationSettlementSatisfied,
-	reconciledPreparation
-} from '../../backup/restore-preparation-record.js'
+	completeWriteStep,
+	issueWriteStep,
+	observeWriteStep,
+	writeStepAttempt,
+	writeStepCanReconcile,
+	writeStepCompleted,
+	writeStepNotIssued,
+	writeStepSettlementSatisfied,
+	reconcileWriteStep,
+	type RestorePlannedWrite,
+	type RestoreStepWriter,
+	type RestoreWriteInput,
+	type RestoreWriteResult
+} from '../../backup/restore-write-step.js'
 import {
 	requirePreparationValue,
 	type RestorePreparationEvent,
-	type RestorePreparationInput,
-	type RestorePreparationOutcome,
-	type RestorePreparationResult,
 	type RestorePreparationWriter
 } from '../../backup/restore-preparation.js'
 import {
@@ -28,11 +29,17 @@ import {
 } from '../workspaces/transaction-custody.js'
 import { createRestoreJournalStepMachine } from './restore-journal-step.js'
 
-/** One preparation attempt. No replay or replacement destination on uncertain outcomes. */
-export function createRestorePreparationWriteMachine<Transaction, Write>(
-	capability: RestorePreparationWriter<Transaction, Write>
+/** Shared one-step statechart; factories bind the planned descriptor, not alternate I/O workflows. */
+export function createRestoreWriteStepMachine<
+	Transaction,
+	Write,
+	Input extends RestoreWriteInput,
+	Success extends 'prepared' | 'batchWritten'
+>(
+	capability: RestoreStepWriter<Transaction, Write>,
+	selectWrite: (input: Input) => RestorePlannedWrite,
+	completedOutcome: Success
 ) {
-	type Input = RestorePreparationInput & { record: RestoreJournalRecord }
 	type Native = {
 		custody: ReturnType<typeof createTransactionCustody<Transaction, Write>>
 		transaction: Transaction | undefined
@@ -52,18 +59,21 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 		})
 		return handle
 	}
-	type Context = Input & {
+	type Context = RestoreWriteInput & {
+		step: RestorePlannedWrite
 		native: Handle
 		candidate: RestoreJournalRecord | undefined
 		interruption: 'cancelled' | 'closed' | 'invalidated' | undefined
-		outcome: RestorePreparationOutcome
+		outcome: RestoreWriteResult<Success>['outcome']
 	}
 	const actors = {
 		journal: createRestoreJournalStepMachine(),
 		custodian: transactionCustodian<Transaction, Write>(),
-		remote: fromPromise(({ input }: { input: Input }) => capability.readRemote(input.intent)),
-		authority: fromPromise(({ input }: { input: Input }) =>
-			capability.checkAuthority(input.intent)
+		remote: fromPromise(({ input }: { input: Context }) =>
+			capability.readRemote(input.intent, input.step)
+		),
+		authority: fromPromise(({ input }: { input: Context }) =>
+			capability.checkAuthority(input.intent, input.step)
 		),
 		open: fromPromise(({ input }: { input: Handle }) => {
 			const data = native(input)
@@ -74,13 +84,17 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 		read: fromPromise(({ input }: { input: Context }) => {
 			const data = native(input.native)
 			return transactionCall(data.custody, () =>
-				capability.readTransaction(requirePreparationValue(data.transaction), input.intent)
+				capability.readTransaction(
+					requirePreparationValue(data.transaction),
+					input.intent,
+					input.step
+				)
 			)
 		}),
 		stage: fromPromise(({ input }: { input: Context }) => {
 			const data = native(input.native)
 			return transactionCall(data.custody, () =>
-				capability.stage(requirePreparationValue(data.transaction), input.intent)
+				capability.stage(requirePreparationValue(data.transaction), input.intent, input.step)
 			)
 		}),
 		commit: fromPromise(({ input }: { input: Handle }) => {
@@ -117,7 +131,7 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 		never,
 		string,
 		Input,
-		RestorePreparationResult
+		RestoreWriteResult<Success>
 	>({
 		actors,
 		guards: {
@@ -148,9 +162,13 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 		} satisfies import('../../backup/restore-journal-browser.js').BrowserJournalCommand
 	})
 	return model.createMachine({
-		id: 'restore-preparation-write',
+		id: 'restore-write-step',
 		context: ({ input }) => ({
-			...input,
+			binding: input.binding,
+			intent: input.intent,
+			databaseName: input.databaseName,
+			record: input.record,
+			step: selectWrite(input),
 			native: allocate(),
 			candidate: undefined,
 			interruption: undefined,
@@ -173,74 +191,59 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 				invoke: {
 					src: 'custodian',
 					input: ({ context, self }) => ({ custody: native(context.native).custody, owner: self }),
-					onError: '#restore-preparation-write.complete'
+					onError: '#restore-write-step.complete'
 				},
 				states: {
 					reconciling: {
-						on: {
-							CANCEL: { target: '#restore-preparation-write.complete', actions: 'interrupt' },
-							SHUTDOWN: { target: '#restore-preparation-write.complete', actions: 'interrupt' },
-							INVALIDATE: {
-								guard: 'currentBinding',
-								target: '#restore-preparation-write.complete',
-								actions: 'interrupt'
-							}
-						},
 						invoke: {
 							src: 'remote',
 							input,
 							onDone: [
-								{ guard: 'interrupted', target: '#restore-preparation-write.complete' },
+								{ guard: 'interrupted', target: '#restore-write-step.complete' },
 								{
 									guard: ({ event }) => event.output === 'conflict',
-									target: '#restore-preparation-write.conflict'
+									target: '#restore-write-step.conflict'
 								},
 								{
 									guard: ({ context, event }) =>
-										event.output === 'match' && preparationCompleted(context.record),
-									target: '#restore-preparation-write.prepared'
+										event.output === 'match' && writeStepCompleted(context.record, context.step),
+									target: '#restore-write-step.written'
 								},
 								{
 									guard: ({ context, event }) =>
-										event.output === 'match' && preparationCanReconcile(context.record),
+										event.output === 'match' && writeStepCanReconcile(context.record, context.step),
 									target: 'savingContentMatch',
 									actions: assign({
-										candidate: ({ context }) => reconciledPreparation(context.record)
+										candidate: ({ context }) => reconcileWriteStep(context.record, context.step)
 									})
 								},
 								{
 									guard: ({ context, event }) =>
-										event.output === 'missingOrHidden' && preparationNotIssued(context.record),
+										event.output === 'missingOrHidden' &&
+										writeStepNotIssued(context.record, context.step),
 									target: 'checkingAuthority'
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					checkingAuthority: {
-						on: {
-							CANCEL: { target: '#restore-preparation-write.complete', actions: 'interrupt' },
-							SHUTDOWN: { target: '#restore-preparation-write.complete', actions: 'interrupt' },
-							INVALIDATE: {
-								guard: 'currentBinding',
-								target: '#restore-preparation-write.complete',
-								actions: 'interrupt'
-							}
-						},
 						invoke: {
 							src: 'authority',
 							input,
 							onDone: [
-								{ guard: 'interrupted', target: '#restore-preparation-write.complete' },
+								{ guard: 'interrupted', target: '#restore-write-step.complete' },
 								{
 									guard: ({ event }) => event.output,
 									target: 'savingIntent',
-									actions: assign({ candidate: ({ context }) => issuePreparation(context.record) })
+									actions: assign({
+										candidate: ({ context }) => issueWriteStep(context.record, context.step)
+									})
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					savingIntent: {
@@ -257,14 +260,14 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 										record: ({ event }) => requirePreparationValue(event.output.record)
 									})
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					admittingTransaction: {
 						always: [
-							{ guard: 'interrupted', target: '#restore-preparation-write.complete' },
+							{ guard: 'interrupted', target: '#restore-write-step.complete' },
 							{ target: 'opening' }
 						]
 					},
@@ -287,7 +290,7 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 									}
 								}
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					readingTransaction: {
@@ -296,6 +299,11 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 							input,
 							onDone: [
 								{ guard: 'interrupted', target: 'rollingBack' },
+								{
+									guard: ({ event }) => event.output === 'conflict',
+									target: 'rollingBack',
+									actions: assign({ outcome: 'conflict' })
+								},
 								{ guard: ({ event }) => event.output === 'missingOrHidden', target: 'staging' },
 								{ target: 'rollingBack' }
 							],
@@ -320,7 +328,7 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 									native(context.native).write = event.output
 								}
 							},
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					readingTransactionId: {
@@ -333,7 +341,7 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 									native(context.native).transactionId = event.output
 								}
 							},
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					persistingLocal: {
@@ -344,8 +352,9 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 								target: 'savingLocal',
 								actions: assign({
 									candidate: ({ context }) =>
-										observePreparation(
+										observeWriteStep(
 											context.record,
+											context.step,
 											requirePreparationValue(native(context.native).transactionId),
 											{ local: 'persisted', remote: 'unobserved' }
 										)
@@ -355,8 +364,9 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 								target: 'savingLocal',
 								actions: assign({
 									candidate: ({ context }) =>
-										observePreparation(
+										observeWriteStep(
 											context.record,
+											context.step,
 											requirePreparationValue(native(context.native).transactionId),
 											{ local: 'unobserved', remote: 'unobserved' }
 										)
@@ -378,14 +388,14 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 										record: ({ event }) => requirePreparationValue(event.output.record)
 									})
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					admittingObservation: {
 						always: [
-							{ guard: 'interrupted', target: '#restore-preparation-write.complete' },
+							{ guard: 'interrupted', target: '#restore-write-step.complete' },
 							{
 								guard: ({ context }) => context.intent.plan.requirements.remote === 'notRequired',
 								target: 'checkingSettlement'
@@ -395,11 +405,11 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 					},
 					observingRemote: {
 						on: {
-							CANCEL: { target: '#restore-preparation-write.complete', actions: 'interrupt' },
-							SHUTDOWN: { target: '#restore-preparation-write.complete', actions: 'interrupt' },
+							CANCEL: { target: '#restore-write-step.complete', actions: 'interrupt' },
+							SHUTDOWN: { target: '#restore-write-step.complete', actions: 'interrupt' },
 							INVALIDATE: {
 								guard: 'currentBinding',
-								target: '#restore-preparation-write.complete',
+								target: '#restore-write-step.complete',
 								actions: 'interrupt'
 							}
 						},
@@ -410,10 +420,14 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 								target: 'savingRemote',
 								actions: assign({
 									candidate: ({ context }) =>
-										observePreparation(
+										observeWriteStep(
 											context.record,
+											context.step,
 											requirePreparationValue(native(context.native).transactionId),
-											{ ...preparationAttempt(context.record).settlement, remote: 'accepted' }
+											{
+												...writeStepAttempt(context.record, context.step).settlement,
+												remote: 'accepted'
+											}
 										)
 								})
 							},
@@ -427,14 +441,18 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 									target: 'savingRemote',
 									actions: assign({
 										candidate: ({ context }) =>
-											observePreparation(
+											observeWriteStep(
 												context.record,
+												context.step,
 												requirePreparationValue(native(context.native).transactionId),
-												{ ...preparationAttempt(context.record).settlement, remote: 'rejected' }
+												{
+													...writeStepAttempt(context.record, context.step).settlement,
+													remote: 'rejected'
+												}
 											)
 									})
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							]
 						}
 					},
@@ -452,22 +470,26 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 										record: ({ event }) => requirePreparationValue(event.output.record)
 									})
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					checkingSettlement: {
 						always: [
 							{
-								guard: ({ context }) => preparationSettlementSatisfied(context.record),
+								guard: ({ context }) => writeStepSettlementSatisfied(context.record, context.step),
 								target: 'savingCompletion',
 								actions: assign({
 									candidate: ({ context }) =>
-										completePreparation(context.record, preparationAttempt(context.record))
+										completeWriteStep(
+											context.record,
+											context.step,
+											writeStepAttempt(context.record, context.step)
+										)
 								})
 							},
-							{ target: '#restore-preparation-write.complete' }
+							{ target: '#restore-write-step.complete' }
 						]
 					},
 					savingCompletion: {
@@ -479,15 +501,15 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 									guard: ({ event }) =>
 										(event.output.outcome === 'updated' || event.output.outcome === 'existing') &&
 										event.output.record !== undefined,
-									target: '#restore-preparation-write.prepared',
+									target: '#restore-write-step.written',
 									actions: [
 										assign({ record: ({ event }) => requirePreparationValue(event.output.record) }),
 										({ context }) => clearTransactionCustody(native(context.native).custody)
 									]
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					savingContentMatch: {
@@ -499,14 +521,14 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 									guard: ({ event }) =>
 										(event.output.outcome === 'updated' || event.output.outcome === 'existing') &&
 										event.output.record !== undefined,
-									target: '#restore-preparation-write.prepared',
+									target: '#restore-write-step.written',
 									actions: assign({
 										record: ({ event }) => requirePreparationValue(event.output.record)
 									})
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					},
 					rollingBack: {
@@ -516,20 +538,20 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 							onDone: [
 								{
 									guard: ({ event }) => event.output,
-									target: '#restore-preparation-write.complete',
+									target: '#restore-write-step.complete',
 									actions: ({ context }) => clearTransactionCustody(native(context.native).custody)
 								},
-								{ target: '#restore-preparation-write.complete' }
+								{ target: '#restore-write-step.complete' }
 							],
-							onError: '#restore-preparation-write.complete'
+							onError: '#restore-write-step.complete'
 						}
 					}
 				}
 			},
-			prepared: {
+			written: {
 				type: 'final',
 				entry: [
-					assign({ outcome: 'prepared' }),
+					assign({ outcome: completedOutcome }),
 					({ context }) => {
 						storage.delete(context.native)
 					}
@@ -552,4 +574,15 @@ export function createRestorePreparationWriteMachine<Transaction, Write>(
 			}
 		}
 	})
+}
+
+/** Compatibility entry point: the public preparation coordinator still prepares only its control row. */
+export function createRestorePreparationWriteMachine<Transaction, Write>(
+	capability: RestorePreparationWriter<Transaction, Write>
+) {
+	return createRestoreWriteStepMachine(
+		capability,
+		(input: RestoreWriteInput) => input.intent.plan.preparation,
+		'prepared'
+	)
 }

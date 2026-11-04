@@ -1,13 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { assign, createActor, fromPromise, setup, toPromise, waitFor } from 'xstate'
 import wire from '../../../tests/fixtures/restore-journal-v1.json'
-import { createRestorePreparationWriteMachine } from '../machines/backup/restore-preparation-write.js'
+import {
+	createRestoreWriteStepMachine,
+	createRestorePreparationWriteMachine
+} from '../machines/backup/restore-preparation-write.js'
 import { createRestorePreparationMachine } from '../machines/backup/restore-preparation.js'
 import { isRestoreJournalSuccessor } from './restore-journal-successor.js'
 import { parseRestoreJournalRecord, type RestoreJournalRecord } from './restore-journal.js'
 import type { BrowserJournalConfiguration } from './restore-journal-browser.js'
 import type { RestorePreparationWriter } from './restore-preparation.js'
 import { issuePreparation, observePreparation } from './restore-preparation-record.js'
+import {
+	issueWriteStep,
+	observeWriteStep,
+	type RestoreWriteInput,
+	type RestoreStepPresence
+} from './restore-write-step.js'
+import { createRestoreBatchMachine } from '../machines/backup/restore-batch.js'
 
 const journal = vi.hoisted(() => {
 	const state: {
@@ -365,4 +375,189 @@ it('requests nonqueued exclusive ownership without the incompatible AbortSignal 
 	const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
 	expect((await toPromise(actor)).outcome).toBe('prepared')
 	expect(request).toHaveBeenCalledOnce()
+})
+
+function completed(record: RestoreWriteInput['record'] | undefined) {
+	if (!record || record.checkpoint.kind === 'conflict')
+		throw new Error('Expected progress checkpoint')
+	return record.checkpoint.completed
+}
+function batchRecord(prefix = 1) {
+	const initial = parseRestoreJournalRecord(wire)
+	const receipt = (writeId: string) => ({
+		writeId,
+		issuance: 1,
+		transactionId: 'accepted-' + writeId,
+		settlement: { local: 'persisted', remote: 'accepted' }
+	})
+	return parseRestoreJournalRecord({
+		...initial,
+		revision: 10,
+		intent: {
+			...initial.intent,
+			plan: {
+				...initial.intent.plan,
+				batches: [
+					{ writeId: 'batch-one', expectedContentSha256: '5'.repeat(64), mappingIndexes: [1] },
+					{ writeId: 'batch-two', expectedContentSha256: '7'.repeat(64), mappingIndexes: [2] }
+				]
+			}
+		},
+		checkpoint: {
+			kind: 'writing',
+			completed: prefix === 1 ? [receipt('prepare')] : [receipt('prepare'), receipt('batch-one')],
+			current: {
+				status: 'notIssued',
+				writeId: prefix === 1 ? 'batch-one' : 'batch-two',
+				issuance: 0
+			}
+		}
+	})
+}
+function batchFixture(record = batchRecord()) {
+	const base = fixture(record)
+	const step = record.intent.plan.batches.find(
+		(entry) =>
+			record.checkpoint.kind === 'writing' && entry.writeId === record.checkpoint.current.writeId
+	)
+	if (!step) throw new Error('Missing test batch')
+	const select = (_input: RestoreWriteInput) => step
+	const actor = createActor(createRestoreWriteStepMachine(base.writer, select, 'batchWritten'), {
+		input: base.input
+	})
+	return { ...base, actor, step }
+}
+describe('single batch ownership and retained journal prefix', () => {
+	for (const prefix of [1, 2]) {
+		it(`retains ${prefix} completed receipts and advances exactly one current batch`, async () => {
+			const { actor, writer, input } = batchFixture(batchRecord(prefix))
+			actor.start()
+			const result = await toPromise(actor)
+			expect(result.outcome).toBe('batchWritten')
+			const before = input.record.checkpoint
+			if (before.kind !== 'writing') throw new Error('Expected writing')
+			expect(completed(result.record).slice(0, prefix)).toEqual(before.completed)
+			expect(completed(result.record)).toHaveLength(prefix + 1)
+			expect(result.record?.checkpoint.kind).toBe(prefix === 1 ? 'writing' : 'comparing')
+			if (result.record?.checkpoint.kind === 'writing')
+				expect(result.record.checkpoint.current).toEqual({
+					status: 'notIssued',
+					issuance: 0,
+					writeId: 'batch-two'
+				})
+			expect(writer.commit).toHaveBeenCalledOnce()
+		})
+	}
+	it('does not open the transaction if the batch issuance checkpoint fails', async () => {
+		const { actor, writer, input } = batchFixture()
+		journal.failRevision = input.record.revision + 1
+		actor.start()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	it('reconciles remote content while retaining the prefix and unknown original transaction fate', async () => {
+		const base = batchFixture()
+		const issued = observeWriteStep(
+			issueWriteStep(base.input.record, base.step),
+			base.step,
+			'original-batch-tx',
+			{ local: 'persisted', remote: 'unobserved' }
+		)
+		const { actor, writer } = batchFixture(issued)
+		writer.readRemote.mockResolvedValue('match')
+		actor.start()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('batchWritten')
+		expect(completed(result.record)[0]).toEqual(completed(issued)[0])
+		expect(completed(result.record)[1]).toMatchObject({
+			basis: 'remoteContentMatch',
+			attempt: {
+				transactionId: 'original-batch-tx',
+				issuance: 1,
+				settlement: { local: 'persisted', remote: 'unobserved' }
+			}
+		})
+		expect(writer.commit).not.toHaveBeenCalled()
+	})
+	for (const observation of ['match', 'missingOrHidden', 'conflict']) {
+		it(`does not replay an unknown batch on ${observation} with missing local evidence`, async () => {
+			const base = batchFixture()
+			const { actor, writer, input } = batchFixture(issueWriteStep(base.input.record, base.step))
+			if (observation === 'match' || observation === 'conflict')
+				writer.readRemote.mockResolvedValue(observation)
+			actor.start()
+			const result = await toPromise(actor)
+			expect(result.outcome).toBe(observation === 'conflict' ? 'conflict' : 'incomplete')
+			expect(result.record).toEqual(input.record)
+			expect(writer.open).not.toHaveBeenCalled()
+		})
+	}
+	it('blocks unavailable destination control without interpreting it as missing attachment', async () => {
+		const { input, writer, step } = batchFixture()
+		const actor = createActor(
+			createRestoreWriteStepMachine(
+				{ ...writer, readRemote: () => Promise.resolve<RestoreStepPresence>('unavailable') },
+				() => step,
+				'batchWritten'
+			),
+			{ input }
+		).start()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(writer.checkAuthority).not.toHaveBeenCalled()
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	for (const leaf of ['remote', 'authority']) {
+		it(`drains ${leaf} observation after cancellation before completing`, async () => {
+			const { writer, input, step } = batchFixture()
+			const gate = deferred<void>()
+			const actor = createActor(
+				createRestoreWriteStepMachine(
+					{
+						...writer,
+						readRemote: () =>
+							leaf === 'remote' ? gate.promise.then(() => 'missingOrHidden') : writer.readRemote(),
+						checkAuthority: () =>
+							leaf === 'authority' ? gate.promise.then(() => true) : writer.checkAuthority()
+					},
+					() => step,
+					'batchWritten'
+				),
+				{ input }
+			).start()
+			await waitFor(actor, (snapshot) =>
+				snapshot.matches({ working: leaf === 'remote' ? 'reconciling' : 'checkingAuthority' })
+			)
+			actor.send({ type: 'CANCEL' })
+			expect(actor.getSnapshot().status).toBe('active')
+			gate.resolve()
+			expect((await toPromise(actor)).outcome).toBe('cancelled')
+			expect(writer.open).not.toHaveBeenCalled()
+		})
+	}
+	it('rolls back a transaction conflict without erasing prior completed receipts', async () => {
+		const { actor, writer, input } = batchFixture()
+		writer.readTransaction.mockResolvedValue('conflict')
+		actor.start()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('conflict')
+		expect(completed(result.record)).toEqual(completed(input.record))
+		expect(writer.rollback).toHaveBeenCalledOnce()
+		expect(writer.stage).not.toHaveBeenCalled()
+	})
+	it('refuses a stale requested step after loading a later completed prefix', async () => {
+		const { writer, input } = batchFixture(batchRecord(2))
+		vi.stubGlobal('navigator', {
+			locks: {
+				request: (_name: string, _options: unknown, callback: (lock: object) => Promise<void>) =>
+					callback({})
+			}
+		})
+		const actor = createActor(createRestoreBatchMachine(writer), {
+			input: { ...input, writeId: 'batch-one' }
+		}).start()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('incomplete')
+		expect(result.record).toEqual(input.record)
+		expect(writer.readRemote).not.toHaveBeenCalled()
+	})
 })

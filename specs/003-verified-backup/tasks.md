@@ -6,6 +6,23 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**Current T006 slice locally qualified: one attachment batch.** Following implementation review,
+the user authorized qualification. All 914 units (31 focused write-owner cases), 13 real Jazz/Chromium
+preparation/attachment cases, package/consumer and static checks pass. The attachment root writes one
+file with durable intent, separate local/remote evidence, exact-byte conflict detection and same-browser
+uncertain-write reconciliation without replay. Destinations remain incomplete. See
+[qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
+Notebook/note writers, fresh full comparison and activation remain open. The user subsequently
+authorized committing and pushing this qualified slice for pull-request review.
+
+**Preparation committed; next slice proposed.** The user authorized the local preparation commit
+`bba5f49` (`feat(backup): qualify isolated notebook restore preparation`). Nothing was pushed.
+The [next bounded attachment design](restore-attachment-design.md) proposes advancing one existing
+attachment batch with actual bytes and the retained journal prefix. The user subsequently authorized implementation, now awaiting review above. At the user’s request, [isolated actual-SDK research](attachment-research.md)
+now passes 14 disposable Chromium cases, informing scalar-byte storage and bounded include reads.
+Those probes are not attachment-restore implementation tests. Data writers,
+full comparison, activation and Finance adoption remain incomplete.
+
 **New active T006 slice: notebook restore preparation.** PR #22 is merged; work continues on
 `feat/notebook-restore-preparation` from `08f4c38`. The user approved beginning the bounded design.
 See [preparation design and implementation review](restore-preparation-design.md). Shared preparation
@@ -181,7 +198,7 @@ reviewed implementation, qualification and limitation documentation; no deployme
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; data writers/comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
+- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; one attachment batch qualified; notebook/note writers/comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,
