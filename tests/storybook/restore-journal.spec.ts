@@ -319,8 +319,11 @@ test('missing storage is not recreated and malformed rows are preserved', async 
 		})
 		const malformed = await run({ mode: 'create', record: initial })
 		const retained = await new Promise<unknown>((resolve, reject) => {
-			const request = db.transaction('restoreOperations').objectStore('restoreOperations').get(key)
-			request.onsuccess = () => resolve(request.result)
+			const tx = db.transaction('restoreOperations')
+			const request = tx.objectStore('restoreOperations').get(key)
+			// A successful request can precede transaction completion and keep close() pending.
+			tx.oncomplete = () => resolve(request.result)
+			tx.onabort = () => reject(tx.error)
 			request.onerror = () => reject(request.error)
 		})
 		db.close()

@@ -263,3 +263,23 @@ The temporary preview was shut down. No live user database was used and no produ
 during this testing slice. The results qualify this bounded journal representation and native CAS,
 not end-to-end restore, destination authority, actual content evidence production or Finance adoption.
 Restore coordinator/destination writers remain paused; T006/T012 remain open for integration.
+
+### PR #22 CI follow-up: fixture read completion
+
+[The initial CI run](https://github.com/delightful-labs/delightful-local-first/actions/runs/41744594358/job/126294299044?pr=22)
+passed unit/package/consumer/private-creation checks but failed the malformed-row browser test during
+database deletion. The same `Leaked database connection` failure reproduced locally once in 30
+runs with two Chromium workers.
+
+The fixture resolved its retained-row read on request success, then called `close()` while that
+read transaction could still be active. The
+[IndexedDB connection-closing algorithm](https://w3c.github.io/IndexedDB/#closing-connection)
+waits for transactions to complete; deletion can report blocked during that interval. The fixture
+now resolves the read on the native transaction `complete` event and rejects on abort before
+closing the connection. The blocked-deletion assertion remains intact. Production ownership and
+journal behavior are unchanged; no sleeps, automatic test retries or weaker cleanup assertions
+were introduced.
+
+After the fix, all 30 repeated runs and the full 51-case Chromium suite pass with CI settings/two
+workers. Svelte/strict TypeScript, lint, formatting and whitespace checks also pass. Remote CI for
+the follow-up commit is checked separately.
