@@ -27,6 +27,7 @@
 		"svelte.config.js",
 		"vitest.config.ts",
 		"tests/**/*.ts",
+		"tests/**/*.svelte",
 		"playwright.config.ts"
 	],
 	"exclude": ["node_modules", "dist", "storybook-static", ".netlify", ".svelte-kit"]

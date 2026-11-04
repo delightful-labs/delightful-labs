@@ -471,3 +471,31 @@ advancing. Native crypto ownership, output transfer, cancellation drain, and pub
 stay with their existing owners. No extra supervisor or new retry behavior is required. Review
 the implementation and static checks before adding/running envelope tests, including all four
 modes, malformed preparation, and release/cancellation at the new boundaries.
+
+## Avatar selection ownership — design before implementation
+
+The component-owned selection workflow becomes a component-lifetime root machine, attached by a
+private Svelte integration. It owns saved/selected files and the current crop request. The existing
+submitted-avatar processor/write actor remains separate. No new public export or localized copy.
+
+```text
+ready/invalid -> SELECT(file) -> validating -> cropping / invalid
+ready/invalid -> EDIT(file) -> cropping
+cropping -> ACCEPT(current crop, file) -> ready + notify selection
+cropping -> DISMISS(current crop) -> ready
+SELECT(null) -> request saved removal / clear draft to saved
+OBSERVE(profile or reset revision change) -> ready + discard draft/crop
+SHUTDOWN -> closed + clear file references
+```
+
+Validation is one synchronous pure leaf returning a boolean, with thrown validators treated as
+invalid selections. Named actions validate, assign, or notify; guards choose outcomes. A crop request
+object correlates acceptance/dismissal with the current selection. Late crop results after reset or
+replacement are ignored. Saved-image refresh updates the saved reference and follows it only when
+the selection still points to the previous saved image; it does not close an active crop.
+
+The binding owns root start/subscription/stop and forwards one observation containing profile ID,
+reset revision and saved file. Presentation consumes selected file, crop request, invalid/dirty
+facts and callbacks; no component flags reconstruct workflow state. Native dialog close reports
+dismissal for the captured crop request. Scope/reset discards presentation state without publishing
+an extra selection callback, matching the form owner's reset responsibility. Review before tests.

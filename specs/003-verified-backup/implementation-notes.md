@@ -530,3 +530,53 @@ port 6015 required sandbox escalation for socket binding and shut down after the
 Svelte/TypeScript, lint, formatting and whitespace checks pass. No implementation adjustment was
 needed after testing. No commit/push; the separate notebook correction and backup journal owner
 still have their previously recorded qualification limits. Remaining review findings are unbuilt.
+
+## Avatar selection correction — awaiting implementation review
+
+Committed the preceding notebook/envelope correction and repository review as a16cdaf at the user's
+request. No push. Notebook runtime qualification remains pending; the envelope checks above passed.
+
+Implemented review finding 2 as a separate local slice. The selection machine owns ready,
+validating, invalid, cropping and closed states. Guarded transitions decide validation outcome,
+saved-image removal versus draft clearing, reset and crop acceptance/dismissal. Its named actions
+perform bounded validation, assignments or host notifications. Validator exceptions become invalid
+selection; notifications retain the existing synchronous callback contract.
+
+The private Svelte binding owns actor start/subscription/SHUTDOWN/stop and forwards profile, reset
+revision and saved-image observations. ProfileAvatarForm consumes selected/crop/invalid/dirty view
+facts and forwards callbacks. Crop requests correlate callbacks by object identity, and each native
+dialog is keyed to that request. Reset/replacement invalidates old acceptance/dismissal callbacks.
+Saved preview refresh preserves drafts and active crops. The same profile composition moves from components/profile to integrations/profile because it
+now owns an actor binding; the public profile/avatar-form entry targets the moved file. Only this
+component is changed; the submitted image processor/write actor, public component props and localized copy stay
+as before. No new exported entry, image processing or generic dialog implementation.
+
+Svelte/TypeScript, lint, pnpm format, pnpm format:check and whitespace checks pass. Rebuilt package,
+publint, consumer declarations and the consumer Vite build also pass with the relocated public
+component target. No runtime tests
+added/run before implementation review. After approval, qualify valid/invalid/throwing validation,
+crop accept/cancel, stale crop callbacks after reset/replacement, saved refresh, draft clear versus
+saved removal, and shutdown. Component/browser validation must cover actual DUI input/dialog
+callbacks and profile reset; machine tests alone will not qualify that binding. Recovery failure
+and transaction teardown remain separate unresolved design slices. Avatar changes are uncommitted.
+
+### Avatar selection qualification
+
+After approval to continue, added ten real-actor cases covering validation acceptance/rejection/
+exceptions, crop acceptance/dismissal, profile/revision reset, stale crop callbacks, saved-image
+refresh, draft clearing versus saved removal, and shutdown reference cleanup. All ten pass. The
+combined avatar, form cleanup/submission and extraction regression run passes 51 cases in four
+files. Lint, formatting and whitespace checks pass.
+
+Added a small synthetic host consuming the built public profile/avatar-form entry and real DUI
+controls. Two Chromium scenarios pass: native Escape dismissal, accepted file and Save binding,
+reset clearing the input, profile replacement rejecting an old crop callback, invalid-file feedback,
+and unmount closing the native dialog. The synthetic cropper invokes callbacks; this does not
+qualify a consumer's image crop/processing implementation. Host controls/labels are test fixtures,
+not additions to the product catalog. No production change was needed after testing.
+
+The normal consumer check now builds this browser fixture for CI, and root Svelte checking includes
+test components. The package fixture build and root Svelte/TypeScript checks pass. Playwright owned
+a temporary preview on localhost port 6015, with sandbox escalation for socket binding, and stopped
+it after the run. Runtime checks apply to avatar selection only; notebook/journal qualification
+limits remain as previously recorded. No commit/push of this avatar slice.
