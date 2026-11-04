@@ -13,6 +13,7 @@ import {
 
 export type BrowserJournalCommand =
 	| { mode: 'initialize' }
+	| { mode: 'discover' }
 	| { mode: 'load'; intent: RestoreJournalIntent }
 	| { mode: 'create'; record: RestoreJournalRecord }
 	| { mode: 'update'; expectedRevision: number; record: RestoreJournalRecord }
@@ -147,6 +148,7 @@ export function prepareBrowserRestoreJournal(
 	if (!name.success || !binding.success) throw createBrowserJournalError('invalidJournalRequest')
 	let command: BrowserJournalCommand
 	if (options.command.mode === 'initialize') command = { mode: 'initialize' }
+	else if (options.command.mode === 'discover') command = { mode: 'discover' }
 	else if (options.command.mode === 'load')
 		command = { mode: 'load', intent: createRestoreJournalRecord(options.command.intent).intent }
 	else if (options.command.mode === 'create' || options.command.mode === 'update') {
@@ -166,7 +168,7 @@ export function prepareBrowserRestoreJournal(
 			command = { mode: 'update', expectedRevision: revision, record }
 		}
 	} else throw createBrowserJournalError('invalidJournalRequest')
-	if (command.mode !== 'initialize') {
+	if (command.mode !== 'initialize' && command.mode !== 'discover') {
 		const record =
 			command.mode === 'load' ? createRestoreJournalRecord(command.intent) : command.record
 		if (!matchesJournalBinding(record, binding.data))

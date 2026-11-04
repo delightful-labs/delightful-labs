@@ -131,12 +131,16 @@ export function createBrowserRestoreJournalMachine() {
 				event.type === 'INVALIDATE' && sameBackupBinding(context.binding, event.binding),
 			hasFailure: ({ context }) => context.failure !== undefined,
 			creating: ({ context }) => configuration(context)?.command.mode === 'create',
-			loading: ({ context }) => configuration(context)?.command.mode === 'load',
+			loading: ({ context }) =>
+				configuration(context)?.command.mode === 'load' ||
+				configuration(context)?.command.mode === 'discover',
 			missing: ({ context }) => !context.exists,
 			matchingIntent: ({ context }) => {
 				const data = browserJournalData(context.request),
 					command = data.configuration?.command
 				if (!data.observed || !command || command.mode === 'initialize') return false
+				if (command.mode === 'discover')
+					return matchesJournalBinding(data.observed, context.binding)
 				const expected = command.mode === 'load' ? command.intent : command.record.intent
 				return (
 					matchesJournalBinding(data.observed, context.binding) &&

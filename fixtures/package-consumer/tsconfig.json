@@ -10,6 +10,8 @@
 	},
 	"include": [
 		"../backup-notebook/export.ts",
+		"../backup-notebook/restore.ts",
+		"../backup-notebook/restore-writer.ts",
 		"./consumer.ts",
 		"./restore-journal.ts",
 		"./restore-journal-runtime.js",

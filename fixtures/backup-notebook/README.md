@@ -72,3 +72,45 @@ on prebuilt package output.
 See [qualification evidence](../../specs/003-verified-backup/lifecycle-design.md#export-qualification)
 for full counts and limitations. Restore/write owners and a concrete versioned Zod journal (T012)
 are the subsequent implementation slice.
+
+## Restore preparation — qualified bounded slice
+
+`restore.ts` adds a separate unstarted notebook preparation machine and a single-use request:
+`prepareNotebookRestore({ mode: 'new' | 'resume', binding, databaseName, archive })`. The archive is
+an existing immutable integrity-checked resource; this request takes ownership and validates its
+exact notebook profile before destination work. Start the host-owned root with `{ request }` input.
+`mode: 'new'` allocates mappings once. `mode: 'resume'` discovers the original mappings from the
+existing browser journal, reconstructs the complete expected intent from the selected checked file,
+and compares it again under exclusive operation ownership. Retain the original operation/destination
+reference; a fresh live generation is required after reload. The host explicitly initializes its
+journal namespace using the existing journal workflow before starting a new restore.
+
+`restore-schema.ts` declares a disposable Jazz app and policies; `restore-writer.ts` supplies single
+SDK leaves to the shared preparation actor. Inject `createNotebookPreparationWriter(db,
+retainDetached)` into `createNotebookRestorePreparationMachine`. The host owns the persistent Jazz
+session/schema setup and the detached-native-receipt recipient; no listener, schema deployment,
+credentials or browser session is created implicitly by these factories. The transaction owner
+journals issuance before its effect, stages only an incomplete owner-bound control row, and records
+local persistence separately from remote acceptance. Web Locks is required; unavailable ownership
+blocks writes. Ordinary notebook discovery uses the active-only query.
+
+For teardown, send CANCEL/SHUTDOWN or a scoped INVALIDATE and await completion before stopping.
+`request.release()` is the abrupt reference-revocation fallback, not a drain acknowledgement. Keep
+the host/session alive for detached native receipts. Remote null, uncertain writes and missing
+required local evidence remain incomplete; neither replacement destinations nor automatic retries
+are provided. A `prepared` result still has no restored notes/attachment bytes and cannot activate.
+
+Qualification after implementation review passes: 19 focused machine cases, eight real Jazz/Chromium
+preparation cases and the existing journal browser regressions. First-write admission checks the
+current bound session identity; real server policy enforces ownership and incomplete-only creation.
+Local persistence and remote acceptance are observed and journaled separately. Same-browser reload
+recovers the same mappings and reconciles remotely matching contents without another write.
+`pnpm check:backup-restore` runs the disposable browser suite on localhost:6199 and is included in CI.
+The suite owns and shuts down its browser, Vite host and disposable Jazz authority. It also verifies
+wrong-file/identity refusal, cross-tab exclusion, malformed metadata preservation, and real server
+rejection of forged ownership and premature activation.
+
+Qualification found/fixed incompatible Web Locks options and a parent cancellation guard that stopped
+the active destination child before its drained result. Browser-process crash, offline restore,
+notes/attachment writing and full-content verification remain outside this evidence. See the
+[preparation qualification](../../specs/003-verified-backup/restore-preparation-design.md#preparation-qualification--completed).

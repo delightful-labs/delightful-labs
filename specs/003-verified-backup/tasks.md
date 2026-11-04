@@ -6,6 +6,21 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**New active T006 slice: notebook restore preparation.** PR #22 is merged; work continues on
+`feat/notebook-restore-preparation` from `08f4c38`. The user approved beginning the bounded design.
+See [preparation design and implementation review](restore-preparation-design.md). Shared preparation
+coordination, a write-owner contract, scoped journal discovery and the concrete notebook Jazz control
+row/writer are implemented and locally qualified after review. All 902 unit cases pass, including
+19 focused preparation cases; eight real Jazz/Chromium cases and all 14 existing native journal
+browser regressions pass. The user approved owner-bound first-write admission; server acceptance
+remains separately observed. The earlier permission-advice blocker is resolved, and cancellation now
+retains the active child's drained result. See the
+[completed preparation qualification](restore-preparation-design.md#preparation-qualification--completed).
+Note/attachment
+writes, fresh full-content comparison and activation remain unimplemented; T006/T012 stay open.
+Later qualification entries below supersede historical awaiting-review notes only for their covered
+behavior. No unrelated cleanup, Finance adoption, commit or publication is included.
+
 **Current correction awaiting review: notebook finite operations.** Following the user's review,
 REPLACE/READ now have explicit validation/capture and success/failure states with named single-leaf
 actions. State-specific rejection handlers replace root defaults; the source adapter projects an
@@ -166,7 +181,7 @@ reviewed implementation, qualification and limitation documentation; no deployme
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store reviewed with focused Chromium checks; restore coordinator/writers remain unimplemented.** Implement shared export/restore actor protocols and a small
+- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; data writers/comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,

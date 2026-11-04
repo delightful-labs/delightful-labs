@@ -89,7 +89,11 @@
 				"fixtures/private-creation/permissions.ts",
 				"fixtures/private-creation/policy.test.ts",
 				"fixtures/private-creation/browser.ts",
-				"fixtures/private-creation/restart.test.ts"
+				"fixtures/private-creation/restart.test.ts",
+				"fixtures/backup-notebook/restore-schema.ts",
+				"fixtures/backup-notebook/restore-writer.ts",
+				"fixtures/backup-notebook/restore-browser.ts",
+				"fixtures/backup-notebook/restore-browser.test.ts"
 			],
 			"rules": {
 				"no-restricted-imports": [
