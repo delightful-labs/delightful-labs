@@ -13,8 +13,9 @@ existing reconciliation rules. Preparation leaves the destination incomplete.
 Current qualification passes all 914 unit cases, 13 real Jazz/Chromium preparation/attachment cases,
 and package/consumer/static checks. See [attachment qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
 The one-attachment continuation and extracted owner/planner are qualified within that scope. No full
-restore is claimed: notebook/note writers, fresh graph/relationship/byte comparison and activation
-remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
+restore is claimed. A one-notebook-root batch stacked on PR #23 is implemented for review;
+its extracted continuation and additive schema/writer await runtime qualification. Note writers,
+fresh graph/relationship/byte comparison and activation remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
 T007–T010 remain open. See the [current handoff](tasks.md#current-handoff-2026-11-04).
 
 Journal metadata alone supplies no destination authority, actual content evidence or replay

@@ -1,5 +1,5 @@
 import { payloadLimits } from 'delightful-local-first/backup/archive'
-import { matchRestoreJournalIntent } from 'delightful-local-first/backup/restore/journal'
+import { currentNotebookBatch } from './restore-step-data.js'
 import {
 	notebookRestoreData as data,
 	requiredNotebookRestoreValue as required,
@@ -7,34 +7,9 @@ import {
 } from './restore-request.js'
 
 type Input = { request: NotebookRestoreRequest }
-export function notebookRecoveryIntentMatches(input: Input): boolean {
-	const value = data(input)
-	return (
-		value.intent !== undefined &&
-		value.observedJournal !== undefined &&
-		matchRestoreJournalIntent(value.observedJournal, value.intent)
-	)
-}
-export function notebookRecoveryConflict(input: Input): boolean {
-	return data(input).observedJournal?.checkpoint.kind === 'conflict'
-}
-export function notebookPreparationComplete(input: Input): boolean {
-	const checkpoint = data(input).observedJournal?.checkpoint
-	return (
-		checkpoint !== undefined && checkpoint.kind !== 'conflict' && checkpoint.completed.length > 0
-	)
-}
-function currentBatch(input: Input) {
-	const value = data(input),
-		record = value.observedJournal
-	if (!record || record.checkpoint.kind !== 'writing' || record.checkpoint.completed.length === 0)
-		return undefined
-	const batch = value.intent?.plan.batches[record.checkpoint.completed.length - 1]
-	return batch?.writeId === record.checkpoint.current.writeId ? batch : undefined
-}
 export function notebookCurrentStepIsAttachment(input: Input): boolean {
 	const value = data(input),
-		batch = currentBatch(input)
+		batch = currentNotebookBatch(input)
 	if (!batch || batch.mappingIndexes.length !== 1) return false
 	const index = batch.mappingIndexes[0]
 	return index !== undefined && value.intent?.plan.mappings[index]?.kind === 'attachment'
@@ -43,7 +18,7 @@ export function notebookCurrentStepIsAttachment(input: Input): boolean {
 export function prepareNotebookAttachmentBytes(input: Input): void {
 	const value = data(input),
 		intent = required(value.intent),
-		batch = required(currentBatch(input))
+		batch = required(currentNotebookBatch(input))
 	const index = required(batch.mappingIndexes[0]),
 		mapping = required(intent.plan.mappings[index])
 	if (mapping.kind !== 'attachment' || batch.mappingIndexes.length !== 1)
@@ -72,3 +47,10 @@ export function prepareNotebookAttachmentBytes(input: Input): void {
 		contents
 	}
 }
+
+export {
+	notebookRecoveryIntentMatches,
+	notebookRecoveryConflict,
+	notebookPreparationComplete,
+	currentNotebookBatch
+} from './restore-step-data.js'

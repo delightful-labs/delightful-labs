@@ -8,7 +8,7 @@ import type {
 } from 'delightful-local-first/backup/restore/journal'
 import type { NotebookRestorePlanData } from './restore-plan.js'
 
-export type NotebookAttachmentExpected = {
+type NotebookMappedExpected = {
 	id: string
 	sourceId: string
 	writeId: string
@@ -17,12 +17,15 @@ export type NotebookAttachmentExpected = {
 	destinationId: string
 	ownerId: string
 	operationId: string
+}
+export type NotebookAttachmentExpected = NotebookMappedExpected & {
 	mediaType: string
 	fileName: string
 	sizeBytes: number
 	sha256: string
 	contents: Uint8Array<ArrayBuffer>
 }
+export type NotebookRootExpected = NotebookMappedExpected & { title: string }
 export interface NotebookRestoreRequest {
 	release(): void
 	toJSON(): { kind: 'notebookRestoreRequest' }
@@ -39,6 +42,7 @@ export type NotebookRestoreData = NotebookRestorePlanData & {
 	releaseControl: (() => void) | undefined
 	observedJournal: RestoreJournalRecord | undefined
 	attachment: NotebookAttachmentExpected | undefined
+	notebook: NotebookRootExpected | undefined
 }
 const requests = new WeakMap<NotebookRestoreRequest, { data: NotebookRestoreData; claim(): void }>()
 function prepared(request: NotebookRestoreRequest) {
@@ -76,7 +80,8 @@ export function prepareNotebookRestore(options: NotebookRestoreOptions): Noteboo
 		intent: undefined,
 		releaseControl: undefined,
 		observedJournal: undefined,
-		attachment: undefined
+		attachment: undefined,
+		notebook: undefined
 	}
 	let available: NotebookRestoreData | undefined = data
 	const request: NotebookRestoreRequest = {
@@ -106,6 +111,7 @@ function clear(data: NotebookRestoreData) {
 	data.intent = undefined
 	data.observedJournal = undefined
 	data.attachment = undefined
+	data.notebook = undefined
 }
 export function requiredNotebookRestoreValue<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Missing notebook restore resource')
