@@ -15,7 +15,7 @@ export function createNotebookSource(payload: unknown, binding: BackupBinding) {
 	})
 	function ready() {
 		const snapshot = actor.getSnapshot()
-		return snapshot.status === 'active' && !snapshot.matches('initializing')
+		return snapshot.status === 'active' && snapshot.hasTag('acceptingCommands')
 	}
 	function request<T>(event: (reply: NotebookReply<T>) => NotebookSourceEvent): T {
 		if (!ready()) throw new Error('Notebook source unavailable')

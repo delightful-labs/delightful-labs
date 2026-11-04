@@ -437,7 +437,8 @@ describe('operation ownership, interruption and safe snapshots', () => {
 	})
 	it.each([
 		'claiming',
-		'preparing',
+		'parsingPayload',
+		'creatingPasswordHeader',
 		'hashingAttachment',
 		'importingPassword',
 		'derivingKey',
@@ -474,7 +475,8 @@ describe('operation ownership, interruption and safe snapshots', () => {
 	})
 	it.each([
 		'claiming',
-		'preparing',
+		'parsingEnvelope',
+		'decodingPasswordEnvelope',
 		'importingPassword',
 		'derivingKey',
 		'decrypting',
@@ -505,6 +507,37 @@ describe('operation ownership, interruption and safe snapshots', () => {
 		expect(reached).toBe(true)
 		const resource = undelivered
 		if (resource) expect(() => resource.readPayload()).toThrow('resourceReleased')
+	})
+	it('releases a plain opening during decoding without hashing or retaining parsed input', async () => {
+		const request = prepareArchiveOpen(
+			wire(externalPlain(Buffer.from(encodeArchivePayload(sample()))))
+		)
+		const actor = createActor(createArchiveEnvelopeMachine(), { input: { request } })
+		const digest = vi.spyOn(crypto.subtle, 'digest')
+		let reached = false
+		actor.subscribe((snapshot) => {
+			if (!reached && snapshot.matches({ working: 'decodingPlainEnvelope' })) {
+				reached = true
+				request.release()
+			}
+		})
+		actor.start()
+		expect(await toPromise(actor)).toEqual({ outcome: 'failed', code: 'resourceReleased' })
+		expect(reached).toBe(true)
+		expect(digest).not.toHaveBeenCalled()
+		expect(await run(request)).toEqual({ outcome: 'failed', code: 'resourceReleased' })
+	})
+	it('fails password-header generation through cleanup before invoking crypto', async () => {
+		vi.spyOn(crypto, 'getRandomValues').mockImplementation(() => {
+			throw new Error('private entropy failure')
+		})
+		const imported = vi.spyOn(crypto.subtle, 'importKey')
+		const digest = vi.spyOn(crypto.subtle, 'digest')
+		const request = prepareArchiveSeal(sample(), { kind: 'password', password })
+		expect(await run(request)).toEqual({ outcome: 'failed', code: 'cryptoFailed' })
+		expect(imported).not.toHaveBeenCalled()
+		expect(digest).not.toHaveBeenCalled()
+		expect(await run(request)).toEqual({ outcome: 'failed', code: 'resourceReleased' })
 	})
 	it('uses nonextractable keys and clears password bytes after asynchronous import rejection', async () => {
 		const imported = vi

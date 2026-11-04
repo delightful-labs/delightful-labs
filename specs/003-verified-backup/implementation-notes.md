@@ -471,3 +471,62 @@ This final wrapper cleanup is uncommitted. Prior workspace journal correction is
 No push/merge. The original code-cleanup audit items are addressed; separate restore-journal
 validation and full regression/PR qualification still remain, and cannot be inferred from these
 focused codec tests.
+
+## Notebook finite-operation correction — awaiting implementation review (2026-11-04)
+
+The user correctly identified that eliminating classes did not finish the notebook's state modeling:
+REPLACE/READ still combined fallible work, branch selection and replies in large inline actions.
+Those operations now have explicit validatingWrite -> committingWrite/rejectingWrite and
+capturingRead -> returningRead/rejectingRead states. Named actions perform a single transform,
+assignment or reply. Bounded synchronous helpers return typed success/failure facts; chart guards
+choose the branch and success states publish the result. Failed writes preserve source data.
+Requests/results are cleared on return to idle, with captured payloads held only in opaque capsules.
+
+Unavailable-operation defaults now belong to available/leased state handlers instead of the root.
+Only shared binding/authority observations remain global. The adapter reads an acceptingCommands
+state tag rather than matching internal initialization paths; it keeps no lease-policy copy. The
+synchronous API remains unchanged. No async promise actor or reply waiter was added for pure,
+synchronous fixture transforms.
+
+Svelte/TypeScript, notebook/public-consumer declaration checks, lint, formatting and whitespace
+checks pass. No implementation tests added/run for this correction before review, per AGENTS.md.
+Existing qualification totals apply to the preceding implementation only. Review should precede
+checks of both success/failure state branches, data preservation, response cleanup and existing
+lease/invalidation/opaque-snapshot integration cases. No new commit/push/merge.
+
+## Envelope preparation correction — awaiting implementation review
+
+Repository state-model review finding 1 is implemented locally. The former prepare promise actor
+is removed. Claim completion guards select payload parsing for seals or envelope parsing for opens.
+Envelope parsing reports protection only; completion guards select plain/password decoding. Password
+sealing separately invokes header construction after payload parsing. The existing payload parsing
+leaf is reused, and all new invocations route failures/interruption through existing cleanup.
+
+Parsed envelope content has one private request-storage reference, cleared after decoding and by
+normal/abrupt cleanup. Context retains mode/count facts only. No public API, native crypto owner,
+retry policy or consumer workflow was added. Reviewed the changed leaves and their parsing/decoding/
+header helpers against the machine-first gate; shape-narrowing checks remain leaf invariants.
+
+Svelte/TypeScript, lint, formatting and whitespace checks pass. These do not qualify runtime
+behavior. Existing envelope cancellation
+tables at envelope.test.ts lines 438 and 475 still refer to the removed preparing state; update
+those tables to exercise the new meaningful preparation states after implementation approval.
+No tests added/run and no commit/push. Avatar selection, recovery failure and transaction teardown
+findings remain untouched; they need their own review slices and ownership decisions.
+
+### Envelope correction qualification
+
+After the user approved continuation, replaced the two obsolete preparing-stage cancellation
+entries with payload parsing/header construction and envelope parsing/password decoding. Added
+focused cases for release during plain decoding (no hashing afterward) and failed password-header
+generation (no hashing or password import; request revoked). Existing independent crypto vectors,
+all four modes, malformed inputs, interruption drain, output ownership and secret-free snapshots
+remain covered by the focused suite.
+
+All 148 cases in envelope, inspection and export unit suites pass. The rebuilt public package
+passes publint, consumer declarations and the Node envelope consumer. Its freshly rebuilt IIFE
+passes the Chromium envelope integration (one test). Playwright's temporary localhost preview on
+port 6015 required sandbox escalation for socket binding and shut down after the run.
+Svelte/TypeScript, lint, formatting and whitespace checks pass. No implementation adjustment was
+needed after testing. No commit/push; the separate notebook correction and backup journal owner
+still have their previously recorded qualification limits. Remaining review findings are unbuilt.

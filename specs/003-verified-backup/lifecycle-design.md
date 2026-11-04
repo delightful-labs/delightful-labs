@@ -418,3 +418,56 @@ leaf adapter boundary; no asynchronous actor/promise bridge or hidden child star
 The source chart and payload policy remain in the fixture, outside DLF's reusable public exports.
 The new cleanup is uncommitted; prior export/capture work is committed locally as 77b008f. No push
 or merge. Older workspace journal disposal and restore-journal qualification remain separate work.
+
+## Notebook finite-operation correction — design before implementation (2026-11-04)
+
+The user identified that the source conversion still embeds fallible read/write work and response
+routing inside event actions. Correct that ownership rather than treating the presence of a machine
+as sufficient. Keep the synchronous fixture contract and existing lease/binding semantics.
+
+```text
+available.idle -> validatingWrite -> committingWrite / rejectingWrite -> idle
+leased.current.idle -> capturingRead -> returningRead / rejectingRead -> idle
+leased.current -> binding replacement -> leased.invalidated -> owning release -> available
+```
+
+Named actions perform one bounded transform or one assignment/reply. Validation/capture helpers
+return typed success/failure facts; they do not choose commit, reply or next-stage behavior. Write
+success updates source data in committingWrite only; failure preserves the old data. Read success
+stores an opaque captured-data reference until returningRead replies. Both branches clear their
+request/result references before returning idle. Payloads remain private capsules, not raw context.
+The adapters observe a readiness tag attached to accepting states, without reconstructing lease
+policy. Source lifecycle, admission, invalidation and ownership remain chart decisions.
+
+These are synchronous finite states, not promise actors: the leaf transforms require no asynchronous
+resource owner, and introducing promises would change the synchronous writer contract and create
+another reply bridge. Do not make a state for each expression. Existing source/lease adapters remain
+inert protocol translation. Present implementation and static checks for review before further
+runtime qualification of this correction.
+
+## Envelope preparation routing correction — design before implementation
+
+Keep the existing envelope root and its fixed native crypto child. Replace the procedural
+preparation actor with chart-owned selection and bounded leaves:
+
+```text
+claim completion -> parsingPayload (seal) / parsingEnvelope (open)
+parsingPayload -> creatingPasswordHeader (password seal) / checkingAttachments
+creatingPasswordHeader -> checkingAttachments
+parsingEnvelope -> decodingPlainEnvelope / decodingPasswordEnvelope
+decodingPlainEnvelope -> hashingPayload
+decodingPasswordEnvelope -> importingPassword
+```
+
+The claim operation reports the requested mode as an observed fact. Envelope parsing reports
+protection; completion guards choose the decoding state. Parsed envelope content remains in
+private request storage until decoding or cleanup, never actor context/output. Decode leaves
+each handle one known envelope shape, retaining the existing bounds and expected digest/header.
+Payload parsing is reused for sealing and post-open validation. Password header generation is
+an independently invoked leaf, selected only for password sealing.
+
+Each invocation retains the existing failure-to-cleaning path and checks interruption before
+advancing. Native crypto ownership, output transfer, cancellation drain, and public contracts
+stay with their existing owners. No extra supervisor or new retry behavior is required. Review
+the implementation and static checks before adding/running envelope tests, including all four
+modes, malformed preparation, and release/cancellation at the new boundaries.

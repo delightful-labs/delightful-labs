@@ -35,27 +35,37 @@ export function createArchiveEnvelopeMachine() {
 	const actors = {
 		crypto: envelopeCrypto,
 		cleanup: leaf(({ request }) => clearEnvelopeData(request)),
-		claim: leaf(({ request }) => claimEnvelopeRequest(request)),
-		prepare: leaf(({ request }): { mode: EnvelopeMode; attachmentCount: number } => {
+		claim: leaf(({ request }) => {
+			claimEnvelopeRequest(request)
+			return requireEnvelopeValue(envelopeData(request).initialMode)
+		}),
+		parseEnvelope: leaf(({ request }) => {
 			const data = envelopeData(request)
-			const mode = requireEnvelopeValue(data.initialMode)
-			if (mode === 'sealPlain' || mode === 'sealPassword') {
-				data.payload = parseArchivePayload(requireEnvelopeValue(data.bytes), data.limits)
-				if (mode === 'sealPassword') data.header = newPasswordHeader()
-				return { mode, attachmentCount: data.payload.attachments.length }
-			}
 			const envelope = parseEnvelope(requireEnvelopeValue(data.file), data.limits)
+			data.parsedEnvelope = envelope
 			data.file?.fill(0)
 			data.file = undefined
-			if (envelope.protection === 'none') {
-				data.bytes = decodeBase64(envelope.payload, data.limits.payloadBytes)
-				data.expectedDigest = envelope.sha256
-				return { mode: 'openPlain', attachmentCount: 0 }
-			}
+			return envelope.protection
+		}),
+		decodePlainEnvelope: leaf(({ request }) => {
+			const data = envelopeData(request)
+			const envelope = requireEnvelopeValue(data.parsedEnvelope)
+			if (envelope.protection !== 'none') throw new Error('Expected plain envelope')
+			data.bytes = decodeBase64(envelope.payload, data.limits.payloadBytes)
+			data.expectedDigest = envelope.sha256
+			data.parsedEnvelope = undefined
+		}),
+		decodePasswordEnvelope: leaf(({ request }) => {
+			const data = envelopeData(request)
+			const envelope = requireEnvelopeValue(data.parsedEnvelope)
+			if (envelope.protection !== 'password') throw new Error('Expected password envelope')
 			const { payload, ...header } = envelope
-			data.header = Object.freeze(header)
 			data.ciphertext = decodeBase64(payload, data.limits.payloadBytes + 16)
-			return { mode: 'openPassword', attachmentCount: 0 }
+			data.header = Object.freeze(header)
+			data.parsedEnvelope = undefined
+		}),
+		createPasswordHeader: leaf(({ request }) => {
+			envelopeData(request).header = newPasswordHeader()
 		}),
 		parsePayload: leaf(({ request }) => {
 			const data = envelopeData(request)
@@ -131,41 +141,67 @@ export function createArchiveEnvelopeMachine() {
 				invoke: {
 					src: 'claim',
 					input,
-					onDone: { target: 'working', actions: assign({ acquired: true }) },
+					onDone: [
+						{ guard: 'interrupted', target: 'cleaning', actions: assign({ acquired: true }) },
+						{
+							guard: ({ event }) => event.output === 'sealPlain' || event.output === 'sealPassword',
+							target: 'working.parsingPayload',
+							actions: assign({ acquired: true, mode: ({ event }) => event.output })
+						},
+						{
+							target: 'working.parsingEnvelope',
+							actions: assign({ acquired: true, mode: ({ event }) => event.output })
+						}
+					],
 					onError: failed
 				}
 			},
 			working: {
 				invoke: { id: 'crypto', src: 'crypto', input, onError: failed },
-				initial: 'preparing',
+				initial: 'parsingEnvelope',
 				on: { CRYPTO_FAILED: failed },
 				states: {
-					preparing: {
-						always: interrupted,
+					parsingEnvelope: {
 						invoke: {
-							src: 'prepare',
+							src: 'parseEnvelope',
 							input,
 							onError: failed,
 							onDone: [
 								interrupted,
 								{
-									guard: ({ event }) => event.output.mode === 'openPlain',
-									target: 'hashingPayload',
-									actions: assign({ mode: ({ event }) => event.output.mode })
+									guard: ({ event }) => event.output === 'none',
+									target: 'decodingPlainEnvelope',
+									actions: assign({ mode: 'openPlain' })
 								},
 								{
-									guard: ({ event }) => event.output.mode === 'openPassword',
-									target: 'importingPassword',
-									actions: assign({ mode: ({ event }) => event.output.mode })
-								},
-								{
-									target: 'checkingAttachments',
-									actions: assign({
-										mode: ({ event }) => event.output.mode,
-										attachmentCount: ({ event }) => event.output.attachmentCount
-									})
+									target: 'decodingPasswordEnvelope',
+									actions: assign({ mode: 'openPassword' })
 								}
 							]
+						}
+					},
+					decodingPlainEnvelope: {
+						invoke: {
+							src: 'decodePlainEnvelope',
+							input,
+							onDone: advance('hashingPayload'),
+							onError: failed
+						}
+					},
+					decodingPasswordEnvelope: {
+						invoke: {
+							src: 'decodePasswordEnvelope',
+							input,
+							onDone: advance('importingPassword'),
+							onError: failed
+						}
+					},
+					creatingPasswordHeader: {
+						invoke: {
+							src: 'createPasswordHeader',
+							input,
+							onDone: advance('checkingAttachments'),
+							onError: failed
 						}
 					},
 					checkingAttachments: {
@@ -286,6 +322,11 @@ export function createArchiveEnvelopeMachine() {
 							onError: failed,
 							onDone: [
 								interrupted,
+								{
+									guard: ({ context }) => context.mode === 'sealPassword',
+									target: 'creatingPasswordHeader',
+									actions: assign({ attachmentCount: ({ event }) => event.output })
+								},
 								{
 									target: 'checkingAttachments',
 									actions: assign({ attachmentCount: ({ event }) => event.output })

@@ -7,6 +7,7 @@ import {
 	formatEnvelope,
 	type EnvelopeErrorCode,
 	type EnvelopeMode,
+	type Envelope,
 	type PasswordHeader
 } from './envelope.js'
 import { encodeArchivePayload } from './payload.js'
@@ -84,6 +85,7 @@ type EnvelopeData = {
 	readonly limits: PayloadLimits
 	bytes: Uint8Array<ArrayBuffer> | undefined
 	file: Uint8Array<ArrayBuffer> | undefined
+	parsedEnvelope: Envelope | undefined
 	ciphertext: Uint8Array<ArrayBuffer> | undefined
 	payload: ArchivePayload | undefined
 	password: string | undefined
@@ -136,6 +138,7 @@ export function clearEnvelopeData(request: ArchiveEnvelopeRequest, keepOutput = 
 	data.output?.archive.release()
 	data.initialMode = undefined
 	data.file = undefined
+	data.parsedEnvelope = undefined
 	data.bytes = undefined
 	data.ciphertext = undefined
 	data.payload = undefined
@@ -199,6 +202,7 @@ function prepare(
 		limits,
 		bytes: mode.startsWith('seal') ? bytes : undefined,
 		file: mode.startsWith('open') ? bytes : undefined,
+		parsedEnvelope: undefined,
 		ciphertext: undefined,
 		payload: undefined,
 		password,

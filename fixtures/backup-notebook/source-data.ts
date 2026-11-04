@@ -24,10 +24,13 @@ export interface NotebookWrite {
 }
 const payloads = new WeakMap<NotebookData, ArchivePayload>()
 const writes = new WeakMap<NotebookWrite, { payload: unknown }>()
-export function createNotebookData(payload: unknown): NotebookData {
+function retainNotebookPayload(payload: ArchivePayload): NotebookData {
 	const data = Object.freeze({ toJSON: (): { kind: 'notebookData' } => ({ kind: 'notebookData' }) })
-	payloads.set(data, detachNotebookPayload(payload))
+	payloads.set(data, payload)
 	return data
+}
+export function createNotebookData(payload: unknown): NotebookData {
+	return retainNotebookPayload(detachNotebookPayload(payload))
 }
 export function notebookPayload(data: NotebookData): ArchivePayload {
 	const payload = payloads.get(data)
@@ -41,9 +44,40 @@ export function createNotebookWrite(payload: unknown): NotebookWrite {
 	writes.set(write, { payload })
 	return write
 }
-export function applyNotebookWrite(write: NotebookWrite): NotebookData {
-	const input = writes.get(write)
-	if (input === undefined) throw new Error('Notebook write unavailable')
-	writes.delete(write)
-	return createNotebookData(input.payload)
+export type NotebookTransformResult =
+	| { ok: true; data: NotebookData }
+	| { ok: false; error: unknown }
+/** One bounded validation/normalization leaf. The chart decides whether to commit the result. */
+export function validateNotebookWrite(write: NotebookWrite): NotebookTransformResult {
+	try {
+		const input = writes.get(write)
+		if (input === undefined) throw new Error('Notebook write unavailable')
+		writes.delete(write)
+		return { ok: true, data: createNotebookData(input.payload) }
+	} catch (error) {
+		return { ok: false, error }
+	}
+}
+/** One bounded synchronous capture leaf; no response or workflow decisions. */
+export function captureNotebookData(
+	data: NotebookData,
+	limits: PayloadLimits
+): NotebookTransformResult {
+	try {
+		return {
+			ok: true,
+			data: retainNotebookPayload(
+				detachNotebookPayload(
+					{
+						...notebookPayload(data),
+						archiveId: crypto.randomUUID(),
+						capturedAt: new Date().toISOString()
+					},
+					limits
+				)
+			)
+		}
+	} catch (error) {
+		return { ok: false, error }
+	}
 }

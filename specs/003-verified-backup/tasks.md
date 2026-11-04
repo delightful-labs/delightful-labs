@@ -6,6 +6,14 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**Current correction awaiting review: notebook finite operations.** Following the user's review,
+REPLACE/READ now have explicit validation/capture and success/failure states with named single-leaf
+actions. State-specific rejection handlers replace root defaults; the source adapter projects an
+acceptingCommands tag. Synchronous capture/writer contracts and opaque payloads remain intact.
+See [review notes](implementation-notes.md#notebook-finite-operation-correction--awaiting-implementation-review-2026-11-04).
+Static checks pass; no new tests added/run before implementation approval. These changes are
+uncommitted/unpushed. Earlier runtime totals below do not qualify this correction.
+
 **Current qualified correction: remaining error/SDK wrappers.** The user continued the final code
 cleanup. Payload error factory/guard replaces its subclass; subscription factories return native
 SDK instances rather than extending SDK classes. Callers, declarations and examples are migrated.
