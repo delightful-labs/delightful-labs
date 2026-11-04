@@ -359,3 +359,62 @@ rewrite, the older workspace journal disposal finding or the committed restore-j
 Cleanup custody remains in-memory; this is not a durable recovery journal. Graceful drain still
 requires issued consumer calls to settle, and native release cannot be cancelled by stopping an
 actor. No new commit, push or merge was performed.
+
+## Notebook source ownership correction — design before implementation (2026-11-04)
+
+The user requested committing the qualified export correction and completing the next cleanup,
+including tests. The prior correction is committed locally as 77b008f. This instruction explicitly
+authorizes implementation and tests together for this fixture slice.
+
+The notebook source is a fixture-owned root whose lifetime spans writes and successive exports:
+available -> leased.current -> leased.invalidated -> available. The chart owns acquisition,
+writer exclusion, exact binding/current-owner checks, invalidation and release. An observed binding
+replacement invalidates the current lease until its own release, even if the binding later returns
+to the same value. Old lease release cannot release a newer token. Aborted calls cannot acquire,
+drain or read; release is idempotent and does not depend on AbortSignal. All fixture writers remain
+synchronous; this does not qualify real Jazz capture, durability or remote acceptance.
+
+The factory returns an unstarted source actor and leaf adapter methods. The fixture host explicitly
+starts/stops this independent source root; it is not a hidden child started by the shared library.
+Its lifetime outlasts a single export so the host can write and export again. The machine belongs
+under fixtures/backup-notebook/machines, not the reusable DLF machine exports: notebook domain
+models stay outside the foundation. The host exposes the source actor for explicit disposal.
+
+Synchronous typed request/reply events keep the existing leaf API: one actor event is processed
+before returning Promise.resolve for the capture contract. No deferred promise/await bridge,
+subscription waiter, private owner flag or class is added. Actor context holds binding facts, an
+opaque data reference and an opaque lease token; payloads/proposed writes stay in private capsules.
+Pure codec/profile transforms and inert lease adapters remain functions. Invalid writes/reads return
+errors without crashing the source owner. An inactive source rejects work; it has no external lease
+resource requiring asynchronous stop cleanup. Hosts drain exports before stopping their source.
+
+Qualify existing content/lease/public package tests plus focused invalidation, wrong-owner release,
+writer rejection, failed write preservation and explicit host-stop behavior. Rebuild and run focused
+shared backup units, reader/notebook integrations and Chromium checks. No commit/push/merge of this
+new slice is implied by committing the preceding correction.
+
+### Notebook source correction qualification (2026-11-04)
+
+Implemented the fixture-owned source chart and removed NotebookSource. The source factory returns
+an unstarted actor with synchronous leaf adapters. The fixture host starts it explicitly and Node/
+Chromium callers stop it after export drain. The readiness state is explicit: XState reports an
+initial snapshot as active before start, so initializing waits for the start-entry event before
+admitting adapter calls. No private started flag is used, and early calls cannot queue later writes
+or acquisition. Context contains only binding, opaque data and lease references.
+
+All 18 notebook/package integration cases pass, including four added cases for pre-start admission,
+A -> B -> A invalidation without revival, failed-write preservation/opaque snapshots, and stopped
+source/harmless old release. Existing exact file content, writer exclusion, old-owner release,
+reduced bounds and explicit cleanup recovery cases pass. All 144 focused shared backup unit cases,
+11 independent reader cases and four Chromium cases pass with the rebuilt notebook bundle. Chromium
+host paths explicitly stop the new source root after drain. Playwright owned a temporary preview on
+localhost port 6014 for its run. Svelte/TypeScript, public-consumer declarations, lint, formatting
+and whitespace checks pass. The browser host declaration was updated to include actor.stop().
+
+This only qualifies the disposable, synchronous in-memory notebook fixture. It does not prove
+Jazz capture/quiescence, persistence, remote acceptance or production completeness. Hosts must drain
+exports before stopping their source. Synchronous replies are confined to the fixture's immediate
+leaf adapter boundary; no asynchronous actor/promise bridge or hidden child start was introduced.
+The source chart and payload policy remain in the fixture, outside DLF's reusable public exports.
+The new cleanup is uncommitted; prior export/capture work is committed locally as 77b008f. No push
+or merge. Older workspace journal disposal and restore-journal qualification remain separate work.

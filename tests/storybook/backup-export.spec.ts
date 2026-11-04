@@ -52,6 +52,7 @@ declare global {
 					>
 					request: ArchiveExportRequest
 					source: ArchiveCaptureSource & {
+						actor: { stop(): void }
 						replace(payload: unknown): void
 						observeBinding(binding: BackupBinding): void
 					}
@@ -139,6 +140,7 @@ for (const kind of ['none', 'password']) {
 				const archived = payload.records.find((record) => record.id === 'archived')
 				const first = payload.records.find((record) => record.id === 'first')
 				const empty = payload.records.find((record) => record.id === 'empty')
+				fixture.source.actor.stop()
 				return {
 					exported: exported.outcome,
 					handoff: exported.handoff,
@@ -240,6 +242,7 @@ test('browser invalidation drains a late notebook lease and rejects a stale A â†
 		deliver?.()
 		const output = await api.toPromise(fixture.actor)
 		fixture.source.replace(payload)
+		fixture.source.actor.stop()
 		return { excluded, draining, dispatches, outcome: output.outcome, handoff: output.handoff }
 	})
 	expect(result).toEqual({

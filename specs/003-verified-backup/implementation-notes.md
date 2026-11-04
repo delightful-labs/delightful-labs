@@ -389,3 +389,26 @@ No production fixes were needed. See [qualification](lifecycle-design.md#export-
 The preceding static-only status is historical. These changes remain uncommitted; f50a97c is the
 prior ownership commit. Notebook source ownership is next. Journal corrections remain separately
 unqualified. No push/merge.
+
+## Notebook source ownership correction — implemented and tested (2026-11-04)
+
+The user authorized committing the preceding export correction and doing this next cleanup including
+tests. Committed export/capture work as 77b008f; no push/merge. Removed NotebookSource in favor of a
+fixture-owned source chart with initialization, available, leased.current and leased.invalidated
+states. The chart owns admission, writer exclusion, binding/current-owner decisions and release;
+payloads stay in private data capsules. Pure codec transforms and inert lease adapters remain
+functions. There is no private owner/started flag or source-owned multi-step promise workflow.
+
+The source factory returns an unstarted root. The fixture host starts it explicitly and exposes
+source.actor so hosts can stop it after drain; its lifetime spans writes and successive captures,
+rather than being a manually started hidden shared-library child. An explicit initialization state
+handles XState's pre-start active snapshot without queuing work. Binding replacement invalidates
+an existing lease even when the binding returns to the same value. Failed writes preserve the prior
+data and keep the actor usable. These are bounded fixture rules, not new persistence/recovery scope.
+
+All 18 notebook/package cases (four added ownership cases), 144 focused shared backup units,
+11 independent reader cases and four Chromium cases pass. Static/declaration/lint/format checks
+pass. See [qualification](lifecycle-design.md#notebook-source-correction-qualification-2026-11-04).
+No full repository suite was run. The new source cleanup remains uncommitted. Next audited source
+finding: the older workspace journal's native disposal boundary. The committed restore-journal
+correction still requires separate review/qualification; these tests do not qualify it.

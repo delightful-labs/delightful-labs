@@ -26,7 +26,7 @@ import {
 import { createNotebookExport } from './export.js'
 import { createNotebookDataset } from './dataset.js'
 import { notebookProfile } from './profile.js'
-import { NotebookSource } from './source.js'
+import { createNotebookSource } from './source.js'
 
 const binding: BackupBinding = Object.freeze({
 	applicationId: 'notebook-fixture',
@@ -91,6 +91,7 @@ for (const protection of protections) {
 				}
 			}
 		})
+		t.after(() => source.actor.stop())
 		actor.start()
 		assert.deepEqual(await toPromise(actor), {
 			outcome: 'exported',
@@ -163,9 +164,11 @@ for (const protection of protections) {
 	})
 }
 
-test('notebook capture lease excludes writers and other owners, releases idempotently and bounds reads', async () => {
-	const source = new NotebookSource(sample(), binding),
+test('notebook capture lease excludes writers and other owners, releases idempotently and bounds reads', async (t) => {
+	const source = createNotebookSource(sample(), binding),
 		signal = new AbortController().signal
+	source.actor.start()
+	t.after(() => source.actor.stop())
 	const lease = await source.acquire(binding, signal)
 	assert.throws(() => source.replace(sample()))
 	assert.throws(() => source.acquire(binding, signal))
@@ -282,8 +285,10 @@ for (const { name, change } of invalidProfiles)
 	test(`notebook rejects generically valid ${name}`, () =>
 		assert.equal(notebookProfile.validate(canonical(change(sample()))), false))
 
-test('public cleanup machine releases the retained notebook lease without replaying export', async () => {
-	const source = new NotebookSource(sample(), binding)
+test('public cleanup machine releases the retained notebook lease without replaying export', async (t) => {
+	const source = createNotebookSource(sample(), binding)
+	source.actor.start()
+	t.after(() => source.actor.stop())
 	let releases = 0
 	let dispatches = 0
 	const request = prepareArchiveExport({
@@ -322,4 +327,80 @@ test('public cleanup machine releases the retained notebook lease without replay
 	source.replace(sample())
 	assert.equal(releases, 2)
 	assert.equal(dispatches, 0)
+})
+
+test('source startup rejects early work without queuing it for later', async (t) => {
+	const original = sample()
+	const source = createNotebookSource(original, binding)
+	t.after(() => source.actor.stop())
+	const signal = new AbortController().signal
+	assert.equal(await source.checkAuthority(binding, signal), false)
+	assert.throws(() => source.acquire(binding, signal), /unavailable/)
+	assert.throws(() => source.replace({ invalid: true }), /unavailable/)
+	source.actor.start()
+	const lease = await source.acquire(binding, signal)
+	assert.deepEqual(
+		canonical(await lease.read(signal, payloadLimits)).records,
+		canonical(original).records
+	)
+	await lease.release()
+})
+
+test('binding replacement invalidates an existing lease even after A to B to A', async (t) => {
+	const source = createNotebookSource(sample(), binding)
+	source.actor.start()
+	t.after(() => source.actor.stop())
+	const signal = new AbortController().signal
+	const lease = await source.acquire(binding, signal)
+	source.observeBinding({ ...binding, generation: binding.generation + 1 })
+	source.observeBinding(binding)
+	assert.equal(source.actor.getSnapshot().matches({ leased: 'invalidated' }), true)
+	assert.equal(await lease.checkConsistency(signal), false)
+	assert.throws(() => lease.drain(signal), /invalidated/)
+	assert.throws(() => lease.read(signal, payloadLimits), /invalidated/)
+	assert.throws(() => source.replace(sample()), /capture owns/)
+	await lease.release()
+	const next = await source.acquire(binding, signal)
+	assert.equal(await next.checkConsistency(signal), true)
+	await lease.release()
+	assert.throws(() => source.replace(sample()), /capture owns/)
+	await next.release()
+	source.replace(sample())
+})
+
+test('invalid writes preserve source contents and keep payloads out of source snapshots', async (t) => {
+	const original = sample()
+	const source = createNotebookSource(original, binding)
+	source.actor.start()
+	t.after(() => source.actor.stop())
+	const snapshots: string[] = []
+	source.actor.subscribe(() => snapshots.push(JSON.stringify(source.actor.getPersistedSnapshot())))
+	assert.throws(() => source.replace({ private: 'rejected-private-payload' }))
+	assert.equal(source.actor.getSnapshot().status, 'active')
+	const signal = new AbortController().signal
+	const lease = await source.acquire(binding, signal)
+	assert.deepEqual(
+		canonical(await lease.read(signal, payloadLimits)).records,
+		canonical(original).records
+	)
+	await lease.release()
+	for (const snapshot of snapshots) {
+		assert.equal(snapshot.includes('Preserve archived content'), false)
+		assert.equal(snapshot.includes('bytes.bin'), false)
+		assert.equal(snapshot.includes('rejected-private-payload'), false)
+	}
+})
+
+test('stopped source rejects work and old lease release remains harmless', async () => {
+	const source = createNotebookSource(sample(), binding)
+	source.actor.start()
+	const signal = new AbortController().signal
+	const lease = await source.acquire(binding, signal)
+	source.actor.stop()
+	assert.equal(await source.checkAuthority(binding, signal), false)
+	assert.equal(await lease.checkConsistency(signal), false)
+	assert.throws(() => lease.read(signal, payloadLimits), /unavailable/)
+	assert.throws(() => source.replace(sample()), /unavailable/)
+	await lease.release()
+	await lease.release()
 })

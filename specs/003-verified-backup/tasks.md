@@ -4,7 +4,17 @@ Implementation authorized 2026-11-03 after the user merged PR #15. Work proceeds
 and focused review cycles. No production deployment, commit or publication is implied. Tests are
 added/run only after review approval of the implementation they cover.
 
-## Current handoff (2026-11-03)
+## Current handoff (2026-11-04)
+
+**Current qualified correction: notebook source ownership.** Export/capture correction committed
+locally as 77b008f at the user's request. The user authorized this next cleanup including tests.
+NotebookSource is removed; the fixture source chart owns initialization, availability, lease
+invalidation, writer exclusion and current-owner release. Four new cases plus existing checks pass:
+18 notebook/package cases, 144 focused backup units, 11 reader cases and four Chromium cases.
+Static/declaration/lint/format checks pass. See
+[qualification](lifecycle-design.md#notebook-source-correction-qualification-2026-11-04).
+This new fixture cleanup is uncommitted; no push/merge. Next audited finding is older workspace
+journal native disposal. Restore-journal correction review/qualification remains separate.
 
 **Current qualified correction: export/capture ownership and explicit cleanup recovery.** The user
 continued from implementation review. All 144 focused envelope/inspection/export unit cases,
@@ -13,7 +23,7 @@ cleanup protocol units and one built-public-package case proving cleanup restore
 without replaying export. Static/package checks pass; no production fixes were needed. See
 [qualification](lifecycle-design.md#export-ownership-correction-qualification-after-implementation-review).
 The explicit cleanup factory replaces request.retryCleanup() as approved. Notebook source ownership
-is the next review slice. These changes remain uncommitted; prior corrections are in f50a97c.
+is the next review slice. These export/capture changes are now committed locally as 77b008f; prior corrections are in f50a97c.
 No push/merge. Journal corrections remain separately unqualified.
 
 **Current qualified correction: inspection ownership.** The user continued from implementation
