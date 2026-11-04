@@ -16,6 +16,18 @@ declare global {
 	interface Window {
 		// Root checks precede dist. These types describe the fixture's public-package-backed IIFE.
 		DLFNotebook: Pick<typeof import('xstate'), 'createActor' | 'toPromise'> &
+			Pick<
+				typeof import('../../src/lib/backup/restore-journal.js'),
+				'decodeRestoreJournalRecord' | 'encodeRestoreJournalRecord' | 'parseRestoreJournalRecord'
+			> &
+			Pick<
+				typeof import('../../src/lib/backup/restore-journal-browser-api.js'),
+				'prepareBrowserRestoreJournal'
+			> &
+			Pick<
+				typeof import('../../src/lib/machines/backup/restore-journal.js'),
+				'createBrowserRestoreJournalMachine'
+			> &
 			Pick<typeof import('../../src/lib/backup/envelope-api.js'), 'prepareArchiveOpen'> &
 			Pick<
 				typeof import('../../src/lib/machines/backup/envelope.js'),

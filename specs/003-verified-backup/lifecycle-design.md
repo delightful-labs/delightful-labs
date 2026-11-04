@@ -8,6 +8,10 @@ export qualification is recorded below. Restore machines, persisted journal and 
 qualification remain unimplemented. Restore protocols below remain design requirements; implemented
 and locally tested export behavior is described explicitly.
 
+This export slice merged in PR #21 on 2026-11-03 as `04f3203`, after final-commit CI passed for
+`06362cf`. Subsequent [restore journal identity/model progress and qualification](restore-journal-design.md)
+are recorded separately from this export evidence.
+
 ## Ownership tree
 
 ```text
@@ -256,5 +260,6 @@ independently validate specific retained fixture files; they do not certify arbi
 all browsers, large-file memory/latency, Jazz/Finance quiescence, durable restore journals, remote write
 settlement or a successful full restore. T006 remains open for restore/T012 and round-trip qualification;
 T004 and Finance adoption remain outstanding. No live data, identity configuration or deployment was
-changed. After reviewing the qualification, the user authorized committing and publishing this export
-slice as a PR targeting `main`. Final-commit CI is checked separately. Merge requires separate authorization.
+changed. The user authorized committing/publishing this export slice and subsequently merged PR #21.
+All final-commit GitHub CI checks passed. Subsequent restore work uses its own feature branch and
+review cycles; this export qualification is not authorization to publish or merge those later changes.

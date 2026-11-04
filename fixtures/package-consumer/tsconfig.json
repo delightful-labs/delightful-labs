@@ -10,6 +10,9 @@
 	"include": [
 		"../backup-notebook/export.ts",
 		"./consumer.ts",
+		"./restore-journal.ts",
+		"./restore-journal-runtime.js",
+		"./browser-restore-journal.ts",
 		"./cleanup.ts",
 		"./backup.js",
 		"./backup-envelope.js",

@@ -20,7 +20,7 @@ import {
 } from './types.js'
 
 const identifier = z.string().min(1).max(256)
-const bindingSchema = z
+export const backupBindingSchema = z
 	.strictObject({
 		applicationId: identifier,
 		environment: identifier,
@@ -30,7 +30,7 @@ const bindingSchema = z
 		operationId: identifier
 	})
 	.readonly()
-export type BackupBinding = z.infer<typeof bindingSchema>
+export type BackupBinding = z.infer<typeof backupBindingSchema>
 
 export interface ArchiveCaptureLease {
 	/** One acknowledgement that the consumer's existing writers have drained. */
@@ -345,7 +345,7 @@ export function prepareArchiveExport(options: {
 	protection: ArchiveProtection
 	limits?: PayloadLimitOverrides
 }): ArchiveExportRequest {
-	const binding = bindingSchema.safeParse(options.binding)
+	const binding = backupBindingSchema.safeParse(options.binding)
 	const limits = resolvePayloadLimits(options.limits)
 	const profile = createPayloadSchemas(limits).payload.unwrap().shape.profile.safeParse({
 		id: options.profile.id,

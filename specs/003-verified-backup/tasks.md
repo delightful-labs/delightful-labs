@@ -15,19 +15,47 @@ on 2026-11-03 as `afc92fd`. See the
 
 **Current implementation task: T006.** Shared capture/export and the notebook profile/source are
 implemented and locally verified after the user authorized continuing from implementation review.
+PR #21 merged on 2026-11-03 as `04f3203`; all final-commit GitHub CI checks passed for `06362cf`.
 See the [lifecycle design and qualification evidence](lifecycle-design.md#export-qualification).
 Public export subpaths are `backup/export` and `backup/export/workflow`. New verification includes
 51 export unit cases, 13 notebook/public-package cases (with independent retained-file inspection)
 and three Chromium cases. Tests are included in normal unit, consumer and browser checks.
 
-**Next implementation slice: restore/write owners and concrete journal validation (T012).** Read
-the [workflow contract](contracts/workflow.md) and lifecycle ownership notes. Restore actors, persisted
-journal/storage, isolated destination and content round-trip remain unimplemented. Present that
-implementation for review before its tests. No additional general cleanup is required. Finance
+**Current slice: restore journal identity/model (T012 foundation), reviewed and locally verified.**
+The [journal design and codec evidence](restore-journal-design.md#codec-qualification) record the
+strict Zod model/inferred types and bounded pure codec on
+`feat/backup-restore-journal`. All 87 new journal unit cases, the built public Node consumer and one
+new Chromium case pass; the qualified pure-codec totals are 815 unit tests and 46 Chromium cases.
+Those results do not qualify the new native owner/store implementation below. T012 remains incomplete.
+
+**Current reviewed slice: browser journal resource owner/concrete store.** The
+[native ownership design](browser-journal-design.md) records same-browser recovery, IndexedDB-only
+atomic transactions and focused qualification: 89 journal unit cases and five Chromium cases.
+Redundant locks, alternative storage interfaces and cleanup-retry API were removed in review.
+No destination restore writes are implemented. Page reload is qualified; browser-process crash and
+actual Jazz restore are not. The new attempt/completion representation is locally qualified below.
+
+**Current completed review/test slice: focused journal attempt/completion representation.** The user
+authorized this slice after [real-code research](research.md#restore-limitation-investigation--2026-11-03)
+and [persistent-browser recovery probes](research.md#persistent-jazz-write-recovery-investigation--2026-11-03).
+The [design](restore-journal-design.md#focused-attemptcompletion-change--implementation-review-2026-11-03)
+adds a bounded most-recent rejection summary, a guarded new transaction attempt after a confirmed
+remote rejection, and completion by exact remote content match with unchanged transaction evidence.
+Intent, mappings and storage ownership remain unchanged. Unknown access/outcomes stay unresolved.
+After implementation review, the user authorized tests. Added 16 focused unit cases and one native
+Chromium case; all 833 unit tests (32 files, including 105 journal cases) and all 51 Chromium cases
+(including six journal cases) pass. Package/strict Publint, public consumer checks, Svelte/TypeScript,
+lint and formatting pass. No production fixes were needed. The
+[qualification evidence](restore-journal-design.md#attemptcompletion-qualification--completed-2026-11-03)
+distinguishes journal validation from the unbuilt destination comparison and writer integration.
+Restore coordinator/destination writers remain paused. The user authorized committing and publishing
+this reviewed journal slice as a PR targeting `main`; merge requires separate authorization.
+Read the [workflow contract](contracts/workflow.md) and lifecycle ownership
+notes. Isolated destination and content round-trip remain unimplemented.
+Present each implementation slice before its tests. No additional general cleanup is required. Finance
 inventory/adoption (T007–T010), T004 large-file measurements and sign-in delivery remain outstanding.
-No deployed data or identity/storage configuration changed. The user authorized committing this
-capture/export slice and opening a PR targeting `main`; restore remains subsequent work and merge
-requires separate authorization.
+No deployed data or identity/storage configuration changed. The journal PR contains only this
+reviewed implementation, qualification and limitation documentation; no deployment or merge is authorized.
 
 ## Archive core
 
@@ -52,7 +80,7 @@ requires separate authorization.
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **In progress: capture/export and notebook source locally qualified; restore remains unimplemented.** Implement shared export/restore actor protocols and a small
+- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store reviewed with focused Chromium checks; restore coordinator/writers remain unimplemented.** Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,
@@ -89,7 +117,7 @@ runtime guard or to finish unrelated refactors before backup work continues.
       existing `parseAsync` and injected `validationIssues` contracts so consumers may use other
       validators. Map issue paths/codes without copying input values or automatically exposing raw
       Zod messages; localization stays consumer-owned. Review the implementation before tests.
-- [ ] T012 — When implementing the concrete restore-operation journal in T006/T009, define its
+- [ ] T012 — **Started: pure record/codec verified; browser owner/CAS store prepared for review; native storage/restart remains unqualified.** When implementing the concrete restore-operation journal in T006/T009, define its
       persisted record/version schema with Zod and infer its types. Validate unknown stored data
       before reuse; reject malformed/unsupported records without resetting storage, inventing a new
       operation or replaying unknown writes. Reuse existing schema-injection boundaries; do not

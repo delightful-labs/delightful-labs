@@ -1,0 +1,63 @@
+{
+	"format": "DLF-RESTORE-JOURNAL",
+	"version": 1,
+	"revision": 0,
+	"intent": {
+		"operation": {
+			"applicationId": "notebook",
+			"environment": "disposable",
+			"identityId": "restoring-owner",
+			"operationId": "restore-one",
+			"destinationWorkspaceId": "destination-workspace"
+		},
+		"archive": {
+			"archiveId": "12345678-1234-4234-8234-123456789abc",
+			"payloadSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+			"profile": { "id": "notebook-profile", "version": 1 },
+			"source": { "applicationId": "notebook", "workspaceId": "source-workspace" }
+		},
+		"plan": {
+			"id": "notebook-plan",
+			"version": 1,
+			"sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+			"expectedGraphSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+			"mappings": [
+				{
+					"kind": "record",
+					"type": "notebook",
+					"sourceId": "book",
+					"destinationId": "destination-workspace"
+				},
+				{
+					"kind": "record",
+					"type": "note",
+					"sourceId": "note-one",
+					"destinationId": "destination-note"
+				},
+				{ "kind": "attachment", "sourceId": "binary", "destinationId": "destination-file" }
+			],
+			"preparation": {
+				"writeId": "prepare",
+				"expectedContentSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+				"mappingIndexes": [0]
+			},
+			"batches": [
+				{
+					"writeId": "batch-notes",
+					"expectedContentSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+					"mappingIndexes": [1, 2]
+				}
+			],
+			"activation": {
+				"writeId": "activate",
+				"expectedContentSha256": "6666666666666666666666666666666666666666666666666666666666666666"
+			},
+			"requirements": { "local": "required", "remote": "required" }
+		}
+	},
+	"checkpoint": {
+		"kind": "writing",
+		"completed": [],
+		"current": { "status": "notIssued", "writeId": "prepare", "issuance": 0 }
+	}
+}

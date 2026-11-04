@@ -5,11 +5,23 @@
 **Status**: Archive codec, envelope/integrity handling and independent inspector are implemented
 and functionally verified. Large-file browser memory/latency qualification remains. Shared-library
 cleanup implementation merged in PR #19; regression qualification and two reproduced fixes are in
-merged PR #20. Shared capture/export actors and a disposable notebook source are implemented and
-locally qualified in T006. Restore and its persisted journal remain unimplemented; no deployed
+merged PR #20. Shared capture/export actors and a disposable notebook source are merged in PR #21
+and locally qualified in T006. The pure restore journal model/codec is implemented and locally verified.
+The browser journal owner/store is reviewed with focused Chromium checks; restore coordination and
+destination writes remain unimplemented. No deployed
 consumer export or verified restore is qualified. See the [current handoff](tasks.md#current-handoff-2026-11-03),
 [payload review notes](implementation-notes.md), [envelope ownership/design](envelope-design.md)
 and [inspector design](inspector-design.md).
+
+The [restore journal identity/model](restore-journal-design.md) has pure-codec qualification.
+The [browser journal owner/concrete store](browser-journal-design.md) has focused native transaction/page-reload qualification; destination effects remain unimplemented.
+Record parsing alone supplies no persistence, authority or replay guarantee.
+
+Following research and user discussion of the
+[known restore limitations](spec.md#known-restore-limitations-and-implementation-gate), the user
+authorized a focused journal attempt/completion change, then approved testing. It is implemented
+and locally qualified: 833 unit tests and 51 Chromium tests pass along with package/consumer and
+static checks. Restore coordination and destination writes remain paused.
 
 ## Summary
 

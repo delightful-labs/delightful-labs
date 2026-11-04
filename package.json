@@ -15,7 +15,7 @@
 		"check": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc --noEmit --project tsconfig.json",
 		"check:watch": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --watch",
 		"package": "pnpm paraglide && svelte-package --input src/lib --output dist && publint --strict",
-		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/notebook.vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:backup-notebook",
+		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/notebook.vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:backup-notebook",
 		"verify": "pnpm format:check && pnpm lint && pnpm check && pnpm test:unit --run && pnpm package && pnpm check:consumer && pnpm build-storybook",
 		"test:unit": "pnpm paraglide && vitest --config vitest.config.ts",
 		"paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --emit-ts-declarations --no-emit-readme --no-emit-prettier-ignore --no-emit-git-ignore",
@@ -51,6 +51,18 @@
 	"version": "0.0.0",
 	"description": "Reusable local-first identity and workspace foundations for Delightful apps.",
 	"exports": {
+		"./backup/restore/journal/browser": {
+			"types": "./dist/backup/restore-journal-browser-api.d.ts",
+			"default": "./dist/backup/restore-journal-browser-api.js"
+		},
+		"./backup/restore/journal/workflow": {
+			"types": "./dist/machines/backup/restore-journal.d.ts",
+			"default": "./dist/machines/backup/restore-journal.js"
+		},
+		"./backup/restore/journal": {
+			"types": "./dist/backup/restore-journal.d.ts",
+			"default": "./dist/backup/restore-journal.js"
+		},
 		"./backup/export": {
 			"types": "./dist/backup/export-api.d.ts",
 			"default": "./dist/backup/export-api.js"
