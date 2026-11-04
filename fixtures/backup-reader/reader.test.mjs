@@ -6,6 +6,9 @@ import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileSource } from './io.mjs'
+import { Readable } from 'node:stream'
+import { createActor, toPromise, waitFor } from 'xstate'
+import { boundedReadMachine } from './machines/read.mjs'
 
 const vector = JSON.parse(await readFile('tests/fixtures/archive-envelope-v1.json', 'utf8'))
 const directory = await mkdtemp(join(tmpdir(), 'dlf-reader-'))
@@ -191,4 +194,80 @@ test('rejects extra arguments without echoing them', async () => {
 	assert.equal(result.code, 1)
 	assert.equal(JSON.parse(result.stdout).code, 'usage')
 	assert.ok(!result.stdout.includes('private-secret-argument'))
+})
+
+// Direct stream-owner checks supplement the real file/subprocess cases above.
+/** @param {boolean} waitForClose @param {number} [maximum] */
+function streamOwner(waitForClose, maximum = 4) {
+	const stream = new Readable({ read() {}, autoDestroy: false, emitClose: false })
+	const controller = new AbortController()
+	/** @type {import('./stream-native.mjs').ReadStorage} */
+	const storage = { chunks: [], bytes: undefined }
+	const actor = createActor(boundedReadMachine, {
+		input: { stream, maximum, signal: controller.signal, waitForClose, storage }
+	}).start()
+	return { stream, controller, storage, actor }
+}
+test('file EOF waits for descriptor close, then transfers copied bytes and removes listeners', async () => {
+	const f = streamOwner(true),
+		chunk = Uint8Array.of(1, 2)
+	f.stream.emit('data', chunk)
+	f.stream.emit('end')
+	assert.equal(f.actor.getSnapshot().status, 'active')
+	f.stream.emit('close')
+	const result = await toPromise(f.actor)
+	assert.equal(result.outcome, 'read')
+	if (result.outcome !== 'read') throw new Error('Expected read')
+	assert.deepEqual(result.bytes, Uint8Array.of(1, 2))
+	assert.deepEqual(chunk, Uint8Array.of(0, 0))
+	assert.equal(f.storage.chunks.length, 0)
+	for (const event of ['data', 'end', 'error', 'close'])
+		assert.equal(f.stream.listenerCount(event), 0)
+})
+test('stdin completes at EOF without waiting for close or destroying the host stream', async () => {
+	const f = streamOwner(false)
+	f.stream.emit('data', Uint8Array.of(1))
+	f.stream.emit('end')
+	assert.equal((await toPromise(f.actor)).outcome, 'read')
+	assert.equal(f.stream.destroyed, false)
+	f.stream.destroy()
+})
+test('premature close rejects partial data and clears it', async () => {
+	const f = streamOwner(true),
+		chunk = Uint8Array.of(1)
+	f.stream.emit('data', chunk)
+	f.stream.emit('close')
+	assert.deepEqual(await toPromise(f.actor), { outcome: 'failed', code: 'fileReadFailed' })
+	assert.equal(chunk[0], 0)
+})
+test('file errors wait for close and discard late data', async () => {
+	const f = streamOwner(true),
+		late = Uint8Array.of(3)
+	f.stream.emit('error', new Error('private read failure'))
+	f.stream.emit('data', late)
+	assert.equal(f.actor.getSnapshot().status, 'active')
+	assert.equal(late[0], 0)
+	f.stream.emit('close')
+	assert.deepEqual(await toPromise(f.actor), { outcome: 'failed', code: 'fileReadFailed' })
+})
+test('abort after file EOF destroys and waits for native close before failure', async () => {
+	const f = streamOwner(true)
+	f.stream.emit('end')
+	f.controller.abort()
+	await waitFor(f.actor, (s) => s.matches({ active: 'awaitingFailureClose' }))
+	assert.equal(f.stream.destroyed, true)
+	assert.equal(f.actor.getSnapshot().status, 'active')
+	f.stream.emit('close')
+	assert.deepEqual(await toPromise(f.actor), { outcome: 'failed', code: 'fileReadFailed' })
+})
+test('oversize stdin is destroyed, reports the bound failure, and clears all chunks', async () => {
+	const f = streamOwner(false, 1),
+		first = Uint8Array.of(1),
+		extra = Uint8Array.of(2)
+	f.stream.emit('data', first)
+	f.stream.emit('data', extra)
+	assert.deepEqual(await toPromise(f.actor), { outcome: 'failed', code: 'limitExceeded' })
+	assert.equal(f.stream.destroyed, true)
+	assert.equal(first[0], 0)
+	assert.equal(extra[0], 0)
 })

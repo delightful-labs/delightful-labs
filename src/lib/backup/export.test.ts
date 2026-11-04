@@ -1,6 +1,10 @@
+import type { EnvelopeMode } from './envelope.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createActor, fromPromise, toPromise, waitFor } from 'xstate'
-import { createArchiveExportMachine } from '../machines/backup/export.js'
+import {
+	createArchiveExportMachine,
+	createArchiveExportCleanupMachine
+} from '../machines/backup/export.js'
 import { createArchiveCaptureMachine } from '../machines/backup/capture.js'
 import {
 	createArchiveEnvelopeMachine,
@@ -10,7 +14,7 @@ import { createArchiveInspectionMachine } from '../machines/backup/inspection.js
 import { prepareArchiveInspection } from './inspection-api.js'
 import { prepareArchiveOpen } from './envelope-api.js'
 import {
-	envelopeOperation,
+	buildSealedArchive,
 	type EnvelopeSuccess,
 	type SealedArchive
 } from './envelope-operation.js'
@@ -38,6 +42,13 @@ const testProfile = {
 	version: 1,
 	validate: (payload: ArchivePayload) => payload.records.length === 2
 }
+async function retryCleanup(request: ArchiveExportRequest) {
+	const actor = createActor(createArchiveExportCleanupMachine(), { input: { request } })
+	actor.start()
+	const result = await toPromise(actor)
+	if (result.outcome === 'failed') throw new Error(result.code)
+}
+
 function sample(): ArchivePayload {
 	return {
 		archiveId: '12345678-1234-4234-8234-123456789abc',
@@ -433,7 +444,7 @@ describe('capture drain and resource lifetime', () => {
 		let unsubscribe: (() => void) | undefined
 		actor.subscribe((snapshot) => {
 			const child = snapshot.children.effect
-			if (snapshot.value !== 'capturing' || !child || attached) return
+			if (!snapshot.matches({ working: 'capturing' }) || !child || attached) return
 			attached = true
 			const probe = (value: unknown) => {
 				if (
@@ -474,7 +485,11 @@ describe('capture drain and resource lifetime', () => {
 		const actor = createActor(createArchiveExportMachine(), { input: { request } })
 		let reached = false
 		actor.subscribe((snapshot) => {
-			if (!reached && snapshot.value === stage) {
+			if (
+				!reached &&
+				(snapshot.value === stage ||
+					(typeof snapshot.value === 'object' && snapshot.value.working === stage))
+			) {
 				reached = true
 				actor.send({ type: 'CANCEL' })
 			}
@@ -543,7 +558,7 @@ describe('capture drain and resource lifetime', () => {
 			})
 			const request = h.request(),
 				actor = start(request)
-			await expect(request.retryCleanup()).rejects.toThrow('exportInUse')
+			await expect(retryCleanup(request)).rejects.toThrow('exportInUse')
 			await vi.waitFor(() => expect(h.read).toHaveBeenCalled())
 			actor.send({ type: 'CANCEL' })
 			gate.resolve(h.payload)
@@ -552,13 +567,87 @@ describe('capture drain and resource lifetime', () => {
 				code: 'captureCleanupFailed'
 			})
 			expect(h.release).toHaveBeenCalledOnce()
-			await request.retryCleanup()
+			await retryCleanup(request)
 			expect(h.release).toHaveBeenCalledTimes(2)
-			await request.retryCleanup()
+			await retryCleanup(request)
 			expect(h.release).toHaveBeenCalledTimes(2)
 			expect(h.dispatch).not.toHaveBeenCalled()
 		}
 	)
+
+	it('rejects concurrent cleanup attempts and releases only the retained lease', async () => {
+		const h = harness()
+		const gate = deferred<void>()
+		h.release
+			.mockRejectedValueOnce(new Error('private-initial-release'))
+			.mockReturnValueOnce(gate.promise)
+		const request = h.request()
+		expect(await toPromise(start(request))).toMatchObject({
+			outcome: 'failed',
+			code: 'captureCleanupFailed'
+		})
+		const cleanup = createActor(createArchiveExportCleanupMachine(), { input: { request } })
+		cleanup.start()
+		await vi.waitFor(() => expect(h.release).toHaveBeenCalledTimes(2))
+		await expect(retryCleanup(request)).rejects.toThrow('exportInUse')
+		expect(cleanup.getSnapshot().status).toBe('active')
+		gate.resolve()
+		expect(await toPromise(cleanup)).toEqual({ outcome: 'cleaned' })
+		await retryCleanup(request)
+		expect(h.release).toHaveBeenCalledTimes(2)
+		expect(h.acquire).toHaveBeenCalledOnce()
+		expect(h.read).toHaveBeenCalledOnce()
+		expect(h.dispatch).not.toHaveBeenCalled()
+	})
+	it.each(['throw', 'reject'])(
+		'retains failed cleanup custody after a %s for another explicit actor',
+		async (mode) => {
+			const h = harness()
+			h.release
+				.mockRejectedValueOnce(new Error('private-initial-release'))
+				.mockImplementationOnce(() => {
+					if (mode === 'throw') throw new Error('private-cleanup-failure')
+					return Promise.reject(new Error('private-cleanup-failure'))
+				})
+			const request = h.request()
+			expect(await toPromise(start(request))).toMatchObject({
+				outcome: 'failed',
+				code: 'captureCleanupFailed'
+			})
+			const cleanup = createActor(createArchiveExportCleanupMachine(), { input: { request } })
+			cleanup.start()
+			expect(await toPromise(cleanup)).toEqual({ outcome: 'failed', code: 'captureCleanupFailed' })
+			expect(h.release).toHaveBeenCalledTimes(2)
+			await retryCleanup(request)
+			expect(h.release).toHaveBeenCalledTimes(3)
+			expect(h.acquire).toHaveBeenCalledOnce()
+			expect(h.dispatch).not.toHaveBeenCalled()
+		}
+	)
+	it('keeps cleanup custody with a stopped actor until native release settles', async () => {
+		const h = harness()
+		const gate = deferred<void>()
+		h.release
+			.mockRejectedValueOnce(new Error('private-initial-release'))
+			.mockReturnValueOnce(gate.promise)
+		const request = h.request()
+		expect(await toPromise(start(request))).toMatchObject({
+			outcome: 'failed',
+			code: 'captureCleanupFailed'
+		})
+		const cleanup = createActor(createArchiveExportCleanupMachine(), { input: { request } })
+		cleanup.start()
+		await vi.waitFor(() => expect(h.release).toHaveBeenCalledTimes(2))
+		cleanup.stop()
+		await expect(retryCleanup(request)).rejects.toThrow('exportInUse')
+		gate.reject(new Error('private-late-release'))
+		await vi.waitFor(async () => {
+			await expect(retryCleanup(request)).resolves.toBeUndefined()
+		})
+		expect(h.release).toHaveBeenCalledTimes(3)
+		expect(h.acquire).toHaveBeenCalledOnce()
+		expect(h.dispatch).not.toHaveBeenCalled()
+	})
 	it('abruptly releases a late lease even when the actor has stopped', async () => {
 		const h = harness(),
 			gate = deferred<ArchiveCaptureLease>(),
@@ -568,10 +657,10 @@ describe('capture drain and resource lifetime', () => {
 		await vi.waitFor(() => expect(h.acquire).toHaveBeenCalled())
 		request.release()
 		actor.stop()
-		await expect(request.retryCleanup()).rejects.toThrow('exportInUse')
+		await expect(retryCleanup(request)).rejects.toThrow('exportInUse')
 		gate.resolve(h.lease)
 		await vi.waitFor(() => expect(h.release).toHaveBeenCalledOnce())
-		await request.retryCleanup()
+		await retryCleanup(request)
 		expect(h.read).not.toHaveBeenCalled()
 	})
 	it('abrupt stop waits for a late graph read before releasing the lease', async () => {
@@ -587,7 +676,7 @@ describe('capture drain and resource lifetime', () => {
 		expect(h.release).not.toHaveBeenCalled()
 		gate.resolve(h.payload)
 		await vi.waitFor(() => expect(h.release).toHaveBeenCalledOnce())
-		await request.retryCleanup()
+		await retryCleanup(request)
 		expect(h.checkConsistency).not.toHaveBeenCalled()
 		expect(h.dispatch).not.toHaveBeenCalled()
 	})
@@ -605,10 +694,10 @@ describe('capture drain and resource lifetime', () => {
 		request.release()
 		actor.stop()
 		expect(borrowed?.copyBytes().length).toBeGreaterThan(0)
-		await expect(request.retryCleanup()).rejects.toThrow('exportInUse')
+		await expect(retryCleanup(request)).rejects.toThrow('exportInUse')
 		gate.resolve('dispatched')
 		await vi.waitFor(() => expect(() => borrowed?.copyBytes()).toThrow('resourceReleased'))
-		await request.retryCleanup()
+		await retryCleanup(request)
 		expect(h.release).toHaveBeenCalledOnce()
 	})
 	it('drains the resource owner after an unexpected capture-child crash', async () => {
@@ -659,8 +748,11 @@ describe('capture drain and resource lifetime', () => {
 			let acquired: SealedArchive | undefined
 			const seal = createArchiveEnvelopeMachine().provide({
 				actors: {
-					buildEnvelope: fromPromise<EnvelopeSuccess, ArchiveEnvelopeInput>(({ input }) => {
-						const output = envelopeOperation(input.request).buildEnvelope()
+					buildEnvelope: fromPromise<
+						EnvelopeSuccess,
+						ArchiveEnvelopeInput & { mode: EnvelopeMode }
+					>(({ input }) => {
+						const output = buildSealedArchive(input.request, input.mode)
 						if (output.outcome === 'sealed') acquired = output.archive
 						return Promise.resolve(output)
 					})
@@ -673,11 +765,19 @@ describe('capture drain and resource lifetime', () => {
 				stopped = false
 			let unsubscribe: (() => void) | undefined
 			actor.subscribe((snapshot) => {
-				if (!attached && snapshot.value === 'sealing' && snapshot.children.effect) {
+				if (!attached && snapshot.matches({ working: 'sealing' }) && snapshot.children.effect) {
 					attached = true
 					const child = snapshot.children.effect
 					const subscription = child.subscribe((value) => {
-						if (!stopped && 'value' in value && value.value === stage) {
+						if (
+							!stopped &&
+							'value' in value &&
+							(value.value === stage ||
+								(typeof value.value === 'object' &&
+									value.value !== null &&
+									'working' in value.value &&
+									value.value.working === stage))
+						) {
 							stopped = true
 							request.release()
 							actor.stop()

@@ -1,4 +1,9 @@
-export { prepareArchiveExport, sameBackupBinding, ArchiveExportError } from './export.js'
+export {
+	prepareArchiveExport,
+	sameBackupBinding,
+	createArchiveExportError,
+	isArchiveExportError
+} from './export.js'
 export type {
 	BackupBinding,
 	ArchiveCaptureSource,
@@ -8,6 +13,7 @@ export type {
 	ArchiveHandoffObservation,
 	ArchiveExportRequest,
 	ArchiveExportResult,
+	ArchiveExportCleanupResult,
 	ArchiveExportErrorCode,
 	ArchiveExportInterruption
 } from './export.js'

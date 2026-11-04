@@ -1,6 +1,6 @@
 /** Preparation is synchronous; execute each request once through backup/envelope/workflow. */
 export { prepareArchiveSeal, prepareArchiveOpen } from './envelope-operation.js'
-export { ArchiveEnvelopeError } from './envelope.js'
+export { createArchiveEnvelopeError, isArchiveEnvelopeError } from './envelope.js'
 export type {
 	ArchiveEnvelopeRequest,
 	ArchiveEnvelopeResult,

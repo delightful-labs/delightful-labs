@@ -64,6 +64,28 @@ shutdown, and observer/startup failure priority. If a parent stops this child or
 SDK call is pending, this machine cannot abort that operation or recover supervision on its own.
 Do not claim that stopping an actor or closing its view waits for settlement.
 
+### Coordinator child-crash handling
+
+The `recovery/coordination` wrapper keeps unexpected restoration-child crashes on the host's
+invocation-error path. It does not return an ordinary `restoreFailed`/`closed` result, because the
+child supplied no reliable mutation-settlement evidence. Finance's host handles an invocation error
+separately from normal recovery completion and workspace reattachment.
+
+The wrapper transitions out of restoring, invalidates its binding, and clears its own request and
+binding references before queuing failure propagation. The next actor turn reaches the output
+error boundary and emits only `Restoration child failed`; it retains no raw child exception.
+The separate turn allows the cleared snapshot to commit before the actor errors. A shutdown queued
+at this boundary cannot convert the crash into a successful close result.
+
+`RecoveryRestorationBinding.invalidate` is a total, synchronous, idempotent reference release,
+implemented by the Jazz adapter with one assignment. It must not perform fallible SDK work. This
+cleanup does not cancel an already-issued restoration, prove settlement, recover lost SDK
+supervision, or qualify abrupt ancestor teardown. The host still owns those limitations.
+Coordinator tests now qualify child crashes before assessment completes and after restoration issue,
+including shutdown, cleanup-before-parent-error ordering, cleared failed snapshots, and normal SDK
+rejection/success/shutdown regressions. A crash does not recover lost supervision of an outstanding
+SDK operation. See the active feature implementation notes for final run results.
+
 ## Sensitive data and leaf audit
 
 The child clears its phrase context when parsing succeeds, and clears credential context through a

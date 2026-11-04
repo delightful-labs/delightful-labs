@@ -300,3 +300,99 @@ test('a real constraint error still fails and rolls back the journal transaction
 		read: { outcome: 'succeeded', record: undefined }
 	})
 })
+
+for (const stage of ['opening', 'acquired', 'first-opening']) {
+	test(`abrupt stop during ${stage} releases native journal handles`, async ({ page }) => {
+		const result = await page.evaluate(async (stage) => {
+			const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+			const name = `dlf-journal-stop-${crypto.randomUUID()}`
+			const machine = createNotebookJournal(name)
+			// Establish the existing store so the stopped open exercises late onsuccess, not upgrade abort.
+			if (stage !== 'first-opening') {
+				const seed = createActor(machine, { input: { mode: 'read', key: 'member' } }).start()
+				await toPromise(seed)
+				seed.stop()
+			}
+			let acquired = false
+			let stop = () => {}
+			const actor = createActor(machine, {
+				input: { mode: 'read', key: 'member' },
+				inspect(event) {
+					if (
+						stage === 'acquired' &&
+						event.type === '@xstate.event' &&
+						event.event.type === 'ACQUIRED'
+					) {
+						acquired = true
+						stop()
+					}
+				}
+			})
+			stop = () => actor.stop()
+			actor.start()
+			if (stage !== 'acquired') actor.stop()
+			else
+				await new Promise<void>((resolve) => {
+					// Native acquisition reports from an IndexedDB task, without a timer or mocked database.
+					const subscription = actor.subscribe({
+						complete: () => {
+							subscription.unsubscribe()
+							resolve()
+						}
+					})
+					if (actor.getSnapshot().status === 'stopped') {
+						subscription.unsubscribe()
+						resolve()
+					}
+				})
+			const status = actor.getSnapshot().status
+			await new Promise<void>((resolve, reject) => {
+				const removal = indexedDB.deleteDatabase(name)
+				removal.onsuccess = () => resolve()
+				removal.onerror = () => reject(removal.error)
+				removal.onblocked = () =>
+					reject(new Error('Stopped journal retained a database connection'))
+			})
+			return { status, acquired }
+		}, stage)
+		expect(result).toEqual({ status: 'stopped', acquired: stage === 'acquired' })
+	})
+}
+
+test('abrupt stop aborts a staged journal transaction and releases its database', async ({
+	page
+}) => {
+	const result = await page.evaluate(async () => {
+		const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+		const name = `dlf-journal-stop-staged-${crypto.randomUUID()}`
+		const machine = createNotebookJournal(name)
+		const record = { key: 'member', attempt: { notebookId: 'stopped', title: 'notes' } }
+		let stopped = false
+		let abortObserved: Promise<void> | undefined
+		const actor = createActor(machine, { input: { mode: 'write', key: record.key, record } })
+		actor.subscribe((snapshot) => {
+			if (!stopped && snapshot.matches({ running: { work: { using: 'waiting' } } })) {
+				const tx = snapshot.context.tx
+				if (!tx) throw new Error('Missing staged transaction')
+				abortObserved = new Promise((resolve) =>
+					tx.addEventListener('abort', () => resolve(), { once: true })
+				)
+				stopped = true
+				actor.stop()
+			}
+		})
+		actor.start()
+		const reader = createActor(machine, { input: { mode: 'read', key: record.key } }).start()
+		const read = await toPromise(reader)
+		reader.stop()
+		await abortObserved
+		await new Promise<void>((resolve, reject) => {
+			const removal = indexedDB.deleteDatabase(name)
+			removal.onsuccess = () => resolve()
+			removal.onerror = () => reject(removal.error)
+			removal.onblocked = () => reject(new Error('Stopped transaction retained its database'))
+		})
+		return { stopped, read }
+	})
+	expect(result).toEqual({ stopped: true, read: { outcome: 'succeeded', record: undefined } })
+})

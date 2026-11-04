@@ -2,16 +2,16 @@ import { z } from 'zod'
 import { createPayloadSchemas } from './schemas.js'
 import { encodeArchivePayload, parseArchivePayload } from './payload.js'
 import {
-	envelopeOperation,
+	retainSealedOutput,
 	prepareArchiveSeal,
 	type ArchiveEnvelopeRequest,
 	type ArchiveProtection,
 	type SealedArchive
 } from './envelope-operation.js'
-import { ArchiveEnvelopeError, type EnvelopeErrorCode } from './envelope.js'
+import { isArchiveEnvelopeError, type EnvelopeErrorCode } from './envelope.js'
 import type { ArchiveProfileValidator } from './inspection.js'
 import {
-	ArchivePayloadError,
+	isArchivePayloadError,
 	resolvePayloadLimits,
 	type ArchivePayload,
 	type ArchivePayloadErrorCode,
@@ -20,7 +20,7 @@ import {
 } from './types.js'
 
 const identifier = z.string().min(1).max(256)
-const bindingSchema = z
+export const backupBindingSchema = z
 	.strictObject({
 		applicationId: identifier,
 		environment: identifier,
@@ -30,7 +30,7 @@ const bindingSchema = z
 		operationId: identifier
 	})
 	.readonly()
-export type BackupBinding = z.infer<typeof bindingSchema>
+export type BackupBinding = z.infer<typeof backupBindingSchema>
 
 export interface ArchiveCaptureLease {
 	/** One acknowledgement that the consumer's existing writers have drained. */
@@ -65,8 +65,6 @@ export interface ArchiveExportRequest {
 	 * Await machine completion after CANCEL/SHUTDOWN for a graceful drain acknowledgement.
 	 */
 	release(): void
-	/** One explicit lease-release retry after completion/teardown. Rejects while work is issued. */
-	retryCleanup(): Promise<void>
 	toJSON(): { kind: 'archiveExportRequest' }
 }
 export type ArchiveExportInterruption = 'cancelled' | 'closed' | 'invalidated'
@@ -79,11 +77,25 @@ export type ArchiveExportErrorCode =
 	| 'profileInvalid'
 	| 'captureCleanupFailed'
 	| 'exportFailed'
-export class ArchiveExportError extends Error {
-	constructor(readonly code: ArchiveExportErrorCode) {
-		super(code)
-		this.name = 'ArchiveExportError'
-	}
+export function createArchiveExportError(code: ArchiveExportErrorCode) {
+	return Object.assign(new Error(code), { name: 'ArchiveExportError', code })
+}
+export function isArchiveExportError(
+	error: unknown
+): error is ReturnType<typeof createArchiveExportError> {
+	return (
+		error instanceof Error &&
+		error.name === 'ArchiveExportError' &&
+		'code' in error &&
+		(error.code === 'invalidExportConfiguration' ||
+			error.code === 'exportInUse' ||
+			error.code === 'exportReleased' ||
+			error.code === 'authorityDenied' ||
+			error.code === 'captureInconsistent' ||
+			error.code === 'profileInvalid' ||
+			error.code === 'captureCleanupFailed' ||
+			error.code === 'exportFailed')
+	)
 }
 export type ArchiveExportResult = Readonly<{
 	binding: BackupBinding
@@ -101,8 +113,8 @@ export type ArchiveCaptureResult =
 	| { outcome: 'captured' | ArchiveExportInterruption }
 	| ReturnType<typeof exportFailure>
 
-function required<T>(value: T | undefined): T {
-	if (value === undefined) throw new ArchiveExportError('exportReleased')
+export function requireExportValue<T>(value: T | undefined): T {
+	if (value === undefined) throw createArchiveExportError('exportReleased')
 	return value
 }
 export function sameBackupBinding(left: BackupBinding, right: BackupBinding): boolean {
@@ -116,227 +128,123 @@ export function sameBackupBinding(left: BackupBinding, right: BackupBinding): bo
 	)
 }
 
-/** Private resource boundary. Methods are one leaf or a synchronous bounded transform. */
-class ExportOperation {
-	#source: ArchiveCaptureSource | undefined
-	#handoff: ArchiveFileHandoff | undefined
-	#profile: ArchiveProfileValidator | undefined
-	#protection: ArchiveProtection | undefined
-	#lease: ArchiveCaptureLease | undefined
-	#releasePromise: Promise<void> | undefined
-	#cleanupFailed = false
-	#captured: unknown
-	#payload: ArchivePayload | undefined
-	#envelope: ArchiveEnvelopeRequest | undefined
-	#sealed: SealedArchive | undefined
-	#abort = new AbortController()
-	#pending = 0
-	#idleWaiters = new Set<() => void>()
-	#claimed = false
-	#released = false
-	readonly binding: BackupBinding
-	readonly limits: PayloadLimits
-	constructor(options: {
-		binding: BackupBinding
-		source: ArchiveCaptureSource
-		handoff: ArchiveFileHandoff
-		profile: ArchiveProfileValidator
-		protection: ArchiveProtection
-		limits: PayloadLimits
-	}) {
-		this.binding = options.binding
-		this.limits = options.limits
-		this.#source = options.source
-		this.#handoff = options.handoff
-		this.#profile = options.profile
-		this.#protection = options.protection
-	}
-	claim() {
-		if (this.#released) throw new ArchiveExportError('exportReleased')
-		if (this.#claimed) throw new ArchiveExportError('exportInUse')
-		this.#claimed = true
-	}
-	#eligible() {
-		if (this.#released || this.#abort.signal.aborted) throw new ArchiveExportError('exportReleased')
-	}
-	/** Retain acquisitions before promise completion; cleanup sees even a late acquired lease. */
-	#track<T>(issue: () => Promise<T>, accept: (value: T) => void): Promise<void> {
-		this.#eligible()
-		this.#pending += 1
-		return Promise.resolve()
-			.then(() => {
-				this.#eligible()
-				return issue()
-			})
-			.then(accept)
-			.finally(() => {
-				this.#settled()
-			})
-	}
-	checkAuthority(): Promise<void> {
-		return this.#track(
-			() => required(this.#source).checkAuthority(this.binding, this.#abort.signal),
-			(allowed) => {
-				if (!allowed) throw new ArchiveExportError('authorityDenied')
-			}
+/** Pure bounded structural/domain transform; no I/O or resource-lifetime decisions. */
+export function validateExportPayload(
+	captured: unknown,
+	profile: ArchiveProfileValidator,
+	binding: BackupBinding,
+	limits: PayloadLimits
+): ArchivePayload {
+	const bytes = encodeArchivePayload(captured, limits)
+	try {
+		const payload = parseArchivePayload(bytes, limits)
+		if (
+			payload.profile.id !== profile.id ||
+			payload.profile.version !== profile.version ||
+			payload.source.applicationId !== binding.applicationId ||
+			payload.source.workspaceId !== binding.workspaceId ||
+			!profile.validate(payload)
 		)
-	}
-	acquire(): Promise<void> {
-		return this.#track(
-			() => required(this.#source).acquire(this.binding, this.#abort.signal),
-			(lease) => {
-				this.#lease = lease
-			}
-		)
-	}
-	drain(): Promise<void> {
-		return this.#track(
-			() => required(this.#lease).drain(this.#abort.signal),
-			() => {}
-		)
-	}
-	read(): Promise<void> {
-		return this.#track(
-			() => required(this.#lease).read(this.#abort.signal, this.limits),
-			(payload) => {
-				if (!this.#released && !this.#abort.signal.aborted) this.#captured = payload
-			}
-		)
-	}
-	validate() {
-		this.#eligible()
-		const bytes = encodeArchivePayload(this.#captured, this.limits)
-		this.#captured = undefined
-		try {
-			const payload = parseArchivePayload(bytes, this.limits)
-			const profile = required(this.#profile)
-			if (
-				payload.profile.id !== profile.id ||
-				payload.profile.version !== profile.version ||
-				payload.source.applicationId !== this.binding.applicationId ||
-				payload.source.workspaceId !== this.binding.workspaceId ||
-				!profile.validate(payload)
-			)
-				throw new ArchiveExportError('profileInvalid')
-			this.#payload = payload
-		} finally {
-			bytes.fill(0)
-		}
-	}
-	checkConsistency(): Promise<void> {
-		return this.#track(
-			() => required(this.#lease).checkConsistency(this.#abort.signal),
-			(consistent) => {
-				if (!consistent) throw new ArchiveExportError('captureInconsistent')
-			}
-		)
-	}
-	releaseLease(): Promise<void> {
-		if (this.#releasePromise) return this.#releasePromise
-		const lease = this.#lease
-		if (!lease) return Promise.resolve()
-		this.#releasePromise = Promise.resolve()
-			.then(() => lease.release())
-			.then(() => {
-				this.#lease = undefined
-				this.#cleanupFailed = false
-			})
-			.catch(() => {
-				this.#cleanupFailed = true
-				throw new ArchiveExportError('captureCleanupFailed')
-			})
-			.finally(() => {
-				this.#releasePromise = undefined
-			})
-		return this.#releasePromise
-	}
-	prepareEnvelope(): ArchiveEnvelopeRequest {
-		this.#eligible()
-		this.#envelope = prepareArchiveSeal(
-			required(this.#payload),
-			required(this.#protection),
-			this.limits
-		)
-		this.#payload = undefined
-		this.#protection = undefined
-		envelopeOperation(this.#envelope).retainSealedOutput((archive) => {
-			this.#sealed = archive
-			if (this.#released) archive.release()
-		})
-		return this.#envelope
-	}
-	/** Handoff is one consumer effect. A throw cannot prove the effect never dispatched. */
-	dispatch(): Promise<ArchiveHandoffObservation> {
-		this.#eligible()
-		const archive = required(this.#sealed)
-		const file: ArchiveHandoffFile = Object.freeze({
-			copyBytes: () => archive.copyBytes(),
-			toJSON: (): { kind: 'sealedArchive' } => ({ kind: 'sealedArchive' })
-		})
-		this.#pending += 1
-		return Promise.resolve()
-			.then(() => {
-				this.#eligible()
-				return required(this.#handoff).dispatch(file, this.binding, this.#abort.signal)
-			})
-			.then((observation): ArchiveHandoffObservation => {
-				if (observation === 'dispatched' || observation === 'rejected') return observation
-				return 'unknown'
-			})
-			.catch((): ArchiveHandoffObservation => 'unknown')
-			.finally(() => {
-				this.#settled()
-			})
-	}
-	#settled() {
-		this.#pending -= 1
-		if (this.#pending === 0) {
-			for (const resolve of this.#idleWaiters) resolve()
-			this.#idleWaiters.clear()
-		}
-		if (this.#released) this.#clear()
-	}
-	drainIssued(): Promise<void> {
-		if (this.#pending === 0) return Promise.resolve()
-		return new Promise((resolve) => this.#idleWaiters.add(resolve))
-	}
-	abort() {
-		this.#abort.abort()
-	}
-	release() {
-		this.finish()
-	}
-	retryCleanup(): Promise<void> {
-		if (!this.#released || this.#pending !== 0)
-			return Promise.reject(new ArchiveExportError('exportInUse'))
-		return this.releaseLease()
-	}
-	finish() {
-		this.#released = true
-		this.abort()
-		this.#clear()
-	}
-	#clear() {
-		this.#captured = undefined
-		this.#payload = undefined
-		this.#protection = undefined
-		this.#profile = undefined
-		this.#envelope?.release()
-		this.#envelope = undefined
-		// An issued handoff may still be reading its borrowed handle. Drain before clearing it.
-		if (this.#pending !== 0) return
-		this.#sealed?.release()
-		this.#sealed = undefined
-		this.#source = undefined
-		this.#handoff = undefined
-		if (!this.#cleanupFailed) void this.releaseLease().catch(() => {})
+			throw createArchiveExportError('profileInvalid')
+		return payload
+	} finally {
+		bytes.fill(0)
 	}
 }
 
-const exports = new WeakMap<ArchiveExportRequest, ExportOperation>()
-export function exportOperation(request: ArchiveExportRequest) {
-	return required(exports.get(request))
+type ExportInputData = {
+	source: ArchiveCaptureSource
+	handoff: ArchiveFileHandoff
+	profile: ArchiveProfileValidator
+	protection: ArchiveProtection | undefined
 }
+export type ExportCleanupCustody = { lease: ArchiveCaptureLease | undefined }
+/** Payload/native resource facts only; the charts own admission, sequencing and drain. */
+type ExportData = {
+	readonly binding: BackupBinding
+	readonly limits: PayloadLimits
+	input: ExportInputData | undefined
+	lease: ArchiveCaptureLease | undefined
+	failedLease: ArchiveCaptureLease | undefined
+	captured: unknown
+	payload: ArchivePayload | undefined
+	envelope: ArchiveEnvelopeRequest | undefined
+	sealed: SealedArchive | undefined
+	readonly abort: AbortController
+	issued: Promise<unknown> | undefined
+	cleanup: ExportCleanupCustody | undefined
+	releaseControl: (() => void) | undefined
+}
+type PreparedExport = { data: ExportData; claim(): void }
+const exports = new WeakMap<ArchiveExportRequest, PreparedExport>()
+function prepared(request: ArchiveExportRequest) {
+	return requireExportValue(exports.get(request))
+}
+export function exportData(request: ArchiveExportRequest) {
+	return prepared(request).data
+}
+export function claimExportRequest(request: ArchiveExportRequest) {
+	prepared(request).claim()
+}
+/** Transfer cleanup custody only after the native borrower has returned or disposed its resources. */
+export function publishExportCleanup(request: ArchiveExportRequest) {
+	const data = exportData(request)
+	if (
+		data.releaseControl !== undefined ||
+		data.input !== undefined ||
+		data.issued !== undefined ||
+		data.lease !== undefined ||
+		data.cleanup !== undefined
+	)
+		return
+	data.cleanup = { lease: data.failedLease }
+	data.failedLease = undefined
+}
+export function takeExportCleanup(request: ArchiveExportRequest): ExportCleanupCustody {
+	const data = exportData(request)
+	if (data.cleanup === undefined) throw createArchiveExportError('exportInUse')
+	const custody = data.cleanup
+	data.cleanup = undefined
+	return custody
+}
+/** Clearing payload references is synchronous. Native resource release belongs to its leaf adapter. */
+export function clearExportData(request: ArchiveExportRequest) {
+	const data = exportData(request)
+	data.input = undefined
+	data.captured = undefined
+	data.payload = undefined
+	data.envelope?.release()
+	data.envelope = undefined
+	data.sealed?.release()
+	data.sealed = undefined
+}
+export function validateCapturedExport(request: ArchiveExportRequest) {
+	const data = exportData(request)
+	const input = requireExportValue(data.input)
+	const captured = data.captured
+	data.captured = undefined
+	data.payload = validateExportPayload(captured, input.profile, data.binding, data.limits)
+}
+export function prepareExportEnvelope(request: ArchiveExportRequest): ArchiveEnvelopeRequest {
+	const data = exportData(request)
+	const input = requireExportValue(data.input)
+	const envelope = prepareArchiveSeal(
+		requireExportValue(data.payload),
+		requireExportValue(input.protection),
+		data.limits
+	)
+	data.envelope = envelope
+	data.payload = undefined
+	input.protection = undefined
+	retainSealedOutput(envelope, (archive) => {
+		data.sealed = archive
+		if (data.input === undefined) archive.release()
+	})
+	return envelope
+}
+export type ArchiveExportCleanupResult =
+	| { outcome: 'cleaned' }
+	| { outcome: 'failed'; code: 'exportInUse' | 'captureCleanupFailed' | 'exportFailed' }
 export function prepareArchiveExport(options: {
 	binding: BackupBinding
 	source: ArchiveCaptureSource
@@ -345,7 +253,7 @@ export function prepareArchiveExport(options: {
 	protection: ArchiveProtection
 	limits?: PayloadLimitOverrides
 }): ArchiveExportRequest {
-	const binding = bindingSchema.safeParse(options.binding)
+	const binding = backupBindingSchema.safeParse(options.binding)
 	const limits = resolvePayloadLimits(options.limits)
 	const profile = createPayloadSchemas(limits).payload.unwrap().shape.profile.safeParse({
 		id: options.profile.id,
@@ -366,32 +274,57 @@ export function prepareArchiveExport(options: {
 		typeof options.source?.acquire !== 'function' ||
 		typeof options.handoff?.dispatch !== 'function'
 	)
-		throw new ArchiveExportError('invalidExportConfiguration')
-	const operation = new ExportOperation({
+		throw createArchiveExportError('invalidExportConfiguration')
+	const data: ExportData = {
 		binding: binding.data,
-		source: options.source,
-		handoff: options.handoff,
-		profile: Object.freeze({ ...profile.data, validate: options.profile.validate }),
-		protection: Object.freeze(protection.data),
-		limits
-	})
+		limits,
+		input: {
+			source: options.source,
+			handoff: options.handoff,
+			profile: Object.freeze({ ...profile.data, validate: options.profile.validate }),
+			protection: Object.freeze(protection.data)
+		},
+		lease: undefined,
+		failedLease: undefined,
+		captured: undefined,
+		payload: undefined,
+		envelope: undefined,
+		sealed: undefined,
+		abort: new AbortController(),
+		issued: undefined,
+		cleanup: undefined,
+		releaseControl: undefined
+	}
+	let available: ExportData | undefined = data
 	const request: ArchiveExportRequest = Object.freeze({
-		release: () => operation.release(),
-		retryCleanup: () => operation.retryCleanup(),
+		release() {
+			if (data.input === undefined) return
+			data.input = undefined
+			available = undefined
+			data.abort.abort()
+			if (data.releaseControl) data.releaseControl()
+			else {
+				clearExportData(request)
+				publishExportCleanup(request)
+			}
+		},
 		toJSON: (): { kind: 'archiveExportRequest' } => ({ kind: 'archiveExportRequest' })
 	})
-	exports.set(request, operation)
+	exports.set(request, {
+		data,
+		claim() {
+			requireExportValue(data.input)
+			if (available === undefined) throw createArchiveExportError('exportInUse')
+			available = undefined
+		}
+	})
 	return request
 }
 export function exportFailure(error: unknown): {
 	outcome: 'failed'
 	code: ArchiveExportErrorCode | ArchivePayloadErrorCode | EnvelopeErrorCode
 } {
-	if (
-		error instanceof ArchiveExportError ||
-		error instanceof ArchivePayloadError ||
-		error instanceof ArchiveEnvelopeError
-	)
+	if (isArchiveExportError(error) || isArchivePayloadError(error) || isArchiveEnvelopeError(error))
 		return { outcome: 'failed', code: error.code }
 	return { outcome: 'failed', code: 'exportFailed' }
 }

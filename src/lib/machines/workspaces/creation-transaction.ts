@@ -1,3 +1,10 @@
+import {
+	createTransactionCustody,
+	clearTransactionCustody,
+	transactionCall,
+	transactionCustodian,
+	type TransactionCustody
+} from './transaction-custody.js'
 import { assign, fromPromise, setup, stateIn } from 'xstate'
 import type {
 	WorkspaceCreationAssessment,
@@ -19,7 +26,9 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 ) {
 	type Attempt = WorkspaceCreationAttempt<Draft>
 	type Outcome = WorkspaceCreationOutcome<Workspace>
+	type Custody = TransactionCustody<Transaction, Write>
 	type Context = {
+		custody: Custody
 		attempt: Attempt
 		transaction: Transaction | undefined
 		workspace: Workspace | undefined
@@ -27,26 +36,41 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 		result: Outcome | undefined
 	}
 	const actors = {
-		open: fromPromise(async () => capability.open()),
+		custodian: transactionCustodian<Transaction, Write>(),
+		open: fromPromise(({ input }: { input: { custody: Custody } }) => {
+			const call = transactionCall(input.custody, () => capability.open())
+			input.custody.acquisition = call
+			return call
+		}),
 		read: fromPromise(
-			async ({ input }: { input: { transaction: Transaction; attempt: Attempt } }) =>
-				capability.readLocal(input.transaction, input.attempt)
+			async ({
+				input
+			}: {
+				input: { transaction: Transaction; attempt: Attempt; custody: Custody }
+			}) =>
+				transactionCall(input.custody, () => capability.readLocal(input.transaction, input.attempt))
 		),
 		assess: fromPromise(async ({ input }: { input: { records: Records; attempt: Attempt } }) =>
 			capability.assess(input.records, input.attempt)
 		),
 		stage: fromPromise(
-			async ({ input }: { input: { transaction: Transaction; attempt: Attempt } }) =>
-				capability.stage(input.transaction, input.attempt)
+			async ({
+				input
+			}: {
+				input: { transaction: Transaction; attempt: Attempt; custody: Custody }
+			}) => transactionCall(input.custody, () => capability.stage(input.transaction, input.attempt))
 		),
-		commit: fromPromise(async ({ input }: { input: { transaction: Transaction } }) =>
-			capability.commit(input.transaction)
+		commit: fromPromise(({ input }: { input: { transaction: Transaction; custody: Custody } }) => {
+			const call = transactionCall(input.custody, () => capability.commit(input.transaction))
+			input.custody.commit = call
+			return call
+		}),
+		persist: fromPromise(async ({ input }: { input: { write: Write; custody: Custody } }) =>
+			transactionCall(input.custody, () => capability.persistLocal(input.write))
 		),
-		persist: fromPromise(async ({ input }: { input: { write: Write } }) =>
-			capability.persistLocal(input.write)
-		),
-		rollback: fromPromise(async ({ input }: { input: { transaction: Transaction } }) =>
-			capability.rollback(input.transaction)
+		rollback: fromPromise(
+			async ({ input }: { input: { transaction: Transaction; custody: Custody } }) =>
+				transactionCall(input.custody, () => capability.rollback(input.transaction))
 		)
 	}
 	type FullContext = Context & { records: Records | undefined }
@@ -74,6 +98,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 		settlement: unresolved ? { kind: 'unresolved', error } : { kind: 'notStarted' }
 	})
 	const transactionInput = ({ context }: { context: FullContext }) => ({
+		custody: context.custody,
 		transaction: required(context.transaction),
 		attempt: context.attempt
 	})
@@ -84,6 +109,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 	return model.createMachine({
 		id: 'workspace-creation-transaction',
 		context: ({ input }) => ({
+			custody: createTransactionCustody(capability.retainDetached),
 			attempt: input.attempt,
 			transaction: undefined,
 			records: undefined,
@@ -96,6 +122,15 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 		states: {
 			running: {
 				type: 'parallel',
+				invoke: {
+					src: 'custodian',
+					input: ({ context, self }) => ({ custody: context.custody, owner: self }),
+					onError: {
+						actions: () => {
+							throw new Error('Transaction custody failed')
+						}
+					}
+				},
 				states: {
 					control: {
 						initial: 'active',
@@ -111,6 +146,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 							opening: {
 								invoke: {
 									src: 'open',
+									input: ({ context }) => ({ custody: context.custody }),
 									onDone: {
 										target: 'checkingAfterOpen',
 										actions: assign({ transaction: ({ event }) => event.output })
@@ -190,7 +226,10 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 							committing: {
 								invoke: {
 									src: 'commit',
-									input: ({ context }) => ({ transaction: required(context.transaction) }),
+									input: ({ context }) => ({
+										transaction: required(context.transaction),
+										custody: context.custody
+									}),
 									onDone: {
 										target: 'persistingLocal',
 										actions: assign({ write: ({ event }) => event.output })
@@ -204,18 +243,24 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 							persistingLocal: {
 								invoke: {
 									src: 'persist',
-									input: ({ context }) => ({ write: required(context.write) }),
+									input: ({ context }) => ({
+										write: required(context.write),
+										custody: context.custody
+									}),
 									onDone: {
 										target: 'finishing',
-										actions: assign({
-											result: ({ context }): Outcome => ({
-												outcome: 'succeeded',
-												settlement: {
-													kind: 'locallyPersisted',
-													workspace: required(context.workspace)
-												}
+										actions: [
+											({ context }) => clearTransactionCustody(context.custody),
+											assign({
+												result: ({ context }): Outcome => ({
+													outcome: 'succeeded',
+													settlement: {
+														kind: 'locallyPersisted',
+														workspace: required(context.workspace)
+													}
+												})
 											})
-										})
+										]
 									},
 									onError: {
 										target: 'rollingBack',
@@ -226,8 +271,17 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 							rollingBack: {
 								invoke: {
 									src: 'rollback',
-									input: ({ context }) => ({ transaction: required(context.transaction) }),
+									input: ({ context }) => ({
+										transaction: required(context.transaction),
+										custody: context.custody
+									}),
 									onDone: [
+										{
+											guard: ({ context, event }) =>
+												event.output && context.result?.settlement.kind !== 'unresolved',
+											target: 'finishing',
+											actions: ({ context }) => clearTransactionCustody(context.custody)
+										},
 										{ guard: ({ event }) => event.output, target: 'finishing' },
 										{
 											target: 'finishing',

@@ -1,12 +1,22 @@
 import { assign, fromPromise, setup } from 'xstate'
 import {
 	exportFailure,
-	exportOperation,
+	validateCapturedExport,
 	type ArchiveCaptureResult,
 	type ArchiveExportInterruption,
 	type ArchiveExportRequest,
 	type BackupBinding
 } from '../../backup/export.js'
+
+import {
+	abortExport,
+	observeExportAuthority,
+	acquireExportLease,
+	drainExportWriters,
+	readExportGraph,
+	observeExportConsistency,
+	releaseExportLease
+} from '../../backup/export-native.js'
 
 export type ArchiveExportInput = { request: ArchiveExportRequest }
 export type ArchiveExportControl =
@@ -22,19 +32,19 @@ type Context = ArchiveExportInput & {
 
 /** Invoked only by the claimed export owner. Payloads and leases never enter actor snapshots. */
 export function createArchiveCaptureMachine() {
-	function leaf(run: (operation: ReturnType<typeof exportOperation>) => void | Promise<void>) {
-		return fromPromise<void, ArchiveExportInput>(({ input }) =>
-			Promise.resolve(run(exportOperation(input.request)))
+	function leaf<Output>(run: (request: ArchiveExportRequest) => Output | Promise<Output>) {
+		return fromPromise<Output, ArchiveExportInput>(({ input }) =>
+			Promise.resolve(run(input.request))
 		)
 	}
 	const actors = {
-		authority: leaf((operation) => operation.checkAuthority()),
-		acquire: leaf((operation) => operation.acquire()),
-		drain: leaf((operation) => operation.drain()),
-		read: leaf((operation) => operation.read()),
-		validate: leaf((operation) => operation.validate()),
-		consistency: leaf((operation) => operation.checkConsistency()),
-		release: leaf((operation) => operation.releaseLease())
+		authority: leaf((request) => observeExportAuthority(request)),
+		acquire: leaf((request) => acquireExportLease(request)),
+		drain: leaf((request) => drainExportWriters(request)),
+		read: leaf((request) => readExportGraph(request)),
+		validate: leaf((request) => validateCapturedExport(request)),
+		consistency: leaf((request) => observeExportConsistency(request)),
+		release: leaf((request) => releaseExportLease(request))
 	}
 	const model = setup<
 		Context,
@@ -56,7 +66,7 @@ export function createArchiveCaptureMachine() {
 			fail: assign({
 				failure: ({ event }) => exportFailure('error' in event ? event.error : undefined)
 			}),
-			abort: ({ context }) => exportOperation(context.request).abort()
+			abort: ({ context }) => abortExport(context.request)
 		}
 	})
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
@@ -95,7 +105,20 @@ export function createArchiveCaptureMachine() {
 		},
 		states: {
 			checkingAuthority: {
-				invoke: { src: 'authority', input, onDone: advance('acquiring'), onError: failed }
+				invoke: {
+					src: 'authority',
+					input,
+					onDone: [
+						{ guard: 'interrupted', target: 'releasing' },
+						{
+							guard: ({ event }) => !event.output,
+							target: 'releasing',
+							actions: assign({ failure: { outcome: 'failed', code: 'authorityDenied' } })
+						},
+						{ target: 'acquiring' }
+					],
+					onError: failed
+				}
 			},
 			acquiring: {
 				invoke: { src: 'acquire', input, onDone: advance('draining'), onError: failed }
@@ -110,7 +133,19 @@ export function createArchiveCaptureMachine() {
 				invoke: { src: 'validate', input, onDone: advance('checkingConsistency'), onError: failed }
 			},
 			checkingConsistency: {
-				invoke: { src: 'consistency', input, onDone: 'releasing', onError: failed }
+				invoke: {
+					src: 'consistency',
+					input,
+					onDone: [
+						{
+							guard: ({ event }) => !event.output,
+							target: 'releasing',
+							actions: assign({ failure: { outcome: 'failed', code: 'captureInconsistent' } })
+						},
+						{ target: 'releasing' }
+					],
+					onError: failed
+				}
 			},
 			releasing: {
 				invoke: {

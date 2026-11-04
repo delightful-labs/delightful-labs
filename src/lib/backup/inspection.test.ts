@@ -1,5 +1,5 @@
 import {
-	envelopeOperation,
+	buildCheckedArchive,
 	type EnvelopeSuccess,
 	type IntegrityCheckedArchive
 } from './envelope-operation.js'
@@ -272,28 +272,39 @@ describe('password and input boundaries', () => {
 })
 
 describe('inspection lifecycle', () => {
-	it.each(['claiming', 'reading', 'preparingEnvelope', 'opening', 'inspectingProfile', 'cleaning'])(
-		'cancels at %s with owned report cleanup',
-		async (stage) => {
-			const request = prepareArchiveInspection({ source: source(), profiles: [profile()] })
-			const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
-			let reached = false
-			let report: ArchiveInspectionReport | undefined
-			actor.subscribe((snapshot) => {
-				if (snapshot.value === stage && !reached) {
-					reached = true
-					if (snapshot.context.result && 'report' in snapshot.context.result)
-						report = snapshot.context.result.report
-					actor.send({ type: 'CANCEL' })
-				}
-			})
-			actor.start()
-			expect(await toPromise(actor)).toEqual({ outcome: 'cancelled' })
-			expect(reached).toBe(true)
-			const acquired = report
-			if (acquired) expect(() => acquired.readSummary()).toThrow()
-		}
-	)
+	it.each([
+		'claiming',
+		'reading',
+		'checkingSource',
+		'preparingEnvelope',
+		'opening',
+		'matchingProfile',
+		'inspectingProfile',
+		'buildingReport',
+		'cleaning'
+	])('cancels at %s with owned report cleanup', async (stage) => {
+		const request = prepareArchiveInspection({ source: source(), profiles: [profile()] })
+		const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
+		let reached = false
+		let report: ArchiveInspectionReport | undefined
+		actor.subscribe((snapshot) => {
+			if (
+				(snapshot.value === stage ||
+					(typeof snapshot.value === 'object' && snapshot.value.working === stage)) &&
+				!reached
+			) {
+				reached = true
+				if (snapshot.context.result && 'report' in snapshot.context.result)
+					report = snapshot.context.result.report
+				actor.send({ type: 'CANCEL' })
+			}
+		})
+		actor.start()
+		expect(await toPromise(actor)).toEqual({ outcome: 'cancelled' })
+		expect(reached).toBe(true)
+		const acquired = report
+		if (acquired) expect(() => acquired.readSummary()).toThrow()
+	})
 	it('aborts a pending file read and drains/clears bytes from a late provider', async () => {
 		const gate = deferred<Uint8Array>(),
 			owned = plain()
@@ -315,6 +326,57 @@ describe('inspection lifecycle', () => {
 		gate.resolve(owned)
 		expect(await toPromise(actor)).toEqual({ outcome: 'closed' })
 		expect(owned.every((byte) => byte === 0)).toBe(true)
+	})
+	it('reports repeated release once and drains the aborted source before failing', async () => {
+		const gate = deferred<Uint8Array>()
+		const owned = plain()
+		let signal: AbortSignal | undefined
+		let revocations = 0
+		const request = prepareArchiveInspection({
+			source: {
+				read(input) {
+					signal = input
+					return gate.promise
+				}
+			}
+		})
+		const actor = createActor(createArchiveInspectionMachine(), {
+			input: { request },
+			inspect(event) {
+				if (event.type === '@xstate.event' && event.event.type === 'RELEASE') revocations += 1
+			}
+		})
+		actor.start()
+		await vi.waitFor(() => expect(signal).toBeDefined())
+		request.release()
+		request.release()
+		expect(revocations).toBe(1)
+		expect(signal?.aborted).toBe(true)
+		expect(actor.getSnapshot().status).toBe('active')
+		gate.resolve(owned)
+		expect(await toPromise(actor)).toEqual({ outcome: 'failed', code: 'inspectionFailed' })
+		expect(owned.every((byte) => byte === 0)).toBe(true)
+	})
+	it('drains an issued envelope digest after inspection request release', async () => {
+		const gate = deferred<ArrayBuffer>()
+		const request = prepareArchiveInspection({ source: source() })
+		const native = vi.spyOn(crypto.subtle, 'digest').mockReturnValueOnce(gate.promise)
+		const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
+		try {
+			actor.start()
+			await vi.waitFor(() => expect(native).toHaveBeenCalledOnce())
+			const borrowed = native.mock.calls[0]?.[1]
+			request.release()
+			expect(actor.getSnapshot().status).toBe('active')
+			gate.resolve(new Uint8Array(32).buffer)
+			expect(await toPromise(actor)).toEqual({ outcome: 'failed', code: 'inspectionFailed' })
+			expect(borrowed).toBeInstanceOf(Uint8Array)
+			if (borrowed instanceof Uint8Array) expect(borrowed.every((byte) => byte === 0)).toBe(true)
+		} finally {
+			gate.resolve(new Uint8Array(32).buffer)
+			actor.stop()
+			native.mockRestore()
+		}
 	})
 	it('cancels a pending password source without starting cryptography', async () => {
 		const gate = deferred<string>()
@@ -356,7 +418,7 @@ describe('inspection lifecycle', () => {
 			const open = createArchiveEnvelopeMachine().provide({
 				actors: {
 					buildChecked: fromPromise<EnvelopeSuccess, ArchiveEnvelopeInput>(({ input }) => {
-						const output = envelopeOperation(input.request).buildChecked()
+						const output = buildCheckedArchive(input.request)
 						if (output.outcome === 'integrityChecked') acquired = output.archive
 						return Promise.resolve(output)
 					})
@@ -370,10 +432,18 @@ describe('inspection lifecycle', () => {
 				stopped = false
 			let subscription: { unsubscribe(): void } | undefined
 			actor.subscribe((snapshot) => {
-				if (!attached && snapshot.value === 'opening' && snapshot.children.envelope) {
+				if (!attached && snapshot.matches({ working: 'opening' }) && snapshot.children.envelope) {
 					attached = true
 					subscription = snapshot.children.envelope.subscribe((child) => {
-						if (!stopped && 'value' in child && child.value === stage) {
+						if (
+							!stopped &&
+							'value' in child &&
+							(child.value === stage ||
+								(typeof child.value === 'object' &&
+									child.value !== null &&
+									'working' in child.value &&
+									child.value.working === stage))
+						) {
 							stopped = true
 							request.release()
 							actor.stop()
@@ -389,17 +459,20 @@ describe('inspection lifecycle', () => {
 			subscription?.unsubscribe()
 		}
 	)
-	it('clears a late source after abrupt request release and actor stop', async () => {
-		const gate = deferred<Uint8Array>(),
-			owned = plain()
-		const read = vi.fn(() => gate.promise)
-		const request = prepareArchiveInspection({ source: { read } })
-		const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
-		actor.start()
-		await vi.waitFor(() => expect(read).toHaveBeenCalled())
-		request.release()
-		actor.stop()
-		gate.resolve(owned)
-		await vi.waitFor(() => expect(owned.every((byte) => byte === 0)).toBe(true))
-	})
+	it.each(['release-and-stop', 'stop'])(
+		'clears a late source after abrupt %s',
+		async (teardown) => {
+			const gate = deferred<Uint8Array>(),
+				owned = plain()
+			const read = vi.fn(() => gate.promise)
+			const request = prepareArchiveInspection({ source: { read } })
+			const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
+			actor.start()
+			await vi.waitFor(() => expect(read).toHaveBeenCalled())
+			if (teardown === 'release-and-stop') request.release()
+			actor.stop()
+			gate.resolve(owned)
+			await vi.waitFor(() => expect(owned.every((byte) => byte === 0)).toBe(true))
+		}
+	)
 })

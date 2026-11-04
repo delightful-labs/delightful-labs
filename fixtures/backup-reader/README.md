@@ -32,3 +32,12 @@ stdin handling, limits and file growth, signal handling and private error output
 makes HTTP, TCP and fetch APIs throw, and the child receives no application credentials. Run
 `pnpm check:backup-reader` and `node --test fixtures/backup-reader/reader.test.mjs` after packaging.
 These checks are part of `pnpm check:consumer` in CI. They do not validate Finance or prove restore.
+
+The stream-lifecycle refactor passes 17 reader checks (eleven existing subprocess/file cases and
+six direct stream-owner cases). `machines/read.mjs`
+now owns EOF/close, bounds, abort and outcome decisions; `stream-native.mjs` owns event listeners,
+destroy and buffer disposal. `io.mjs` adapts each finite read root to the existing Promise API.
+File EOF waits for descriptor close before success; stdin may complete at EOF. Do not inspect or
+persist this actor tree: its storage and terminal output contain input bytes. Reader type, lint and
+format checks also pass. Direct cases verify EOF/close separation, premature close, abort/error,
+limits, listener removal and chunk clearing. These do not qualify arbitrary host stream implementations.

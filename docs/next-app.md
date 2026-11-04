@@ -21,14 +21,17 @@ validate → request host drain → restore → check navigation facts → navig
 ## Foreground data
 
 ```ts
-import { QuerySubscription } from 'delightful-local-first/backend/jazz/data'
+import { createQuerySubscription } from 'delightful-local-first/backend/jazz/data'
 import { observeRows } from 'delightful-local-first/data/observations'
 
 // In the component that owns the subscription and actor binding:
-const notes = new QuerySubscription(() => app.notes.where({ workspaceId }))
+const notes = createQuerySubscription(() => app.notes.where({ workspaceId }))
 // Inside its reactive observation, before the untracked actor.send:
 const rows = observeRows(notes.current)
 ```
+
+Use `createQuerySubscriptionOne()` for a single row. Both factories return the native SDK instance;
+create it inside the owning component. They replace the former DLF subscription subclass exports.
 
 `app` and `workspaceId` above belong to your app. Subscriptions use LocalFirst unless a caller
 explicitly supplies a tier; native Svelte subscription disposal remains attached to the component.

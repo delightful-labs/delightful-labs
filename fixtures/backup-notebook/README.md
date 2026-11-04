@@ -11,13 +11,20 @@ must receive a generically validated payload; it does not hash attachments or gr
 content, combining Unicode, line breaks, embedded NUL, an empty body and four binary attachment bytes.
 The source codec preserves these contents exactly; a later round-trip must prove destination fidelity.
 
-`source.ts` supplies the capture leaves. All fixture writers are synchronous, and an exclusive lease
+`source.ts` supplies leaf adapters for the fixture-owned state machine under `machines/source.ts`.
+The chart owns available/leased state, binding invalidation and current-owner release. Payloads stay
+in private capsules; there is no application class or parallel lease flag. `createNotebookSource()`
+returns an unstarted root as `source.actor`; the host must start it before use and stop it after
+all exports have drained. Early/stopped source work is rejected, not queued for later execution.
+All fixture writers are synchronous, and an exclusive lease
 blocks `replace()` while capture owns the source. `checkAuthority`, acquisition, drain, read and
 consistency checks each perform one bounded leaf step. The shared invoked capture machine sequences
 them and releases the lease before protection/handoff. This is an in-memory model; it provides no
 persisted journal, cross-instance locking, remote confirmation or Jazz consistency guarantees.
 
-`export.ts` creates an **unstarted** root actor, request and source. The application supplies a full
+`export.ts` creates an **unstarted export** root actor and request, and explicitly starts the
+independent in-memory source root. It returns `source.actor` for host disposal after export drain;
+the source lifetime spans later writes and exports. The application supplies a full
 binding, protection choice and one file-handoff capability. Start the returned actor and observe its
 tags/output through normal XState APIs. The handoff receives a borrowed copy-only file handle and the
 original binding; it must check current authority immediately before its one dispatch effect and
@@ -36,7 +43,9 @@ A → B → A. For graceful teardown, send `CANCEL` or `SHUTDOWN` and await acto
 stopping. Cancellation drains already issued calls; native crypto and dispatched files cannot be
 undone. Call request `release()` as abrupt-stop cleanup, then stop; stopping alone is insufficient.
 If the result is `captureCleanupFailed`, retain the request and explicitly retry cleanup with
-`retryCleanup()`, awaiting its bounded lease-release result. The abrupt `release()` fallback alone
+the caller-owned `createArchiveExportCleanupMachine()` from `backup/export/workflow`, passing
+`{ request }` as actor input and awaiting its `cleaned` or safe failure result. A subsequent cleanup
+actor retries only lease release; it never repeats capture or handoff. The abrupt `release()` fallback alone
 does not provide a graceful drain acknowledgement.
 
 Build and run the notebook/public-package verification:
@@ -47,10 +56,10 @@ pnpm check:backup-notebook
 ```
 
 This compiles the fixture and its Node tests into ignored `.svelte-kit/backup-notebook/` output, then
-runs 13 cases. Two export actual plaintext/password files, independently inspect them in separate
+runs 18 cases. Two export actual plaintext/password files, independently inspect them in separate
 processes with common network APIs disabled and only PATH in the environment, compare exact records,
 relationships, archived content and attachment bytes, and verify original source/file preservation.
-The remaining cases check lease exclusion/binding/limits and exact profile allowlists. The trusted
+The remaining cases check lease exclusion/binding/limits, exact profile allowlists and public cleanup-machine recovery after failed lease release, binding invalidation, startup/stop behavior, failed-write preservation and opaque source snapshots. The trusted
 notebook validator is registered by test code, never loaded from archive contents.
 
 `pnpm check:consumer` includes these cases and builds the browser fixture. Three Chromium cases under

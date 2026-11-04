@@ -13,6 +13,7 @@ type Session = RecoverySession
 export type RecoveryRestorationBinding = Readonly<{
 	binding: object
 	capability: RestorationCapability
+	/** Total, synchronous, idempotent release of this binding's references; never SDK I/O. */
 	invalidate: () => void
 }>
 export type RecoveryNavigation = { origin: string; destination: string; identity: string }
@@ -32,6 +33,8 @@ export type RecoveryResult =
 export type RecoveryNotice =
 	| { type: 'RECOVERY_VALIDATED'; attempt: number }
 	| { type: 'RECOVERY_DRAIN_REQUESTED'; attempt: number }
+// Internal failure evidence preserves the host's invocation-error protocol, not a settled result.
+type RecoveryCompletion = RecoveryResult | { outcome: 'restorationChildFailed' }
 type Input = {
 	attempt: number
 	request: RecoveryRequest
@@ -51,13 +54,14 @@ type Context = {
 	destination: string
 	identity: string | undefined
 	mutation: 'notStarted' | 'settled'
-	result: RecoveryResult | undefined
+	result: RecoveryCompletion | undefined
 }
 type Event =
 	| RestorationReport
 	| { type: 'WORKSPACE_DRAINED' }
 	| { type: 'SHUTDOWN' }
 	| { type: 'RELEASE_REQUEST' }
+	| { type: 'PROPAGATE_FAILURE' }
 
 const actors = {
 	restoration: restorationMachine,
@@ -132,7 +136,11 @@ export const sessionRecoveryMachine = model.createMachine({
 		mutation: 'notStarted',
 		result: undefined
 	}),
-	output: ({ context }) => required(context.result),
+	output: ({ context }) => {
+		const result = required(context.result)
+		if (result.outcome === 'restorationChildFailed') throw new Error('Restoration child failed')
+		return result
+	},
 	on: { SHUTDOWN: '.closed' },
 	states: {
 		choosing: {
@@ -197,12 +205,8 @@ export const sessionRecoveryMachine = model.createMachine({
 						actions: assign({ mutation: ({ event }) => event.output.mutation })
 					}
 				],
-				// Unexpected child crashes remain application failures, not a fabricated settled result.
-				onError: {
-					actions: () => {
-						throw new Error('Restoration child failed')
-					}
-				}
+				// Exit this scope before propagating failure, so binding cleanup actually executes.
+				onError: 'restorationChildFailed'
 			},
 			on: {
 				RELEASE_REQUEST: { actions: assign({ request: undefined }) },
@@ -279,6 +283,15 @@ export const sessionRecoveryMachine = model.createMachine({
 		restoreFailed: finish('restoreFailed'),
 		restored: finish('restored'),
 		closed: finish('closed'),
+		restorationChildFailed: {
+			entry: [
+				assign({ request: undefined, result: { outcome: 'restorationChildFailed' } }),
+				// Queue a new actor turn so the cleared snapshot is committed before output throws.
+				({ self }) => self.send({ type: 'PROPAGATE_FAILURE' })
+			],
+			on: { PROPAGATE_FAILURE: 'failed', SHUTDOWN: {} }
+		},
+		failed: { type: 'final' },
 		navigationFailed: { type: 'final', entry: assign({ request: undefined }) }
 	}
 })

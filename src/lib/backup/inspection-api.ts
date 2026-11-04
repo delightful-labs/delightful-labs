@@ -1,5 +1,9 @@
 /** File inspection capabilities; no filesystem, application session or schema registry is assumed. */
-export { prepareArchiveInspection, ArchiveInspectionError } from './inspection.js'
+export {
+	prepareArchiveInspection,
+	createArchiveInspectionError,
+	isArchiveInspectionError
+} from './inspection.js'
 export type {
 	ArchiveInspectionSource,
 	ArchivePasswordSource,

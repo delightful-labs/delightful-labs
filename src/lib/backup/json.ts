@@ -1,4 +1,4 @@
-import { ArchivePayloadError, type PayloadLimits } from './types.js'
+import { createArchivePayloadError, type PayloadLimits } from './types.js'
 
 /** JSON.parse alone silently accepts duplicate keys, including escaped-key aliases. */
 export function parsePayloadJson(source: string, limits: PayloadLimits): unknown {
@@ -6,7 +6,7 @@ export function parsePayloadJson(source: string, limits: PayloadLimits): unknown
 	let values = 0
 
 	function fail(): never {
-		throw new ArchivePayloadError('invalidJson')
+		throw createArchivePayloadError('invalidJson')
 	}
 
 	function whitespace() {
@@ -45,7 +45,7 @@ export function parsePayloadJson(source: string, limits: PayloadLimits): unknown
 	function value(depth: number): unknown {
 		values += 1
 		if (depth > limits.depth || values > limits.jsonValues)
-			throw new ArchivePayloadError('limitExceeded')
+			throw createArchivePayloadError('limitExceeded')
 		whitespace()
 		const character = source[position]
 		if (character === '"') return string()
@@ -61,7 +61,7 @@ export function parsePayloadJson(source: string, limits: PayloadLimits): unknown
 			while (position < source.length) {
 				whitespace()
 				const key = string()
-				if (keys.has(key)) throw new ArchivePayloadError('duplicateKey')
+				if (keys.has(key)) throw createArchivePayloadError('duplicateKey')
 				keys.add(key)
 				whitespace()
 				if (source[position] !== ':') return fail()

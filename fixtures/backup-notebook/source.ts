@@ -1,89 +1,91 @@
+import { createActor } from 'xstate'
+import type { ArchivePayload, PayloadLimits } from 'delightful-local-first/backup/archive'
+import type { ArchiveCaptureLease, BackupBinding } from 'delightful-local-first/backup/export'
+import { createNotebookData, createNotebookWrite } from './source-data.js'
 import {
-	encodeArchivePayload,
-	parseArchivePayload,
-	type ArchivePayload,
-	type PayloadLimits
-} from 'delightful-local-first/backup/archive'
-import {
-	sameBackupBinding,
-	type ArchiveCaptureSource,
-	type ArchiveCaptureLease,
-	type BackupBinding
-} from 'delightful-local-first/backup/export'
-import { notebookProfile } from './profile.js'
+	createNotebookSourceMachine,
+	type NotebookReply,
+	type NotebookSourceEvent
+} from './machines/source.js'
 
-function detach(payload: unknown, limits?: PayloadLimits): ArchivePayload {
-	const bytes = encodeArchivePayload(payload, limits)
-	try {
-		const result = parseArchivePayload(bytes, limits)
-		if (!notebookProfile.validate(result)) throw new Error('Invalid notebook profile')
-		return result
-	} finally {
-		bytes.fill(0)
+/** Fixture-owned, unstarted source root. Its host lifetime spans successive writes/exports. */
+export function createNotebookSource(payload: unknown, binding: BackupBinding) {
+	const actor = createActor(createNotebookSourceMachine(), {
+		input: { data: createNotebookData(payload), binding }
+	})
+	function ready() {
+		const snapshot = actor.getSnapshot()
+		return snapshot.status === 'active' && snapshot.hasTag('acceptingCommands')
 	}
-}
-
-/** Disposable fixture only: exclusive synchronous writers, no persistence or remote acceptance.
- * Capture orchestration is the invoked DLF capture machine, never hidden in these leaf methods.
- */
-export class NotebookSource implements ArchiveCaptureSource {
-	#payload: ArchivePayload
-	#binding: BackupBinding
-	#owner: object | undefined
-	constructor(payload: unknown, binding: BackupBinding) {
-		this.#payload = detach(payload)
-		this.#binding = Object.freeze({ ...binding })
-	}
-	observeBinding(binding: BackupBinding) {
-		this.#binding = Object.freeze({ ...binding })
-	}
-	/** Synchronous fixture writer. A lease blocks changes, rather than pretending to drain Jazz. */
-	replace(payload: unknown) {
-		if (this.#owner) throw new Error('Notebook capture owns the source')
-		this.#payload = detach(payload)
-	}
-	#allowed(binding: BackupBinding, signal: AbortSignal): boolean {
-		return (
-			!signal.aborted &&
-			sameBackupBinding(this.#binding, binding) &&
-			this.#payload.source.applicationId === binding.applicationId &&
-			this.#payload.source.workspaceId === binding.workspaceId
+	function request<T>(event: (reply: NotebookReply<T>) => NotebookSourceEvent): T {
+		if (!ready()) throw new Error('Notebook source unavailable')
+		const observation: { result: Parameters<NotebookReply<T>>[0] | undefined } = {
+			result: undefined
+		}
+		actor.send(
+			event((result) => {
+				observation.result = result
+			})
 		)
+		const result = observation.result
+		if (result === undefined) throw new Error('Notebook source unavailable')
+		if (!result.ok) throw result.error
+		return result.value
 	}
-	checkAuthority(binding: BackupBinding, signal: AbortSignal): Promise<boolean> {
-		return Promise.resolve(this.#allowed(binding, signal))
-	}
-	acquire(binding: BackupBinding, signal: AbortSignal): Promise<ArchiveCaptureLease> {
-		if (!this.#allowed(binding, signal) || this.#owner)
-			throw new Error('Notebook capture unavailable')
-		const owner = Object.freeze({})
-		this.#owner = owner
-		const current = (signal: AbortSignal) => this.#owner === owner && this.#allowed(binding, signal)
-		const lease: ArchiveCaptureLease = Object.freeze({
-			drain: (signal: AbortSignal) => {
-				if (!current(signal)) throw new Error('Notebook capture invalidated')
-				// All fixture writers are synchronous and excluded by the acquired lease.
-				return Promise.resolve()
-			},
-			read: (signal: AbortSignal, limits: PayloadLimits) => {
-				if (!current(signal)) throw new Error('Notebook capture invalidated')
-				return Promise.resolve(
-					detach(
-						{
-							...this.#payload,
-							archiveId: crypto.randomUUID(),
-							capturedAt: new Date().toISOString()
-						},
-						limits
-					)
-				)
-			},
-			checkConsistency: (signal: AbortSignal) => Promise.resolve(current(signal)),
-			release: () => {
-				if (this.#owner === owner) this.#owner = undefined
-				return Promise.resolve()
-			}
-		})
-		return Promise.resolve(lease)
+	return {
+		actor,
+		observeBinding(binding: BackupBinding) {
+			request<void>((reply) => ({ type: 'OBSERVE_BINDING', binding, reply }))
+		},
+		replace(payload: unknown) {
+			request<void>((reply) => ({ type: 'REPLACE', write: createNotebookWrite(payload), reply }))
+		},
+		checkAuthority(binding: BackupBinding, signal: AbortSignal): Promise<boolean> {
+			if (!ready()) return Promise.resolve(false)
+			return Promise.resolve(
+				request<boolean>((reply) => ({ type: 'AUTHORITY', binding, signal, reply }))
+			)
+		},
+		acquire(binding: BackupBinding, signal: AbortSignal): Promise<ArchiveCaptureLease> {
+			const expected = Object.freeze({ ...binding })
+			const owner = Object.freeze({
+				toJSON: (): { kind: 'notebookLease' } => ({ kind: 'notebookLease' })
+			})
+			request<void>((reply) => ({ type: 'ACQUIRE', owner, binding: expected, signal, reply }))
+			const lease: ArchiveCaptureLease = Object.freeze({
+				drain: (signal: AbortSignal) =>
+					Promise.resolve(
+						request<void>((reply) => ({ type: 'DRAIN', owner, binding: expected, signal, reply }))
+					),
+				read: (signal: AbortSignal, limits: PayloadLimits) =>
+					Promise.resolve(
+						request<ArchivePayload>((reply) => ({
+							type: 'READ',
+							owner,
+							binding: expected,
+							signal,
+							limits,
+							reply
+						}))
+					),
+				checkConsistency: (signal: AbortSignal) =>
+					!ready()
+						? Promise.resolve(false)
+						: Promise.resolve(
+								request<boolean>((reply) => ({
+									type: 'CONSISTENCY',
+									owner,
+									binding: expected,
+									signal,
+									reply
+								}))
+							),
+				release: () => {
+					if (ready()) request<void>((reply) => ({ type: 'RELEASE', owner, reply }))
+					return Promise.resolve()
+				}
+			})
+			return Promise.resolve(lease)
+		}
 	}
 }

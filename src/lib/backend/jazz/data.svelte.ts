@@ -13,17 +13,15 @@ function localFirstOptions(options: SubscriptionOptions) {
 /** The native schema/query stays consumer-owned. Foreground subscriptions default to local-first.
  * Explicit caller tiers remain explicit for authority/acquisition flows. Create inside the owning component.
  */
-export class QuerySubscription<Row extends { id: string }> extends NativeQuerySubscription<Row> {
-	constructor(...[query, options]: ConstructorParameters<typeof NativeQuerySubscription<Row>>) {
-		super(query, localFirstOptions(options))
-	}
+export function createQuerySubscription<Row extends { id: string }>(
+	...[query, options]: ConstructorParameters<typeof NativeQuerySubscription<Row>>
+) {
+	return new NativeQuerySubscription<Row>(query, localFirstOptions(options))
 }
-export class QuerySubscriptionOne<
-	Row extends { id: string }
-> extends NativeQuerySubscriptionOne<Row> {
-	constructor(...[query, options]: ConstructorParameters<typeof NativeQuerySubscriptionOne<Row>>) {
-		super(query, localFirstOptions(options))
-	}
+export function createQuerySubscriptionOne<Row extends { id: string }>(
+	...[query, options]: ConstructorParameters<typeof NativeQuerySubscriptionOne<Row>>
+) {
+	return new NativeQuerySubscriptionOne<Row>(query, localFirstOptions(options))
 }
 /** Issue and settlement are separate leaves. A local receipt never implies remote acceptance. */
 export function issueLocalWrite<Receipt>(issue: () => Receipt): { write: Receipt } {

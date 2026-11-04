@@ -170,3 +170,60 @@ The tests reproduced and fixed two production-code defects:
 No storage format, consumer dependency, deployment or user data changes are included. These checks
 close the scoped shared-library cleanup findings; they do not claim production Finance migration,
 all-browser qualification or a completed backup/restore feature. T006 remains the next feature.
+
+## Workspace journal native disposal correction — design (2026-11-04)
+
+The user requested committing the notebook cleanup and continuing the established cleanup workflow.
+Notebook correction committed locally as 8e5efe0. This slice addresses the audit's older workspace
+journal resource-disposal finding; it does not rewrite journal policy or qualify the separate restore
+journal. Follow the preceding cleanup workflow, including focused tests.
+
+Keep the current control/work statechart and read/validate/choose/stage/settle/close semantics.
+Replace opening/acquisition/close promise handoffs with a fixed native database owner invoked for
+the running scope. The chart commands OPEN -> observes OPENED/OPEN_FAILED -> ACQUIRE -> observes
+ACQUIRED/ACQUIRE_FAILED -> existing transaction resource -> CLOSE -> observes CLOSED/CLOSE_FAILED.
+The native owner retains each handle before reporting it, covering actor stop before delivery.
+It performs no journal row validation, conflict selection or retry decisions.
+
+Disposal detaches reports, attempts abort of an acquired transaction and closes the owned database.
+An IndexedDB open request itself cannot be cancelled: if success arrives after disposal, close that
+connection immediately; if an upgrade starts after disposal, abort its upgrade transaction rather
+than create the store. Bridge upgrade callback failures into a typed native failure. Keep schema,
+database version, store/key paths and public result/input contracts unchanged.
+
+The transaction adapter detaches handlers and aborts on disposal; late read callbacks consult the
+detached reporter. Native abort can throw for a committing/finished transaction. Disposal must not
+invent TX_ABORTED or claim rollback from that exception; graceful cancellation still observes actual
+native completion/abort. Abrupt stop has no drain acknowledgement and cannot undo an already
+committed write. No locks, fallback storage, timeouts, durable recovery protocol or new app UI.
+
+Qualify same-stack stop during opening, acquired-handle handoff and staged transaction stop with
+real IndexedDB, including successful database deletion proving no retained connection. Run existing
+workspace journal native cases and relevant workspace creation units. This is bounded disposal
+work, not a new universal IndexedDB abstraction.
+
+### Workspace journal disposal qualification (2026-11-04)
+
+Implemented the fixed native database owner and transaction callback disposal. The existing work/
+control states and schema/CAS semantics are retained. Open/acquire/close are chart-commanded native
+operations; handles are retained before reports, including the acquisition-to-observer handoff.
+The exported WorkspaceJournalEvent union includes these native reports so typed consumer journal
+compositions continue to accept the factory. Public input/result contracts are unchanged.
+
+All 213 workspace unit cases pass across seven files. All nine real Chromium journal cases pass:
+five existing persistence/conflict/cancellation/commit-error/version/constraint checks plus four
+new stop probes for existing-database open, first-use open/upgrade, acquired handle delivery and
+staged transaction teardown. Successful database deletion verifies no retained connection in those
+probes, and the staged-stop case observes a native abort and reads back no committed record.
+Playwright used a task-owned preview on localhost port 6014. Package/strict Publint, Svelte/
+TypeScript, public-consumer declarations, lint, formatting and whitespace checks pass. The consumer
+check caught an event-type mismatch; aligning the exported protocol union resolved it.
+
+No full repository/browser suite was run. These results qualify this bounded native disposal
+correction, not browser-process crash safety or rollback of already committed data. A stopped open
+request may still settle; late connections close, and late upgrade callbacks abort their upgrade
+transaction. Graceful CANCEL/SHUTDOWN continues to wait for actual native settlement. The separate
+backup restore-journal correction is not qualified by these workspace journal results.
+
+Notebook source correction is committed locally as 8e5efe0. This workspace journal correction is
+uncommitted. No push or merge.

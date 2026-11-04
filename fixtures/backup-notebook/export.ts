@@ -8,21 +8,23 @@ import type { ArchiveProtection } from 'delightful-local-first/backup/envelope'
 import { createArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'
 import { createNotebookDataset } from './dataset.js'
 import { notebookProfile } from './profile.js'
-import { NotebookSource } from './source.js'
+import { createNotebookSource } from './source.js'
 
-/** Creates an unstarted application-owned root actor; no file, network or storage effects here. */
+/** Creates an unstarted application-owned root actor; starts only the independent in-memory source root. */
 export function createNotebookExport(options: {
 	binding: BackupBinding
 	handoff: ArchiveFileHandoff
 	protection: ArchiveProtection
 }) {
-	const source = new NotebookSource(
+	const source = createNotebookSource(
 		createNotebookDataset({
 			applicationId: options.binding.applicationId,
 			workspaceId: options.binding.workspaceId
 		}),
 		options.binding
 	)
+	// Host-owned source lifetime outlasts this one export; callers stop source.actor after drain.
+	source.actor.start()
 	const request = prepareArchiveExport({
 		...options,
 		source,

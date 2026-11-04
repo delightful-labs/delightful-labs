@@ -4,14 +4,21 @@ let calls = 0
 function callCount() {
 	return calls
 }
-const authority = createJazzInvitationAuthority({
-	withAttributionForRequest: async () => {
-		calls++
-		const error = new Error('synthetic-private-credential')
-		error.name = 'RequestAuthenticationError'
-		throw error
+/** @type {Parameters<Parameters<typeof createJazzInvitationAuthority>[1]>[]} */
+const detached = []
+const authority = createJazzInvitationAuthority(
+	{
+		withAttributionForRequest: async () => {
+			calls++
+			const error = new Error('synthetic-private-credential')
+			error.name = 'RequestAuthenticationError'
+			throw error
+		}
+	},
+	(accountId, custody) => {
+		detached.push([accountId, custody])
 	}
-})
+)
 if (callCount() !== 0) throw new Error('Packaged authority eagerly admitted a request')
 const result = await authority.admit(
 	new Request('https://example.test/redeem', {

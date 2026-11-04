@@ -1,18 +1,19 @@
 import { createPayloadSchemas } from './schemas.js'
 import {
-	ArchiveEnvelopeError,
+	isArchiveEnvelopeError,
 	parseEnvelope,
 	envelopeBytesLimit,
 	type EnvelopeErrorCode
 } from './envelope.js'
 import {
-	envelopeOperation,
+	retainCheckedOutput,
 	prepareArchiveOpen,
 	type ArchiveEnvelopeRequest,
 	type IntegrityCheckedArchive
 } from './envelope-operation.js'
 import {
-	ArchivePayloadError,
+	createArchivePayloadError,
+	isArchivePayloadError,
 	resolvePayloadLimits,
 	type ArchivePayload,
 	type ArchivePayloadErrorCode,
@@ -63,197 +64,154 @@ export type InspectionErrorCode =
 	| 'profileValidationFailed'
 	| 'invalidInspectorConfiguration'
 	| 'inspectionFailed'
-export class ArchiveInspectionError extends Error {
-	constructor(readonly code: InspectionErrorCode) {
-		super(code)
-		this.name = 'ArchiveInspectionError'
-	}
+export function createArchiveInspectionError(code: InspectionErrorCode) {
+	return Object.assign(new Error(code), { name: 'ArchiveInspectionError', code })
+}
+export function isArchiveInspectionError(
+	error: unknown
+): error is ReturnType<typeof createArchiveInspectionError> {
+	return (
+		error instanceof Error &&
+		error.name === 'ArchiveInspectionError' &&
+		'code' in error &&
+		(error.code === 'fileReadFailed' ||
+			error.code === 'passwordReadFailed' ||
+			error.code === 'profileValidationFailed' ||
+			error.code === 'invalidInspectorConfiguration' ||
+			error.code === 'inspectionFailed')
+	)
 }
 export type ArchiveInspectionResult =
 	| { outcome: InspectionValidation; report: ArchiveInspectionReport }
 	| { outcome: 'passwordRequired' | 'cancelled' | 'closed' }
 	| { outcome: 'failed'; code: InspectionErrorCode | EnvelopeErrorCode | ArchivePayloadErrorCode }
 
-function required<T>(value: T | undefined): T {
-	if (value === undefined) throw new ArchiveInspectionError('inspectionFailed')
+export function requireInspectionValue<T>(value: T | undefined): T {
+	if (value === undefined) throw createArchiveInspectionError('inspectionFailed')
 	return value
 }
-class Report implements ArchiveInspectionReport {
-	#summary: ArchiveInspectionSummary | undefined
-	constructor(summary: ArchiveInspectionSummary) {
-		this.#summary = summary
-		Object.freeze(this)
-	}
-	readSummary() {
-		return required(this.#summary)
-	}
-	release() {
-		this.#summary = undefined
-	}
-	toJSON(): { kind: 'archiveInspectionReport' } {
-		return { kind: 'archiveInspectionReport' }
+function createInspectionReport(input: ArchiveInspectionSummary): ArchiveInspectionReport {
+	let summary: ArchiveInspectionSummary | undefined = input
+	return Object.freeze({
+		readSummary: () => requireInspectionValue(summary),
+		release() {
+			summary = undefined
+		},
+		toJSON: (): { kind: 'archiveInspectionReport' } => ({ kind: 'archiveInspectionReport' })
+	})
+}
+type InspectionInput = {
+	source: ArchiveInspectionSource
+	password: ArchivePasswordSource | undefined
+	profiles: readonly ArchiveProfileValidator[]
+}
+/** Private payload references only. The chart owns stage, routing, interruption and transfer. */
+type InspectionData = {
+	input: InspectionInput | undefined
+	readonly limits: PayloadLimits
+	bytes: unknown
+	password: string | undefined
+	envelope: ArchiveEnvelopeRequest | undefined
+	checked: IntegrityCheckedArchive | undefined
+	report: ArchiveInspectionReport | undefined
+	releaseControl: (() => void) | undefined
+}
+type PreparedInspection = { data: InspectionData; claim(): boolean }
+const inspections = new WeakMap<ArchiveInspectionRequest, PreparedInspection>()
+function prepared(request: ArchiveInspectionRequest) {
+	return requireInspectionValue(inspections.get(request))
+}
+export function inspectionData(request: ArchiveInspectionRequest) {
+	return prepared(request).data
+}
+export function claimInspectionRequest(request: ArchiveInspectionRequest) {
+	return prepared(request).claim()
+}
+export function clearInspectionData(request: ArchiveInspectionRequest, keepReport = false) {
+	const data = inspectionData(request)
+	if (keepReport) data.report = undefined
+	if (data.bytes instanceof Uint8Array) data.bytes.fill(0)
+	data.bytes = undefined
+	data.envelope?.release()
+	data.envelope = undefined
+	data.checked?.release()
+	data.checked = undefined
+	data.report?.release()
+	data.report = undefined
+	data.password = undefined
+	data.input = undefined
+}
+function sourceBytes(value: unknown): Uint8Array {
+	if (!(value instanceof Uint8Array)) throw createArchivePayloadError('limitExceeded')
+	return value
+}
+/** Pure bounded header check. Routing the observed protection belongs to the chart. */
+export function inspectSourceHeader(request: ArchiveInspectionRequest): 'none' | 'password' {
+	const data = inspectionData(request)
+	const bytes = sourceBytes(data.bytes)
+	if (bytes.byteLength > envelopeBytesLimit) throw createArchivePayloadError('limitExceeded')
+	return parseEnvelope(bytes, data.limits).protection
+}
+/** Synchronous construction and early ownership registration, not an envelope workflow. */
+export function prepareInspectionEnvelope(
+	request: ArchiveInspectionRequest
+): ArchiveEnvelopeRequest {
+	const data = inspectionData(request)
+	requireInspectionValue(data.input)
+	const envelope = prepareArchiveOpen(sourceBytes(data.bytes), data.password, data.limits)
+	data.envelope = envelope
+	retainCheckedOutput(envelope, (archive) => {
+		data.checked = archive
+	})
+	sourceBytes(data.bytes).fill(0)
+	data.bytes = undefined
+	data.password = undefined
+	return envelope
+}
+export function matchInspectionProfile(request: ArchiveInspectionRequest): number {
+	const data = inspectionData(request)
+	const profile = requireInspectionValue(data.checked).readPayload().profile
+	return requireInspectionValue(data.input).profiles.findIndex(
+		(candidate) => candidate.id === profile.id && candidate.version === profile.version
+	)
+}
+export function validateInspectionProfile(
+	request: ArchiveInspectionRequest,
+	index: number
+): boolean {
+	const data = inspectionData(request)
+	const profile = requireInspectionValue(requireInspectionValue(data.input).profiles[index])
+	try {
+		const valid: unknown = profile.validate(requireInspectionValue(data.checked).readPayload())
+		if (typeof valid !== 'boolean') throw createArchiveInspectionError('profileValidationFailed')
+		return valid
+	} catch {
+		throw createArchiveInspectionError('profileValidationFailed')
 	}
 }
-class Inspection {
-	#source: ArchiveInspectionSource | undefined
-	#passwordSource: ArchivePasswordSource | undefined
-	#password: string | undefined
-	#bytes: Uint8Array | undefined
-	#envelope: ArchiveEnvelopeRequest | undefined
-	#checked: IntegrityCheckedArchive | undefined
-	#report: ArchiveInspectionReport | undefined
-	#profiles: readonly ArchiveProfileValidator[]
-	#abort = new AbortController()
-	#claimed = false
-	#released = false
-	#protection: 'none' | 'password' = 'none'
-	readonly limits
-	constructor(
-		source: ArchiveInspectionSource,
-		password: ArchivePasswordSource | undefined,
-		profiles: readonly ArchiveProfileValidator[],
-		limits: PayloadLimits
-	) {
-		this.#source = source
-		this.#passwordSource = password
-		this.#profiles = profiles
-		this.limits = limits
-	}
-	#open() {
-		if (this.#released) throw new ArchiveInspectionError('inspectionFailed')
-	}
-	claim() {
-		this.#open()
-		if (this.#claimed) throw new ArchiveInspectionError('inspectionFailed')
-		this.#claimed = true
-	}
-	readSource(): Promise<'plain' | 'password' | 'passwordRequired'> {
-		this.#open()
-		return Promise.resolve()
-			.then(() => {
-				this.#open()
-				return required(this.#source).read(this.#abort.signal, envelopeBytesLimit)
-			})
-			.then((bytes) => {
-				try {
-					this.#open()
-					if (!(bytes instanceof Uint8Array) || bytes.byteLength > envelopeBytesLimit)
-						throw new ArchivePayloadError('limitExceeded')
-					this.#protection = parseEnvelope(bytes, this.limits).protection
-					this.#bytes = bytes
-					return this.#protection === 'none'
-						? 'plain'
-						: this.#passwordSource
-							? 'password'
-							: 'passwordRequired'
-				} catch (error) {
-					if (bytes instanceof Uint8Array) bytes.fill(0)
-					throw error
-				}
-			})
-			.catch((error: unknown) => {
-				if (
-					error instanceof ArchivePayloadError ||
-					error instanceof ArchiveInspectionError ||
-					error instanceof ArchiveEnvelopeError
-				)
-					throw error
-				throw new ArchiveInspectionError('fileReadFailed')
-			})
-	}
-	readPassword(): Promise<void> {
-		this.#open()
-		return Promise.resolve()
-			.then(() => {
-				this.#open()
-				return required(this.#passwordSource).read(this.#abort.signal)
-			})
-			.then((password) => {
-				this.#open()
-				this.#password = password
-			})
-			.catch(() => {
-				throw new ArchiveInspectionError('passwordReadFailed')
-			})
-	}
-	prepareEnvelope(): ArchiveEnvelopeRequest {
-		this.#open()
-		const request = prepareArchiveOpen(required(this.#bytes), this.#password, this.limits)
-		this.#envelope = request
-		// buildChecked is synchronous and rejects released envelope requests before calling this hook.
-		envelopeOperation(request).retainCheckedOutput((archive) => {
-			this.#checked = archive
+export function buildInspectionReport(
+	request: ArchiveInspectionRequest,
+	protection: 'none' | 'password'
+): ArchiveInspectionReport {
+	const data = inspectionData(request)
+	requireInspectionValue(data.input)
+	const checked = requireInspectionValue(data.checked)
+	const payload = checked.readPayload()
+	const report = createInspectionReport(
+		Object.freeze({
+			archiveId: payload.archiveId,
+			profile: payload.profile,
+			declaredSource: payload.source,
+			protection,
+			payloadSha256: checked.payloadDigest(),
+			records: payload.records.length,
+			references: payload.references.length,
+			attachments: payload.attachments.length,
+			attachmentBytes: payload.attachments.reduce((total, file) => total + file.sizeBytes, 0)
 		})
-		this.#bytes?.fill(0)
-		this.#bytes = undefined
-		this.#password = undefined
-		return request
-	}
-	inspectProfile(): ArchiveInspectionResult {
-		this.#open()
-		const payload = required(this.#checked).readPayload()
-		const matched = this.#profiles.find(
-			(candidate) =>
-				candidate.id === payload.profile.id && candidate.version === payload.profile.version
-		)
-		let outcome: InspectionValidation = 'integrityValidProfileUnsupported'
-		if (matched) {
-			try {
-				const valid: unknown = matched.validate(payload)
-				if (typeof valid !== 'boolean') throw new ArchiveInspectionError('profileValidationFailed')
-				outcome = valid ? 'profileValid' : 'profileInvalid'
-			} catch {
-				throw new ArchiveInspectionError('profileValidationFailed')
-			}
-		}
-		return { outcome, report: this.#makeReport() }
-	}
-	#makeReport(): ArchiveInspectionReport {
-		this.#open()
-		const checked = required(this.#checked),
-			payload = checked.readPayload()
-		this.#report = new Report(
-			Object.freeze({
-				archiveId: payload.archiveId,
-				profile: payload.profile,
-				declaredSource: payload.source,
-				protection: this.#protection,
-				payloadSha256: checked.payloadDigest(),
-				records: payload.records.length,
-				references: payload.references.length,
-				attachments: payload.attachments.length,
-				attachmentBytes: payload.attachments.reduce((total, file) => total + file.sizeBytes, 0)
-			})
-		)
-		return this.#report
-	}
-	abortRead() {
-		this.#abort.abort()
-	}
-	cleanup(keepReport: boolean) {
-		if (keepReport) this.#report = undefined
-		this.release()
-	}
-	release() {
-		this.#released = true
-		this.#abort.abort()
-		this.#bytes?.fill(0)
-		this.#bytes = undefined
-		this.#envelope?.release()
-		this.#envelope = undefined
-		this.#checked?.release()
-		this.#checked = undefined
-		this.#report?.release()
-		this.#report = undefined
-		this.#password = undefined
-		this.#passwordSource = undefined
-		this.#source = undefined
-		this.#profiles = []
-	}
-}
-const inspections = new WeakMap<ArchiveInspectionRequest, Inspection>()
-export function inspectionOperation(request: ArchiveInspectionRequest) {
-	return required(inspections.get(request))
+	)
+	data.report = report
+	return report
 }
 export function prepareArchiveInspection(options: {
 	source: ArchiveInspectionSource
@@ -270,32 +228,60 @@ export function prepareArchiveInspection(options: {
 			!schema.safeParse({ id: profile.id, version: profile.version }).success ||
 			typeof profile.validate !== 'function'
 		)
-			throw new ArchiveInspectionError('invalidInspectorConfiguration')
+			throw createArchiveInspectionError('invalidInspectorConfiguration')
 		const versions = known.get(profile.id) ?? new Set<number>()
 		if (versions.has(profile.version))
-			throw new ArchiveInspectionError('invalidInspectorConfiguration')
+			throw createArchiveInspectionError('invalidInspectorConfiguration')
 		versions.add(profile.version)
 		known.set(profile.id, versions)
 	}
-	const operation = new Inspection(
-		options.source,
-		options.password,
-		profiles.map((profile) => Object.freeze({ ...profile })),
-		limits
-	)
+	const input: InspectionInput = {
+		source: options.source,
+		password: options.password,
+		profiles: profiles.map((profile) => Object.freeze({ ...profile }))
+	}
+	const data: InspectionData = {
+		input,
+		limits,
+		bytes: undefined,
+		password: undefined,
+		envelope: undefined,
+		checked: undefined,
+		report: undefined,
+		releaseControl: undefined
+	}
+	// Single-use admission consumes this reference; it does not track the running lifecycle.
+	let available: InspectionInput | undefined = input
 	const request: ArchiveInspectionRequest = Object.freeze({
-		release: () => operation.release(),
+		release() {
+			if (data.input === undefined) return
+			data.input = undefined
+			available = undefined
+			if (data.releaseControl) data.releaseControl()
+			else clearInspectionData(request)
+		},
 		toJSON: (): { kind: 'archiveInspectionRequest' } => ({ kind: 'archiveInspectionRequest' })
 	})
-	inspections.set(request, operation)
+	inspections.set(request, {
+		data,
+		claim() {
+			const current = requireInspectionValue(data.input)
+			requireInspectionValue(available)
+			available = undefined
+			return current.password !== undefined
+		}
+	})
 	return request
 }
-export function inspectionFailure(error: unknown): ArchiveInspectionResult {
+export function inspectionFailure(
+	error: unknown,
+	fallback: InspectionErrorCode = 'inspectionFailed'
+): Extract<ArchiveInspectionResult, { outcome: 'failed' }> {
 	if (
-		error instanceof ArchiveInspectionError ||
-		error instanceof ArchivePayloadError ||
-		error instanceof ArchiveEnvelopeError
+		isArchiveInspectionError(error) ||
+		isArchivePayloadError(error) ||
+		isArchiveEnvelopeError(error)
 	)
 		return { outcome: 'failed', code: error.code }
-	return { outcome: 'failed', code: 'inspectionFailed' }
+	return { outcome: 'failed', code: fallback }
 }

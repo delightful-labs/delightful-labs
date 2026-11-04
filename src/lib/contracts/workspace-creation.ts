@@ -1,3 +1,5 @@
+import type { RetainDetachedTransaction } from './transaction-custody.js'
+export type { DetachedTransaction } from './transaction-custody.js'
 /** Prepared explicit intent. Preserve this identity in the host's durable recovery journal. */
 export type WorkspaceCreationAttempt<Draft> = Readonly<{
 	operationId: string
@@ -35,6 +37,8 @@ type Leaf<Value> = Value | PromiseLike<Value>
 export type WorkspaceCreationTransactionCapability<Draft, Transaction, Records, Workspace, Write> =
 	Readonly<{
 		open: () => Leaf<Transaction>
+		/** Retain uncertain native receipts after abrupt teardown or unresolved completion. */
+		retainDetached: RetainDetachedTransaction<Transaction, Write>
 		readLocal: (transaction: Transaction, attempt: WorkspaceCreationAttempt<Draft>) => Leaf<Records>
 		assess: (
 			records: Records,

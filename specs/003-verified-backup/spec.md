@@ -4,10 +4,15 @@
 
 **Created**: 2026-11-03
 
-**Status**: Implementation in progress. The bounded archive codec, envelope/integrity handling and
+**Status**: Journal semantics were locally verified; machine-first browser ownership correction now
+awaits implementation review and runtime qualification. Restore coordination
+and destination writes remain paused. The bounded archive codec, envelope/integrity handling and
 independent file inspector are implemented and verified. Shared capture/export actors and a disposable
 notebook source are implemented and locally verified in T006. Restore coordination and Finance adoption remain
-unbuilt; no live backup or successful restore is claimed. See
+unbuilt. The pure restore journal model/codec is implemented and locally verified. The browser journal
+owner/store has focused Chromium transaction/page-reload qualification; browser-process crash and
+actual restore remain unqualified. No live backup
+or successful restore is claimed. See
 [tasks and current handoff](tasks.md#current-handoff-2026-11-03).
 
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
@@ -129,6 +134,72 @@ As an application developer, I can use the same backup machinery with another ap
 - Clipper can adopt the generic contract later. This feature does not implement Clipper capture or reader workflows.
 - Encryption password loss makes that encrypted file unrecoverable. Existing identity recovery remains separate.
 - Implementation review and subsequent tests follow repository agreements. This specification does not claim that a usable backup exists yet.
+
+## Known restore limitations and implementation gate
+
+**Only the focused journal attempt/completion change is authorized following research and discussion.**
+The attempt/completion semantics were locally verified after implementation review. The subsequent
+machine-first ownership correction is implemented but awaits review and new runtime qualification.
+Restore coordination/destination writes remain paused. Further work must stay within the supported
+behavior agreed below; this gate does not require covering unlikely edge cases.
+
+- **Retry representation is implemented and locally qualified; writer integration is unbuilt.** A new transaction attempt
+  can follow a confirmed remote rejection with a known transaction ID, retaining the same operation,
+  destination and mappings. Preserve the most recent rejected attempt and the attempt counter;
+  this is bounded recovery metadata, not a complete audit history. A generic exception or uncertain
+  outcome cannot increase the counter. The future writer still needs corrected authority before
+  actually issuing a retry. FR-010 and SC-004 remain unfulfilled until restore integration is qualified.
+- **Recovery is scoped to the same browser and origin with retained journal storage.** The user
+  approved this scope. Resuming requires selecting the backup file again. IndexedDB holds operation
+  identity, mappings and progress; Jazz holds restored application data. Clearing or losing browser
+  storage removes that local recovery metadata. Cross-browser/device recovery is outside this scope.
+- **Qualification is limited.** Chromium page reload, atomic journal updates and cancellation around
+  commit are tested. Browser-process crash recovery and actual Jazz destination restoration are
+  unqualified. Journal commit does not establish Jazz local persistence, remote acceptance or a
+  verified restore. The coordinator and destination writers remain unimplemented.
+
+The [real-code limitation investigation](research.md#restore-limitation-investigation--2026-11-03)
+reproduced a Jazz retry after permission repair at the same destination IDs, which the current
+journal previously could not represent. It also demonstrated pending acceptance across disconnect/reconnect,
+permission-filtered remote null results and journal retention across graceful Chromium process
+restart. These findings do not qualify actual Jazz recovery after restart.
+
+### Accepted retry behavior — 2026-11-03
+
+The user confirmed that fixing access after a confirmed rejection should allow continuation of the
+**same restore operation**, retaining its destination and source-to-destination mappings. A new
+transaction attempt may be issued after the failure is corrected and current authority is checked
+again. Preserve evidence of the rejected attempt rather than rewriting it as accepted.
+
+An uncertain outcome must continue waiting or reconcile existing destination contents before another
+write is issued. A generic exception or permission-filtered missing result is not sufficient evidence
+for replay. A new destination is not the recovery action for this permission-failure case.
+
+The user subsequently authorized the focused journal representation change after the follow-up
+research. It is implemented for review: current attempt plus the most recent rejected attempt, and
+completion by either a settled transaction receipt or an exact remote content match retaining the
+unchanged attempt evidence. Reconciliation cannot silently satisfy a separately required local
+persistence observation. No generalized retry engine or unbounded attempt history is required.
+No restore coordinator or destination writer is authorized by this slice.
+
+### Follow-up recovery evidence — 2026-11-03
+
+[Persistent-browser probes](research.md#persistent-jazz-write-recovery-investigation--2026-11-03)
+recovered an accepted-but-uncheckpointed write and a locally persisted pending write after graceful
+Chromium process restart, with zero application-issued replacement writes. This qualifies those small
+cases, not a full restore or forced-crash recovery.
+
+With read permission revoked, the browser returned null for an existing remote row and `canRead`
+returned `unknown`; it remained unknown after permission repair even though the row became readable.
+Recovery must therefore leave this case unresolved instead of treating null/unknown as authority to
+reissue a write. Matching remote contents may support step reconciliation, but must not be recorded
+as an invented acceptance receipt for the original transaction. The focused journal change now
+represents that completion basis separately, with the exact planned digest and unchanged attempt
+facts. After review approval, 105 journal unit cases and six journal Chromium cases pass (full suites:
+833 unit and 51 Chromium tests). These checks qualify the representation and journal storage, not
+production destination comparison or the unbuilt restore coordinator/writers.
+
+See the [reviewed browser journal design](browser-journal-design.md) for implementation evidence.
 
 ## Evidence and implementation investigation
 

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { Button, Dialog, Text, InputAvatar } from 'delightful-ui'
-	import { untrack, type Snippet } from 'svelte'
+	import type { Snippet } from 'svelte'
+	import { createAvatarSelection } from './avatar-selection.svelte.js'
 	import type { ProfileView } from '../../contracts/profile.js'
-	import FormFeedback from '../forms/FormFeedback.svelte'
-	import FormContent from '../forms/FormContent.svelte'
+	import FormFeedback from '../../components/forms/FormFeedback.svelte'
+	import FormContent from '../../components/forms/FormContent.svelte'
 	const instanceId = $props.id()
 	const avatarId = `${instanceId}-avatar`
 	const helpId = `${instanceId}-avatar-help`
@@ -36,37 +37,16 @@
 		onRemove: () => void
 		onSelectionChange: (file: File | null) => void
 	} = $props()
-	let savedFile = $state<File | null>(null)
-	let selectedFile = $state<File | null>(null)
-	let pendingFile = $state<File | null>(null)
-	let cropOpen = $state(false)
-	let selectionError = $state(false)
-	const resetRevision = $derived(view.draftRevision)
-	const recordId = $derived(profileId)
 	const persistedFile = $derived(
 		avatarData && mimeType
 			? new File([Uint8Array.from(avatarData)], 'avatar', { type: mimeType })
 			: null
 	)
-	// Refresh the saved preview without replacing a selected draft or closing its cropper.
-	$effect(() => {
-		const file = persistedFile
-		untrack(() => {
-			if (selectedFile === savedFile) selectedFile = file
-			savedFile = file
-		})
-	})
-	// Only a new profile or an accepted workflow reset discards presentation drafts.
-	$effect(() => {
-		void recordId
-		void resetRevision
-		untrack(() => {
-			savedFile = persistedFile
-			selectedFile = savedFile
-			pendingFile = null
-			cropOpen = false
-			selectionError = false
-		})
+	const selection = createAvatarSelection({
+		observe: () => ({ profileId, resetRevision: view.draftRevision, saved: persistedFile }),
+		validateFile: (file) => validateFile(file),
+		onSelectionChange: (file) => onSelectionChange(file),
+		onRemove: () => onRemove()
 	})
 </script>
 
@@ -88,34 +68,10 @@
 			<InputAvatar
 				label={labels.avatar}
 				uploadLabel={labels.select}
-				bind:value={
-					() => selectedFile,
-					(file) => {
-						if (file === null && selectedFile === savedFile && savedFile !== null) {
-							onRemove()
-							return
-						}
-						if (file) {
-							if (!validateFile(file)) {
-								selectedFile = savedFile
-								pendingFile = null
-								cropOpen = false
-								selectionError = true
-								onSelectionChange(savedFile)
-								return
-							}
-							selectionError = false
-							pendingFile = file
-							cropOpen = true
-							return
-						}
-						selectedFile = savedFile
-						onSelectionChange(savedFile)
-					}
-				}
+				bind:value={() => selection.view.selected, selection.select}
 				infoLabel={labels.details}
 				closeLabel={labels.close}
-				removeLabel={selectedFile === savedFile
+				removeLabel={!selection.view.dirty
 					? labels.remove
 					: labels.clear}
 				id={avatarId}
@@ -131,16 +87,15 @@
 						disabled={!view.fieldsEditable}
 						onclick={() => {
 							closePreview()
-							pendingFile = file
-							cropOpen = true
+							selection.edit(file)
 						}}>{labels.edit}</Button
 					>
 				{/snippet}
 			</InputAvatar>
-			{#if selectionError}<p role="alert">{labels.invalid}</p>{/if}
+			{#if selection.view.invalid}<p role="alert">{labels.invalid}</p>{/if}
 		{/snippet}
 		{#snippet controls(view)}
-			{#if selectedFile && selectedFile !== savedFile}
+			{#if selection.view.dirty}
 				<Button type="submit" disabled={!view.canSubmit}>
 					{labels.save}
 				</Button>
@@ -159,13 +114,16 @@
 		{/snippet}
 	</FormContent>
 {/key}
-{#if pendingFile}
-	<Dialog
-		heading={labels.cropTitle}
-		bind:open={cropOpen}
-		closedby="any"
-		onclose={() => (pendingFile = null)}
-	>
-		{@render cropper(pendingFile,(file)=>{selectedFile=file;onSelectionChange(file);pendingFile=null;cropOpen=false},()=>{pendingFile=null;cropOpen=false})}
-	</Dialog>
+{#if selection.view.crop}
+	{@const crop = selection.view.crop}
+	{#key crop}
+		<Dialog
+			heading={labels.cropTitle}
+			open
+			closedby="any"
+			onclose={() => selection.dismiss(crop)}
+		>
+			{@render cropper(crop.file, (file) => selection.accept(crop, file), () => selection.dismiss(crop))}
+		</Dialog>
+	{/key}
 {/if}

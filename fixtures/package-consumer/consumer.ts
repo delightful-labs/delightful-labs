@@ -225,7 +225,8 @@ export type {
 export {
 	encodeArchivePayload,
 	parseArchivePayload,
-	ArchivePayloadError
+	createArchivePayloadError,
+	isArchivePayloadError
 } from 'delightful-local-first/backup/archive'
 export type {
 	ArchivePayload,

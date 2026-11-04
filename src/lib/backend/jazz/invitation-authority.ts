@@ -6,7 +6,16 @@ type Client = Pick<JazzClient, 'withAttributionForRequest'>
 type Admission = InvitationAuthorityAdmission<Transaction<'exclusive'>, ExclusiveWriteHandle>
 
 /** Server-only adapter. The host retains its backend session and owns transaction sequencing. */
-export function createJazzInvitationAuthority(client: Client) {
+export function createJazzInvitationAuthority(
+	client: Client,
+	retainDetached: (
+		accountId: string,
+		custody: import('../../contracts/transaction-custody.js').DetachedTransaction<
+			Transaction<'exclusive'>,
+			Readonly<{ write: ExclusiveWriteHandle }>
+		>
+	) => void
+) {
 	return {
 		async admit(request: Pick<Request, 'headers'>): Promise<Admission> {
 			try {
@@ -24,6 +33,7 @@ export function createJazzInvitationAuthority(client: Client) {
 					accountId,
 					transactions: {
 						open: () => db.beginExclusiveTransaction(),
+						retainDetached: (custody) => retainDetached(accountId, custody),
 						commit: (transaction) => ({ write: transaction.commit() }),
 						confirm: (write) => write.wait(),
 						rollback: (transaction) => transaction.rollback()
