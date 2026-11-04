@@ -51,6 +51,7 @@ function fixture() {
 	const workspace: Workspace = { id: attempt.workspaceId }
 	const write: Write = { token: {} }
 	const capability = {
+		retainDetached: vi.fn<Capability['retainDetached']>(),
 		open: vi.fn<Capability['open']>(() => transaction),
 		readLocal: vi.fn<Capability['readLocal']>(() => records),
 		assess: vi.fn<Capability['assess']>(() => ({ outcome: 'eligible' })),
@@ -156,6 +157,12 @@ describe('private workspace creation transaction ownership', () => {
 			})
 			expect(f.capability.commit).toHaveBeenCalledTimes(1)
 			expect(f.capability.rollback).toHaveBeenCalledExactlyOnceWith(f.transaction)
+			expect(f.capability.retainDetached).toHaveBeenCalledOnce()
+			const receipt = f.capability.retainDetached.mock.calls[0]?.[0]
+			if (!receipt?.commit) throw new Error('Missing uncertain commit custody')
+			expect(await receipt.acquisition).toBe(f.transaction)
+			if (step === 'commit') await expect(receipt.commit).rejects.toBe(error)
+			else expect(await receipt.commit).toBe(f.write)
 		}
 	)
 	for (const type of ['CANCEL', 'SHUTDOWN'] satisfies ('CANCEL' | 'SHUTDOWN')[]) {
@@ -256,4 +263,100 @@ describe('private workspace creation transaction ownership', () => {
 			expect(f.capability.commit).not.toHaveBeenCalled()
 		}
 	)
+})
+
+describe('creation detached native custody', () => {
+	it('hands late acquisition to the host after stop without starting more work', async () => {
+		const f = fixture(),
+			opening = deferred<Transaction>()
+		f.capability.open.mockReturnValue(opening.promise)
+		f.start()
+		f.actor.stop()
+		expect(f.capability.retainDetached).toHaveBeenCalledOnce()
+		const receipt = f.capability.retainDetached.mock.calls[0]?.[0]
+		if (!receipt) throw new Error('Missing custody')
+		opening.resolve(f.transaction)
+		expect(await receipt.acquisition).toBe(f.transaction)
+		expect(receipt.commit).toBeUndefined()
+		expect(f.capability.readLocal).not.toHaveBeenCalled()
+		expect(f.capability.rollback).not.toHaveBeenCalled()
+	})
+	it.each(['readLocal', 'stage'] satisfies (keyof Pick<Capability, 'readLocal' | 'stage'>)[])(
+		'retains the actual pending %s before host cleanup',
+		async (step) => {
+			const f = fixture(),
+				pending = deferred<Records & Workspace>()
+			f.capability[step].mockReturnValue(pending.promise)
+			f.start()
+			await vi.waitFor(() => expect(f.capability[step]).toHaveBeenCalledOnce())
+			f.actor.stop()
+			const receipt = f.capability.retainDetached.mock.calls[0]?.[0]
+			if (!receipt) throw new Error('Missing custody')
+			expect(await receipt.acquisition).toBe(f.transaction)
+			pending.resolve({ ...f.records, ...f.workspace })
+			await receipt.pending
+			expect(f.capability.commit).not.toHaveBeenCalled()
+			expect(f.capability.rollback).not.toHaveBeenCalled()
+		}
+	)
+	it('hands off the actual commit receipt without rollback or persistence replay', async () => {
+		const f = fixture(),
+			commit = deferred<Write>()
+		f.capability.commit.mockReturnValue(commit.promise)
+		f.start()
+		await vi.waitFor(() => expect(f.capability.commit).toHaveBeenCalledOnce())
+		f.actor.stop()
+		const receipt = f.capability.retainDetached.mock.calls[0]?.[0]
+		if (!receipt?.commit) throw new Error('Missing commit custody')
+		commit.resolve(f.write)
+		expect(await receipt.commit).toBe(f.write)
+		expect(f.capability.rollback).not.toHaveBeenCalled()
+		expect(f.capability.persistLocal).not.toHaveBeenCalled()
+	})
+	it('retains an unconfirmed rollback instead of treating it as disposal', async () => {
+		const f = fixture()
+		f.capability.assess.mockReturnValue({ outcome: 'blocked', reason: 'blocked' })
+		f.capability.rollback.mockReturnValue(false)
+		f.start()
+		expect((await f.done())?.settlement.kind).toBe('unresolved')
+		expect(f.capability.retainDetached).toHaveBeenCalledOnce()
+	})
+	it('does not hand off confirmed persistence or confirmed cancellation rollback', async () => {
+		const success = fixture()
+		success.start()
+		await success.done()
+		expect(success.capability.retainDetached).not.toHaveBeenCalled()
+		const f = fixture(),
+			opening = deferred<Transaction>()
+		f.capability.open.mockReturnValue(opening.promise)
+		f.start()
+		f.actor.send({ type: 'CANCEL' })
+		opening.resolve(f.transaction)
+		await f.done()
+		expect(f.capability.rollback).toHaveBeenCalledExactlyOnceWith(f.transaction)
+		expect(f.capability.retainDetached).not.toHaveBeenCalled()
+	})
+})
+
+it('retains creation custody when the owner crashes after acquisition', async () => {
+	const f = fixture(),
+		errors: unknown[] = []
+	const logic = createWorkspaceCreationTransaction<Draft, Transaction, Records, Workspace, Write>(
+		f.capability
+	).provide({
+		guards: {
+			closing: () => {
+				throw new Error('owner failed')
+			}
+		}
+	})
+	const actor = createActor(logic, { input: { attempt: f.attempt } })
+	actors.add(actor)
+	actor.subscribe({ error: (error) => errors.push(error) })
+	actor.start()
+	await vi.waitFor(() => expect(errors).toHaveLength(1))
+	const receipt = f.capability.retainDetached.mock.calls[0]?.[0]
+	if (!receipt) throw new Error('Missing custody')
+	expect(await receipt.acquisition).toBe(f.transaction)
+	expect(f.capability.rollback).not.toHaveBeenCalled()
 })

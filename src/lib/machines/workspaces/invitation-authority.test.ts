@@ -81,6 +81,7 @@ function fixture(
 	}
 	const records: Records = { invitation, membership: null, evidence: null }
 	const transactions = {
+		retainDetached: vi.fn<Transactions['retainDetached']>(),
 		open: vi.fn<Transactions['open']>(() => transaction),
 		commit: vi.fn<Transactions['commit']>(() => ({ write })),
 		confirm: vi.fn<Transactions['confirm']>(async () => {}),
@@ -751,4 +752,97 @@ describe('invitation authority resource owner', () => {
 		expect(f.transactions.rollback).toHaveBeenCalledExactlyOnceWith(f.transaction)
 		assertCleared(f, snapshot)
 	})
+})
+
+describe('invitation detached native custody', () => {
+	it('retains late acquisition after abrupt stop without issuing a read or rollback', async () => {
+		const f = fixture(),
+			opening = deferred<Transaction>()
+		f.transactions.open.mockReturnValue(opening.promise)
+		f.actor.start()
+		await vi.waitFor(() => expect(f.transactions.open).toHaveBeenCalledOnce())
+		f.actor.stop()
+		const receipt = f.transactions.retainDetached.mock.calls[0]?.[0]
+		if (!receipt) throw new Error('Missing custody')
+		opening.resolve(f.transaction)
+		expect(await receipt.acquisition).toBe(f.transaction)
+		expect(f.capability.read).not.toHaveBeenCalled()
+		expect(f.transactions.rollback).not.toHaveBeenCalled()
+	})
+	it('retains a pending stage before any host cleanup decision', async () => {
+		const f = fixture(),
+			stage = deferred<void>()
+		f.capability.stage.mockReturnValue(stage.promise)
+		f.actor.start()
+		await vi.waitFor(() => expect(f.capability.stage).toHaveBeenCalledOnce())
+		f.actor.stop()
+		const receipt = f.transactions.retainDetached.mock.calls[0]?.[0]
+		if (!receipt) throw new Error('Missing custody')
+		stage.resolve()
+		await receipt.pending
+		expect(await receipt.acquisition).toBe(f.transaction)
+		expect(receipt.commit).toBeUndefined()
+		expect(f.transactions.commit).not.toHaveBeenCalled()
+		expect(f.transactions.rollback).not.toHaveBeenCalled()
+	})
+	it('hands off an uncertain commit without issuing confirmation or rollback after stop', async () => {
+		const f = fixture(),
+			commit = deferred<{ write: Write }>()
+		f.transactions.commit.mockReturnValue(commit.promise)
+		f.actor.start()
+		await vi.waitFor(() => expect(f.transactions.commit).toHaveBeenCalledOnce())
+		f.actor.stop()
+		const receipt = f.transactions.retainDetached.mock.calls[0]?.[0]
+		if (!receipt?.commit) throw new Error('Missing commit custody')
+		commit.resolve({ write: f.write })
+		expect((await receipt.commit).write).toBe(f.write)
+		expect(f.transactions.confirm).not.toHaveBeenCalled()
+		expect(f.transactions.rollback).not.toHaveBeenCalled()
+	})
+	it('uses the existing unresolved output handoff without a second teardown owner', async () => {
+		const f = fixture()
+		f.transactions.confirm.mockRejectedValue(new Error('uncertain'))
+		f.actor.start()
+		const snapshot = await f.done()
+		expect(snapshot.output?.settlement.kind).toBe('unknown')
+		expect(f.transactions.retainDetached).not.toHaveBeenCalled()
+	})
+	it('does not detach confirmed success or graceful cancellation', async () => {
+		const f = fixture()
+		f.actor.start()
+		await f.done()
+		expect(f.transactions.retainDetached).not.toHaveBeenCalled()
+		const cancelled = fixture(),
+			opening = deferred<Transaction>()
+		cancelled.transactions.open.mockReturnValue(opening.promise)
+		cancelled.actor.start()
+		await vi.waitFor(() => expect(cancelled.transactions.open).toHaveBeenCalledOnce())
+		cancelled.actor.send({ type: 'CANCEL' })
+		opening.resolve(cancelled.transaction)
+		await cancelled.done()
+		expect(cancelled.transactions.rollback).toHaveBeenCalledOnce()
+		expect(cancelled.transactions.retainDetached).not.toHaveBeenCalled()
+	})
+})
+
+it('retains invitation custody when the owner crashes after acquisition', async () => {
+	const f = fixture(),
+		errors: unknown[] = []
+	const logic = createInvitationAuthorityMachine(f.capability).provide({
+		guards: {
+			closing: ({ context }) => {
+				if (context.transaction !== undefined) throw new Error('owner failed')
+				return false
+			}
+		}
+	})
+	const actor = createActor(logic, { input: { credentials: f.credentials, request: f.request } })
+	active.add(actor)
+	actor.subscribe({ error: (error) => errors.push(error) })
+	actor.start()
+	await vi.waitFor(() => expect(errors).toHaveLength(1))
+	const receipt = f.transactions.retainDetached.mock.calls[0]?.[0]
+	if (!receipt) throw new Error('Missing custody')
+	expect(await receipt.acquisition).toBe(f.transaction)
+	expect(f.transactions.rollback).not.toHaveBeenCalled()
 })

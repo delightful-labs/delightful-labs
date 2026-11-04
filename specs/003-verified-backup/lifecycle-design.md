@@ -499,3 +499,53 @@ reset revision and saved file. Presentation consumes selected file, crop request
 facts and callbacks; no component flags reconstruct workflow state. Native dialog close reports
 dismissal for the captured crop request. Scope/reset discards presentation state without publishing
 an extra selection callback, matching the form owner's reset responsibility. Review before tests.
+
+## Recovery child failure — design before implementation
+
+Finance's current host distinguishes recovery invocation errors from finite results: ordinary
+completion resumes readiness and may attach pending workspace work. Returning a new unknown-mutation
+result without changing that host would silently route an unresolved failure through normal
+completion. Preserve the existing public error protocol and finite result union.
+
+```text
+restoring child error -> exit restoring (invalidate binding, drop reference)
+                     -> restorationChildFailed (clear submitted request, internal failure result)
+                     -> queued PROPAGATE_FAILURE -> fail at the output boundary
+```
+
+The present handler throws during the error transition and consequently never exits restoring.
+Replace that throw with an actual state transition. Existing restoring exit cleanup then executes
+before the failure terminal/output boundary. A self-sent event queues propagation for the next
+actor turn: the cleared snapshot must commit before output throws, or an error snapshot could
+retain the previous binding reference. Shutdown cannot turn this failure into ordinary completion.
+The internal failure result carries only a fixed
+discriminant, not raw error, credentials, or inferred mutation settlement. No navigation, SDK retry,
+or successful shutdown result follows it, including when the child crashes while closing.
+
+Binding invalidation remains a synchronous total/idempotent reference-release operation; the Jazz
+adapter implements it with one reference assignment. It is not SDK logout, cancellation, rollback,
+or a new fallible I/O workflow. Do not add actors around this assignment. A host-provided invalidator
+must honor that contract. Abrupt coordinator stop/ancestor failure and already-issued SDK calls
+remain the documented host ownership limitation, not newly solved by this transition.
+
+After implementation approval, exercise actual child crashes before preparation and during issued
+restoration/shutdown, verify invalidation before the parent error report, secret/reference cleanup,
+and absence of normal completion/navigation. Review existing successful restoration/navigation
+coordination as regression coverage. No Finance code change or new public outcome is needed.
+
+## Transaction teardown custody — implementation and tests authorized together
+
+Use one fixed native custody scope under each transaction chart. Its data contains issued native
+promises only: acquisition, latest call, and commit receipt. It is not a second workflow owner.
+Leaves record exactly one call; the chart clears custody after confirmed persistence, safe
+confirmed rollback, or the invitation owner's existing explicit unresolved-output handoff. On abrupt stop/crash, or unresolved creation completion, callback disposal/owner-error observation
+hands the receipts to a required total synchronous host retainDetached capability. Acquisition may
+still resolve after the actor stops, and commit may already have started: never automatically
+rollback/retry from teardown. The host retains this handoff and waits for outstanding operations
+before deciding recovery. No credential/request bodies are included in the handoff.
+
+This intentionally adds a required capability member to creation and invitation transaction
+contracts; old hosts must implement custody retention before adopting this package. Keep sibling
+consumer source untouched and document migration. Update packaged consumers and typed doubles.
+Qualify late acquisition, stop during a read/stage, stop during commit, unresolved receipts,
+confirmed rollback/persistence without handoff, and ordinary cancellation using real actors.

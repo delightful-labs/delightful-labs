@@ -219,3 +219,13 @@ Sign-in configuration and external-input follow-up belongs to
 [the sign-in delivery TODOs](../002-shared-delightful-sign-in/delivery.md#zod-validation-todos).
 Keep generation/account-binding comparisons and other straightforward state-machine guards as
 ordinary code. No broad validation rewrite is authorized by this list.
+
+## State-model review cleanup status
+
+- [x] Envelope preparation: chart-owned branches; focused and Chromium qualification recorded.
+- [x] Avatar selection: explicit owner; unit and actual DUI/Chromium binding checks recorded.
+- [x] Recovery child failure: cleanup precedes preserved parent error protocol; coordinator tests pass.
+- [x] Transaction teardown custody: required host handoff with native receipts; stop/crash and real
+      Jazz transaction checks pass. Consumer migration is documented in docs/transaction-custody.md.
+
+These statuses concern the reviewed cleanup, not completion of backup restore/journal qualification.

@@ -3,10 +3,15 @@ import { createActor, toPromise } from 'xstate'
 import { createWorkspaceCreationTransaction } from 'delightful-local-first/workspace/creation/workflow'
 import 'delightful-local-first/workspace/creation/contracts'
 
+/** @type {import('delightful-local-first/workspace/creation/contracts').DetachedTransaction<{ staged: boolean }, { local: Promise<void> }>[]} */
+const detached = []
 /** @type {import('delightful-local-first/workspace/creation/contracts').WorkspaceCreationTransactionCapability<
  * { name: string }, { staged: boolean }, { exists: boolean }, { id: string }, { local: Promise<void> }
  * >} */
 const capability = {
+	retainDetached: (custody) => {
+		detached.push(custody)
+	},
 	open: () => ({ staged: false }),
 	readLocal: () => ({ exists: false }),
 	assess: (records) =>

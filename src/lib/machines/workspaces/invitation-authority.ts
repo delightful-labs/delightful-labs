@@ -1,3 +1,10 @@
+import {
+	createTransactionCustody,
+	clearTransactionCustody,
+	transactionCall,
+	transactionCustodian,
+	type TransactionCustody
+} from './transaction-custody.js'
 import { assign, fromPromise, setup, stateIn } from 'xstate'
 import type { InvitationDecision } from '../../contracts/workspace-invitation.js'
 import type {
@@ -45,7 +52,9 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 	>
 	type Transactions = InvitationAuthorityTransactions<Transaction, Write>
 	type Result = InvitationAuthorityResult<Transaction, Write>
+	type Custody = TransactionCustody<Transaction, Readonly<{ write: Write }>>
 	type Context = {
+		custody: Custody
 		identity: InvitationAuthorityIdentity
 		credentials: Credentials | undefined
 		request: InvitationAuthorityRequest | undefined
@@ -62,22 +71,32 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 	const invitation = (context: Context) => required(records(context).invitation ?? undefined)
 	const admitted = (context: Context) => required(context.admission)
 	const actors = {
+		custodian: transactionCustodian<Transaction, Readonly<{ write: Write }>>(),
 		admit: fromPromise(({ input }: { input: { credentials: Credentials } }) =>
 			effect(() => capability.admit(input.credentials))
 		),
-		open: fromPromise(({ input }: { input: { transactions: Transactions } }) =>
-			effect(() => input.transactions.open())
-		),
+		open: fromPromise(({ input }: { input: { transactions: Transactions; custody: Custody } }) => {
+			input.custody.retain = (receipt) => input.transactions.retainDetached(receipt)
+			const call = transactionCall(input.custody, () => input.transactions.open())
+			input.custody.acquisition = call
+			return effect(() => call)
+		}),
 		read: fromPromise(
 			({
 				input
 			}: {
 				input: {
 					transaction: Transaction
+					custody: Custody
 					identity: InvitationAuthorityIdentity
 					accountId: string
 				}
-			}) => effect(() => capability.read(input.transaction, input.identity, input.accountId))
+			}) =>
+				effect(() =>
+					transactionCall(input.custody, () =>
+						capability.read(input.transaction, input.identity, input.accountId)
+					)
+				)
 		),
 		verify: fromPromise(({ input }: { input: { code: string; digest: string } }) =>
 			effect(() => capability.verifyCode(input.code, input.digest))
@@ -85,19 +104,41 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		clock: fromPromise(() => effect(() => capability.now())),
 		prepare: fromPromise(() => effect(() => capability.newMembershipId())),
 		stage: fromPromise(
-			({ input }: { input: { transaction: Transaction; plan: InvitationAuthorityPlan<Role> } }) =>
-				effect(() => capability.stage(input.transaction, input.plan))
+			({
+				input
+			}: {
+				input: { transaction: Transaction; plan: InvitationAuthorityPlan<Role>; custody: Custody }
+			}) =>
+				effect(() =>
+					transactionCall(input.custody, () => capability.stage(input.transaction, input.plan))
+				)
 		),
 		commit: fromPromise(
-			({ input }: { input: { transactions: Transactions; transaction: Transaction } }) =>
-				effect(() => input.transactions.commit(input.transaction))
+			({
+				input
+			}: {
+				input: { transactions: Transactions; transaction: Transaction; custody: Custody }
+			}) => {
+				const call = transactionCall(input.custody, () =>
+					input.transactions.commit(input.transaction)
+				)
+				input.custody.commit = call
+				return effect(() => call)
+			}
 		),
-		confirm: fromPromise(({ input }: { input: { transactions: Transactions; write: Write } }) =>
-			effect(() => input.transactions.confirm(input.write))
+		confirm: fromPromise(
+			({ input }: { input: { transactions: Transactions; write: Write; custody: Custody } }) =>
+				effect(() => transactionCall(input.custody, () => input.transactions.confirm(input.write)))
 		),
 		rollback: fromPromise(
-			({ input }: { input: { transactions: Transactions; transaction: Transaction } }) =>
-				effect(() => input.transactions.rollback(input.transaction))
+			({
+				input
+			}: {
+				input: { transactions: Transactions; transaction: Transaction; custody: Custody }
+			}) =>
+				effect(() =>
+					transactionCall(input.custody, () => input.transactions.rollback(input.transaction))
+				)
 		)
 	}
 
@@ -108,6 +149,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		{},
 		{
 			clear: undefined
+			releaseCustody: undefined
 			failure: undefined
 			unresolved: undefined
 			decide: { decision: InvitationDecision }
@@ -120,6 +162,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 	>({
 		actors,
 		actions: {
+			releaseCustody: ({ context }) => clearTransactionCustody(context.custody),
 			clear: assign({
 				credentials: undefined,
 				request: undefined,
@@ -188,6 +231,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		})
 	})
 	const transactionInput = ({ context }: { context: Context }) => ({
+		custody: context.custody,
 		transactions: admitted(context).transactions,
 		transaction: required(context.transaction)
 	})
@@ -210,6 +254,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 						settlement: context.result?.settlement ?? { kind: 'notStarted' }
 					})
 				}),
+				'releaseCustody',
 				clear
 			]
 		})
@@ -217,6 +262,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		id: 'invitation-authority',
 		initial: 'running',
 		context: ({ input }) => ({
+			custody: createTransactionCustody<Transaction, Readonly<{ write: Write }>>(),
 			identity: {
 				operationId: input.request.operationId,
 				invitationId: input.request.invitationId
@@ -236,6 +282,15 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		states: {
 			running: {
 				type: 'parallel',
+				invoke: {
+					src: 'custodian',
+					input: ({ context, self }) => ({ custody: context.custody, owner: self }),
+					onError: {
+						actions: () => {
+							throw new Error('Transaction custody failed')
+						}
+					}
+				},
 				states: {
 					control: {
 						initial: 'active',
@@ -324,7 +379,8 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								invoke: {
 									src: 'open',
 									input: ({ context }) => ({
-										transactions: admitted(context).transactions
+										transactions: admitted(context).transactions,
+										custody: context.custody
 									}),
 									onDone: [
 										{
@@ -346,6 +402,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									src: 'read',
 									input: ({ context }) => ({
 										transaction: required(context.transaction),
+										custody: context.custody,
 										identity: context.identity,
 										accountId: admitted(context).accountId
 									}),
@@ -572,6 +629,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									src: 'stage',
 									input: ({ context }) => ({
 										transaction: required(context.transaction),
+										custody: context.custody,
 										plan: required(context.plan)
 									}),
 									onDone: [
@@ -615,6 +673,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								invoke: {
 									src: 'confirm',
 									input: ({ context }) => ({
+										custody: context.custody,
 										transactions: admitted(context).transactions,
 										write: required(context.write)
 									}),
@@ -622,13 +681,16 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 										{
 											guard: ({ event }) => event.output.outcome === 'succeeded',
 											target: 'finishing',
-											actions: assign({
-												result: ({ context }: { context: Context }): Result => ({
-													...context.identity,
-													outcome: 'completed',
-													settlement: { kind: 'confirmed', decision: required(context.decision) }
+											actions: [
+												({ context }) => clearTransactionCustody(context.custody),
+												assign({
+													result: ({ context }: { context: Context }): Result => ({
+														...context.identity,
+														outcome: 'completed',
+														settlement: { kind: 'confirmed', decision: required(context.decision) }
+													})
 												})
-											})
+											]
 										},
 										{ target: 'finishing', actions: unresolved }
 									],
@@ -643,7 +705,8 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 										{
 											guard: ({ event }) =>
 												event.output.outcome === 'succeeded' && event.output.value === true,
-											target: 'finishing'
+											target: 'finishing',
+											actions: ({ context }) => clearTransactionCustody(context.custody)
 										},
 										{ target: 'finishing', actions: unresolved }
 									],
@@ -651,6 +714,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							finishing: {
+								entry: 'releaseCustody',
 								always: [
 									{ guard: 'closing', target: '#invitation-authority.closed' },
 									{ guard: 'cancelling', target: '#invitation-authority.cancelled' },
@@ -661,7 +725,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 					}
 				}
 			},
-			settled: { type: 'final', entry: clear },
+			settled: { type: 'final', entry: ['releaseCustody', clear] },
 			cancelled: terminal('cancelled'),
 			closed: terminal('closed')
 		}

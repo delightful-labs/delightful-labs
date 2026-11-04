@@ -2,6 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { schema as s, type Db, type Transaction } from 'jazz-tools'
 import { RequestAuthenticationError, type JazzClient } from 'jazz-tools/backend'
 import { createPolicyTestApp, type PolicyTestApp } from 'jazz-tools/testing'
+import { createActor } from 'xstate'
+import { deferred } from '../../../../tests/helpers/deferred.js'
+import { createInvitationAuthorityMachine } from '../../machines/workspaces/invitation-authority.js'
+import type { ExclusiveWriteHandle } from 'jazz-tools'
 import { createJazzInvitationAuthority } from './invitation-authority.js'
 
 // This is a native delegation fixture, not the future invitation schema or its access policy.
@@ -33,7 +37,21 @@ afterAll(async () => {
 afterEach(() => vi.restoreAllMocks())
 function adapter() {
 	const verify = vi.fn<JazzClient['withAttributionForRequest']>().mockResolvedValue(db)
-	return { verify, authority: createJazzInvitationAuthority({ withAttributionForRequest: verify }) }
+	const retain =
+		vi.fn<
+			(
+				accountId: string,
+				custody: import('../../contracts/transaction-custody.js').DetachedTransaction<
+					Transaction<'exclusive'>,
+					Readonly<{ write: ExclusiveWriteHandle }>
+				>
+			) => void
+		>()
+	return {
+		verify,
+		retain,
+		authority: createJazzInvitationAuthority({ withAttributionForRequest: verify }, retain)
+	}
 }
 function request() {
 	return new Request('https://example.test/redeem', {
@@ -212,5 +230,52 @@ describe('Jazz invitation authority boundary', () => {
 		const wait = vi.spyOn(envelope.write, 'wait').mockRejectedValue(failure)
 		await expect(result.transactions.confirm(envelope.write)).rejects.toBe(failure)
 		expect(wait).toHaveBeenCalledExactlyOnceWith()
+	})
+})
+
+describe('native transaction custody handoff', () => {
+	it('retains an actual Jazz exclusive transaction after owner stop for host rollback', async () => {
+		const f = adapter(),
+			read = deferred<void>()
+		const actor = createActor(
+			createInvitationAuthorityMachine({
+				admit: () => f.authority.admit(request()),
+				read: async () => {
+					await read.promise
+					return { outcome: 'unavailable' }
+				},
+				verifyCode: () => true,
+				now: () => 1000,
+				newMembershipId: () => 'member',
+				stage: () => {}
+			}),
+			{
+				input: {
+					credentials: {},
+					request: { operationId: 'op', invitationId: 'invite', code: 'code' }
+				}
+			}
+		)
+		try {
+			actor.start()
+			await vi.waitFor(() =>
+				expect(actor.getSnapshot().value).toEqual({
+					running: { control: 'active', work: 'reading' }
+				})
+			)
+			actor.stop()
+			const handoff = f.retain.mock.calls[0]
+			if (!handoff) throw new Error('Missing native custody')
+			expect(handoff[0]).toBe(accountId)
+			const native = await handoff[1].acquisition
+			expect(native.kind).toBe('exclusive')
+			read.resolve()
+			await handoff[1].pending
+			expect(handoff[1].commit).toBeUndefined()
+			expect(await native.rollback()).toBe(true)
+		} finally {
+			read.resolve()
+			actor.stop()
+		}
 	})
 })

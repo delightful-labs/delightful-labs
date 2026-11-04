@@ -1,8 +1,12 @@
+import type { RetainDetachedTransaction } from './transaction-custody.js'
+export type { DetachedTransaction } from './transaction-custody.js'
 type Leaf<Value> = Value | PromiseLike<Value>
 
 /** Leaves for a server-owned resource statechart; never an invitation decision by themselves. */
 export type InvitationAuthorityTransactions<Transaction, Write> = Readonly<{
 	open: () => Leaf<Transaction>
+	/** Retain uncertain native receipts after abrupt teardown or unresolved completion. */
+	retainDetached: RetainDetachedTransaction<Transaction, Readonly<{ write: Write }>>
 	/** The envelope keeps a native receipt opaque until authority confirmation is selected. */
 	commit: (transaction: Transaction) => Leaf<Readonly<{ write: Write }>>
 	confirm: (write: Write) => Leaf<void>

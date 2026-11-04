@@ -580,3 +580,74 @@ test components. The package fixture build and root Svelte/TypeScript checks pas
 a temporary preview on localhost port 6015, with sandbox escalation for socket binding, and stopped
 it after the run. Runtime checks apply to avatar selection only; notebook/journal qualification
 limits remain as previously recorded. No commit/push of this avatar slice.
+
+## Recovery child failure correction — awaiting implementation review
+
+Committed the verified avatar selection slice as b0cb9d7 at the user's request. No push.
+
+Read Finance's recovery consumer before choosing the failure protocol. Its normal completion
+resumes readiness/attachment; its invocation error path enters failure handling. Therefore no
+new normal-completion outcome or widened mutation union was introduced. The child-crash handler
+now transitions to restorationChildFailed rather than throwing inside the restoring state.
+Existing restoring exit invalidates the binding and drops its context reference. The failure
+state clears the submitted request, retains only a fixed internal failure discriminant, then
+self-sends PROPAGATE_FAILURE. That separate actor turn commits cleared references before the
+output boundary throws a sanitized error. No raw error is stored and shutdown cannot mask it.
+
+Reviewed the owning child/adapter boundary: invalidation is one synchronous reference assignment,
+now explicitly documented as total/idempotent and never SDK I/O. No actor was added around it.
+Existing finite results, navigation behavior and host supervision contract remain as before.
+This does not solve abrupt parent stop or uncertain already-issued SDK work; those limits are
+recorded in docs/restoration-workflow.md. No Finance file was changed.
+
+Svelte/TypeScript, lint, formatting and whitespace checks pass; these are separate from runtime
+evidence. After approval, add actual coordinator/parent
+cases for child crash before preparation and after restoration issue, crash during shutdown,
+cleanup-before-error ordering, cleared references and absence of normal completion/navigation;
+also exercise ordinary recovery/navigation as regressions. No runtime tests added/run in this
+implementation slice, no commit/push. Transaction teardown remains the next unresolved review item.
+
+## Recovery and transaction custody completion — combined implementation/tests authorized
+
+The user explicitly authorized both remaining cleanup items with tests in the same slice.
+Recovery now has six coordinator/parent tests: child crash before preparation, after SDK issue,
+crash while closing, normal success/navigation, ordinary SDK rejection, and graceful shutdown.
+They verify binding release before the parent error, cleared error snapshots, sanitized failure,
+and no fabricated settled result or navigation on crash. Existing restoration cases also pass.
+
+Both transaction factories now invoke a fixed native custody scope under running. Its record holds
+issued acquisition/latest-call/commit promises, not another lifecycle state. Leaves record one
+native call; existing chart states decide safe relinquishment. Abrupt stop or owner error hands
+receipts to the host's required retainDetached capability. No teardown rollback, retry, persistence
+or authority confirmation is issued. Creation unresolved completion retains custody even after a
+positive rollback report following uncertain commit/persistence. Invitation's existing unknown
+output remains its single normal handoff; a second callback handoff is suppressed before exiting
+running. Confirmed persistence/authority/rollback paths do not detach receipts.
+
+New tests exposed XState 5.33.2's transition-throw orphan behavior: callback disposal alone did not
+run on owner guard/action failure. The native scope now observes the owner's terminal error too,
+transferring receipts without relying on orphan cleanup. This is one resource-boundary handoff,
+not a general actor supervisor. It does not solve XState's orphan bookkeeping or process loss.
+The running-state scope also preserves empty completed children, verified by existing invitation
+cleanup assertions. No workflow policy moved into promise helpers or native finalizers.
+
+Tests cover late acquisition, pending read/stage, pending commit, owner transition crashes,
+unconfirmed rollback, normal completion/cancellation, and no duplicate invitation-output owner.
+The real Jazz backend fixture opens an actual exclusive transaction, stops its workflow during a
+pending read, hands the verified account/receipts to the host, and confirms host rollback after the
+read settles. Its isolated backend listener required sandbox escalation. No persistent service or
+product server was started.
+
+API migration is intentional: both transaction capabilities require retainDetached; the Jazz
+invitation adapter requires a host callback as its second argument. Packaged consumer signatures
+were updated. A no-op callback does not satisfy ownership. Finance source/vendor packages were
+not modified; its creation capability must adopt retention before updating this dependency.
+See docs/transaction-custody.md for the migration and explicit limitations. Recovery's finite
+result union/error protocol is unchanged.
+
+Validation: all 883 unit cases in 35 files pass, including the new real-SDK case. After adding
+stronger assertions for uncertain creation commit/persistence receipts, the focused creation suite
+also passes. Root Svelte/TypeScript, lint, formatting and whitespace checks pass. Package/publint,
+public consumer declarations, three affected Node consumers, and consumer Vite build pass. This
+qualifies these two changes; it does not replace the separately pending notebook/journal native
+qualification or claim arbitrary host recovery correctness. No commit/push of this slice.

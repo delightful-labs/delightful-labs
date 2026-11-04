@@ -9,10 +9,15 @@ import { createInvitationAuthorityMachine } from 'delightful-local-first/workspa
 const transaction = { id: 'exclusive-attempt' }
 /** @type {Write} */
 const write = { receipt: 'authority-receipt' }
+/** @type {import('delightful-local-first/workspace/invitations/authority-contracts').DetachedTransaction<Transaction, {write: Write}>[]} */
+const detached = []
 /** @type {import('delightful-local-first/workspace/invitations/authority-contracts').InvitationAuthorityPlan<Role>[]} */
 const staged = []
 /** @type {import('delightful-local-first/workspace/invitations/authority-contracts').InvitationAuthorityTransactions<Transaction,Write>} */
 const transactions = {
+	retainDetached: (custody) => {
+		detached.push(custody)
+	},
 	open: () => transaction,
 	commit: (tx) => {
 		if (tx !== transaction || staged.length !== 1) throw new Error('Unexpected commit')
