@@ -722,3 +722,20 @@ each run. No production changes were needed during this qualification, and no te
 This qualifies the covered stream/schema/native store behavior, not the full planned restore workflow,
 arbitrary browser support, or the separately pending notebook finite-operation runtime correction.
 No commit or push of the journal change or these tests.
+
+### Fresh-checkout CI type-resolution correction
+
+CI job 126594923873 failed at pnpm check before packaging: the avatar browser host's public
+component import resolved through dist, absent on a fresh checkout. Existing local dist output
+masked the dependency in earlier checks. Reproduced all eight diagnostics with dist temporarily
+moved aside and restored it afterward.
+
+Added one root TypeScript source mapping for the avatar public import so pre-package Svelte
+checking can infer the real props. Packaged-consumer tsconfig explicitly clears inherited paths,
+preserving declaration checks against dist. The browser Vite configuration remains unaliased;
+inspected its built module graph to verify it includes dist/integrations/profile/ProfileAvatarForm
+and excludes the corresponding source component. No component/runtime or validation policy changed.
+
+pnpm check passes with dist absent; packaged-consumer declarations, actual public-component Vite
+build/module verification, lint, formatting and whitespace checks pass. Remote CI is reported
+separately after pushing this fix; local build output is not evidence of a clean-checkout pass.

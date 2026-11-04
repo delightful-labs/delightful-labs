@@ -3,6 +3,11 @@
 		"target": "ES2022",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
+		"paths": {
+			"delightful-local-first/profile/avatar-form": [
+				"./src/lib/integrations/profile/ProfileAvatarForm.svelte"
+			]
+		},
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"types": ["node", "svelte", "vite/client"],
 		"strict": true,
