@@ -18,6 +18,9 @@ import {
 	createNotebookAttachmentRestore
 } from './restore-attachment-writer.js'
 
+import { createNotebookRootRestore, createNotebookRootWriter } from './restore-notebook-writer.js'
+import { createNotebookRestoreRootMachine, prepareNotebookRootRestore } from './restore-notebook.js'
+
 type Writer = ReturnType<typeof createNotebookPreparationWriter>
 const config = new URLSearchParams(location.search)
 const appId = config.get('appId'),
@@ -55,7 +58,18 @@ const attachmentPending: {
 	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreAttachmentMachine>>
 	cleanup?: () => void
 } = {}
+const rootPending: {
+	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreRootMachine>>
+	cleanup?: () => void
+	releaseStage?: () => void
+	staged?: boolean
+} = {}
 const api = {
+	rootPending,
+	createNotebookRootRestore,
+	createNotebookRootWriter,
+	createNotebookRestoreRootMachine,
+	prepareNotebookRootRestore,
 	attachmentPending,
 	createNotebookAttachmentWriter,
 	createNotebookRestoreAttachmentMachine,

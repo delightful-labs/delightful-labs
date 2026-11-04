@@ -171,3 +171,17 @@ notebook schema, policies, shared continuation and title recovery await qualific
 Earlier passing totals qualify PR #23 rather than this working tree. No new implementation tests
 were added or run. Notes, full comparison and activation remain open. See
 [design and review](../../specs/003-verified-backup/restore-notebook-design.md).
+
+### Notebook-root qualification (2026-11-04)
+
+Following implementation review and user authorization, all 22 real Jazz/Chromium cases pass:
+13 preparation/attachment regressions and nine notebook-root cases. They cover exact empty and
+Unicode/control-character titles, mapped identity and prefix/reload, step admission, actual-title
+conflict, uncertain-write recovery without replay, native-stage cancellation/invalidation drain and
+rollback, plus server-enforced owner/control scope and immutable rows. All 914 units and
+package/consumer/static checks pass. This supersedes the pending-qualification status above.
+
+A staged rollback still leaves its issued marker unresolved; later continuation remains incomplete
+rather than replaying. One-step completion does not reverify previously completed steps, restore
+notes/relationships, compare the full graph or activate the destination. See
+[evidence and limits](../../specs/003-verified-backup/restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).

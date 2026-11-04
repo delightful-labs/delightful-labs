@@ -89,3 +89,40 @@ Publint, consumer TypeScript against rebuilt public declarations, Oxlint, Oxfmt 
 No implementation tests were added or run locally, and no live SDK/server operation was performed.
 This is an implementation-review PR; runtime behavior is not yet qualified. PR #23's earlier passing
 914/13 totals do not establish correctness of this extracted continuation or additive table/policy.
+
+## Notebook-root qualification — completed (2026-11-04)
+
+The user approved implementation qualification with “continue” after the stacked implementation
+review. The following current-tree evidence supersedes historical pending-qualification statements:
+
+- **22 real Jazz/Chromium cases pass**, comprising all 13 preparation/attachment regressions plus
+  nine notebook-root cases against the concrete writer, actual schema/policies, rebuilt public
+  package and native IndexedDB journal. No production-code correction was required.
+- Three title cases exercise ordinary, empty and exact combining-Unicode/emoji/newline/CRLF/NUL
+  strings. Fresh remote reads verify mapped IDs, scope and actual title. Completion preserves both
+  preparation and attachment receipts, leaves the control incomplete, advances exactly one step,
+  and survives reload with zero replacement commits and unchanged intent/mappings.
+- Admission checks refuse missing journal/preparation, do not skip a pending attachment, and reject
+  a different checked archive without replacing the retained journal. A conflicting actual title
+  stops conflict without overwriting the row or advancing progress.
+- An uncertain-write case holds only global acceptance observation after real commit/local
+  persistence, separately observes the actual remote notebook, cancels and reloads. Fresh content
+  reconciles with remoteContentMatch and zero replacement writes, retaining the original transaction
+  ID, issuance and separate local/remote observations rather than inventing acceptance.
+- CANCEL and current-binding INVALIDATE during native staging leave the root active until the held
+  stage settles, then roll back without committing or leaving a remote row. A mismatched-generation
+  invalidation is ignored. The issued journal marker remains unresolved; subsequent continuation
+  stays incomplete and does not replay. This slice deliberately does not add a rollback/retry protocol.
+- Server-boundary checks observe actual PersistedWriteRejectedError/permission_denied for notebook
+  update, deletion, wrong-operation insert, missing-control insert and forged-owner insert. A foreign
+  identity cannot read the owner row, and a fresh owner remote read preserves the original row.
+- All **914 unit tests** pass, including the existing 31 focused write-owner/preparation cases.
+  No redundant projection-only unit tests were added. Package/strict Publint, consumer compilation,
+  public imports/builds and runtime checks (17 reader, 18 notebook export tests), notebook and root
+  Svelte/strict TypeScript, lint, formatting and whitespace checks pass.
+
+The disposable host at http://127.0.0.1:6199/restore.html, Jazz authority and Chromium were shut down
+by test teardown. Qualification runs used synthetic data only. Scope remains one notebook root;
+note records/relationships, fresh full-graph comparison and activation are unimplemented. Earlier
+completed steps are not freshly revalidated by this one-step continuation. No cross-browser/device,
+forced-crash, offline restart, Finance completeness or production restore safety claim follows.

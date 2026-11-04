@@ -11,8 +11,8 @@ preparation coordinator and concrete Jazz destination-control writer are now loc
 incomplete destination with durable intent and mappings, separate settlement observations and
 same-browser reload reconciliation. A one-attachment continuation and the shared owner/planner are now locally qualified:
 914 unit tests and 13 real Jazz/Chromium preparation/attachment cases pass for PR #23.
-A stacked one-notebook-root batch is now implemented for review; its extracted continuation and
-new schema/writer await runtime qualification. Note writers, fresh full-content comparison and
+The one-notebook-root batch stacked in PR #24 and its extracted continuation/schema/writer are now
+locally qualified: 914 units and 22 actual Jazz/Chromium preparation/attachment/notebook cases pass. Note writers, fresh full-content comparison and
 activation remain unimplemented. T006/T012 and Finance adoption remain incomplete; no successful
 full restore or production restore safety is claimed. See the
 [preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
