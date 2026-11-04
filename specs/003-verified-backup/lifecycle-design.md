@@ -549,3 +549,26 @@ contracts; old hosts must implement custody retention before adopting this packa
 consumer source untouched and document migration. Update packaged consumers and typed doubles.
 Qualify late acquisition, stop during a read/stage, stop during commit, unresolved receipts,
 confirmed rollback/persistence without handoff, and ordinary cancellation using real actors.
+
+## Independent reader stream lifecycle — design before implementation
+
+Replace boundedRead's ended/settled/failure callback flags with a fixture-owned statechart:
+reading -> awaitingSuccessClose (file EOF) -> assembling -> succeeded;
+reading -> assembling (stdin EOF);
+reading/awaitingSuccessClose -> destroying -> awaitingFailureClose -> failed.
+Premature close fails. Stream error waits for close in file mode and fails immediately in stdin
+mode. Abort and oversize input destroy the stream; later chunks are discarded. The chart chooses
+bounds, EOF/close policy, interruption and terminal outcome. Buffer collection/concatenation/zeroing
+are bounded leaves; the fixed native callback child only observes events and performs destroy.
+File success cannot precede descriptor-close observation. Password decoding remains a pure transform.
+
+io.mjs is the independent CLI host's Promise-based source adapter. Each read call owns one finite
+root actor and converts its terminal result to the existing Promise contract; it starts no manual
+child actor. The root invokes its native stream scope. No shared library API, registry or native
+stream flags are introduced. Buffers remain private read storage and chunks are cleared on scope
+teardown; returned bytes transfer to the existing inspection/password consumer. Do not inspect or
+persist this actor tree. File reads keep the existing inclusive maximum+one-byte detection bound.
+
+After implementation review, qualify EOF-before-close, premature close, stream errors, abort,
+limits, chunk zeroing/listener disposal and the existing independent-reader subprocess cases.
+No test execution is implied before that review for this new slice.

@@ -1,3 +1,5 @@
+import { createActor, toPromise } from 'xstate'
+import { boundedReadMachine } from './machines/read.mjs'
 import { createReadStream } from 'node:fs'
 import { createArchivePayloadError } from 'delightful-local-first/backup/archive'
 import { createArchiveInspectionError } from 'delightful-local-first/backup/inspection'
@@ -11,78 +13,16 @@ import { createArchiveInspectionError } from 'delightful-local-first/backup/insp
  * @returns {Promise<Uint8Array>}
  */
 function boundedRead(stream, maximum, signal, waitForClose) {
-	return new Promise((resolve, reject) => {
-		/** @type {Uint8Array[]} */
-		const chunks = []
-		let total = 0
-		let ended = false
-		let settled = false
-		/** @type {Error | undefined} */
-		let failure
-		function finish() {
-			if (settled) return
-			settled = true
-			signal.removeEventListener('abort', abort)
-			stream.removeListener('data', data)
-			stream.removeListener('end', end)
-			stream.removeListener('error', error)
-			stream.removeListener('close', close)
-			stream.pause()
-			try {
-				if (failure || !ended) {
-					reject(failure ?? createArchiveInspectionError('fileReadFailed'))
-					return
-				}
-				const bytes = new Uint8Array(total)
-				let offset = 0
-				for (const chunk of chunks) {
-					bytes.set(chunk, offset)
-					offset += chunk.length
-				}
-				resolve(bytes)
-			} catch {
-				reject(createArchiveInspectionError('fileReadFailed'))
-			} finally {
-				for (const chunk of chunks) chunk.fill(0)
-				chunks.length = 0
-			}
-		}
-		function abort() {
-			failure = createArchiveInspectionError('fileReadFailed')
-			stream.destroy(failure)
-		}
-		/** @param {Uint8Array} chunk */
-		function data(chunk) {
-			if (failure) {
-				chunk.fill(0)
-				return
-			}
-			total += chunk.length
-			if (total > maximum) {
-				chunk.fill(0)
-				failure = createArchivePayloadError('limitExceeded')
-				stream.destroy(failure)
-				return
-			}
-			chunks.push(chunk)
-		}
-		function end() {
-			ended = true
-			if (!waitForClose) finish()
-		}
-		function error() {
-			failure ??= createArchiveInspectionError('fileReadFailed')
-			if (!waitForClose) finish()
-		}
-		function close() {
-			finish()
-		}
-		stream.on('data', data)
-		stream.once('end', end)
-		stream.on('error', error)
-		stream.once('close', close)
-		signal.addEventListener('abort', abort, { once: true })
-		if (signal.aborted) abort()
+	// The independent CLI adapter owns this finite root; its native observer is invoked by the chart.
+	const actor = createActor(boundedReadMachine, {
+		input: { stream, maximum, signal, waitForClose, storage: { chunks: [], bytes: undefined } }
+	})
+	actor.start()
+	return toPromise(actor).then((result) => {
+		if (result.outcome === 'read') return result.bytes
+		throw result.code === 'limitExceeded'
+			? createArchivePayloadError('limitExceeded')
+			: createArchiveInspectionError('fileReadFailed')
 	})
 }
 

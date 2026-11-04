@@ -651,3 +651,26 @@ also passes. Root Svelte/TypeScript, lint, formatting and whitespace checks pass
 public consumer declarations, three affected Node consumers, and consumer Vite build pass. This
 qualifies these two changes; it does not replace the separately pending notebook/journal native
 qualification or claim arbitrary host recovery correctness. No commit/push of this slice.
+
+## Independent-reader stream owner — awaiting implementation review
+
+The user identified that boundedRead's callback flags encoded a lifecycle. Replaced that logic
+with the fixture-owned read chart in machines/read.mjs. Reading, success-close wait, destroying,
+failure-close wait, assembly and terminal outcomes are explicit states. Chart guards enforce the
+byte bound and distinguish EOF from close. Abort/error/oversize transitions choose failure, and
+late chunks in non-reading states are discarded. Pure assembly and chunk collection stay bounded
+actions rather than separate asynchronous workflows.
+
+The fixed native callback child translates stream/signal events and performs one destroy command.
+It owns listener removal, pause, file-descriptor teardown fallback and chunk zeroing. Its only
+local mutable report reference detaches late native delivery; it contains no ended/settled/failure
+workflow flags. Bytes live in private per-read storage; copied successful output transfers to the
+existing consumer before chunk disposal. No inspect/persist or secret-free snapshot claim is made.
+
+io.mjs owns each finite native-read root at the independent CLI's Promise source boundary; children
+are invoked by the chart, not started manually. FileSource/stdinPassword contracts, maximum+one
+file detection, exact password decoding and stdout report behavior are preserved in design.
+Those behavior claims await tests: none added/run before this implementation review. Reader
+TypeScript, lint, formatting and whitespace checks pass. After approval, exercise EOF-before-close,
+premature close, abort/error/limit handling, listener/chunk disposal and the existing eleven
+separate-process reader scenarios. No commit or push of this change.
