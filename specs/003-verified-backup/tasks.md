@@ -203,7 +203,7 @@ runtime guard or to finish unrelated refactors before backup work continues.
       existing `parseAsync` and injected `validationIssues` contracts so consumers may use other
       validators. Map issue paths/codes without copying input values or automatically exposing raw
       Zod messages; localization stays consumer-owned. Review the implementation before tests.
-- [ ] T012 — **Started: pure record/codec verified; browser owner/CAS store prepared for review; native storage/restart remains unqualified.** When implementing the concrete restore-operation journal in T006/T009, define its
+- [ ] T012 — **Started: record/codec verified; browser owner/CAS store now exercised by 14 Chromium cases including native reload and schema approval; complete restore workflow remains unbuilt.** When implementing the concrete restore-operation journal in T006/T009, define its
       persisted record/version schema with Zod and infer its types. Validate unknown stored data
       before reuse; reject malformed/unsupported records without resetting storage, inventing a new
       operation or replaying unknown writes. Reuse existing schema-injection boundaries; do not
@@ -229,3 +229,9 @@ ordinary code. No broad validation rewrite is authorized by this list.
       Jazz transaction checks pass. Consumer migration is documented in docs/transaction-custody.md.
 
 These statuses concern the reviewed cleanup, not completion of backup restore/journal qualification.
+
+Reader/journal follow-up qualification: the stream lifecycle passes 17 Node checks, and the rebuilt
+journal public package passes 14 distinct Chromium cases, including the synchronous upgrade handshake
+and existing native CAS/reload regressions. These results supersede earlier unqualified-browser-store
+notes for the covered behavior; they do not complete T006/T009/T012 or qualify the pending notebook
+finite-operation correction. Details are in implementation-notes.md.

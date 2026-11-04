@@ -544,3 +544,259 @@ test('native journal CAS retains a rejected retry and content-match completion a
 		}
 	})
 })
+
+test('only explicit initialization creates schema, synchronously within the upgrade callback', async ({
+	page
+}) => {
+	await page.goto('/')
+	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	const result = await page.evaluate(async (wire) => {
+		const api = window.DLFNotebook,
+			record = api.parseRestoreJournalRecord(wire),
+			scope = record.intent.operation
+		const binding = {
+			applicationId: scope.applicationId,
+			environment: scope.environment,
+			identityId: scope.identityId,
+			operationId: scope.operationId,
+			workspaceId: scope.destinationWorkspaceId,
+			generation: 1
+		}
+		const nativeOpen = indexedDB.open.bind(indexedDB),
+			nativeCreate = IDBDatabase.prototype.createObjectStore
+		let inside = false
+		const mutations: boolean[] = []
+		indexedDB.open = (name, version) => {
+			const request = nativeOpen(name, version)
+			Object.defineProperty(request, 'onupgradeneeded', {
+				set(handler: IDBOpenDBRequest['onupgradeneeded']) {
+					request.addEventListener('upgradeneeded', (event) => {
+						inside = true
+						try {
+							handler?.call(request, event)
+						} finally {
+							inside = false
+						}
+					})
+				}
+			})
+			return request
+		}
+		IDBDatabase.prototype.createObjectStore = function (this: IDBDatabase, name, options) {
+			mutations.push(inside)
+			return nativeCreate.call(this, name, options)
+		}
+		const outputs = []
+		try {
+			const commands: import('../../src/lib/backup/restore-journal-browser.js').BrowserJournalCommand[] =
+				[
+					{ mode: 'initialize' },
+					{ mode: 'load', intent: record.intent },
+					{ mode: 'create', record },
+					{
+						mode: 'update',
+						expectedRevision: 0,
+						record: api.parseRestoreJournalRecord({ ...record, revision: 1 })
+					}
+				]
+			for (const command of commands) {
+				const databaseName = `dlf-upgrade-policy-${crypto.randomUUID()}`
+				const request = api.prepareBrowserRestoreJournal({ databaseName, binding, command })
+				const actor = api
+					.createActor(api.createBrowserRestoreJournalMachine(), { input: { request } })
+					.start()
+				try {
+					const output = await api.toPromise(actor)
+					outputs.push({
+						mode: command.mode,
+						outcome: output.outcome,
+						exists: (await indexedDB.databases()).some((db) => db.name === databaseName)
+					})
+				} finally {
+					request.release()
+					actor.stop()
+				}
+				await new Promise<void>((resolve, reject) => {
+					const deletion = indexedDB.deleteDatabase(databaseName)
+					deletion.onsuccess = () => resolve()
+					deletion.onerror = () => reject(deletion.error)
+					deletion.onblocked = () => reject(new Error('Connection leaked'))
+				})
+			}
+			return { outputs, mutations }
+		} finally {
+			indexedDB.open = nativeOpen
+			IDBDatabase.prototype.createObjectStore = nativeCreate
+		}
+	}, wire)
+	expect(result).toEqual({
+		outputs: [
+			{ mode: 'initialize', outcome: 'initialized', exists: true },
+			{ mode: 'load', outcome: 'unavailable', exists: false },
+			{ mode: 'create', outcome: 'unavailable', exists: false },
+			{ mode: 'update', outcome: 'unavailable', exists: false }
+		],
+		mutations: [true]
+	})
+})
+
+for (const interruption of ['CANCEL', 'SHUTDOWN', 'release', 'stop', 'creationFailure']) {
+	test(`journal upgrade handles ${interruption} without leaving schema or connections`, async ({
+		page
+	}) => {
+		await page.goto('/')
+		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		const result = await page.evaluate(
+			async ({ wire, interruption }) => {
+				const api = window.DLFNotebook,
+					record = api.parseRestoreJournalRecord(wire),
+					scope = record.intent.operation
+				const databaseName = `dlf-upgrade-interrupt-${crypto.randomUUID()}`
+				const binding = {
+					applicationId: scope.applicationId,
+					environment: scope.environment,
+					identityId: scope.identityId,
+					operationId: scope.operationId,
+					workspaceId: scope.destinationWorkspaceId,
+					generation: 1
+				}
+				const nativeOpen = indexedDB.open.bind(indexedDB),
+					nativeCreate = IDBDatabase.prototype.createObjectStore
+				let finishOpen = () => {}
+				const openSettled = new Promise<void>((resolve) => {
+					finishOpen = resolve
+				})
+				indexedDB.open = (name, version) => {
+					const request = nativeOpen(name, version)
+					request.addEventListener('error', () => finishOpen())
+					request.addEventListener('success', () => finishOpen())
+					return request
+				}
+				let mutations = 0,
+					observed = false
+				IDBDatabase.prototype.createObjectStore = function (this: IDBDatabase, name, options) {
+					mutations++
+					if (interruption === 'creationFailure') throw new Error('Synthetic schema failure')
+					return nativeCreate.call(this, name, options)
+				}
+				const request = api.prepareBrowserRestoreJournal({
+					databaseName,
+					binding,
+					command: { mode: 'initialize' }
+				})
+				const actor = api.createActor(api.createBrowserRestoreJournalMachine(), {
+					input: { request },
+					inspect(event) {
+						if (event.type === '@xstate.event' && event.event.type === 'UPGRADE_REQUESTED') {
+							observed = true
+							if (interruption === 'CANCEL') actor.send({ type: 'CANCEL' })
+							if (interruption === 'SHUTDOWN') actor.send({ type: 'SHUTDOWN' })
+							if (interruption === 'release') request.release()
+							if (interruption === 'stop') actor.stop()
+						}
+					}
+				})
+				try {
+					actor.start()
+					const output = interruption === 'stop' ? undefined : await api.toPromise(actor)
+					await openSettled
+					const exists = (await indexedDB.databases()).some((db) => db.name === databaseName)
+					await new Promise<void>((resolve, reject) => {
+						const deletion = indexedDB.deleteDatabase(databaseName)
+						deletion.onsuccess = () => resolve()
+						deletion.onerror = () => reject(deletion.error)
+						deletion.onblocked = () => reject(new Error('Connection leaked'))
+					})
+					return {
+						observed,
+						mutations,
+						exists,
+						outcome: output?.outcome ?? 'stopped',
+						code: output?.outcome === 'failed' ? output.code : undefined
+					}
+				} finally {
+					request.release()
+					actor.stop()
+					indexedDB.open = nativeOpen
+					IDBDatabase.prototype.createObjectStore = nativeCreate
+				}
+			},
+			{ wire, interruption }
+		)
+		expect(result.observed).toBe(true)
+		expect(result.exists).toBe(false)
+		expect(result.mutations).toBe(interruption === 'creationFailure' ? 1 : 0)
+		expect(result.outcome).toBe(
+			{
+				CANCEL: 'cancelled',
+				SHUTDOWN: 'closed',
+				release: 'closed',
+				stop: 'stopped',
+				creationFailure: 'failed'
+			}[interruption]
+		)
+		if (interruption === 'creationFailure') expect(result.code).toBe('journalStoreFailed')
+	})
+}
+
+for (const version of [1, 2]) {
+	test(`initialization preserves unsupported existing schema/version ${version}`, async ({
+		page
+	}) => {
+		await page.goto('/')
+		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		const result = await page.evaluate(
+			async ({ wire, version }) => {
+				const api = window.DLFNotebook,
+					record = api.parseRestoreJournalRecord(wire),
+					scope = record.intent.operation
+				const databaseName = `dlf-upgrade-existing-${crypto.randomUUID()}`
+				const seed = await new Promise<IDBDatabase>((resolve, reject) => {
+					const request = indexedDB.open(databaseName, version)
+					request.onupgradeneeded = () => request.result.createObjectStore('unrelated')
+					request.onsuccess = () => resolve(request.result)
+					request.onerror = () => reject(request.error)
+				})
+				seed.close()
+				const binding = {
+					applicationId: scope.applicationId,
+					environment: scope.environment,
+					identityId: scope.identityId,
+					operationId: scope.operationId,
+					workspaceId: scope.destinationWorkspaceId,
+					generation: 1
+				}
+				const request = api.prepareBrowserRestoreJournal({
+					databaseName,
+					binding,
+					command: { mode: 'initialize' }
+				})
+				const actor = api
+					.createActor(api.createBrowserRestoreJournalMachine(), { input: { request } })
+					.start()
+				try {
+					const output = await api.toPromise(actor)
+					const stored = await new Promise<IDBDatabase>((resolve, reject) => {
+						const open = indexedDB.open(databaseName)
+						open.onsuccess = () => resolve(open.result)
+						open.onerror = () => reject(open.error)
+					})
+					const observed = { version: stored.version, stores: Array.from(stored.objectStoreNames) }
+					stored.close()
+					await new Promise<void>((resolve, reject) => {
+						const deletion = indexedDB.deleteDatabase(databaseName)
+						deletion.onsuccess = () => resolve()
+						deletion.onerror = () => reject(deletion.error)
+						deletion.onblocked = () => reject(new Error('Connection leaked'))
+					})
+					return { outcome: output.outcome, ...observed }
+				} finally {
+					request.release()
+					actor.stop()
+				}
+			},
+			{ wire, version }
+		)
+		expect(result).toEqual({ outcome: 'unavailable', version, stores: ['unrelated'] })
+	})
+}

@@ -572,3 +572,27 @@ persist this actor tree. File reads keep the existing inclusive maximum+one-byte
 After implementation review, qualify EOF-before-close, premature close, stream errors, abort,
 limits, chunk zeroing/listener disposal and the existing independent-reader subprocess cases.
 No test execution is implied before that review for this new slice.
+
+## Journal schema approval — design before implementation
+
+Move the initialize-only schema-creation decision out of onupgradeneeded. Opening now has
+awaitingOpen, creatingSchema and rejectingSchema substates. Native upgrade callbacks report
+UPGRADE_REQUESTED with the observed old/new versions. The chart rejects interruption/failure,
+then permits creation only for initialize with version 0 -> 1; every other request rejects.
+creatingSchema issues CREATE_SCHEMA; rejectingSchema issues REJECT_UPGRADE. UPGRADE_APPLIED
+returns to awaitingOpen. Actual OPENED/OPEN_FAILED still decide the next stage, and schema creation
+alone never establishes initialized/durable journal success.
+
+The native scope temporarily retains the open request during its upgrade callback. Commands
+operate on that active native handle synchronously, with reporter/current-request checks beside
+the mutation. No promise, timer or asynchronous child is inserted into the upgrade transaction.
+The callback aborts any upgrade still undecided when synchronous chart reporting returns, including
+stop or delayed/ignored command delivery. Creation failures report NATIVE_FAILED and reject/abort;
+the owner waits for native open settlement before closing. A late open after stop still closes its
+connection. This models policy without stretching IndexedDB's active callback lifetime.
+
+Review before tests. Required browser qualification: initialization on an absent database,
+load/create/update refusing to create missing schema, unexpected stored schema/version, failure
+and interruption/release during upgrade, and proof that schema creation occurs inside the native
+upgrade callback. Existing restore-journal Chromium cases remain the regression baseline; static
+checks alone do not qualify this new synchronous command handshake.

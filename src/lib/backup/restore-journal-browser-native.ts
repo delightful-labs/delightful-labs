@@ -8,9 +8,20 @@ import {
 } from './restore-journal-browser.js'
 
 export type BrowserJournalNativeCommand = {
-	type: 'OPEN' | 'BEGIN' | 'READ' | 'WRITE' | 'COMMIT' | 'ABORT' | 'CLOSE'
+	type:
+		| 'OPEN'
+		| 'CREATE_SCHEMA'
+		| 'REJECT_UPGRADE'
+		| 'BEGIN'
+		| 'READ'
+		| 'WRITE'
+		| 'COMMIT'
+		| 'ABORT'
+		| 'CLOSE'
 }
 export type BrowserJournalNativeEvent =
+	| { type: 'UPGRADE_REQUESTED'; oldVersion: number; newVersion: number | null }
+	| { type: 'UPGRADE_APPLIED' }
 	| { type: 'OPENED'; supported: boolean }
 	| { type: 'OPEN_FAILED'; code?: BrowserJournalErrorCode }
 	| { type: 'BEGIN_FAILED'; code: BrowserJournalErrorCode }
@@ -30,6 +41,7 @@ export const browserJournalNativeActor = fromCallback<
 >(({ input, receive, sendBack }) => {
 	const data = browserJournalData(input.request)
 	const configuration = data.configuration
+	let upgrade: IDBOpenDBRequest | undefined
 	let database: IDBDatabase | undefined
 	let transaction: IDBTransaction | undefined
 	let report: ((event: BrowserJournalNativeEvent) => void) | undefined = sendBack
@@ -45,6 +57,25 @@ export const browserJournalNativeActor = fromCallback<
 	}
 	receive((command) => {
 		try {
+			if (command.type === 'REJECT_UPGRADE') {
+				upgrade?.transaction?.abort()
+				upgrade = undefined
+				return
+			}
+			if (command.type === 'CREATE_SCHEMA') {
+				const pending = upgrade
+				if (!pending) throw new Error('Missing active journal upgrade')
+				// The chart grants schema creation; recheck native request custody beside the mutation.
+				if (!report || data.configuration !== configuration) {
+					pending.transaction?.abort()
+					upgrade = undefined
+					return
+				}
+				pending.result.createObjectStore(storeName)
+				upgrade = undefined
+				report({ type: 'UPGRADE_APPLIED' })
+				return
+			}
 			if (command.type === 'CLOSE') {
 				database?.close()
 				database = undefined
@@ -63,28 +94,28 @@ export const browserJournalNativeActor = fromCallback<
 				}
 				const request = indexedDB.open(configuration.databaseName, 1)
 				request.onupgradeneeded = (event) => {
+					upgrade = request
 					try {
-						if (
-							configuration.command.mode !== 'initialize' ||
-							event.oldVersion !== 0 ||
-							!report ||
-							!data.configuration
-						) {
-							request.transaction?.abort()
-							return
-						}
-						request.result.createObjectStore(storeName)
+						report?.({
+							type: 'UPGRADE_REQUESTED',
+							oldVersion: event.oldVersion,
+							newVersion: event.newVersion
+						})
 					} catch (error) {
 						report?.({
 							type: 'NATIVE_FAILED',
 							operation: 'OPEN',
 							code: browserJournalFailure(error)
 						})
+					} finally {
+						// A command must decide synchronously while this versionchange transaction is active.
+						// Never let delayed delivery, missing ownership or actor stop implicitly accept it.
 						try {
-							request.transaction?.abort()
+							upgrade?.transaction?.abort()
 						} catch {
 							/* await native open settlement */
 						}
+						upgrade = undefined
 					}
 				}
 				request.onerror = (event) => {
@@ -180,6 +211,12 @@ export const browserJournalNativeActor = fromCallback<
 		// Callback teardown releases native handles even after abrupt parent stop. A late open
 		// observes the detached reporter above and closes its connection instead of delivering it.
 		report = undefined
+		try {
+			upgrade?.transaction?.abort()
+		} catch {
+			/* native upgrade may already be terminal */
+		}
+		upgrade = undefined
 		if (data.releaseControl === release) data.releaseControl = undefined
 		abort()
 		try {

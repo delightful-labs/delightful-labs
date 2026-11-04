@@ -674,3 +674,51 @@ Those behavior claims await tests: none added/run before this implementation rev
 TypeScript, lint, formatting and whitespace checks pass. After approval, exercise EOF-before-close,
 premature close, abort/error/limit handling, listener/chunk disposal and the existing eleven
 separate-process reader scenarios. No commit or push of this change.
+
+## Journal schema-approval correction — awaiting implementation review
+
+Moved the initialize-only upgrade decision from the native onupgradeneeded callback into opening's
+awaitingOpen/creatingSchema/rejectingSchema states. UPGRADE_REQUESTED reports old/new version facts;
+chart guards reject interruption/failure and permit only initialize with 0 -> 1. The chart issues
+CREATE_SCHEMA or REJECT_UPGRADE, then still waits for actual OPENED/OPEN_FAILED. Schema mutation
+does not itself establish initialized status, durability or journal transaction completion.
+
+The native scope holds an open-request reference only during the upgrade callback. Creation checks
+that reporting/current request custody remain valid beside createObjectStore. Any undecided upgrade
+is aborted in callback finally; stop also aborts an active upgrade. No promise/timer or async actor
+is inserted between upgrade notification and native mutation. Creation failure reports NATIVE_FAILED,
+which selects rejection; the callback fallback also rejects if delivery is delayed or ignored.
+Existing late-open disposal and normal transaction/settlement ownership remain as before.
+
+Reviewed the changed chart/native helpers. Svelte/TypeScript, lint, formatting and whitespace checks
+pass. No tests added/run before this implementation review. The synchronous XState/IndexedDB
+handshake remains unqualified until real Chromium tests verify absent-database initialization,
+non-initialize refusal to create schema, unsupported schema/version, creation failure and
+interruption/release during upgrade. Existing journal browser cases are the baseline, not proof
+of this change. No commit/push. Reader stream-runtime qualification remains separately pending.
+
+### Reader and journal schema-approval qualification
+
+After the user requested tests, all 17 reader cases pass: eleven existing actual-file/subprocess
+checks (including exact password input, network-disabled inspection, limits/growth and process
+signals) plus six direct Node stream-owner cases. Direct cases verify file EOF waits for close,
+stdin completes at EOF without destroying its host stream, premature close fails, file error waits
+for close/discards late data, abort after EOF drains close, and oversize input destroys/clears data.
+Success also verifies detached listeners and zeroed source chunks with independent returned bytes.
+
+Rebuilt the package and notebook browser IIFE from current source. Fourteen distinct Chromium
+journal tests pass: twelve in the main run, then two additional unsupported-schema/version checks.
+The baseline verifies native create/update/CAS, reload recovery, cancellation settlement and
+malformed-row preservation. New tests wrap the native upgrade handler to prove schema mutation
+occurs synchronously within that callback and only for explicit initialize. Load/create/update on
+absent databases create no schema. CANCEL, SHUTDOWN, release and abrupt stop before upgrade approval
+leave no database; synthetic creation failure aborts and reports journalStoreFailed. Database deletion
+checks detect leaked connections. Existing unsupported v1 schema and higher v2 schema remain intact.
+
+All 105 focused journal codec/attempt unit cases pass. Reader and root Svelte/TypeScript, lint,
+formatting, whitespace, package build and publint checks pass. Playwright owned a temporary localhost
+preview at port 6015 with sandbox escalation for listener/browser execution and stopped it after
+each run. No production changes were needed during this qualification, and no tests were weakened.
+This qualifies the covered stream/schema/native store behavior, not the full planned restore workflow,
+arbitrary browser support, or the separately pending notebook finite-operation runtime correction.
+No commit or push of the journal change or these tests.

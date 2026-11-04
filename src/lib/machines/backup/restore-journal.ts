@@ -274,7 +274,36 @@ export function createBrowserRestoreJournalMachine() {
 				on: { NATIVE_FAILED: { actions: 'failNative' } },
 				states: {
 					opening: {
+						initial: 'awaitingOpen',
 						entry: sendTo('native', { type: 'OPEN' }),
+						states: {
+							awaitingOpen: {
+								on: {
+									UPGRADE_REQUESTED: [
+										{ guard: 'interrupted', target: 'rejectingSchema' },
+										{ guard: 'hasFailure', target: 'rejectingSchema' },
+										{
+											guard: ({ context, event }) =>
+												configuration(context)?.command.mode === 'initialize' &&
+												event.oldVersion === 0 &&
+												event.newVersion === 1,
+											target: 'creatingSchema'
+										},
+										{ target: 'rejectingSchema' }
+									]
+								}
+							},
+							creatingSchema: {
+								entry: sendTo('native', { type: 'CREATE_SCHEMA' }),
+								on: {
+									UPGRADE_APPLIED: 'awaitingOpen',
+									NATIVE_FAILED: { target: 'rejectingSchema', actions: 'failNative' }
+								}
+							},
+							rejectingSchema: {
+								entry: sendTo('native', { type: 'REJECT_UPGRADE' })
+							}
+						},
 						on: {
 							OPENED: [
 								{ guard: 'interrupted', target: 'closing' },
