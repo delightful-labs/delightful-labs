@@ -14,7 +14,15 @@ import {
 } from 'delightful-local-first/backup/archive'
 import { prepareArchiveOpen, type ArchiveProtection } from 'delightful-local-first/backup/envelope'
 import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
-import type { ArchiveHandoffObservation, BackupBinding } from 'delightful-local-first/backup/export'
+import {
+	prepareArchiveExport,
+	type ArchiveHandoffObservation,
+	type BackupBinding
+} from 'delightful-local-first/backup/export'
+import {
+	createArchiveExportMachine,
+	createArchiveExportCleanupMachine
+} from 'delightful-local-first/backup/export/workflow'
 import { createNotebookExport } from './export.js'
 import { createNotebookDataset } from './dataset.js'
 import { notebookProfile } from './profile.js'
@@ -273,3 +281,45 @@ const invalidProfiles: { name: string; change: (payload: ArchivePayload) => Arch
 for (const { name, change } of invalidProfiles)
 	test(`notebook rejects generically valid ${name}`, () =>
 		assert.equal(notebookProfile.validate(canonical(change(sample()))), false))
+
+test('public cleanup machine releases the retained notebook lease without replaying export', async () => {
+	const source = new NotebookSource(sample(), binding)
+	let releases = 0
+	let dispatches = 0
+	const request = prepareArchiveExport({
+		binding,
+		profile: notebookProfile,
+		protection: { kind: 'none' },
+		source: {
+			checkAuthority: (expected, signal) => source.checkAuthority(expected, signal),
+			acquire: (expected, signal) =>
+				source.acquire(expected, signal).then((lease) => ({
+					...lease,
+					release() {
+						releases += 1
+						if (releases === 1) return Promise.reject(new Error('disposable release failure'))
+						return lease.release()
+					}
+				}))
+		},
+		handoff: {
+			dispatch() {
+				dispatches += 1
+				return Promise.resolve<ArchiveHandoffObservation>('dispatched')
+			}
+		}
+	})
+	const exporting = createActor(createArchiveExportMachine(), { input: { request } })
+	exporting.start()
+	const result = await toPromise(exporting)
+	assert.equal(result.outcome, 'failed')
+	if (result.outcome !== 'failed') throw new Error('Expected retained lease failure')
+	assert.equal(result.code, 'captureCleanupFailed')
+	assert.throws(() => source.replace(sample()), /capture owns/)
+	const cleanup = createActor(createArchiveExportCleanupMachine(), { input: { request } })
+	cleanup.start()
+	assert.deepEqual(await toPromise(cleanup), { outcome: 'cleaned' })
+	source.replace(sample())
+	assert.equal(releases, 2)
+	assert.equal(dispatches, 0)
+})

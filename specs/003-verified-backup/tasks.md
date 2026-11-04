@@ -6,6 +6,16 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-03)
 
+**Current qualified correction: export/capture ownership and explicit cleanup recovery.** The user
+continued from implementation review. All 144 focused envelope/inspection/export unit cases,
+14 notebook/package integration cases, 11 reader cases and four Chromium cases pass. Added four
+cleanup protocol units and one built-public-package case proving cleanup restores writer access
+without replaying export. Static/package checks pass; no production fixes were needed. See
+[qualification](lifecycle-design.md#export-ownership-correction-qualification-after-implementation-review).
+The explicit cleanup factory replaces request.retryCleanup() as approved. Notebook source ownership
+is the next review slice. These changes remain uncommitted; prior corrections are in f50a97c.
+No push/merge. Journal corrections remain separately unqualified.
+
 **Current qualified correction: inspection ownership.** The user continued from implementation
 review. The chart now owns read/header/password routing, envelope drain, profile decisions and
 report transfer. All 140 focused envelope/inspection/export unit cases (including six added

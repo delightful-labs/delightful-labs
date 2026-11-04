@@ -313,3 +313,79 @@ cases pass. Package/strict Publint and static checks pass. No production fixes w
 See [qualification](inspector-design.md#ownership-correction-qualification-after-implementation-review).
 The static-only status above is historical. The pending journal correction remains separately
 unqualified. Export/capture is the next owner slice; no commit/publication/merge was performed.
+
+## Export/capture correction — started, cleanup API decision pending
+
+At the user's explicit request, committed the prior ownership changes as local feature-branch
+commit f50a97c (`refactor(backup): move resource lifecycles into state machines`). This includes the
+journal correction with its separately recorded unqualified runtime status. No push or merge.
+
+Started export/capture independently of the pending cleanup protocol choice: authority and
+consistency observations are returned to capture-machine guards, bounded structural/profile
+validation is extracted as a pure synchronous transform, and the export error subclass is replaced
+with createArchiveExportError/isArchiveExportError. The public barrel follows that error API.
+The existing operation lifecycle remains in place until its cleanup recovery contract is resolved;
+this is partial progress, not a completed ownership correction.
+
+A question is pending with the user about replacing request.retryCleanup() with a caller-owned
+cleanup machine, versus preserving it as a single native release leaf. The explicit-machine option
+is recommended because retry admission/settlement remains visible after export completion. Do not
+silently remove cleanup recovery or choose the dependent API without the user's answer. The
+[ownership design](lifecycle-design.md#machine-first-export-correction--ownership-design-in-progress)
+records the resource and interruption constraints for either implementation.
+
+No implementation tests added/run for these new changes; static checks only. The previously passing
+140 focused unit cases and other integration totals describe the preceding committed slice.
+
+## Export/capture ownership correction — implementation awaiting review
+
+The user selected the explicit cleanup machine, resolving the preceding API question. The export
+class is now removed. Capture-chart guards own authority and consistency decisions; the export
+chart owns child drain, handoff retry, failure precedence and cleanup. Private data contains actual
+resources and payloads, not a pending count, waiter set, release promise cache or lifecycle flags.
+`backup/export-native.ts` keeps one native call's promise as a settlement receipt, which the chart
+awaits in its draining state if a child crashes. This is the actual native effect, not a manually
+started child or an actor/promise bridge.
+
+Native leaves move a lease or sealed handoff handle out of idle storage while borrowing it, return
+it on settlement while its owner remains attached, and dispose it after settlement if teardown has
+revoked the owner. Late acquired leases receive one native release. Failed lease disposal retains
+the resource rather than silently retrying. The fixed teardown observer aborts/clears input and
+performs narrow native disposal; cleanup custody is published only after that owner is detached
+and the actual issued call has settled. Cleanup cannot steal resources from an active export or
+another cleanup actor. Previously reported dispatch/unknown facts and cleanup-failure precedence
+are retained. No new archive-sized input copy or generalized retry framework is introduced.
+
+`createArchiveExportCleanupMachine()` is exported on `backup/export/workflow`. A caller-owned root
+claims cleanup custody, makes one uninterruptible lease-release attempt, and returns `cleaned` or
+`failed` with exportInUse/captureCleanupFailed/exportFailed. A failed attempt restores the retained
+lease for another explicit cleanup actor; an already cleaned request is a no-op. Stopping the
+cleanup actor drops reports but does not claim to cancel an issued native release. The request's
+retryCleanup() method is removed as approved. Existing test callers were mechanically migrated to
+run that root actor, preserving their existing throw-on-failure expectations in a test host helper.
+The notebook README records the public API migration. Export errors now use factory/guard functions.
+
+No implementation tests were added/run for this correction. Existing test edits only migrate the
+cleanup API and nested root scope paths. Static checks cover Svelte/TypeScript, package/strict
+Publint, public-consumer and notebook declaration checks, lint, formatting and whitespace. Review
+must precede runtime checks of capture release, native drain, late lease/read/handoff disposal,
+cleanup admission/concurrency/failure recovery and existing notebook/browser integrations. Earlier
+140-unit/reader/notebook/browser totals qualify the preceding implementation, not this correction.
+
+The lease and cleanup custody are in-memory resources, not persisted recovery or a restore journal.
+Providers that ignore AbortSignal still must eventually settle for graceful drain. Native lease
+release cannot be cancelled or proven successful from actor.stop(). Consumer-retained file copies
+cannot be recalled. Notebook source ownership, older workspace journal disposal and the committed
+restore-journal correction remain separate unqualified follow-ups. No new commit/push/merge.
+
+### Export/capture correction — reviewed continuation and focused qualification
+
+The user continued from implementation review. All 140 existing focused units passed. Four new
+cleanup protocol cases cover concurrency, synchronous/asynchronous retry failure, stopped actor
+custody and late settlement. All 144 focused units pass. A new built-public-package notebook case
+proves retained lease cleanup actually restores writer access without replaying export; all 14
+notebook/package, 11 independent reader and four Chromium cases pass. Static/package checks pass.
+No production fixes were needed. See [qualification](lifecycle-design.md#export-ownership-correction-qualification-after-implementation-review).
+The preceding static-only status is historical. These changes remain uncommitted; f50a97c is the
+prior ownership commit. Notebook source ownership is next. Journal corrections remain separately
+unqualified. No push/merge.

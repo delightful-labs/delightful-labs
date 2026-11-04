@@ -36,7 +36,9 @@ A → B → A. For graceful teardown, send `CANCEL` or `SHUTDOWN` and await acto
 stopping. Cancellation drains already issued calls; native crypto and dispatched files cannot be
 undone. Call request `release()` as abrupt-stop cleanup, then stop; stopping alone is insufficient.
 If the result is `captureCleanupFailed`, retain the request and explicitly retry cleanup with
-`retryCleanup()`, awaiting its bounded lease-release result. The abrupt `release()` fallback alone
+the caller-owned `createArchiveExportCleanupMachine()` from `backup/export/workflow`, passing
+`{ request }` as actor input and awaiting its `cleaned` or safe failure result. A subsequent cleanup
+actor retries only lease release; it never repeats capture or handoff. The abrupt `release()` fallback alone
 does not provide a graceful drain acknowledgement.
 
 Build and run the notebook/public-package verification:
@@ -47,10 +49,10 @@ pnpm check:backup-notebook
 ```
 
 This compiles the fixture and its Node tests into ignored `.svelte-kit/backup-notebook/` output, then
-runs 13 cases. Two export actual plaintext/password files, independently inspect them in separate
+runs 14 cases. Two export actual plaintext/password files, independently inspect them in separate
 processes with common network APIs disabled and only PATH in the environment, compare exact records,
 relationships, archived content and attachment bytes, and verify original source/file preservation.
-The remaining cases check lease exclusion/binding/limits and exact profile allowlists. The trusted
+The remaining cases check lease exclusion/binding/limits, exact profile allowlists and public cleanup-machine recovery after failed lease release. The trusted
 notebook validator is registered by test code, never loaded from archive contents.
 
 `pnpm check:consumer` includes these cases and builds the browser fixture. Three Chromium cases under

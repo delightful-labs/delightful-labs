@@ -263,3 +263,99 @@ T004 and Finance adoption remain outstanding. No live data, identity configurati
 changed. The user authorized committing/publishing this export slice and subsequently merged PR #21.
 All final-commit GitHub CI checks passed. Subsequent restore work uses its own feature branch and
 review cycles; this export qualification is not authorization to publish or merge those later changes.
+
+## Machine-first export correction — ownership design in progress
+
+The prior journal/envelope/inspection corrections were committed locally as f50a97c at the user's
+request. Envelope and inspection have focused runtime qualification; the committed journal correction
+still awaits separate review/qualification. The user authorized continuing to export/capture.
+
+The existing export class privately coordinates pending counts, drain waiters, release-promise
+coalescing, cleanup failure/retry eligibility and fire-and-forget disposal. These are the ownership
+findings to correct, not merely class syntax. Capture already exposes meaningful states, but its
+helpers still own those lifecycles. Keep binding checks, unknown handoff observations, retained
+sealed-file retries and confirmed release failure precedence.
+
+```text
+claim input -> active export scope
+  capture owner: authority observation -> allowed/denied
+    acquire -> retain lease -> drain -> bounded graph read -> pure payload/profile validation
+    consistency observation -> consistent/inconsistent -> release lease -> capture result
+  prepare seal -> invoke envelope owner -> retain sealed output
+  handoff -> observe dispatched/rejected/unknown
+    rejected/unknown -> await binding-qualified handoff retry or interruption
+  cleanup -> settle issued effects -> release owned lease -> clear private resources -> final
+```
+
+Only leaf native adapters may retain an issued call after abrupt actor stop. Each lease effect must
+retain its acquired handle until that effect settles; stopping an owner cannot release a lease still
+borrowed by a graph read. A late acquisition still needs disposal. A borrowed handoff file similarly
+must remain usable until its issued handoff settles. Root/capture states own admission, interruption,
+settlement, cleanup failure and handoff retry; there must be no second private pending/drain workflow.
+
+Pure payload validation remains a bounded synchronous transform. Authority/consistency observations
+must be returned as facts for chart decisions. Native adapters must not combine check/read/write
+policy into their promise chains. Private storage retains payloads, passwords, capabilities and
+resource references, never a competing phase/claimed/released/pending state.
+
+### Cleanup recovery API decision — resolved below
+
+The existing request.retryCleanup() ran after the export actor completed. The user was asked to prefer an explicit caller-owned cleanup machine for this recovery, or preserve the
+method as one native release leaf. This is a consequential public protocol choice, not permission to
+silently remove cleanup recovery. The user selected the explicit machine, as recorded below. The requested explicit cleanup machine would model claim -> release -> success/failure,
+retain failed lease custody for a subsequent explicit attempt, and reject concurrent attempts or
+attempts while an issued export effect still borrows the lease. No automatic retries or manually
+started hidden child actors are proposed. Pure transform/error cleanup can proceed independently.
+
+### Cleanup recovery decision accepted; implementation design
+
+The user selected the explicit cleanup machine. Remove request.retryCleanup(); callers run
+createArchiveExportCleanupMachine() from backup/export/workflow with the same opaque request.
+One attempt claims the available cleanup resource, releases only its retained failed lease, and
+returns cleaned or a safe failure. No automatic retry, cancellation of release, capture/handoff
+replay, hidden actor start or promise bridge is added. Concurrent attempts and attempts before
+export's issued work settles fail with exportInUse. An already cleaned request is an idempotent no-op.
+
+Keep the existing capture child and envelope child. The export's active scope invokes a narrow
+resource teardown observer. Private data holds the actual issued native promise as a resource fact,
+not a pending counter or waiter set; the chart's draining state awaits this single native settlement
+if a child crashes. Leaf adapters loan the lease (or sealed handoff handle) into exactly one call,
+removing it from idle storage until settlement. On abrupt teardown the call retains its borrowed
+resource; its narrow finalizer disposes it after settlement. Late acquired leases also receive one
+native release. Release failures quarantine the actual lease rather than setting a parallel failure
+flag. The chart publishes cleanup custody only after clearing export input and settling issued work.
+A failed cleanup attempt returns that custody for a subsequent caller-owned cleanup machine.
+
+CANCEL/SHUTDOWN/invalidation still abort leaf signals and forward drain only to an active child.
+Root output retains dispatched/unknown facts and release-failure precedence. An issued handoff owns
+its borrowed sealed handle until settlement, so no new archive-sized copy is required. Native leaf
+finalizers may dispose only their resource; they do not choose capture, consistency, retry or handoff
+stages. Single-use request/cleanup admission uses consumed resource references, not lifecycle flags.
+Present the complete correction for review before adding/running implementation tests.
+
+### Export ownership correction qualification after implementation review
+
+The user authorized continuation from export/capture and explicit cleanup-machine review. All 140
+existing focused envelope/inspection/export cases passed. Added four cleanup protocol cases:
+concurrent attempt rejection with no extra release/capture/handoff; synchronous and asynchronous
+retry failure retaining custody for another explicit actor; and stopped-actor custody remaining
+unavailable until the issued native release settles, with late failure recoverable by a new actor.
+All 144 focused unit cases pass. Existing acquisition/read/handoff late-disposal, child-crash drain,
+crypto drain, cancellation/invalidation, output retention and safe failure cases still pass.
+No production fixes were needed during this qualification.
+
+After rebuilding the package, all 14 notebook/package integration cases pass. The added case imports
+the new cleanup factory through backup/export/workflow, forces initial lease release to fail, proves
+fixture writers remain excluded while custody is retained, then runs cleanup and proves writers can
+resume without dispatching an archive. All 11 independent reader cases also pass. Fresh public-export
+browser bundles pass all four focused Chromium cases: standalone envelope protection/integrity,
+plain/password notebook file dispatch and inspection, and invalidation/drain/stale binding rejection.
+Playwright owned a temporary localhost preview on port 6014 for that run.
+
+Svelte/TypeScript, package/strict Publint, public-consumer/reader declarations, lint, formatting and
+whitespace checks pass. No full repository unit/browser suite was run. These results qualify the
+export correction with the current notebook source; they do not qualify its forthcoming owner
+rewrite, the older workspace journal disposal finding or the committed restore-journal correction.
+Cleanup custody remains in-memory; this is not a durable recovery journal. Graceful drain still
+requires issued consumer calls to settle, and native release cannot be cancelled by stopping an
+actor. No new commit, push or merge was performed.
