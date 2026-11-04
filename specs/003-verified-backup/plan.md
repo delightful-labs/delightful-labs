@@ -23,6 +23,11 @@ authorized a focused journal attempt/completion change, then approved testing. I
 and locally qualified: 833 unit tests and 51 Chromium tests pass along with package/consumer and
 static checks. Restore coordination and destination writes remain paused.
 
+The subsequent machine-first ownership correction is implemented for review. Earlier green CI does
+not qualify the rewritten browser owner. See the
+[ownership correction](browser-journal-design.md#machine-first-ownership-correction--implementation-design).
+No coordinator/destination work is included, and no new runtime tests have been run before review.
+
 ## Summary
 
 Start implementation with a standalone, bounded DLF archive codec and independent file inspector. It has no Jazz, Finance, login, or UI dependency. Add the stateful export/restore coordination separately, then Finance’s domain profile against its existing `jazz-tools@2.0.0-alpha.59` deployment. A newer Jazz release and AT Protocol sign-in are not prerequisites.

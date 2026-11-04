@@ -24,12 +24,28 @@ export type RestoreJournalErrorCode =
 	| 'invalidJournalEncoding'
 	| 'unsupportedJournalVersion'
 	| 'journalLimitExceeded'
-export class RestoreJournalError extends Error {
-	constructor(readonly code: RestoreJournalErrorCode) {
-		super(code)
-		this.name = 'RestoreJournalError'
-	}
+export function createRestoreJournalError(code: RestoreJournalErrorCode) {
+	return Object.assign(new Error(code), { name: 'RestoreJournalError', code })
 }
+export function isRestoreJournalErrorCode(code: unknown): code is RestoreJournalErrorCode {
+	return (
+		code === 'invalidJournal' ||
+		code === 'invalidJournalEncoding' ||
+		code === 'unsupportedJournalVersion' ||
+		code === 'journalLimitExceeded'
+	)
+}
+export function isRestoreJournalError(
+	error: unknown
+): error is ReturnType<typeof createRestoreJournalError> {
+	return (
+		error instanceof Error &&
+		error.name === 'RestoreJournalError' &&
+		'code' in error &&
+		isRestoreJournalErrorCode(error.code)
+	)
+}
+
 const limits = resolvePayloadLimits({
 	payloadBytes: restoreJournalLimits.bytes,
 	jsonValues: restoreJournalLimits.jsonValues,
@@ -39,17 +55,17 @@ function bounded<T>(run: () => T): T {
 	try {
 		return run()
 	} catch (error) {
-		if (error instanceof RestoreJournalError) throw error
+		if (isRestoreJournalError(error)) throw error
 		if (error instanceof ArchivePayloadError && error.code === 'limitExceeded')
-			throw new RestoreJournalError('journalLimitExceeded')
-		throw new RestoreJournalError('invalidJournal')
+			throw createRestoreJournalError('journalLimitExceeded')
+		throw createRestoreJournalError('invalidJournal')
 	}
 }
 function intent(input: unknown): RestoreJournalIntent {
 	return bounded(() => {
 		checkPayloadBudget(input, limits)
 		const result = restoreIntentSchema.safeParse(input)
-		if (!result.success) throw new RestoreJournalError('invalidJournal')
+		if (!result.success) throw createRestoreJournalError('invalidJournal')
 		return result.data
 	})
 }
@@ -66,9 +82,9 @@ function validatedRecord(input: unknown): RestoreJournalRecord {
 			Number.isSafeInteger(input.version) &&
 			input.version > 1
 		)
-			throw new RestoreJournalError('unsupportedJournalVersion')
+			throw createRestoreJournalError('unsupportedJournalVersion')
 		const result = restoreJournalSchema.safeParse(input)
-		if (!result.success) throw new RestoreJournalError('invalidJournal')
+		if (!result.success) throw createRestoreJournalError('invalidJournal')
 		return result.data
 	})
 }
@@ -76,7 +92,7 @@ function serialize(value: RestoreJournalRecord): Uint8Array<ArrayBuffer> {
 	const bytes = new TextEncoder().encode(JSON.stringify(value))
 	if (bytes.byteLength > restoreJournalLimits.bytes) {
 		bytes.fill(0)
-		throw new RestoreJournalError('journalLimitExceeded')
+		throw createRestoreJournalError('journalLimitExceeded')
 	}
 	return bytes
 }
@@ -118,17 +134,17 @@ export function encodeRestoreJournalRecord(input: unknown): Uint8Array<ArrayBuff
 /** Strict, bounded UTF-8/JSON; unsupported and malformed records are rejected without repair. */
 export function decodeRestoreJournalRecord(bytes: Uint8Array): RestoreJournalRecord {
 	if (bytes.byteLength > restoreJournalLimits.bytes)
-		throw new RestoreJournalError('journalLimitExceeded')
+		throw createRestoreJournalError('journalLimitExceeded')
 	let raw: unknown
 	try {
 		const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
-		if (text.startsWith('\ufeff')) throw new RestoreJournalError('invalidJournalEncoding')
+		if (text.startsWith('\ufeff')) throw createRestoreJournalError('invalidJournalEncoding')
 		raw = parsePayloadJson(text, limits)
 	} catch (error) {
-		if (error instanceof RestoreJournalError) throw error
+		if (isRestoreJournalError(error)) throw error
 		if (error instanceof ArchivePayloadError && error.code === 'limitExceeded')
-			throw new RestoreJournalError('journalLimitExceeded')
-		throw new RestoreJournalError('invalidJournalEncoding')
+			throw createRestoreJournalError('journalLimitExceeded')
+		throw createRestoreJournalError('invalidJournalEncoding')
 	}
 	return parseRestoreJournalRecord(raw)
 }

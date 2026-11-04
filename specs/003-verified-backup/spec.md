@@ -4,7 +4,8 @@
 
 **Created**: 2026-11-03
 
-**Status**: Focused journal attempt/completion change implemented and locally verified; restore coordination
+**Status**: Journal semantics were locally verified; machine-first browser ownership correction now
+awaits implementation review and runtime qualification. Restore coordination
 and destination writes remain paused. The bounded archive codec, envelope/integrity handling and
 independent file inspector are implemented and verified. Shared capture/export actors and a disposable
 notebook source are implemented and locally verified in T006. Restore coordination and Finance adoption remain
@@ -137,7 +138,8 @@ As an application developer, I can use the same backup machinery with another ap
 ## Known restore limitations and implementation gate
 
 **Only the focused journal attempt/completion change is authorized following research and discussion.**
-It is implemented and locally verified after the user approved implementation testing.
+The attempt/completion semantics were locally verified after implementation review. The subsequent
+machine-first ownership correction is implemented but awaits review and new runtime qualification.
 Restore coordination/destination writes remain paused. Further work must stay within the supported
 behavior agreed below; this gate does not require covering unlikely edge cases.
 

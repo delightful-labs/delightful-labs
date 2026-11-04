@@ -1,3 +1,4 @@
+import type { EnvelopeMode } from './envelope.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createActor, fromPromise, toPromise, waitFor } from 'xstate'
 import { createArchiveExportMachine } from '../machines/backup/export.js'
@@ -10,7 +11,7 @@ import { createArchiveInspectionMachine } from '../machines/backup/inspection.js
 import { prepareArchiveInspection } from './inspection-api.js'
 import { prepareArchiveOpen } from './envelope-api.js'
 import {
-	envelopeOperation,
+	buildSealedArchive,
 	type EnvelopeSuccess,
 	type SealedArchive
 } from './envelope-operation.js'
@@ -659,8 +660,11 @@ describe('capture drain and resource lifetime', () => {
 			let acquired: SealedArchive | undefined
 			const seal = createArchiveEnvelopeMachine().provide({
 				actors: {
-					buildEnvelope: fromPromise<EnvelopeSuccess, ArchiveEnvelopeInput>(({ input }) => {
-						const output = envelopeOperation(input.request).buildEnvelope()
+					buildEnvelope: fromPromise<
+						EnvelopeSuccess,
+						ArchiveEnvelopeInput & { mode: EnvelopeMode }
+					>(({ input }) => {
+						const output = buildSealedArchive(input.request, input.mode)
 						if (output.outcome === 'sealed') acquired = output.archive
 						return Promise.resolve(output)
 					})
@@ -677,7 +681,15 @@ describe('capture drain and resource lifetime', () => {
 					attached = true
 					const child = snapshot.children.effect
 					const subscription = child.subscribe((value) => {
-						if (!stopped && 'value' in value && value.value === stage) {
+						if (
+							!stopped &&
+							'value' in value &&
+							(value.value === stage ||
+								(typeof value.value === 'object' &&
+									value.value !== null &&
+									'working' in value.value &&
+									value.value.working === stage))
+						) {
 							stopped = true
 							request.release()
 							actor.stop()

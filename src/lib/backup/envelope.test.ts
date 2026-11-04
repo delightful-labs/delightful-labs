@@ -403,17 +403,29 @@ describe('operation ownership, interruption and safe snapshots', () => {
 			expect(captured?.every((byte) => byte === 0)).toBe(true)
 		}
 	)
-	it('keeps secrets out of persisted snapshots and makes request release an abrupt teardown fallback', async () => {
+	it('keeps snapshots secret-free and reports repeated request release only once', async () => {
 		const request = prepareArchiveSeal(sample(), { kind: 'password', password })
-		const actor = createActor(createArchiveEnvelopeMachine(), { input: { request } })
+		let revocations = 0
+		let released = false
+		const actor = createActor(createArchiveEnvelopeMachine(), {
+			input: { request },
+			inspect(event) {
+				if (event.type === '@xstate.event' && event.event.type === 'RELEASE') revocations += 1
+			}
+		})
 		const snapshots: string[] = []
 		actor.subscribe((snapshot) => {
 			snapshots.push(JSON.stringify(actor.getPersistedSnapshot()))
-			if (snapshot.value === 'derivingKey') request.release()
+			if (!released && snapshot.matches({ working: 'derivingKey' })) {
+				released = true
+				request.release()
+				request.release()
+			}
 		})
 		actor.start()
 		const result = await toPromise(actor)
 		expect(result).toEqual({ outcome: 'failed', code: 'resourceReleased' })
+		expect(revocations).toBe(1)
 		for (const snapshot of snapshots)
 			for (const secret of [
 				password,
@@ -438,7 +450,11 @@ describe('operation ownership, interruption and safe snapshots', () => {
 		let reached = false
 		let undelivered: SealedArchive | IntegrityCheckedArchive | undefined
 		actor.subscribe((snapshot) => {
-			if (!reached && snapshot.value === stage) {
+			if (
+				!reached &&
+				(snapshot.value === stage ||
+					(typeof snapshot.value === 'object' && snapshot.value.working === stage))
+			) {
 				reached = true
 				if (
 					snapshot.context.result?.outcome === 'sealed' ||
@@ -473,7 +489,11 @@ describe('operation ownership, interruption and safe snapshots', () => {
 		let reached = false
 		let undelivered: IntegrityCheckedArchive | undefined
 		actor.subscribe((snapshot) => {
-			if (!reached && snapshot.value === stage) {
+			if (
+				!reached &&
+				(snapshot.value === stage ||
+					(typeof snapshot.value === 'object' && snapshot.value.working === stage))
+			) {
 				reached = true
 				if (snapshot.context.result?.outcome === 'integrityChecked')
 					undelivered = snapshot.context.result.archive

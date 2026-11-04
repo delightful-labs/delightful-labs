@@ -117,3 +117,78 @@ The CLI has no Finance validator or application session, and no archive can load
 for an unknown profile means integrity inspection completed, not that content is domain-valid or
 restorable. No user data, application storage or remote services were accessed. Final-commit GitHub
 CI is checked separately before reporting completion; merge remains the user’s decision.
+
+## Machine-first ownership correction — design before implementation
+
+The user continued after envelope qualification. This slice corrects only inspection ownership;
+export/capture, notebook lease ownership and the older workspace journal remain separate slices.
+The earlier class-backed inspector test totals do not qualify this correction.
+
+```text
+claim input -> working (invoke source/password native adapter)
+  reading -> checkingSource (bounds + strict header, pure)
+    plain -> preparingEnvelope
+    password + provider -> readingPassword -> preparingEnvelope
+    password without provider -> passwordRequired -> cleanup
+  preparingEnvelope -> opening (invoke envelope owner)
+    failure/interruption -> cleanup
+    integrity checked -> matchingProfile
+      no exact match -> unsupported -> buildingReport
+      exact match -> inspectingProfile (one synchronous validator call)
+        true/false -> profileValid/profileInvalid -> buildingReport
+        throw/nonboolean -> failure -> cleanup
+  buildingReport -> transferringReport -> cleanup -> final
+```
+
+Context holds only opaque request/child handles, protection/password-source availability, matched
+profile index, validation result and interruption/result facts. Source bytes, password strings,
+validators, decrypted payloads and report summaries remain private payload data. Single-use claim
+consumes an input capability; there is no class-owned claimed/released/pending lifecycle.
+
+The native callback adapter performs one source or password read per machine command and translates
+settlement. It owns the AbortController and late-result disposal, not header/password/profile
+routing. The chart aborts reads on interruption, waits for an issued read to settle, and forwards
+interruption to the invoked envelope owner. Releasing the request revokes the existing input
+reference once and reports to its owner. Abrupt callback teardown aborts the read, clears private
+resources and detaches reports; a late transferred byte array is cleared rather than published.
+An ignored AbortSignal still requires provider settlement for graceful drain; no new timeout/retry
+or claimed cancellation guarantee is added. Abandoning an unattached prepared request still requires
+explicit release. No actor is manually started beneath this owner.
+
+Pure helpers construct the envelope request, register the checked-output retention hook, find an
+exact profile, call its synchronous validator, and construct a report. They do not coordinate async
+stages. The chart chooses unsupported/valid/invalid results and explicitly transfers the report
+before its working scope disposes other resources. Late cancellation during final handoff releases
+an undelivered report. Failed claims cannot dispose a different owner's resources.
+
+Replace Inspection and Report classes with private data and inert resource functions. Replace the
+error subclass with createArchiveInspectionError/isArchiveInspectionError and mechanically migrate
+the independent reader adapter. This changes error construction/type checking only; no CLI outcome,
+exit status, translated copy, archive format or validation guarantee changes. Present implementation
+for review before adding/running tests for this correction; static checks are not race qualification.
+
+### Ownership correction qualification after implementation review
+
+The user authorized continuation from the inspection implementation review. The original 134 focused
+envelope/inspection/export cases passed without production fixes. Added six bounded cases: cancel
+at checkingSource, matchingProfile and buildingReport; repeat release during an active source read
+with one revocation report and drain/byte clearing; release during an issued envelope digest and
+wait for native settlement; and clear late bytes after actor stop without explicit request release
+once the native read owner is attached. Existing source/password cancellation, safe failures,
+concurrent claims, profile outcomes, snapshot secrecy and child output retention cases still pass.
+All 140 focused unit cases pass. No production implementation changes were needed in qualification.
+
+After rebuilding the package, all 11 independent reader cases and 13 notebook/public-package
+integration cases pass. These include real retained plaintext/encrypted files, exact stdin password
+bytes, invalid/bounded inputs, sanitized errors, SIGINT/SIGTERM during pending password input and
+independent retained notebook content inspection. Fresh public-export browser bundles pass all four
+focused Chromium cases: standalone envelope crypto/integrity, plain/password notebook downloads and
+inspection, and invalidation/drain/stale binding handling. Playwright owned a temporary preview on
+localhost port 6014 and stopped it after the run.
+
+Svelte/TypeScript, package/strict Publint, reader/public-consumer declarations, lint, formatting and
+whitespace checks pass. These focused checks qualify this inspection correction with the existing
+export/notebook owners; they do not qualify the pending export/notebook rewrites or journal
+correction. No full repository unit/browser suite was run. Graceful drain still depends on a
+provider eventually settling when it ignores AbortSignal; password string zeroization, large-file
+memory/latency and additional browsers remain unqualified. No commit, publication or merge.

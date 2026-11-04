@@ -95,3 +95,221 @@ PR #16 receives these verification changes; its final-commit CI status is checke
 reporting completion. Merge remains subject to the user’s explicit authorization.
 
 These checks do not establish universal parser security, browser peak-memory limits or end-to-end backup safety. Cryptography and actual source capture/restore remain subsequent slices.
+
+## Cross-slice machine-ownership audit
+
+Requested after the user identified hidden lifecycle ownership and application-owned classes in the
+browser restore journal. This is a source audit, not a new implementation or runtime qualification.
+The journal rewrite already in the worktree remains a separate, uncommitted review slice.
+
+### Scope and method
+
+Re-read `.specify/memory/xstate.md` and constitution III/VII. Inventoried 104 non-test source/config
+files: 93 under `src/lib` (excluding generated Paraglide/declarations) and 11 under the notebook,
+independent reader and private-creation fixtures. Included TypeScript in Svelte integrations. Used
+syntax inventory for classes, native promises, async functions and actor starts, then traced the
+actual helper bodies beneath backup and foundation actors. Also reviewed the eight Svelte story/
+example files and 29 public-package consumer source/config files for the same patterns, for 141
+non-test source/config files in total. A low await count is not evidence of a
+leaf: the violations below use chained promises and private mutable state.
+
+The criterion is meaningful steps, decisions and resource lifetimes, not whether a function could
+technically be represented as a machine. Pure transformations and narrow native/event translation
+remain functions. A class-to-closure rewrite alone does not correct a hidden workflow.
+
+### Required lifecycle corrections
+
+1. **Export/capture: `src/lib/backup/export.ts:120`.** `ExportOperation` is another lifecycle owner
+   beneath `machines/backup/export.ts` and `capture.ts`. `#track` controls admission and issued-work
+   retention (`:163`); `releaseLease` maintains a release promise and cleanup-failure flag (`:234`);
+   `#settled`, `drainIssued`, `retryCleanup`, `finish` and `#clear` implement drain/retry/disposal
+   (`:291`–`:332`). `#clear` can start lease release with a fire-and-forget promise. These decisions
+   belong in the capture/export owner states, including a failed lease release and explicit retry.
+   Source authority/read/consistency calls and the consumer handoff can remain individual effects;
+   their completion must be reported to the owning actor. Preserve an issued handoff's borrowed
+   file until that effect settles. Retain late acquired leases without a second imperative lifecycle.
+
+2. **Envelope/crypto: `src/lib/backup/envelope-operation.ts:104`.** `Operation` duplicates lifecycle
+   through `#claimed`, `#released` and `#pending`; `#track` decides when late native results are
+   discarded and cleanup runs (`:182`), while `release` gates clearing on the counter (`:347`). The
+   attachment cursor advances inside `hashAttachment` and controls the chart via `hasAttachment`
+   (`:294`–`:306`). Put operation admission, attachment index/continuation, interruption, native
+   completion and result transfer in the envelope machine. Each Web Crypto import/derive/encrypt/
+   decrypt/digest remains one native effect. Keep passwords, keys and raw bytes in an opaque data
+   capsule, not ordinary/persisted context; privacy is not a justification for a second lifecycle.
+
+3. **Inspection: `src/lib/backup/inspection.ts:97`.** `Inspection.readSource` reads a provider, bounds
+   and parses its bytes, then chooses plain/password/password-required routing (`:130`–`:148`). The
+   inspection machine currently receives that already-classified result. Separate file reading,
+   header validation and protection/password routing in the chart. `#claimed`, `#released`, abort,
+   retained child output and `cleanup/release` (`:230`–`:251`) also duplicate owner lifecycle. Keep
+   profile validation/summary construction pure and retain the checked archive through its owning
+   actor's cleanup. The class-backed `Report` is a separate unnecessary class, not a reason to create
+   another workflow for a reference getter.
+
+4. **Older workspace journal: `src/lib/machines/workspaces/journal.ts:33`.** This already models
+   normal read/validate/write/settlement/close decisions; it does not need wholesale conversion.
+   However, the open promise retains the acquired database only through its resolved output (`:40`),
+   and native callback teardown only removes transaction listeners (`:84`). If the actor is stopped
+   during opening, the late connection has no explicit cleanup owner. Graceful SHUTDOWN/CANCEL is
+   modeled and must not be confused with arbitrary actor stop. Correct/qualify the native resource
+   disposal boundary; do not add a second lifecycle or claim the existing cancellation tests prove
+   abrupt-stop cleanup. This is a source-level ownership finding, not a reproduced runtime failure.
+
+5. **Notebook fixture lease: `fixtures/backup-notebook/source.ts:29`.** `NotebookSource` owns available/
+   leased source state through `#owner`, rejects writers while leased, checks binding changes and
+   permits release only for the matching owner token. If this mutable lease/writer demonstration is
+   retained, model ACQUIRE/RELEASE/REPLACE/BINDING_CHANGED with an explicit fixture owner instead of
+   another class-backed lifecycle. Payload detachment and the profile validator stay pure. This is
+   fixture work; it does not justify a new production locking feature or broader platform support.
+
+The first three are the same architectural mistake as the original journal owner, despite the
+presence of outer machines and earlier passing runtime tests. Source comments describing methods
+as leaves do not make the hidden lifecycle acceptable.
+
+### Remaining application-owned classes
+
+The inventory found 13 remaining class declarations after the journal correction. Three are the
+production lifecycle owners above; one is the notebook fixture. The other nine are:
+
+- `SealedResource` and `CheckedResource` in `backup/envelope-operation.ts:56` / `:73`, and `Report`
+  in `backup/inspection.ts:81`: replace with ordinary opaque data/reference factories. These getters,
+  copies, descriptors and reference/buffer release operations do not themselves require machines;
+  their orchestration/lifetime belongs to the corresponding workflow owner.
+- `ArchivePayloadError`, `ArchiveEnvelopeError`, `ArchiveInspectionError`, `ArchiveExportError` in
+  `backup/types.ts:38`, `envelope.ts:32`, `inspection.ts:66`, `export.ts:82`: use native Error factories
+  and narrow type guards. Error classification is pure; error objects need no lifecycle machine.
+- `QuerySubscription` and `QuerySubscriptionOne` in `backend/jazz/data.svelte.ts:16` / `:21`: the
+  subclasses only supply local-first options to the SDK. Replace application inheritance with
+  functions/options composition while preserving SDK construction/ownership semantics. The SDK
+  owns the subscription lifecycle; adding an independent subscription machine just to remove the
+  classes would duplicate ownership.
+
+### Reviewed areas where another machine is not indicated
+
+| Area                                                                                                                                                         | Source conclusion                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Payload/envelope wire parsing, JSON tokenizer, binary conversion, budgets, Zod schemas, journal intent/successor predicates, notebook dataset/profile        | Synchronous bounded transformations/validation. Local parser cursors are algorithm data, not an operation lifecycle. Keep functions; replace only the custom error classes listed above.                                                                                             |
+| Form readiness/submission/write, profile/avatar, workspace naming/creation/persistence/initialization/invitations, identity restoration/session coordination | Meaningful phases are already modeled in their machines. The in-repo promise bodies delegate individual effects or normalize one result/error. No additional concrete hidden multi-effect workflow was found in those inspected bodies.                                              |
+| Jazz session/acquisition/readiness, recovery phrase/restoration and invitation-authority adapters                                                            | Single SDK calls, synchronous binding/generation projections, current-binding rechecks and event subscriptions. SDK-owned internal workflows stay behind the documented boundary; no new app lifecycle machine is indicated for these adapter bodies.                                |
+| `backend/jazz/startup.ts`, Svelte form/recovery bindings and reader CLI entrypoint                                                                           | Start application/host-owned root actors, rather than manually starting hidden children. The startup registry retains an actor reference, not an acquisition promise cache.                                                                                                          |
+| `machines/forms/lifecycle.ts`                                                                                                                                | Sends SHUTDOWN and observes the existing owner's completion/error before stop. Its subscription bookkeeping does not implement form cleanup itself. Keep the narrow root-integration helper.                                                                                         |
+| `fixtures/backup-reader/io.mjs`                                                                                                                              | One bounded native stream read with byte counting, abort/error/end/close translation and listener/buffer cleanup. It does not choose password, crypto, profile or retry stages. Narrow native adapter bookkeeping can remain here; inspection stages belong to the inspection chart. |
+| `fixtures/private-creation/browser.ts`                                                                                                                       | Test controls expose separate SDK acquisition/stage/commit/wait/read boundaries. The test harness owns sequencing/process termination. This is not a production promise pretending to own a transaction workflow.                                                                    |
+| Contracts, public barrels, localization projections, logger, validation mappings and presentation components                                                 | Data contracts, composition, synchronous projection or presentation state. No new resource-owning lifecycle was found.                                                                                                                                                               |
+| Current journal rewrite                                                                                                                                      | Machine owns decision/settlement/cleanup states; native adapter holds handles and translates events. Still awaiting implementation review/runtime qualification. It is not declared correct merely because the class declarations are gone.                                          |
+
+Injected host callbacks such as form completion/save handlers and domain transaction/capture
+capabilities remain a qualification boundary. An interface returning a promise does not certify
+that an external implementation is a leaf. No deployed consumer implementation was inspected in
+this audit; its internal workflows cannot be certified by inspecting DLF's delegation alone.
+
+### Follow-up boundaries
+
+Keep the current journal ownership correction as its own review slice. Then correct envelope
+ownership first (inspection and export both depend on it), followed by inspection, export/capture,
+and the notebook fixture. Address the older workspace journal's disposal boundary as a separate
+foundation slice. Remove the remaining helper/error/SDK wrapper classes with their owning slice,
+including public consumer API updates. Do not turn every predicate or native call into a machine.
+
+No additional production files were changed for this audit, no tests were added/run, and nothing
+was committed or published. These findings are recorded for review; earlier green CI is behavior
+qualification of the old implementations, not proof of machine-first compliance.
+
+## Envelope ownership correction — implementation awaiting review
+
+The first follow-up slice is implemented locally, uncommitted. `machines/backup/envelope.ts` now owns
+admission, parsed mode, attachment index/count and advancement, digest decisions, crypto stage
+sequencing, cancellation/drain, construction and output transfer. `backup/envelope-operation.ts`
+contains private payload storage, single-use admission, pure construction/serialization and inert
+revocable resource handles. The Operation, SealedResource and CheckedResource classes are removed;
+there is no private pending counter, cursor, release phase or cleanup promise.
+
+`backup/envelope-native.ts` translates one machine command into one Web Crypto call. Each issued
+call owns a dedicated input buffer, cleared before its completion/error report. Native callback
+disposal detaches reports and clears capsule originals; a late ArrayBuffer is cleared instead of
+being published. It cannot stop native crypto. Graceful CANCEL/SHUTDOWN waits for settlement, and
+request release reports revocation to the owner. A prepared request not yet attached to the working
+owner still requires explicit request release if abandoned, as before. JavaScript strings/CryptoKey
+objects have no proven zeroization guarantee. The additional bounded copy increases peak memory;
+large-file memory/latency qualification remains open under T004.
+
+Successful output passes through an explicit transfer state before the working owner exits.
+Cancellation during the final cleanup window releases that transferred but undelivered result.
+Parent retention hooks continue capturing constructed output before a child done event can be
+lost; inspection/export ownership itself is not rewritten here.
+
+The public error subclass is replaced by `createArchiveEnvelopeError` and `isArchiveEnvelopeError`
+on `backup/envelope`; callers that constructed the subclass or used instanceof must migrate.
+Internal parent imports and existing tests were adjusted mechanically for the API and nested working
+state paths. No new test cases were added, and no implementation tests were run for this correction.
+Svelte/TypeScript, package generation/strict Publint, public-consumer declaration type checking,
+lint and formatting are the static checks; they do not establish race, wire interoperability,
+cleanup or browser correctness for this implementation. Prior test/CI totals qualify the previous
+implementation only. Implementation review must precede runtime qualification under AGENTS.md.
+
+Remaining audited owners: inspection, export/capture, notebook fixture and the older workspace
+journal disposal boundary. Their findings remain open; pure helper and SDK wrapper cleanup follows
+its owning review slice.
+
+### Envelope correction — reviewed continuation and focused qualification
+
+The user continued from the implementation review above. Runtime qualification found and fixed
+non-idempotent revocation: request release now returns when the prepared input reference is already
+revoked. The existing snapshot test explicitly asserts one report for repeated release without
+creating an unbounded subscriber loop. Focused validation passes: 134 envelope/inspection/export
+unit cases, 13 notebook/package integration cases, standalone public envelope consumer, four
+Chromium cases using fresh public-export bundles, and the static checks listed above. See
+[qualification](envelope-design.md#ownership-correction-qualification-after-implementation-review).
+The earlier static-only status is historical; the journal correction and remaining owner rewrites
+are not qualified by these results. No commit/publication/merge. Inspection is the next owner slice.
+
+## Inspection ownership correction — implementation awaiting review
+
+The user continued after envelope qualification. The inspection owner is now locally rewritten,
+uncommitted. `machines/backup/inspection.ts` owns source/header/password routing, the invoked
+envelope's lifetime and drain, exact profile matching, valid/invalid/unsupported decisions,
+report construction/transfer and cleanup. It holds only safe observed facts and opaque handles.
+`backup/inspection.ts` holds private data, single-use admission and pure helpers; Inspection,
+Report and ArchiveInspectionError classes are removed. The report remains an inert releasable
+metadata reference. There is no private claimed/released flag, pending counter or cleanup promise.
+
+The invoked `backup/inspection-native.ts` callback owns one AbortController, issues one source or
+password read per command and reports settlement without interpreting headers/profiles. The chart
+requests abort and waits for an issued read to settle; disposal clears owned references and drops
+reports, clearing late transferred byte arrays. It retains only the issued provider, not the whole
+profile registry. Request release revokes the existing input reference once, sends the owner a
+revocation report and reaches the appropriate read abort/envelope shutdown protocol. Failed claims
+do not enter that native scope or clear another owner's resources. Abrupt teardown still cannot
+prove cancellation of a provider that ignores AbortSignal, nor zeroize JavaScript password strings.
+
+The existing checked-output retention hook still captures decrypted output before the envelope's
+done event can be discarded. Report construction also records its handle before returning. An
+explicit transfer state detaches the successful report before disposing private payload resources;
+CANCEL/SHUTDOWN during final cleanup releases an undelivered report.
+
+Public inspection errors now use createArchiveInspectionError/isArchiveInspectionError; the reader
+adapter's constructor calls were mechanically migrated. CLI outcomes, exit statuses, metadata and
+wire format remain the same. Existing unit tests received only state-path compatibility updates;
+no new cases were added and no implementation tests were run for this slice. Affected runtime
+qualification after review is inspection/envelope/export units, independent reader and notebook
+consumers, and public envelope/notebook Chromium cases. The previous envelope totals qualify the
+prior inspector integration, not this new owner.
+
+Static checks cover Svelte/TypeScript, package/strict Publint, public consumer declarations, reader
+adapter types, lint, formatting and whitespace. These do not establish read cancellation/drain,
+late-result disposal, output handoff or native crypto correctness for this owner. Export/capture,
+notebook lease ownership and the older workspace journal disposal finding remain separate follow-ups.
+No commit, publication or merge was performed.
+
+### Inspection correction — reviewed continuation and focused qualification
+
+The user continued from implementation review. All existing 134 focused envelope/inspection/export
+unit cases passed. Six additional focused cases cover the newly exposed cancellation stages,
+idempotent release during a pending source read, envelope drain after request release and late
+source disposal on actor stop without explicit release after native ownership attaches. All 140
+focused cases, 11 independent reader cases, 13 notebook/package integration cases and four Chromium
+cases pass. Package/strict Publint and static checks pass. No production fixes were needed.
+See [qualification](inspector-design.md#ownership-correction-qualification-after-implementation-review).
+The static-only status above is historical. The pending journal correction remains separately
+unqualified. Export/capture is the next owner slice; no commit/publication/merge was performed.

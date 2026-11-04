@@ -2,13 +2,13 @@ import { z } from 'zod'
 import { createPayloadSchemas } from './schemas.js'
 import { encodeArchivePayload, parseArchivePayload } from './payload.js'
 import {
-	envelopeOperation,
+	retainSealedOutput,
 	prepareArchiveSeal,
 	type ArchiveEnvelopeRequest,
 	type ArchiveProtection,
 	type SealedArchive
 } from './envelope-operation.js'
-import { ArchiveEnvelopeError, type EnvelopeErrorCode } from './envelope.js'
+import { isArchiveEnvelopeError, type EnvelopeErrorCode } from './envelope.js'
 import type { ArchiveProfileValidator } from './inspection.js'
 import {
 	ArchivePayloadError,
@@ -259,7 +259,7 @@ class ExportOperation {
 		)
 		this.#payload = undefined
 		this.#protection = undefined
-		envelopeOperation(this.#envelope).retainSealedOutput((archive) => {
+		retainSealedOutput(this.#envelope, (archive) => {
 			this.#sealed = archive
 			if (this.#released) archive.release()
 		})
@@ -390,7 +390,7 @@ export function exportFailure(error: unknown): {
 	if (
 		error instanceof ArchiveExportError ||
 		error instanceof ArchivePayloadError ||
-		error instanceof ArchiveEnvelopeError
+		isArchiveEnvelopeError(error)
 	)
 		return { outcome: 'failed', code: error.code }
 	return { outcome: 'failed', code: 'exportFailed' }

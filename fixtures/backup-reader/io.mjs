@@ -1,6 +1,6 @@
 import { createReadStream } from 'node:fs'
 import { ArchivePayloadError } from 'delightful-local-first/backup/archive'
-import { ArchiveInspectionError } from 'delightful-local-first/backup/inspection'
+import { createArchiveInspectionError } from 'delightful-local-first/backup/inspection'
 
 /**
  * One bounded native read; file mode settles only after descriptor close.
@@ -30,7 +30,7 @@ function boundedRead(stream, maximum, signal, waitForClose) {
 			stream.pause()
 			try {
 				if (failure || !ended) {
-					reject(failure ?? new ArchiveInspectionError('fileReadFailed'))
+					reject(failure ?? createArchiveInspectionError('fileReadFailed'))
 					return
 				}
 				const bytes = new Uint8Array(total)
@@ -41,14 +41,14 @@ function boundedRead(stream, maximum, signal, waitForClose) {
 				}
 				resolve(bytes)
 			} catch {
-				reject(new ArchiveInspectionError('fileReadFailed'))
+				reject(createArchiveInspectionError('fileReadFailed'))
 			} finally {
 				for (const chunk of chunks) chunk.fill(0)
 				chunks.length = 0
 			}
 		}
 		function abort() {
-			failure = new ArchiveInspectionError('fileReadFailed')
+			failure = createArchiveInspectionError('fileReadFailed')
 			stream.destroy(failure)
 		}
 		/** @param {Uint8Array} chunk */
@@ -71,7 +71,7 @@ function boundedRead(stream, maximum, signal, waitForClose) {
 			if (!waitForClose) finish()
 		}
 		function error() {
-			failure ??= new ArchiveInspectionError('fileReadFailed')
+			failure ??= createArchiveInspectionError('fileReadFailed')
 			if (!waitForClose) finish()
 		}
 		function close() {
@@ -90,7 +90,7 @@ function boundedRead(stream, maximum, signal, waitForClose) {
 export function fileSource(path) {
 	return {
 		read: (signal, maximum) => {
-			if (signal.aborted) return Promise.reject(new ArchiveInspectionError('fileReadFailed'))
+			if (signal.aborted) return Promise.reject(createArchiveInspectionError('fileReadFailed'))
 			// Inclusive end permits exactly one oversize detection byte; no unbounded readFile/stat race.
 			return boundedRead(createReadStream(path, { start: 0, end: maximum }), maximum, signal, true)
 		}
@@ -105,7 +105,7 @@ export function stdinPassword() {
 				try {
 					return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
 				} catch {
-					throw new ArchiveInspectionError('passwordReadFailed')
+					throw createArchiveInspectionError('passwordReadFailed')
 				} finally {
 					bytes.fill(0)
 				}

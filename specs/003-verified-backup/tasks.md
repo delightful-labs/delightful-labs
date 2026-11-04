@@ -6,6 +6,25 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-03)
 
+**Current qualified correction: inspection ownership.** The user continued from implementation
+review. The chart now owns read/header/password routing, envelope drain, profile decisions and
+report transfer. All 140 focused envelope/inspection/export unit cases (including six added
+inspection cases), 11 independent reader cases, 13 notebook/package integration cases and four
+Chromium cases pass; static/package checks pass. No production fixes were needed in qualification.
+See [qualification](inspector-design.md#ownership-correction-qualification-after-implementation-review).
+No commit/publication. Export/capture is the next owner rewrite. The journal correction still
+awaits its own review/qualification; these focused results do not qualify it.
+
+**Current qualified correction: envelope ownership.** The user continued from implementation
+review. Chart-owned verification, attachment iteration, crypto/drain and output transfer replace the
+envelope class owner. Runtime checks found/fixed repeated revocation; release is idempotent using
+the existing input reference. All 134 focused envelope/inspection/export unit cases, 13 notebook/
+package integration cases, standalone public envelope consumer and four Chromium cases pass.
+Static checks pass. See [qualification](envelope-design.md#ownership-correction-qualification-after-implementation-review).
+No commit/publication. Inspection is now qualified above; export/capture and the
+remaining audited owners follow it. The journal correction still awaits its own review/qualification;
+historical full-suite totals below do not qualify that correction.
+
 Archive/inspector implementation is complete through T005, except T004's large-file measurements.
 The cleanup interruption is complete: PR #19 merged the implementation; [PR #20](https://github.com/delightful-labs/delightful-local-first/pull/20)
 adds regression qualification and two reproduced retry/IndexedDB cancellation fixes. Its implementation
@@ -50,6 +69,25 @@ lint and formatting pass. No production fixes were needed. The
 distinguishes journal validation from the unbuilt destination comparison and writer integration.
 Restore coordinator/destination writers remain paused. The user authorized committing and publishing
 this reviewed journal slice as a PR targeting `main`; merge requires separate authorization.
+**Current correction awaiting review: machine-first browser journal ownership.** The user rejected
+application-owned classes and the parallel lifecycle hidden in `BrowserJournalOperation`. The
+[corrected ownership design](browser-journal-design.md#machine-first-ownership-correction--implementation-design)
+now puts read/write decisions, native settlement, interruption, cleanup and final classification in
+the journal machine. The native callback only performs native commands and bridges events; prepared
+inputs/results are inert opaque references. Journal error subclasses are replaced with factories
+and type guards. No new retry/restore behavior is included. Earlier green tests/CI describe the
+previous owner, not this rewrite. Existing test imports/state paths were adapted; no implementation
+tests were added or run before review. The correction is uncommitted/unpublished.
+
+**Broader source audit completed; additional ownership corrections remain.** The
+[cross-slice audit](implementation-notes.md#cross-slice-machine-ownership-audit) records hidden
+lifecycles in envelope, inspection and export owners, notebook fixture lease coordination, an
+older workspace-journal abrupt-stop resource concern, and the remaining helper/error/SDK classes.
+It distinguishes those findings from pure functions and native leaves that do not need machines.
+Review/correct one owner at a time; do not treat earlier passing tests as architecture approval.
+The audit itself adds no production changes or tests. Restore coordinator/destination work remains
+paused while these ownership findings are addressed.
+
 Read the [workflow contract](contracts/workflow.md) and lifecycle ownership
 notes. Isolated destination and content round-trip remain unimplemented.
 Present each implementation slice before its tests. No additional general cleanup is required. Finance

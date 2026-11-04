@@ -7,7 +7,7 @@ import {
 	encodeRestoreJournalRecord,
 	matchRestoreJournalIntent,
 	parseRestoreJournalRecord,
-	RestoreJournalError
+	isRestoreJournalError
 } from 'delightful-local-first/backup/restore/journal'
 
 const wire = readFileSync(new URL('../../tests/fixtures/restore-journal-v1.json', import.meta.url))
@@ -44,9 +44,9 @@ assert.deepEqual(decodeRestoreJournalRecord(encodeRestoreJournalRecord(pending))
 assert.equal(pending.checkpoint.kind, 'writing')
 assert.throws(
 	() => parseRestoreJournalRecord({ ...record, version: 2 }),
-	(error) => error instanceof RestoreJournalError && error.code === 'unsupportedJournalVersion'
+	(error) => isRestoreJournalError(error) && error.code === 'unsupportedJournalVersion'
 )
 assert.throws(
 	() => decodeRestoreJournalRecord(new TextEncoder().encode('{"version":1,"version":1}')),
-	(error) => error instanceof RestoreJournalError && error.code === 'invalidJournalEncoding'
+	(error) => isRestoreJournalError(error) && error.code === 'invalidJournalEncoding'
 )

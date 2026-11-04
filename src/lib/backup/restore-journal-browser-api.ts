@@ -1,4 +1,8 @@
-export { prepareBrowserRestoreJournal, BrowserJournalError } from './restore-journal-browser.js'
+export {
+	prepareBrowserRestoreJournal,
+	createBrowserJournalError,
+	isBrowserJournalError
+} from './restore-journal-browser.js'
 export { isRestoreJournalSuccessor } from './restore-journal-successor.js'
 export type {
 	BrowserJournalCommand,

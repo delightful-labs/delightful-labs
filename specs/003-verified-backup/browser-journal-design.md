@@ -1,6 +1,10 @@
-# Browser restore journal — reviewed scope
+# Browser restore journal — ownership correction under review
 
 Branch `feat/backup-restore-journal`, based on PR #21 merge `04f3203`.
+
+The [machine-first correction below](#machine-first-ownership-correction--implementation-design)
+supersedes the previously qualified class-backed owner. Earlier test evidence remains historical;
+the corrected owner is uncommitted and awaits implementation review before runtime qualification.
 
 The user approved same-browser recovery and keeping IndexedDB for operation IDs, destination
 mappings and progress. Jazz owns the restored application data. Resuming requires selecting the
@@ -88,3 +92,67 @@ representation; subsequent qualification adds 16 unit cases and one native Chrom
 current totals to 833 unit tests and 51 Chromium tests. The new native case qualifies rejected retry,
 blocked uncertain retry, remote-content completion and exact metadata retention after reload. See
 the linked design for evidence and limits. No production fix was needed during qualification.
+
+## Machine-first ownership correction — implementation design
+
+The user identified that the class-backed resource owner duplicates lifecycle and hides decisions
+outside the chart. The earlier design treated too much behavior as a native boundary. Replacing the
+classes with closures would preserve that mistake. Re-read `.specify/memory/xstate.md` and constitution
+III before this correction. No application-owned classes are used in the corrected journal slice.
+
+One journal machine owns admission, opening, transaction eligibility, read-result routing, decoding,
+intent/successor decisions, encoding, staging, commit/abort settlement, closing and outcome reporting.
+The native callback actor spans its active lifetime and performs only the corresponding native
+commands. There is no second lifecycle implemented with pending counters, cleanup promises or a
+resource-owner phase/terminal state. Context may retain native observations needed for the final
+result; it does not make them a parallel statechart.
+
+```text
+claim request -> active (invoke native adapter)
+  opening -> starting transaction -> transaction
+    checking support/initialization -> reading -> checking row -> validating stored record
+      missing + create -> encoding -> staging -> committing
+      missing + load/update -> aborting
+      malformed/conflicting -> aborting
+      matching load/create/exact stored update -> committing
+      admitted successor -> encoding -> staging -> committing
+    native complete/abort -> closing database -> final output
+```
+
+Cancellation while opening waits for native open completion before closing. Cancellation during a
+transaction requests abort and waits for the actual native terminal event. Failure cannot bypass
+those ownership boundaries. Callback disposal requests native abort/close; an eventual late-open
+connection is closed by its retained native callback. This narrow callback cleanup is not another
+workflow or an acknowledgement that an issued write was undone. Read/validate/write remains
+synchronous within the native read-success task so IndexedDB transaction activity is preserved.
+
+The prepared request is a single-use input capability. Its opaque data capsule holds configuration,
+raw/decoded metadata, encoded bytes and a borrowed result reference, with descriptor-only JSON.
+It has no workflow decisions or lifecycle phase. Release revokes input/result references and signals
+the owning machine; callback teardown owns native handles. Reference getters/clearing and pure codec,
+binding/successor predicates and error factories remain ordinary functions. Result observation does
+not require another detached actor or a manually started child.
+
+Existing API consumers will use error factories/type guards rather than custom Error subclasses.
+No generic resource framework, new restore behavior or extra edge-case matrix is introduced. Review
+this correction before adding or running its implementation tests; prior runtime qualification is
+not evidence for the rewritten owner.
+
+### Correction review scope and API impact
+
+The statechart now contains the actual missing/create/load/exact-replay/successor branches and
+explicit success/interruption/failure terminals. Native acquisition failures distinguish no acquired
+transaction from an acquired transaction that must abort and settle. The native callback keeps only
+its handles and event subscription, with narrow disposal for late acquisition. Private input/data
+references contain no pending counter, drain waiter, controller, terminal phase or outcome classifier.
+
+Public journal error constructors are replaced by `createRestoreJournalError` /
+`isRestoreJournalError` and `createBrowserJournalError` / `isBrowserJournalError`. Existing consumers
+must use these factories/guards. Error names/codes, journal wire representation and borrowed-view
+release behavior remain the same. Existing tests have only been adapted to these names and the
+new machine state paths; no new tests are added and none are executed before implementation review.
+
+Static validation includes Svelte/TypeScript, package/Publint, public consumer declarations, lint and
+formatting. Runtime qualification after review must cover the existing native read/decide/write,
+commit/abort/cancellation, late acquisition and view-release boundaries against this owner; passing
+checks for the previous owner cannot substitute for that evidence.

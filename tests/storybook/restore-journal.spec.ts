@@ -226,7 +226,9 @@ for (const stage of ['staging', 'committing']) {
 						if (
 							cancel &&
 							!cancelled &&
-							snapshot.matches({ using: stage === 'staging' ? 'staging' : 'committing' })
+							snapshot.matches({
+								active: { transaction: stage === 'staging' ? 'staging' : 'committing' }
+							})
 						) {
 							cancelled = true
 							actor.send({ type: 'CANCEL' })

@@ -7,7 +7,7 @@ import {
 	matchRestoreJournalIntent,
 	parseRestoreJournalRecord,
 	restoreJournalLimits,
-	RestoreJournalError,
+	isRestoreJournalError,
 	type RestoreJournalCheckpoint,
 	type RestoreJournalReceipt
 } from './restore-journal.js'
@@ -109,7 +109,7 @@ describe('journal wire and immutable public model', () => {
 		} catch (caught) {
 			error = caught
 		}
-		expect(error).toBeInstanceOf(RestoreJournalError)
+		expect(isRestoreJournalError(error)).toBe(true)
 		expect(error).toMatchObject({ code: 'invalidJournal', message: 'invalidJournal' })
 		expect(JSON.stringify(error)).not.toContain('private-recovery-sentinel')
 	})

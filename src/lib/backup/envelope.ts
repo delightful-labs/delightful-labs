@@ -29,11 +29,24 @@ export type EnvelopeErrorCode =
 	| 'resourceReleased'
 	| 'operationInUse'
 	| 'cryptoFailed'
-export class ArchiveEnvelopeError extends Error {
-	constructor(readonly code: EnvelopeErrorCode) {
-		super(code)
-		this.name = 'ArchiveEnvelopeError'
-	}
+export function createArchiveEnvelopeError(code: EnvelopeErrorCode) {
+	return Object.assign(new Error(code), { name: 'ArchiveEnvelopeError', code })
+}
+export function isArchiveEnvelopeError(
+	error: unknown
+): error is ReturnType<typeof createArchiveEnvelopeError> {
+	return (
+		error instanceof Error &&
+		error.name === 'ArchiveEnvelopeError' &&
+		'code' in error &&
+		(error.code === 'invalidEnvelope' ||
+			error.code === 'authenticationFailed' ||
+			error.code === 'integrityMismatch' ||
+			error.code === 'invalidPassword' ||
+			error.code === 'resourceReleased' ||
+			error.code === 'operationInUse' ||
+			error.code === 'cryptoFailed')
+	)
 }
 
 export function parseEnvelope(bytes: Uint8Array, limits: PayloadLimits) {
@@ -60,7 +73,7 @@ export function parseEnvelope(bytes: Uint8Array, limits: PayloadLimits) {
 			.readonly()
 	])
 	const result = schema.safeParse(parsePayloadJson(source, { ...limits, depth: 4, jsonValues: 32 }))
-	if (!result.success) throw new ArchiveEnvelopeError('invalidEnvelope')
+	if (!result.success) throw createArchiveEnvelopeError('invalidEnvelope')
 	const envelope = result.data
 	if (envelope.protection === 'password') {
 		if (
@@ -68,7 +81,7 @@ export function parseEnvelope(bytes: Uint8Array, limits: PayloadLimits) {
 			base64Size(envelope.iv, 12) !== 12 ||
 			base64Size(envelope.payload, limits.payloadBytes + 16) < 16
 		)
-			throw new ArchiveEnvelopeError('invalidEnvelope')
+			throw createArchiveEnvelopeError('invalidEnvelope')
 	} else base64Size(envelope.payload, limits.payloadBytes)
 	return envelope
 }
