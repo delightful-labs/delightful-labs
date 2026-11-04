@@ -103,29 +103,32 @@ Error text and borders use dark red on light surfaces and light red on dark surf
 
 Button defaults to `variant="raised"`. Use `variant="flat"` for square bordered controls with no default shadow or pressed movement. Flat pressed colors can be customized with `--dui-button-color-active` and `--dui-button-background-color-active`.
 
-## FloatingAction
+## FloatingActionLink and FloatingActionButton
 
 ```svelte
-<FloatingAction href={resolvedHref} label={addLabel} icon={AddIcon} />
-<FloatingAction label={addLabel} icon={AddIcon} onclick={addItem} />
+<FloatingActionLink href={resolvedHref} aria-label={addLabel} title={addLabel}>
+    <Icon icon={AddIcon} />
+</FloatingActionLink>
+<FloatingActionButton aria-label={addLabel} onclick={addItem}>
+    <Icon icon={AddIcon} />
+</FloatingActionButton>
 ```
 
-An icon-only circular control aligned to the inline end of a bottom-sticky wrapper. Supplying
-`href` renders a native anchor; omitting it renders a native button with `type="button"` by default.
-The caller supplies the decorative SVG icon and a translated accessible `label`. The label also
-provides the default native title; an explicit `title` overrides it.
+Use FloatingActionLink for navigation and FloatingActionButton for actions. Each accepts its native
+HTML attributes and child content directly. The button defaults to `type="button"`; native
+`disabled`, explicit `type="submit"`, and form attributes retain their normal behavior. Supply an
+accessible name for icon-only controls using `aria-label` or `aria-labelledby`. Title is an optional
+native attribute, and Icon is decorative by default. Visible child text can also provide a name.
 
-Native anchor or button attributes, class/style, and callbacks pass to the control. Use native
-`disabled` on the button variant and explicit `type="submit"`/form attributes when submitting a
-form. Links retain normal browser activation and new-tab behavior; consumers own resolved URLs,
-routing, query parameters, and labels that describe deliberate new-window navigation. The component
-owns no application state or async workflow, and provides no default action or message.
+Both components share a private presentation wrapper: a circular control aligned to the inline end
+of its bottom-sticky container. Native class/style and callbacks apply to the actual anchor or button.
+Consumers own icons, labels, resolved URLs, query parameters, and actions. Link activation and new-tab
+behavior stay browser-native; labels for deliberate new-window navigation should describe that behavior.
 
-The wrapper sticks within the caller's scrolling/containing layout rather than fixing itself to the
-viewport. The app owns surrounding spacing and scroll/layout policy. Customize control size with
-`--dui-floating-action-size` (default `3.5rem`) and icon size with
-`--dui-floating-action-icon-size` (default `--dui-font-size-xxl`). Colors, border, shadow, and focus use
-the existing theme. The control accepts no child content.
+The wrapper stays within the caller's scrolling/containing layout. The app owns surrounding spacing
+and scroll/layout policy. Customize control size with `--dui-floating-action-size` (default `3.5rem`)
+and content/icon size with `--dui-floating-action-icon-size` (default `--dui-font-size-xxl`). Colors,
+border, shadow, and focus use the existing theme. Neither component owns application workflow state.
 
 ## NumberKeypad
 
@@ -602,7 +605,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, FloatingAction, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 

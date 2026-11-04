@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-/** @param {import('@playwright/test').Page} page @param {string} story */
-async function open(page, story) {
+/** @param {import('@playwright/test').Page} page @param {'link' | 'button'} component @param {string} story */
+async function open(page, component, story = 'default') {
 	await page.goto(
-		`/iframe.html?id=actions-floatingaction--${story}&viewMode=story`
+		`/iframe.html?id=actions-floatingaction${component}--${story}&viewMode=story`
 	)
 }
 
@@ -53,7 +53,7 @@ test('button callbacks activate through both Enter and Space without link semant
 test('disabled button cannot receive keyboard focus or dispatch a native click', async ({
 	page
 }) => {
-	await open(page, 'disabled')
+	await open(page, 'button', 'disabled')
 	const button = page.getByRole('button', { name: 'Add an item' })
 	await expect(button).toBeDisabled()
 	await button.evaluate((element) => {
@@ -72,7 +72,7 @@ test('disabled button cannot receive keyboard focus or dispatch a native click',
 test('explicit submit respects native form validation and submits when valid', async ({
 	page
 }) => {
-	await open(page, 'form-submission')
+	await open(page, 'button', 'form-submission')
 	const input = page.getByRole('textbox', { name: 'Item name' })
 	const save = page.getByRole('button', { name: 'Save item' })
 	await save.click()
@@ -88,7 +88,7 @@ test('floating link stays within its scrolling region at narrow widths', async (
 	page
 }) => {
 	await page.setViewportSize({ width: 320, height: 700 })
-	await open(page, 'scrolling-content')
+	await open(page, 'link', 'scrolling-content')
 	const region = page.getByRole('region', { name: 'Scrollable content' })
 	const action = region.getByRole('link', { name: 'Add an item' })
 	await expect(action).toBeVisible()
