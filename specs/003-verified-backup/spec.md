@@ -18,6 +18,10 @@ full restore or production restore safety is claimed. See the
 [preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
 and [current handoff](tasks.md#current-handoff-2026-11-04).
 
+The subsequent PR #23 operation-lock ownership correction is qualified after review with 924 units
+and 13 native Jazz/Chromium cases. Propagation to the notebook-root branch passes 22 browser cases;
+the note branch still requires propagation and qualification. See [lock design](restore-lock-design.md).
+
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
 
 ## User Scenarios & Testing

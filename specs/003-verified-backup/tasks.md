@@ -6,9 +6,17 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**PR #23 operation-lock correction locally qualified after review.** `operationLock` is now an
+explicit acquisition/held/release/failure machine with a minimal Web Locks bridge. Preparation and
+batch coordinators drain work, explicitly release and await native settlement before returning.
+All 924 units (41 focused cases), 13 actual Jazz/Chromium cases, package/consumer and static checks
+pass. See [design and qualification](restore-lock-design.md). The browser harness correction from
+PR #24 is backported without weakening byte assertions. Propagation to #24 is now qualified by
+22 native browser cases; #25 propagation/qualification follows separately. No PR merge is authorized.
+
 **PR #24 stacked on PR #23: one notebook-root batch locally qualified.** After implementation
 review, the user authorized qualification. All 22 actual Jazz/Chromium cases pass (13 prior regressions
-and nine notebook-root cases), alongside 914 units and package/consumer/static checks. Exact title,
+and nine notebook-root cases), alongside the 924-unit shared suite and package/consumer/static checks. Exact title,
 mapped IDs/prefix/reload, no step skipping, conflict, uncertain-write reconciliation, staged-write
 drain/rollback and actual notebook policy denials are covered. See
 [qualification and limits](restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).
