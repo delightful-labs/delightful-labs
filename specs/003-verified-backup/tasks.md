@@ -6,6 +6,16 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**Current qualified correction: older workspace journal native disposal.** Notebook cleanup
+committed locally as 8e5efe0 at the user's request. The journal now has a fixed invoked database
+owner and transaction disposal that retains/clears handles across stop and late native delivery.
+Policy and input/result contracts are unchanged; typed native reports are included in the event
+union. All 213 workspace unit cases and nine Chromium journal cases pass, with four new stop probes.
+Package/strict Publint and static/declaration/lint/format checks pass. See
+[qualification](../001-local-first-foundation/cleanup-review.md#workspace-journal-disposal-qualification-2026-11-04).
+This correction is uncommitted; no push/merge. Remaining audit cleanup is inert error/SDK wrappers;
+the backup restore-journal correction still requires separate review/qualification.
+
 **Current qualified correction: notebook source ownership.** Export/capture correction committed
 locally as 77b008f at the user's request. The user authorized this next cleanup including tests.
 NotebookSource is removed; the fixture source chart owns initialization, availability, lease
@@ -13,8 +23,8 @@ invalidation, writer exclusion and current-owner release. Four new cases plus ex
 18 notebook/package cases, 144 focused backup units, 11 reader cases and four Chromium cases.
 Static/declaration/lint/format checks pass. See
 [qualification](lifecycle-design.md#notebook-source-correction-qualification-2026-11-04).
-This new fixture cleanup is uncommitted; no push/merge. Next audited finding is older workspace
-journal native disposal. Restore-journal correction review/qualification remains separate.
+This fixture cleanup is now committed locally as 8e5efe0; no push/merge. Older workspace
+journal native disposal is qualified above. Restore-journal correction review/qualification remains separate.
 
 **Current qualified correction: export/capture ownership and explicit cleanup recovery.** The user
 continued from implementation review. All 144 focused envelope/inspection/export unit cases,

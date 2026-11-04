@@ -412,3 +412,21 @@ pass. See [qualification](lifecycle-design.md#notebook-source-correction-qualifi
 No full repository suite was run. The new source cleanup remains uncommitted. Next audited source
 finding: the older workspace journal's native disposal boundary. The committed restore-journal
 correction still requires separate review/qualification; these tests do not qualify it.
+
+## Older workspace journal native disposal correction — implemented and tested (2026-11-04)
+
+At the user's request, committed the preceding notebook source cleanup as 8e5efe0, then corrected
+the audited workspace journal disposal boundary. A fixed invoked native owner retains database/
+transaction handles before delivery, closes a late successful open after stop and aborts a late
+upgrade after disposal. Transaction teardown detaches callbacks and attempts native abort without
+inventing abort settlement. The existing chart keeps validation/conflict/transaction decisions.
+The exported event union is aligned with its new native observations for typed consumer compatibility;
+input and result contracts stay the same.
+
+All 213 workspace units and nine real Chromium journal cases pass, including four added native
+stop/deletion/rollback probes. Package/strict Publint and static/declaration/lint/format checks pass.
+See [qualification](../001-local-first-foundation/cleanup-review.md#workspace-journal-disposal-qualification-2026-11-04).
+This correction is uncommitted; no push/merge. It does not qualify the separate restore-journal
+correction or claim rollback after commit/browser-process crash. Remaining audit cleanup includes
+inert payload-error/SDK subscription wrappers; those do not warrant new lifecycle machines merely
+to remove inheritance. Restore-journal review/qualification remains separate.

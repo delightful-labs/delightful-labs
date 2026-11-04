@@ -1,8 +1,10 @@
+import { journalDatabase, type JournalDatabaseEvent } from './journal-native.js'
 export type WorkspaceJournalEvent =
+	| JournalDatabaseEvent
 	| { type: 'SHUTDOWN' | 'CANCEL' | 'TX_COMPLETE' | 'TX_ABORTED' }
 	| { type: 'RECORD'; value: unknown }
 	| { type: 'TX_FAILED'; error: unknown }
-import { assign, fromCallback, fromPromise, sendTo, setup, stateIn } from 'xstate'
+import { assign, fromCallback, sendTo, setup, stateIn } from 'xstate'
 export type WorkspaceJournalResult<Record> =
 	| { outcome: 'succeeded'; record: Record | undefined }
 	| { outcome: 'conflict' | 'cancelled' }
@@ -30,36 +32,23 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 		if (value === undefined) throw new Error('Missing journal resource')
 		return value
 	}
-	const open = fromPromise(
-		() =>
-			new Promise<IDBDatabase>((resolve, reject) => {
-				const request = indexedDB.open(options.databaseName, 1)
-				request.onupgradeneeded = () => {
-					request.result.createObjectStore('attempts', { keyPath: 'key' })
-				}
-				request.onsuccess = () => resolve(request.result)
-				request.onerror = () => reject(request.error)
-			})
-	)
-	const acquire = fromPromise(({ input }: { input: IDBDatabase }) =>
-		Promise.resolve(input.transaction('attempts', 'readwrite'))
-	)
 	// Native resource adapter: commands each perform one operation; the chart chooses policy/staging.
 	const resource = fromCallback<Command, IDBTransaction>(({ input: tx, receive, sendBack }) => {
-		tx.oncomplete = () => sendBack({ type: 'TX_COMPLETE' })
-		tx.onabort = () => sendBack({ type: 'TX_ABORTED' })
+		let report: ((event: WorkspaceJournalEvent) => void) | undefined = sendBack
+		tx.oncomplete = () => report?.({ type: 'TX_COMPLETE' })
+		tx.onabort = () => report?.({ type: 'TX_ABORTED' })
 		tx.onerror = (event) => {
 			const requestError = event.target instanceof IDBRequest ? event.target.error : undefined
 			// Explicit abort rejects pending requests with AbortError but leaves tx.error null.
 			// Its native abort event supplies settlement; those request errors are not new failures.
 			if (requestError?.name === 'AbortError' && tx.error === null) return
-			sendBack({ type: 'TX_FAILED', error: tx.error ?? requestError })
+			report?.({ type: 'TX_FAILED', error: tx.error ?? requestError })
 		}
 		receive((command) => {
 			try {
 				if (command.type === 'READ') {
 					const request = tx.objectStore('attempts').get(command.key)
-					request.onsuccess = () => sendBack({ type: 'RECORD', value: request.result })
+					request.onsuccess = () => report?.({ type: 'RECORD', value: request.result })
 					return
 				}
 				if (command.type === 'INSERT') {
@@ -72,25 +61,29 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 				}
 				tx.abort()
 			} catch (error) {
-				sendBack({ type: 'TX_FAILED', error })
+				report?.({ type: 'TX_FAILED', error })
 				if (command.type === 'ABORT') return
 				try {
 					tx.abort()
 				} catch (abortError) {
-					sendBack({ type: 'TX_FAILED', error: abortError })
+					report?.({ type: 'TX_FAILED', error: abortError })
 				}
 			}
 		})
 		return () => {
+			report = undefined
 			tx.oncomplete = null
 			tx.onabort = null
 			tx.onerror = null
+			try {
+				tx.abort()
+			} catch {
+				/* Native commit/abort may already be terminal. */
+			}
 		}
 	})
-	const close = fromPromise(({ input }: { input: IDBDatabase }) => Promise.resolve(input.close()))
 	type Context = {
 		request: Input
-		database: IDBDatabase | undefined
 		tx: IDBTransaction | undefined
 		raw: unknown
 		record: WorkspaceJournalRecord | undefined
@@ -99,7 +92,7 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 	const machine = setup<
 		Context,
 		Event,
-		{ open: typeof open; acquire: typeof acquire; resource: typeof resource; close: typeof close },
+		{ database: typeof journalDatabase; resource: typeof resource },
 		{},
 		{},
 		{ closing: undefined },
@@ -108,14 +101,13 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 		Input,
 		JournalResult
 	>({
-		actors: { open, acquire, resource, close },
+		actors: { database: journalDatabase, resource },
 		guards: { closing: stateIn({ running: { control: 'closing' } }) }
 	}).createMachine({
 		id: 'workspace-creation-journal',
 		initial: 'running',
 		context: ({ input }) => ({
 			request: input,
-			database: undefined,
 			tx: undefined,
 			raw: undefined,
 			record: undefined,
@@ -125,6 +117,17 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 		states: {
 			running: {
 				type: 'parallel',
+				invoke: {
+					id: 'database',
+					src: 'database',
+					input: () => ({ databaseName: options.databaseName }),
+					onError: {
+						target: '#workspace-creation-journal.failed',
+						actions: assign({
+							result: ({ event }): JournalResult => ({ outcome: 'failed', error: event.error })
+						})
+					}
+				},
 				states: {
 					control: {
 						initial: 'active',
@@ -137,13 +140,10 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 						initial: 'opening',
 						states: {
 							opening: {
-								invoke: {
-									src: 'open',
-									onDone: {
-										target: 'checkingOpen',
-										actions: assign({ database: ({ event }) => event.output })
-									},
-									onError: {
+								entry: sendTo('database', { type: 'OPEN' }),
+								on: {
+									OPENED: 'checkingOpen',
+									OPEN_FAILED: {
 										target: 'finishing',
 										actions: assign({
 											result: ({ event }): JournalResult => ({
@@ -158,11 +158,10 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 								always: [{ guard: 'closing', target: 'closingDatabase' }, { target: 'acquiring' }]
 							},
 							acquiring: {
-								invoke: {
-									src: 'acquire',
-									input: ({ context }) => required(context.database),
-									onDone: { target: 'using', actions: assign({ tx: ({ event }) => event.output }) },
-									onError: {
+								entry: sendTo('database', { type: 'ACQUIRE' }),
+								on: {
+									ACQUIRED: { target: 'using', actions: assign({ tx: ({ event }) => event.tx }) },
+									ACQUIRE_FAILED: {
 										target: 'closingDatabase',
 										actions: assign({
 											result: ({ event }): JournalResult => ({
@@ -352,11 +351,10 @@ export function createWorkspaceJournal<Record extends { key: string }>(options: 
 								}
 							},
 							closingDatabase: {
-								invoke: {
-									src: 'close',
-									input: ({ context }) => required(context.database),
-									onDone: 'finishing',
-									onError: {
+								entry: sendTo('database', { type: 'CLOSE' }),
+								on: {
+									CLOSED: 'finishing',
+									CLOSE_FAILED: {
 										target: 'finishing',
 										actions: assign({
 											result: ({ event }): JournalResult => ({
