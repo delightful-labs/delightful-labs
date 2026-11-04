@@ -4,6 +4,8 @@ import NavigationLink from './Components/NavigationLink.svelte'
 import Text from './Components/Text.svelte'
 import Heading from './Components/Heading.svelte'
 import Button from './Components/Button.svelte'
+import FloatingActionLink from './Components/FloatingActionLink.svelte'
+import FloatingActionButton from './Components/FloatingActionButton.svelte'
 import ButtonContent from './Components/ButtonContent.svelte'
 import Icon from './Components/Icon.svelte'
 import NumberKeypad from './Components/NumberKeypad.svelte'
@@ -45,6 +47,8 @@ export {
 	Text,
 	Heading,
 	Button,
+	FloatingActionLink,
+	FloatingActionButton,
 	ButtonContent,
 	Icon,
 	NumberKeypad,

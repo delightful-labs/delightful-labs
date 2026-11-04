@@ -103,6 +103,33 @@ Error text and borders use dark red on light surfaces and light red on dark surf
 
 Button defaults to `variant="raised"`. Use `variant="flat"` for square bordered controls with no default shadow or pressed movement. Flat pressed colors can be customized with `--dui-button-color-active` and `--dui-button-background-color-active`.
 
+## FloatingActionLink and FloatingActionButton
+
+```svelte
+<FloatingActionLink href={resolvedHref} aria-label={addLabel} title={addLabel}>
+    <Icon icon={AddIcon} />
+</FloatingActionLink>
+<FloatingActionButton aria-label={addLabel} onclick={addItem}>
+    <Icon icon={AddIcon} />
+</FloatingActionButton>
+```
+
+Use FloatingActionLink for navigation and FloatingActionButton for actions. Each accepts its native
+HTML attributes and child content directly. The button defaults to `type="button"`; native
+`disabled`, explicit `type="submit"`, and form attributes retain their normal behavior. Supply an
+accessible name for icon-only controls using `aria-label` or `aria-labelledby`. Title is an optional
+native attribute, and Icon is decorative by default. Visible child text can also provide a name.
+
+Both components share a private presentation wrapper: a circular control aligned to the inline end
+of its bottom-sticky container. Native class/style and callbacks apply to the actual anchor or button.
+Consumers own icons, labels, resolved URLs, query parameters, and actions. Link activation and new-tab
+behavior stay browser-native; labels for deliberate new-window navigation should describe that behavior.
+
+The wrapper stays within the caller's scrolling/containing layout. The app owns surrounding spacing
+and scroll/layout policy. Customize control size with `--dui-floating-action-size` (default `3.5rem`)
+and content/icon size with `--dui-floating-action-icon-size` (default `--dui-font-size-xxl`). Colors,
+border, shadow, and focus use the existing theme. Neither component owns application workflow state.
+
 ## NumberKeypad
 
 ```svelte
@@ -578,7 +605,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 
