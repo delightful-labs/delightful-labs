@@ -10,13 +10,14 @@ The user approved replacing unusable browser permission advice with owner-bound 
 admission; actual server policy still enforces acceptance. Issued/uncertain attempts retain the
 existing reconciliation rules. Preparation leaves the destination incomplete.
 
-Current qualification passes all 914 unit cases, 22 real Jazz/Chromium preparation/attachment/notebook cases,
+Current qualification passes all 914 unit cases, 30 real Jazz/Chromium preparation/attachment/notebook/note cases,
 and package/consumer/static checks. See [attachment qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
 The one-attachment continuation and extracted owner/planner are qualified within that scope. No full
 restore is claimed. The one-notebook-root batch stacked in PR #24, extracted continuation and
 additive schema/writer are now qualified with 914 units and 22 actual Jazz/Chromium cases; see
-[notebook-root evidence and limits](restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04). Note writers,
-fresh graph/relationship/byte comparison and activation remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
+[notebook-root evidence and limits](restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04). A one-note continuation with mapped notebook/nullable attachment relationships is also locally
+qualified; see [note evidence and limits](restore-note-design.md). Fresh graph/relationship/byte
+comparison and activation remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
 T007–T010 remain open. See the [current handoff](tasks.md#current-handoff-2026-11-04).
 
 Journal metadata alone supplies no destination authority, actual content evidence or replay

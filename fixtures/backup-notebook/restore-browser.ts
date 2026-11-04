@@ -21,6 +21,9 @@ import {
 import { createNotebookRootRestore, createNotebookRootWriter } from './restore-notebook-writer.js'
 import { createNotebookRestoreRootMachine, prepareNotebookRootRestore } from './restore-notebook.js'
 
+import { createNotebookNoteRestore, createNotebookNoteWriter } from './restore-note-writer.js'
+import { createNotebookRestoreNoteMachine, prepareNotebookNoteRestore } from './restore-note.js'
+
 type Writer = ReturnType<typeof createNotebookPreparationWriter>
 const config = new URLSearchParams(location.search)
 const appId = config.get('appId'),
@@ -64,7 +67,18 @@ const rootPending: {
 	releaseStage?: () => void
 	staged?: boolean
 } = {}
+const notePending: {
+	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreNoteMachine>>
+	cleanup?: () => void
+	releaseStage?: () => void
+	staged?: boolean
+} = {}
 const api = {
+	notePending,
+	createNotebookNoteRestore,
+	createNotebookNoteWriter,
+	createNotebookRestoreNoteMachine,
+	prepareNotebookNoteRestore,
 	rootPending,
 	createNotebookRootRestore,
 	createNotebookRootWriter,

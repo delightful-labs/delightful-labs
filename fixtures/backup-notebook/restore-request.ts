@@ -26,6 +26,12 @@ export type NotebookAttachmentExpected = NotebookMappedExpected & {
 	contents: Uint8Array<ArrayBuffer>
 }
 export type NotebookRootExpected = NotebookMappedExpected & { title: string }
+export type NotebookNoteExpected = NotebookMappedExpected & {
+	notebookId: string
+	attachmentId: string | null
+	body: string
+	archived: boolean
+}
 export interface NotebookRestoreRequest {
 	release(): void
 	toJSON(): { kind: 'notebookRestoreRequest' }
@@ -43,6 +49,7 @@ export type NotebookRestoreData = NotebookRestorePlanData & {
 	observedJournal: RestoreJournalRecord | undefined
 	attachment: NotebookAttachmentExpected | undefined
 	notebook: NotebookRootExpected | undefined
+	note: NotebookNoteExpected | undefined
 }
 const requests = new WeakMap<NotebookRestoreRequest, { data: NotebookRestoreData; claim(): void }>()
 function prepared(request: NotebookRestoreRequest) {
@@ -81,7 +88,8 @@ export function prepareNotebookRestore(options: NotebookRestoreOptions): Noteboo
 		releaseControl: undefined,
 		observedJournal: undefined,
 		attachment: undefined,
-		notebook: undefined
+		notebook: undefined,
+		note: undefined
 	}
 	let available: NotebookRestoreData | undefined = data
 	const request: NotebookRestoreRequest = {
@@ -112,6 +120,7 @@ function clear(data: NotebookRestoreData) {
 	data.observedJournal = undefined
 	data.attachment = undefined
 	data.notebook = undefined
+	data.note = undefined
 }
 export function requiredNotebookRestoreValue<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Missing notebook restore resource')

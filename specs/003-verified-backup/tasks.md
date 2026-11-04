@@ -6,6 +6,17 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**Next stacked slice: one mapped note and relationships locally qualified.** The user explicitly
+authorized implementation and tests together while away. On `feat/notebook-restore-note` (stacked
+on PR #24 at `81ba2d6`), the concrete note writer reuses existing actors and stable mappings,
+preserves exact body/archive status, and links the mapped notebook and shared/nullable attachment.
+All 30 actual Jazz/Chromium cases pass (22 prior plus eight note cases), along with 914 units and
+package/consumer/static checks. See [design, evidence and limits](restore-note-design.md).
+One explicit invocation writes one note; the final batch reaches comparing and remains incomplete.
+Fresh full-graph/relationship/attachment-byte comparison and activation are next, not implemented.
+Parent PR #24's bounded large-file harness correction is independently green in GitHub CI. No merge
+is authorized. The normal review-before-tests rule remains for later slices unless overridden again.
+
 **PR #24 stacked on PR #23: one notebook-root batch locally qualified.** After implementation
 review, the user authorized qualification. All 22 actual Jazz/Chromium cases pass (13 prior regressions
 and nine notebook-root cases), alongside 914 units and package/consumer/static checks. Exact title,
@@ -207,7 +218,7 @@ reviewed implementation, qualification and limitation documentation; no deployme
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; one attachment batch qualified; notebook-root writer locally qualified; note writers/comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
+- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; one attachment batch qualified; notebook-root and single-note writers locally qualified; full comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,

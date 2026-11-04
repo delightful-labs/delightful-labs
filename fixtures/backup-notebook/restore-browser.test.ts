@@ -1153,3 +1153,450 @@ it('enforces notebook owner/control scope and immutable rows at the actual serve
 	await foreign.context().close()
 	await deleteJournal(page, value)
 })
+
+async function note(page: Page, value: Sample) {
+	return page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const request = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
+		const restore = api.createNotebookNoteRestore({
+			db: api.db,
+			retainDetached: () => {},
+			...value,
+			archive: checked.archive
+		})
+		restore.actor.start()
+		const output = await api.toPromise(restore.actor)
+		restore.request.release()
+		restore.actor.stop()
+		request.release()
+		envelope.stop()
+		const rows = await api.db.all(
+			api.notebookRestoreApp.restoreNotes.where({ destinationId: value.binding.workspaceId }),
+			{ tier: 'remote' }
+		)
+		const destination = await api.db.one(
+			api.notebookRestoreApp.restoreDestinations.where({ id: value.binding.workspaceId }),
+			{ tier: 'remote' }
+		)
+		return { output, rows, destination, issued: api.issued() }
+	}, value)
+}
+async function preparedNotes(page: Page, value: Sample) {
+	await preparedNotebook(page, value)
+	const root = await notebook(page, value)
+	expect(root.output.outcome).toBe('batchWritten')
+	return root.output.record
+}
+it('writes one mapped note at a time with exact bodies, archived flags, shared/null relationships and retained receipts through comparing', async () => {
+	const page = await open(),
+		value = await sample(page)
+	const initial = await preparedNotes(page, value)
+	if (!initial) throw new Error('Missing journal')
+	const notebookId = initial.intent.plan.mappings.find(
+		(entry) => entry.kind === 'record' && entry.type === 'notebook'
+	)?.destinationId
+	const attachmentId = initial.intent.plan.mappings.find(
+		(entry) => entry.kind === 'attachment'
+	)?.destinationId
+	let previous = initial
+	for (const [index, source] of [
+		{
+			id: 'archived',
+			body: 'Preserve archived content\u0000exactly.',
+			archived: true,
+			attachmentId
+		},
+		{ id: 'empty', body: '', archived: false, attachmentId: null },
+		{ id: 'first', body: 'First line\nSecond line\r\nCafe\u0301 ☕', archived: false, attachmentId }
+	].entries()) {
+		const result = await note(page, value)
+		expect(result.output.outcome).toBe('batchWritten')
+		expect(result.issued).toBe(4 + index)
+		expect(result.rows).toHaveLength(index + 1)
+		const mapping = initial.intent.plan.mappings.find(
+			(entry) => entry.kind === 'record' && entry.type === 'note' && entry.sourceId === source.id
+		)
+		expect(result.rows.find((row) => row.id === mapping?.destinationId)).toMatchObject({
+			notebookId,
+			attachmentId: source.attachmentId,
+			body: source.body,
+			archived: source.archived,
+			destinationId: value.binding.workspaceId,
+			ownerId: value.binding.identityId,
+			operationId: value.binding.operationId
+		})
+		const after = result.output.record?.checkpoint,
+			prior = previous.checkpoint
+		if (!after || after.kind === 'conflict' || prior.kind === 'conflict' || !result.output.record)
+			throw new Error('Expected progress')
+		expect(after.completed.slice(0, prior.completed.length)).toEqual(prior.completed)
+		expect(after.completed).toHaveLength(prior.completed.length + 1)
+		expect(after.kind).toBe(index === 2 ? 'comparing' : 'writing')
+		expect(result.output.record.intent).toEqual(initial.intent)
+		expect(result.destination?.status).toBe('incomplete')
+		previous = result.output.record
+	}
+	await page.reload()
+	await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
+	const resumed = await note(page, value)
+	expect(resumed.output.outcome).toBe('noNoteStep')
+	expect(resumed.issued).toBe(0)
+	expect(resumed.rows).toHaveLength(3)
+	expect(resumed.output.record).toEqual(previous)
+	expect(resumed.destination?.status).toBe('incomplete')
+	await deleteJournal(page, value)
+})
+it('does not skip pending notebook preparation or accept another archive for a note step', async () => {
+	const page = await open(),
+		value = await sample(page)
+	expect((await note(page, value)).issued).toBe(0)
+	await preparedNotebook(page, value)
+	const before = await discover(page, value)
+	const blocked = await note(page, value)
+	expect(blocked.output.outcome).toBe('noNoteStep')
+	expect(blocked.issued).toBe(2)
+	expect(blocked.output.record).toEqual(before.record)
+	expect(blocked.rows).toEqual([])
+	expect((await notebook(page, value)).output.outcome).toBe('batchWritten')
+	const original = await discover(page, value)
+	const other = await sample(page)
+	const wrong = await note(page, { ...value, file: other.file })
+	expect(wrong.output.outcome).toBe('conflict')
+	expect(wrong.issued).toBe(3)
+	expect((await discover(page, value)).record).toEqual(original.record)
+	await deleteJournal(page, value)
+})
+for (const mismatch of ['body', 'attachment']) {
+	it(`rejects conflicting note ${mismatch} without overwriting or advancing the journal`, async () => {
+		const page = await open(),
+			value = await sample(page)
+		const before = await preparedNotes(page, value)
+		if (!before) throw new Error('Missing journal')
+		const mappings = before.intent.plan.mappings
+		const id = mappings.find(
+			(entry) => entry.kind === 'record' && entry.type === 'note' && entry.sourceId === 'archived'
+		)?.destinationId
+		const notebookId = mappings.find(
+			(entry) => entry.kind === 'record' && entry.type === 'notebook'
+		)?.destinationId
+		const attachmentId = mappings.find((entry) => entry.kind === 'attachment')?.destinationId
+		if (!id || !notebookId || !attachmentId) throw new Error('Missing mappings')
+		await page.evaluate(
+			async ({ value, id, notebookId, attachmentId, mismatch }) => {
+				const api = window.DLFRestoreQualification
+				await api.db
+					.insert(
+						api.notebookRestoreApp.restoreNotes,
+						{
+							destinationId: value.binding.workspaceId,
+							ownerId: api.ownerId,
+							operationId: value.binding.operationId,
+							notebookId,
+							attachmentId: mismatch === 'attachment' ? null : attachmentId,
+							body:
+								mismatch === 'body'
+									? 'Conflicting body'
+									: 'Preserve archived content\u0000exactly.',
+							archived: true
+						},
+						{ id }
+					)
+					.wait({ tier: 'global' })
+			},
+			{ value, id, notebookId, attachmentId, mismatch }
+		)
+		const result = await note(page, value)
+		expect(result.output.outcome).toBe('conflict')
+		expect(result.issued).toBe(3)
+		expect(result.output.record).toEqual(before)
+		expect(result.rows).toHaveLength(1)
+		expect(result.rows[0]?.body).toBe(
+			mismatch === 'body' ? 'Conflicting body' : 'Preserve archived content\u0000exactly.'
+		)
+		await deleteJournal(page, value)
+	})
+}
+it('reconciles an uncertain note after reload using actual fields and relationship IDs while preserving its attempt', async () => {
+	const page = await open(),
+		value = await sample(page)
+	const before = await preparedNotes(page, value)
+	await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
+		const request = api.prepareNotebookNoteRestore({ ...value, archive: checked.archive })
+		const writer = api.createNotebookNoteWriter(api.db, request, () => {})
+		api.notePending.actor = api
+			.createActor(
+				api.createNotebookRestoreNoteMachine({
+					...writer,
+					acceptRemote: () => new Promise(() => {})
+				}),
+				{ input: { request } }
+			)
+			.start()
+		api.notePending.cleanup = () => {
+			request.release()
+			open.release()
+			envelope.stop()
+		}
+	}, value)
+	await expect
+		.poll(async () => (await discover(page, value)).record?.checkpoint)
+		.toMatchObject({ current: { settlement: { local: 'persisted', remote: 'unobserved' } } })
+	await expect
+		.poll(() =>
+			page.evaluate(async (id) => {
+				const api = window.DLFRestoreQualification
+				return (
+					await api.db.all(api.notebookRestoreApp.restoreNotes.where({ destinationId: id }), {
+						tier: 'remote'
+					})
+				).length
+			}, value.binding.workspaceId)
+		)
+		.toBe(1)
+	const interrupted = await page.evaluate(async () => {
+		const api = window.DLFRestoreQualification,
+			actor = api.notePending.actor
+		if (!actor) throw new Error('Missing note actor')
+		actor.send({ type: 'CANCEL' })
+		const output = await api.toPromise(actor)
+		api.notePending.cleanup?.()
+		actor.stop()
+		return output
+	})
+	expect(interrupted.outcome).toBe('cancelled')
+	const prior = interrupted.record?.checkpoint
+	if (!prior || prior.kind !== 'writing' || prior.current.status !== 'issued')
+		throw new Error('Expected uncertain note')
+	await page.reload()
+	await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
+	const result = await note(page, value)
+	expect(result.output.outcome).toBe('batchWritten')
+	expect(result.issued).toBe(0)
+	const after = result.output.record?.checkpoint
+	if (!after || after.kind !== 'writing' || !before || before.checkpoint.kind !== 'writing')
+		throw new Error('Expected prefix')
+	expect(after.completed.slice(0, 3)).toEqual(before.checkpoint.completed)
+	expect(after.completed[3]).toMatchObject({
+		basis: 'remoteContentMatch',
+		localPersistence: 'persisted',
+		attempt: {
+			issuance: prior.current.issuance,
+			transactionId: prior.current.transactionId,
+			settlement: prior.current.settlement
+		}
+	})
+	expect(result.rows[0]?.body).toBe('Preserve archived content\u0000exactly.')
+	await deleteJournal(page, value)
+})
+
+for (const interruption of ['CANCEL', 'INVALIDATE']) {
+	it(`drains note staging and rolls back on ${interruption} without automatically replaying`, async () => {
+		const page = await open(),
+			value = await sample(page)
+		const before = await preparedNotes(page, value)
+		await page.evaluate(async (value) => {
+			const api = window.DLFRestoreQualification
+			const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+			const envelope = api
+				.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+				.start()
+			const checked = await api.toPromise(envelope)
+			if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
+			const request = api.prepareNotebookNoteRestore({ ...value, archive: checked.archive })
+			const writer = api.createNotebookNoteWriter(api.db, request, () => {})
+			const gate = new Promise<void>((resolve) => {
+				api.notePending.releaseStage = resolve
+			})
+			api.notePending.actor = api
+				.createActor(
+					api.createNotebookRestoreNoteMachine({
+						...writer,
+						stage: async (...args) => {
+							await writer.stage(...args)
+							api.notePending.staged = true
+							await gate
+						}
+					}),
+					{ input: { request } }
+				)
+				.start()
+			api.notePending.cleanup = () => {
+				request.release()
+				open.release()
+				envelope.stop()
+			}
+		}, value)
+		await page.waitForFunction(() => window.DLFRestoreQualification.notePending.staged)
+		const result = await page.evaluate(
+			async ({ value, interruption }) => {
+				const api = window.DLFRestoreQualification,
+					actor = api.notePending.actor
+				if (!actor) throw new Error('Missing note actor')
+				actor.send({
+					type: 'INVALIDATE',
+					binding: { ...value.binding, generation: value.binding.generation + 1 }
+				})
+				if (actor.getSnapshot().status !== 'active')
+					throw new Error('Mismatched binding terminated note actor')
+				actor.send(
+					interruption === 'CANCEL'
+						? { type: 'CANCEL' }
+						: { type: 'INVALIDATE', binding: value.binding }
+				)
+				const beforeDrain = actor.getSnapshot().status
+				api.notePending.releaseStage?.()
+				const output = await api.toPromise(actor)
+				api.notePending.cleanup?.()
+				actor.stop()
+				const rows = await api.db.all(
+					api.notebookRestoreApp.restoreNotes.where({ destinationId: value.binding.workspaceId }),
+					{ tier: 'remote' }
+				)
+				return { output, beforeDrain, rows, issued: api.issued() }
+			},
+			{ value, interruption }
+		)
+		expect(result.beforeDrain).toBe('active')
+		expect(result.output.outcome).toBe(interruption === 'CANCEL' ? 'cancelled' : 'invalidated')
+		expect(result.issued).toBe(3)
+		expect(result.rows).toEqual([])
+		const after = result.output.record?.checkpoint
+		if (!after || after.kind !== 'writing' || !before || before.checkpoint.kind !== 'writing')
+			throw new Error('Expected prefix')
+		expect(after.completed).toEqual(before.checkpoint.completed)
+		expect(after.current).toMatchObject({
+			status: 'issued',
+			settlement: { local: 'unobserved', remote: 'unobserved' }
+		})
+		const resumed = await note(page, value)
+		expect(resumed.output.outcome).toBe('incomplete')
+		expect(resumed.issued).toBe(3)
+		expect(resumed.output.record).toEqual(result.output.record)
+		await deleteJournal(page, value)
+	})
+}
+it('enforces note relationship scope, owner-only reads and immutable rows at the actual server boundary', async () => {
+	const page = await open(),
+		value = await sample(page)
+	await preparedNotes(page, value)
+	const original = await note(page, value)
+	expect(original.output.outcome).toBe('batchWritten')
+	const row = original.rows[0]
+	if (!row) throw new Error('Missing restored note')
+	const other = await sample(page)
+	const otherRecord = await preparedNotes(page, other)
+	const otherNotebook = otherRecord?.intent.plan.mappings.find(
+		(entry) => entry.kind === 'record' && entry.type === 'notebook'
+	)?.destinationId
+	const otherAttachment = otherRecord?.intent.plan.mappings.find(
+		(entry) => entry.kind === 'attachment'
+	)?.destinationId
+	if (!otherNotebook || !otherAttachment) throw new Error('Missing other destination mappings')
+	const denied = await page.evaluate(
+		async ({ row, otherNotebook, otherAttachment }) => {
+			const api = window.DLFRestoreQualification
+			async function denial(effect: () => PromiseLike<unknown>) {
+				try {
+					await effect()
+					return 'accepted'
+				} catch (error) {
+					if (
+						error instanceof api.PersistedWriteRejectedError &&
+						error.code === 'permission_denied'
+					)
+						return 'permission_denied'
+					throw error
+				}
+			}
+			const base = {
+				destinationId: row.destinationId,
+				ownerId: row.ownerId,
+				operationId: row.operationId,
+				notebookId: row.notebookId,
+				attachmentId: row.attachmentId,
+				body: 'Policy fixture',
+				archived: false
+			}
+			const outcomes: string[] = []
+			for (const fields of [
+				{ ...base, notebookId: otherNotebook },
+				{ ...base, attachmentId: otherAttachment },
+				{ ...base, notebookId: crypto.randomUUID() },
+				{ ...base, attachmentId: crypto.randomUUID() },
+				{ ...base, operationId: crypto.randomUUID() },
+				{ ...base, ownerId: crypto.randomUUID() }
+			])
+				outcomes.push(
+					await denial(() =>
+						api.db
+							.insert(api.notebookRestoreApp.restoreNotes, fields, { id: crypto.randomUUID() })
+							.wait({ tier: 'global' })
+					)
+				)
+			outcomes.push(
+				await denial(() =>
+					api.db
+						.update(api.notebookRestoreApp.restoreNotes, row.id, { body: 'Changed' })
+						.wait({ tier: 'global' })
+				)
+			)
+			outcomes.push(
+				await denial(() =>
+					api.db.delete(api.notebookRestoreApp.restoreNotes, row.id).wait({ tier: 'global' })
+				)
+			)
+			const fresh = await api.db.one(api.notebookRestoreApp.restoreNotes.where({ id: row.id }), {
+				tier: 'remote'
+			})
+			return { outcomes, fresh }
+		},
+		{ row, otherNotebook, otherAttachment }
+	)
+	expect(denied.outcomes).toEqual(Array.from({ length: 8 }, () => 'permission_denied'))
+	expect(denied.fresh).toEqual(row)
+	const foreign = await open()
+	const foreignResult = await foreign.evaluate(async (row) => {
+		const api = window.DLFRestoreQualification
+		const observed = await api.db.one(api.notebookRestoreApp.restoreNotes.where({ id: row.id }), {
+			tier: 'remote'
+		})
+		try {
+			await api.db
+				.insert(
+					api.notebookRestoreApp.restoreNotes,
+					{
+						destinationId: row.destinationId,
+						ownerId: row.ownerId,
+						operationId: row.operationId,
+						notebookId: row.notebookId,
+						attachmentId: row.attachmentId,
+						body: 'Forged owner',
+						archived: false
+					},
+					{ id: crypto.randomUUID() }
+				)
+				.wait({ tier: 'global' })
+			return { observed, outcome: 'accepted' }
+		} catch (error) {
+			if (error instanceof api.PersistedWriteRejectedError && error.code === 'permission_denied')
+				return { observed, outcome: 'permission_denied' }
+			throw error
+		}
+	}, row)
+	expect(foreignResult).toEqual({ observed: null, outcome: 'permission_denied' })
+	await foreign.context().close()
+	await deleteJournal(page, value)
+	await deleteJournal(page, other)
+})

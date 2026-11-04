@@ -12,8 +12,10 @@ incomplete destination with durable intent and mappings, separate settlement obs
 same-browser reload reconciliation. A one-attachment continuation and the shared owner/planner are now locally qualified:
 914 unit tests and 13 real Jazz/Chromium preparation/attachment cases pass for PR #23.
 The one-notebook-root batch stacked in PR #24 and its extracted continuation/schema/writer are now
-locally qualified: 914 units and 22 actual Jazz/Chromium preparation/attachment/notebook cases pass. Note writers, fresh full-content comparison and
-activation remain unimplemented. T006/T012 and Finance adoption remain incomplete; no successful
+locally qualified: 914 units and 22 actual Jazz/Chromium preparation/attachment/notebook cases pass.
+The next single-note continuation and actual mapped relationships are now locally qualified with
+914 units and 30 real Jazz/Chromium cases. Fresh full-content comparison and activation remain
+unimplemented; reaching the comparing checkpoint is not a verified restore. T006/T012 and Finance adoption remain incomplete; no successful
 full restore or production restore safety is claimed. See the
 [preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
 and [current handoff](tasks.md#current-handoff-2026-11-04).
