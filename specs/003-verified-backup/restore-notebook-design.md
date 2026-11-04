@@ -126,3 +126,12 @@ by test teardown. Qualification runs used synthetic data only. Scope remains one
 note records/relationships, fresh full-graph comparison and activation are unimplemented. Earlier
 completed steps are not freshly revalidated by this one-step continuation. No cross-browser/device,
 forced-crash, offline restart, Finance completeness or production restore safety claim follows.
+
+### Parent CI harness correction (2026-11-04)
+
+The first PR #24 CI run timed out only the 1 MiB attachment case at 30 seconds; 21 other cases
+passed. The harness now closes browser contexts after every test, compares every large-payload byte
+inside Chromium instead of transferring a million-element actual array back to Node, and gives
+that single large case a bounded 90-second timeout. All 22 real browser cases pass locally after
+this correction; CI must qualify the pushed correction independently. Assertions and payload size
+were retained, and this is not a restore performance guarantee.

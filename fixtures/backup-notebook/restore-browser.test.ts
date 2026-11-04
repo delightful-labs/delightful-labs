@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
 import { jazzPlugin } from 'jazz-tools/dev/vite'
@@ -31,6 +31,9 @@ afterAll(async () => {
 	await browser?.close()
 	await web?.close()
 	await authority?.stop()
+})
+afterEach(async () => {
+	await Promise.all(contexts.splice(0).map((context) => context.close()))
 })
 async function open() {
 	const context = await browser.newContext()
@@ -535,43 +538,48 @@ it('refuses first-write admission for a different restoring identity before tran
 	await page.context().close()
 })
 
-async function attachment(page: Page, value: Sample) {
-	return page.evaluate(async (value) => {
-		const api = window.DLFRestoreQualification
-		const request = api.prepareArchiveOpen(new Uint8Array(value.file))
-		const envelope = api
-			.createActor(api.createArchiveEnvelopeMachine(), { input: { request } })
-			.start()
-		const checked = await api.toPromise(envelope)
-		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
-		const restore = api.createNotebookAttachmentRestore({
-			db: api.db,
-			retainDetached: () => {},
-			binding: value.binding,
-			databaseName: value.databaseName,
-			archive: checked.archive
-		})
-		restore.actor.start()
-		const output = await api.toPromise(restore.actor)
-		restore.request.release()
-		restore.actor.stop()
-		request.release()
-		envelope.stop()
-		const rows = await api.db.all(
-			api.notebookRestoreApp.restoreAttachments.where({ destinationId: value.binding.workspaceId }),
-			{ tier: 'remote' }
-		)
-		const destination = await api.db.one(
-			api.notebookRestoreApp.restoreDestinations.where({ id: value.binding.workspaceId }),
-			{ tier: 'remote' }
-		)
-		return {
-			output,
-			issued: api.issued(),
-			rows: rows.map((row) => ({ ...row, contents: Array.from(row.contents) })),
-			destination
-		}
-	}, value)
+async function attachment(page: Page, value: Sample, summarize = false) {
+	return page.evaluate(
+		async ({ value, summarize }) => {
+			const api = window.DLFRestoreQualification
+			const request = api.prepareArchiveOpen(new Uint8Array(value.file))
+			const envelope = api
+				.createActor(api.createArchiveEnvelopeMachine(), { input: { request } })
+				.start()
+			const checked = await api.toPromise(envelope)
+			if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
+			const restore = api.createNotebookAttachmentRestore({
+				db: api.db,
+				retainDetached: () => {},
+				binding: value.binding,
+				databaseName: value.databaseName,
+				archive: checked.archive
+			})
+			restore.actor.start()
+			const output = await api.toPromise(restore.actor)
+			restore.request.release()
+			restore.actor.stop()
+			request.release()
+			envelope.stop()
+			const rows = await api.db.all(
+				api.notebookRestoreApp.restoreAttachments.where({
+					destinationId: value.binding.workspaceId
+				}),
+				{ tier: 'remote' }
+			)
+			const destination = await api.db.one(
+				api.notebookRestoreApp.restoreDestinations.where({ id: value.binding.workspaceId }),
+				{ tier: 'remote' }
+			)
+			return {
+				output,
+				issued: api.issued(),
+				rows: rows.map((row) => ({ ...row, contents: summarize ? [] : Array.from(row.contents) })),
+				destination
+			}
+		},
+		{ value, summarize }
+	)
 }
 it('writes actual attachment bytes, preserves preparation evidence, and does not replay after reload', async () => {
 	const page = await open(),
@@ -602,18 +610,34 @@ it('writes actual attachment bytes, preserves preparation evidence, and does not
 })
 
 for (const size of [0, 1024 * 1024]) {
-	it(`restores and freshly reads ${size} attachment bytes through the actual root`, async () => {
-		const page = await open(),
-			value = await sample(page, size)
-		expect(await initialize(page, value)).toBe('initialized')
-		expect((await run(page, value, 'new')).outcome).toBe('prepared')
-		const result = await attachment(page, value)
-		expect(result.output.outcome).toBe('batchWritten')
-		expect(result.rows[0]?.contents).toEqual(Array.from({ length: size }, (_, i) => i % 251))
-		expect(result.rows[0]?.fileName).toBe('Cafe\u0301 ☕.bin')
-		expect(result.destination?.status).toBe('incomplete')
-		await deleteJournal(page, value)
-	})
+	it(
+		`restores and freshly reads ${size} attachment bytes through the actual root`,
+		async () => {
+			const page = await open(),
+				value = await sample(page, size)
+			expect(await initialize(page, value)).toBe('initialized')
+			expect((await run(page, value, 'new')).outcome).toBe('prepared')
+			const result = await attachment(page, value, true)
+			expect(result.output.outcome).toBe('batchWritten')
+			const actual = await page.evaluate(async (id) => {
+				const api = window.DLFRestoreQualification
+				const row = await api.db.one(
+					api.notebookRestoreApp.restoreAttachments.where({ destinationId: id }),
+					{ tier: 'remote' }
+				)
+				if (!row) throw new Error('Missing actual attachment')
+				return {
+					size: row.contents.byteLength,
+					exact: row.contents.every((byte, index) => byte === index % 251)
+				}
+			}, value.binding.workspaceId)
+			expect(actual).toEqual({ size, exact: true })
+			expect(result.rows[0]?.fileName).toBe('Cafe\u0301 ☕.bin')
+			expect(result.destination?.status).toBe('incomplete')
+			await deleteJournal(page, value)
+		},
+		size === 0 ? 30000 : 90000
+	)
 }
 it('rejects conflicting actual bytes despite a matching declared digest without overwriting or replay', async () => {
 	const page = await open(),
