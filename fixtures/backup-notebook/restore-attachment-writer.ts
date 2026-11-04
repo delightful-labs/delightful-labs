@@ -1,26 +1,28 @@
 import { z } from 'zod'
-import { createActor } from 'xstate'
+import { assign, not, createActor, fromCallback, fromPromise, setup } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { payloadLimits } from 'delightful-local-first/backup/archive'
 import type { RestoreJournalIntent } from 'delightful-local-first/backup/restore/journal'
 import type {
 	RestorePlannedWrite,
-	RestoreStepPresence,
-	RestoreStepWriter
-} from 'delightful-local-first/backup/restore/batch'
+	RestoreDestinationInput,
+	RestoreDestinationResult,
+	RestoreTransactionWriter,
+	RestoreEvent
+} from 'delightful-local-first/backup/restore'
+import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
+import { sameBackupBinding } from 'delightful-local-first/backup/export'
 import { notebookRestoreApp } from './restore-schema.js'
-import { createNotebookPreparationWriter } from './restore-writer.js'
+import { createNotebookTransactionWriter } from './restore-writer.js'
 import {
+	prepareNotebookRestore,
 	notebookRestoreData,
 	requiredNotebookRestoreValue as required,
 	type NotebookRestoreRequest,
 	type NotebookRestoreOptions,
 	type NotebookAttachmentExpected
 } from './restore-request.js'
-import {
-	createNotebookRestoreAttachmentMachine,
-	prepareNotebookAttachmentRestore
-} from './restore-attachment.js'
+import { createNotebookRestoreAttachmentMachine } from './restore-attachment.js'
 
 const identifier = z.string().min(1).max(256)
 const digest = z.string().regex(/^[0-9a-f]{64}$/)
@@ -103,95 +105,280 @@ function attachmentMatches(
 		file.contents.every((byte, index) => byte === expected.contents[index])
 	)
 }
-/** Pure decoding/content classification only; no I/O, retries or workflow advancement. */
-function presence(
-	raw: unknown,
-	expected: NotebookAttachmentExpected,
-	intent: RestoreJournalIntent,
-	step: RestorePlannedWrite
-): RestoreStepPresence {
-	const observed = destinationObservation.safeParse(raw)
-	if (!observed.success) return 'unavailable'
-	if (
-		!expectedScopeMatches(expected, intent, step) ||
-		!expectedMappingMatches(expected, intent, step)
-	)
-		return 'conflict'
-	if (!destinationMatches(observed.data, intent)) return 'conflict'
-	const file = observed.data.attachments[0]
-	if (!file) return 'missingOrHidden'
-	return attachmentMatches(file, expected) ? 'match' : 'conflict'
-}
 function query(intent: RestoreJournalIntent, expected: NotebookAttachmentExpected) {
 	return notebookRestoreApp.restoreDestinations
 		.where({ id: intent.operation.destinationWorkspaceId })
 		.include({ attachments: notebookRestoreApp.restoreAttachments.where({ id: expected.id }) })
 }
-/** Every asynchronous method performs one SDK leaf against the original bound database. */
-export function createNotebookAttachmentWriter(
-	db: Db,
-	request: NotebookRestoreRequest,
-	retainDetached: RestoreStepWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached']
-): RestoreStepWriter<Transaction<'mergeable'>, WriteHandle> {
-	const native = createNotebookPreparationWriter(db, retainDetached)
-	const expected = () => required(notebookRestoreData({ request }).attachment)
-	return {
-		...native,
-		readRemote: (intent, step) => {
-			const file = expected()
-			return db
-				.one(query(intent, file), { tier: 'remote' })
-				.then((row) => presence(row, file, intent, step))
-		},
-		checkAuthority: (intent, step) =>
-			Promise.resolve(
-				db.getAuthState().session?.user.account === intent.operation.identityId &&
-					expectedScopeMatches(expected(), intent, step) &&
-					expectedMappingMatches(expected(), intent, step)
-			),
-		readTransaction: (transaction, intent, step) => {
-			const file = expected()
-			return transaction.one(query(intent, file)).then((row) => presence(row, file, intent, step))
-		},
-		stage(transaction, intent, step) {
-			const file = expected()
-			// Recheck atomic scope beside the mutation; the chart owns issuance eligibility.
-			if (
-				db.getAuthState().session?.user.account !== intent.operation.identityId ||
-				!expectedScopeMatches(file, intent, step) ||
-				!expectedMappingMatches(file, intent, step)
-			)
-				throw new Error('Attachment write scope changed')
-			transaction.insert(
-				notebookRestoreApp.restoreAttachments,
-				{
-					destinationId: file.destinationId,
-					ownerId: file.ownerId,
-					operationId: file.operationId,
-					mediaType: file.mediaType,
-					fileName: file.fileName,
-					sizeBytes: file.sizeBytes,
-					sha256: file.sha256,
-					contents: file.contents
-				},
-				{ id: file.id }
-			)
-		}
+/** The destination actor borrows a transaction; the shared write actor owns its full lifetime. */
+export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreRequest) {
+	type Input = RestoreDestinationInput<Transaction<'mergeable'>>
+	type Handle = { toJSON(): { kind: 'notebookAttachmentObservation' } }
+	type Context = {
+		input: Input
+		handle: Handle
+		interruption: 'cancelled' | 'closed' | 'invalidated' | undefined
+		result: RestoreDestinationResult
 	}
+	const observations = new WeakMap<Handle, { observed: DestinationObservation | undefined }>()
+	const expected = () => required(notebookRestoreData({ request }).attachment)
+	const observed = (context: Context) => observations.get(context.handle)?.observed
+	// This is result admission into an owned observation buffer, not workflow classification.
+	const consume = (handle: Handle, raw: unknown) => {
+		const cell = observations.get(handle)
+		if (!cell) return
+		const parsed = destinationObservation.safeParse(raw)
+		cell.observed = parsed.success ? parsed.data : undefined
+	}
+	const actors = {
+		observations: fromCallback<
+			{ type: string },
+			{
+				handle: Handle
+				owner: { subscribe(observer: { error: (error: unknown) => void }): { unsubscribe(): void } }
+			}
+		>(({ input }) => {
+			// As with transaction custody, owner failure must also release private observations.
+			const clear = () => {
+				observations.delete(input.handle)
+			}
+			const subscription = input.owner.subscribe({ error: clear })
+			return () => {
+				subscription.unsubscribe()
+				clear()
+			}
+		}),
+		remote: fromPromise<void, Context>(({ input }) =>
+			db
+				.one(query(input.input.intent, expected()), { tier: 'remote' })
+				.then((row) => consume(input.handle, row))
+		),
+		read: fromPromise<void, Context>(({ input }) => {
+			const access = restoreTransactionAccess(input.input)
+			return access.call((transaction) =>
+				transaction
+					.one(query(input.input.intent, expected()))
+					.then((row) => consume(input.handle, row))
+			)
+		}),
+		stage: fromPromise<void, Context>(({ input }) => {
+			const access = restoreTransactionAccess(input.input),
+				file = expected()
+			return access.call((transaction) => {
+				// Atomic identity invariant beside the one mutation; admission/routing lives in states.
+				if (db.getAuthState().session?.user.account !== input.input.intent.operation.identityId)
+					throw new Error('Attachment identity changed')
+				transaction.insert(
+					notebookRestoreApp.restoreAttachments,
+					{
+						destinationId: file.destinationId,
+						ownerId: file.ownerId,
+						operationId: file.operationId,
+						mediaType: file.mediaType,
+						fileName: file.fileName,
+						sizeBytes: file.sizeBytes,
+						sha256: file.sha256,
+						contents: file.contents
+					},
+					{ id: file.id }
+				)
+			})
+		})
+	}
+	const model = setup<
+		Context,
+		RestoreEvent,
+		typeof actors,
+		{},
+		{ interrupt: undefined },
+		{
+			interrupted: undefined
+			currentBinding: undefined
+			scopeMatches: undefined
+			remoteOperation: undefined
+			authorityOperation: undefined
+			readOperation: undefined
+			stageOperation: undefined
+			identityMatches: undefined
+			hasObservation: undefined
+			controlMatches: undefined
+			filePresent: undefined
+			contentMatches: undefined
+		},
+		never,
+		string,
+		Input,
+		RestoreDestinationResult
+	>({
+		actors,
+		guards: {
+			interrupted: ({ context }) => context.interruption !== undefined,
+			currentBinding: ({ context, event }) =>
+				event.type === 'INVALIDATE' && sameBackupBinding(context.input.binding, event.binding),
+			scopeMatches: ({ context }) =>
+				expectedScopeMatches(expected(), context.input.intent, context.input.step) &&
+				expectedMappingMatches(expected(), context.input.intent, context.input.step),
+			remoteOperation: ({ context }) => context.input.operation === 'remote',
+			authorityOperation: ({ context }) => context.input.operation === 'authority',
+			readOperation: ({ context }) => context.input.operation === 'read',
+			stageOperation: ({ context }) => context.input.operation === 'stage',
+			identityMatches: ({ context }) =>
+				db.getAuthState().session?.user.account === context.input.intent.operation.identityId,
+			hasObservation: ({ context }) => observed(context) !== undefined,
+			controlMatches: ({ context }) => {
+				const row = observed(context)
+				return row !== undefined && destinationMatches(row, context.input.intent)
+			},
+			filePresent: ({ context }) => observed(context)?.attachments.length === 1,
+			contentMatches: ({ context }) => {
+				const file = observed(context)?.attachments[0]
+				return file !== undefined && attachmentMatches(file, expected())
+			}
+		},
+		actions: {
+			interrupt: assign({
+				interruption: ({ context, event }) =>
+					context.interruption ??
+					(event.type === 'SHUTDOWN'
+						? 'closed'
+						: event.type === 'INVALIDATE'
+							? 'invalidated'
+							: 'cancelled')
+			})
+		}
+	})
+	const input = ({ context }: { context: Context }) => context
+	return model.createMachine({
+		id: 'notebook-attachment-destination',
+		initial: 'working',
+		context: ({ input }) => {
+			const handle: Handle = { toJSON: () => ({ kind: 'notebookAttachmentObservation' }) }
+			observations.set(handle, { observed: undefined })
+			return { input, handle, interruption: undefined, result: 'unavailable' }
+		},
+		output: ({ context }) => context.interruption ?? context.result,
+		on: {
+			CANCEL: { actions: 'interrupt' },
+			SHUTDOWN: { actions: 'interrupt' },
+			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
+		},
+		states: {
+			working: {
+				initial: 'admitting',
+				invoke: {
+					src: 'observations',
+					input: ({ context, self }) => ({ handle: context.handle, owner: self }),
+					onError: 'unavailable'
+				},
+				states: {
+					admitting: {
+						always: [
+							{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
+							{ guard: 'scopeMatches', target: 'selectingOperation' },
+							{ target: '#notebook-attachment-destination.conflict' }
+						]
+					},
+					selectingOperation: {
+						always: [
+							{ guard: 'remoteOperation', target: 'readingRemote' },
+							{ guard: 'authorityOperation', target: 'admittingIdentity' },
+							{ guard: 'readOperation', target: 'readingTransaction' },
+							{ guard: 'stageOperation', target: 'admittingStage' },
+							{ target: '#notebook-attachment-destination.unavailable' }
+						]
+					},
+					readingRemote: {
+						invoke: {
+							src: 'remote',
+							input,
+							onDone: [
+								{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
+								{ target: 'checkingObservation' }
+							],
+							onError: '#notebook-attachment-destination.unavailable'
+						}
+					},
+					readingTransaction: {
+						invoke: {
+							src: 'read',
+							input,
+							onDone: [
+								{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
+								{ target: 'checkingObservation' }
+							],
+							onError: '#notebook-attachment-destination.unavailable'
+						}
+					},
+					checkingObservation: {
+						always: [
+							{
+								guard: not('hasObservation'),
+								target: '#notebook-attachment-destination.unavailable'
+							},
+							{ guard: not('controlMatches'), target: '#notebook-attachment-destination.conflict' },
+							{ guard: not('filePresent'), target: '#notebook-attachment-destination.missing' },
+							{ guard: 'contentMatches', target: '#notebook-attachment-destination.match' },
+							{ target: '#notebook-attachment-destination.conflict' }
+						]
+					},
+					admittingIdentity: {
+						always: [
+							{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
+							{ guard: 'identityMatches', target: '#notebook-attachment-destination.allowed' },
+							{ target: '#notebook-attachment-destination.denied' }
+						]
+					},
+					admittingStage: {
+						always: [
+							{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
+							{ guard: 'identityMatches', target: 'inserting' },
+							{ target: '#notebook-attachment-destination.denied' }
+						]
+					},
+					inserting: {
+						invoke: {
+							src: 'stage',
+							input,
+							onDone: [
+								{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
+								{ target: '#notebook-attachment-destination.staged' }
+							],
+							onError: '#notebook-attachment-destination.unavailable'
+						}
+					}
+				}
+			},
+			match: { type: 'final', entry: assign({ result: 'match' }) },
+			missing: { type: 'final', entry: assign({ result: 'missingOrHidden' }) },
+			conflict: { type: 'final', entry: assign({ result: 'conflict' }) },
+			unavailable: { type: 'final' },
+			allowed: { type: 'final', entry: assign({ result: 'allowed' }) },
+			denied: { type: 'final', entry: assign({ result: 'denied' }) },
+			staged: { type: 'final', entry: assign({ result: 'staged' }) },
+			complete: { type: 'final' }
+		}
+	})
 }
 /** Creates an unstarted host root, binding its writer and private checked-file request together. */
 export function createNotebookAttachmentRestore(
 	options: Omit<NotebookRestoreOptions, 'mode'> & {
 		db: Db
-		retainDetached: RestoreStepWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached']
+		retainDetached: RestoreTransactionWriter<
+			Transaction<'mergeable'>,
+			WriteHandle
+		>['retainDetached']
 	}
 ) {
-	const request = prepareNotebookAttachmentRestore({
+	const request = prepareNotebookRestore({
+		mode: 'resume',
 		archive: options.archive,
 		binding: options.binding,
 		databaseName: options.databaseName
 	})
-	const writer = createNotebookAttachmentWriter(options.db, request, options.retainDetached)
-	const actor = createActor(createNotebookRestoreAttachmentMachine(writer), { input: { request } })
+	const destination = createNotebookAttachmentWriter(options.db, request)
+	const writer = createNotebookTransactionWriter(options.db, options.retainDetached)
+	const actor = createActor(createNotebookRestoreAttachmentMachine(writer, destination), {
+		input: { request }
+	})
 	return { actor, request }
 }

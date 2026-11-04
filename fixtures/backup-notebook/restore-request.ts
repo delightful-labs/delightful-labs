@@ -40,7 +40,10 @@ export type NotebookRestoreData = NotebookRestorePlanData & {
 	observedJournal: RestoreJournalRecord | undefined
 	attachment: NotebookAttachmentExpected | undefined
 }
-const requests = new WeakMap<NotebookRestoreRequest, { data: NotebookRestoreData; claim(): void }>()
+const requests = new WeakMap<
+	NotebookRestoreRequest,
+	{ data: NotebookRestoreData; claimed: boolean }
+>()
 function prepared(request: NotebookRestoreRequest) {
 	const value = requests.get(request)
 	if (!value) throw new Error('Invalid notebook restore request')
@@ -78,7 +81,6 @@ export function prepareNotebookRestore(options: NotebookRestoreOptions): Noteboo
 		observedJournal: undefined,
 		attachment: undefined
 	}
-	let available: NotebookRestoreData | undefined = data
 	const request: NotebookRestoreRequest = {
 		release() {
 			data.releaseControl?.()
@@ -86,13 +88,7 @@ export function prepareNotebookRestore(options: NotebookRestoreOptions): Noteboo
 		},
 		toJSON: () => ({ kind: 'notebookRestoreRequest' })
 	}
-	requests.set(request, {
-		data,
-		claim() {
-			if (!available || !data.options) throw new Error('Notebook restore request unavailable')
-			available = undefined
-		}
-	})
+	requests.set(request, { data, claimed: false })
 	return request
 }
 function clear(data: NotebookRestoreData) {
@@ -116,7 +112,9 @@ export function notebookRestoreData(input: { request: NotebookRestoreRequest }) 
 	return prepared(input.request).data
 }
 export function claimNotebookRestore(input: { request: NotebookRestoreRequest }) {
-	prepared(input.request).claim()
+	const value = prepared(input.request)
+	if (value.claimed || !value.data.options) throw new Error('Notebook restore request unavailable')
+	value.claimed = true
 }
 export const notebookRestoreResources = fromCallback<
 	{ type: string },

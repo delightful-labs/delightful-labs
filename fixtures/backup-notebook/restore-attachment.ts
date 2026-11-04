@@ -1,19 +1,19 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { assign, fromPromise, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
 import type {
-	RestoreBatchEvent,
-	RestoreStepWriter,
-	RestoreWriteResult
-} from 'delightful-local-first/backup/restore/batch'
-import { createRestoreBatchMachine } from 'delightful-local-first/backup/restore/batch/workflow'
+	RestoreEvent,
+	RestoreDestinationResult,
+	RestoreDestinationLogic,
+	RestoreTransactionWriter,
+	RestoreResult
+} from 'delightful-local-first/backup/restore'
+import { createRestoreMachine } from 'delightful-local-first/backup/restore/workflow'
 import {
 	claimNotebookRestore,
 	notebookRestoreData as data,
 	notebookRestoreResources,
-	prepareNotebookRestore,
 	requiredNotebookRestoreValue as required,
-	type NotebookRestoreRequest,
-	type NotebookRestoreOptions
+	type NotebookRestoreRequest
 } from './restore-request.js'
 import { createNotebookRestorePlanningMachine } from './restore-planning.js'
 import {
@@ -24,16 +24,16 @@ import {
 	prepareNotebookAttachmentBytes
 } from './restore-attachment-data.js'
 
-export type NotebookAttachmentResult = Omit<RestoreWriteResult<'batchWritten'>, 'outcome'> & {
-	outcome: RestoreWriteResult<'batchWritten'>['outcome'] | 'noAttachmentStep'
+export type NotebookAttachmentResult = Omit<RestoreResult, 'outcome'> & {
+	outcome: RestoreResult['outcome'] | 'noAttachmentStep'
 }
-/** Same operation/file, new live generation. No new destination or mappings are allocated. */
-export function prepareNotebookAttachmentRestore(options: Omit<NotebookRestoreOptions, 'mode'>) {
-	return prepareNotebookRestore({ ...options, mode: 'resume' })
-}
-
-export function createNotebookRestoreAttachmentMachine<Transaction, Write>(
-	writer: RestoreStepWriter<Transaction, Write>
+export function createNotebookRestoreAttachmentMachine<
+	Transaction,
+	Write,
+	S extends Snapshot<RestoreDestinationResult>
+>(
+	writer: RestoreTransactionWriter<Transaction, Write>,
+	destination: RestoreDestinationLogic<Transaction, S>
 ) {
 	type Input = { request: NotebookRestoreRequest }
 	type Context = Input & {
@@ -53,11 +53,11 @@ export function createNotebookRestoreAttachmentMachine<Transaction, Write>(
 			prepareNotebookAttachmentBytes(input)
 			return Promise.resolve()
 		}),
-		batch: createRestoreBatchMachine(writer)
+		batch: createRestoreMachine(writer, destination)
 	}
 	const model = setup<
 		Context,
-		RestoreBatchEvent | { type: 'RELEASE' },
+		RestoreEvent | { type: 'RELEASE' },
 		typeof actors,
 		{},
 		{ interrupt: undefined },

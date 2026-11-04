@@ -1,8 +1,8 @@
 import { assign, fromCallback, sendParent, sendTo, setup } from 'xstate'
-import type { RestorePreparationInput } from '../../backup/restore-preparation.js'
+import type { RestoreScope } from '../../backup/restore.js'
 
 export type LockEvent = { type: 'LOCK_ACQUIRED' | 'LOCK_FAILED' }
-type Input = Pick<RestorePreparationInput, 'binding'>
+type Input = Pick<RestoreScope, 'binding'>
 type NativeEvent =
 	| { type: 'NATIVE_OFFERED'; available: boolean }
 	| { type: 'NATIVE_SETTLED' | 'NATIVE_FAILED' }

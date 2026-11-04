@@ -1,5 +1,10 @@
 # T006 next slice — one notebook attachment batch
 
+> Current API: the unmerged preparation/batch specializations described historically below were
+> replaced by `createRestoreMachine(native, destination)` at `backup/restore/workflow`, contracts at
+> `backup/restore`, with explicit `writeId` input. Both concrete destination writers are machines.
+> See [consolidated cleanup and passing qualification](pr23-coordinator-cleanup.md).
+
 Proposed after qualified preparation commit `bba5f49` on `feat/notebook-restore-preparation`.
 The preparation implementation is committed locally; no push or PR publication is authorized.
 The user authorized this bounded implementation after research. It is now prepared for

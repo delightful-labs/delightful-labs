@@ -6,7 +6,7 @@ import {
 	type BrowserJournalResult
 } from '../../backup/restore-journal-browser.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
-import { requirePreparationValue } from '../../backup/restore-preparation.js'
+import { requireRestoreValue } from '../../backup/restore.js'
 import { createBrowserRestoreJournalMachine } from './restore-journal.js'
 
 type Input = BrowserJournalConfiguration
@@ -55,7 +55,7 @@ export function createRestoreJournalStepMachine() {
 			running: {
 				invoke: {
 					src: 'journal',
-					input: ({ context }) => ({ request: requirePreparationValue(context.request) }),
+					input: ({ context }) => ({ request: requireRestoreValue(context.request) }),
 					onDone: {
 						target: 'complete',
 						actions: assign({

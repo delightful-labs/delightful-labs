@@ -130,13 +130,16 @@ async function run(page: Page, sample: Sample, mode: 'new' | 'resume') {
 				archive: checked.archive
 			})
 			const trace: string[] = []
-			const actor = api.createActor(api.createNotebookRestorePreparationMachine(api.writer), {
-				input: { request },
-				inspect(event) {
-					if (event.type === '@xstate.event' && event.event.type.startsWith('xstate.error'))
-						trace.push(String(event.event.error))
+			const actor = api.createActor(
+				api.createNotebookRestorePreparationMachine(api.writer, api.preparationDestination),
+				{
+					input: { request },
+					inspect(event) {
+						if (event.type === '@xstate.event' && event.event.type.startsWith('xstate.error'))
+							trace.push(String(event.event.error))
+					}
 				}
-			})
+			)
 			actor.subscribe((snapshot) => trace.push(JSON.stringify(snapshot.value)))
 			actor.start()
 			const output = await api.toPromise(actor)
@@ -441,10 +444,19 @@ it('holds one operation owner across tabs and releases ownership after cancellat
 	await initialize(page, value)
 	await page.evaluate(async (sample) => {
 		const api = window.DLFRestoreQualification
-		api.writer.checkAuthority = () =>
-			new Promise<boolean>((resolve) => {
-				api.pending.releaseAuthority = () => resolve(true)
+		api.machine = api.createNotebookRestorePreparationMachine(
+			api.writer,
+			api.preparationDestination.provide({
+				actors: {
+					identity: api.fromPromise(
+						() =>
+							new Promise<boolean>((resolve) => {
+								api.pending.releaseAuthority = () => resolve(true)
+							})
+					)
+				}
 			})
+		)
 		const open = api.prepareArchiveOpen(new Uint8Array(sample.file))
 		const envelope = api
 			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
@@ -681,12 +693,20 @@ it('reconciles an uncertain attachment after reload using fresh bytes while pres
 			.start()
 		const checked = await api.toPromise(envelope)
 		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
-		const request = api.prepareNotebookAttachmentRestore({ ...value, archive: checked.archive })
-		const writer = api.createNotebookAttachmentWriter(api.db, request, () => {})
-		const machine = api.createNotebookRestoreAttachmentMachine({
-			...writer,
-			acceptRemote: () => new Promise(() => {})
+		const request = api.prepareNotebookRestore({
+			mode: 'resume',
+			...value,
+			archive: checked.archive
 		})
+		const destination = api.createNotebookAttachmentWriter(api.db, request)
+		const writer = api.createNotebookTransactionWriter(api.db, () => {})
+		const machine = api.createNotebookRestoreAttachmentMachine(
+			{
+				...writer,
+				acceptRemote: () => new Promise(() => {})
+			},
+			destination
+		)
 		api.attachmentPending.actor = api.createActor(machine, { input: { request } }).start()
 		api.attachmentPending.cleanup = () => {
 			request.release()
@@ -744,3 +764,117 @@ it('reconciles an uncertain attachment after reload using fresh bytes while pres
 	expect(recovered.rows[0]?.contents).toEqual([0, 255, 128, 10])
 	await deleteJournal(page, value)
 })
+
+it('rejects a second claim without clearing the first restore actor’s resources', async () => {
+	const page = await open(),
+		value = await sample(page)
+	expect(await initialize(page, value)).toBe('initialized')
+	const result = await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid fixture')
+		const request = api.prepareNotebookRestore({ ...value, mode: 'new', archive: checked.archive })
+		let release: () => void = () => {
+			throw new Error('Missing authority gate')
+		}
+		let reportEntered: () => void = () => {
+			throw new Error('Missing entry observation')
+		}
+		const gate = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const entered = new Promise<void>((resolve) => {
+			reportEntered = resolve
+		})
+		const destinationLogic = api.preparationDestination.provide({
+			actors: {
+				identity: api.fromPromise(({ input }) => {
+					reportEntered()
+					return gate.then(
+						() => api.db.getAuthState().session?.user.account === input.intent.operation.identityId
+					)
+				})
+			}
+		})
+		const machine = api.createNotebookRestorePreparationMachine(api.writer, destinationLogic)
+		const first = api.createActor(machine, { input: { request } }).start()
+		await entered
+		const second = api.createActor(machine, { input: { request } }).start()
+		const rejected = await api.toPromise(second)
+		const activeBeforeRelease = first.getSnapshot().status
+		const writesBeforeRelease = api.issued()
+		second.stop()
+		release()
+		const completed = await api.toPromise(first)
+		first.stop()
+		request.release()
+		open.release()
+		envelope.stop()
+		const destination = await api.db.one(
+			api.notebookRestoreApp.restoreDestinations.where({ id: value.binding.workspaceId }),
+			{ tier: 'remote' }
+		)
+		return {
+			rejected,
+			completed,
+			activeBeforeRelease,
+			writesBeforeRelease,
+			issued: api.issued(),
+			destination
+		}
+	}, value)
+	expect(result.rejected.outcome).toBe('unavailable')
+	expect(result.rejected.record).toBeUndefined()
+	expect(result.activeBeforeRelease).toBe('active')
+	expect(result.writesBeforeRelease).toBe(0)
+	expect(result.completed.outcome).toBe('prepared')
+	expect(result.issued).toBe(1)
+	expect(result.destination).toMatchObject({
+		id: value.binding.workspaceId,
+		operationId: value.binding.operationId,
+		status: 'incomplete'
+	})
+	await deleteJournal(page, value)
+})
+
+for (const authority of ['denied', 'failed']) {
+	it(`keeps preparation unissued when destination identity admission is ${authority}`, async () => {
+		const page = await open(),
+			value = await sample(page)
+		expect(await initialize(page, value)).toBe('initialized')
+		await page.evaluate((authority) => {
+			const api = window.DLFRestoreQualification
+			api.preparationDestination = api.preparationDestination.provide({
+				actors: {
+					identity: api.fromPromise(() => {
+						if (authority === 'failed')
+							return Promise.reject(new Error('Injected identity observation failure'))
+						return Promise.resolve(false)
+					})
+				}
+			})
+		}, authority)
+		const result = await run(page, value, 'new')
+		expect(result.outcome).toBe('incomplete')
+		expect(result.issued).toBe(0)
+		expect(result.record?.checkpoint).toMatchObject({
+			kind: 'writing',
+			completed: [],
+			current: { status: 'notIssued', issuance: 0 }
+		})
+		expect((await discover(page, value)).record).toEqual(result.record)
+		const row = await page.evaluate((value) => {
+			const api = window.DLFRestoreQualification
+			return api.db.one(
+				api.notebookRestoreApp.restoreDestinations.where({ id: value.binding.workspaceId }),
+				{ tier: 'remote' }
+			)
+		}, value)
+		expect(row).toBeNull()
+		await deleteJournal(page, value)
+	})
+}

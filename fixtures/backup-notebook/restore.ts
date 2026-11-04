@@ -1,11 +1,13 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { assign, fromPromise, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
 import type {
-	RestorePreparationEvent,
-	RestorePreparationResult,
-	RestorePreparationWriter
-} from 'delightful-local-first/backup/restore/preparation'
-import { createRestorePreparationMachine } from 'delightful-local-first/backup/restore/preparation/workflow'
+	RestoreEvent,
+	RestoreResult,
+	RestoreTransactionWriter,
+	RestoreDestinationLogic,
+	RestoreDestinationResult
+} from 'delightful-local-first/backup/restore'
+import { createRestoreMachine } from 'delightful-local-first/backup/restore/workflow'
 import {
 	claimNotebookRestore,
 	notebookRestoreData as data,
@@ -18,15 +20,20 @@ export { prepareNotebookRestore } from './restore-request.js'
 export type { NotebookRestoreRequest } from './restore-request.js'
 
 /** The root owns checked-archive references until planning and the active destination child drain. */
-export function createNotebookRestorePreparationMachine<Transaction, Write>(
-	writer: RestorePreparationWriter<Transaction, Write>
+export function createNotebookRestorePreparationMachine<
+	Transaction,
+	Write,
+	S extends Snapshot<RestoreDestinationResult>
+>(
+	writer: RestoreTransactionWriter<Transaction, Write>,
+	destination: RestoreDestinationLogic<Transaction, S>
 ) {
 	type Input = { request: NotebookRestoreRequest }
 	type Context = Input & {
 		binding: BackupBinding
 		databaseName: string
 		interruption: 'cancelled' | 'closed' | 'invalidated' | undefined
-		result: RestorePreparationResult
+		result: RestoreResult
 	}
 	const actors = {
 		claim: fromPromise<void, Input>(({ input }) => {
@@ -35,11 +42,11 @@ export function createNotebookRestorePreparationMachine<Transaction, Write>(
 		}),
 		resources: notebookRestoreResources,
 		plan: createNotebookRestorePlanningMachine(),
-		prepare: createRestorePreparationMachine(writer)
+		prepare: createRestoreMachine(writer, destination)
 	}
 	const model = setup<
 		Context,
-		RestorePreparationEvent | { type: 'RELEASE' },
+		RestoreEvent | { type: 'RELEASE' },
 		typeof actors,
 		{},
 		{ interrupt: undefined },
@@ -47,7 +54,7 @@ export function createNotebookRestorePreparationMachine<Transaction, Write>(
 		never,
 		string,
 		Input,
-		RestorePreparationResult
+		RestoreResult
 	>({
 		actors,
 		guards: {
@@ -125,6 +132,7 @@ export function createNotebookRestorePreparationMachine<Transaction, Write>(
 							input: ({ context }) => ({
 								binding: context.binding,
 								databaseName: context.databaseName,
+								writeId: required(data(context).intent).plan.preparation.writeId,
 								intent: required(data(context).intent)
 							}),
 							onDone: {
