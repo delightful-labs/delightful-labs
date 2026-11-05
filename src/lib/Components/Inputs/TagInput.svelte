@@ -20,6 +20,7 @@
 		value?: string[]
 		defaultValue?: string[]
 		suggestions?: string[]
+		normalizeTag?: (tag: string) => string
 		name?: string
 		id?: string
 		placeholder?: string
@@ -43,6 +44,7 @@
 		value = $bindable(),
 		defaultValue = [],
 		suggestions = [],
+		normalizeTag = (tag: string) => tag.toLowerCase(),
 		name,
 		id,
 		placeholder,
@@ -77,16 +79,20 @@
 	let expanded = $state(false)
 	let nativePopover = $state(true)
 	let activeIndex = $state(-1)
+	function comparisonKey(tag: string) {
+		return normalizeTag(tag.trim())
+	}
 	const matches = $derived.by(() => {
-		const selected = (value ?? []).map((tag) => tag.toLowerCase())
+		const selected = (value ?? []).map(comparisonKey)
 		const seen: string[] = []
+		const query = comparisonKey(draft)
 		return suggestions
 			.map((tag) => tag.trim())
 			.filter((tag) => {
-				const key = tag.toLowerCase()
+				const key = comparisonKey(tag)
 				if (!tag || selected.includes(key) || seen.includes(key)) return false
 				seen.push(key)
-				return key.includes(draft.trim().toLowerCase())
+				return key.includes(query)
 			})
 	})
 	const inputId = $derived(id ?? generatedId)
@@ -110,7 +116,8 @@
 		if (locked) return
 		const tag = tagText.trim()
 		if (!tag) return
-		if (value?.some((item) => item.toLowerCase() === tag.toLowerCase())) {
+		const key = comparisonKey(tag)
+		if (value?.some((item) => comparisonKey(item) === key)) {
 			void announce(duplicateMessage(tag), true)
 			return
 		}

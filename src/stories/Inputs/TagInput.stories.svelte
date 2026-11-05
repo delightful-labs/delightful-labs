@@ -63,6 +63,24 @@
 		defaultValue: ['Work']
 	}}
 />
+<Story
+	name="Custom normalization"
+	args={{
+		// Example policy only; applications can supply their own Unicode implementation.
+		normalizeTag: (tag: string) =>
+			tag.normalize('NFC').toLowerCase().replaceAll('ß', 'ss'),
+		defaultValue: ['Straße', 'Café'],
+		suggestions: [
+			'Straße',
+			'STRASSE',
+			'Café',
+			'Cafe\u0301',
+			'Fußball',
+			'FUSSBALL',
+			'Café Notes'
+		]
+	}}
+/>
 <Story name="Disabled" args={{ disabled: true, defaultValue: ['Work'] }} />
 <Story name="Readonly" args={{ readonly: true, defaultValue: ['Personal'] }} />
 <Story
