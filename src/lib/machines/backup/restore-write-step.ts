@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup, type Snapshot } from 'xstate'
+import { forwardTo, assign, fromPromise, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
 import {
@@ -152,10 +152,7 @@ export function createRestoreWriteStepMachine<
 			),
 		toJSON: () => ({ kind: 'restoreTransactionAccess' })
 	})
-	const forward = model.enqueueActions(({ self, event, enqueue }) => {
-		const child = self.getSnapshot().children.destination
-		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
-	})
+
 	const handle = ({ context }: { context: Context }) => context.native
 	const journalInput = ({ context }: { context: Context }) => ({
 		databaseName: context.databaseName,
@@ -186,9 +183,9 @@ export function createRestoreWriteStepMachine<
 			outcome: context.interruption ?? context.outcome
 		}),
 		on: {
-			CANCEL: { actions: ['interrupt', forward] },
-			SHUTDOWN: { actions: ['interrupt', forward] },
-			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] }
+			CANCEL: { actions: 'interrupt' },
+			SHUTDOWN: { actions: 'interrupt' },
+			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
 		},
 		states: {
 			working: {
@@ -200,6 +197,15 @@ export function createRestoreWriteStepMachine<
 				},
 				states: {
 					reconciling: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('destination')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('destination')] },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								actions: ['interrupt', forwardTo('destination')]
+							}
+						},
+
 						invoke: {
 							id: 'destination',
 							src: 'remote',
@@ -235,6 +241,15 @@ export function createRestoreWriteStepMachine<
 						}
 					},
 					checkingAuthority: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('destination')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('destination')] },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								actions: ['interrupt', forwardTo('destination')]
+							}
+						},
+
 						invoke: {
 							id: 'destination',
 							src: 'authority',
@@ -299,6 +314,15 @@ export function createRestoreWriteStepMachine<
 						}
 					},
 					readingTransaction: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('destination')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('destination')] },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								actions: ['interrupt', forwardTo('destination')]
+							}
+						},
+
 						invoke: {
 							id: 'destination',
 							src: 'read',
@@ -321,6 +345,15 @@ export function createRestoreWriteStepMachine<
 						}
 					},
 					staging: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('destination')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('destination')] },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								actions: ['interrupt', forwardTo('destination')]
+							}
+						},
+
 						invoke: {
 							id: 'destination',
 							src: 'stage',

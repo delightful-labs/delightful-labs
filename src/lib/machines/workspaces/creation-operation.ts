@@ -1,5 +1,15 @@
 import type { WorkspaceJournalEvent } from './journal.js'
-import { assign, fromPromise, setup, stateIn, type ActorLogic, type Snapshot } from 'xstate'
+import {
+	forwardTo,
+	and,
+	not,
+	assign,
+	fromPromise,
+	setup,
+	stateIn,
+	type ActorLogic,
+	type Snapshot
+} from 'xstate'
 import type {
 	CreationBinding,
 	CreationRequest as Request,
@@ -121,11 +131,7 @@ export function createWorkspaceCreationOperation<
 					(context.request.mode === 'retry' && context.request.settlement === 'unresolved'))
 		}
 	})
-	const forward = (type: Event['type']) =>
-		model.enqueueActions(({ self, enqueue }) => {
-			const effect = self.getSnapshot().children.effect
-			if (effect?.getSnapshot().status === 'active') enqueue.sendTo(effect, { type })
-		})
+
 	const checkpoint = (
 		target: string
 	): ({ guard: 'closing' | 'cancelling'; target: string } | { target: string })[] => [
@@ -156,12 +162,21 @@ export function createWorkspaceCreationOperation<
 						states: {
 							active: {
 								on: {
-									CANCEL: { target: 'cancelling', actions: forward('CANCEL') },
-									SHUTDOWN: { target: 'closing', actions: forward('SHUTDOWN') }
+									CANCEL: {
+										target: 'cancelling'
+									},
+									SHUTDOWN: {
+										target: 'closing'
+									}
 								}
 							},
 							cancelling: {
-								on: { CANCEL: {}, SHUTDOWN: { target: 'closing', actions: forward('SHUTDOWN') } }
+								on: {
+									CANCEL: {},
+									SHUTDOWN: {
+										target: 'closing'
+									}
+								}
 							},
 							closing: { on: { CANCEL: {}, SHUTDOWN: {} } }
 						}
@@ -248,6 +263,14 @@ export function createWorkspaceCreationOperation<
 								]
 							},
 							readingJournal: {
+								on: {
+									CANCEL: {
+										guard: and([not('closing'), not('cancelling')]),
+										actions: forwardTo('effect')
+									},
+									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
+								},
+
 								invoke: {
 									id: 'effect',
 									src: 'journal',
@@ -319,6 +342,14 @@ export function createWorkspaceCreationOperation<
 								]
 							},
 							recordingJournal: {
+								on: {
+									CANCEL: {
+										guard: and([not('closing'), not('cancelling')]),
+										actions: forwardTo('effect')
+									},
+									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
+								},
+
 								invoke: {
 									id: 'effect',
 									src: 'journal',
@@ -357,6 +388,14 @@ export function createWorkspaceCreationOperation<
 								]
 							},
 							clearingJournal: {
+								on: {
+									CANCEL: {
+										guard: and([not('closing'), not('cancelling')]),
+										actions: forwardTo('effect')
+									},
+									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
+								},
+
 								invoke: {
 									id: 'effect',
 									src: 'journal',
@@ -491,6 +530,14 @@ export function createWorkspaceCreationOperation<
 								]
 							},
 							persisting: {
+								on: {
+									CANCEL: {
+										guard: and([not('closing'), not('cancelling')]),
+										actions: forwardTo('effect')
+									},
+									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
+								},
+
 								invoke: {
 									id: 'effect',
 									src: 'persist',

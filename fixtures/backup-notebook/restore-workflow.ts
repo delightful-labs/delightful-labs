@@ -1,4 +1,4 @@
-import { assign, createActor, fromCallback, fromPromise, raise, setup } from 'xstate'
+import { forwardTo, raise, assign, createActor, fromCallback, fromPromise, setup } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
 import type {
@@ -117,15 +117,7 @@ export function createNotebookRestoreWorkflow(
 			})
 		}
 	})
-	const forward = model.enqueueActions(({ context, self, event, enqueue }) => {
-		const child = self.getSnapshot().children.effect
-		if (child?.getSnapshot().status !== 'active') return
-		if (event.type === 'CANCEL' || event.type === 'SHUTDOWN' || event.type === 'INVALIDATE')
-			enqueue.sendTo(child, event)
-		else if (event.type === 'RELEASE') enqueue.sendTo(child, { type: 'CANCEL' })
-		else if (event.type === 'IDENTITY' || event.type === 'IDENTITY_FAILED')
-			enqueue.sendTo(child, { type: 'INVALIDATE', binding: context.binding })
-	})
+
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
 	const writeInput = ({ context }: { context: Context }) => ({
 		binding: context.binding,
@@ -140,6 +132,12 @@ export function createNotebookRestoreWorkflow(
 	const terminal = '#notebook-restore-workflow.reporting'
 	const batchWrite = (src: 'attachment' | 'notebook' | 'note') =>
 		model.createStateConfig({
+			on: {
+				CANCEL: { actions: ['interrupt', forwardTo('effect')] },
+				SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
+				INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+			},
+
 			invoke: {
 				id: 'effect',
 				src,
@@ -178,19 +176,19 @@ export function createNotebookRestoreWorkflow(
 			outcome: context.interruption ?? context.result.outcome
 		}),
 		on: {
-			CANCEL: { actions: ['interrupt', forward] },
-			SHUTDOWN: { actions: ['interrupt', forward] },
-			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] },
-			RELEASE: { actions: ['interrupt', forward] },
+			CANCEL: { actions: 'interrupt' },
+			SHUTDOWN: { actions: 'interrupt' },
+			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' },
+			RELEASE: { actions: raise({ type: 'CANCEL' }) },
 			IDENTITY: {
 				guard: ({ context, event }) =>
 					sameBackupBinding(context.binding, event.binding) &&
 					event.identityId !== context.binding.identityId,
-				actions: ['interrupt', forward]
+				actions: raise(({ context }) => ({ type: 'INVALIDATE', binding: context.binding }))
 			},
 			IDENTITY_FAILED: {
 				guard: ({ context, event }) => sameBackupBinding(context.binding, event.binding),
-				actions: ['interrupt', forward]
+				actions: raise(({ context }) => ({ type: 'INVALIDATE', binding: context.binding }))
 			}
 		},
 		states: {
@@ -246,6 +244,12 @@ export function createNotebookRestoreWorkflow(
 						}
 					},
 					planning: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
+							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+						},
+
 						invoke: {
 							id: 'effect',
 							src: 'plan',
@@ -311,6 +315,12 @@ export function createNotebookRestoreWorkflow(
 						]
 					},
 					preparing: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
+							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+						},
+
 						invoke: {
 							id: 'effect',
 							src: 'prepare',
@@ -447,6 +457,12 @@ export function createNotebookRestoreWorkflow(
 						}
 					},
 					activating: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
+							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+						},
+
 						invoke: {
 							id: 'effect',
 							src: 'activate',

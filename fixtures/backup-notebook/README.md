@@ -113,6 +113,10 @@ reload/resume, uncertain activation without replay, privacy/draining and actual 
 Browser-process crashes, cleared journal storage, offline restart and cross-browser recovery remain
 outside the qualified restore boundary. Finance integration is T007–T010.
 
+The [native event-routing review](../../specs/003-verified-backup/native-event-routing-review.md)
+records the repository-wide follow-up: invoking states deliver controls with XState actions, while
+native read leaves drain under their owner's interruption state.
+
 The following sections record earlier bounded slices and their historical test totals; the complete
 workflow above supersedes their statements that comparison/activation remain unimplemented.
 

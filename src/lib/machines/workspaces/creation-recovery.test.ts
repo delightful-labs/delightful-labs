@@ -155,8 +155,10 @@ function operationFixture(
 		matchesBinding: (candidate) => candidate.attempt.member === 'a',
 		attemptId: (candidate) => candidate.attempt.notebookId
 	})
-	const start = (request: CreationRequest<Record>) =>
-		tracked(createActor(machine, { input: { binding, request } })).start()
+	const start = (request: CreationRequest<Record>, inspect?: (event: InspectionEvent) => void) =>
+		tracked(
+			createActor(machine, { input: { binding, request }, ...(inspect ? { inspect } : {}) })
+		).start()
 	return { start, persistCall, journalRead }
 }
 function persistenceFixture(
@@ -586,4 +588,21 @@ describe('host-owned initialization projection', () => {
 		expect(discover.mock.calls).toHaveLength(2)
 		expect(actor.getSnapshot().value).toBe('ready')
 	})
+})
+
+it('drains the active journal on cancel/shutdown without sending repeated ignored commands', async () => {
+	const pending = deferred<WorkspaceJournalResult<Record>>()
+	const f = operationFixture({ read: () => pending.promise }),
+		events: string[] = []
+	const actor = f.start({ mode: 'load' }, observeCommands(events, 'effect'))
+	await vi.waitFor(() => expect(f.journalRead).toHaveBeenCalledOnce())
+	actor.send({ type: 'CANCEL' })
+	actor.send({ type: 'CANCEL' })
+	actor.send({ type: 'SHUTDOWN' })
+	actor.send({ type: 'SHUTDOWN' })
+	expect(events).toEqual(['CANCEL', 'SHUTDOWN'])
+	expect(actor.getSnapshot().status).toBe('active')
+	pending.resolve({ outcome: 'succeeded', record })
+	expect((await toPromise(actor)).outcome).toBe('closed')
+	expect(f.persistCall).not.toHaveBeenCalled()
 })

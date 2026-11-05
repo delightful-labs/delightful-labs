@@ -14,6 +14,10 @@ resume, unknown activation without replay and storage policies are qualified in
 [the completion design](restore-completion-design.md). Performance observations and their limits
 are in [the measurement report](notebook-performance.md).
 
+The subsequent user-requested native event-routing review covers all 45 machine-bearing modules.
+Nineteen implementation modules now use state-scoped native routing, with four added drain/precedence
+regressions. All 1,097 functional cases pass locally. See [routing audit and evidence](native-event-routing-review.md).
+
 T006/T012 are implemented for the notebook integration. T004 now has a bounded desktop measurement
 baseline; actual consumer/platform performance qualification stays open pending T007 inventory.
 Finance adoption (T007–T010) and the separate sign-in delivery work remain. No deployed data,

@@ -1,4 +1,4 @@
-import { raise, assign, fromPromise, setup } from 'xstate'
+import { sendTo, raise, assign, fromPromise, setup } from 'xstate'
 import {
 	exportFailure,
 	exportData,
@@ -100,14 +100,11 @@ export function createArchiveExportMachine() {
 			})
 		}
 	})
-	// Ask only a currently active child to drain. A completed child cannot acknowledge shutdown.
-	const forward = model.enqueueActions(({ context, event, self, enqueue }) => {
-		if (!context.claimed) return
-		abortExport(context.request)
-		const child = self.getSnapshot().children.effect
-		if (child?.getSnapshot().status !== 'active') return
-		enqueue.sendTo(child, { type: event.type === 'SHUTDOWN' ? 'SHUTDOWN' : 'CANCEL' })
+	// Abort the host leaf only after this actor has claimed its request. Child commands are state-scoped.
+	const abort = model.createAction(({ context }) => {
+		if (context.claimed) abortExport(context.request)
 	})
+
 	const synchronous = (run: (context: Context) => Partial<Context>) =>
 		model.createAction(({ context, self }) => {
 			try {
@@ -152,11 +149,11 @@ export function createArchiveExportMachine() {
 					raise({ type: 'SYNC_APPLIED' })
 				]
 			},
-			CANCEL: { actions: ['interrupt', forward] },
-			SHUTDOWN: { actions: ['interrupt', forward] },
-			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] },
+			CANCEL: { actions: ['interrupt', abort] },
+			SHUTDOWN: { actions: ['interrupt', abort] },
+			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', abort] },
 			RELEASE: {
-				actions: [assign({ failure: { outcome: 'failed', code: 'exportReleased' } }), forward]
+				actions: [assign({ failure: { outcome: 'failed', code: 'exportReleased' } }), abort]
 			}
 		},
 		states: {
@@ -178,6 +175,22 @@ export function createArchiveExportMachine() {
 				invoke: { src: 'resources', input, onError: { target: '.cleaning', actions: 'fail' } },
 				states: {
 					capturing: {
+						on: {
+							CANCEL: { actions: ['interrupt', abort, sendTo('effect', { type: 'CANCEL' })] },
+							SHUTDOWN: { actions: ['interrupt', abort, sendTo('effect', { type: 'SHUTDOWN' })] },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								actions: ['interrupt', abort, sendTo('effect', { type: 'CANCEL' })]
+							},
+							RELEASE: {
+								actions: [
+									assign({ failure: { outcome: 'failed', code: 'exportReleased' } }),
+									abort,
+									sendTo('effect', { type: 'CANCEL' })
+								]
+							}
+						},
+
 						tags: 'capturing',
 						invoke: {
 							id: 'effect',
@@ -214,6 +227,22 @@ export function createArchiveExportMachine() {
 						}
 					},
 					sealing: {
+						on: {
+							CANCEL: { actions: ['interrupt', abort, sendTo('effect', { type: 'CANCEL' })] },
+							SHUTDOWN: { actions: ['interrupt', abort, sendTo('effect', { type: 'SHUTDOWN' })] },
+							INVALIDATE: {
+								guard: 'currentBinding',
+								actions: ['interrupt', abort, sendTo('effect', { type: 'CANCEL' })]
+							},
+							RELEASE: {
+								actions: [
+									assign({ failure: { outcome: 'failed', code: 'exportReleased' } }),
+									abort,
+									sendTo('effect', { type: 'CANCEL' })
+								]
+							}
+						},
+
 						always: {
 							guard: ({ context }) => context.envelope === undefined,
 							target: 'cleaning',

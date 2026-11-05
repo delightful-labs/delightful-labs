@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { assign, not, createActor, fromCallback, fromPromise, setup } from 'xstate'
+import { forwardTo, not, assign, createActor, fromCallback, fromPromise, setup } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { payloadLimits } from 'delightful-local-first/backup/archive'
 import type { RestoreJournalIntent } from 'delightful-local-first/backup/restore/journal'
@@ -251,10 +251,7 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 			})
 		}
 	})
-	const forward = model.enqueueActions(({ self, event, enqueue }) => {
-		const child = self.getSnapshot().children.write
-		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
-	})
+
 	const input = ({ context }: { context: Context }) => context
 	return model.createMachine({
 		id: 'notebook-attachment-destination',
@@ -266,9 +263,9 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 		},
 		output: ({ context }) => context.interruption ?? context.result,
 		on: {
-			CANCEL: { actions: ['interrupt', forward] },
-			SHUTDOWN: { actions: ['interrupt', forward] },
-			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] }
+			CANCEL: { actions: 'interrupt' },
+			SHUTDOWN: { actions: 'interrupt' },
+			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
 		},
 		states: {
 			working: {
@@ -331,6 +328,12 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 						]
 					},
 					writing: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('write')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('write')] },
+							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('write')] }
+						},
+
 						invoke: {
 							id: 'write',
 							src: 'write',

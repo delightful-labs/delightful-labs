@@ -1,4 +1,4 @@
-import { assign, setup, type Snapshot } from 'xstate'
+import { forwardTo, raise, assign, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
 import type {
 	RestoreEvent,
@@ -71,17 +71,7 @@ export function createNotebookRestorePreparationMachine<
 		}
 	})
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
-	const forward = model.enqueueActions(({ self, event, enqueue }) => {
-		const child = self.getSnapshot().children.effect
-		if (
-			(event.type === 'CANCEL' ||
-				event.type === 'SHUTDOWN' ||
-				event.type === 'INVALIDATE' ||
-				event.type === 'RELEASE') &&
-			child?.getSnapshot().status === 'active'
-		)
-			enqueue.sendTo(child, event.type === 'RELEASE' ? { type: 'CANCEL' } : event)
-	})
+
 	return model.createMachine({
 		id: 'notebook-restore-preparation',
 		initial: 'claiming',
@@ -100,10 +90,10 @@ export function createNotebookRestorePreparationMachine<
 			outcome: context.interruption ?? context.result.outcome
 		}),
 		on: {
-			CANCEL: { actions: ['interrupt', forward] },
-			SHUTDOWN: { actions: ['interrupt', forward] },
-			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] },
-			RELEASE: { actions: ['interrupt', forward] }
+			CANCEL: { actions: 'interrupt' },
+			SHUTDOWN: { actions: 'interrupt' },
+			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' },
+			RELEASE: { actions: raise({ type: 'CANCEL' }) }
 		},
 		states: {
 			claiming: {
@@ -116,6 +106,12 @@ export function createNotebookRestorePreparationMachine<
 				invoke: { src: 'resources', input, onError: 'complete' },
 				states: {
 					planning: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
+							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+						},
+
 						invoke: {
 							id: 'effect',
 							src: 'plan',
@@ -132,6 +128,12 @@ export function createNotebookRestorePreparationMachine<
 						}
 					},
 					preparingDestination: {
+						on: {
+							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
+							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+						},
+
 						invoke: {
 							id: 'effect',
 							src: 'prepare',

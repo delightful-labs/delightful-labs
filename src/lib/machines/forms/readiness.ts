@@ -1,4 +1,12 @@
-import { assign, raise, setup, type ActorLogic, type ActorRef, type Snapshot } from 'xstate'
+import {
+	forwardTo,
+	raise,
+	assign,
+	setup,
+	type ActorLogic,
+	type ActorRef,
+	type Snapshot
+} from 'xstate'
 import type {
 	FormAssessmentToken,
 	FormCapability,
@@ -104,10 +112,7 @@ export function createScopedFormReadinessMachine<
 							OBSERVE: {
 								actions: [
 									assign({ observation: ({ event }) => event.observation }),
-									workflow.enqueueActions(({ self, event, enqueue }) => {
-										const child = self.getSnapshot().children.source
-										if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
-									})
+									forwardTo('source')
 								]
 							},
 							PROJECTED: {
