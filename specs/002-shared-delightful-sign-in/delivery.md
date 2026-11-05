@@ -21,10 +21,12 @@ prerequisite for implementation or adoption.
 ## Implementation handoff (2026-11-05)
 
 The shared backup foundation and complete notebook reference are implemented and qualified through
-[PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26), ready for the user's merge.
-PR #20 and PRs #23–#25 are already merged. The current [backup specification](../003-verified-backup/spec.md)
-and [task ledger](../003-verified-backup/tasks.md#current-handoff) track what remains: T007 deployed
-Finance inventory, T004 consumer/platform performance, T008 capture/profile/interaction, T009 isolated
+[PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26), now merged.
+PR #20 and PRs #23–#25 are also merged. T007's
+[deployed Finance inventory](../003-verified-backup/finance-deployment-inventory.md) is complete.
+The current [backup specification](../003-verified-backup/spec.md)
+and [task ledger](../003-verified-backup/tasks.md#current-handoff) track what remains:
+T004 consumer/platform performance, T008 capture/profile/interaction, T009 isolated
 restore and T010 actual retained-file recovery. T014 separately tracks explicit confirmed-rejection
 retry integration; conservative notebook resume already avoids unknown-write replay.
 

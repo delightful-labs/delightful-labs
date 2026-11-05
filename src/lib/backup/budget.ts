@@ -1,6 +1,5 @@
 import { createArchivePayloadError, type PayloadLimits } from './types.js'
-
-const utf8 = new TextEncoder()
+import { utf8ByteLength } from './utf8.js'
 
 /** Bounds caller-supplied data BEFORE schema cloning/error collection; does not validate shapes. */
 export function checkPayloadBudget(input: unknown, limits: PayloadLimits): void {
@@ -8,7 +7,7 @@ export function checkPayloadBudget(input: unknown, limits: PayloadLimits): void 
 	let stringBytes = 0
 	function text(value: string) {
 		if (value.length > limits.payloadBytes) throw createArchivePayloadError('limitExceeded')
-		stringBytes += utf8.encode(value).length
+		stringBytes += utf8ByteLength(value)
 		if (stringBytes > limits.payloadBytes) throw createArchivePayloadError('limitExceeded')
 	}
 	function visit(value: unknown, depth: number) {

@@ -2,6 +2,7 @@ import { base64Size } from './binary.js'
 import { checkPayloadBudget } from './budget.js'
 import { createPayloadSchemas } from './schemas.js'
 import { parsePayloadJson } from './json.js'
+import { utf8ByteLength } from './utf8.js'
 import {
 	createArchivePayloadError,
 	resolvePayloadLimits,
@@ -88,7 +89,7 @@ function serialize(payload: ArchivePayload, limits: PayloadLimits): Uint8Array<A
 	let bytes = 0
 	let values = 0
 	function append(part: string) {
-		bytes += utf8.encode(part).length
+		bytes += utf8ByteLength(part)
 		if (bytes > limits.payloadBytes) throw createArchivePayloadError('limitExceeded')
 		parts.push(part)
 	}

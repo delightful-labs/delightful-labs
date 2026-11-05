@@ -24,6 +24,7 @@
 		"check:backup-notebook": "tsc --project fixtures/backup-notebook/tsconfig.json --noEmit false --rootDir fixtures/backup-notebook --outDir .svelte-kit/backup-notebook && node --test .svelte-kit/backup-notebook/export.test.js",
 		"test:storybook": "playwright test --config playwright.config.ts",
 		"measure:backup": "DLF_BACKUP_MEASURE=1 vitest run --config fixtures/backup-notebook/restore.vitest.config.ts -t 'measures encrypted'",
+		"measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/backup-notebook/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
 		"check:backup-restore": "tsc --noEmit --project fixtures/backup-notebook/tsconfig.json && vitest run --config fixtures/backup-notebook/restore.vitest.config.ts"
 	},
 	"devDependencies": {

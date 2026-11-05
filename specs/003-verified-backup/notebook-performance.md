@@ -30,6 +30,10 @@ restore against the actual Jazz server. Only metrics cross the browser test boun
 fixture is prepared before timing; memory sampling starts before fixture construction, so the
 reported memory includes its construction and the loaded application/SDK. Each case gets a fresh
 browser context. The regular functional suite does not run these optional measurements.
+The later record-workload extension adds phase-attributed timing and byte/journal diagnostics;
+the table above preserves the 2026-11-04 observations. A separately labeled final-code rerun is
+recorded in the [simplification report](record-performance.md#binary-compatibility-and-remaining-limits);
+large-file stalls remain substantial.
 
 CDP `Performance.getMetrics` samples used JavaScript heap approximately every 25 ms. OS `ps` samples
 RSS every 100 ms for the two Chromium renderer processes reported by CDP for this harness. RSS is
@@ -54,6 +58,10 @@ that final code; because both changed, this is not a controlled attribution of t
 
 T004 now has a reproducible bounded desktop baseline for realistic binary files through the
 current maximum attachment size. It does not cover maximum aggregate archive size, 50,000 records,
-slow networks, other browsers, mobile hardware, or deployed Finance data. T007 still owns the actual
-consumer inventory and sizes. Keep that consumer/platform performance qualification open rather
+slow networks, other browsers, mobile hardware, or deployed Finance data. The completed
+[T007 inventory](finance-deployment-inventory.md) records 633 scoped projected records, 672,633 bytes
+of comparison encoding and no reachable transaction attachments. The separate
+[record workload investigation](record-performance.md) exercises that aggregate shape synthetically
+and exposes journal/per-record costs that these four-record binary runs do not cover.
+Keep consumer/platform performance qualification open rather
 than treating desktop functional success as a production memory/responsiveness guarantee.

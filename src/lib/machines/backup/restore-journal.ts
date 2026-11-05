@@ -152,6 +152,7 @@ export function createBrowserRestoreJournalMachine() {
 					command = data.configuration?.command
 				return (
 					command?.mode === 'update' &&
+					data.observed !== undefined &&
 					JSON.stringify(data.observed) === JSON.stringify(command.record)
 				)
 			},

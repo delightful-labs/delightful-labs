@@ -19,13 +19,14 @@ import {
 } from './restore-writer.js'
 import {
 	prepareNotebookRestore,
-	notebookRestoreNote,
+	notebookRestoreNotes,
 	requiredNotebookRestoreValue as required,
 	type NotebookRestoreRequest,
 	type NotebookRestoreOptions,
 	type NotebookNoteExpected
 } from './restore-request.js'
 import { createNotebookRestoreNoteMachine } from './restore-note.js'
+import { notebookNoteBatchLimits } from './restore-plan.js'
 
 const identifier = z.string().min(1).max(256)
 const digest = z.string().regex(/^[0-9a-f]{64}$/)
@@ -52,9 +53,9 @@ const destinationObservation = z.object({
 	payloadSha256: digest,
 	graphSha256: digest,
 	status: z.enum(['incomplete', 'active']),
-	notes: z.array(noteObservation).max(1),
+	notes: z.array(noteObservation).max(notebookNoteBatchLimits.records),
 	notebooks: z.array(parentObservation).max(1),
-	attachments: z.array(parentObservation).max(1)
+	attachments: z.array(parentObservation).max(notebookNoteBatchLimits.records)
 })
 type DestinationObservation = z.infer<typeof destinationObservation>
 
@@ -77,9 +78,9 @@ function expectedMappingMatches(
 	intent: RestoreJournalIntent,
 	step: RestorePlannedWrite
 ): boolean {
-	if (step.mappingIndexes.length !== 1) return false
-	const index = step.mappingIndexes[0]
-	const mapping = index === undefined ? undefined : intent.plan.mappings[index]
+	const mapping = step.mappingIndexes
+		.map((index) => intent.plan.mappings[index])
+		.find((entry) => entry?.destinationId === expected.id)
 	return (
 		mapping?.kind === 'record' &&
 		mapping.type === 'note' &&
@@ -132,33 +133,55 @@ function parentScopeMatches(
 		row.operationId === expected.operationId
 	)
 }
-function parentsPresent(row: DestinationObservation, expected: NotebookNoteExpected): boolean {
+function parentsPresent(
+	row: DestinationObservation,
+	notes: readonly NotebookNoteExpected[]
+): boolean {
 	return (
-		row.notebooks.length === 1 && (expected.attachmentId === null || row.attachments.length === 1)
+		row.notebooks.length === 1 &&
+		notes.every(
+			(note) =>
+				note.attachmentId === null || row.attachments.some((file) => file.id === note.attachmentId)
+		)
 	)
 }
-function parentsMatch(row: DestinationObservation, expected: NotebookNoteExpected): boolean {
-	const notebook = row.notebooks[0],
-		attachment = row.attachments[0]
-	if (!notebook || notebook.id !== expected.notebookId || !parentScopeMatches(notebook, expected))
+function parentsMatch(
+	row: DestinationObservation,
+	notes: readonly NotebookNoteExpected[]
+): boolean {
+	const notebook = row.notebooks[0]
+	if (
+		!notebook ||
+		!notes.every((note) => notebook.id === note.notebookId && parentScopeMatches(notebook, note))
+	)
 		return false
-	if (expected.attachmentId === null) return row.attachments.length === 0
+	const attachments = new Set(
+		notes.flatMap((note) => (note.attachmentId === null ? [] : [note.attachmentId]))
+	)
 	return (
-		attachment !== undefined &&
-		attachment.id === expected.attachmentId &&
-		parentScopeMatches(attachment, expected)
+		row.attachments.length === attachments.size &&
+		row.attachments.every(
+			(file) => attachments.has(file.id) && notes.every((note) => parentScopeMatches(file, note))
+		)
 	)
 }
-function query(intent: RestoreJournalIntent, expected: NotebookNoteExpected) {
+function query(intent: RestoreJournalIntent, notes: readonly NotebookNoteExpected[]) {
+	const first = required(notes[0])
+	const attachments = [
+		...new Set(notes.flatMap((note) => (note.attachmentId === null ? [] : [note.attachmentId])))
+	]
 	return notebookRestoreApp.restoreDestinations
 		.where({ id: intent.operation.destinationWorkspaceId })
 		.include({
-			notes: notebookRestoreApp.restoreNotes.where({ id: expected.id }),
-			notebooks: notebookRestoreApp.restoreNotebooks.where({ id: expected.notebookId }),
-			// Mapping IDs are globally disjoint; a note ID cannot name an attachment.
-			attachments: notebookRestoreApp.restoreAttachments.where({
-				id: expected.attachmentId ?? expected.id
-			})
+			notes:
+				notes.length === 1
+					? notebookRestoreApp.restoreNotes.where({ id: first.id })
+					: notebookRestoreApp.restoreNotes.where({ id: { in: notes.map((note) => note.id) } }),
+			notebooks: notebookRestoreApp.restoreNotebooks.where({ id: first.notebookId }),
+			attachments:
+				attachments.length > 1
+					? notebookRestoreApp.restoreAttachments.where({ id: { in: attachments } })
+					: notebookRestoreApp.restoreAttachments.where({ id: attachments[0] ?? first.id })
 		})
 }
 /** The destination actor borrows a transaction; the shared write actor owns its full lifetime. */
@@ -172,7 +195,7 @@ export function createNotebookNoteWriter(db: Db, request: NotebookRestoreRequest
 		result: RestoreDestinationResult
 	}
 	const observations = new WeakMap<Handle, { observed: DestinationObservation | undefined }>()
-	const expected = () => required(notebookRestoreNote(request))
+	const expected = () => required(notebookRestoreNotes(request))
 	const observed = (context: Context) => observations.get(context.handle)?.observed
 	// This is result admission into an owned observation buffer, not workflow classification.
 	const consume = (handle: Handle, raw: unknown) => {
@@ -213,20 +236,20 @@ export function createNotebookNoteWriter(db: Db, request: NotebookRestoreRequest
 			)
 		}),
 		write: createNotebookDestinationWriteMachine(db, (transaction) => {
-			const note = expected()
-			transaction.insert(
-				notebookRestoreApp.restoreNotes,
-				{
-					destinationId: note.destinationId,
-					ownerId: note.ownerId,
-					operationId: note.operationId,
-					notebookId: note.notebookId,
-					attachmentId: note.attachmentId,
-					body: note.body,
-					archived: note.archived
-				},
-				{ id: note.id }
-			)
+			for (const note of expected())
+				transaction.insert(
+					notebookRestoreApp.restoreNotes,
+					{
+						destinationId: note.destinationId,
+						ownerId: note.ownerId,
+						operationId: note.operationId,
+						notebookId: note.notebookId,
+						attachmentId: note.attachmentId,
+						body: note.body,
+						archived: note.archived
+					},
+					{ id: note.id }
+				)
 		})
 	}
 	const model = setup<
@@ -262,14 +285,21 @@ export function createNotebookNoteWriter(db: Db, request: NotebookRestoreRequest
 			currentBinding: ({ context, event }) =>
 				event.type === 'INVALIDATE' && sameBackupBinding(context.input.binding, event.binding),
 			scopeMatches: ({ context }) => {
-				const note = notebookRestoreNote(request)
+				const notes = notebookRestoreNotes(request)
 				return (
-					note !== undefined &&
-					expectedScopeMatches(note, context.input.intent, context.input.step) &&
-					expectedMappingMatches(note, context.input.intent, context.input.step)
+					notes !== undefined &&
+					notes.length > 0 &&
+					notes.length <= notebookNoteBatchLimits.records &&
+					notes.length === context.input.step.mappingIndexes.length &&
+					new Set(notes.map((note) => note.id)).size === notes.length &&
+					notes.every(
+						(note) =>
+							expectedScopeMatches(note, context.input.intent, context.input.step) &&
+							expectedMappingMatches(note, context.input.intent, context.input.step)
+					)
 				)
 			},
-			hasExpected: () => notebookRestoreNote(request) !== undefined,
+			hasExpected: () => notebookRestoreNotes(request) !== undefined,
 			remoteOperation: ({ context }) => context.input.operation === 'remote',
 			authorityOperation: ({ context }) => context.input.operation === 'authority',
 			readOperation: ({ context }) => context.input.operation === 'read',
@@ -281,19 +311,24 @@ export function createNotebookNoteWriter(db: Db, request: NotebookRestoreRequest
 			},
 			parentsPresent: ({ context }) => {
 				const row = observed(context),
-					expectation = notebookRestoreNote(request)
+					expectation = notebookRestoreNotes(request)
 				return row !== undefined && expectation !== undefined && parentsPresent(row, expectation)
 			},
 			parentsMatch: ({ context }) => {
 				const row = observed(context),
-					expectation = notebookRestoreNote(request)
+					expectation = notebookRestoreNotes(request)
 				return row !== undefined && expectation !== undefined && parentsMatch(row, expectation)
 			},
-			notePresent: ({ context }) => observed(context)?.notes.length === 1,
+			notePresent: ({ context }) => (observed(context)?.notes.length ?? 0) > 0,
 			contentMatches: ({ context }) => {
-				const note = observed(context)?.notes[0]
-				const expectation = notebookRestoreNote(request)
-				return note !== undefined && expectation !== undefined && noteMatches(note, expectation)
+				const rows = observed(context)?.notes,
+					notes = notebookRestoreNotes(request)
+				if (!rows || !notes || rows.length !== notes.length) return false
+				const byId = new Map(rows.map((row) => [row.id, row]))
+				return notes.every((note) => {
+					const row = byId.get(note.id)
+					return row !== undefined && noteMatches(row, note)
+				})
 			}
 		},
 		actions: {

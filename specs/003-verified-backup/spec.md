@@ -8,13 +8,16 @@
 versioned browser restore journal are implemented. The complete notebook reference now writes all
 mapped content, freshly compares exact fields/relationships/attachment bytes and activates the
 isolated destination. Same-browser resume and conservative uncertain-activation recovery are
-qualified. PRs #23–#25 are merged; [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
-is ready for the user's merge, with 1,097 functional cases and GitHub CI passing on `d69fe4c`.
+qualified. PRs #23–#26 are merged; [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
+has 1,097 functional cases and GitHub CI passing on `d69fe4c`.
 The routing review covers all 45 machine-bearing modules.
 
-This establishes the notebook reference, not Finance production recovery. Remaining work is actual
-consumer/platform performance qualification (T004), deployed Finance inventory/adoption/rehearsal
-(T007–T010), and explicit retry integration after confirmed rejection (T014). See
+T007's [read-only Finance inventory](finance-deployment-inventory.md) is complete: frontend `31f70cb`,
+matching 22-table backend schema/policy head v8, 633 scoped projected records, zero reachable
+attachments and no observed tracked pending writes or projected local/remote differences.
+This establishes inventory and the notebook reference, not Finance production recovery. Remaining
+work is consumer/platform performance qualification (T004), Finance adoption/rehearsal (T008–T010),
+and explicit retry integration after confirmed rejection (T014). See
 [the active TODOs](tasks.md#current-handoff), [restore qualification](restore-completion-design.md),
 [routing audit](native-event-routing-review.md) and [desktop measurements](notebook-performance.md).
 
@@ -130,7 +133,7 @@ As an application developer, I can use the same backup machinery with another ap
 
 ## Assumptions
 
-- The user has confirmed the important data is in the deployed app. Its actual deployed revision, schema, and data coverage still need verification; repository schemas alone are insufficient evidence.
+- The user has confirmed the important data is in the deployed app. T007 verifies its current frontend/backend schema/policy identity and the selected workspace's scoped graph and sizes. Repeat inventory if these change before capture; repository schemas alone remain insufficient evidence.
 - One workspace is the initial backup unit. Whole-identity backups, automatic scheduled backups, cloud vaults, and importing into existing workspaces are deferred.
 - Backup protects current application data and declared provenance; complete engine history and deleted records are not implicitly included.
 - Full offline export is not promised when the device lacks required data. Independent file inspection can work offline; remote destination restoration requires its normal connectivity and authorization.
@@ -164,8 +167,8 @@ As an application developer, I can use the same backup machinery with another ap
 - **Consumer/platform performance remains T004.** The 1/4/8 MiB desktop measurements are recorded,
   including a substantial 8 MiB timer delay and memory footprint. They do not qualify phones,
   maximum aggregate archives or the deployed Finance graph.
-- **Finance remains T007–T010.** Inventory actual deployment/data read-only, implement and qualify
-  its capture/profile and isolated restore, then demonstrate an actual retained-file recovery before
+- **Finance inventory T007 is complete; adoption remains T008–T010.** Implement and qualify
+  capture/profile and isolated restore, then demonstrate an actual retained-file recovery before
   identity/storage changes. Shared code and notebook evidence do not fulfill the Finance success
   criteria or its consumer-owned interactions.
 

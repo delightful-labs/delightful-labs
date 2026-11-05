@@ -5,12 +5,13 @@
 **Status (2026-11-05)**: Shared archive, envelope, independent inspection, capture/export,
 versioned journal and complete notebook restore are implemented and qualified. PR #26 adds fresh
 full-content comparison, activation, complete coordination and native event-routing cleanup.
-All 1,097 functional cases, static/package/consumer checks and GitHub CI pass on `d69fe4c`.
+PR #26 is merged. All 1,097 functional cases, static/package/consumer checks and GitHub CI pass on `d69fe4c`.
 See [the active handoff](tasks.md#current-handoff), [restore evidence](restore-completion-design.md),
 [routing audit](native-event-routing-review.md) and [performance baseline](notebook-performance.md).
 
-T006/T012 are complete for the notebook reference. Remaining gates are T004 consumer/platform
-performance, Finance inventory/capture/isolated restore/rehearsal (T007–T010), and the accepted explicit
+T006/T012 are complete for the notebook reference. T007's read-only deployed Finance inventory is
+complete. Remaining gates are T004 consumer/platform performance, Finance capture/isolated
+restore/rehearsal (T008–T010), and the accepted explicit
 permission-repair retry integration (T014). No Finance deployment or identity/storage change is implied.
 
 ## Summary
@@ -32,7 +33,7 @@ consumer interaction and deployment compatibility remain unimplemented and requi
 - **Platform**: secure-context desktop browsers first. Browser compatibility and memory behavior must be qualified before platform claims. Independent reader uses standard cryptographic primitives without a Jazz session.
 - **Verification**: static checks during implementation review; unit, package-consumer, browser, real Jazz permissions and restart checks after the user approves the corresponding implementation, per repository policy.
 - **Scale**: initial conservative bounds: 64 MiB outer file, 32 MiB decoded payload, 16 MiB aggregate raw attachments, 8 MiB per attachment, 50,000 records, 32 nesting levels. These are implemented bounds, not evidence the deployed workspace fits or every permitted maximum is performance-qualified. Refuse oversized captures before success; measure deployed requirements before adoption.
-- **Performance**: input bounds prevent unbounded work; no streaming or compression in v1. Desktop 1/4/8 MiB measurements are complete; 8 MiB recorded a 684 ms timer delay. Qualify actual consumer sizes/platforms under T004 and decide whether CPU/file parsing needs a dedicated worker before responsiveness claims; do not describe current APIs as cancellable cryptographic operations.
+- **Performance**: input bounds prevent unbounded work; no streaming or compression in v1. Desktop 1/4/8 MiB measurements are complete; 8 MiB recorded a 684 ms timer delay. The [633-record investigation](record-performance.md) adds T007-sized synthetic data and exposes journal/per-record costs. Qualify the actual Finance profile/interaction and domain restore after T008/T009; address bounded off-thread work and repeated journal/plan processing before responsiveness claims. Do not describe current APIs as cancellable cryptographic operations.
 - **Scope**: one workspace, explicit application profile, current supported application graph. No scheduled backup service, whole engine history, generic ORM, second backend, or migration automation.
 
 ## Constitution Check
@@ -74,17 +75,30 @@ Finance additions live in a separate Finance feature branch/PR: a consumer profi
 
 ## Remaining delivery sequence
 
-1. **T007, read-only inventory:** verify published Finance revisions, schema/permissions, all released
-   graph/attachment coverage, pending local writes and actual sizes.
-2. **T004, consumer performance:** measure that supported workload/platform and address unacceptable
+**T007 is complete:** the [deployed inventory](finance-deployment-inventory.md) verifies frontend
+`31f70cb`, the matching 22-table backend schema/policy head v8, owner authority, 633 projected records
+and zero reachable attachment bytes. Its 672,633-byte comparison encoding, matching local/remote
+projections and zero observed tracked pending writes identify the current workload, not a validated
+archive or capture protocol. Repeat inventory if source/deployment/device changes before adoption.
+
+1. **T004, consumer performance:** measure that supported workload/platform and address unacceptable
    blocking or memory use before claiming responsiveness or increasing bounds. The notebook baseline
-   is already recorded; a worker is a decision based on qualification, not an assumed redesign.
-3. **T008, Finance capture/profile/interaction:** allowlisted complete graph, owner authority,
+   and [record workload investigation](record-performance.md) expose distinct archive and journal/
+   per-record costs. T004 spans this shared baseline and actual profile/interaction/restore checks
+   after T008/T009; it must not block disposable consumer implementation needed to measure those paths.
+   The user subsequently authorized a broader [simplification review](restore-simplification-review.md)
+   and all necessary tests. Bounded note transactions use the existing shared owner, version retained
+   plans explicitly, and preserve exact v1 recovery. Indexed remapping and allocation-free byte counts
+   remove avoidable repeated work. Retained JSON caches and the journal worker are removed after their
+   negative measurements; historical reports remain preserved. Final synthetic results are in the
+   [record report](record-performance.md#simplification-review). T004 remains open for actual consumer
+   and platform qualification; these changes do not authorize deployment or Finance integration.
+2. **T008, Finance capture/profile/interaction:** allowlisted complete graph, owner authority,
    maintenance/drain, exact bytes, local/remote comparison and disposable-data qualification.
-4. **T009, Finance isolated restore:** additive schema/policy lane, stable mappings/journal,
+3. **T009, Finance isolated restore:** additive schema/policy lane, stable mappings/journal,
    reconciliation, domain staging, fresh comparison and activation. Qualify policies, cached clients,
    restart and uncertain outcomes before proposing live additive deployment.
-5. **T010, actual recovery rehearsal:** retain the deployed file, inspect independently, restore into
+4. **T010, actual recovery rehearsal:** retain the deployed file, inspect independently, restore into
    a new isolated destination, compare every supported value/reference/byte in a fresh session and
    preserve the original. This precedes separate identity/storage work.
 
@@ -95,9 +109,10 @@ engine is planned.
 
 ## Remaining evidence requirements
 
-Actual production revisions/catalogue/permission hashes, released graph and size inventory, Finance
-capture consistency and local/remote differences, additive isolation with cached-client compatibility,
-and an actual retained-file recovery remain required. Notebook success does not establish consumer
+T007 records actual production frontend/catalogue/policy identity and scoped live graph/size
+measurements. Finance capture consistency and full profile/envelope size, explicit writer drain,
+additive isolation with cached-client compatibility and an actual retained-file recovery remain
+required. Notebook success does not establish consumer
 completeness or production safety. Report a specific alpha.59 limitation rather than silently upgrading
 or deleting data. Browser-process crash, cleared journal, offline restart and cross-device recovery
 remain outside the qualified notebook claims; expanding those claims requires scoped evidence.

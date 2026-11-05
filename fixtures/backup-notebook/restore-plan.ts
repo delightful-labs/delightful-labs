@@ -8,6 +8,7 @@ import {
 
 type Mapping = RestoreJournalIntent['plan']['mappings'][number]
 export type NotebookRestorePlanData = {
+	planVersion: 1 | 2
 	archive: IntegrityCheckedArchive
 	binding: BackupBinding
 	mappings: readonly Mapping[]
@@ -42,8 +43,8 @@ export function notebookCanonical(value: unknown): string {
 }
 function sourceKey(mapping: Mapping): string {
 	return mapping.kind === 'attachment'
-		? notebookCanonical(['attachment', mapping.sourceId])
-		: notebookCanonical([mapping.kind, mapping.type, mapping.sourceId])
+		? JSON.stringify(['attachment', mapping.sourceId])
+		: JSON.stringify([mapping.kind, mapping.type, mapping.sourceId])
 }
 export function allocateNotebookMappings(payload: ArchivePayload): readonly Mapping[] {
 	const records: Mapping[] = payload.records.map((record) => ({
@@ -57,65 +58,120 @@ export function allocateNotebookMappings(payload: ArchivePayload): readonly Mapp
 		sourceId: attachment.id,
 		destinationId: crypto.randomUUID()
 	}))
-	return [...records, ...attachments].sort((left, right) =>
-		sourceKey(left) < sourceKey(right) ? -1 : sourceKey(left) > sourceKey(right) ? 1 : 0
-	)
+	return [...records, ...attachments]
+		.map((mapping) => ({ mapping, key: sourceKey(mapping) }))
+		.sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0))
+		.map(({ mapping }) => mapping)
 }
 function mappedId(
-	mappings: readonly Mapping[],
+	ids: ReadonlyMap<string, string>,
 	expected:
 		| { kind: 'record'; type: string; sourceId: string }
 		| { kind: 'attachment'; sourceId: string }
 ): string {
-	const mapping = mappings.find(
-		(entry) => sourceKey(entry) === sourceKey({ ...expected, destinationId: '' })
-	)
-	if (!mapping) throw new Error('Missing notebook mapping')
-	return mapping.destinationId
+	const id = ids.get(sourceKey({ ...expected, destinationId: '' }))
+	if (!id) throw new Error('Missing notebook mapping')
+	return id
 }
-function remapValue(value: ArchiveValue, mappings: readonly Mapping[]): ArchiveValue {
+function remapValue(value: ArchiveValue, ids: ReadonlyMap<string, string>): ArchiveValue {
 	if (value.kind === 'reference')
 		return {
 			...value,
-			id: mappedId(mappings, { kind: 'record', type: value.type, sourceId: value.id })
+			id: mappedId(ids, { kind: 'record', type: value.type, sourceId: value.id })
 		}
 	if (value.kind === 'attachment')
-		return { ...value, id: mappedId(mappings, { kind: 'attachment', sourceId: value.id }) }
+		return { ...value, id: mappedId(ids, { kind: 'attachment', sourceId: value.id }) }
 	return value
 }
 export function projectNotebookRecords(data: NotebookRestorePlanData) {
+	const ids = new Map(data.mappings.map((mapping) => [sourceKey(mapping), mapping.destinationId]))
 	return data.archive.readPayload().records.map((record) => ({
 		type: record.type,
-		id: mappedId(data.mappings, { kind: 'record', type: record.type, sourceId: record.id }),
+		id: mappedId(ids, { kind: 'record', type: record.type, sourceId: record.id }),
 		fields: Object.fromEntries(
-			Object.entries(record.fields).map(([key, value]) => [key, remapValue(value, data.mappings)])
+			Object.entries(record.fields).map(([key, value]) => [key, remapValue(value, ids)])
 		)
 	}))
 }
-export function projectNotebookGraph(data: NotebookRestorePlanData): void {
+export const notebookNoteBatchLimits = Object.freeze({ records: 32, bytes: 64 * 1024 })
+export function projectNotebookGraph(
+	data: NotebookRestorePlanData,
+	retained?: RestoreJournalIntent['plan']
+): void {
+	if (retained) {
+		if (retained.id !== 'dlf-notebook' || (retained.version !== 1 && retained.version !== 2))
+			throw new Error('Unsupported notebook restore plan')
+		data.planVersion = retained.version
+	}
 	const payload = data.archive.readPayload()
 	const records = projectNotebookRecords(data)
+	const ids = new Map(data.mappings.map((mapping) => [sourceKey(mapping), mapping.destinationId]))
 	const attachments = payload.attachments.map((attachment) => ({
 		...attachment,
-		id: mappedId(data.mappings, { kind: 'attachment', sourceId: attachment.id })
+		id: mappedId(ids, { kind: 'attachment', sourceId: attachment.id })
 	}))
+	const recordsById = new Map(records.map((record) => [record.id, record]))
+	const attachmentsById = new Map(attachments.map((file) => [file.id, file]))
 	// Notebook root precedes notes; attachments precede all notes. Source tuples settle peer order.
 	const ordered = data.mappings
 		.map((mapping, index) => {
 			const contents =
 				mapping.kind === 'attachment'
-					? attachments.find((row) => row.id === mapping.destinationId)
-					: records.find((row) => row.id === mapping.destinationId)
+					? attachmentsById.get(mapping.destinationId)
+					: recordsById.get(mapping.destinationId)
 			if (!contents) throw new Error('Unexpected notebook mapping')
 			return {
 				mappingIndexes: [index],
 				contents: notebookCanonical(contents),
+				projected: contents,
 				sha256: '',
 				rank: mapping.kind === 'attachment' ? 0 : mapping.type === 'notebook' ? 1 : 2
 			}
 		})
 		.sort((left, right) => left.rank - right.rank)
-	data.batches = ordered
+	if (data.planVersion === 1)
+		data.batches = ordered.map(({ mappingIndexes, contents, sha256 }) => ({
+			mappingIndexes,
+			contents,
+			sha256
+		}))
+	else {
+		const batches: NotebookRestorePlanData['batches'] = []
+		let indexes: number[] = [],
+			contents: unknown[] = [],
+			bytes = 2
+		const flush = () => {
+			if (!indexes.length) return
+			batches.push({ mappingIndexes: indexes, contents: notebookCanonical(contents), sha256: '' })
+			indexes = []
+			contents = []
+			bytes = 2
+		}
+		const encoder = new TextEncoder()
+		for (const row of ordered) {
+			if (row.rank !== 2) {
+				flush()
+				batches.push({
+					mappingIndexes: row.mappingIndexes,
+					contents: row.contents,
+					sha256: row.sha256
+				})
+				continue
+			}
+			const size = encoder.encode(row.contents).byteLength
+			if (
+				indexes.length >= notebookNoteBatchLimits.records ||
+				(indexes.length && bytes + size + 1 > notebookNoteBatchLimits.bytes)
+			)
+				flush()
+			if (indexes.length) bytes++
+			indexes.push(...row.mappingIndexes)
+			contents.push(row.projected)
+			bytes += size
+		}
+		flush()
+		data.batches = batches
+	}
 	data.graph = notebookCanonical({
 		records: records.sort((a, b) => (a.id < b.id ? -1 : 1)),
 		attachments: attachments.sort((a, b) => (a.id < b.id ? -1 : 1))
@@ -135,7 +191,7 @@ export function projectNotebookControl(data: NotebookRestorePlanData): void {
 export function notebookPlan(data: NotebookRestorePlanData) {
 	return {
 		id: 'dlf-notebook',
-		version: 1,
+		version: data.planVersion,
 		expectedGraphSha256: data.graphSha256,
 		mappings: data.mappings,
 		preparation: {

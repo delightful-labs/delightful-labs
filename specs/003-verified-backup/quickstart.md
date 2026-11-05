@@ -68,18 +68,51 @@ the notebook validator; archives cannot register or load executable validators.
 
 ```sh
 pnpm measure:backup
+pnpm measure:backup-records
 ```
 
 Run after package/consumer compilation has finished, with no overlapping native restore harness on
 port 6199. The three optional 1/4/8 MiB cases measure encrypted export/open/full restore, sampled heap,
 renderer RSS and event-loop delay. They are separate from the normal functional command and have no
-CI timing thresholds. See [measured results and limits](notebook-performance.md). Consumer sizes and
-platform responsiveness still need T007/T004 qualification; the desktop run does not qualify phones.
+CI timing thresholds. See [measured results and limits](notebook-performance.md). T007's
+[Finance inventory](finance-deployment-inventory.md) records 633 projected records, about 0.64 MiB
+of comparison encoding and no reachable attachments. Actual profile/envelope size and platform
+responsiveness still need T008/T004 qualification; the desktop run does not qualify phones.
+
+The opt-in record command runs three desktop 633-record/672,633-byte synthetic notebook cases and
+one Chrome 4× CPU stress case. The final implementation uses bounded note transactions; the earlier
+single-record baseline took several minutes. Each case has a finite ten-minute runner deadline.
+No Finance data is copied. Ordinary functional runs skip these diagnostics.
+
+Use a unique label to preserve existing results (exclusive file creation). For independent repeated
+observations, run this command sequentially with a new label each time; each invocation starts a
+fresh disposable authority. Do not overlap builds or other browser measurements.
+
+```sh
+DLF_BACKUP_RECORD_MEASURE=1 DLF_BACKUP_REVIEW_LABEL=my-run-1 pnpm exec vitest run \
+  --config fixtures/backup-notebook/restore.vitest.config.ts \
+  -t 'measures record workload 633, CPU 1x, run 1' --disableConsoleIntercept
+```
+
+For the throttled case use the filter `measures record workload 633, CPU 4x, run 1` and a distinct
+label. Review-only diagnostics also accept `DLF_BACKUP_REVIEW_RECORDS=128`,
+`DLF_BACKUP_REVIEW_BATCHING=single-record` and `DLF_BACKUP_REVIEW_TRACE=1`; traces aggregate actor
+lifetimes, not private data or exclusive CPU time. The defaults are 633 records, bounded notes and
+no tracing. These switches affect the disposable diagnostic, not existing retained recovery plans.
+Raw files use `.svelte-kit/notebook-performance-review-<label>-records-633-cpu1-run1.json`.
+
+The [current review](restore-simplification-review.md) and
+[performance report](record-performance.md#simplification-review) document exact results, recovery
+checks and memory/sampling limits. The earlier [worker experiment](journal-worker-design.md) is
+retired: the package worker entrypoint, host and `DLF_BACKUP_JOURNAL_COMPARE` option no longer exist.
+Historical worker/reuse measurements are preserved. New complete notebook restores use plan v2;
+resume honors the retained v1/v2 version and never rebatches an issued plan.
 
 ## Finance adoption and actual recovery rehearsal
 
-1. **T007:** inspect actual published frontend/backend revisions, schema/permissions, every released
-   type/attachment, pending local writes and sizes read-only. Repository schemas alone are insufficient.
+1. **T007, complete:** [read-only deployed inventory](finance-deployment-inventory.md) verifies
+   frontend/backend schema/policy identity, released graph, scoped sizes and observable pending-write
+   state. Repeat if source/deployment/device changes before adoption; source schemas alone are insufficient.
 2. **T008:** qualify an allowlisted profile and owner-authorized quiescent/drained capture against
    alpha.59, including local/remote comparison and exact complete bytes. Use disposable data first.
 3. **T009:** qualify the additive isolation/policy lane and consumer interaction. Exercise complete

@@ -2,6 +2,55 @@ import { expect, test } from '@playwright/test'
 import { resolve } from 'node:path'
 import wire from '../fixtures/restore-journal-v1.json' with { type: 'json' }
 
+test('public journal reuse keeps encoded buffers independent and revalidates foreign input in Chromium', async ({
+	page
+}) => {
+	await page.goto('/')
+	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	const result = await page.evaluate((wire) => {
+		const api = window.DLFNotebook
+		const record = api.parseRestoreJournalRecord(wire)
+		const first = api.encodeRestoreJournalRecord(record)
+		const expected = first.slice()
+		const second = api.encodeRestoreJournalRecord(record)
+		first.fill(0)
+		const foreign = Object.freeze({ ...record, revision: -1 })
+		const errors: string[] = []
+		try {
+			api.parseRestoreJournalRecord(foreign)
+		} catch (error) {
+			errors.push(error instanceof Error ? error.message : 'unexpected')
+		}
+		const input = second.slice()
+		const reopened = api.decodeRestoreJournalRecord(input)
+		input.fill(0)
+		try {
+			api.decodeRestoreJournalRecord(input)
+		} catch (error) {
+			errors.push(error instanceof Error ? error.message : 'unexpected')
+		}
+		const last = api.encodeRestoreJournalRecord(record)
+		return {
+			reused: api.parseRestoreJournalRecord(record) === record,
+			detachedDecode: reopened !== record,
+			independentBuffers: first.buffer !== second.buffer && second.buffer !== last.buffer,
+			preservedBytes:
+				second.every((byte, i) => byte === expected[i]) &&
+				last.every((byte, i) => byte === expected[i]),
+			preservedMetadata: JSON.stringify(reopened) === JSON.stringify(wire),
+			errors
+		}
+	}, wire)
+	expect(result).toEqual({
+		reused: true,
+		detachedDecode: true,
+		independentBuffers: true,
+		preservedBytes: true,
+		preservedMetadata: true,
+		errors: ['invalidJournal', 'invalidJournalEncoding']
+	})
+})
+
 test('public journal codec preserves unknown-write facts and rejects malformed wire data in Chromium', async ({
 	page
 }) => {

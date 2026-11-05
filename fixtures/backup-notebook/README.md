@@ -103,15 +103,38 @@ pnpm package
 pnpm check:backup-notebook
 pnpm check:backup-restore
 pnpm measure:backup # optional desktop memory/latency experiment
+pnpm measure:backup-records # optional 633-record experiment based on T007 aggregate sizes
 ```
 
 See [completion design and evidence](../../specs/003-verified-backup/restore-completion-design.md)
-and [performance measurements](../../specs/003-verified-backup/notebook-performance.md). The
-functional suite includes a real retained export, independent network-disabled inspection,
-isolated restore, fresh-session comparison, original source/file preservation, comparison conflict,
-reload/resume, uncertain activation without replay, privacy/draining and actual policy checks.
-Browser-process crashes, cleared journal storage, offline restart and cross-browser recovery remain
-outside the qualified restore boundary. Finance integration is T007–T010.
+and [binary performance measurements](../../specs/003-verified-backup/notebook-performance.md).
+The [record workload investigation](../../specs/003-verified-backup/record-performance.md) uses
+synthetic data matching T007's count and comparison-encoding byte target. The broader
+[simplification review](../../specs/003-verified-backup/restore-simplification-review.md) replaces
+per-note transactions with groups of at most 32 notes targeting 64 KiB canonical content (one larger
+valid note stays a singleton). Root and attachment dependencies remain singleton writes. The existing
+transaction owner still enforces authority, rollback, local/remote settlement and full comparison.
+Partial group presence is conflict and never authorizes subset replay.
+
+`createNotebookRestore` defaults to `batching: 'bounded-notes'` and plan v2. Low-level
+`prepareNotebookRestore` defaults to `single-record`/v1 for continuation compatibility. Resume uses
+the retained v1/v2 plan regardless of the requested default and rejects unknown versions. Existing
+mappings, write identities and grouping never change. The archive profile/wire format is unchanged.
+
+The optional benchmarks retain phase delays, heap/RSS, writes and final journal size. Use
+`DLF_BACKUP_REVIEW_LABEL=<unique-label>` to avoid overwriting earlier artifacts; see the
+[measurement commands](../../specs/003-verified-backup/quickstart.md#optional-desktop-size-experiments).
+The original 4× case timed out at ten minutes; final bounded-transaction results are recorded
+separately. The unsuccessful journal worker and retained JSON caches are removed, with their
+historical [worker design/results](../../specs/003-verified-backup/journal-worker-design.md) preserved.
+There is no current worker host, worker package export or journal execution option.
+
+Functional qualification covers retained export/independent network-disabled inspection, isolated
+restore, fresh-session comparison, original preservation, conflicts, reload/resume, uncertain writes
+without replay, rollback, cancellation/draining and actual policies. Browser-process crashes, cleared
+journal, offline restart and cross-browser recovery remain outside the qualified restore boundary.
+T007 inventory is complete; actual Finance integration and supported-platform qualification remain
+T008–T010 and T004. Desktop/throttled notebook measurements do not qualify phones or Finance recovery.
 
 The [native event-routing review](../../specs/003-verified-backup/native-event-routing-review.md)
 records the repository-wide follow-up: invoking states deliver controls with XState actions, while

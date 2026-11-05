@@ -8,6 +8,7 @@ export default defineConfig({
 	test: {
 		environment: 'node',
 		include: [
+			'fixtures/backup-notebook/restore-plan.test.ts',
 			'src/lib/machines/**/*.test.ts',
 			'src/lib/presentation/**/*.test.ts',
 			'src/lib/localization/**/*.test.ts',

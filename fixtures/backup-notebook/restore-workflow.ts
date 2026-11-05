@@ -150,7 +150,7 @@ export function createNotebookRestoreWorkflow(
 							({ context, event }) => {
 								data(context).attachment = undefined
 								data(context).notebook = undefined
-								data(context).note = undefined
+								data(context).notes = undefined
 								retainRecord(context, event.output.record)
 							},
 							assign({ result: ({ event }) => ({ ...event.output, outcome: 'incomplete' }) })
@@ -522,6 +522,7 @@ export function createNotebookRestore(
 	}
 ) {
 	const request = prepareNotebookRestore({
+		batching: options.batching ?? 'bounded-notes',
 		mode: options.mode,
 		binding: options.binding,
 		databaseName: options.databaseName,

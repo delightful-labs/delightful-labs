@@ -6,8 +6,8 @@ combined authorization does not authorize Finance deployment or identity/storage
 
 ## Current handoff
 
-**Updated 2026-11-05.** PRs #23–#25 are merged. [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
-implements complete notebook restore and native actor routing and is ready for the user's merge.
+**Updated 2026-11-05.** PRs #23–#26 are merged. [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
+implements complete notebook restore and native actor routing.
 The notebook root coordinates the retained plan, all mapped writes, fresh exact-content comparison,
 activation and same-browser resume. Shared actors own journal/lock/transaction settlement and drain.
 No Finance data, production configuration or dependency versions changed.
@@ -20,20 +20,41 @@ See [restore evidence](restore-completion-design.md), [routing audit](native-eve
 and [performance report](notebook-performance.md). Earlier slice notes live in
 [handoff history](handoff-history.md).
 
+The user authorized a broader implementation review and all necessary tests while away. The
+[simplification review](restore-simplification-review.md) replaces the unsuccessful serialized-cache
+and worker experiments with allocation-free UTF-8 byte counts, indexed graph remapping and bounded
+note transactions under the existing restore owner. New complete restores use plan v2; retained v1
+journals resume with their original exact grouping. The historical
+[reuse](journal-reuse-design.md) and [worker](journal-worker-design.md) measurements remain preserved;
+the worker path and retained JSON caches are removed. Final measurements and qualification are
+recorded in the review and [performance report](record-performance.md#simplification-review).
+Changes are ready for pull-request review; no deployment has been performed.
+
+**T007 is complete:** [read-only deployed Finance inventory](finance-deployment-inventory.md)
+verifies frontend `31f70cb`, the 22-table backend schema and permission head v8, owner authority,
+633 scoped projected records and zero reachable attachments. Local/remote projections match and
+no tracked pending writes were observed in the existing browser. The comparison encoding totals
+672,633 bytes; it is not a Finance archive-size or capture-readiness claim.
+
 ## Next work
 
-1. **T007:** inventory the actual deployed Finance revisions, released graph and sizes read-only.
-2. Use that inventory for **T004** consumer/platform performance qualification; decide whether
-   responsiveness requires a bounded worker/off-thread implementation before consumer claims.
-3. **T008–T009:** implement and qualify Finance capture/profile, consumer interaction and additive
-   isolated restore/policies on disposable data before proposing live changes.
+1. Use the [T007 inventory](finance-deployment-inventory.md) for **T004** consumer/platform
+   qualification. The [simplification review](restore-simplification-review.md) resolves the
+   synthetic notebook's multi-minute record restore through bounded consumer transactions.
+   T004 stays open: qualify actual Finance capture/interaction after T008 and domain restore after
+   T009, plus supported platforms and memory limits. Synthetic count/size matching is not Finance
+   recovery evidence. The 1/4/8 MiB binary workload remains a separate responsiveness concern.
+2. **T008:** implement and qualify Finance capture/profile and consumer interaction on disposable
+   data. It supplies the actual encoded graph/file and interaction for T004 export/open qualification.
+3. **T009:** implement and qualify additive isolated restore/policies and domain transaction batches
+   on disposable data. Qualify T004 restore performance against this actual path before live claims.
 4. **T010:** retain and independently inspect an actual deployed backup, restore/compare it in a
    fresh isolated destination/session and preserve the original before identity/storage changes.
 
 **T014** is a separate explicit retry integration follow-up. It is not an automatic retry engine
 or a prerequisite to recognizing the already qualified conservative notebook path.
 
-## Completed shared and notebook work
+## Completed shared, notebook and inventory work
 
 - [x] **T001:** bounded portable archive codec, strict schemas, canonical values and graph validation.
 - [x] **T002:** archive corruption, bounds, exactness and public-package qualification.
@@ -46,6 +67,13 @@ or a prerequisite to recognizing the already qualified conservative notebook pat
       progress through comparison/activation. Finance-specific integration remains T009.
 - [x] **T011:** optional Zod form-error adapter, preserving library-neutral consumer contracts.
 - [x] **T013:** profile draft-check review; retain simple draft checks rather than adding a schema.
+- [x] **T007:** establish deployed Finance frontend/backend revisions, schema/permission hashes,
+      all released record/attachment types, observable pending local writes and aggregate sizes
+      read-only. [Inventory evidence](finance-deployment-inventory.md): deployed frontend `31f70cb`,
+      matching 22-table schema/policies at head v8, 633 projected records, zero reachable attachment
+      bytes, matching local/remote projections and zero tracked pending operations. Scope excludes
+      hidden physical rows, excluded secret/avatar values and other devices. No source mutation,
+      publication, write flush or storage reset was performed; capture qualification remains T008.
 - [x] **State-model cleanup:** envelope/avatar/recovery/custody corrections and the routing audit of
       all 45 machine-bearing modules. Nineteen implementation modules now use state-scoped native
       sends; qualified seed-health and stale-assessment checks remain deliberately documented.
@@ -53,12 +81,14 @@ or a prerequisite to recognizing the already qualified conservative notebook pat
 ## Remaining qualification and adoption
 
 - [ ] **T004:** qualify memory, latency and responsiveness on actual consumer sizes and supported
-      platforms. Functional crypto/interop and the 1/4/8 MiB desktop runs are complete. The 8 MiB run
-      recorded a 684 ms timer delay and substantial memory use. Inventory comes from T007; do not
-      expand limits or claim phone responsiveness from the desktop result.
-- [ ] **T007:** establish deployed Finance frontend/backend revisions, schema/permission hashes,
-      all released record/attachment types, pending local writes and aggregate sizes read-only. No
-      schema/data mutation, production auto-publication or live storage reset during inventory.
+      platforms. The [record report](record-performance.md) preserves the 323–439-second baseline,
+      ten-minute 4× CPU timeout and unsuccessful reuse/worker experiments. The subsequent
+      [simplification review](restore-simplification-review.md) uses bounded note transactions,
+      indexed projection and allocation-free byte counting; its final results supersede the old
+      performance bottleneck for this synthetic workload. Archive limits remain unchanged. Actual
+      Finance profile/interaction measurements depend on T008, and staged domain restore on T009.
+      Consumer implementation can proceed on disposable data while T004 stays a readiness gate;
+      desktop/throttled notebook results do not qualify phones or actual Finance recovery.
 - [ ] **T008:** implement Finance's allowlisted capture/profile and consumer-owned backup interaction
       against its existing Jazz alpha.59 setup, including owner authority, quiescent/drained capture,
       exact complete attachment bytes, local/remote comparison and disposable-data qualification.

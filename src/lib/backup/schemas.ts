@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import type { PayloadLimits } from './types.js'
-
-const utf8 = new TextEncoder()
+import { utf8ByteLength } from './utf8.js'
 
 /** UTF-8 must not silently replace malformed UTF-16 with replacement characters. */
 export function wellFormed(text: string): boolean {
@@ -24,7 +23,7 @@ export function createPayloadSchemas(limits: PayloadLimits) {
 			.min(minimum)
 			.max(maximum)
 			.refine(wellFormed)
-			.refine((value) => utf8.encode(value).length <= maximum)
+			.refine((value) => utf8ByteLength(value) <= maximum)
 	const name = text(limits.nameBytes)
 	const id = text(limits.idBytes)
 	const timestamp = z.iso.datetime({ precision: 3 })

@@ -185,7 +185,7 @@ export function createNotebookRestorePlanningMachine() {
 			},
 			projecting: {
 				entry: synchronous((context) => {
-					projectNotebookGraph(data(context))
+					projectNotebookGraph(data(context), data(context).observedJournal?.intent.plan)
 				}),
 				on: {
 					PLANNING_APPLIED: [
