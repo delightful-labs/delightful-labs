@@ -93,3 +93,13 @@ The parent correction was carried into the notebook-root branch without rewritin
 No source correction was required; the existing 924-unit shared suite (41 focused cases) and
 package/consumer checks cover the same unchanged shared implementation. Only the handoff notes
 needed conflict reconciliation. The later note branch still requires propagation and qualification.
+
+## PR #25 propagation qualification
+
+All **30 actual Jazz/Chromium cases** pass after carrying the correction through the full note stack,
+including note/relationship admission, exact content, reload reconciliation and staged interruption.
+All **924 units** (41 focused cases), full public consumer/runtime checks, root/notebook TypeScript,
+lint, formatting and whitespace checks also pass on this combined tree. No additional source change
+was needed. Propagation to both later PRs is now qualified; pending-propagation notes above describe
+earlier steps. Only handoff/status documentation needed conflict reconciliation; no PR was merged
+and no branch history was rewritten. Full fresh comparison/activation remain unimplemented.

@@ -186,6 +186,29 @@ rather than replaying. One-step completion does not reverify previously complete
 notes/relationships, compare the full graph or activate the destination. See
 [evidence and limits](../../specs/003-verified-backup/restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).
 
+## One mapped note — locally qualified
+
+`createNotebookNoteRestore` in `restore-note-writer.ts` accepts the same bound host capabilities,
+checked archive and recovery metadata as the notebook-root factory, returning an unstarted actor
+and request. It requires the exact retained plan's current `record/note` step and scoped mapped
+parents, writes one note, and stops. Invoke again explicitly to process the next note. It preserves
+exact body/archive status, shared attachment IDs and explicit null attachments. No IDs are allocated.
+The underlying finite continuation/write actors own decisions, intent, transaction and separate
+settlement; expected content remains private and is cleared through their resource protocol.
+
+The additive note table has actual control/notebook/attachment relations. Server insertion policy
+checks same destination/owner/operation for all required parents, including the null attachment path;
+updates/deletes remain denied. Observations read one bounded filtered include query and compare
+actual fields and relationship IDs. Parent scope/presence is not fresh full parent-content comparison.
+
+After the user's explicit combined implementation/test authorization, all 30 real Jazz/Chromium
+cases and 914 units pass, plus package/consumer/static checks. This includes the earlier 22
+regressions, note prefix/fields/null/shared relationships, conflicts, reload/uncertain reconciliation,
+staged-write interruption/rollback and actual relationship-policy denials. See
+[design, qualification and limits](../../specs/003-verified-backup/restore-note-design.md).
+The last note can reach comparing; it does not complete comparison or activate the destination.
+Full fresh comparison and activation remain open. No Finance or production restore claim is made.
+
 ### Update after PR #23 merged
 
 The notebook destination now invokes the shared live-identity admission/staging actor through
@@ -194,3 +217,13 @@ synchronous machine actions, with finite failures. Request release drains its ow
 clearing private content. All 37 restore-browser cases and 918 units pass, plus the package,
 consumer, private-creation and Storybook checks. Current evidence and limits are recorded in
 [the updated design](../../specs/003-verified-backup/restore-notebook-design.md#post-merge-machine-review-2026-11-04).
+
+### Note update after PR #23 merged
+
+The note destination now uses the consolidated restore API and shared live-identity
+admission/staging actor. Explicit guards admit expected content, control, parents and exact
+note fields/reference IDs; bounded observations stay private. The continuation inherits the
+parent's synchronous capsule actions and drain-before-clear release protocol. All 51 actual
+restore-browser cases and 918 units pass, plus package/consumer/static checks, 65 Storybook
+cases and 10 private-creation cases. Updated evidence and limits are in
+[the note design](../../specs/003-verified-backup/restore-note-design.md#post-merge-machine-review-2026-11-04).

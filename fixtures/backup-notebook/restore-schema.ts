@@ -1,6 +1,6 @@
 import { schema as s } from 'jazz-tools'
 
-/** Disposable restore-control lane, outside DLF domain exports. Note/activation writers follow later. */
+/** Disposable restore-control lane, outside DLF domain exports. Activation follows later. */
 export const notebookRestoreApp = s.defineApp({
 	restoreDestinations: s.table(
 		{
@@ -12,9 +12,27 @@ export const notebookRestoreApp = s.defineApp({
 		},
 		{
 			attachments: s.reverse('restoreAttachments', 'destination'),
-			notebooks: s.reverse('restoreNotebooks', 'destination')
+			notebooks: s.reverse('restoreNotebooks', 'destination'),
+			notes: s.reverse('restoreNotes', 'destination')
 		}
 	),
+	restoreNotes: s.table(
+		{
+			destinationId: s.uuid(),
+			ownerId: s.uuid(),
+			operationId: s.string(),
+			notebookId: s.uuid(),
+			attachmentId: s.uuid().optional(),
+			body: s.string(),
+			archived: s.boolean()
+		},
+		{
+			destination: s.rel('restoreDestinations', 'destinationId'),
+			notebook: s.rel('restoreNotebooks', 'notebookId'),
+			attachment: s.rel('restoreAttachments', 'attachmentId')
+		}
+	),
+
 	restoreNotebooks: s.table(
 		{
 			destinationId: s.uuid(),
@@ -41,7 +59,7 @@ export const notebookRestoreApp = s.defineApp({
 
 export const notebookRestorePermissions = s.definePermissions(
 	notebookRestoreApp,
-	({ policy, session, allOf }) => {
+	({ policy, session, allOf, anyOf }) => {
 		policy.restoreDestinations.allowRead.where({ ownerId: session.user.account })
 		policy.restoreDestinations.allowInsert.where({
 			ownerId: session.user.account,
@@ -49,6 +67,45 @@ export const notebookRestorePermissions = s.definePermissions(
 		})
 		policy.restoreDestinations.allowUpdate.never()
 		policy.restoreDestinations.allowDelete.never()
+		policy.restoreNotes.allowRead.where((row) =>
+			allOf([
+				{ ownerId: session.user.account },
+				policy.restoreDestinations.exists.where({
+					id: row.destinationId,
+					ownerId: session.user.account,
+					operationId: row.operationId
+				})
+			])
+		)
+		policy.restoreNotes.allowInsert.where((row) =>
+			allOf([
+				{ ownerId: session.user.account },
+				policy.restoreDestinations.exists.where({
+					id: row.destinationId,
+					ownerId: session.user.account,
+					operationId: row.operationId,
+					status: 'incomplete'
+				}),
+				policy.restoreNotebooks.exists.where({
+					id: row.notebookId,
+					destinationId: row.destinationId,
+					ownerId: session.user.account,
+					operationId: row.operationId
+				}),
+				anyOf([
+					{ attachmentId: { isNull: true } },
+					policy.restoreAttachments.exists.where({
+						id: row.attachmentId,
+						destinationId: row.destinationId,
+						ownerId: session.user.account,
+						operationId: row.operationId
+					})
+				])
+			])
+		)
+		policy.restoreNotes.allowUpdate.never()
+		policy.restoreNotes.allowDelete.never()
+
 		policy.restoreNotebooks.allowRead.where((row) =>
 			allOf([
 				{ ownerId: session.user.account },

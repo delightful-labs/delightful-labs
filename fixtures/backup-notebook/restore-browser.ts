@@ -13,7 +13,7 @@ import { prepareBrowserRestoreJournal } from 'delightful-local-first/backup/rest
 import { createBrowserRestoreJournalMachine } from 'delightful-local-first/backup/restore/journal/workflow'
 import { parseRestoreJournalRecord } from 'delightful-local-first/backup/restore/journal'
 import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
-import { notebookRestoreRoot } from './restore-request.js'
+import { notebookRestoreRoot, notebookRestoreNote } from './restore-request.js'
 import { createNotebookDataset } from './dataset.js'
 import { createNotebookRestorePreparationMachine, prepareNotebookRestore } from './restore.js'
 import { notebookRestoreApp, activeNotebookDestinations } from './restore-schema.js'
@@ -31,6 +31,9 @@ import {
 
 import { createNotebookRootRestore, createNotebookRootWriter } from './restore-notebook-writer.js'
 import { createNotebookRestoreRootMachine, prepareNotebookRootRestore } from './restore-notebook.js'
+
+import { createNotebookNoteRestore, createNotebookNoteWriter } from './restore-note-writer.js'
+import { createNotebookRestoreNoteMachine, prepareNotebookNoteRestore } from './restore-note.js'
 
 type Writer = ReturnType<typeof createNotebookTransactionWriter>
 const config = new URLSearchParams(location.search)
@@ -80,10 +83,25 @@ const rootPending: {
 	reportIdentity?: (failed: boolean) => void
 	staged?: boolean
 } = {}
+const notePending: {
+	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreNoteMachine>>
+	cleanup?: () => void
+	releaseStage?: () => void
+	releaseRequest?: () => void
+	hasExpected?: () => boolean
+	reportIdentity?: (failed: boolean) => void
+	staged?: boolean
+} = {}
 const api = {
+	notePending,
+	createNotebookNoteRestore,
+	createNotebookNoteWriter,
+	createNotebookRestoreNoteMachine,
+	prepareNotebookNoteRestore,
 	rootPending,
 	restoreTransactionAccess,
 	notebookRestoreRoot,
+	notebookRestoreNote,
 	createNotebookDestinationWriteMachine,
 	createNotebookRootRestore,
 	createNotebookRootWriter,

@@ -14,6 +14,7 @@
 		"../backup-notebook/restore-writer.ts",
 		"../backup-notebook/restore-attachment-writer.ts",
 		"../backup-notebook/restore-notebook-writer.ts",
+		"../backup-notebook/restore-note-writer.ts",
 		"./consumer.ts",
 		"./restore-journal.ts",
 		"./restore-journal-runtime.js",
