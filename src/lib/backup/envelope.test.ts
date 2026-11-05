@@ -1,3 +1,4 @@
+import * as binary from './binary.js'
 import vector from '../../../tests/fixtures/archive-envelope-v1.json'
 import { createCipheriv, createDecipheriv, createHash, pbkdf2Sync } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -344,6 +345,16 @@ describe('tampering, parameters and input bounds', () => {
 })
 
 describe('operation ownership, interruption and safe snapshots', () => {
+	it('does not claim an envelope merely by constructing an unstarted actor', async () => {
+		const request = prepareArchiveSeal(sample(), { kind: 'none' })
+		const dormant = createActor(createArchiveEnvelopeMachine(), { input: { request } })
+		const active = createActor(createArchiveEnvelopeMachine(), { input: { request } }).start()
+		dormant.start()
+		expect(await toPromise(dormant)).toEqual({ outcome: 'failed', code: 'operationInUse' })
+		const result = await toPromise(active)
+		expect(result.outcome).toBe('sealed')
+		if (result.outcome === 'sealed') result.archive.release()
+	})
 	it('detaches Node Buffer inputs instead of retaining Buffer.slice views', async () => {
 		const input = Buffer.from(wire(externalPlain()))
 		const request = prepareArchiveOpen(input)
@@ -435,56 +446,43 @@ describe('operation ownership, interruption and safe snapshots', () => {
 			])
 				expect(snapshot).not.toContain(secret)
 	})
-	it.each([
-		'claiming',
-		'parsingPayload',
-		'creatingPasswordHeader',
-		'hashingAttachment',
-		'importingPassword',
-		'derivingKey',
-		'encrypting',
-		'buildingEnvelope',
-		'cleaning'
-	])('cancels sealing at %s and releases any undelivered result', async (stage) => {
-		const request = prepareArchiveSeal(sample(), { kind: 'password', password })
-		const actor = createActor(createArchiveEnvelopeMachine(), { input: { request } })
-		let reached = false
-		let undelivered: SealedArchive | IntegrityCheckedArchive | undefined
-		actor.subscribe((snapshot) => {
-			if (
-				!reached &&
-				(snapshot.value === stage ||
-					(typeof snapshot.value === 'object' && snapshot.value.working === stage))
-			) {
-				reached = true
+	it.each(['hashingAttachment', 'importingPassword', 'derivingKey', 'encrypting'])(
+		'cancels sealing at %s and releases any undelivered result',
+		async (stage) => {
+			const request = prepareArchiveSeal(sample(), { kind: 'password', password })
+			const actor = createActor(createArchiveEnvelopeMachine(), { input: { request } })
+			let reached = false
+			let undelivered: SealedArchive | IntegrityCheckedArchive | undefined
+			actor.subscribe((snapshot) => {
 				if (
-					snapshot.context.result?.outcome === 'sealed' ||
-					snapshot.context.result?.outcome === 'integrityChecked'
-				)
-					undelivered = snapshot.context.result.archive
-				actor.send({ type: 'CANCEL' })
-			}
-		})
-		actor.start()
-		expect(await toPromise(actor)).toEqual({ outcome: 'cancelled' })
-		expect(reached).toBe(true)
-		const resource = undelivered
-		if (resource && 'copyBytes' in resource)
-			expect(() => resource.copyBytes()).toThrow('resourceReleased')
-		expect(await run(request)).toEqual({ outcome: 'failed', code: 'resourceReleased' })
-	})
+					!reached &&
+					(snapshot.value === stage ||
+						(typeof snapshot.value === 'object' && snapshot.value.working === stage))
+				) {
+					reached = true
+					if (
+						snapshot.context.result?.outcome === 'sealed' ||
+						snapshot.context.result?.outcome === 'integrityChecked'
+					)
+						undelivered = snapshot.context.result.archive
+					actor.send({ type: 'CANCEL' })
+				}
+			})
+			actor.start()
+			expect(await toPromise(actor)).toEqual({ outcome: 'cancelled' })
+			expect(reached).toBe(true)
+			const resource = undelivered
+			if (resource && 'copyBytes' in resource)
+				expect(() => resource.copyBytes()).toThrow('resourceReleased')
+			expect(await run(request)).toEqual({ outcome: 'failed', code: 'resourceReleased' })
+		}
+	)
 	it.each([
-		'claiming',
-		'parsingEnvelope',
-		'decodingPasswordEnvelope',
 		'importingPassword',
 		'derivingKey',
 		'decrypting',
 		'hashingPayload',
-		'parsingPayload',
-		'hashingAttachment',
-		'buildingChecked',
-		'cleaning'
+		'hashingAttachment'
 	])('closes opening at %s and releases any undelivered result', async (stage) => {
 		const request = prepareArchiveOpen(wire(externalEncrypted()), password)
 		const actor = createActor(createArchiveEnvelopeMachine(), { input: { request } })
@@ -515,11 +513,12 @@ describe('operation ownership, interruption and safe snapshots', () => {
 		const actor = createActor(createArchiveEnvelopeMachine(), { input: { request } })
 		const digest = vi.spyOn(crypto.subtle, 'digest')
 		let reached = false
-		actor.subscribe((snapshot) => {
-			if (!reached && snapshot.matches({ working: 'decodingPlainEnvelope' })) {
-				reached = true
-				request.release()
-			}
+		const decode = binary.decodeBase64
+		vi.spyOn(binary, 'decodeBase64').mockImplementation((...args) => {
+			const bytes = decode(...args)
+			reached = true
+			request.release()
+			return bytes
 		})
 		actor.start()
 		expect(await toPromise(actor)).toEqual({ outcome: 'failed', code: 'resourceReleased' })

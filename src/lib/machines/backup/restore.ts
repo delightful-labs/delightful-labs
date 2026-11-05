@@ -1,4 +1,4 @@
-import { assign, fromPromise, sendTo, setup, type Snapshot } from 'xstate'
+import { assign, sendTo, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
 import {
 	createRestoreJournalRecord,
@@ -38,16 +38,16 @@ export function createRestoreMachine<
 		interruption: 'cancelled' | 'closed' | 'invalidated' | undefined
 	}
 	const actors = {
-		validate: fromPromise(({ input }: { input: RestoreInput }) =>
-			Promise.resolve(validateRestoreInput(input))
-		),
 		lock: operationLock,
 		journal: createRestoreJournalStepMachine(),
 		write: createRestoreWriteStepMachine(writer, destination)
 	}
 	const model = setup<
 		Context,
-		RestoreEvent | LockEvent,
+		| RestoreEvent
+		| LockEvent
+		| { type: 'INPUT_VALIDATED'; value: ReturnType<typeof validateRestoreInput> }
+		| { type: 'INPUT_INVALID' },
 		typeof actors,
 		{},
 		{ interrupt: undefined },
@@ -82,7 +82,11 @@ export function createRestoreMachine<
 	})
 	const forward = model.enqueueActions(({ self, event, enqueue }) => {
 		const child = self.getSnapshot().children.write
-		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
+		if (
+			child?.getSnapshot().status === 'active' &&
+			(event.type === 'CANCEL' || event.type === 'SHUTDOWN' || event.type === 'INVALIDATE')
+		)
+			enqueue.sendTo(child, event)
 	})
 	const shutdownWriter = model.enqueueActions(({ self, enqueue }) => {
 		const child = self.getSnapshot().children.write
@@ -111,21 +115,26 @@ export function createRestoreMachine<
 		},
 		states: {
 			validating: {
-				invoke: {
-					src: 'validate',
-					input,
-					onDone: [
+				entry: ({ context, self }) => {
+					try {
+						self.send({ type: 'INPUT_VALIDATED', value: validateRestoreInput(input({ context })) })
+					} catch {
+						self.send({ type: 'INPUT_INVALID' })
+					}
+				},
+				on: {
+					INPUT_VALIDATED: [
 						{ guard: 'interrupted', target: 'complete' },
 						{
 							target: 'owned',
 							actions: assign({
-								step: ({ event }) => event.output.step,
-								binding: ({ event }) => event.output.binding,
-								intent: ({ event }) => event.output.record.intent
+								step: ({ event }) => event.value.step,
+								binding: ({ event }) => event.value.binding,
+								intent: ({ event }) => event.value.record.intent
 							})
 						}
 					],
-					onError: 'complete'
+					INPUT_INVALID: 'complete'
 				}
 			},
 			owned: {

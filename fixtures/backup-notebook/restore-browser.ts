@@ -1,5 +1,12 @@
 import { createJazzSession, PersistedWriteRejectedError } from 'jazz-tools'
-import { fromPromise, createActor, toPromise, waitFor, type ActorRefFrom } from 'xstate'
+import {
+	fromCallback,
+	fromPromise,
+	createActor,
+	toPromise,
+	waitFor,
+	type ActorRefFrom
+} from 'xstate'
 import { prepareArchiveOpen, prepareArchiveSeal } from 'delightful-local-first/backup/envelope'
 import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
 import { prepareBrowserRestoreJournal } from 'delightful-local-first/backup/restore/journal/browser'
@@ -10,6 +17,7 @@ import { createNotebookRestorePreparationMachine, prepareNotebookRestore } from 
 import { notebookRestoreApp, activeNotebookDestinations } from './restore-schema.js'
 import {
 	createNotebookPreparationWriter,
+	createNotebookPreparationWriteMachine,
 	createNotebookTransactionWriter
 } from './restore-writer.js'
 import { createNotebookRestoreAttachmentMachine } from './restore-attachment.js'
@@ -45,7 +53,8 @@ db.beginTransaction = () => {
 	return transaction
 }
 const writer: Writer = native
-const preparationDestination = createNotebookPreparationWriter(db)
+const preparationWrite = createNotebookPreparationWriteMachine(db)
+const preparationDestination = createNotebookPreparationWriter(db, preparationWrite)
 const machine = createNotebookRestorePreparationMachine(writer, preparationDestination)
 const pending: {
 	actor: ActorRefFrom<typeof machine> | undefined
@@ -80,6 +89,8 @@ const api = {
 	db,
 	fromPromise,
 	preparationDestination,
+	preparationWrite,
+	fromCallback,
 	writer,
 	ownerId,
 	pending,

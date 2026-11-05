@@ -13,10 +13,13 @@ import type {
 import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
 import { sameBackupBinding } from 'delightful-local-first/backup/export'
 import { notebookRestoreApp } from './restore-schema.js'
-import { createNotebookTransactionWriter } from './restore-writer.js'
+import {
+	createNotebookTransactionWriter,
+	createNotebookDestinationWriteMachine
+} from './restore-writer.js'
 import {
 	prepareNotebookRestore,
-	notebookRestoreData,
+	notebookRestoreAttachment,
 	requiredNotebookRestoreValue as required,
 	type NotebookRestoreRequest,
 	type NotebookRestoreOptions,
@@ -121,7 +124,7 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 		result: RestoreDestinationResult
 	}
 	const observations = new WeakMap<Handle, { observed: DestinationObservation | undefined }>()
-	const expected = () => required(notebookRestoreData({ request }).attachment)
+	const expected = () => required(notebookRestoreAttachment(request))
 	const observed = (context: Context) => observations.get(context.handle)?.observed
 	// This is result admission into an owned observation buffer, not workflow classification.
 	const consume = (handle: Handle, raw: unknown) => {
@@ -161,28 +164,22 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 					.then((row) => consume(input.handle, row))
 			)
 		}),
-		stage: fromPromise<void, Context>(({ input }) => {
-			const access = restoreTransactionAccess(input.input),
-				file = expected()
-			return access.call((transaction) => {
-				// Atomic identity invariant beside the one mutation; admission/routing lives in states.
-				if (db.getAuthState().session?.user.account !== input.input.intent.operation.identityId)
-					throw new Error('Attachment identity changed')
-				transaction.insert(
-					notebookRestoreApp.restoreAttachments,
-					{
-						destinationId: file.destinationId,
-						ownerId: file.ownerId,
-						operationId: file.operationId,
-						mediaType: file.mediaType,
-						fileName: file.fileName,
-						sizeBytes: file.sizeBytes,
-						sha256: file.sha256,
-						contents: file.contents
-					},
-					{ id: file.id }
-				)
-			})
+		write: createNotebookDestinationWriteMachine(db, (transaction) => {
+			const file = expected()
+			transaction.insert(
+				notebookRestoreApp.restoreAttachments,
+				{
+					destinationId: file.destinationId,
+					ownerId: file.ownerId,
+					operationId: file.operationId,
+					mediaType: file.mediaType,
+					fileName: file.fileName,
+					sizeBytes: file.sizeBytes,
+					sha256: file.sha256,
+					contents: file.contents
+				},
+				{ id: file.id }
+			)
 		})
 	}
 	const model = setup<
@@ -195,11 +192,11 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 			interrupted: undefined
 			currentBinding: undefined
 			scopeMatches: undefined
+			hasExpected: undefined
 			remoteOperation: undefined
 			authorityOperation: undefined
 			readOperation: undefined
 			stageOperation: undefined
-			identityMatches: undefined
 			hasObservation: undefined
 			controlMatches: undefined
 			filePresent: undefined
@@ -215,15 +212,19 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 			interrupted: ({ context }) => context.interruption !== undefined,
 			currentBinding: ({ context, event }) =>
 				event.type === 'INVALIDATE' && sameBackupBinding(context.input.binding, event.binding),
-			scopeMatches: ({ context }) =>
-				expectedScopeMatches(expected(), context.input.intent, context.input.step) &&
-				expectedMappingMatches(expected(), context.input.intent, context.input.step),
+			scopeMatches: ({ context }) => {
+				const file = notebookRestoreAttachment(request)
+				return (
+					file !== undefined &&
+					expectedScopeMatches(file, context.input.intent, context.input.step) &&
+					expectedMappingMatches(file, context.input.intent, context.input.step)
+				)
+			},
+			hasExpected: () => notebookRestoreAttachment(request) !== undefined,
 			remoteOperation: ({ context }) => context.input.operation === 'remote',
 			authorityOperation: ({ context }) => context.input.operation === 'authority',
 			readOperation: ({ context }) => context.input.operation === 'read',
 			stageOperation: ({ context }) => context.input.operation === 'stage',
-			identityMatches: ({ context }) =>
-				db.getAuthState().session?.user.account === context.input.intent.operation.identityId,
 			hasObservation: ({ context }) => observed(context) !== undefined,
 			controlMatches: ({ context }) => {
 				const row = observed(context)
@@ -232,7 +233,10 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 			filePresent: ({ context }) => observed(context)?.attachments.length === 1,
 			contentMatches: ({ context }) => {
 				const file = observed(context)?.attachments[0]
-				return file !== undefined && attachmentMatches(file, expected())
+				const expectation = notebookRestoreAttachment(request)
+				return (
+					file !== undefined && expectation !== undefined && attachmentMatches(file, expectation)
+				)
 			}
 		},
 		actions: {
@@ -247,6 +251,10 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 			})
 		}
 	})
+	const forward = model.enqueueActions(({ self, event, enqueue }) => {
+		const child = self.getSnapshot().children.write
+		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
+	})
 	const input = ({ context }: { context: Context }) => context
 	return model.createMachine({
 		id: 'notebook-attachment-destination',
@@ -258,9 +266,9 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 		},
 		output: ({ context }) => context.interruption ?? context.result,
 		on: {
-			CANCEL: { actions: 'interrupt' },
-			SHUTDOWN: { actions: 'interrupt' },
-			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
+			CANCEL: { actions: ['interrupt', forward] },
+			SHUTDOWN: { actions: ['interrupt', forward] },
+			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] }
 		},
 		states: {
 			working: {
@@ -274,6 +282,7 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 					admitting: {
 						always: [
 							{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
+							{ guard: not('hasExpected'), target: '#notebook-attachment-destination.unavailable' },
 							{ guard: 'scopeMatches', target: 'selectingOperation' },
 							{ target: '#notebook-attachment-destination.conflict' }
 						]
@@ -281,9 +290,9 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 					selectingOperation: {
 						always: [
 							{ guard: 'remoteOperation', target: 'readingRemote' },
-							{ guard: 'authorityOperation', target: 'admittingIdentity' },
+							{ guard: 'authorityOperation', target: 'writing' },
 							{ guard: 'readOperation', target: 'readingTransaction' },
-							{ guard: 'stageOperation', target: 'admittingStage' },
+							{ guard: 'stageOperation', target: 'writing' },
 							{ target: '#notebook-attachment-destination.unavailable' }
 						]
 					},
@@ -321,28 +330,15 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 							{ target: '#notebook-attachment-destination.conflict' }
 						]
 					},
-					admittingIdentity: {
-						always: [
-							{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
-							{ guard: 'identityMatches', target: '#notebook-attachment-destination.allowed' },
-							{ target: '#notebook-attachment-destination.denied' }
-						]
-					},
-					admittingStage: {
-						always: [
-							{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
-							{ guard: 'identityMatches', target: 'inserting' },
-							{ target: '#notebook-attachment-destination.denied' }
-						]
-					},
-					inserting: {
+					writing: {
 						invoke: {
-							src: 'stage',
-							input,
-							onDone: [
-								{ guard: 'interrupted', target: '#notebook-attachment-destination.complete' },
-								{ target: '#notebook-attachment-destination.staged' }
-							],
+							id: 'write',
+							src: 'write',
+							input: ({ context }) => context.input,
+							onDone: {
+								target: '#notebook-attachment-destination.complete',
+								actions: assign({ result: ({ event }) => event.output })
+							},
 							onError: '#notebook-attachment-destination.unavailable'
 						}
 					}
@@ -352,9 +348,6 @@ export function createNotebookAttachmentWriter(db: Db, request: NotebookRestoreR
 			missing: { type: 'final', entry: assign({ result: 'missingOrHidden' }) },
 			conflict: { type: 'final', entry: assign({ result: 'conflict' }) },
 			unavailable: { type: 'final' },
-			allowed: { type: 'final', entry: assign({ result: 'allowed' }) },
-			denied: { type: 'final', entry: assign({ result: 'denied' }) },
-			staged: { type: 'final', entry: assign({ result: 'staged' }) },
 			complete: { type: 'final' }
 		}
 	})

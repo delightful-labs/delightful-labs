@@ -448,12 +448,18 @@ it('holds one operation owner across tabs and releases ownership after cancellat
 			api.writer,
 			api.preparationDestination.provide({
 				actors: {
-					identity: api.fromPromise(
-						() =>
-							new Promise<boolean>((resolve) => {
-								api.pending.releaseAuthority = () => resolve(true)
+					write: api.preparationWrite.provide({
+						actors: {
+							observeIdentity: api.fromCallback(({ input, sendBack }) => {
+								api.pending.releaseAuthority = () =>
+									sendBack({
+										type: 'IDENTITY_OBSERVED',
+										binding: input.binding,
+										identityId: input.intent.operation.identityId
+									})
 							})
-					)
+						}
+					})
 				}
 			})
 		)
@@ -792,11 +798,19 @@ it('rejects a second claim without clearing the first restore actor’s resource
 		})
 		const destinationLogic = api.preparationDestination.provide({
 			actors: {
-				identity: api.fromPromise(({ input }) => {
-					reportEntered()
-					return gate.then(
-						() => api.db.getAuthState().session?.user.account === input.intent.operation.identityId
-					)
+				write: api.preparationWrite.provide({
+					actors: {
+						observeIdentity: api.fromCallback(({ input, sendBack }) => {
+							reportEntered()
+							void gate.then(() =>
+								sendBack({
+									type: 'IDENTITY_OBSERVED',
+									binding: input.binding,
+									identityId: api.db.getAuthState().session?.user.account ?? undefined
+								})
+							)
+						})
+					}
 				})
 			}
 		})
@@ -850,10 +864,20 @@ for (const authority of ['denied', 'failed']) {
 			const api = window.DLFRestoreQualification
 			api.preparationDestination = api.preparationDestination.provide({
 				actors: {
-					identity: api.fromPromise(() => {
-						if (authority === 'failed')
-							return Promise.reject(new Error('Injected identity observation failure'))
-						return Promise.resolve(false)
+					write: api.preparationWrite.provide({
+						actors: {
+							observeIdentity: api.fromCallback(({ input, sendBack }) => {
+								if (authority === 'failed') {
+									sendBack({ type: 'IDENTITY_FAILED', binding: input.binding })
+									return
+								}
+								sendBack({
+									type: 'IDENTITY_OBSERVED',
+									binding: input.binding,
+									identityId: undefined
+								})
+							})
+						}
 					})
 				}
 			})
@@ -878,3 +902,185 @@ for (const authority of ['denied', 'failed']) {
 		await deleteJournal(page, value)
 	})
 }
+
+for (const change of ['lost', 'failed', 'stale', 'cancelBeforeObservation']) {
+	it(`keeps write admission finite for ${change} identity reports and disposes observation`, async () => {
+		const page = await open(),
+			value = await sample(page)
+		await initialize(page, value)
+		const prepared = await run(page, value, 'new')
+		if (!prepared.record) throw new Error('Missing prepared intent')
+		const result = await page.evaluate(
+			async ({ value, record, change }) => {
+				const api = window.DLFRestoreQualification
+				let report: (change: string) => void = () => {
+					throw new Error('Missing observer')
+				}
+				let release: () => void = () => {
+					throw new Error('Missing insert gate')
+				}
+				let started: () => void = () => {
+					throw new Error('Missing insert observation')
+				}
+				const gate = new Promise<void>((resolve) => {
+					release = resolve
+				})
+				const entered = new Promise<void>((resolve) => {
+					started = resolve
+				})
+				let disposed = 0
+				const logic = api.preparationWrite.provide({
+					actors: {
+						observeIdentity: api.fromCallback(({ input, sendBack }) => {
+							report = (kind) => {
+								if (kind === 'failed') {
+									sendBack({ type: 'IDENTITY_FAILED', binding: input.binding })
+									return
+								}
+								sendBack({
+									type: 'IDENTITY_OBSERVED',
+									binding:
+										kind === 'stale'
+											? { ...input.binding, generation: input.binding.generation + 1 }
+											: input.binding,
+									identityId: kind === 'same' ? input.intent.operation.identityId : undefined
+								})
+							}
+							if (change !== 'cancelBeforeObservation') report('same')
+							return () => {
+								disposed++
+							}
+						}),
+						insert: api.fromPromise(() => {
+							started()
+							return gate.then((): 'inserted' => 'inserted')
+						})
+					}
+				})
+				const transaction = api.db.beginTransaction()
+				const actor = api
+					.createActor(logic, {
+						input: {
+							binding: value.binding,
+							databaseName: value.databaseName,
+							intent: record.intent,
+							step: record.intent.plan.preparation,
+							operation: 'stage',
+							transaction: {
+								call: (operation) => Promise.resolve(operation(transaction)),
+								toJSON: () => ({ kind: 'restoreTransactionAccess' })
+							}
+						}
+					})
+					.start()
+				if (change === 'cancelBeforeObservation') actor.send({ type: 'CANCEL' })
+				else {
+					await entered
+					report(change)
+					report('same')
+				}
+				const activeBeforeSettlement = actor.getSnapshot().status
+				release()
+				const outcome = await api.toPromise(actor)
+				await transaction.rollback()
+				actor.stop()
+				return { outcome, activeBeforeSettlement, disposed }
+			},
+			{ value, record: prepared.record, change }
+		)
+		expect(result.outcome).toBe(
+			change === 'lost'
+				? 'denied'
+				: change === 'failed'
+					? 'unavailable'
+					: change === 'stale'
+						? 'staged'
+						: 'cancelled'
+		)
+		expect(result.disposed).toBe(1)
+		if (change !== 'cancelBeforeObservation') expect(result.activeBeforeSettlement).toBe('active')
+		await deleteJournal(page, value)
+	})
+}
+
+it('denies identity replacement at the actual native insert boundary', async () => {
+	const page = await open(),
+		value = await sample(page)
+	await initialize(page, value)
+	const prepared = await run(page, value, 'new')
+	if (!prepared.record) throw new Error('Missing prepared intent')
+	const outcome = await page.evaluate(
+		async ({ value, record }) => {
+			const api = window.DLFRestoreQualification
+			const transaction = api.db.beginTransaction()
+			const read = api.db.getAuthState.bind(api.db)
+			const state = read(),
+				session = state.session
+			if (!session) throw new Error('Missing qualification session')
+			api.db.getAuthState = () => ({
+				...state,
+				session: { ...session, user: { ...session.user, account: crypto.randomUUID() } }
+			})
+			try {
+				const actor = api
+					.createActor(api.preparationWrite, {
+						input: {
+							binding: value.binding,
+							databaseName: value.databaseName,
+							intent: record.intent,
+							step: record.intent.plan.preparation,
+							operation: 'stage',
+							transaction: {
+								call: (operation) => Promise.resolve(operation(transaction)),
+								toJSON: () => ({ kind: 'restoreTransactionAccess' })
+							}
+						}
+					})
+					.start()
+				const result = await api.toPromise(actor)
+				actor.stop()
+				return result
+			} finally {
+				api.db.getAuthState = read
+				await transaction.rollback()
+			}
+		},
+		{ value, record: prepared.record }
+	)
+	expect(outcome).toBe('denied')
+	await deleteJournal(page, value)
+})
+
+it('returns unavailable for an attachment request with no owned expected bytes', async () => {
+	const page = await open(),
+		value = await sample(page)
+	await initialize(page, value)
+	const prepared = await run(page, value, 'new')
+	if (!prepared.record) throw new Error('Missing prepared intent')
+	const outcome = await page.evaluate(
+		async ({ value, record }) => {
+			const api = window.DLFRestoreQualification
+			const destination = api.createNotebookAttachmentWriter(api.db, {
+				release() {},
+				toJSON: () => ({ kind: 'notebookRestoreRequest' })
+			})
+			const actor = api
+				.createActor(destination, {
+					input: {
+						binding: value.binding,
+						databaseName: value.databaseName,
+						intent: record.intent,
+						step: record.intent.plan.preparation,
+						operation: 'authority'
+					}
+				})
+				.start()
+			const result = await api.toPromise(actor)
+			actor.stop()
+			return result
+		},
+		{ value, record: prepared.record }
+	)
+	expect(outcome).toBe('unavailable')
+	await deleteJournal(page, value)
+})

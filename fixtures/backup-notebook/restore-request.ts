@@ -111,6 +111,10 @@ export function requiredNotebookRestoreValue<T>(value: T | undefined): T {
 export function notebookRestoreData(input: { request: NotebookRestoreRequest }) {
 	return prepared(input.request).data
 }
+/** Optional observation of root-owned data; absence is a destination admission decision. */
+export function notebookRestoreAttachment(request: NotebookRestoreRequest) {
+	return requests.get(request)?.data.attachment
+}
 export function claimNotebookRestore(input: { request: NotebookRestoreRequest }) {
 	const value = prepared(input.request)
 	if (value.claimed || !value.data.options) throw new Error('Notebook restore request unavailable')

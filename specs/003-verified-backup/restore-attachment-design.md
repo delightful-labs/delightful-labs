@@ -83,6 +83,60 @@ adding a generic job runner.
 
 ## Explicit flow
 
+### Write-boundary identity denial (2026-11-04)
+
+The destination owns scope/content eligibility and invokes a shared notebook write-admission
+machine for authority or staging. The shared transaction owner retains acquisition, commit,
+settlement, rollback and detached custody. No promise wrapper owns an application workflow.
+
+```text
+destination: expected data available? -> scope/mapping -> select operation
+  remote/read -> one SDK read -> observation/content guards -> finite result
+  authority/stage -> invoke write-admission machine
+    observingIdentity -> SDK identity report -> denied / allowed / inserting
+    inserting (owns tracked insert invocation)
+      pending -> identity loss: revoked; observer failure: observationFailed
+      revoked / observationFailed retain the failed fact even after A -> B -> A
+      invocation settles -> interruption / denied / unavailable / staged
+```
+
+The SDK callback leaf subscribes to `db.onAuthChanged`, which emits initial and subsequent facts,
+and unsubscribes when its owning machine completes/stops. It reports typed, binding-correlated
+identity observations or subscription failures. It makes no admission, retry or write decisions.
+The machine consumes reports in guards and transitions. During insertion, nested states preserve
+loss/failure without exiting the state that owns the issued operation. Cancellation is latched and
+drained there; while waiting for initial identity it can complete without waiting for another report.
+An unexpected insert failure uses `onError` after settlement. Both destination parents forward
+interruption and await the admission child's finite output.
+
+Expected attachment access is an optional pure lookup in the existing root request, with no new
+load actor, promise or duplicate byte buffer. Missing/released data reaches `unavailable` through
+an admission guard. Scope/content predicates tolerate absence. Native leaves require the resource
+only at their SDK boundary; invocation errors remain finite. The root keeps ownership of bytes.
+
+The shared write machine retains the synchronous identity recheck beside the single native insert
+inside the borrowed transaction callback. A mismatch reports the native fact `identityMismatch`
+without inserting; invocation completion routes to the machine's finite `denied` state. The native
+fact `inserted` routes to `staged`. Unexpected SDK failures retain the invocation error
+path. Interruption takes precedence after the issued leaf settles. The shared write owner rolls
+back any non-staged result before returning, so denial never permits commit or checkpoint advance.
+Transaction ownership, observation cleanup and private attachment bytes keep their existing owners.
+
+The user subsequently authorized runtime qualification together with the remaining state-model fixes.
+The required coverage includes identity replacement
+between admission and the write-boundary check for both writers: no insert or commit, finite denied
+destination output and parent rollback; retain cancellation precedence and SDK-failure coverage.
+Also cover missing/released attachment data, stale binding reports, cancellation before the first
+identity report, identity loss and A -> B -> A while insertion is pending, observer failure while
+insertion is pending, and subscription disposal on completion/stop. Pending writes must settle
+before the transaction owner attempts rollback. The three existing browser-test injection sites
+now replace the native identity subscription inside the write machine; their assertions are
+unchanged. All 22 actual Jazz/Chromium restore tests now pass, including six new cases for identity
+loss and A -> B -> A during pending insert, observer failure, stale binding rejection, cancellation
+before initial observation, native write-boundary identity replacement, missing expected bytes and
+subscription disposal. Injected pending-insert cases qualify the machine protocol; the separate
+boundary case and existing preparation/attachment cases use the actual native transaction adapter.
+
 ```text
 validate checked archive/profile -> rebuild exact intent -> acquire operation lock -> load journal
   -> guard: preparation complete and current step is an attachment batch
