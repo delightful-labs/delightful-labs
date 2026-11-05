@@ -467,6 +467,111 @@ The application owns visibility, loading/save state, translations, retry actions
 
 Children supply visually hidden supplementary text. Native span attributes pass through, including `id` for accessible description references. Keep interactive controls outside this component.
 
+## SwipeActions
+
+```svelte
+<ul>
+	<li>
+		<SwipeActions
+			{actionsLabel}
+			leftActions={[
+				{ id: 'archive', label: archiveLabel },
+				{
+					id: 'delete',
+					label: deleteLabel,
+					variant: 'destructive',
+					dismissOnSwipe: true
+				}
+			]}
+			rightActions={[{ id: 'favorite', label: favoriteLabel }]}
+			onactionchosen={(choice) => handleAction(item.id, choice)}
+		>
+			<a href={item.href}>{item.title}</a>
+		</SwipeActions>
+	</li>
+</ul>
+```
+
+A reusable action drawer beneath caller-owned content. Swiping right reveals
+`leftActions`; swiping left reveals `rightActions`. Sides describe the physical
+location of the drawer, including in RTL layouts. Order actions from the first
+stage to the final stage, with unique IDs within each side. Each action accepts
+`id`, `label`, optional `disabled` and `dismissOnSwipe`, and the existing Button `variant` values.
+
+A short horizontal drag reveals native action buttons when released. Dragging
+35% of the row width arms the first enabled action; intermediate enabled actions
+are spaced evenly up to the final action at 90%. With one enabled action, it is
+reserved for the 90% full swipe. Releasing an armed swipe chooses that action;
+moving back reduces or cancels the armed stage. Reopening a drawer requires a
+deliberate additional drag before arming. Action labels keep the same wrapping
+and text styling as their backgrounds expand. Once an action is armed, the other
+actions fade to dimmed while it stays at full brightness. Retreating below the threshold
+restores them; the cue also stays visible during a committed exit. Selection
+changes only opacity, so label positions and wrapping remain unchanged.
+A gesture never chooses an action until release. Disabled actions remain visible as disabled buttons and are skipped by
+the progressive swipe stages.
+
+Set `dismissOnSwipe: true` on the final enabled action to finish a full swipe off
+the row instead of returning it to the closed position. On release, the final
+action's background expands across the row and covers the other buttons while
+the content slides away. Its label retains its width and text styling. It works independently
+of `variant`: archive can dismiss without destructive styling, while trash can
+use both. Releasing at the 90% threshold commits the exit; retreating or
+cancelling before release still backs out. The row becomes inert during the exit
+and hidden when it finishes. `onactionchosen` fires once after the native CSS
+exit and fill transitions complete, so the app can remove its list item without interrupting
+the animation. With reduced motion or zero duration, completion is immediate.
+Choosing a button or an earlier action retains the ordinary callback behavior.
+
+To restore a retained row after an undo or failed operation, bind the component
+instance (`bind:this={swipeRow}`) and call `swipeRow.reset()`. Resetting during an
+exit cancels its pending notification. The component does not delete data or
+remove the consuming app's `li`.
+
+`onactionchosen` is a typed Svelte 5 callback receiving `{ id, side, source }`,
+where `side` is `left` or `right` and `source` is `swipe` or `button`. The component
+closes after an ordinary choice, or exits for an opted-in final full swipe. The consuming app owns archiving, deleting, confirmations,
+async work, persistence, and item removal. The callback does not receive a
+CustomEvent or `.detail`. The package also exports the `SwipeAction`,
+`SwipeActionChosen`, and `SwipeSide` types.
+
+Native Pointer Events handle touch, mouse and pen; CSS `touch-action: pan-y
+pinch-zoom` preserves vertical scrolling and pinch zoom. Gesture tracking locks
+only after horizontal intent. Cancellation, lost capture, window blur, resizing,
+and action/disabled changes back out without choosing. Ordinary taps and keyboard
+link activation retain their native behavior; a completed horizontal drag
+suppresses the resulting click. Starts on buttons, inputs, selects, textareas,
+summaries, editable content, or descendants marked `data-swipe-ignore` do not start
+a swipe. Browser/OS edge-navigation gestures remain browser-owned.
+
+Actions stay underneath the row in the same fixed-height container. The row
+slides aside to expose solid, edge-to-edge action surfaces; it has no visible
+menu trigger or separate expanded panel. `actionsLabel` supplies the group's
+accessible name. For keyboard access, focus the row link and press ArrowRight to
+reveal the left drawer or ArrowLeft to reveal the right drawer. These keys slide
+the same row and focus its first enabled action. Escape closes it and returns
+focus to the row. For content without a focusable child, give SwipeActions
+`tabindex={0}`. Native action buttons stay inert and hidden from the accessibility
+tree until their side is revealed. `disabled` cancels the interaction while
+leaving caller-owned content available.
+
+The root is a `div`: place it inside the consuming app's `li` when building a
+list. Supply the row's anchor/content as children; do not wrap SwipeActions in a
+link or nest the `li` produced by LinkedListRow inside it. Native root attributes,
+class and style pass through. Customize `--dui-swipe-background-color` (defaults to
+the theme background), `--dui-swipe-action-width` (5.5rem) and
+`--dui-swipe-duration` (180ms). Button variants and focus styles use the existing
+theme; corners remain square, and reduced-motion preferences disable settling
+and dimming animations. XState is the only added runtime dependency; there is no gesture
+library or Svelte adapter dependency.
+
+Interaction ownership is a private XState machine: closed/open rest,
+pointer tracking, yielding to vertical scrolling, revealing/armed drag, and a
+single chosen-action emission. The Svelte wrapper owns native event listeners,
+pointer capture, measurement, focus, and actor teardown. Storybook includes both
+directions, three progressive actions, full-swipe dismissal with reset, one-sided actions, disabled actions,
+disabling, and a scrollable mobile list.
+
 ## LinkedListRow
 
 ```svelte
@@ -603,9 +708,11 @@ pnpm storybook
 pnpm build-storybook
 ```
 
-The development command uses http://127.0.0.1:6006 with a strict port. The static build writes `storybook-static`, which is ignored by git and excluded from the published library. Stories and configuration participate in static checking and linting.
+Development servers bind to `0.0.0.0` by default. Storybook uses http://127.0.0.1:6006 with a strict port and is also accessible at `http://<your-LAN-IP>:6006`. The static build writes `storybook-static`, which is ignored by git and excluded from the published library. Stories and configuration participate in static checking and linting.
 
 After reviewing implementation, `pnpm test:storybook` builds a test-only Storybook and runs Select, Textarea, Checkbox, and InputDate Chromium scenarios on temporary preview port 6007. It includes binding fixtures without adding them to the normal Storybook.
+
+To test SwipeActions against an already-running development server, use `DUI_STORYBOOK_URL=http://127.0.0.1:6006 pnpm exec playwright test --config playwright.storybook.config.js tests/storybook/swipe-actions.spec.js`. Coverage includes desktop Chromium, mobile Chromium and mobile WebKit contexts. Native touch swipes, cancellation and scrolling use Chromium CDP; WebKit covers pointer gestures and native taps. These checks do not replace physical-device testing.
 
 ## Deployment and CI
 
@@ -625,7 +732,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, RadioGroup, RadioItem, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, RadioGroup, RadioItem, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, SwipeActions, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 

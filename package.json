@@ -2,7 +2,7 @@
 	"name": "delightful-ui",
 	"version": "0.0.25",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "vite dev --host 0.0.0.0",
 		"build": "vite build && pnpm run package",
 		"preview": "vite preview",
 		"package": "svelte-kit sync && svelte-package && publint",
@@ -13,7 +13,7 @@
 		"test:unit": "vitest",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"storybook": "storybook dev --host 127.0.0.1 --port 6006 --exact-port --disable-telemetry",
+		"storybook": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
 		"storybook:network": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
 		"build-storybook": "storybook build --disable-telemetry",
 		"test:storybook": "storybook build --config-dir tests/storybook --output-dir storybook-test-static --disable-telemetry && playwright test --config playwright.storybook.config.js"
@@ -77,6 +77,7 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
-		"tdesign-icons-svg": "^0.4.7"
+		"tdesign-icons-svg": "^0.4.7",
+		"xstate": "^5.33.3"
 	}
 }
