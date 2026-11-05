@@ -33,6 +33,8 @@ import InputCurrency from './Components/Inputs/InputCurrency.svelte'
 import Select from './Components/Inputs/Select.svelte'
 import Textarea from './Components/Inputs/Textarea.svelte'
 import Checkbox from './Components/Inputs/Checkbox.svelte'
+import RadioGroup from './Components/Inputs/RadioGroup.svelte'
+import RadioItem from './Components/Inputs/RadioItem.svelte'
 import AvatarImageTile from './Components/Inputs/AvatarImageTile.svelte'
 import InputImages from './Components/Inputs/InputImages.svelte'
 import InputAvatar from './Components/Inputs/InputAvatar.svelte'
@@ -69,6 +71,8 @@ export {
 	Select,
 	Textarea,
 	Checkbox,
+	RadioGroup,
+	RadioItem,
 	LoadingSpinner,
 	StatusMessage,
 	LoadingScreen,
