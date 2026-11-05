@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { backupBindingSchema, type BackupBinding } from './export.js'
+import { backupBindingSchema, type BackupBinding } from './binding.js'
 import { wellFormed } from './schemas.js'
 import {
 	createRestoreJournalRecord,

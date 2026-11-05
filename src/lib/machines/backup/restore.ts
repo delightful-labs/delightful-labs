@@ -1,5 +1,5 @@
 import { forwardTo, sendTo, assign, setup, type Snapshot } from 'xstate'
-import { sameBackupBinding } from '../../backup/export.js'
+import { sameBackupBinding } from '../../backup/binding.js'
 import {
 	createRestoreJournalRecord,
 	type RestoreJournalRecord

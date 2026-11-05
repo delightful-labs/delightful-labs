@@ -1,5 +1,5 @@
 import { assign, fromPromise, raise, setup } from 'xstate'
-import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
+import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type { RestoreEvent } from 'delightful-local-first/backup/restore'
 import { createRestoreJournalStepMachine } from 'delightful-local-first/backup/restore/workflow'
 import { testAppProfile } from './profile.js'

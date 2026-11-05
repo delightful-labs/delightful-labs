@@ -3,8 +3,8 @@
 Hypothesis: Jazz 2's native exclusive-transaction snapshot can replace consumer writer gating
 and repeated graph reads when exporting a complete point-in-time workspace graph.
 
-This is a disposable SDK experiment, not a DLF workflow implementation. It uses Jazz,
-Vitest, Playwright, Vite and Node utilities. It must not import DLF's admission or capture machinery. Use the
+`experiment.test.ts` is a disposable SDK experiment, independent of DLF's workflow implementation.
+It uses Jazz, Vitest, Playwright, Vite and Node utilities. It does not import DLF's capture machinery. Use the
 installed `jazz-tools@2.0.0-alpha.59`, an explicitly in-memory server on an automatically assigned
 loopback port, and independent native client sessions. Never load Finance configuration or data.
 
@@ -28,13 +28,12 @@ are observed through their native verdicts. Browser contexts are disposable and 
 Bounded observations record an expired deadline as pending, never as a native failure or proof
 of cancellation. Sessions and test servers close after the matrix, including failing probes.
 Observations contain only synthetic revisions/bytes and operation outcomes. Native
-credentials are neither logged nor written to the observation artifact.
+credentials are never logged.
 
-Run: `pnpm exec vitest run --config fixtures/native-capture/vitest.config.ts`
+Build the public package with `pnpm package`, then run `pnpm check:native-backup`.
 
-The runner needs local-listener access. It writes observations to
-`/private/tmp/dlf-native-capture-observations.json`. No experiment changes are automatically added
-to PR #28. Results and limits must be reviewed before changing the backup design.
+The runner needs local-listener access. Synthetic observations are logged by the tests; no separate
+report file is written during teardown.
 
 ## Result: use the native exclusive verdict
 
@@ -75,5 +74,13 @@ handoff. A read-only native commit is an engine transaction, not a mutation of a
 
 This establishes a simpler architecture to qualify in Finance. It does not establish arbitrary
 graph-size limits, memory use, throughput, every permission policy or behavior on other browser
-engines. The experiment has not changed the implementation on PR #28; its admission design should
-be reduced before merge rather than treated as required by Jazz.
+engines. These results informed the native rewrite on PR #28; the former source/lease export runtime
+and in-memory capture simulator have now been removed.
+
+## Actual exporter checks
+
+`export-reader.ts` is a finite domain reader for this synthetic graph. `export-browser.ts` consumes
+the built public `backend/jazz/backup` and `backup/export/workflow` entrypoints. Two browser cases
+download protected/unprotected files through the sole native workflow and reopen them outside the
+browser with exact bytes and unchanged source. These supplement the 18 independent SDK probes.
+Resource ownership, interruptions and failures are tested in `src/lib/backend/jazz/backup.test.ts`.

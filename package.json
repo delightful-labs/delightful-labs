@@ -21,7 +21,7 @@
 		"paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --emit-ts-declarations --no-emit-readme --no-emit-prettier-ignore --no-emit-git-ignore",
 		"backup:inspect": "node fixtures/backup-reader/inspect.mjs",
 		"check:backup-reader": "tsc --noEmit --project fixtures/backup-reader/tsconfig.json",
-		"check:test-app": "tsc --project fixtures/test-app/tsconfig.json --noEmit false --rootDir fixtures/test-app --outDir .svelte-kit/test-app && node --test .svelte-kit/test-app/export.test.js",
+		"check:test-app": "tsc --project fixtures/test-app/tsconfig.json --noEmit false --rootDir fixtures/test-app --outDir .svelte-kit/test-app && node --test .svelte-kit/test-app/archive.test.js",
 		"test:storybook": "playwright test --config playwright.config.ts",
 		"measure:backup": "DLF_BACKUP_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures encrypted'",
 		"measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
@@ -59,10 +59,6 @@
 			"types": "./dist/backend/jazz/backup-api.d.ts",
 			"default": "./dist/backend/jazz/backup-api.js"
 		},
-		"./backup/jazz/workflow": {
-			"types": "./dist/machines/backup/jazz-export.d.ts",
-			"default": "./dist/machines/backup/jazz-export.js"
-		},
 		"./backup/restore/journal/browser": {
 			"types": "./dist/backup/restore-journal-browser-api.d.ts",
 			"default": "./dist/backup/restore-journal-browser-api.js"
@@ -75,9 +71,9 @@
 			"types": "./dist/backup/restore-journal.d.ts",
 			"default": "./dist/backup/restore-journal.js"
 		},
-		"./backup/export": {
-			"types": "./dist/backup/export-api.d.ts",
-			"default": "./dist/backup/export-api.js"
+		"./backup/binding": {
+			"types": "./dist/backup/binding.d.ts",
+			"default": "./dist/backup/binding.js"
 		},
 		"./backup/export/workflow": {
 			"types": "./dist/machines/backup/export.d.ts",

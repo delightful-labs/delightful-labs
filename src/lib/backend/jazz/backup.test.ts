@@ -16,10 +16,10 @@ import {
 	type Graph
 } from '../../../../fixtures/native-capture/schema.js'
 import { prepareJazzArchiveExport, type JazzArchiveReaderInput } from './backup-api.js'
-import { createJazzArchiveExportMachine } from '../../machines/backup/jazz-export.js'
+import { createJazzArchiveExportMachine } from '../../machines/backup/export.js'
 import { createArchiveEnvelopeMachine } from '../../machines/backup/envelope.js'
 import { prepareArchiveOpen, type ArchiveProtection } from '../../backup/envelope-api.js'
-import type { ArchiveHandoffFile } from '../../backup/export.js'
+import type { ArchiveHandoffFile, ArchiveHandoffObservation } from './backup-api.js'
 
 let authority: LocalJazzServerHandle
 const sessions: JazzSession<JazzClient>[] = []
@@ -129,7 +129,7 @@ function options(graph: Graph, protection: ArchiveProtection = { kind: 'none' })
 			protection,
 			isCurrent: () => true,
 			handoff: {
-				dispatch: vi.fn(async (file: ArchiveHandoffFile): Promise<'dispatched'> => {
+				dispatch: vi.fn(async (file: ArchiveHandoffFile): Promise<ArchiveHandoffObservation> => {
 					files.push(file.copyBytes())
 					return 'dispatched'
 				})
@@ -152,6 +152,81 @@ function start(
 }
 
 describe('native Jazz archive export', () => {
+	it('rejects duplicate owners without releasing or replaying the active export', async () => {
+		const graph = await seed(),
+			reached = deferred<void>(),
+			resume = deferred<void>()
+		const h = start(graph, options(graph), () => {
+			reached.resolve()
+			return resume.promise
+		})
+		await reached.promise
+		const machine = createJazzArchiveExportMachine(reader(graph))
+		const duplicate = createActor(machine, { input: { request: h.request } }).start()
+		expect(await toPromise(duplicate)).toMatchObject({ outcome: 'failed', code: 'inUse' })
+		expect(h.actor.getSnapshot().status).toBe('active')
+		resume.resolve()
+		expect(await toPromise(h.actor)).toMatchObject({ outcome: 'exported' })
+		const replay = createActor(machine, { input: { request: h.request } }).start()
+		expect(await toPromise(replay)).toMatchObject({ outcome: 'failed', code: 'inUse' })
+		expect(h.value.handoff.dispatch).toHaveBeenCalledTimes(1)
+	})
+	it('rejects a domain-invalid payload before issuing a native commit or handoff', async () => {
+		const graph = await seed(),
+			input = options(graph)
+		input.value.profile = { ...profile, validate: () => false }
+		const h = start(graph, input)
+		expect(await toPromise(h.actor)).toMatchObject({
+			outcome: 'failed',
+			code: 'invalidData',
+			archiveProduced: false,
+			handoff: 'notStarted'
+		})
+		expect(h.files).toHaveLength(0)
+	})
+	it('rejects a different authenticated identity before reading', async () => {
+		const graph = await seed(),
+			input = options(graph)
+		input.value.binding.identityId = crypto.randomUUID()
+		const h = start(graph, input)
+		expect(await toPromise(h.actor)).toMatchObject({
+			outcome: 'failed',
+			code: 'permissionDenied',
+			archiveProduced: false
+		})
+		expect(h.files).toHaveLength(0)
+	})
+	it('discards a captured view when native read permission is revoked', async () => {
+		const graph = await seed(),
+			reached = deferred<void>(),
+			resume = deferred<void>()
+		const h = start(graph, options(graph), () => {
+			reached.resolve()
+			return resume.promise
+		})
+		await reached.promise
+		await writer
+			.update(app.workspaces, graph.workspace, { visible: false })
+			.wait({ tier: 'global' })
+		resume.resolve()
+		expect(await toPromise(h.actor)).toMatchObject({ outcome: 'failed', archiveProduced: false })
+		expect(h.files).toHaveLength(0)
+	})
+	it.each(['rejected', 'unknown'] satisfies ArchiveHandoffObservation[])(
+		'preserves the %s handoff result without automatic replay',
+		async (observation) => {
+			const graph = await seed(),
+				input = options(graph)
+			input.value.handoff.dispatch.mockResolvedValue(observation)
+			const h = start(graph, input)
+			expect(await toPromise(h.actor)).toMatchObject({
+				outcome: 'failed',
+				archiveProduced: true,
+				handoff: observation
+			})
+			expect(input.value.handoff.dispatch).toHaveBeenCalledTimes(1)
+		}
+	)
 	it.each(['none', 'password'])(
 		'exports %s protection and independently reopens exact source bytes',
 		async (kind) => {

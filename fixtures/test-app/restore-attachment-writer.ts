@@ -11,7 +11,7 @@ import type {
 	RestoreEvent
 } from 'delightful-local-first/backup/restore'
 import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
-import { sameBackupBinding } from 'delightful-local-first/backup/export'
+import { sameBackupBinding } from 'delightful-local-first/backup/binding'
 import { testAppRestoreApp } from './restore-schema.js'
 import {
 	createTestAppTransactionWriter,

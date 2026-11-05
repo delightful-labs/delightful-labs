@@ -116,7 +116,8 @@ or a prerequisite to recognizing the already qualified conservative test app pat
 
 ## Qualification boundary
 
-The test app source is an in-memory actor; destination/policy checks use actual Jazz. Recovery is
+The test app restore input is a known prebuilt archive; destination/policy checks use actual Jazz.
+Actual capture uses the sole native Jazz export workflow; the old in-memory source simulator is removed. Recovery is
 qualified for the same browser/origin with retained IndexedDB and a reselected matching archive,
 including page reload/fresh session. Browser-process crash, cleared journal, offline restart and
 cross-device/browser recovery are not qualified product claims. Additional platform guarantees need

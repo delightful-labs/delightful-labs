@@ -1,6 +1,6 @@
 import { createActor, toPromise } from 'xstate'
-import { prepareJazzArchiveExport } from '../../src/lib/backend/jazz/backup-api.js'
-import { createJazzArchiveExportMachine } from '../../src/lib/machines/backup/jazz-export.js'
+import { prepareJazzArchiveExport } from 'delightful-local-first/backend/jazz/backup'
+import { createJazzArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'
 import type { ArchiveProtection } from '../../src/lib/backup/envelope-api.js'
 import { createBrowserSession, type Graph } from './schema.js'
 import { createExportReader, testExportProfile } from './export-reader.js'

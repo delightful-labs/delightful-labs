@@ -2,6 +2,24 @@ import { expect, test } from '@playwright/test'
 import { resolve } from 'node:path'
 import wire from '../fixtures/restore-journal-v1.json' with { type: 'json' }
 
+declare global {
+	interface Window {
+		DLFTestApp: Pick<typeof import('xstate'), 'createActor' | 'toPromise'> &
+			Pick<
+				typeof import('../../src/lib/backup/restore-journal.js'),
+				'decodeRestoreJournalRecord' | 'encodeRestoreJournalRecord' | 'parseRestoreJournalRecord'
+			> &
+			Pick<
+				typeof import('../../src/lib/backup/restore-journal-browser-api.js'),
+				'prepareBrowserRestoreJournal'
+			> &
+			Pick<
+				typeof import('../../src/lib/machines/backup/restore-journal.js'),
+				'createBrowserRestoreJournalMachine'
+			>
+	}
+}
+
 test('public journal reuse keeps encoded buffers independent and revalidates foreign input in Chromium', async ({
 	page
 }) => {

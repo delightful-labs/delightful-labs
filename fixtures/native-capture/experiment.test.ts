@@ -1,4 +1,3 @@
-import { writeFile } from 'node:fs/promises'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db, Transaction } from 'jazz-tools'
 import { app, permissions, bytes, readGraph, type Graph } from './schema.js'
@@ -23,12 +22,10 @@ declare global {
 	}
 }
 
-type Observation = { name: string; facts: object }
 type NativeObservation<Value> =
 	| { outcome: 'resolved'; value: Value }
 	| { outcome: 'rejected'; message: string }
 	| { outcome: 'pending' }
-const observations: Observation[] = []
 const transactions = new Set<Transaction>()
 const sessions: JazzSession<JazzClient>[] = []
 let server: LocalJazzServerHandle | undefined
@@ -38,7 +35,6 @@ let web: ViteDevServer | undefined
 let browser: Browser | undefined
 
 function record(name: string, facts: object) {
-	observations.push({ name, facts })
 	console.info(JSON.stringify({ experiment: name, ...facts }))
 }
 function transaction(kind: 'exclusive', db?: Db): Transaction<'exclusive'>
@@ -198,10 +194,6 @@ beforeAll(async () => {
 	reader.onMutationError(() => {})
 })
 afterAll(async () => {
-	await writeFile(
-		'/private/tmp/dlf-native-capture-observations.json',
-		JSON.stringify({ sdk: 'jazz-tools@2.0.0-alpha.59', observations }, null, 2)
-	)
 	for (const tx of transactions) await observe(tx.rollback())
 	for (const session of sessions) await observe(session.close())
 	await browser?.close()

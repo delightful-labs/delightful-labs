@@ -9,7 +9,6 @@
 		"exactOptionalPropertyTypes": false
 	},
 	"include": [
-		"../test-app/export.ts",
 		"../test-app/restore.ts",
 		"../test-app/restore-writer.ts",
 		"../test-app/restore-attachment-writer.ts",

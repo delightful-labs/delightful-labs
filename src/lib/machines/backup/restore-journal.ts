@@ -1,5 +1,5 @@
 import { assign, not, sendTo, setup } from 'xstate'
-import { sameBackupBinding, type BackupBinding } from '../../backup/export.js'
+import { sameBackupBinding, type BackupBinding } from '../../backup/binding.js'
 import {
 	browserJournalBinding,
 	browserJournalData,

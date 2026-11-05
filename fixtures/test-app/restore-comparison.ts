@@ -6,7 +6,7 @@ import {
 	type RestoreDestinationResult,
 	type RestoreEvent
 } from 'delightful-local-first/backup/restore'
-import { sameBackupBinding } from 'delightful-local-first/backup/export'
+import { sameBackupBinding } from 'delightful-local-first/backup/binding'
 import { testAppRestoreApp } from './restore-schema.js'
 import { testAppCanonical, projectTestAppRecords } from './restore-plan.js'
 import { testAppRestoreData, type TestAppRestoreRequest } from './restore-request.js'

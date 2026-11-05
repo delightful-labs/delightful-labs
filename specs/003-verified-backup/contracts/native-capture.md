@@ -7,6 +7,23 @@ repository and removed from this working tree before starting the replacement.
 The portable archive codec, profile validation, encryption and independent reader remain useful.
 The new native export must not call the old source/lease or admission workflows.
 
+## Cleanup scope (2026-11-05)
+
+Remove the merged source/lease protocol and its capture, export and retry-cleanup machines, rather
+than keeping them beside native export. The native machine becomes the sole export workflow at
+`backup/export/workflow`. Shared binding validation/equality moves to `backup/binding`; restore
+coordination continues using those pure contracts without depending on an export implementation.
+Native export owns its handoff types and payload validation.
+
+Delete the synthetic test app's in-memory lease simulator. Restore test inputs are known, prebuilt
+payloads: prepare them through the existing envelope request/machine directly, with test-owned file
+I/O. They are archive generation fixtures, not evidence of native source capture. Keep their profile
+validation and independent retained-file restore checks. Actual source capture, conflicts, pending
+writes and source preservation are qualified by real-Jazz tests and persistent browser downloads.
+No new application workflow is needed for pure fixture construction. The native export chart and
+its resource ownership remain unchanged. Remove obsolete protocol tests, and retain equivalent
+applicable coverage on the sole native owner. No compatibility aliases or alternate export modes.
+
 ## Ownership and statechart before implementation
 
 One finite export owner invokes one consumer reader twice. Hydration queries the live Db at the
@@ -45,8 +62,9 @@ about five or six integration files; no mutation-path changes or global writer r
 
 ## Implementation and evidence
 
-The replacement adds three runtime files: the native resource boundary, its public API and the
-finite export machine. Public consumers use `backend/jazz/backup` and `backup/jazz/workflow`.
+The replacement keeps one native resource boundary, its public API and the sole export machine.
+Public consumers use `backend/jazz/backup` and `backup/export/workflow`; restore/export binding
+contracts are at `backup/binding`. The former generic export runtime and source simulator are deleted.
 `prepareJazzArchiveExport` takes the native database, exact attachment binding, profile validator,
 protection, file handoff and a pure binding-validity observation. The machine invokes the same
 domain reader in `hydrate` and `capture` modes. Its read capability fixes the native scope and
@@ -57,17 +75,23 @@ The archive declares `jazz-exclusive-transaction` consistency. The native owner 
 declaration and the positive verdict before protection. The old quiescent declaration remains
 readable for existing archives. Neither declaration is an authority signature over the file.
 
-Verified on 2026-11-05 with the pinned Jazz `2.0.0-alpha.59`:
+Cleanup qualification on 2026-11-05 with pinned Jazz `2.0.0-alpha.59`:
 
-- `pnpm verify`: formatting/lint, strict Svelte/TypeScript, **962 unit tests**, package/publint,
-  built-package consumers, independent-reader checks, test app exports and Storybook build pass.
-- Fourteen new export-owner cases cover both protection choices, exact byte reopening and unchanged
-  source, conflicts/fresh attempts, interruptions, stale binding, late reads, offline confirmation,
-  reader/owner crashes, abrupt stop and handoff custody.
-- Eighteen independent native probes establish the SDK behavior recorded in the experiment README.
-- Two real persistent-Chromium downloads, protected and unprotected, reopen in Node with the expected
-  profile and exact original bytes while preserving the source.
-- `check:native-backup` type-checks and runs the native/browser matrix in CI after Chromium setup.
+- Formatting/lint, strict Svelte/TypeScript, **916 unit cases**, package/publint, built-package
+  consumers, independent-reader checks, 12 retained-file/profile cases and Storybook build pass.
+- Twenty native export-owner cases cover protection, exact bytes/source preservation, conflicts and
+  fresh attempts, interruptions, stale binding, late reads, offline confirmation, reader/owner crashes,
+  abrupt stop, single use, invalid profiles, identity/permission changes and handoff custody/outcomes.
+- `pnpm check:native-backup`: 18 independent SDK probes plus two real persistent-Chromium downloads
+  through the built public package pass; both files reopen in Node with exact bytes and unchanged source.
+- `pnpm check:backup-restore`: **69 functional cases pass**; seven opt-in performance cases are skipped.
+- Fifteen built-package browser journal cases pass after moving the binding contract and removing
+  the synthetic export browser fixture. The native download checks replace its capture claims.
+
+The old generic capture/export/cleanup runtime and in-memory source simulator are deleted. Existing
+restore actors change only their binding import; their workflow and destination policies are retained.
+The optional synthetic performance harness now reports sealing/open/restore timing, not native capture
+latency. No Finance-size or new performance measurements were run for this cleanup.
 
 Finance's reader, settings interaction, actual graph-size performance and other browser engines
 remain unqualified. This shared replacement does not complete T008 or T004.

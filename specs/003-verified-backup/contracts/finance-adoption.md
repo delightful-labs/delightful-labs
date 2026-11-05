@@ -51,17 +51,29 @@ Current file permissions depend on valid transaction linkage. A client cannot es
 
 ## Source capture decision
 
-Use an explicit single-user maintenance window for first adoption, without claiming automatic server snapshot isolation:
+The 2026-11-05 [native experiment](../../../fixtures/native-capture/README.md) replaces the former
+maintenance-window, writer-admission and repeated-comparison proposal. Use the existing pinned Jazz
+SDK; no SDK upgrade or mutation-workflow registration is needed.
 
-1. Confirm no other person is editing the workspace. Ask the user to close other tabs/devices and stop pending bank import/capture workflows before capture; explain this quiescence assumption in the interaction. Do not call it enforced cross-device locking.
-2. The current app acquires a local write-admission lease and drains known mutation owners, attachments, and imports. A browser lock can coordinate cooperating current-version tabs but cannot control cached old clients or another device. If quiescence is unknown, stop.
-3. Confirm remote owner membership and organization ownership consistency. Selected-account access and admin-only access do not satisfy owner-only backup. Revalidate authority at completion.
-4. Read each required domain type using explicit `ReadTier.Remote`, no visible-screen filters, including archived records. Read relationships in all directions required by the profile and attachment contents. Use bounded, deterministic ordering. No implicit paging limit may truncate results.
-5. Read the corresponding local-first graph and compare exact supported application values to detect pending/divergent local changes. Any difference causes an incomplete-source result; do not overwrite, discard, or silently back up only remote state. The procedure cannot discover edits retained only on an unconnected other device: those devices must be settled explicitly by the user.
-6. Perform another complete remote graph read and compare exact values/references/bytes. Under the explicit no-writer assumption this detects accidental drift; two matching passes alone do not prove snapshot isolation and cannot exclude an ABA change.
-7. Validate reference closure, unsupported legacy references, attachment part sequence/length and actual bytes, bounds, exact integer range, and source audit provenance. Freeze validated data in an owned immutable resource, then release the source lease.
+1. Confirm remote owner membership and consistent organization ownership. Selected-account access
+   and admin-only access do not satisfy owner-only backup. Read all supported scope through ordinary
+   remote queries, including archived records, relationships and bounded attachment contents.
+2. Open one exclusive transaction after complete hydration. Read the same complete declared scope
+   through its remote read capability; cold native snapshots alone can omit data. Do not truncate
+   result sets or treat unavailable/hidden rows as proof of absence.
+3. Validate reference closure, unsupported legacy references, attachment part sequence/length and
+   exact bytes, bounds, exact integer range and source audit provenance. Deposit only plain,
+   allowlisted immutable archive data. Recheck owner authority through the captured scope.
+4. Commit with zero application mutations and await the native exclusive verdict. Only acceptance
+   permits protection/download. A rejected/conflicting capture is discarded; an explicit retry
+   hydrates again and opens a fresh transaction. Offline confirmation may remain pending.
 
-This procedure requires qualification on the actual pinned SDK: remote read scope, policy filtering, attachment retrieval, local pending overlays and remote equality, limits, and failure outcomes. If quiescence and coverage cannot be established, export fails clearly. No disconnect, storage deletion, account replacement, or schema publication is part of capture. A future server snapshot may improve concurrency without being a prerequisite for the pure archive module.
+DLF owns native receipts, binding checks, interruption, transaction cleanup and protection/handoff.
+Finance owns complete domain coverage, owner checks and bounded exact-byte handling. This protocol
+is qualified on synthetic data on alpha.59; Finance profile and actual-size qualification remain
+T008/T004. It cannot recover edits that exist only on another disconnected device. No disconnect,
+storage deletion, account replacement or schema publication is part of capture. See
+[native ownership and evidence](native-capture.md).
 
 ## Restore decision
 

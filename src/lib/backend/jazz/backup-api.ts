@@ -3,6 +3,9 @@ export {
 	jazzExportFailure as classifyJazzArchiveFailure
 } from './backup.js'
 export type {
+	ArchiveFileHandoff,
+	ArchiveHandoffFile,
+	ArchiveHandoffObservation,
 	JazzArchiveExportRequest,
 	JazzArchiveExportResult,
 	JazzArchiveReaderInput,

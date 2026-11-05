@@ -5,13 +5,8 @@ import {
 	type QueryBuilder,
 	type Transaction
 } from 'jazz-tools'
-import {
-	backupBindingSchema,
-	validateExportPayload,
-	type BackupBinding,
-	type ArchiveFileHandoff,
-	type ArchiveHandoffObservation
-} from '../../backup/export.js'
+import { backupBindingSchema, type BackupBinding } from '../../backup/binding.js'
+import { encodeArchivePayload, parseArchivePayload } from '../../backup/payload.js'
 import {
 	resolvePayloadLimits,
 	isArchivePayloadError,
@@ -27,6 +22,17 @@ import {
 	type SealedArchive
 } from '../../backup/envelope-operation.js'
 import type { ArchiveProfileValidator } from '../../backup/inspection.js'
+
+export type ArchiveHandoffObservation = 'dispatched' | 'rejected' | 'unknown'
+export type ArchiveHandoffFile = Pick<SealedArchive, 'copyBytes' | 'toJSON'>
+export interface ArchiveFileHandoff {
+	/** One dispatch effect. The consumer owns and must clear byte copies it takes. */
+	dispatch(
+		archive: ArchiveHandoffFile,
+		binding: BackupBinding,
+		signal: AbortSignal
+	): Promise<ArchiveHandoffObservation>
+}
 
 export type JazzExportErrorCode =
 	| 'inUse'
@@ -210,17 +216,24 @@ export function validateJazzExport(request: JazzArchiveExportRequest) {
 		captured = scope.captured
 	scope.reader = undefined
 	scope.captured = undefined
+	const bytes = encodeArchivePayload(captured, scope.limits)
 	try {
-		scope.payload = validateExportPayload(
-			captured,
-			required(scope.input).profile,
-			scope.binding,
-			scope.limits
+		const payload = parseArchivePayload(bytes, scope.limits),
+			profile = required(scope.input).profile
+		if (
+			payload.profile.id !== profile.id ||
+			payload.profile.version !== profile.version ||
+			payload.source.applicationId !== scope.binding.applicationId ||
+			payload.source.workspaceId !== scope.binding.workspaceId ||
+			payload.coverage.consistency !== 'jazz-exclusive-transaction' ||
+			!profile.validate(payload)
 		)
-		if (scope.payload.coverage.consistency !== 'jazz-exclusive-transaction')
 			throw fault('invalidData')
+		scope.payload = payload
 	} catch {
 		throw fault('invalidData')
+	} finally {
+		bytes.fill(0)
 	}
 }
 export function commitJazzExport(request: JazzArchiveExportRequest) {

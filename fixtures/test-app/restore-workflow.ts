@@ -1,6 +1,6 @@
 import { forwardTo, raise, assign, createActor, fromCallback, fromPromise, setup } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
-import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
+import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
 	RestoreEvent,
 	RestoreResult,

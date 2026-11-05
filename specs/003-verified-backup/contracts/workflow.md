@@ -13,7 +13,7 @@ moving its domain schema or policy into the foundation. See
 
 Consumer integration owns the existing session binding, access observations, browser file input/download effects, and the lifetime of one backup operation. DLF owns the generic export/inspection/restore coordinators. Consumer capture and destination adapters are child actor logic where they have multiple meaningful steps, not promise functions hiding a whole workflow. Promise actors may perform one bounded leaf operation (one read, one digest, one journal lookup).
 
-Resource owner children hold passwords, keys, decoded bytes, file handles, and capture leases privately. Parent context holds only opaque resources and safe progress. Neither parent nor child persisted snapshots may contain secrets or decoded records; persistence serializes only the explicit restore journal. This is a persistence boundary, not a claim that JavaScript memory can be reliably zeroized. Clear references and worker resources on release; strings and Web Crypto internals may remain until garbage collection.
+Resource owner children hold passwords, keys, decoded bytes, file handles, and native capture transactions privately. Parent context holds only opaque resources and safe progress. Neither parent nor child persisted snapshots may contain secrets or decoded records; persistence serializes only the explicit restore journal. This is a persistence boundary, not a claim that JavaScript memory can be reliably zeroized. Clear references and worker resources on release; strings and Web Crypto internals may remain until garbage collection.
 
 ## Profile responsibilities
 
@@ -23,22 +23,36 @@ A validated archive has no write authority. Before new writes the destination lo
 
 ## Export statechart
 
+The sole native Jazz export workflow is `createJazzArchiveExportMachine` at
+`backup/export/workflow`. Prepare its request through `backend/jazz/backup`. Shared restore/export
+binding validation and equality are at `backup/binding`. The former generic source/lease protocol
+and retry-cleanup machine are removed.
+
 ```mermaid
 stateDiagram-v2
-    [*] --> checkingAuthority
-    checkingAuthority --> acquiringCapture
-    acquiringCapture --> drainingWriters
-    drainingWriters --> capturing
+    [*] --> hydrating
+    hydrating --> openingExclusive
+    openingExclusive --> capturing
     capturing --> validatingCapture
-    validatingCapture --> encoding
-    encoding --> protecting
+    validatingCapture --> committingReadOnly
+    committingReadOnly --> awaitingVerdict
+    awaitingVerdict --> protecting
     protecting --> handingOff
-    handingOff --> releasing
-    releasing --> exported
-    exported --> [*]
+    handingOff --> cleaning
+    cleaning --> complete
+    complete --> [*]
 ```
 
-All active states handle cancellation, binding invalidation, child failure, and unexpected errors by entering cleanup appropriate to owned resources. Acquisition cancellation must still collect and release a late acquired lease. A failed or incomplete capture never enters encoding. Protection is plaintext digest or authenticated encryption. Handoff does not imply retained-file validation. Capture can be released after validated immutable capture exists; implementation should shorten its duration without releasing it before all consistency checks finish.
+The consumer reader covers the full scope during hydration and capture and owns domain/owner/byte
+validation. DLF owns the native transaction and issued query/digest/verdict receipts. Only a positive
+zero-application-mutation exclusive verdict reaches protection/handoff. Failed captures are discarded;
+explicit retries begin with new hydration and a fresh transaction.
+
+Cancellation, invalidation and child failure revoke reader capabilities, clear private inputs and
+enter cleanup. Cleanup drains issued native calls and rolls back only an uncommitted transaction.
+A committed receipt is observed, never rolled back or replayed. Offline cleanup can remain pending
+until native work settles. A direct resource custodian also survives abrupt owner/reader errors.
+Handoff reports dispatch, never retained-file safety. See [native capture](native-capture.md).
 
 ## File inspection statechart
 
