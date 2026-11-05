@@ -37,7 +37,6 @@ export interface NotebookRestoreRequest {
 	toJSON(): { kind: 'notebookRestoreRequest' }
 }
 export type NotebookRestoreOptions = {
-	batching?: 'single-record' | 'bounded-notes'
 	mode: 'new' | 'resume'
 	binding: BackupBinding
 	databaseName: string
@@ -63,12 +62,6 @@ function prepared(request: NotebookRestoreRequest) {
 }
 /** Transfers checked-archive ownership. Resume requires the same operation binding and file. */
 export function prepareNotebookRestore(options: NotebookRestoreOptions): NotebookRestoreRequest {
-	if (
-		options.batching !== undefined &&
-		options.batching !== 'single-record' &&
-		options.batching !== 'bounded-notes'
-	)
-		throw new Error('Invalid notebook restore batching')
 	const binding = z
 		.strictObject({
 			applicationId: z.string().min(1).max(256),
@@ -83,7 +76,6 @@ export function prepareNotebookRestore(options: NotebookRestoreOptions): Noteboo
 	if (!binding.success) throw new Error('Invalid notebook restore binding')
 	const captured = Object.freeze({ ...options, binding: binding.data })
 	const data: NotebookRestoreData = {
-		planVersion: options.batching === 'bounded-notes' ? 2 : 1,
 		options: captured,
 		archive: captured.archive,
 		binding: captured.binding,
@@ -138,10 +130,6 @@ export function notebookRestoreData(input: { request: NotebookRestoreRequest }) 
 	return prepared(input.request).data
 }
 /** Optional observation of root-owned data; absence is a destination admission decision. */
-export function notebookRestoreNote(request: NotebookRestoreRequest) {
-	const notes = notebookRestoreNotes(request)
-	return notes?.length === 1 ? notes[0] : undefined
-}
 export function notebookRestoreNotes(request: NotebookRestoreRequest) {
 	return requests.get(request)?.data.notes
 }

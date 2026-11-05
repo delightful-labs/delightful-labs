@@ -23,8 +23,8 @@ and [performance report](notebook-performance.md). Earlier slice notes live in
 The user authorized a broader implementation review and all necessary tests while away. The
 [simplification review](restore-simplification-review.md) replaces the unsuccessful serialized-cache
 and worker experiments with allocation-free UTF-8 byte counts, indexed graph remapping and bounded
-note transactions under the existing restore owner. New complete restores use plan v2; retained v1
-journals resume with their original exact grouping. The historical
+note transactions under the existing restore owner. At the user's request, all entry points now
+use only the faster plan (fixed saved version 2); older plans are rejected without writes. The historical
 [reuse](journal-reuse-design.md) and [worker](journal-worker-design.md) measurements remain preserved;
 the worker path and retained JSON caches are removed. Final measurements and qualification are
 recorded in the review and [performance report](record-performance.md#simplification-review).

@@ -232,7 +232,8 @@ journal/restore path. The decisive change is bounded consumer note transactions 
 shared journal/custody/settlement owner. One group has at most 32 notes and targets 64 KiB canonical
 content; a larger valid note stays a singleton. Root/attachment order, exact set/content/reference
 checks, transaction rollback, local/remote requirements and full final comparison remain enforced.
-New complete restores use plan v2; old v1 recovery retains its exact mappings and grouping.
+All restores now use the faster plan with fixed saved version 2. A user-requested follow-up removed
+the v1 compatibility path; older/unknown journals are rejected without destination writes.
 
 Two pure simplifications accompany batching: count UTF-8 bytes without allocating arrays, and index
 immutable mapping/projection inputs instead of repeatedly canonicalizing/searching them. The worker,
@@ -251,6 +252,7 @@ A 128-record ablation isolates the direction of improvement (nested actor wall t
 The initial trace also attributes 7,639.2 ms to note remote reads, 3,835.6 ms to remote settlement
 and 1,650.1 ms to transactional note reads. These are synthetic actor lifetimes, not exclusive CPU.
 Those ablations preceded final removal of worker/cache code and are not the final qualification.
+Their single-record mode is historical and is no longer available in the diagnostic.
 Raw files are ignored `.svelte-kit/notebook-performance-review-{before-trace,utf8-indexed-single,
 bounded-trace}-records-128-cpu1-run1.json` (the brace notation describes three actual filenames).
 
@@ -301,6 +303,13 @@ rewrites the equivalent non-ASCII regex range; exhaustive UTF-16 tests verify eq
 Memory remains sampled page heap/summed two-renderer RSS, not exact whole-system memory. These
 shorter runs also have fewer samples and may miss peaks; do not infer a memory leak or precise
 percentage memory saving.
+
+After the user-requested removal of the v1 compatibility path and all batching options, one
+fresh-authority confirmation completes in **4,789 ms**, with the same 23 writes, 21 data batches,
+78,730-byte journal and exact archive/destination contents. Maximum restore delay is 35.7 ms with
+zero callbacks above 50 ms. Raw file:
+`.svelte-kit/notebook-performance-review-single-plan-only-records-633-cpu1-run1.json`.
+This is a separate follow-up observation; the three-run table above remains unchanged.
 
 ### Binary compatibility and remaining limits
 

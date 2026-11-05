@@ -522,7 +522,6 @@ export function createNotebookRestore(
 	}
 ) {
 	const request = prepareNotebookRestore({
-		batching: options.batching ?? 'bounded-notes',
 		mode: options.mode,
 		binding: options.binding,
 		databaseName: options.databaseName,

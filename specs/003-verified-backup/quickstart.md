@@ -95,18 +95,18 @@ DLF_BACKUP_RECORD_MEASURE=1 DLF_BACKUP_REVIEW_LABEL=my-run-1 pnpm exec vitest ru
 ```
 
 For the throttled case use the filter `measures record workload 633, CPU 4x, run 1` and a distinct
-label. Review-only diagnostics also accept `DLF_BACKUP_REVIEW_RECORDS=128`,
-`DLF_BACKUP_REVIEW_BATCHING=single-record` and `DLF_BACKUP_REVIEW_TRACE=1`; traces aggregate actor
-lifetimes, not private data or exclusive CPU time. The defaults are 633 records, bounded notes and
-no tracing. These switches affect the disposable diagnostic, not existing retained recovery plans.
+label. Review-only diagnostics also accept `DLF_BACKUP_REVIEW_RECORDS=128` and
+`DLF_BACKUP_REVIEW_TRACE=1`; traces aggregate actor lifetimes, not private data or exclusive CPU
+time. The defaults are 633 records and no tracing. All restore entry points use bounded notes;
+there is no alternate batching mode.
 Raw files use `.svelte-kit/notebook-performance-review-<label>-records-633-cpu1-run1.json`.
 
 The [current review](restore-simplification-review.md) and
 [performance report](record-performance.md#simplification-review) document exact results, recovery
 checks and memory/sampling limits. The earlier [worker experiment](journal-worker-design.md) is
 retired: the package worker entrypoint, host and `DLF_BACKUP_JOURNAL_COMPARE` option no longer exist.
-Historical worker/reuse measurements are preserved. New complete notebook restores use plan v2;
-resume honors the retained v1/v2 version and never rebatches an issued plan.
+Historical worker/reuse measurements are preserved. Notebook restores use one plan with fixed
+saved version 2; resume rejects older/unknown versions without changing the journal or destination.
 
 ## Finance adoption and actual recovery rehearsal
 

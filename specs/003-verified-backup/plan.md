@@ -88,7 +88,8 @@ archive or capture protocol. Repeat inventory if source/deployment/device change
    after T008/T009; it must not block disposable consumer implementation needed to measure those paths.
    The user subsequently authorized a broader [simplification review](restore-simplification-review.md)
    and all necessary tests. Bounded note transactions use the existing shared owner, version retained
-   plans explicitly, and preserve exact v1 recovery. Indexed remapping and allocation-free byte counts
+   plans explicitly, and reject incompatible saved plans without writes. Indexed remapping and
+   allocation-free byte counts
    remove avoidable repeated work. Retained JSON caches and the journal worker are removed after their
    negative measurements; historical reports remain preserved. Final synthetic results are in the
    [record report](record-performance.md#simplification-review). T004 remains open for actual consumer

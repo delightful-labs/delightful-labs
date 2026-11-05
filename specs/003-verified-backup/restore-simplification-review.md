@@ -66,11 +66,13 @@ parent/reference/scope and exact full set/content, then stage all selected notes
 the same borrowed Jazz transaction. Partial or mismatched presence is conflict, never permission
 to replay a subset. The existing shared custody/journal/settlement machine governs the transaction.
 
-New complete-restore convenience calls use plan version 2. Low-level preparation/continuation APIs
-retain version 1 single-record defaults for compatibility; an explicit batching option selects v2.
-On resume, discover and honor the retained v1/v2 plan before recomputing content/hash expectations.
-Reject unknown versions and never rebatch an issued plan. Both versions use the same archive
-profile and full destination comparison. This changes transaction grouping, not captured data.
+All entry points now use only bounded note transactions, at the user's explicit request after PR
+review. The mutable `data.planVersion`, batching option, alternate defaults, diagnostic batching
+switch and legacy single-note accessor are removed. The serialized plan has fixed version 2 so
+older/unknown formats can be rejected before any write; there is no compatibility implementation
+or migration. Resume retains exact mappings and checks the complete current intent. Unsupported
+journals and their incomplete destinations are left untouched. The archive profile/wire format and
+shared resource/transaction/settlement statecharts are unchanged.
 
 ## Final disposition
 
@@ -87,10 +89,10 @@ not permission to replay. The native backend/policy boundary and archive limits 
 | Archive and journal bounds/schemas | Use [allocation-free byte counting](../../src/lib/backup/utf8.ts) in budget/schema/canonical-output counts. Actual serialization still encodes and checks complete wire length. Well-formed UTF-16 validation remains independent.                          |
 | Journal codec/storage/successors   | Remove the private codec split and JSON/comparison caches. Keep two weak sets for this codec's detached frozen outputs, complete foreign/byte admission and fresh output bytes. Keep exact intent/record comparisons, receipt evidence, CAS and durability. |
 | Shared restore/write/custody       | Keep existing states and transaction lifetime. Remove the worker capability propagation/IPC branch entirely. No new orchestration, replay rule or authority shortcut.                                                                                       |
-| Notebook planning/remapping        | Index immutable tuples/projected rows instead of nested scans; preserve exact v1 canonical bytes and dependency order.                                                                                                                                      |
+| Notebook planning/remapping        | Index immutable tuples/projected rows instead of nested scans; preserve exact fast-plan canonical bytes and dependency order.                                                                                                                               |
 | Notebook note destination          | Use the existing chart for up to 32 notes targeting 64 KiB canonical content, with exact selected-ID queries, full group/parent/scope matching and synchronous staging in one borrowed transaction.                                                         |
 | Comparison/activation/cleanup      | Preserve complete fresh graph/attachment comparison, transactional activation gate and local/remote observations; clear the private note array through existing resource ownership.                                                                         |
-| Recovery compatibility             | Version new grouping as plan v2. Honor retained v1/v2 before recomputation; reject unknown versions. Low-level v1 defaults retain existing continuation compatibility.                                                                                      |
+| Recovery compatibility             | Use the same fast plan everywhere with a fixed saved version 2. Reject older/unknown saved formats before writes; no batching selector or legacy continuation mode.                                                                                         |
 
 The former journal worker, protocol/server/host, package export and dedicated tests are removed.
 Its historical design/results and the unsuccessful serialized-cache results remain in
@@ -125,16 +127,18 @@ are untouched.
 
 - **948 unit cases pass**, including the full existing backup/journal/envelope/restore suites,
   immutable-output trust/mutation/proxy/byte-ownership cases, exhaustive native UTF-8 equivalence
-  for every UTF-16 code unit and mixed surrogate inputs, and six versioned-plan/batch-bound cases.
-- **68 native Jazz/Chromium restore cases pass in one complete invocation**, with seven opt-in
-  measurements skipped. Eight new cases exercise the default grouped policy, old v1 recovery,
+  for every UTF-16 code unit and mixed surrogate inputs, and six fixed-plan/batch-bound cases.
+- **69 native Jazz/Chromium restore cases pass in one complete invocation**, with seven opt-in
+  measurements skipped. Follow-up cases exercise the sole grouped policy, rejection of saved
+  versions 1 and 3 without writes,
   cancellation before comparison, remotely accepted uncertainty without replay, staging failure
   rollback, cancellation/drain during staging, partial-presence conflict, and multiple groups with
   three distinct attachments plus null references. Reload preserves exact data and issues no
-  duplicate writes. The final log is `.svelte-kit/restore-review/final-native-complete.log`.
+  duplicate writes. The current log is `.svelte-kit/restore-review/single-plan-native.log`.
 - **17 independent-reader and 18 notebook-export cases pass**, plus the complete package-consumer
   type/runtime/bundle checks. This includes strict network-disabled independent inspection and
-  original data/file preservation. Logs: `final-consumer.log` under the same ignored review folder.
+  original data/file preservation. Current log: `single-plan-consumer.log` under the same ignored
+  review folder.
 - **65 of 66 Storybook Chromium cases pass**. All backup/export/envelope/journal cases pass.
   A final focused run against the rebuilt package passes all **19 backup browser cases**
   (`final-backup-browser.log`), after the equivalent regex lint correction.
@@ -154,3 +158,16 @@ No commit, publication, schema change, production mutation or live backup recove
 T007 inventory remains complete; T008 Finance capture/profile, T009 isolated domain restore and
 T010 actual retained-file recovery remain separate work. Nothing is needed from the user to
 complete this local investigation. It does not claim completion of those consumer adoption tasks.
+
+The post-review CI correction makes root unit tests resolve notebook package imports from source,
+so they pass before packaging even with `dist` absent. The complete GitHub CI and title checks
+passed on `d7b5317`. The subsequent user-requested single-plan simplification reruns all 948 units,
+69 native restore cases, consumer/static checks and one 633-record measurement. This follow-up
+removes compatibility implementation rather than adding another plan mode.
+
+The single-plan follow-up measurement completes the same 633-record workload in **4,789 ms**,
+with 23 writes, 21 data batches, a 78,730-byte journal and a 35.7 ms maximum restore delay
+(no restore callbacks above 50 ms). The separately preserved raw artifact is
+`.svelte-kit/notebook-performance-review-single-plan-only-records-633-cpu1-run1.json`.
+It confirms the same fast grouping with the compatibility selector removed; it does not replace
+the earlier three-run range or broaden platform/consumer qualification.

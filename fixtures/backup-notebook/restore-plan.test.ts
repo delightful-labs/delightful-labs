@@ -13,9 +13,8 @@ import {
 	type NotebookRestorePlanData
 } from './restore-plan.js'
 
-function dataFor(payload: ArchivePayload, planVersion: 1 | 2): NotebookRestorePlanData {
+function dataFor(payload: ArchivePayload): NotebookRestorePlanData {
 	return {
-		planVersion,
 		archive: {
 			readPayload: () => payload,
 			payloadDigest: () => '1'.repeat(64),
@@ -77,16 +76,16 @@ function synthetic(notes: number, body: string): ArchivePayload {
 		encodeArchivePayload({ ...raw, records: [root, ...rows], attachments: [] })
 	)
 }
-it('preserves the pre-review version-one graph and batch bytes exactly', () => {
+it('preserves the fast plan graph and batch bytes exactly', () => {
 	const payload = parseArchivePayload(
 		encodeArchivePayload(
 			createNotebookDataset({ applicationId: 'notebook', workspaceId: 'original' })
 		)
 	)
-	const data = dataFor(payload, 1)
+	const data = dataFor(payload)
 	projectNotebookGraph(data)
 	const expected: unknown = JSON.parse(
-		readFileSync(new URL('../../tests/fixtures/notebook-plan-v1.json', import.meta.url), 'utf8')
+		readFileSync(new URL('../../tests/fixtures/notebook-plan-v2.json', import.meta.url), 'utf8')
 	)
 	expect({
 		graph: data.graph,
@@ -94,7 +93,7 @@ it('preserves the pre-review version-one graph and batch bytes exactly', () => {
 	}).toEqual(expected)
 })
 it('groups notes within count bounds, after the root, assigning every mapping exactly once', () => {
-	const data = dataFor(synthetic(65, 'café ☕\n'), 2)
+	const data = dataFor(synthetic(65, 'café ☕\n'))
 	projectNotebookGraph(data)
 	expect(data.batches.map((b) => b.mappingIndexes.length)).toEqual([1, 32, 32, 1])
 	expect(
@@ -109,14 +108,14 @@ it('groups notes within count bounds, after the root, assigning every mapping ex
 it.each(['x'.repeat(35000), '😀'.repeat(17000)])(
 	'uses UTF-8 byte bounds and permits a large valid singleton',
 	(body) => {
-		const data = dataFor(synthetic(3, body), 2)
+		const data = dataFor(synthetic(3, body))
 		projectNotebookGraph(data)
 		expect(data.batches.map((b) => b.mappingIndexes.length)).toEqual([1, 1, 1, 1])
 		for (const batch of data.batches.slice(1)) expect(JSON.parse(batch.contents)).toHaveLength(1)
 	}
 )
 it('checks both the count and canonical byte size at the boundary', () => {
-	const data = dataFor(synthetic(64, '界'.repeat(1000)), 2)
+	const data = dataFor(synthetic(64, '界'.repeat(1000)))
 	projectNotebookGraph(data)
 	for (const batch of data.batches.slice(1)) {
 		expect(batch.mappingIndexes.length).toBeLessThanOrEqual(notebookNoteBatchLimits.records)
@@ -125,26 +124,30 @@ it('checks both the count and canonical byte size at the boundary', () => {
 		)
 	}
 })
-it('honors the retained version rather than rebatching an old recovery plan', () => {
+it('accepts the fast retained plan and rejects incompatible plans before projection', () => {
 	const payload = synthetic(40, 'body')
-	const legacy = dataFor(payload, 1),
-		current = dataFor(payload, 2)
-	projectNotebookGraph(legacy)
+	const data = dataFor(payload)
+	projectNotebookGraph(data)
 	const retained = {
 		id: 'dlf-notebook',
-		version: 1,
+		version: 2,
 		sha256: '1'.repeat(64),
 		expectedGraphSha256: '2'.repeat(64),
-		mappings: legacy.mappings,
+		mappings: data.mappings,
 		preparation: { writeId: 'prepare', expectedContentSha256: '3'.repeat(64), mappingIndexes: [] },
 		batches: [],
 		activation: { writeId: 'activate', expectedContentSha256: '4'.repeat(64) },
 		requirements: { local: 'required', remote: 'required' }
 	} satisfies Parameters<typeof projectNotebookGraph>[1]
-	projectNotebookGraph(current, retained)
-	expect(current.planVersion).toBe(1)
-	expect(current.batches).toEqual(legacy.batches)
-	expect(() => projectNotebookGraph(current, { ...retained, version: 3 })).toThrow(
-		'Unsupported notebook restore plan'
-	)
+	const resumed = dataFor(payload)
+	projectNotebookGraph(resumed, retained)
+	expect(resumed.batches).toEqual(data.batches)
+	for (const version of [1, 3]) {
+		const incompatible = dataFor(payload)
+		expect(() => projectNotebookGraph(incompatible, { ...retained, version })).toThrow(
+			'Unsupported notebook restore plan'
+		)
+		expect(incompatible.batches).toEqual([])
+		expect(incompatible.graph).toBe('')
+	}
 })

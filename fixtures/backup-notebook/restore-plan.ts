@@ -8,7 +8,6 @@ import {
 
 type Mapping = RestoreJournalIntent['plan']['mappings'][number]
 export type NotebookRestorePlanData = {
-	planVersion: 1 | 2
 	archive: IntegrityCheckedArchive
 	binding: BackupBinding
 	mappings: readonly Mapping[]
@@ -98,11 +97,8 @@ export function projectNotebookGraph(
 	data: NotebookRestorePlanData,
 	retained?: RestoreJournalIntent['plan']
 ): void {
-	if (retained) {
-		if (retained.id !== 'dlf-notebook' || (retained.version !== 1 && retained.version !== 2))
-			throw new Error('Unsupported notebook restore plan')
-		data.planVersion = retained.version
-	}
+	if (retained && (retained.id !== 'dlf-notebook' || retained.version !== 2))
+		throw new Error('Unsupported notebook restore plan')
 	const payload = data.archive.readPayload()
 	const records = projectNotebookRecords(data)
 	const ids = new Map(data.mappings.map((mapping) => [sourceKey(mapping), mapping.destinationId]))
@@ -129,49 +125,41 @@ export function projectNotebookGraph(
 			}
 		})
 		.sort((left, right) => left.rank - right.rank)
-	if (data.planVersion === 1)
-		data.batches = ordered.map(({ mappingIndexes, contents, sha256 }) => ({
-			mappingIndexes,
-			contents,
-			sha256
-		}))
-	else {
-		const batches: NotebookRestorePlanData['batches'] = []
-		let indexes: number[] = [],
-			contents: unknown[] = [],
-			bytes = 2
-		const flush = () => {
-			if (!indexes.length) return
-			batches.push({ mappingIndexes: indexes, contents: notebookCanonical(contents), sha256: '' })
-			indexes = []
-			contents = []
-			bytes = 2
-		}
-		const encoder = new TextEncoder()
-		for (const row of ordered) {
-			if (row.rank !== 2) {
-				flush()
-				batches.push({
-					mappingIndexes: row.mappingIndexes,
-					contents: row.contents,
-					sha256: row.sha256
-				})
-				continue
-			}
-			const size = encoder.encode(row.contents).byteLength
-			if (
-				indexes.length >= notebookNoteBatchLimits.records ||
-				(indexes.length && bytes + size + 1 > notebookNoteBatchLimits.bytes)
-			)
-				flush()
-			if (indexes.length) bytes++
-			indexes.push(...row.mappingIndexes)
-			contents.push(row.projected)
-			bytes += size
-		}
-		flush()
-		data.batches = batches
+	const batches: NotebookRestorePlanData['batches'] = []
+	let indexes: number[] = [],
+		contents: unknown[] = [],
+		bytes = 2
+	const flush = () => {
+		if (!indexes.length) return
+		batches.push({ mappingIndexes: indexes, contents: notebookCanonical(contents), sha256: '' })
+		indexes = []
+		contents = []
+		bytes = 2
 	}
+	const encoder = new TextEncoder()
+	for (const row of ordered) {
+		if (row.rank !== 2) {
+			flush()
+			batches.push({
+				mappingIndexes: row.mappingIndexes,
+				contents: row.contents,
+				sha256: row.sha256
+			})
+			continue
+		}
+		const size = encoder.encode(row.contents).byteLength
+		if (
+			indexes.length >= notebookNoteBatchLimits.records ||
+			(indexes.length && bytes + size + 1 > notebookNoteBatchLimits.bytes)
+		)
+			flush()
+		if (indexes.length) bytes++
+		indexes.push(...row.mappingIndexes)
+		contents.push(row.projected)
+		bytes += size
+	}
+	flush()
+	data.batches = batches
 	data.graph = notebookCanonical({
 		records: records.sort((a, b) => (a.id < b.id ? -1 : 1)),
 		attachments: attachments.sort((a, b) => (a.id < b.id ? -1 : 1))
@@ -191,7 +179,7 @@ export function projectNotebookControl(data: NotebookRestorePlanData): void {
 export function notebookPlan(data: NotebookRestorePlanData) {
 	return {
 		id: 'dlf-notebook',
-		version: data.planVersion,
+		version: 2,
 		expectedGraphSha256: data.graphSha256,
 		mappings: data.mappings,
 		preparation: {

@@ -22,11 +22,7 @@ import { createBrowserRestoreJournalMachine } from 'delightful-local-first/backu
 import { createRestoreMachine } from 'delightful-local-first/backup/restore/workflow'
 import { parseRestoreJournalRecord } from 'delightful-local-first/backup/restore/journal'
 import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
-import {
-	notebookRestoreRoot,
-	notebookRestoreNote,
-	notebookRestoreNotes
-} from './restore-request.js'
+import { notebookRestoreRoot, notebookRestoreNotes } from './restore-request.js'
 import { createNotebookDataset } from './dataset.js'
 import { createNotebookRestorePreparationMachine, prepareNotebookRestore } from './restore.js'
 import { notebookRestoreApp, activeNotebookDestinations } from './restore-schema.js'
@@ -125,7 +121,6 @@ const api = {
 	rootPending,
 	restoreTransactionAccess,
 	notebookRestoreRoot,
-	notebookRestoreNote,
 	notebookRestoreNotes,
 	createNotebookDestinationWriteMachine,
 	createNotebookRootRestore,

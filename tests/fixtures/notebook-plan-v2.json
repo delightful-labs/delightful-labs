@@ -10,16 +10,8 @@
 			"contents": "{\"fields\":{\"title\":{\"kind\":\"text\",\"value\":\"Notebook fixture\"}},\"id\":\"destination-record-3\",\"type\":\"notebook\"}"
 		},
 		{
-			"mappingIndexes": [0],
-			"contents": "{\"fields\":{\"archived\":{\"kind\":\"boolean\",\"value\":true},\"attachment\":{\"id\":\"destination-file-0\",\"kind\":\"attachment\"},\"body\":{\"kind\":\"text\",\"value\":\"Preserve archived content\\u0000exactly.\"},\"notebook\":{\"id\":\"destination-record-3\",\"kind\":\"reference\",\"type\":\"notebook\"}},\"id\":\"destination-record-0\",\"type\":\"note\"}"
-		},
-		{
-			"mappingIndexes": [1],
-			"contents": "{\"fields\":{\"archived\":{\"kind\":\"boolean\",\"value\":false},\"attachment\":{\"kind\":\"null\"},\"body\":{\"kind\":\"text\",\"value\":\"\"},\"notebook\":{\"id\":\"destination-record-3\",\"kind\":\"reference\",\"type\":\"notebook\"}},\"id\":\"destination-record-1\",\"type\":\"note\"}"
-		},
-		{
-			"mappingIndexes": [2],
-			"contents": "{\"fields\":{\"archived\":{\"kind\":\"boolean\",\"value\":false},\"attachment\":{\"id\":\"destination-file-0\",\"kind\":\"attachment\"},\"body\":{\"kind\":\"text\",\"value\":\"First line\\nSecond line\\r\\nCafé ☕\"},\"notebook\":{\"id\":\"destination-record-3\",\"kind\":\"reference\",\"type\":\"notebook\"}},\"id\":\"destination-record-2\",\"type\":\"note\"}"
+			"mappingIndexes": [0, 1, 2],
+			"contents": "[{\"fields\":{\"archived\":{\"kind\":\"boolean\",\"value\":true},\"attachment\":{\"id\":\"destination-file-0\",\"kind\":\"attachment\"},\"body\":{\"kind\":\"text\",\"value\":\"Preserve archived content\\u0000exactly.\"},\"notebook\":{\"id\":\"destination-record-3\",\"kind\":\"reference\",\"type\":\"notebook\"}},\"id\":\"destination-record-0\",\"type\":\"note\"},{\"fields\":{\"archived\":{\"kind\":\"boolean\",\"value\":false},\"attachment\":{\"kind\":\"null\"},\"body\":{\"kind\":\"text\",\"value\":\"\"},\"notebook\":{\"id\":\"destination-record-3\",\"kind\":\"reference\",\"type\":\"notebook\"}},\"id\":\"destination-record-1\",\"type\":\"note\"},{\"fields\":{\"archived\":{\"kind\":\"boolean\",\"value\":false},\"attachment\":{\"id\":\"destination-file-0\",\"kind\":\"attachment\"},\"body\":{\"kind\":\"text\",\"value\":\"First line\\nSecond line\\r\\nCafé ☕\"},\"notebook\":{\"id\":\"destination-record-3\",\"kind\":\"reference\",\"type\":\"notebook\"}},\"id\":\"destination-record-2\",\"type\":\"note\"}]"
 		}
 	]
 }

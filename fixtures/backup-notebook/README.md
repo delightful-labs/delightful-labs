@@ -116,10 +116,10 @@ valid note stays a singleton). Root and attachment dependencies remain singleton
 transaction owner still enforces authority, rollback, local/remote settlement and full comparison.
 Partial group presence is conflict and never authorizes subset replay.
 
-`createNotebookRestore` defaults to `batching: 'bounded-notes'` and plan v2. Low-level
-`prepareNotebookRestore` defaults to `single-record`/v1 for continuation compatibility. Resume uses
-the retained v1/v2 plan regardless of the requested default and rejects unknown versions. Existing
-mappings, write identities and grouping never change. The archive profile/wire format is unchanged.
+Every restore entry point uses the same bounded note groups. There is no batching option or
+mutable plan-version selector. The saved plan has fixed version 2; resume accepts only that version
+and checks the exact retained intent/mappings before writes. Older/unknown plans return unavailable
+without changing the journal or destination. The archive profile/wire format is unchanged.
 
 The optional benchmarks retain phase delays, heap/RSS, writes and final journal size. Use
 `DLF_BACKUP_REVIEW_LABEL=<unique-label>` to avoid overwriting earlier artifacts; see the
