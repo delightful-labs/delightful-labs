@@ -18,6 +18,7 @@ import LoadingScreen from './Components/LoadingScreen.svelte'
 import LoadingContent from './Components/LoadingContent.svelte'
 import Table from './Components/Table.svelte'
 import LinkedListRow from './Components/LinkedListRow.svelte'
+import SwipeActions from './Components/SwipeActions.svelte'
 import Navigation from './Components/Navigation.svelte'
 import Stepper from './Components/Stepper.svelte'
 import Pagination from './Components/Pagination.svelte'
@@ -79,6 +80,7 @@ export {
 	LoadingContent,
 	Table,
 	LinkedListRow,
+	SwipeActions,
 	Navigation,
 	Stepper,
 	Pagination,
@@ -98,3 +100,6 @@ export const INPUT_TYPES = Object.freeze({
 })
 
 /** @typedef {import('./Components/NumberKeypad.svelte').NumberKeypadKey} NumberKeypadKey */
+/** @typedef {import('./Components/internal/swipe-actions.js').SwipeAction} SwipeAction */
+/** @typedef {import('./Components/internal/swipe-actions.js').SwipeActionChosen} SwipeActionChosen */
+/** @typedef {import('./Components/internal/swipe-actions.js').SwipeSide} SwipeSide */

@@ -1,5 +1,9 @@
 # Agent guidance
 
+## Development servers
+
+- Start development servers on the network by default (`0.0.0.0`), unless the user explicitly requests localhost-only access. Provide both localhost and LAN URLs.
+
 ## Tests
 
 - Test user-observable behavior, native HTML state, and accessibility semantics rather than styling implementation details.
