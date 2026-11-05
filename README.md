@@ -300,6 +300,25 @@ Native multiline editing, attributes, and callbacks pass through. `bind:value` i
 
 The native control submits its value only when checked and enabled. `bind:checked` is optional; `defaultChecked` supplies initial/reset state. The clickable label and native checkbox use green accent and explicit focus styling.
 
+## RadioGroup
+
+```svelte
+<RadioGroup
+	label="View"
+	name="view"
+	defaultValue="week"
+	options={[
+		{ label: 'Day', value: 'day' },
+		{ label: 'Week', value: 'week' },
+		{ label: 'Month', value: 'month', disabled: true }
+	]}
+/>
+```
+
+Connected, square-cornered radio buttons inspired by [Ant Design's radio buttons](https://ant.design/components/radio/). The selected option uses the theme accent and an inset underline. A native fieldset/legend names the group; each button is a labelled native radio input with browser keyboard navigation, focus, validation, and form submission. Options wrap on narrow screens. Supply unique string values and caller-owned labels. `bind:value` is optional; `defaultValue` supplies the initial selection and the selection restored by form reset. An explicit `value` takes precedence over `defaultValue`. Without either, the group starts unselected; assigning `undefined` clears a bound selection.
+
+`required` uses native radio-group validation. `disabled` disables the whole group; an option's `disabled` disables just that choice. Only an enabled selection is submitted. Supply `name` for a stable form-data key; omitted names are generated per instance so groups remain independent. `form` associates every radio with an external form. Native fieldset attributes, class, style, and events pass through; `onchange` receives the native input event. Customize `--dui-radio-background-color`, `--dui-radio-color`, `--dui-radio-border-color`, `--dui-radio-selected-background-color`, `--dui-radio-selected-color`, `--dui-radio-focus-color`, `--dui-radio-padding`, `--dui-radio-min-height` (44px), and `--dui-radio-disabled-opacity` (0.5). Typography, label spacing, and border width use shared field/input and theme tokens.
+
 ## Typography and Button styling
 
 Typography resolves size props through a shared typed font-token lookup and uses one scoped base rule per component. Existing `--dui-heading-font-size` / `--dui-text-font-size` overrides and native inline styles remain supported; omitted alignment inherits from the parent, including nested typography. `data-size` and `data-align` remain available without driving variant selectors.
@@ -605,7 +624,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, RadioGroup, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 
