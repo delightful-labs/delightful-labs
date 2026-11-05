@@ -26,6 +26,19 @@ applicable coverage on the sole native owner. No compatibility aliases or altern
 
 ## Ownership and statechart before implementation
 
+Review fixes: during protection, CANCEL/SHUTDOWN/invalidation keep the encryption child invoked,
+revoke private inputs and forward its existing cancellation command. The parent enters cleanup
+only after that child finishes draining native crypto. Abrupt actor stop still detaches native
+crypto, whose issued call retains and clears its own copies; it is not a graceful acknowledgement.
+
+Payload preparation uses the codec's existing normalization and bounded deterministic serializer
+once, returning their paired immutable payload and encoded bytes internally. The envelope retains
+both from preparation; sealing starts at attachment verification instead of parsing its own bytes.
+Native capture performs its domain/binding checks against that same prepared payload before commit,
+then invokes protection only after the native verdict. Opening an external file still parses and
+validates it independently. No alternate export path or trusted caller-supplied validation flag is
+added. Cancellation or rejection releases the prepared envelope and its private data.
+
 One finite export owner invokes one consumer reader twice. Hydration queries the live Db at the
 remote tier. Capture queries one native exclusive transaction. The reader receives only read
 capabilities, binding, limits and an AbortSignal; it never receives a writable Db/transaction.
@@ -77,11 +90,15 @@ readable for existing archives. Neither declaration is an authority signature ov
 
 Cleanup qualification on 2026-11-05 with pinned Jazz `2.0.0-alpha.59`:
 
-- Formatting/lint, strict Svelte/TypeScript, **916 unit cases**, package/publint, built-package
+- Formatting/lint, strict Svelte/TypeScript, **922 unit cases**, package/publint, built-package
   consumers, independent-reader checks, 12 retained-file/profile cases and Storybook build pass.
-- Twenty native export-owner cases cover protection, exact bytes/source preservation, conflicts and
+- Twenty-three native export-owner cases cover protection, exact bytes/source preservation, conflicts and
   fresh attempts, interruptions, stale binding, late reads, offline confirmation, reader/owner crashes,
   abrupt stop, single use, invalid profiles, identity/permission changes and handoff custody/outcomes.
+- Review regressions hold key derivation pending during CANCEL/SHUTDOWN/invalidation and require
+  protection to finish draining before the root completes. Both protection modes prepare once with
+  no payload reparsing; independent reopening still parses. Additional envelope checks cover caller
+  mutation after preparation, exact escaped-JSON byte limits and immediate clearing on release.
 - `pnpm check:native-backup`: 18 independent SDK probes plus two real persistent-Chromium downloads
   through the built public package pass; both files reopen in Node with exact bytes and unchanged source.
 - `pnpm check:backup-restore`: **69 functional cases pass**; seven opt-in performance cases are skipped.

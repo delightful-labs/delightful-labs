@@ -14,6 +14,7 @@ import {
 	type IntegrityCheckedArchive
 } from './envelope-api.js'
 import { createArchiveEnvelopeMachine } from '../machines/backup/envelope.js'
+import { envelopeData } from './envelope-operation.js'
 
 const utf8 = new TextEncoder()
 function deferred<T>() {
@@ -367,6 +368,62 @@ describe('operation ownership, interruption and safe snapshots', () => {
 		prepareArchiveOpen(retained).release()
 		expect(retained).toEqual(before)
 	})
+	it.each(['none', 'password'])(
+		'keeps prepared %s graph and bytes independent of later caller mutation',
+		async (kind) => {
+			const input = sample(),
+				record = input.records[0],
+				attachment = input.attachments[0]
+			if (!record || !attachment) throw new Error('Fixture missing')
+			const mutableRecord = { ...record, fields: { ...record.fields } }
+			const mutableAttachment = { ...attachment }
+			const caller = { ...input, records: [mutableRecord], attachments: [mutableAttachment] }
+			const expected = encodeArchivePayload(caller)
+			const request = prepareArchiveSeal(
+				caller,
+				kind === 'password' ? { kind: 'password', password } : { kind: 'none' }
+			)
+			mutableRecord.fields.text = { kind: 'text', value: 'changed after preparation' }
+			mutableAttachment.data = 'AA=='
+			mutableAttachment.sizeBytes = 1
+			caller.records.length = 0
+			const sealed = await run(request)
+			if (sealed.outcome !== 'sealed') throw new Error('Sealing failed')
+			try {
+				const opened = await run(
+					prepareArchiveOpen(sealed.archive.copyBytes(), kind === 'password' ? password : undefined)
+				)
+				if (opened.outcome !== 'integrityChecked') throw new Error('Independent opening failed')
+				try {
+					expect(opened.archive.copyPayloadBytes()).toEqual(expected)
+				} finally {
+					opened.archive.release()
+				}
+			} finally {
+				sealed.archive.release()
+			}
+		}
+	)
+	it('enforces the exact serialized byte bound when escaping expands source text', () => {
+		const input = sample(),
+			record = input.records[0]
+		if (!record) throw new Error('Fixture missing')
+		const payload = {
+			...input,
+			records: [
+				{
+					...record,
+					fields: { ...record.fields, text: { kind: 'text', value: '\u0000'.repeat(100) } }
+				}
+			]
+		}
+		const bytes = encodeArchivePayload(payload)
+		const atLimit = prepareArchiveSeal(payload, { kind: 'none' }, { payloadBytes: bytes.length })
+		atLimit.release()
+		expect(() =>
+			prepareArchiveSeal(payload, { kind: 'none' }, { payloadBytes: bytes.length - 1 })
+		).toThrow('limitExceeded')
+	})
 	it('handles released and already claimed requests without disturbing their owner', async () => {
 		const discarded = prepareArchiveSeal(sample(), { kind: 'none' })
 		discarded.release()
@@ -429,8 +486,14 @@ describe('operation ownership, interruption and safe snapshots', () => {
 			snapshots.push(JSON.stringify(actor.getPersistedSnapshot()))
 			if (!released && snapshot.matches({ working: 'derivingKey' })) {
 				released = true
+				const data = envelopeData(request),
+					bytes = data.bytes
 				request.release()
 				request.release()
+				expect(data.password).toBeUndefined()
+				expect(data.payload).toBeUndefined()
+				expect(data.bytes).toBeUndefined()
+				expect(bytes?.every((byte) => byte === 0)).toBe(true)
 			}
 		})
 		actor.start()

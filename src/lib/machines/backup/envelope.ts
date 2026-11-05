@@ -119,7 +119,8 @@ export function createArchiveEnvelopeMachine() {
 					claimEnvelopeRequest(context.request)
 					return {
 						acquired: true,
-						mode: requireEnvelopeValue(envelopeData(context.request).initialMode)
+						mode: requireEnvelopeValue(envelopeData(context.request).initialMode),
+						attachmentCount: envelopeData(context.request).payload?.attachments.length ?? 0
 					}
 				}),
 				on: {
@@ -127,9 +128,12 @@ export function createArchiveEnvelopeMachine() {
 						{ guard: ({ context }) => !context.acquired, target: 'complete' },
 						{ guard: 'interrupted', target: 'cleaning' },
 						{
-							guard: ({ context }) =>
-								context.mode === 'sealPlain' || context.mode === 'sealPassword',
-							target: 'working.parsingPayload'
+							guard: ({ context }) => context.mode === 'sealPassword',
+							target: 'working.creatingPasswordHeader'
+						},
+						{
+							guard: ({ context }) => context.mode === 'sealPlain',
+							target: 'working.checkingAttachments'
 						},
 						{ target: 'working.parsingEnvelope' }
 					]
@@ -311,16 +315,7 @@ export function createArchiveEnvelopeMachine() {
 							data.payload = parseArchivePayload(requireEnvelopeValue(data.bytes), data.limits)
 							return { attachmentCount: data.payload.attachments.length }
 						}),
-						on: {
-							SYNC_APPLIED: [
-								interrupted,
-								{
-									guard: ({ context }) => context.mode === 'sealPassword',
-									target: 'creatingPasswordHeader'
-								},
-								{ target: 'checkingAttachments' }
-							]
-						}
+						on: { SYNC_APPLIED: advance('checkingAttachments') }
 					},
 					transferring: {
 						entry: synchronous(({ request }) => {

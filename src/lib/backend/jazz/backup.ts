@@ -6,16 +6,16 @@ import {
 	type Transaction
 } from 'jazz-tools'
 import { backupBindingSchema, type BackupBinding } from '../../backup/binding.js'
-import { encodeArchivePayload, parseArchivePayload } from '../../backup/payload.js'
+import { hex } from '../../backup/binary.js'
 import {
 	resolvePayloadLimits,
 	isArchivePayloadError,
 	type PayloadLimits,
-	type PayloadLimitOverrides,
-	type ArchivePayload
+	type PayloadLimitOverrides
 } from '../../backup/types.js'
 import {
 	prepareArchiveSeal,
+	envelopeData,
 	retainSealedOutput,
 	type ArchiveEnvelopeRequest,
 	type ArchiveProtection,
@@ -89,7 +89,6 @@ type Data = {
 	verdict: Promise<void> | undefined
 	reader: JazzArchiveReaderInput | undefined
 	captured: unknown
-	payload: ArchivePayload | undefined
 	envelope: ArchiveEnvelopeRequest | undefined
 	sealed: SealedArchive | undefined
 	archiveProduced: boolean
@@ -153,7 +152,6 @@ export function abortJazzExport(request: JazzArchiveExportRequest) {
 	scope.abort.abort()
 	scope.reader = undefined
 	scope.captured = undefined
-	scope.payload = undefined
 	if (scope.input) scope.input.protection = undefined
 	scope.envelope?.release()
 }
@@ -190,9 +188,7 @@ export function jazzReaderInput(
 				scope,
 				crypto.subtle
 					.digest('SHA-256', copy)
-					.then((value) =>
-						Array.from(new Uint8Array(value), (byte) => byte.toString(16).padStart(2, '0')).join('')
-					)
+					.then(hex)
 					.finally(() => copy.fill(0))
 			).then((value) => {
 				if (scope.abort.signal.aborted) throw fault('sourceChanged')
@@ -216,10 +212,12 @@ export function validateJazzExport(request: JazzArchiveExportRequest) {
 		captured = scope.captured
 	scope.reader = undefined
 	scope.captured = undefined
-	const bytes = encodeArchivePayload(captured, scope.limits)
 	try {
-		const payload = parseArchivePayload(bytes, scope.limits),
-			profile = required(scope.input).profile
+		const input = required(scope.input)
+		scope.envelope = prepareArchiveSeal(captured, required(input.protection), scope.limits)
+		input.protection = undefined
+		const payload = required(envelopeData(scope.envelope).payload),
+			profile = input.profile
 		if (
 			payload.profile.id !== profile.id ||
 			payload.profile.version !== profile.version ||
@@ -229,11 +227,8 @@ export function validateJazzExport(request: JazzArchiveExportRequest) {
 			!profile.validate(payload)
 		)
 			throw fault('invalidData')
-		scope.payload = payload
 	} catch {
 		throw fault('invalidData')
-	} finally {
-		bytes.fill(0)
 	}
 }
 export function commitJazzExport(request: JazzArchiveExportRequest) {
@@ -256,15 +251,7 @@ export function confirmJazzExport(request: JazzArchiveExportRequest) {
 export function protectJazzExport(request: JazzArchiveExportRequest): ArchiveEnvelopeRequest {
 	assertJazzExportCurrent(request)
 	const scope = data(request),
-		input = required(scope.input)
-	const envelope = prepareArchiveSeal(
-		required(scope.payload),
-		required(input.protection),
-		scope.limits
-	)
-	scope.envelope = envelope
-	scope.payload = undefined
-	input.protection = undefined
+		envelope = required(scope.envelope)
 	retainSealedOutput(envelope, (archive) => {
 		scope.archiveProduced = true
 		if (scope.abort.signal.aborted) archive.release()
@@ -324,7 +311,6 @@ export function prepareJazzArchiveExport(options: Options): JazzArchiveExportReq
 		verdict: undefined,
 		reader: undefined,
 		captured: undefined,
-		payload: undefined,
 		envelope: undefined,
 		sealed: undefined,
 		archiveProduced: false,

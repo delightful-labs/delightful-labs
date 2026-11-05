@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup, type ActorLogic, type Snapshot } from 'xstate'
+import { assign, fromPromise, sendTo, setup, type ActorLogic, type Snapshot } from 'xstate'
 import {
 	claimJazzExport,
 	jazzReaderInput,
@@ -90,6 +90,7 @@ export function createJazzArchiveExportMachine<
 					? 'invalidated'
 					: 'cancelled')
 	})
+	const abort = model.createAction(({ context }) => abortJazzExport(context.request))
 	const readerDone = (mode: JazzArchiveReaderInput['mode'], next: string) =>
 		model.createStateConfig({
 			exit: ({ context }) => endJazzReader(context.request),
@@ -181,13 +182,20 @@ export function createJazzArchiveExportMachine<
 						}
 					},
 					protecting: {
+						on: {
+							CANCEL: { actions: [stop, abort, sendTo('seal', { type: 'CANCEL' })] },
+							SHUTDOWN: { actions: [stop, abort, sendTo('seal', { type: 'SHUTDOWN' })] },
+							INVALIDATE: { actions: [stop, abort, sendTo('seal', { type: 'CANCEL' })] }
+						},
 						invoke: {
+							id: 'seal',
 							src: 'seal',
 							input: ({ context }) => {
 								if (!context.envelope) throw new Error('Missing protection request')
 								return { request: context.envelope }
 							},
 							onDone: [
+								{ guard: ({ context }) => context.interruption !== undefined, target: 'cleaning' },
 								{
 									guard: ({ event }) => event.output.outcome === 'sealed',
 									target: 'handingOff'

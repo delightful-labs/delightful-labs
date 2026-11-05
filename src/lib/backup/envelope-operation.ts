@@ -10,7 +10,7 @@ import {
 	type Envelope,
 	type PasswordHeader
 } from './envelope.js'
-import { encodeArchivePayload } from './payload.js'
+import { prepareArchivePayload } from './payload.js'
 import {
 	createArchivePayloadError,
 	isArchivePayloadError,
@@ -195,7 +195,8 @@ function prepare(
 	mode: EnvelopeMode,
 	bytes: Uint8Array<ArrayBuffer>,
 	password: string | undefined,
-	limits: PayloadLimits
+	limits: PayloadLimits,
+	payload?: ArchivePayload
 ): ArchiveEnvelopeRequest {
 	const data: EnvelopeData = {
 		initialMode: mode,
@@ -204,7 +205,7 @@ function prepare(
 		file: mode.startsWith('open') ? bytes : undefined,
 		parsedEnvelope: undefined,
 		ciphertext: undefined,
-		payload: undefined,
+		payload,
 		password,
 		material: undefined,
 		key: undefined,
@@ -221,9 +222,9 @@ function prepare(
 	const request: ArchiveEnvelopeRequest = Object.freeze({
 		release() {
 			if (data.initialMode === undefined) return
-			data.initialMode = undefined
-			if (data.releaseControl) data.releaseControl()
-			else clearEnvelopeData(request)
+			const release = data.releaseControl
+			clearEnvelopeData(request)
+			release?.()
 		},
 		toJSON: (): { kind: 'archiveEnvelopeRequest' } => ({ kind: 'archiveEnvelopeRequest' })
 	})
@@ -262,11 +263,13 @@ export function prepareArchiveSeal(
 		.safeParse(protection)
 	if (!choice.success) throw createArchiveEnvelopeError('invalidPassword')
 	const limits = resolvePayloadLimits(overrides)
+	const prepared = prepareArchivePayload(payload, limits)
 	return prepare(
 		choice.data.kind === 'password' ? 'sealPassword' : 'sealPlain',
-		encodeArchivePayload(payload, limits),
+		prepared.bytes,
 		choice.data.kind === 'password' ? choice.data.password : undefined,
-		limits
+		limits,
+		prepared.payload
 	)
 }
 export function prepareArchiveOpen(

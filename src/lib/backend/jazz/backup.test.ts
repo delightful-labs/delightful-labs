@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import * as payloadCodec from '../../backup/payload.js'
 import { createActor, toPromise, waitFor } from 'xstate'
 import {
 	createExportReader as reader,
@@ -67,6 +68,7 @@ afterAll(async () => {
 	for (const session of sessions) await session.close()
 	await authority?.stop()
 })
+afterEach(() => vi.restoreAllMocks())
 
 function deferred<Value>() {
 	let resolve: (value: Value) => void = () => {}
@@ -174,6 +176,13 @@ describe('native Jazz archive export', () => {
 	it('rejects a domain-invalid payload before issuing a native commit or handoff', async () => {
 		const graph = await seed(),
 			input = options(graph)
+		const prepare = payloadCodec.prepareArchivePayload
+		let encoded: Uint8Array | undefined
+		vi.spyOn(payloadCodec, 'prepareArchivePayload').mockImplementation((...args) => {
+			const prepared = prepare(...args)
+			encoded = prepared.bytes
+			return prepared
+		})
 		input.value.profile = { ...profile, validate: () => false }
 		const h = start(graph, input)
 		expect(await toPromise(h.actor)).toMatchObject({
@@ -183,6 +192,7 @@ describe('native Jazz archive export', () => {
 			handoff: 'notStarted'
 		})
 		expect(h.files).toHaveLength(0)
+		expect(encoded?.every((byte) => byte === 0)).toBe(true)
 	})
 	it('rejects a different authenticated identity before reading', async () => {
 		const graph = await seed(),
@@ -228,8 +238,10 @@ describe('native Jazz archive export', () => {
 		}
 	)
 	it.each(['none', 'password'])(
-		'exports %s protection and independently reopens exact source bytes',
+		'prepares %s protection once and independently reopens exact source bytes',
 		async (kind) => {
+			const preparation = vi.spyOn(payloadCodec, 'prepareArchivePayload')
+			const parsing = vi.spyOn(payloadCodec, 'parseArchivePayload')
 			const graph = await seed(),
 				before = await readGraph(db, graph)
 			const h = start(
@@ -246,6 +258,8 @@ describe('native Jazz archive export', () => {
 				archiveProduced: true,
 				handoff: 'dispatched'
 			})
+			expect(preparation).toHaveBeenCalledTimes(1)
+			expect(parsing).not.toHaveBeenCalled()
 			const file = h.files[0]
 			if (!file) throw new Error('Missing dispatched file')
 			const opened = createActor(createArchiveEnvelopeMachine(), {
@@ -258,6 +272,7 @@ describe('native Jazz archive export', () => {
 			}).start()
 			const result = await toPromise(opened)
 			if (result.outcome !== 'integrityChecked') throw new Error('Independent reopen failed')
+			expect(parsing).toHaveBeenCalledTimes(1)
 			expect(result.archive.readPayload().attachments[0]?.data).toBe(
 				Buffer.from(bytes(0)).toString('base64')
 			)
@@ -267,6 +282,54 @@ describe('native Jazz archive export', () => {
 				/synthetic-private-password|private-native-file/
 			)
 			await h.request.release()
+		}
+	)
+	it.each(['CANCEL', 'SHUTDOWN', 'INVALIDATE'] satisfies ('CANCEL' | 'SHUTDOWN' | 'INVALIDATE')[])(
+		'drains issued protection crypto before %s completes',
+		async (type) => {
+			const graph = await seed(),
+				entered = deferred<void>(),
+				finish = deferred<void>()
+			const native = crypto.subtle.deriveKey.bind(crypto.subtle)
+			let settled = false
+			vi.spyOn(crypto.subtle, 'deriveKey').mockImplementationOnce((...args) => {
+				const result = native(...args)
+				entered.resolve()
+				return finish.promise
+					.then(() => result)
+					.finally(() => {
+						settled = true
+					})
+			})
+			const h = start(
+				graph,
+				options(graph, { kind: 'password', password: 'private-drain-password' })
+			)
+			try {
+				await entered.promise
+				h.actor.send({ type })
+				// Let a premature cleanup finish; crypto remains held by the explicit native barrier.
+				await new Promise<void>((resolve) => setImmediate(resolve))
+				expect(settled).toBe(false)
+				expect(h.actor.getSnapshot().matches({ working: 'protecting' })).toBe(true)
+				expect(h.actor.getSnapshot().status).toBe('active')
+				expect(h.value.handoff.dispatch).not.toHaveBeenCalled()
+				expect(JSON.stringify(h.actor.getPersistedSnapshot())).not.toMatch(
+					/private-drain-password|private-native-file/
+				)
+				finish.resolve()
+				expect(await toPromise(h.actor)).toMatchObject({
+					outcome: type === 'CANCEL' ? 'cancelled' : type === 'SHUTDOWN' ? 'closed' : 'invalidated',
+					archiveProduced: false,
+					handoff: 'notStarted'
+				})
+				expect(settled).toBe(true)
+				expect(h.files).toHaveLength(0)
+			} finally {
+				finish.resolve()
+				await toPromise(h.actor)
+				await h.request.release()
+			}
 		}
 	)
 	it('discards a conflicting capture and succeeds only after a fresh attempt', async () => {
