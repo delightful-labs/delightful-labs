@@ -1,30 +1,5 @@
 // Resolve declarations through package exports, never through src/lib or a source alias.
 import * as foundation from 'delightful-local-first'
-import { setup } from 'xstate'
-import { createArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'
-import type {
-	ArchiveCaptureReaderInput,
-	ArchiveCaptureReaderResult
-} from 'delightful-local-first/backup/export'
-
-// A real consumer machine, including an initially-final reader, satisfies built public declarations.
-const cancelledReader = setup<
-	{},
-	{ type: 'CANCEL' | 'SHUTDOWN' },
-	{},
-	{},
-	{},
-	{},
-	never,
-	string,
-	ArchiveCaptureReaderInput,
-	ArchiveCaptureReaderResult
->({}).createMachine({
-	initial: 'cancelled',
-	output: () => ({ outcome: 'cancelled' }),
-	states: { cancelled: { type: 'final' } }
-})
-export const consumerExport = createArchiveExportMachine({ reader: cancelledReader })
 
 export const publicEntryPoint: object = foundation
 
@@ -279,3 +254,12 @@ export type {
 export { createArchiveInspectionMachine } from 'delightful-local-first/backup/inspection/workflow'
 
 export { zodFormIssues } from 'delightful-local-first/forms/zod'
+
+export { prepareJazzArchiveExport } from 'delightful-local-first/backend/jazz/backup'
+export type {
+	JazzArchiveExportRequest,
+	JazzArchiveExportResult,
+	JazzArchiveReaderInput,
+	JazzArchiveReaderResult
+} from 'delightful-local-first/backend/jazz/backup'
+export { createJazzArchiveExportMachine } from 'delightful-local-first/backup/jazz/workflow'

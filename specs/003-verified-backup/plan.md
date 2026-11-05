@@ -20,7 +20,12 @@ The implemented foundation separates the bounded archive/independent inspector f
 export/restore coordination. The test app reference demonstrates the complete flow. The next adoption
 is Finance’s domain profile against its existing `jazz-tools@2.0.0-alpha.59` deployment. A newer Jazz release and AT Protocol sign-in are not prerequisites.
 
-Finance capture uses an explicitly quiescent single-user maintenance procedure, remote reads for supported complete graph coverage, and comparison with local-first results to detect unsynchronized differences. This is a scoped operational capture, not a claim of SDK snapshot isolation. Do not accept a capture when writer quiescence, full owner authority, or required graph coverage cannot be established. Details and limits appear in [Finance adoption](contracts/finance-adoption.md).
+The 2026-11-05 [native experiment](../../fixtures/native-capture/README.md) supersedes Finance's
+proposed writer gate and repeated graph comparison. Hydrate the complete supported scope through
+ordinary remote reads, capture and validate through one exclusive transaction, then commit with
+zero application mutations and await the native verdict before protection/download. Discard any
+rejected capture; an explicit retry starts fresh. Owner authority, complete coverage and exact byte
+handling remain consumer responsibilities. See the [replacement contract](contracts/native-capture.md).
 
 Restore requires an additive Finance isolation design before destination writes: durable operation identity, stable destination IDs, incomplete status, ordinary workflow exclusion, and authoritative reconciliation. The test app supplies a qualified reference for these capabilities; Finance-specific schema, policy,
 consumer interaction and deployment compatibility remain unimplemented and require their own evidence.
@@ -95,7 +100,7 @@ archive or capture protocol. Repeat inventory if source/deployment/device change
    [record report](record-performance.md#simplification-review). T004 remains open for actual consumer
    and platform qualification; these changes do not authorize deployment or Finance integration.
 2. **T008, Finance capture/profile/interaction:** allowlisted complete graph, owner authority,
-   maintenance/drain, exact bytes, local/remote comparison and disposable-data qualification.
+   complete hydration, exclusive capture/verdict, exact bytes and disposable-data qualification.
 3. **T009, Finance isolated restore:** additive schema/policy lane, stable mappings/journal,
    reconciliation, domain staging, fresh comparison and activation. Qualify policies, cached clients,
    restart and uncertain outcomes before proposing live additive deployment.
@@ -111,7 +116,7 @@ engine is planned.
 ## Remaining evidence requirements
 
 T007 records actual production frontend/catalogue/policy identity and scoped live graph/size
-measurements. Finance capture consistency and full profile/envelope size, explicit writer drain,
+measurements. Finance capture consistency and full profile/envelope size, native verdict integration,
 additive isolation with cached-client compatibility and an actual retained-file recovery remain
 required. Test app success does not establish consumer
 completeness or production safety. Report a specific alpha.59 limitation rather than silently upgrading

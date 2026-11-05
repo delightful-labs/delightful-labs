@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup, sendTo, type ActorLogic, type Snapshot } from 'xstate'
+import { assign, fromPromise, setup } from 'xstate'
 import {
 	exportFailure,
 	validateCapturedExport,
@@ -7,7 +7,6 @@ import {
 	type ArchiveExportRequest,
 	type BackupBinding
 } from '../../backup/export.js'
-import type { ArchiveCaptureReaderInput, ArchiveCaptureReaderResult } from '../../backup/export.js'
 
 import {
 	abortExport,
@@ -18,7 +17,6 @@ import {
 	observeExportConsistency,
 	releaseExportLease
 } from '../../backup/export-native.js'
-import { exportReaderInput } from '../../backup/export-native.js'
 
 export type ArchiveExportInput = { request: ArchiveExportRequest }
 export type ArchiveExportControl =
@@ -31,16 +29,9 @@ type Context = ArchiveExportInput & {
 	interruption: ArchiveExportInterruption | undefined
 	failure: ReturnType<typeof exportFailure> | undefined
 }
-function readerFailure(result: ArchiveCaptureReaderResult | undefined) {
-	return result?.outcome === 'failed' ? result : undefined
-}
 
 /** Invoked only by the claimed export owner. Payloads and leases never enter actor snapshots. */
-export type ArchiveCaptureReader<ReaderSnapshot extends Snapshot<ArchiveCaptureReaderResult>> =
-	ActorLogic<ReaderSnapshot, { type: 'CANCEL' | 'SHUTDOWN' }, ArchiveCaptureReaderInput>
-export function createArchiveCaptureMachine<
-	ReaderSnapshot extends Snapshot<ArchiveCaptureReaderResult>
->(options?: { reader: ArchiveCaptureReader<ReaderSnapshot> }) {
+export function createArchiveCaptureMachine() {
 	function leaf<Output>(run: (request: ArchiveExportRequest) => Output | Promise<Output>) {
 		return fromPromise<Output, ArchiveExportInput>(({ input }) =>
 			Promise.resolve(run(input.request))
@@ -50,11 +41,7 @@ export function createArchiveCaptureMachine<
 		authority: leaf((request) => observeExportAuthority(request)),
 		acquire: leaf((request) => acquireExportLease(request)),
 		drain: leaf((request) => drainExportWriters(request)),
-		read:
-			options?.reader ??
-			fromPromise<ArchiveCaptureReaderResult, ArchiveExportInput & ArchiveCaptureReaderInput>(
-				({ input }) => readExportGraph(input.request).then(() => ({ outcome: 'read' }))
-			),
+		read: leaf((request) => readExportGraph(request)),
 		consistency: leaf((request) => observeExportConsistency(request)),
 		release: leaf((request) => releaseExportLease(request))
 	}
@@ -94,23 +81,6 @@ export function createArchiveCaptureMachine<
 		{ guard: 'interrupted', target: 'releasing' },
 		{ target }
 	]
-	const authority = (next: string) =>
-		model.createStateConfig({
-			invoke: {
-				src: 'authority',
-				input,
-				onDone: [
-					{ guard: 'interrupted', target: 'releasing' },
-					{
-						guard: ({ event }) => !event.output,
-						target: 'releasing',
-						actions: assign({ failure: { outcome: 'failed', code: 'authorityDenied' } })
-					},
-					{ target: next }
-				],
-				onError: failed
-			}
-		})
 	return model.createMachine({
 		id: 'archive-capture',
 		initial: 'checkingAuthority',
@@ -135,61 +105,30 @@ export function createArchiveCaptureMachine<
 			}
 		},
 		states: {
-			checkingAuthority: authority('acquiring'),
+			checkingAuthority: {
+				invoke: {
+					src: 'authority',
+					input,
+					onDone: [
+						{ guard: 'interrupted', target: 'releasing' },
+						{
+							guard: ({ event }) => !event.output,
+							target: 'releasing',
+							actions: assign({ failure: { outcome: 'failed', code: 'authorityDenied' } })
+						},
+						{ target: 'acquiring' }
+					],
+					onError: failed
+				}
+			},
 			acquiring: {
 				invoke: { src: 'acquire', input, onDone: advance('draining'), onError: failed }
 			},
 			draining: {
-				invoke: {
-					src: 'drain',
-					input,
-					onDone: advance('checkingDrainedAuthority'),
-					onError: failed
-				}
+				invoke: { src: 'drain', input, onDone: advance('reading'), onError: failed }
 			},
-			checkingDrainedAuthority: authority('reading'),
 			reading: {
-				on: {
-					CANCEL: {
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' }),
-							'abort',
-							sendTo('reader', { type: 'CANCEL' })
-						]
-					},
-					SHUTDOWN: {
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'closed' }),
-							'abort',
-							sendTo('reader', { type: 'SHUTDOWN' })
-						]
-					}
-				},
-				invoke: {
-					id: 'reader',
-					src: 'read',
-					input: ({ context }) => ({
-						...input({ context }),
-						...exportReaderInput(context.request)
-					}),
-					onDone: [
-						{ guard: 'interrupted', target: 'releasing' },
-						{
-							guard: ({ event }) => event.output === undefined || event.output.outcome === 'failed',
-							target: 'releasing',
-							actions: assign({
-								failure: ({ event }) => readerFailure(event.output) ?? exportFailure(undefined)
-							})
-						},
-						{
-							guard: ({ event }) => event.output?.outcome === 'cancelled',
-							target: 'releasing',
-							actions: assign({ interruption: 'cancelled' })
-						},
-						{ target: 'validating' }
-					],
-					onError: failed
-				}
+				invoke: { src: 'read', input, onDone: advance('validating'), onError: failed }
 			},
 			validating: {
 				entry: ({ context, self }) => {
@@ -218,13 +157,11 @@ export function createArchiveCaptureMachine<
 							target: 'releasing',
 							actions: assign({ failure: { outcome: 'failed', code: 'captureInconsistent' } })
 						},
-						{ guard: 'interrupted', target: 'releasing' },
-						{ target: 'checkingFinalAuthority' }
+						{ target: 'releasing' }
 					],
 					onError: failed
 				}
 			},
-			checkingFinalAuthority: authority('releasing'),
 			releasing: {
 				invoke: {
 					src: 'release',

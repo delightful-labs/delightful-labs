@@ -1,4 +1,4 @@
-import { sendTo, raise, assign, fromPromise, setup, type Snapshot } from 'xstate'
+import { sendTo, raise, assign, fromPromise, setup } from 'xstate'
 import {
 	exportFailure,
 	exportData,
@@ -10,7 +10,6 @@ import {
 	type ArchiveHandoffObservation,
 	type BackupBinding
 } from '../../backup/export.js'
-import type { ArchiveCaptureReaderResult } from '../../backup/export.js'
 import {
 	abortExport,
 	dispatchExportFile,
@@ -27,8 +26,6 @@ import {
 	type ArchiveExportEvent,
 	type ArchiveExportInput
 } from './capture.js'
-import type { ArchiveCaptureReader } from './capture.js'
-export type { ArchiveCaptureReader } from './capture.js'
 export type { ArchiveExportEvent, ArchiveExportInput } from './capture.js'
 
 type Context = ArchiveExportInput & {
@@ -54,12 +51,10 @@ function mergeHandoff(
 }
 
 /** One export per request. Drain via CANCEL/SHUTDOWN before stopping the actor. */
-export function createArchiveExportMachine<
-	ReaderSnapshot extends Snapshot<ArchiveCaptureReaderResult>
->(options?: { reader: ArchiveCaptureReader<ReaderSnapshot> }) {
+export function createArchiveExportMachine() {
 	const actors = {
 		resources: exportResources,
-		capture: createArchiveCaptureMachine(options),
+		capture: createArchiveCaptureMachine(),
 		seal: createArchiveEnvelopeMachine(),
 		handoff: fromPromise<ArchiveHandoffObservation, ArchiveExportInput>(({ input }) =>
 			dispatchExportFile(input.request)
