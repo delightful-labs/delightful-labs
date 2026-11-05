@@ -6,6 +6,40 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**PR #23 coordinator and writer cleanup locally qualified.** The user authorized this cleanup and
+its tests together. One `createRestoreMachine(native, destination)` now owns selected-step admission,
+journal initialization/load and operation-lock drain/release; both dependencies are mandatory.
+Preparation and attachment destinations are finite machines sharing the native transaction leaves.
+The duplicated coordinators and unmerged specialization APIs are removed; planner synchronous work
+no longer uses fake promise actors, and attachment observation routing uses ordered guards.
+All **926 units (43 focused)** and **16 actual Jazz/Chromium cases**, package/consumer and static
+checks pass. Added tests cover missing batch journals, unknown selected writes, identity denial and
+unexpected identity-read failure. See [design, API migration and qualification](pr23-coordinator-cleanup.md).
+This supersedes the following awaiting-review/runtime-pending notes for this local tree. No commit,
+push or propagation to #24/#25; full comparison/activation and Finance adoption remain open.
+
+**PR #23 attachment destination machine prepared for review.** Following the user's request,
+createNotebookAttachmentWriter now returns a real finite statechart. Guards own scope/mapping,
+identity, observed control and exact content decisions; SDK read/insert leaves do not select the
+workflow. The shared write actor invokes this destination actor, forwards interruption and retains
+journal/transaction/settlement/rollback/lock ownership. A borrowed tracked transaction port preserves
+native custody; observations remain private and are cleared on completion, stop or owner error.
+Native transaction leaves are reused directly rather than constructing a preparation writer.
+See [actor design and review](restore-attachment-actor-review.md). Root/package/notebook/public
+consumer static checks pass. No tests run, no commit/push and no stack propagation for this correction;
+the prior 924-unit/14-browser cleanup evidence does not qualify this changed actor tree.
+
+**PR #23 simplification locally qualified after review.** The ten-function forwarding file,
+preparation write specialization, selector callbacks and attachment request wrapper are removed;
+callers pass the selected step/options directly. The shared write chart has one local journal-update
+predicate, and request claim admission stores one claim fact instead of a separate closure.
+All 924 units (41 focused cases), 14 actual Jazz/Chromium cases and package/consumer/static checks
+pass, including a new native second-claim/first-owner-resource test. See
+[review findings and qualification](pr23-simplification-review.md). The duplicated preparation/batch
+coordinator is documented as a separate candidate. Changes remain local and uncommitted; this
+tests-only step did not publish or propagate the cleanup to #24/#25. Their previous passing totals
+do not qualify this changed tree. Full comparison/activation remain open.
+
 **PR #23 operation-lock correction locally qualified after review.** `operationLock` is now an
 explicit acquisition/held/release/failure machine with a minimal Web Locks bridge. Preparation and
 batch coordinators drain work, explicitly release and await native settlement before returning.

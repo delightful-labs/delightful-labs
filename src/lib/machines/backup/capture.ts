@@ -42,13 +42,14 @@ export function createArchiveCaptureMachine() {
 		acquire: leaf((request) => acquireExportLease(request)),
 		drain: leaf((request) => drainExportWriters(request)),
 		read: leaf((request) => readExportGraph(request)),
-		validate: leaf((request) => validateCapturedExport(request)),
 		consistency: leaf((request) => observeExportConsistency(request)),
 		release: leaf((request) => releaseExportLease(request))
 	}
 	const model = setup<
 		Context,
-		{ type: 'CANCEL' | 'SHUTDOWN' },
+		| { type: 'CANCEL' | 'SHUTDOWN' }
+		| { type: 'CAPTURE_VALIDATED' }
+		| { type: 'CAPTURE_VALIDATION_FAILED'; failure: ReturnType<typeof exportFailure> },
 		typeof actors,
 		{},
 		{ fail: undefined; abort: undefined },
@@ -130,7 +131,21 @@ export function createArchiveCaptureMachine() {
 				invoke: { src: 'read', input, onDone: advance('validating'), onError: failed }
 			},
 			validating: {
-				invoke: { src: 'validate', input, onDone: advance('checkingConsistency'), onError: failed }
+				entry: ({ context, self }) => {
+					try {
+						validateCapturedExport(context.request)
+						self.send({ type: 'CAPTURE_VALIDATED' })
+					} catch (error) {
+						self.send({ type: 'CAPTURE_VALIDATION_FAILED', failure: exportFailure(error) })
+					}
+				},
+				on: {
+					CAPTURE_VALIDATED: advance('checkingConsistency'),
+					CAPTURE_VALIDATION_FAILED: {
+						target: 'releasing',
+						actions: assign({ failure: ({ event }) => event.failure })
+					}
+				}
 			},
 			checkingConsistency: {
 				invoke: {

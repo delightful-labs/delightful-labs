@@ -132,8 +132,7 @@ export function createScopedFormMachine<
 		AvailabilitySnapshot
 	>(options)
 	const completion = fromPromise<void, { scope: Scope }>(async ({ input, signal }) => {
-		if (!options.complete) throw new Error('Missing form completion effect')
-		await options.complete(input.scope, signal)
+		await options.complete?.(input.scope, signal)
 	})
 	const actors = { availability, submission, completion }
 	const ready = (context: Context) =>
@@ -525,10 +524,10 @@ export function createScopedFormMachine<
 											'availabilityWatching',
 											({ context, event }) => editable(context) && hasChanges(context, event.values)
 										]),
-										target: 'active',
+										target: 'admittingSubmission',
 										actions: assign({
 											request: ({ context, event }) => {
-												if (!context.scope) throw new Error('Missing form scope')
+												if (!context.scope) return undefined
 												return {
 													id: context.sequence + 1,
 													scope: context.scope.value,
@@ -561,6 +560,25 @@ export function createScopedFormMachine<
 									},
 									SHUTDOWN: 'closed'
 								}
+							},
+							admittingSubmission: {
+								always: [
+									{
+										guard: ({ context }) =>
+											context.request !== undefined && context.observation !== undefined,
+										target: 'active'
+									},
+									{
+										target: 'idle',
+										actions: assign({
+											result: {
+												outcome: 'failed',
+												code: 'operationFailed',
+												settlement: 'notStarted'
+											}
+										})
+									}
+								]
 							},
 							active: {
 								initial: 'pending',
@@ -748,7 +766,7 @@ export function createScopedFormMachine<
 								}
 							},
 							completion: {
-								initial: 'navigating',
+								initial: 'admitting',
 								on: {
 									SHUTDOWN: 'closed',
 									INVALIDATE: {
@@ -761,6 +779,16 @@ export function createScopedFormMachine<
 									CANCEL: { target: 'idle', actions: clearDraft }
 								},
 								states: {
+									admitting: {
+										always: [
+											{
+												guard: ({ context }) =>
+													context.scope !== undefined && options.complete !== undefined,
+												target: 'navigating'
+											},
+											{ target: 'failed' }
+										]
+									},
 									navigating: {
 										invoke: {
 											id: 'completion',
@@ -778,7 +806,7 @@ export function createScopedFormMachine<
 											section: 'result',
 											label: alert(() => dependencies.messages.completionFailed())
 										},
-										on: { SUBMIT: 'navigating' }
+										on: { SUBMIT: 'admitting' }
 									},
 									completed: {}
 								}

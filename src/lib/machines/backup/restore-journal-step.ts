@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { assign, setup } from 'xstate'
 import {
 	prepareBrowserRestoreJournal,
 	type BrowserJournalConfiguration,
@@ -6,7 +6,7 @@ import {
 	type BrowserJournalResult
 } from '../../backup/restore-journal-browser.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
-import { requirePreparationValue } from '../../backup/restore-preparation.js'
+import { requireRestoreValue } from '../../backup/restore.js'
 import { createBrowserRestoreJournalMachine } from './restore-journal.js'
 
 type Input = BrowserJournalConfiguration
@@ -16,14 +16,11 @@ type Result = { outcome: BrowserJournalResult['outcome']; record: RestoreJournal
 /** Finite journal invocation. Copy validated metadata before revoking the borrowed output. */
 export function createRestoreJournalStepMachine() {
 	const actors = {
-		prepare: fromPromise<BrowserJournalRequest, Input>(({ input }) =>
-			Promise.resolve(prepareBrowserRestoreJournal(input))
-		),
 		journal: createBrowserRestoreJournalMachine()
 	}
 	return setup<
 		Context,
-		{ type: 'UNUSED' },
+		{ type: 'PREPARED'; request: BrowserJournalRequest } | { type: 'PREPARATION_FAILED' },
 		typeof actors,
 		{},
 		{},
@@ -45,17 +42,28 @@ export function createRestoreJournalStepMachine() {
 		output: ({ context }) => context.result,
 		states: {
 			preparing: {
-				invoke: {
-					src: 'prepare',
-					input: ({ context }) => context.configuration,
-					onDone: { target: 'running', actions: assign({ request: ({ event }) => event.output }) },
-					onError: 'complete'
+				entry: ({ context, self }) => {
+					try {
+						self.send({
+							type: 'PREPARED',
+							request: prepareBrowserRestoreJournal(context.configuration)
+						})
+					} catch {
+						self.send({ type: 'PREPARATION_FAILED' })
+					}
+				},
+				on: {
+					PREPARED: {
+						target: 'running',
+						actions: assign({ request: ({ event }) => event.request })
+					},
+					PREPARATION_FAILED: 'complete'
 				}
 			},
 			running: {
 				invoke: {
 					src: 'journal',
-					input: ({ context }) => ({ request: requirePreparationValue(context.request) }),
+					input: ({ context }) => ({ request: requireRestoreValue(context.request) }),
 					onDone: {
 						target: 'complete',
 						actions: assign({

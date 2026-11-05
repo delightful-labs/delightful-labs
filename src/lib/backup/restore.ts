@@ -1,43 +1,111 @@
-import type {
-	RestoreJournalRecord,
-	RestoreJournalIntent,
-	RestoreJournalReceipt,
-	RestoreJournalCompletion
+import type { ActorLogic, Snapshot } from 'xstate'
+import { backupBindingSchema, type BackupBinding } from './export.js'
+import {
+	createRestoreJournalRecord,
+	parseRestoreJournalRecord,
+	type RestoreJournalIntent,
+	type RestoreJournalRecord,
+	type RestoreJournalReceipt,
+	type RestoreJournalCompletion
 } from './restore-journal.js'
-import { parseRestoreJournalRecord } from './restore-journal.js'
-import { validatePreparationInput } from './restore-preparation.js'
-import type {
-	RestorePreparationInput,
-	RestorePreparationOutcome,
-	RestorePreparationResult,
-	RestorePreparationWriter,
-	PreparationPresence
-} from './restore-preparation.js'
+import type { RetainDetachedTransaction } from '../contracts/transaction-custody.js'
 
+export type RestoreScope = {
+	binding: BackupBinding
+	databaseName: string
+	intent: RestoreJournalIntent
+}
+export type RestoreInput = RestoreScope & { writeId: string }
+export type RestoreEvent =
+	| { type: 'CANCEL' }
+	| { type: 'SHUTDOWN' }
+	| { type: 'INVALIDATE'; binding: BackupBinding }
+export type RestoreOutcome =
+	| 'prepared'
+	| 'batchWritten'
+	| 'incomplete'
+	| 'conflict'
+	| 'unavailable'
+	| 'cancelled'
+	| 'invalidated'
+	| 'closed'
+export type RestoreResult = {
+	binding: BackupBinding
+	outcome: RestoreOutcome
+	record: RestoreJournalRecord | undefined
+}
 export type RestorePlannedWrite = RestoreJournalIntent['plan']['preparation']
-export type RestoreStepPresence = PreparationPresence | 'unavailable'
-export type RestoreWriteInput = RestorePreparationInput & { record: RestoreJournalRecord }
-export type RestoreBatchInput = RestorePreparationInput & { writeId: string }
-export type RestoreWriteResult<Success extends 'prepared' | 'batchWritten'> = Omit<
-	RestorePreparationResult,
-	'outcome'
-> & { outcome: Exclude<RestorePreparationOutcome, 'prepared'> | Success }
-export type RestoreStepWriter<Transaction, Write> = Omit<
-	RestorePreparationWriter<Transaction, Write>,
-	'readRemote' | 'readTransaction' | 'checkAuthority' | 'stage'
-> & {
-	readRemote(intent: RestoreJournalIntent, step: RestorePlannedWrite): Promise<RestoreStepPresence>
-	readTransaction(
-		transaction: Transaction,
-		intent: RestoreJournalIntent,
-		step: RestorePlannedWrite
-	): Promise<RestoreStepPresence>
-	checkAuthority(intent: RestoreJournalIntent, step: RestorePlannedWrite): Promise<boolean>
-	stage(
-		transaction: Transaction,
-		intent: RestoreJournalIntent,
-		step: RestorePlannedWrite
-	): void | Promise<void>
+export type RestoreStepPresence = 'match' | 'missingOrHidden' | 'conflict' | 'unavailable'
+export type RestoreWriteInput = RestoreScope & {
+	record: RestoreJournalRecord
+	step: RestorePlannedWrite
+}
+export type RestoreWriteResult = Omit<RestoreResult, 'outcome'> & {
+	outcome: Exclude<RestoreOutcome, 'prepared' | 'batchWritten'> | 'written'
+}
+export type RestoreTransactionWriter<Transaction, Write> = {
+	open(): Transaction | Promise<Transaction>
+	commit(transaction: Transaction): Write | Promise<Write>
+	transactionId(write: Write): Promise<string>
+	persistLocal(write: Write): Promise<void>
+	acceptRemote(write: Write): Promise<void>
+	isRemoteRejection(error: unknown, transactionId: string): boolean
+	rollback(transaction: Transaction): Promise<boolean>
+	retainDetached: RetainDetachedTransaction<Transaction, Write>
+}
+/** A tracked operation on the original borrowed transaction, never a replacement owner. */
+export type RestoreTransactionAccess<Transaction> = {
+	call<Result>(
+		operation: (transaction: Transaction) => Result | PromiseLike<Result>
+	): Promise<Result>
+	toJSON(): { kind: 'restoreTransactionAccess' }
+}
+export type RestoreDestinationInput<Transaction> = RestoreScope & { step: RestorePlannedWrite } & (
+		| { operation: 'remote' | 'authority' }
+		| { operation: 'read' | 'stage'; transaction: RestoreTransactionAccess<Transaction> }
+	)
+export type RestoreDestinationResult =
+	| RestoreStepPresence
+	| 'allowed'
+	| 'denied'
+	| 'staged'
+	| 'cancelled'
+	| 'closed'
+	| 'invalidated'
+export type RestoreDestinationLogic<
+	Transaction,
+	S extends Snapshot<RestoreDestinationResult>
+> = ActorLogic<S, RestoreEvent, RestoreDestinationInput<Transaction>>
+export function restoreTransactionAccess<Transaction>(input: RestoreDestinationInput<Transaction>) {
+	if (input.operation !== 'read' && input.operation !== 'stage')
+		throw new Error('Expected transactional destination operation')
+	return input.transaction
+}
+export function requireRestoreValue<T>(value: T | undefined): T {
+	if (value === undefined) throw new Error('Missing restore resource')
+	return value
+}
+/** Pure bounded normalization and selected-step correlation. Metadata grants no authority. */
+export function validateRestoreInput(input: RestoreInput) {
+	const parsed = backupBindingSchema.safeParse(input.binding)
+	if (!parsed.success) throw new Error('Invalid restore binding')
+	const record = createRestoreJournalRecord(input.intent),
+		binding = parsed.data,
+		operation = record.intent.operation
+	if (
+		operation.applicationId !== binding.applicationId ||
+		operation.environment !== binding.environment ||
+		operation.identityId !== binding.identityId ||
+		operation.operationId !== binding.operationId ||
+		operation.destinationWorkspaceId !== binding.workspaceId
+	)
+		throw new Error('Restore binding mismatch')
+	const step = requireRestoreValue(
+		[record.intent.plan.preparation, ...record.intent.plan.batches].find(
+			(step) => step.writeId === input.writeId
+		)
+	)
+	return { binding, record, step }
 }
 export function writeStepPending(record: RestoreJournalRecord, step: RestorePlannedWrite): boolean {
 	return record.checkpoint.kind === 'writing' && record.checkpoint.current.writeId === step.writeId
@@ -171,13 +239,6 @@ export function writeStepSettlementSatisfied(
 	)
 }
 
-/** Membership in the already bounded validated plan also bounds the requested write identity. */
-export function validateRestoreBatchInput(input: RestoreBatchInput) {
-	const normalized = validatePreparationInput(input)
-	if (!normalized.record.intent.plan.batches.some((step) => step.writeId === input.writeId))
-		throw new Error('Unknown restore batch')
-	return normalized
-}
 export function requestedBatchIsCurrent(
 	record: RestoreJournalRecord | undefined,
 	writeId: string

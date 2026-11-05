@@ -208,3 +208,22 @@ staged-write interruption/rollback and actual relationship-policy denials. See
 [design, qualification and limits](../../specs/003-verified-backup/restore-note-design.md).
 The last note can reach comparing; it does not complete comparison or activate the destination.
 Full fresh comparison and activation remain open. No Finance or production restore claim is made.
+
+### Update after PR #23 merged
+
+The notebook destination now invokes the shared live-identity admission/staging actor through
+the consolidated restore API. Continuation claim/projection and planner capsule mutations are
+synchronous machine actions, with finite failures. Request release drains its owner before
+clearing private content. All 37 restore-browser cases and 918 units pass, plus the package,
+consumer, private-creation and Storybook checks. Current evidence and limits are recorded in
+[the updated design](../../specs/003-verified-backup/restore-notebook-design.md#post-merge-machine-review-2026-11-04).
+
+### Note update after PR #23 merged
+
+The note destination now uses the consolidated restore API and shared live-identity
+admission/staging actor. Explicit guards admit expected content, control, parents and exact
+note fields/reference IDs; bounded observations stay private. The continuation inherits the
+parent's synchronous capsule actions and drain-before-clear release protocol. All 51 actual
+restore-browser cases and 918 units pass, plus package/consumer/static checks, 65 Storybook
+cases and 10 private-creation cases. Updated evidence and limits are in
+[the note design](../../specs/003-verified-backup/restore-note-design.md#post-merge-machine-review-2026-11-04).

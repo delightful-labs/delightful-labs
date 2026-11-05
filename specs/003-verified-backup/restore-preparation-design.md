@@ -1,5 +1,10 @@
 # T006 notebook restore preparation — implementation slice
 
+> Current API: the unmerged preparation/batch specializations described historically below were
+> replaced by `createRestoreMachine(native, destination)` at `backup/restore/workflow`, contracts at
+> `backup/restore`, with explicit `writeId` input. Both concrete destination writers are machines.
+> See [consolidated cleanup and passing qualification](pr23-coordinator-cleanup.md).
+
 This slice follows merged PR #22 (`08f4c38`, including `b519d68`) on
 `feat/notebook-restore-preparation`. Implementation and qualification are authorized. The
 [current completed qualification](#preparation-qualification--completed) supersedes historical review

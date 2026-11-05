@@ -135,3 +135,39 @@ inside Chromium instead of transferring a million-element actual array back to N
 that single large case a bounded 90-second timeout. All 22 real browser cases pass locally after
 this correction; CI must qualify the pushed correction independently. Assertions and payload size
 were retained, and this is not a restore performance guarantee.
+
+## Post-merge machine review (2026-11-04)
+
+The user authorized updating PRs 24 and 25 from main, implementation, tests and publication
+for morning review. The shared transaction actor retains acquisition, journal intent, stage,
+commit, independent settlement and rollback. Each destination invokes the shared live-identity
+write machine for authority/staging. Notebook admission checks owned expected data and mapping
+before invoking SDK reads or writes; lost identity and observer failures drain issued staging
+and produce finite results. Actual title comparison stays a pure projection over bounded SDK
+observations, held privately and cleared on owner completion/failure. No stage callback throws
+for ordinary scope changes. The continuation owns claim, planning, expected-content preparation
+and one journaled write. Synchronous capsule operations are ordinary actions that report typed
+events; they must not acquire resources at actor construction or simulate async work. Missing
+owned requests finish unavailable without touching another actor's resources. Cancellation
+forwards only control events and waits for issued child operations; release/error cleanup must
+not bypass the transaction owner. Both existing protocol tests and native Jazz tests qualify
+these paths after integration.
+
+### Updated qualification
+
+Merged `origin/main` at `f37669e`, retaining main's consolidated restore API and live-identity
+destination actor. All 918 unit, 37 actual Jazz/Chromium restore, 65 Storybook browser,
+10 private-creation, 17 independent-reader and 18 notebook-export tests pass (1,065 total).
+The restore set retains all main regressions and nine original notebook-root cases, adding
+request release during staging, latched identity loss/failure during staging, dormant actor
+construction, released-request admission and absent expected-content admission. Stage gates
+exercise actual native insertion before drain/rollback; identity tests inject observer reports.
+Formatting/lint, root and notebook TypeScript, Svelte checks, package/strict Publint, consumer
+checks/builds and the Storybook build pass. A concurrent package rebuild triggered Vite reload
+in one first-run browser case; the clean full rerun passed all 37 cases. Tests now run after
+package construction to avoid this harness interference.
+
+A released request keeps its private content until the owner drains. Claim refusal is a typed
+finite path; a second actor cannot clear the first actor's resources. Planner capsule actions
+also run only after actor start. Existing limits on unresolved issued writes, fresh whole-graph
+comparison and activation remain unchanged; this does not qualify production restoration.

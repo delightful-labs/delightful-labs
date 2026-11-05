@@ -108,3 +108,39 @@ external deletion/loss of an already completed parent was not induced through th
 A rollback-issued marker is conservatively unresolved, without an automatic retry protocol. This
 qualifies one-note continuation and its concrete relationships, not the complete restore coordinator,
 full comparison, activation, Finance completeness, offline restart or production restore safety.
+
+## Post-merge machine review (2026-11-04)
+
+The user authorized updating both PRs from main, fixes, tests and publication for morning
+review. This branch incorporates main through the updated notebook-root parent. Notes adopt
+the consolidated transaction/destination protocol: the shared write actor owns journal intent,
+transaction custody, commit, independent settlement and rollback; a note destination borrows
+its transaction for one operation. Expected scope/mapping and observed control/parent/note
+facts are admitted by guards and explicit states. Observations live in private bounded buffers
+with owner cleanup. Identity admission/staging invokes the common live-observation actor and
+latches identity loss/observer failure until issued staging drains. Scope changes produce finite
+results, with no business-policy throw inside a stage callback. The shared continuation owns
+claim, plan, synchronous expected-content preparation and one write. Request release drains
+before private content clears. Qualify exact note content/relationships, no replay, stale scope,
+cancel/release/invalidate, observer loss, unstarted construction and missing expected admission
+using existing native boundaries and additional regression cases. Full comparison/activation
+remain outside this one-step writer.
+
+### Updated qualification
+
+This branch includes main at `f37669e` through the updated PR #24 branch (`c6352c6`).
+All 918 unit, 51 actual Jazz/Chromium restore, 65 Storybook browser, 10 private-creation,
+17 independent-reader and 18 notebook-export tests pass (1,079 total). The restore suite
+retains all 37 updated parent cases and eight original note cases, with six additional note
+regressions: release during issued staging, latched identity loss and observer failure, dormant
+construction, released-request admission and missing expected-content admission. The five
+note drain paths assert native staged insertion, no premature completion, private-content
+retention through drain and clearing afterward, rollback/no remote row, retained prior prefix
+and no automatic replay. Identity cases inject typed observation reports; ordinary note writes
+and relationship-policy denials execute against the real SDK/server.
+
+Formatting, lint, Svelte/root strict TypeScript, notebook/private-creation TypeScript,
+package/strict Publint, consumer checks/builds and Storybook build pass. No whole-graph
+comparison, activation, production restore or cross-browser/offline/crash qualification is
+implied. Source assertions in checked-content projections remain pure invariant checks;
+the owning action catches projection failure and reports a finite continuation result.

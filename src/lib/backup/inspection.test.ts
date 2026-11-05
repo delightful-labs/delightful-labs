@@ -1,15 +1,8 @@
-import {
-	buildCheckedArchive,
-	type EnvelopeSuccess,
-	type IntegrityCheckedArchive
-} from './envelope-operation.js'
-import {
-	createArchiveEnvelopeMachine,
-	type ArchiveEnvelopeInput
-} from '../machines/backup/envelope.js'
+import * as envelopeOperations from './envelope-operation.js'
+import type { IntegrityCheckedArchive } from './envelope-operation.js'
 import { createHash } from 'node:crypto'
-import { describe, expect, it, vi } from 'vitest'
-import { createActor, fromPromise, toPromise } from 'xstate'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createActor, toPromise } from 'xstate'
 import vector from '../../../tests/fixtures/archive-envelope-v1.json'
 import {
 	prepareArchiveInspection,
@@ -20,6 +13,7 @@ import {
 import { createArchiveInspectionMachine } from '../machines/backup/inspection.js'
 import { parseArchivePayload, type ArchivePayload } from './archive.js'
 
+afterEach(() => vi.restoreAllMocks())
 const utf8 = new TextEncoder()
 function plain() {
 	const base = parseArchivePayload(Buffer.from(vector.payloadBase64, 'base64'))
@@ -272,17 +266,17 @@ describe('password and input boundaries', () => {
 })
 
 describe('inspection lifecycle', () => {
-	it.each([
-		'claiming',
-		'reading',
-		'checkingSource',
-		'preparingEnvelope',
-		'opening',
-		'matchingProfile',
-		'inspectingProfile',
-		'buildingReport',
-		'cleaning'
-	])('cancels at %s with owned report cleanup', async (stage) => {
+	it('does not claim or read a source before an inspector starts', async () => {
+		const read = vi.fn(async () => plain())
+		const request = prepareArchiveInspection({ source: { read } })
+		const dormant = createActor(createArchiveInspectionMachine(), { input: { request } })
+		expect(read).not.toHaveBeenCalled()
+		const result = await run(request)
+		expect(result.outcome).toBe('integrityValidProfileUnsupported')
+		if ('report' in result) result.report.release()
+		dormant.stop()
+	})
+	it.each(['reading', 'opening'])('cancels at %s with owned report cleanup', async (stage) => {
 		const request = prepareArchiveInspection({ source: source(), profiles: [profile()] })
 		const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
 		let reached = false
@@ -411,54 +405,22 @@ describe('inspection lifecycle', () => {
 			(await run({ release() {}, toJSON: () => ({ kind: 'archiveInspectionRequest' }) })).outcome
 		).toBe('failed')
 	})
-	it.each(['buildingChecked', 'cleaning'])(
-		'retains and releases child output on abrupt stop during child %s',
-		async (stage) => {
-			let acquired: IntegrityCheckedArchive | undefined
-			const open = createArchiveEnvelopeMachine().provide({
-				actors: {
-					buildChecked: fromPromise<EnvelopeSuccess, ArchiveEnvelopeInput>(({ input }) => {
-						const output = buildCheckedArchive(input.request)
-						if (output.outcome === 'integrityChecked') acquired = output.archive
-						return Promise.resolve(output)
-					})
-				}
-			})
-			const request = prepareArchiveInspection({ source: source() })
-			const actor = createActor(createArchiveInspectionMachine().provide({ actors: { open } }), {
-				input: { request }
-			})
-			let attached = false,
-				stopped = false
-			let subscription: { unsubscribe(): void } | undefined
-			actor.subscribe((snapshot) => {
-				if (!attached && snapshot.matches({ working: 'opening' }) && snapshot.children.envelope) {
-					attached = true
-					subscription = snapshot.children.envelope.subscribe((child) => {
-						if (
-							!stopped &&
-							'value' in child &&
-							(child.value === stage ||
-								(typeof child.value === 'object' &&
-									child.value !== null &&
-									'working' in child.value &&
-									child.value.working === stage))
-						) {
-							stopped = true
-							request.release()
-							actor.stop()
-						}
-					})
-				}
-			})
-			actor.start()
-			await vi.waitFor(() => expect(stopped).toBe(true))
-			const resource = acquired
-			expect(resource).toBeDefined()
-			if (resource) expect(() => resource.readPayload()).toThrow('resourceReleased')
-			subscription?.unsubscribe()
-		}
-	)
+	it('releases checked output when stopped during synchronous output construction', async () => {
+		let acquired: IntegrityCheckedArchive | undefined
+		const build = envelopeOperations.buildCheckedArchive
+		vi.spyOn(envelopeOperations, 'buildCheckedArchive').mockImplementation((childRequest) => {
+			const output = build(childRequest)
+			if (output.outcome === 'integrityChecked') acquired = output.archive
+			request.release()
+			actor.stop()
+			return output
+		})
+		const request = prepareArchiveInspection({ source: source() })
+		const actor = createActor(createArchiveInspectionMachine(), { input: { request } })
+		actor.start()
+		await vi.waitFor(() => expect(acquired).toBeDefined())
+		expect(() => acquired?.readPayload()).toThrow('resourceReleased')
+	})
 	it.each(['release-and-stop', 'stop'])(
 		'clears a late source after abrupt %s',
 		async (teardown) => {

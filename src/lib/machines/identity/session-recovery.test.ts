@@ -70,7 +70,15 @@ function fixture(crash: 'before' | 'after' | 'none' = 'none', request?: Recovery
 						readHref: () => '/from',
 						navigate
 					},
-					onDone: { target: 'done', actions: assign({ result: ({ event }) => event.output }) },
+					onDone: {
+						target: 'done',
+						actions: [
+							() => {
+								calls.push('parent-done')
+							},
+							assign({ result: ({ event }) => event.output })
+						]
+					},
 					onError: {
 						target: 'failed',
 						actions: [
@@ -107,9 +115,12 @@ describe('recovery coordinator failure cleanup', () => {
 		const f = fixture('before')
 		f.actor.start()
 		const done = await f.done()
-		expect(done.context.result).toBeUndefined()
-		expect(done.context.error).toEqual(new Error('Restoration child failed'))
-		expect(f.calls).toEqual(['invalidate', 'parent-error'])
+		expect(done.context.result).toEqual({
+			outcome: 'restorationChildFailed',
+			mutation: 'notStarted'
+		})
+		expect(done.context.error).toBeUndefined()
+		expect(f.calls).toEqual(['invalidate', 'parent-done'])
 		expect(f.capability.restoreIdentity).not.toHaveBeenCalled()
 		expect(f.navigate).not.toHaveBeenCalled()
 	})
@@ -124,10 +135,13 @@ describe('recovery coordinator failure cleanup', () => {
 			if (closing) coordinator.send({ type: 'SHUTDOWN' })
 			f.restore.resolve()
 			const done = await f.done()
-			expect(f.calls).toEqual(['invalidate', 'parent-error'])
-			expect(done.context.result).toBeUndefined()
-			expect(done.context.error).toEqual(new Error('Restoration child failed'))
-			expect(coordinator.getSnapshot().status).toBe('error')
+			expect(f.calls).toEqual(['invalidate', 'parent-done'])
+			expect(done.context.result).toEqual({
+				outcome: 'restorationChildFailed',
+				mutation: 'unknown'
+			})
+			expect(done.context.error).toBeUndefined()
+			expect(coordinator.getSnapshot().status).toBe('done')
 			expect(coordinator.getSnapshot().context.request).toBeUndefined()
 			expect(coordinator.getSnapshot().context.restorationBinding).toBeUndefined()
 			expect(JSON.stringify(coordinator.getSnapshot().context.result)).not.toContain('private')

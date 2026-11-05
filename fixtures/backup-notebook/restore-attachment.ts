@@ -1,4 +1,9 @@
-import type { RestoreStepWriter } from 'delightful-local-first/backup/restore/batch'
+import type { Snapshot } from 'xstate'
+import type {
+	RestoreTransactionWriter,
+	RestoreDestinationLogic,
+	RestoreDestinationResult
+} from 'delightful-local-first/backup/restore'
 import { createNotebookRestoreContinuationMachine } from './restore-continuation.js'
 import {
 	notebookCurrentStepIsAttachment,
@@ -17,10 +22,15 @@ export type NotebookAttachmentResult =
 export function prepareNotebookAttachmentRestore(options: Omit<NotebookRestoreOptions, 'mode'>) {
 	return prepareNotebookRestore({ ...options, mode: 'resume' })
 }
-export function createNotebookRestoreAttachmentMachine<Transaction, Write>(
-	writer: RestoreStepWriter<Transaction, Write>
+export function createNotebookRestoreAttachmentMachine<
+	Transaction,
+	Write,
+	S extends Snapshot<RestoreDestinationResult>
+>(
+	writer: RestoreTransactionWriter<Transaction, Write>,
+	destination: RestoreDestinationLogic<Transaction, S>
 ) {
-	return createNotebookRestoreContinuationMachine(writer, {
+	return createNotebookRestoreContinuationMachine(writer, destination, {
 		currentStep: notebookCurrentStepIsAttachment,
 		prepareExpected: prepareNotebookAttachmentBytes,
 		writeId: (input) => required(notebookRestoreData(input).attachment).writeId,
