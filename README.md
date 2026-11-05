@@ -300,24 +300,23 @@ Native multiline editing, attributes, and callbacks pass through. `bind:value` i
 
 The native control submits its value only when checked and enabled. `bind:checked` is optional; `defaultChecked` supplies initial/reset state. The clickable label and native checkbox use green accent and explicit focus styling.
 
-## RadioGroup
+## RadioGroup and RadioItem
 
 ```svelte
-<RadioGroup
-	label="View"
-	name="view"
-	defaultValue="week"
-	options={[
-		{ label: 'Day', value: 'day' },
-		{ label: 'Week', value: 'week' },
-		{ label: 'Month', value: 'month', disabled: true }
-	]}
-/>
+<RadioGroup label="View" name="view" defaultValue="week">
+	<RadioItem value="day">Day</RadioItem>
+	<RadioItem value="week">Week</RadioItem>
+	<RadioItem value="month" disabled>Month</RadioItem>
+</RadioGroup>
 ```
 
-Connected, square-cornered radio buttons inspired by [Ant Design's radio buttons](https://ant.design/components/radio/). The selected option uses the theme accent and an inset underline. A native fieldset/legend names the group; each button is a labelled native radio input with browser keyboard navigation, focus, validation, and form submission. Options wrap on narrow screens. Supply unique string values and caller-owned labels. `bind:value` is optional; `defaultValue` supplies the initial selection and the selection restored by form reset. An explicit `value` takes precedence over `defaultValue`. Without either, the group starts unselected; assigning `undefined` clears a bound selection.
+Compose square-cornered radio buttons inspired by [Ant Design's radio buttons](https://ant.design/components/radio/) from two public components. `RadioGroup` supplies the native fieldset/legend, shared name, selection, validation, and reset behavior. `RadioItem` renders a labelled native radio with button styling; its children supply text or non-interactive rich content. Place items directly in the group, render them with an each block, or compose them through application components and layout wrappers. Items inherit the nearest group's state through Svelte context and must be rendered within a `RadioGroup`. Use unique string values within each group, and keep interactive controls outside item labels.
 
-`required` uses native radio-group validation. `disabled` disables the whole group; an option's `disabled` disables just that choice. Only an enabled selection is submitted. Supply `name` for a stable form-data key; omitted names are generated per instance so groups remain independent. `form` associates every radio with an external form. Native fieldset attributes, class, style, and events pass through; `onchange` receives the native input event. Customize `--dui-radio-background-color`, `--dui-radio-color`, `--dui-radio-border-color`, `--dui-radio-selected-background-color`, `--dui-radio-selected-color`, `--dui-radio-focus-color`, `--dui-radio-padding`, `--dui-radio-min-height` (44px), and `--dui-radio-disabled-opacity` (0.5). Typography, label spacing, and border width use shared field/input and theme tokens.
+The default layout connects items and wraps on narrow screens. The selected item uses the theme accent and an inset underline. For a custom layout, place a grid or flex wrapper inside the group and set `--dui-radio-border-overlap: 0px` on it to give each item its own border. Item `class` and `style` apply to the label wrapper so apps can control placement; other native input attributes and callbacks pass through, including `id`, `aria-label`, and `aria-describedby`.
+
+Group `bind:value` is optional; `defaultValue` supplies the initial selection and the selection restored by form reset. An explicit `value` takes precedence over `defaultValue`. Without either, the group starts unselected; assigning `undefined` clears a bound selection. Native keyboard navigation, focus, validation, and form submission are preserved. `required` uses native radio-group validation. Group `disabled` disables every item; item `disabled` disables just that choice. Only an enabled selection is submitted. Supply group `name` for a stable form-data key; omitted names are generated per instance so groups remain independent. Group `form` associates every item with an external form. Native fieldset attributes, class, style, and events pass through; group and item `onchange` callbacks receive the native input event after selection updates.
+
+Customize `--dui-radio-background-color`, `--dui-radio-color`, `--dui-radio-border-color`, `--dui-radio-selected-background-color`, `--dui-radio-selected-color`, `--dui-radio-focus-color`, `--dui-radio-padding`, `--dui-radio-min-height` (44px), and `--dui-radio-disabled-opacity` (0.5). Typography, label spacing, and border width use shared field/input and theme tokens. `RadioItem` owns the item tokens; `RadioGroup` owns `--dui-radio-border-overlap` (defaults to the shared border width).
 
 ## Typography and Button styling
 
@@ -624,7 +623,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, RadioGroup, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, RadioGroup, RadioItem, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 

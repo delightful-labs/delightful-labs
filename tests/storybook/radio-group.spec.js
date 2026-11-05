@@ -130,6 +130,47 @@ test('generated names keep separate groups independent', async ({ page }) => {
 	).toBeChecked()
 })
 
+test('app wrappers, rich item content and conditional items share group state', async ({
+	page
+}) => {
+	await openStory(page, 'custom-composition')
+	const group = page.getByRole('group', { name: 'Plan', exact: true })
+	const personal = group.getByRole('radio', {
+		name: 'Personal For everyday projects'
+	})
+	const business = group.getByRole('radio', {
+		name: 'Business For larger projects'
+	})
+	await expect(personal).toBeChecked()
+	await expect(personal).toHaveAccessibleDescription('Includes one workspace.')
+	await business.check()
+	await expect(personal).not.toBeChecked()
+	await expect(page.getByRole('status', { name: 'Selected plan' })).toHaveText(
+		'business'
+	)
+	await expect(page.getByRole('status', { name: 'Changed item' })).toHaveText(
+		'business'
+	)
+	await page.getByRole('button', { name: 'Submit', exact: true }).click()
+	await expect(page.locator('pre[aria-live="polite"]')).toHaveText(
+		'[["plan","business"]]'
+	)
+	await page.getByRole('button', { name: 'Toggle team option' }).click()
+	const team = group.getByRole('radio', { name: 'Team For shared projects' })
+	await expect(team).toBeVisible()
+	await business.focus()
+	await business.press('ArrowRight')
+	await expect(team).toBeFocused()
+	await expect(team).toBeChecked()
+	await expect(page.getByRole('status', { name: 'Selected plan' })).toHaveText(
+		'team'
+	)
+	await personal.check()
+	await page.getByRole('button', { name: 'Toggle team option' }).click()
+	await expect(team).toHaveCount(0)
+	await expect(personal).toBeChecked()
+})
+
 test('disabled groups retain selection and prevent interaction', async ({
 	page
 }) => {

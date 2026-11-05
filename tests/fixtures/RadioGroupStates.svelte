@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { RadioGroup, Button, Checkbox } from '#lib'
+	import { RadioGroup, RadioItem, Button, Checkbox } from '#lib'
 
 	let selected = $state<string | undefined>('month')
 	let defaultValue = $state<string | undefined>('week')
@@ -30,15 +30,14 @@
 	{defaultValue}
 	{disabled}
 	bind:value={selected}
-	options={[
-		{ label: 'Day', value: 'day' },
-		{ label: 'Week', value: 'week' },
-		{ label: 'Month', value: 'month' }
-	]}
 	onchange={(event) => {
 		changed = `${event.currentTarget.name}:${event.currentTarget.value}`
 	}}
-/>
+>
+	<RadioItem value="day">Day</RadioItem>
+	<RadioItem value="week">Week</RadioItem>
+	<RadioItem value="month">Month</RadioItem>
+</RadioGroup>
 <Checkbox label="Cancel reset" bind:checked={cancelReset} />
 <Button onclick={() => (disabled = !disabled)}>Toggle disabled</Button>
 <Button onclick={() => (defaultValue = undefined)}>Remove default</Button>
