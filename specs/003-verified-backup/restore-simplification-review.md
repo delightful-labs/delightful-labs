@@ -17,7 +17,7 @@ Initial source findings to measure:
 
 - The byte-budget and string schemas allocate a new UTF-8 array for each key/string, repeatedly.
   Counting bytes does not require materializing encoded arrays. Encoding actual output still does.
-- Notebook graph remapping searches all mappings and repeatedly canonicalizes the same identity
+- Test app graph remapping searches all mappings and repeatedly canonicalizes the same identity
   tuples. Batch projection then searches projected arrays again. Indexing those immutable inputs
   can replace nested scans without a new cache/lifecycle or changing the projection.
 - Every selected write rebuilds a proposed initial journal from the complete intent, acquires a
@@ -89,8 +89,8 @@ not permission to replay. The native backend/policy boundary and archive limits 
 | Archive and journal bounds/schemas | Use [allocation-free byte counting](../../src/lib/backup/utf8.ts) in budget/schema/canonical-output counts. Actual serialization still encodes and checks complete wire length. Well-formed UTF-16 validation remains independent.                          |
 | Journal codec/storage/successors   | Remove the private codec split and JSON/comparison caches. Keep two weak sets for this codec's detached frozen outputs, complete foreign/byte admission and fresh output bytes. Keep exact intent/record comparisons, receipt evidence, CAS and durability. |
 | Shared restore/write/custody       | Keep existing states and transaction lifetime. Remove the worker capability propagation/IPC branch entirely. No new orchestration, replay rule or authority shortcut.                                                                                       |
-| Notebook planning/remapping        | Index immutable tuples/projected rows instead of nested scans; preserve exact fast-plan canonical bytes and dependency order.                                                                                                                               |
-| Notebook note destination          | Use the existing chart for up to 32 notes targeting 64 KiB canonical content, with exact selected-ID queries, full group/parent/scope matching and synchronous staging in one borrowed transaction.                                                         |
+| Test app planning/remapping        | Index immutable tuples/projected rows instead of nested scans; preserve exact fast-plan canonical bytes and dependency order.                                                                                                                               |
+| Test app note destination          | Use the existing chart for up to 32 notes targeting 64 KiB canonical content, with exact selected-ID queries, full group/parent/scope matching and synchronous staging in one borrowed transaction.                                                         |
 | Comparison/activation/cleanup      | Preserve complete fresh graph/attachment comparison, transactional activation gate and local/remote observations; clear the private note array through existing resource ownership.                                                                         |
 | Recovery compatibility             | Use the same fast plan everywhere with a fixed saved version 2. Reject older/unknown saved formats before writes; no batching selector or legacy continuation mode.                                                                                         |
 
@@ -135,7 +135,7 @@ are untouched.
   rollback, cancellation/drain during staging, partial-presence conflict, and multiple groups with
   three distinct attachments plus null references. Reload preserves exact data and issues no
   duplicate writes. The current log is `.svelte-kit/restore-review/single-plan-native.log`.
-- **17 independent-reader and 18 notebook-export cases pass**, plus the complete package-consumer
+- **17 independent-reader and 18 test app-export cases pass**, plus the complete package-consumer
   type/runtime/bundle checks. This includes strict network-disabled independent inspection and
   original data/file preservation. Current log: `single-plan-consumer.log` under the same ignored
   review folder.
@@ -159,7 +159,7 @@ T007 inventory remains complete; T008 Finance capture/profile, T009 isolated dom
 T010 actual retained-file recovery remain separate work. Nothing is needed from the user to
 complete this local investigation. It does not claim completion of those consumer adoption tasks.
 
-The post-review CI correction makes root unit tests resolve notebook package imports from source,
+The post-review CI correction makes root unit tests resolve test app package imports from source,
 so they pass before packaging even with `dist` absent. The complete GitHub CI and title checks
 passed on `d7b5317`. The subsequent user-requested single-plan simplification reruns all 948 units,
 69 native restore cases, consumer/static checks and one 633-record measurement. This follow-up

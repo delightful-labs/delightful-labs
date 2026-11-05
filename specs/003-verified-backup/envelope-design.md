@@ -177,10 +177,10 @@ one revocation report, with a bounded subscriber so future regressions fail with
 After the fix, the focused envelope/inspection/export unit run passes all 134 cases. This includes
 independent Node crypto interoperability, native failure sanitization, pending-native cancellation,
 late-result disposal, output retention, snapshot secrecy and interruption at existing meaningful
-stages. The standalone built public envelope consumer passes. All 13 notebook/public-package
+stages. The standalone built public envelope consumer passes. All 13 test app/public-package
 integration cases pass, including retained-file inspection in a separate reader process. Freshly
-built envelope/notebook public-export bundles pass all four focused Chromium cases: envelope
-crypto/integrity without an app session, plain and password notebook downloads/content inspection,
+built envelope/test app public-export bundles pass all four focused Chromium cases: envelope
+crypto/integrity without an app session, plain and password test app downloads/content inspection,
 and invalidation/drain/stale binding handling. Playwright owned a temporary preview on port 6014;
 the sandbox initially blocked the listen call, and the approved rerun passed.
 

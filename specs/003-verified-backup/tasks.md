@@ -1,23 +1,23 @@
 # Verified backup implementation tasks
 
-Implementation began after PR #15. The user subsequently authorized the combined notebook
+Implementation began after PR #15. The user subsequently authorized the combined test app
 completion, tests and experiments in PR #26, then the repository-wide routing cleanup. That
 combined authorization does not authorize Finance deployment or identity/storage changes.
 
 ## Current handoff
 
 **Updated 2026-11-05.** PRs #23–#26 are merged. [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
-implements complete notebook restore and native actor routing.
-The notebook root coordinates the retained plan, all mapped writes, fresh exact-content comparison,
+implements complete test app restore and native actor routing.
+The test app root coordinates the retained plan, all mapped writes, fresh exact-content comparison,
 activation and same-browser resume. Shared actors own journal/lock/transaction settlement and drain.
 No Finance data, production configuration or dependency versions changed.
 
 Final implementation qualification: **1,097 functional cases** — 927 units, 17 independent-reader,
-18 notebook-export, 60 native Jazz/Chromium restore, 65 Storybook browser and 10 native private-creation
+18 test app-export, 60 native Jazz/Chromium restore, 65 Storybook browser and 10 native private-creation
 cases — plus strict static/package/consumer checks. GitHub CI passed on `d69fe4c`. Three separate
 1/4/8 MiB desktop experiments establish a bounded baseline, not mobile or deployed-Finance support.
 See [restore evidence](restore-completion-design.md), [routing audit](native-event-routing-review.md)
-and [performance report](notebook-performance.md). Earlier slice notes live in
+and [performance report](test-app-performance.md). Earlier slice notes live in
 [handoff history](handoff-history.md).
 
 The user authorized a broader implementation review and all necessary tests while away. The
@@ -40,7 +40,7 @@ no tracked pending writes were observed in the existing browser. The comparison 
 
 1. Use the [T007 inventory](finance-deployment-inventory.md) for **T004** consumer/platform
    qualification. The [simplification review](restore-simplification-review.md) resolves the
-   synthetic notebook's multi-minute record restore through bounded consumer transactions.
+   synthetic test app's multi-minute record restore through bounded consumer transactions.
    T004 stays open: qualify actual Finance capture/interaction after T008 and domain restore after
    T009, plus supported platforms and memory limits. Synthetic count/size matching is not Finance
    recovery evidence. The 1/4/8 MiB binary workload remains a separate responsiveness concern.
@@ -52,15 +52,15 @@ no tracked pending writes were observed in the existing browser. The comparison 
    fresh isolated destination/session and preserve the original before identity/storage changes.
 
 **T014** is a separate explicit retry integration follow-up. It is not an automatic retry engine
-or a prerequisite to recognizing the already qualified conservative notebook path.
+or a prerequisite to recognizing the already qualified conservative test app path.
 
-## Completed shared, notebook and inventory work
+## Completed shared, test app and inventory work
 
 - [x] **T001:** bounded portable archive codec, strict schemas, canonical values and graph validation.
 - [x] **T002:** archive corruption, bounds, exactness and public-package qualification.
 - [x] **T003:** plaintext integrity and password envelope, native crypto, immutable releasable resources.
 - [x] **T005:** independent retained-file inspector; generic integrity/profile outcomes remain distinct.
-- [x] **T006:** shared capture/export and complete notebook restore: isolated destination, retained
+- [x] **T006:** shared capture/export and complete test app restore: isolated destination, retained
       mappings, all attachments/notebook/notes, fresh exact fields/references/bytes/set comparison,
       activation, reload/resume and uncertain-activation reconciliation without duplicate replay.
 - [x] **T012:** concrete versioned Zod restore journal, bounded attempts/receipts, CAS and durable
@@ -88,7 +88,7 @@ or a prerequisite to recognizing the already qualified conservative notebook pat
       performance bottleneck for this synthetic workload. Archive limits remain unchanged. Actual
       Finance profile/interaction measurements depend on T008, and staged domain restore on T009.
       Consumer implementation can proceed on disposable data while T004 stays a readiness gate;
-      desktop/throttled notebook results do not qualify phones or actual Finance recovery.
+      desktop/throttled test app results do not qualify phones or actual Finance recovery.
 - [ ] **T008:** implement Finance's allowlisted capture/profile and consumer-owned backup interaction
       against its existing Jazz alpha.59 setup, including owner authority, quiescent/drained capture,
       exact complete attachment bytes, local/remote comparison and disposable-data qualification.
@@ -97,7 +97,7 @@ or a prerequisite to recognizing the already qualified conservative notebook pat
       restart and uncertain outcomes on disposable data before proposing deployment.
 - [ ] **T010:** demonstrate retained-file independent validation, isolated full restore, fresh-session
       exact comparison and original preservation from the actual deployed workspace before changing
-      deployed identity or storage. Never treat a download or notebook fixture as that evidence.
+      deployed identity or storage. Never treat a download or test app fixture as that evidence.
 - [ ] **T014:** integrate an explicit same-operation retry after a confirmed remote rejection and
       corrected authority, as accepted in [the spec](spec.md#accepted-retry-behavior--2026-11-03).
       The journal already represents a new attempt and bounded prior rejection. The current write
@@ -108,7 +108,7 @@ or a prerequisite to recognizing the already qualified conservative notebook pat
 
 ## Qualification boundary
 
-The notebook source is an in-memory actor; destination/policy checks use actual Jazz. Recovery is
+The test app source is an in-memory actor; destination/policy checks use actual Jazz. Recovery is
 qualified for the same browser/origin with retained IndexedDB and a reselected matching archive,
 including page reload/fresh session. Browser-process crash, cleared journal, offline restart and
 cross-device/browser recovery are not qualified product claims. Additional platform guarantees need

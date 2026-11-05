@@ -6,9 +6,9 @@ test('public journal reuse keeps encoded buffers independent and revalidates for
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const result = await page.evaluate((wire) => {
-		const api = window.DLFNotebook
+		const api = window.DLFTestApp
 		const record = api.parseRestoreJournalRecord(wire)
 		const first = api.encodeRestoreJournalRecord(record)
 		const expected = first.slice()
@@ -55,9 +55,9 @@ test('public journal codec preserves unknown-write facts and rejects malformed w
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const result = await page.evaluate((wire) => {
-		const api = window.DLFNotebook,
+		const api = window.DLFTestApp,
 			utf8 = new TextEncoder()
 		const record = api.decodeRestoreJournalRecord(utf8.encode(JSON.stringify(wire)))
 		const pending = api.parseRestoreJournalRecord({
@@ -118,11 +118,11 @@ test('browser journal resumes after reload and atomically rejects stale revision
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const databaseName = `dlf-journal-review-${crypto.randomUUID()}`
 	const result = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook
+			const api = window.DLFTestApp
 			const initial = api.parseRestoreJournalRecord(wire)
 			const binding = {
 				applicationId: initial.intent.operation.applicationId,
@@ -193,10 +193,10 @@ test('browser journal resumes after reload and atomically rejects stale revision
 		privateSnapshot: true
 	})
 	await page.reload()
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const resumed = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook,
+			const api = window.DLFTestApp,
 				initial = api.parseRestoreJournalRecord(wire)
 			const request = api.prepareBrowserRestoreJournal({
 				databaseName,
@@ -248,10 +248,10 @@ test('browser journal resumes after reload and atomically rejects stale revision
 for (const stage of ['staging', 'committing']) {
 	test(`cancellation during ${stage} retains native commit facts`, async ({ page }) => {
 		await page.goto('/')
-		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 		const result = await page.evaluate(
 			async ({ wire, stage }) => {
-				const api = window.DLFNotebook,
+				const api = window.DLFTestApp,
 					initial = api.parseRestoreJournalRecord(wire)
 				const databaseName = `dlf-journal-cancel-${crypto.randomUUID()}`
 				const binding = {
@@ -320,9 +320,9 @@ for (const stage of ['staging', 'committing']) {
 
 test('missing storage is not recreated and malformed rows are preserved', async ({ page }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const result = await page.evaluate(async (wire) => {
-		const api = window.DLFNotebook,
+		const api = window.DLFTestApp,
 			initial = api.parseRestoreJournalRecord(wire)
 		const databaseName = `dlf-journal-invalid-${crypto.randomUUID()}`
 		const binding = {
@@ -406,11 +406,11 @@ test('native journal CAS retains a rejected retry and content-match completion a
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const databaseName = `dlf-journal-attempt-${crypto.randomUUID()}`
 	const result = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook,
+			const api = window.DLFTestApp,
 				initial = api.parseRestoreJournalRecord(wire),
 				scope = initial.intent.operation
 			const binding = {
@@ -537,10 +537,10 @@ test('native journal CAS retains a rejected retry and content-match completion a
 	])
 	expect(result.settlement).toBe('committed')
 	await page.reload()
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const resumed = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook,
+			const api = window.DLFTestApp,
 				initial = api.parseRestoreJournalRecord(wire),
 				scope = initial.intent.operation
 			const request = api.prepareBrowserRestoreJournal({
@@ -598,9 +598,9 @@ test('only explicit initialization creates schema, synchronously within the upgr
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const result = await page.evaluate(async (wire) => {
-		const api = window.DLFNotebook,
+		const api = window.DLFTestApp,
 			record = api.parseRestoreJournalRecord(wire),
 			scope = record.intent.operation
 		const binding = {
@@ -694,10 +694,10 @@ for (const interruption of ['CANCEL', 'SHUTDOWN', 'release', 'stop', 'creationFa
 		page
 	}) => {
 		await page.goto('/')
-		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 		const result = await page.evaluate(
 			async ({ wire, interruption }) => {
-				const api = window.DLFNotebook,
+				const api = window.DLFTestApp,
 					record = api.parseRestoreJournalRecord(wire),
 					scope = record.intent.operation
 				const databaseName = `dlf-upgrade-interrupt-${crypto.randomUUID()}`
@@ -793,10 +793,10 @@ for (const version of [1, 2]) {
 		page
 	}) => {
 		await page.goto('/')
-		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 		const result = await page.evaluate(
 			async ({ wire, version }) => {
-				const api = window.DLFNotebook,
+				const api = window.DLFTestApp,
 					record = api.parseRestoreJournalRecord(wire),
 					scope = record.intent.operation
 				const databaseName = `dlf-upgrade-existing-${crypto.randomUUID()}`

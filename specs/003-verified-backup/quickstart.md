@@ -1,6 +1,6 @@
 # Validation and recovery rehearsal guide
 
-**Updated 2026-11-05.** The shared archive, inspector and complete notebook reference are executable
+**Updated 2026-11-05.** The shared archive, inspector and complete test app reference are executable
 and qualified. Finance capture/restore and an actual deployed-data rehearsal remain unimplemented.
 Use [the task ledger](tasks.md#current-handoff) for current work and
 [the qualification boundary](spec.md#known-restore-limitations-and-remaining-implementation-gates)
@@ -21,29 +21,29 @@ pnpm test:storybook
 ```
 
 `verify` builds the public package, checks consumers, runs 927 units, 17 independent-reader cases
-and 18 notebook-export cases, and builds Storybook. The native/browser commands add 10 private-creation,
+and 18 test app-export cases, and builds Storybook. The native/browser commands add 10 private-creation,
 60 restore and 65 Storybook cases, for 1,097 functional cases. Jazz/Chromium fixtures create disposable
 local servers and browser contexts; the restore harness uses `127.0.0.1:6199` and Storybook uses
 `127.0.0.1:6008`. Do not run tests against the user's app/origin or an auto-publishing production server.
 
-The user authorized the implemented notebook work and its tests together. Future implementation
+The user authorized the implemented test app work and its tests together. Future implementation
 still follows repository review gates unless separately authorized. For documentation-only edits,
 `pnpm format:check` and link/status consistency checks are sufficient; formatting is not backup proof.
 
-## Notebook retained-file round trip
+## Test app retained-file round trip
 
 The fixture uses the real public export/envelope/journal/write APIs, an in-memory source actor and
 an actual Jazz destination with storage policies. Its native suite exercises retained export →
 network-disabled independent inspection → isolated restore → fresh-session exact comparison,
 original source/file preservation, interruption/reload/resume and uncertain activation without replay.
 
-`fixtures/backup-notebook/restore-workflow.ts` exposes an unstarted
-`createNotebookRestore({ db, retainDetached, mode, binding, databaseName, archive })` root and request.
+`fixtures/test-app/restore-workflow.ts` exposes an unstarted
+`createTestAppRestore({ db, retainDetached, mode, binding, databaseName, archive })` root and request.
 The caller supplies an integrity-checked archive and owns session lifetime/detached transaction custody.
 `new` initializes and journals one plan; `resume` requires the same operation/destination, retained
 browser journal, reselected matching file/password and a fresh live generation. Await drain before
 stopping actors or changing identity. Only finite `complete` reports verified activation.
-See [the notebook guide](../../fixtures/backup-notebook/README.md) for the integration contract.
+See [the test app guide](../../fixtures/test-app/README.md) for the integration contract.
 
 No full-restore CLI, generic backup dialog or Finance backup route is supplied by this fixture.
 Ordinary discovery must exclude incomplete destinations. Server policy enforces owner/scope/phase;
@@ -62,7 +62,7 @@ require `--password-stdin` and the exact UTF-8 password through stdin; do not pu
 arguments or logs. See [reader usage, exit codes and bounds](../../fixtures/backup-reader/README.md).
 Generic integrity, recognized-profile validation and verified destination recovery are separate
 outcomes. An unknown profile is not a recognized-profile success. Fixture tests explicitly register
-the notebook validator; archives cannot register or load executable validators.
+the test app validator; archives cannot register or load executable validators.
 
 ## Optional desktop size experiments
 
@@ -74,12 +74,12 @@ pnpm measure:backup-records
 Run after package/consumer compilation has finished, with no overlapping native restore harness on
 port 6199. The three optional 1/4/8 MiB cases measure encrypted export/open/full restore, sampled heap,
 renderer RSS and event-loop delay. They are separate from the normal functional command and have no
-CI timing thresholds. See [measured results and limits](notebook-performance.md). T007's
+CI timing thresholds. See [measured results and limits](test-app-performance.md). T007's
 [Finance inventory](finance-deployment-inventory.md) records 633 projected records, about 0.64 MiB
 of comparison encoding and no reachable attachments. Actual profile/envelope size and platform
 responsiveness still need T008/T004 qualification; the desktop run does not qualify phones.
 
-The opt-in record command runs three desktop 633-record/672,633-byte synthetic notebook cases and
+The opt-in record command runs three desktop 633-record/672,633-byte synthetic test app cases and
 one Chrome 4× CPU stress case. The final implementation uses bounded note transactions; the earlier
 single-record baseline took several minutes. Each case has a finite ten-minute runner deadline.
 No Finance data is copied. Ordinary functional runs skip these diagnostics.
@@ -90,7 +90,7 @@ fresh disposable authority. Do not overlap builds or other browser measurements.
 
 ```sh
 DLF_BACKUP_RECORD_MEASURE=1 DLF_BACKUP_REVIEW_LABEL=my-run-1 pnpm exec vitest run \
-  --config fixtures/backup-notebook/restore.vitest.config.ts \
+  --config fixtures/test-app/restore.vitest.config.ts \
   -t 'measures record workload 633, CPU 1x, run 1' --disableConsoleIntercept
 ```
 
@@ -99,13 +99,13 @@ label. Review-only diagnostics also accept `DLF_BACKUP_REVIEW_RECORDS=128` and
 `DLF_BACKUP_REVIEW_TRACE=1`; traces aggregate actor lifetimes, not private data or exclusive CPU
 time. The defaults are 633 records and no tracing. All restore entry points use bounded notes;
 there is no alternate batching mode.
-Raw files use `.svelte-kit/notebook-performance-review-<label>-records-633-cpu1-run1.json`.
+Raw files use `.svelte-kit/test-app-performance-review-<label>-records-633-cpu1-run1.json`.
 
 The [current review](restore-simplification-review.md) and
 [performance report](record-performance.md#simplification-review) document exact results, recovery
 checks and memory/sampling limits. The earlier [worker experiment](journal-worker-design.md) is
 retired: the package worker entrypoint, host and `DLF_BACKUP_JOURNAL_COMPARE` option no longer exist.
-Historical worker/reuse measurements are preserved. Notebook restores use one plan with fixed
+Historical worker/reuse measurements are preserved. Test app restores use one plan with fixed
 saved version 2; resume rejects older/unknown versions without changing the journal or destination.
 
 ## Finance adoption and actual recovery rehearsal

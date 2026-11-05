@@ -19,13 +19,13 @@ This supersedes the following awaiting-review/runtime-pending notes for this loc
 push or propagation to #24/#25; full comparison/activation and Finance adoption remain open.
 
 **PR #23 attachment destination machine prepared for review.** Following the user's request,
-createNotebookAttachmentWriter now returns a real finite statechart. Guards own scope/mapping,
+createTestAppAttachmentWriter now returns a real finite statechart. Guards own scope/mapping,
 identity, observed control and exact content decisions; SDK read/insert leaves do not select the
 workflow. The shared write actor invokes this destination actor, forwards interruption and retains
 journal/transaction/settlement/rollback/lock ownership. A borrowed tracked transaction port preserves
 native custody; observations remain private and are cleared on completion, stop or owner error.
 Native transaction leaves are reused directly rather than constructing a preparation writer.
-See [actor design and review](restore-attachment-actor-review.md). Root/package/notebook/public
+See [actor design and review](restore-attachment-actor-review.md). Root/package/test app/public
 consumer static checks pass. No tests run, no commit/push and no stack propagation for this correction;
 the prior 924-unit/14-browser cleanup evidence does not qualify this changed actor tree.
 
@@ -59,12 +59,12 @@ Fresh full-graph/relationship/attachment-byte comparison and activation are next
 Parent PR #24's bounded large-file harness correction is independently green in GitHub CI. No merge
 is authorized. The normal review-before-tests rule remains for later slices unless overridden again.
 
-**PR #24 stacked on PR #23: one notebook-root batch locally qualified.** After implementation
+**PR #24 stacked on PR #23: one test app-root batch locally qualified.** After implementation
 review, the user authorized qualification. All 22 actual Jazz/Chromium cases pass (13 prior regressions
-and nine notebook-root cases), alongside the 924-unit shared suite and package/consumer/static checks. Exact title,
+and nine test app-root cases), alongside the 924-unit shared suite and package/consumer/static checks. Exact title,
 mapped IDs/prefix/reload, no step skipping, conflict, uncertain-write reconciliation, staged-write
-drain/rollback and actual notebook policy denials are covered. See
-[qualification and limits](restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).
+drain/rollback and actual test app policy denials are covered. See
+[qualification and limits](restore-root-design.md#test app-root-qualification--completed-2026-11-04).
 Destinations remain incomplete. Note writers, fresh full comparison and activation remain open.
 The user authorized this stacked PR; no merge is authorized.
 
@@ -74,7 +74,7 @@ preparation/attachment cases, package/consumer and static checks pass. The attac
 file with durable intent, separate local/remote evidence, exact-byte conflict detection and same-browser
 uncertain-write reconciliation without replay. Destinations remain incomplete. See
 [qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
-Notebook/note writers, fresh full comparison and activation remain open. The user subsequently
+Test app/note writers, fresh full comparison and activation remain open. The user subsequently
 authorized committing and pushing this qualified slice for pull-request review.
 
 **Preparation committed; next slice proposed.** The user authorized the local preparation commit
@@ -85,10 +85,10 @@ now passes 14 disposable Chromium cases, informing scalar-byte storage and bound
 Those probes are not attachment-restore implementation tests. Data writers,
 full comparison, activation and Finance adoption remain incomplete.
 
-**New active T006 slice: notebook restore preparation.** PR #22 is merged; work continues on
+**New active T006 slice: test app restore preparation.** PR #22 is merged; work continues on
 `feat/notebook-restore-preparation` from `08f4c38`. The user approved beginning the bounded design.
 See [preparation design and implementation review](restore-preparation-design.md). Shared preparation
-coordination, a write-owner contract, scoped journal discovery and the concrete notebook Jazz control
+coordination, a write-owner contract, scoped journal discovery and the concrete test app Jazz control
 row/writer are implemented and locally qualified after review. All 902 unit cases pass, including
 19 focused preparation cases; eight real Jazz/Chromium cases and all 14 existing native journal
 browser regressions pass. The user approved owner-bound first-write admission; server acceptance
@@ -100,25 +100,25 @@ writes, fresh full-content comparison and activation remain unimplemented; T006/
 Later qualification entries below supersede historical awaiting-review notes only for their covered
 behavior. No unrelated cleanup, Finance adoption, commit or publication is included.
 
-**Current correction awaiting review: notebook finite operations.** Following the user's review,
+**Current correction awaiting review: test app finite operations.** Following the user's review,
 REPLACE/READ now have explicit validation/capture and success/failure states with named single-leaf
 actions. State-specific rejection handlers replace root defaults; the source adapter projects an
 acceptingCommands tag. Synchronous capture/writer contracts and opaque payloads remain intact.
-See [review notes](implementation-notes.md#notebook-finite-operation-correction--awaiting-implementation-review-2026-11-04).
+See [review notes](implementation-notes.md#test app-finite-operation-correction--awaiting-implementation-review-2026-11-04).
 Static checks pass; no new tests added/run before implementation approval. These changes are
 uncommitted/unpushed. Earlier runtime totals below do not qualify this correction.
 
 **Current qualified correction: remaining error/SDK wrappers.** The user continued the final code
 cleanup. Payload error factory/guard replaces its subclass; subscription factories return native
 SDK instances rather than extending SDK classes. Callers, declarations and examples are migrated.
-All 321 distinct focused unit cases, 18 notebook/package cases, 11 reader cases, four Chromium cases,
+All 321 distinct focused unit cases, 18 test app/package cases, 11 reader cases, four Chromium cases,
 package/strict Publint, Svelte consumer bundling and static checks pass. See
 [qualification](implementation-notes.md#final-wrapper-cleanup-qualification-2026-11-04).
 No application-owned class declarations remain in src/fixtures. The original audit's code cleanup
 is addressed; restore-journal validation and full regression/PR checks still remain. These wrapper
 changes are uncommitted; workspace journal correction was committed as 75bee3a. No push/merge.
 
-**Current qualified correction: older workspace journal native disposal.** Notebook cleanup
+**Current qualified correction: older workspace journal native disposal.** Test app cleanup
 committed locally as 8e5efe0 at the user's request. The journal now has a fixed invoked database
 owner and transaction disposal that retains/clears handles across stop and late native delivery.
 Policy and input/result contracts are unchanged; typed native reports are included in the event
@@ -128,30 +128,30 @@ Package/strict Publint and static/declaration/lint/format checks pass. See
 This workspace journal correction is now committed as 75bee3a; no push/merge. Inert error/SDK wrapper cleanup is qualified above;
 the backup restore-journal correction still requires separate review/qualification.
 
-**Current qualified correction: notebook source ownership.** Export/capture correction committed
+**Current qualified correction: test app source ownership.** Export/capture correction committed
 locally as 77b008f at the user's request. The user authorized this next cleanup including tests.
 NotebookSource is removed; the fixture source chart owns initialization, availability, lease
 invalidation, writer exclusion and current-owner release. Four new cases plus existing checks pass:
-18 notebook/package cases, 144 focused backup units, 11 reader cases and four Chromium cases.
+18 test app/package cases, 144 focused backup units, 11 reader cases and four Chromium cases.
 Static/declaration/lint/format checks pass. See
-[qualification](lifecycle-design.md#notebook-source-correction-qualification-2026-11-04).
+[qualification](lifecycle-design.md#test app-source-correction-qualification-2026-11-04).
 This fixture cleanup is now committed locally as 8e5efe0; no push/merge. Older workspace
 journal native disposal is qualified above. Restore-journal correction review/qualification remains separate.
 
 **Current qualified correction: export/capture ownership and explicit cleanup recovery.** The user
 continued from implementation review. All 144 focused envelope/inspection/export unit cases,
-14 notebook/package integration cases, 11 reader cases and four Chromium cases pass. Added four
+14 test app/package integration cases, 11 reader cases and four Chromium cases pass. Added four
 cleanup protocol units and one built-public-package case proving cleanup restores writer access
 without replaying export. Static/package checks pass; no production fixes were needed. See
 [qualification](lifecycle-design.md#export-ownership-correction-qualification-after-implementation-review).
-The explicit cleanup factory replaces request.retryCleanup() as approved. Notebook source ownership
+The explicit cleanup factory replaces request.retryCleanup() as approved. Test app source ownership
 is the next review slice. These export/capture changes are now committed locally as 77b008f; prior corrections are in f50a97c.
 No push/merge. Journal corrections remain separately unqualified.
 
 **Current qualified correction: inspection ownership.** The user continued from implementation
 review. The chart now owns read/header/password routing, envelope drain, profile decisions and
 report transfer. All 140 focused envelope/inspection/export unit cases (including six added
-inspection cases), 11 independent reader cases, 13 notebook/package integration cases and four
+inspection cases), 11 independent reader cases, 13 test app/package integration cases and four
 Chromium cases pass; static/package checks pass. No production fixes were needed in qualification.
 See [qualification](inspector-design.md#ownership-correction-qualification-after-implementation-review).
 No commit/publication. Export/capture is the next owner rewrite. The journal correction still
@@ -160,7 +160,7 @@ awaits its own review/qualification; these focused results do not qualify it.
 **Current qualified correction: envelope ownership.** The user continued from implementation
 review. Chart-owned verification, attachment iteration, crypto/drain and output transfer replace the
 envelope class owner. Runtime checks found/fixed repeated revocation; release is idempotent using
-the existing input reference. All 134 focused envelope/inspection/export unit cases, 13 notebook/
+the existing input reference. All 134 focused envelope/inspection/export unit cases, 13 test app/
 package integration cases, standalone public envelope consumer and four Chromium cases pass.
 Static checks pass. See [qualification](envelope-design.md#ownership-correction-qualification-after-implementation-review).
 No commit/publication. Inspection is now qualified above; export/capture and the
@@ -174,12 +174,12 @@ head `82cc5e4` passed GitHub CI, including unit, package/consumer and browser ch
 on 2026-11-03 as `afc92fd`. See the
 [cleanup evidence](../001-local-first-foundation/cleanup-review.md#regression-qualification-completed).
 
-**Current implementation task: T006.** Shared capture/export and the notebook profile/source are
+**Current implementation task: T006.** Shared capture/export and the test app profile/source are
 implemented and locally verified after the user authorized continuing from implementation review.
 PR #21 merged on 2026-11-03 as `04f3203`; all final-commit GitHub CI checks passed for `06362cf`.
 See the [lifecycle design and qualification evidence](lifecycle-design.md#export-qualification).
 Public export subpaths are `backup/export` and `backup/export/workflow`. New verification includes
-51 export unit cases, 13 notebook/public-package cases (with independent retained-file inspection)
+51 export unit cases, 13 test app/public-package cases (with independent retained-file inspection)
 and three Chromium cases. Tests are included in normal unit, consumer and browser checks.
 
 **Current slice: restore journal identity/model (T012 foundation), reviewed and locally verified.**
@@ -223,7 +223,7 @@ tests were added or run before review. The correction is uncommitted/unpublished
 
 **Broader source audit completed; additional ownership corrections remain.** The
 [cross-slice audit](implementation-notes.md#cross-slice-machine-ownership-audit) records hidden
-lifecycles in envelope, inspection and export owners, notebook fixture lease coordination, an
+lifecycles in envelope, inspection and export owners, test app fixture lease coordination, an
 older workspace-journal abrupt-stop resource concern, and the remaining helper/error/SDK classes.
 It distinguishes those findings from pure functions and native leaves that do not need machines.
 Review/correct one owner at a time; do not treat earlier passing tests as architecture approval.

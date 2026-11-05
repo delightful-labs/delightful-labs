@@ -90,15 +90,15 @@
 				"fixtures/private-creation/policy.test.ts",
 				"fixtures/private-creation/browser.ts",
 				"fixtures/private-creation/restart.test.ts",
-				"fixtures/backup-notebook/restore-schema.ts",
-				"fixtures/backup-notebook/restore-writer.ts",
-				"fixtures/backup-notebook/restore-browser.ts",
-				"fixtures/backup-notebook/restore-browser.test.ts",
-				"fixtures/backup-notebook/restore-attachment-writer.ts",
-				"fixtures/backup-notebook/restore-notebook-writer.ts",
-				"fixtures/backup-notebook/restore-note-writer.ts",
-				"fixtures/backup-notebook/restore-comparison.ts",
-				"fixtures/backup-notebook/restore-workflow.ts"
+				"fixtures/test-app/restore-schema.ts",
+				"fixtures/test-app/restore-writer.ts",
+				"fixtures/test-app/restore-browser.ts",
+				"fixtures/test-app/restore-browser.test.ts",
+				"fixtures/test-app/restore-attachment-writer.ts",
+				"fixtures/test-app/restore-root-writer.ts",
+				"fixtures/test-app/restore-note-writer.ts",
+				"fixtures/test-app/restore-comparison.ts",
+				"fixtures/test-app/restore-workflow.ts"
 			],
 			"rules": {
 				"no-restricted-imports": [

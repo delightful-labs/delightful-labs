@@ -186,7 +186,7 @@ The reviewed production codec required no changes during this verification slice
   All **46 Chromium tests** pass on task-owned preview port 6022, which Playwright shuts down.
 - All **815 unit tests across 31 files** pass, using permitted disposable localhost Jazz listeners
   for the existing backend suites. Package/strict Publint, public consumer/Node runtime and browser
-  bundles, all 11 independent-reader cases, all 13 notebook cases, Storybook build, Svelte/TypeScript,
+  bundles, all 11 independent-reader cases, all 13 test app cases, Storybook build, Svelte/TypeScript,
   Oxlint/Oxfmt and whitespace checks pass.
 
 This qualifies the pure record/codec behavior in the exercised Node/Chromium environments. The
@@ -256,7 +256,7 @@ Final checks pass:
 - All **833 unit tests across 32 files**, including **105 journal cases** (89 existing plus 16 new).
 - All **51 Chromium tests**, including six journal cases, on task-owned preview port 6026.
 - Package build/strict Publint and public consumer checks, including 11 independent reader and
-  13 notebook cases; all public browser bundles rebuilt before Chromium qualification.
+  13 test app cases; all public browser bundles rebuilt before Chromium qualification.
 - Svelte/strict TypeScript, Oxlint, Oxfmt and whitespace checks.
 
 The temporary preview was shut down. No live user database was used and no production code changed

@@ -1,7 +1,7 @@
 # Backup data and lifecycle model
 
 See [archive contract](contracts/archive-v1.md) for exact portable fields and validation. The shared
-journal schema is implemented in `src/lib/backup/restore-journal-schemas.ts`; the complete notebook
+journal schema is implemented in `src/lib/backup/restore-journal-schemas.ts`; the complete test app
 integration and qualification are in [the completion design](restore-completion-design.md).
 Finance-specific schema/policy adoption remains T009.
 
@@ -11,7 +11,7 @@ Finance-specific schema/policy adoption remains T009.
 
 **Restore operation**: consumer-owned durable metadata: operation ID, payload digest, profile ID/version, restoring identity, destination workspace ID, explicit stable mapping entries, expected graph fingerprint and planned write descriptors. The
 implemented checkpoint variants are `writing`, `comparing`, `activating`, `complete` and `conflict`.
-The separate notebook destination row has `incomplete` / `active` status; journal progress and
+The separate test app destination row has `incomplete` / `active` status; journal progress and
 destination visibility are different facts. No password or decoded financial values belong in this journal. Its data has permissions and is not public telemetry.
 
 **Mapping**: source `(record type, ID)` to allocated fresh destination ID. Allocate and durably retain the complete mapping before corresponding writes; never generate replacement IDs after an unknown outcome. Finance source audit and bank provenance remain inert records with mapped references, separate from live memberships or integration tables.

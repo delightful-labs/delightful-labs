@@ -5,7 +5,7 @@
 **Created**: 2026-11-03
 
 **Status (2026-11-05)**: Shared archive/envelope, independent inspection, capture/export and the
-versioned browser restore journal are implemented. The complete notebook reference now writes all
+versioned browser restore journal are implemented. The complete test app reference now writes all
 mapped content, freshly compares exact fields/relationships/attachment bytes and activates the
 isolated destination. Same-browser resume and conservative uncertain-activation recovery are
 qualified. PRs #23–#26 are merged; [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
@@ -15,11 +15,11 @@ The routing review covers all 45 machine-bearing modules.
 T007's [read-only Finance inventory](finance-deployment-inventory.md) is complete: frontend `31f70cb`,
 matching 22-table backend schema/policy head v8, 633 scoped projected records, zero reachable
 attachments and no observed tracked pending writes or projected local/remote differences.
-This establishes inventory and the notebook reference, not Finance production recovery. Remaining
+This establishes inventory and the test app reference, not Finance production recovery. Remaining
 work is consumer/platform performance qualification (T004), Finance adoption/rehearsal (T008–T010),
 and explicit retry integration after confirmed rejection (T014). See
 [the active TODOs](tasks.md#current-handoff), [restore qualification](restore-completion-design.md),
-[routing audit](native-event-routing-review.md) and [desktop measurements](notebook-performance.md).
+[routing audit](native-event-routing-review.md) and [desktop measurements](test-app-performance.md).
 
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
 
@@ -139,11 +139,11 @@ As an application developer, I can use the same backup machinery with another ap
 - Full offline export is not promised when the device lacks required data. Independent file inspection can work offline; remote destination restoration requires its normal connectivity and authorization.
 - Clipper can adopt the generic contract later. This feature does not implement Clipper capture or reader workflows.
 - Encryption password loss makes that encrypted file unrecoverable. Existing identity recovery remains separate.
-- Implementation review and tests follow repository agreements and explicit user authorization. The notebook path is qualified; a retained backup and verified restore of actual deployed Finance data have not been demonstrated.
+- Implementation review and tests follow repository agreements and explicit user authorization. The test app path is qualified; a retained backup and verified restore of actual deployed Finance data have not been demonstrated.
 
 ## Known restore limitations and remaining implementation gates
 
-- **Notebook restore is implemented and qualified.** The reference coordinates the complete retained
+- **Test app restore is implemented and qualified.** The reference coordinates the complete retained
   plan, freshly reads all restored records and actual attachment bytes, compares exact sets/values
   and relationships, journals comparison and activates through the existing transaction owner.
   Active reconciliation compares the graph again; counts and stored digests alone are insufficient.
@@ -160,7 +160,7 @@ As an application developer, I can use the same backup machinery with another ap
   owner, scope, immutable provenance and the incomplete-to-active phase boundary. The trusted client
   owns content verification; the server does not attest that arbitrary owner clients ran it. This is
   not a cross-client serializable graph snapshot guarantee.
-- **Qualification has concrete limits.** Retained-file independent inspection, exact notebook restore,
+- **Qualification has concrete limits.** Retained-file independent inspection, exact test app restore,
   page reload/fresh session, cancellation/drain and uncertain activation without replay are tested.
   Browser-process crash, cleared journal and offline restart are not qualified full-restore claims.
   Journal commit alone proves neither Jazz local persistence nor remote acceptance.
@@ -169,7 +169,7 @@ As an application developer, I can use the same backup machinery with another ap
   maximum aggregate archives or the deployed Finance graph.
 - **Finance inventory T007 is complete; adoption remains T008–T010.** Implement and qualify
   capture/profile and isolated restore, then demonstrate an actual retained-file recovery before
-  identity/storage changes. Shared code and notebook evidence do not fulfill the Finance success
+  identity/storage changes. Shared code and test app evidence do not fulfill the Finance success
   criteria or its consumer-owned interactions.
 
 ### Accepted retry behavior — 2026-11-03
@@ -188,7 +188,7 @@ research. The journal representation is implemented and qualified: current attem
 completion by either a settled transaction receipt or an exact remote content match retaining the
 unchanged attempt evidence. Reconciliation cannot silently satisfy a separately required local
 persistence observation. No generalized retry engine or unbounded attempt history is required.
-The later notebook coordinator/writer authorization is implemented in PR #26. Its explicit
+The later test app coordinator/writer authorization is implemented in PR #26. Its explicit
 permission-repair retry path remains T014; the representation alone is not writer retry qualification.
 
 ### Historical recovery evidence — 2026-11-03
@@ -206,7 +206,7 @@ as an invented acceptance receipt for the original transaction. The focused jour
 represents that completion basis separately, with the exact planned digest and unchanged attempt
 facts. After review approval, 105 journal unit cases and six journal Chromium cases pass (full suites:
 833 unit and 51 Chromium tests). These checks qualify the representation and journal storage, not
-production destination comparison. Later notebook coordinator/writer qualification is recorded in
+production destination comparison. Later test app coordinator/writer qualification is recorded in
 [the completion evidence](restore-completion-design.md); full browser-process restart remains outside it.
 
 See the [reviewed browser journal design](browser-journal-design.md) for implementation evidence.

@@ -15,17 +15,17 @@
 		"check": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc --noEmit --project tsconfig.json",
 		"check:watch": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --watch",
 		"package": "pnpm paraglide && svelte-package --input src/lib --output dist && publint --strict",
-		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/notebook.vite.config.ts && vite build --config tests/fixtures/avatar-selection/vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:backup-notebook",
+		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/test-app.vite.config.ts && vite build --config tests/fixtures/avatar-selection/vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:test-app",
 		"verify": "pnpm format:check && pnpm lint && pnpm check && pnpm test:unit --run && pnpm package && pnpm check:consumer && pnpm build-storybook",
 		"test:unit": "pnpm paraglide && vitest --config vitest.config.ts",
 		"paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --emit-ts-declarations --no-emit-readme --no-emit-prettier-ignore --no-emit-git-ignore",
 		"backup:inspect": "node fixtures/backup-reader/inspect.mjs",
 		"check:backup-reader": "tsc --noEmit --project fixtures/backup-reader/tsconfig.json",
-		"check:backup-notebook": "tsc --project fixtures/backup-notebook/tsconfig.json --noEmit false --rootDir fixtures/backup-notebook --outDir .svelte-kit/backup-notebook && node --test .svelte-kit/backup-notebook/export.test.js",
+		"check:test-app": "tsc --project fixtures/test-app/tsconfig.json --noEmit false --rootDir fixtures/test-app --outDir .svelte-kit/test-app && node --test .svelte-kit/test-app/export.test.js",
 		"test:storybook": "playwright test --config playwright.config.ts",
-		"measure:backup": "DLF_BACKUP_MEASURE=1 vitest run --config fixtures/backup-notebook/restore.vitest.config.ts -t 'measures encrypted'",
-		"measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/backup-notebook/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
-		"check:backup-restore": "tsc --noEmit --project fixtures/backup-notebook/tsconfig.json && vitest run --config fixtures/backup-notebook/restore.vitest.config.ts"
+		"measure:backup": "DLF_BACKUP_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures encrypted'",
+		"measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
+		"check:backup-restore": "tsc --noEmit --project fixtures/test-app/tsconfig.json && vitest run --config fixtures/test-app/restore.vitest.config.ts"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "2.27.0",

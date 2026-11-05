@@ -20,7 +20,7 @@ type Record = z.output<typeof recordSchema>
 type Binding = { key: string; memberId: string }
 type Workspace = { notebookId: string }
 
-export function notebookCreation(
+export function testAppCreation(
 	db: object,
 	reconcile: ReconciliationLogic<
 		Snapshot<CreationReconciliation<Workspace>>,
@@ -32,7 +32,7 @@ export function notebookCreation(
 	>
 ) {
 	const journal = createWorkspaceJournal({
-		databaseName: 'notebook-creation',
+		databaseName: 'test-app-creation',
 		schema: recordSchema,
 		attemptId: (record) => record.attempt.notebookId
 	})

@@ -3,7 +3,7 @@
 **2026-11-05. Disposition: worker implementation removed during the broader
 [simplification review](restore-simplification-review.md).** The experiment passed functional
 checks but supplied no convincing performance benefit. There is no current worker package export,
-execution option or notebook worker host. These notes preserve its design and measured outcome.
+execution option or test app worker host. These notes preserve its design and measured outcome.
 
 ## Tested design
 
@@ -14,7 +14,7 @@ request/reply validation stayed on the page. The installed Jazz account store us
 moving Jazz itself would have required a separate storage change.
 
 An optional journal execution capability flowed through shared restore/write factories and the
-notebook workflow. Each finite request used a MessagePort, random request ID and complete binding
+test app workflow. Each finite request used a MessagePort, random request ID and complete binding
 including generation. Both realms admitted bounded detached metadata; replies were revalidated
 after cloning. No archive bytes, password, account secret or admin credential crossed the channel.
 
@@ -27,7 +27,7 @@ unknown commits for fresh reconciliation. There was no retry, fallback success, 
 keepalive, validation shortcut or larger bound. Cancellation could not preempt synchronous work.
 
 The former implementation comprised worker protocol/channel/server modules, a worker package
-entrypoint and notebook host/bundler entry. These files and their dedicated tests are retired.
+entrypoint and test app host/bundler entry. These files and their dedicated tests are retired.
 A local ignored source snapshot is retained at
 `.svelte-kit/restore-review/retired-experiments-source.tar.gz`; it was taken during the subsequent
 batching review and is not an exact source snapshot of the original benchmark revision.

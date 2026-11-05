@@ -2,9 +2,9 @@
 
 The public factory APIs will be typed from this protocol during implementation; this document does not pretend an unreviewed full TypeScript signature is final. Pure archive handling and stateful lifecycle exports are separate. No Finance or Jazz types appear in the shared profile contract.
 
-The notebook reference implementation now supplies complete sequencing in
-`fixtures/backup-notebook/restore-workflow.ts`. Shared `backup/restore/workflow` owns one selected
-journaled write, including activation, with consumer-owned finite destination actors. The notebook
+The test app reference implementation now supplies complete sequencing in
+`fixtures/test-app/restore-workflow.ts`. Shared `backup/restore/workflow` owns one selected
+journaled write, including activation, with consumer-owned finite destination actors. The test app
 root coordinates planning, all mapped writes, complete content comparison and activation without
 moving its domain schema or policy into the foundation. See
 [completion design and qualification](../restore-completion-design.md).

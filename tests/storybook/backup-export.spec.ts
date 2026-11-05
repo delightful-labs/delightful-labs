@@ -15,7 +15,7 @@ import type {
 declare global {
 	interface Window {
 		// Root checks precede dist. These types describe the fixture's public-package-backed IIFE.
-		DLFNotebook: Pick<typeof import('xstate'), 'createActor' | 'toPromise'> &
+		DLFTestApp: Pick<typeof import('xstate'), 'createActor' | 'toPromise'> &
 			Pick<
 				typeof import('../../src/lib/backup/restore-journal.js'),
 				'decodeRestoreJournalRecord' | 'encodeRestoreJournalRecord' | 'parseRestoreJournalRecord'
@@ -38,9 +38,9 @@ declare global {
 				typeof import('../../src/lib/machines/backup/inspection.js'),
 				'createArchiveInspectionMachine'
 			> & {
-				notebookProfile: ArchiveProfileValidator
-				createNotebookDataset(source: ArchivePayload['source']): ArchivePayload
-				createNotebookExport(options: {
+				testAppProfile: ArchiveProfileValidator
+				createTestAppDataset(source: ArchivePayload['source']): ArchivePayload
+				createTestAppExport(options: {
 					binding: BackupBinding
 					protection: ArchiveProtection
 					handoff: ArchiveFileHandoff
@@ -63,20 +63,20 @@ declare global {
 
 test.beforeEach(async ({ page }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 })
 
 for (const kind of ['none', 'password']) {
-	test(`public notebook ${kind} export downloads and opens exact browser contents`, async ({
+	test(`public test app ${kind} export downloads and opens exact browser contents`, async ({
 		page
 	}, info) => {
 		const [download, result] = await Promise.all([
 			page.waitForEvent('download'),
 			page.evaluate(async (kind) => {
-				const api = window.DLFNotebook
+				const api = window.DLFTestApp
 				const password = ' browser-export-password-é😀 '
 				const binding: BackupBinding = {
-					applicationId: 'notebook-browser',
+					applicationId: 'test-app-browser',
 					environment: 'disposable',
 					identityId: 'owner',
 					workspaceId: 'source',
@@ -84,7 +84,7 @@ for (const kind of ['none', 'password']) {
 					operationId: 'browser-export'
 				}
 				let retained = new Uint8Array()
-				const fixture = api.createNotebookExport({
+				const fixture = api.createTestAppExport({
 					binding,
 					protection: kind === 'password' ? { kind: 'password', password } : { kind: 'none' },
 					handoff: {
@@ -98,7 +98,7 @@ for (const kind of ['none', 'password']) {
 							try {
 								const anchor = document.createElement('a')
 								anchor.href = url
-								anchor.download = 'notebook.dlfbackup'
+								anchor.download = 'test-app.dlfbackup'
 								anchor.click()
 							} finally {
 								URL.revokeObjectURL(url)
@@ -129,7 +129,7 @@ for (const kind of ['none', 'password']) {
 					input: {
 						request: api.prepareArchiveInspection({
 							source: { read: () => Promise.resolve(retained.slice()) },
-							profiles: [api.notebookProfile],
+							profiles: [api.testAppProfile],
 							password: { read: () => Promise.resolve(password) }
 						})
 					}
@@ -159,7 +159,7 @@ for (const kind of ['none', 'password']) {
 				}
 			}, kind)
 		])
-		const path = info.outputPath('notebook.dlfbackup')
+		const path = info.outputPath('test-app.dlfbackup')
 		await download.saveAs(path)
 		expect(await readFile(path)).toEqual(Buffer.from(result.bytes))
 		expect(result).toMatchObject({
@@ -185,13 +185,13 @@ for (const kind of ['none', 'password']) {
 	})
 }
 
-test('browser invalidation drains a late notebook lease and rejects a stale A → B → A retry', async ({
+test('browser invalidation drains a late test app lease and rejects a stale A → B → A retry', async ({
 	page
 }) => {
 	const result = await page.evaluate(async () => {
-		const api = window.DLFNotebook
+		const api = window.DLFTestApp
 		const binding: BackupBinding = {
-			applicationId: 'notebook-browser',
+			applicationId: 'test-app-browser',
 			environment: 'disposable',
 			identityId: 'owner',
 			workspaceId: 'source',
@@ -199,7 +199,7 @@ test('browser invalidation drains a late notebook lease and rejects a stale A �
 			operationId: 'interrupted'
 		}
 		let dispatches = 0
-		const fixture = api.createNotebookExport({
+		const fixture = api.createTestAppExport({
 			binding,
 			protection: { kind: 'none' },
 			handoff: {
@@ -225,7 +225,7 @@ test('browser invalidation drains a late notebook lease and rejects a stale A �
 			)
 		fixture.actor.start()
 		await acquired
-		const payload = api.createNotebookDataset({
+		const payload = api.createTestAppDataset({
 			applicationId: binding.applicationId,
 			workspaceId: binding.workspaceId
 		})

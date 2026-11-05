@@ -1,6 +1,6 @@
 # T004 — record workload performance investigation
 
-**2026-11-05.** This experiment extends the approved notebook benchmark with a synthetic workload
+**2026-11-05.** This experiment extends the approved test app benchmark with a synthetic workload
 based on the [T007 inventory](finance-deployment-inventory.md): 633 records, 672,633 bytes of
 comparison encoding and no reachable transaction attachments. It exercises existing export,
 envelope, journaled restore, actual Jazz settlement, full content comparison and activation against
@@ -22,7 +22,7 @@ uses the existing 600,000-iteration PBKDF2/AES-GCM envelope.
 ```sh
 pnpm install --frozen-lockfile
 pnpm package
-pnpm exec tsc --noEmit --project fixtures/backup-notebook/tsconfig.json
+pnpm exec tsc --noEmit --project fixtures/test-app/tsconfig.json
 pnpm measure:backup-records
 ```
 
@@ -34,7 +34,7 @@ Unicode and line breaks, with deterministic ASCII padding to exactly 672,633 UTF
 Each note has a notebook reference, text, archived flag and null attachment. The real Finance
 projection has different record types, field widths and relationships; this is neither its profile
 nor a worst-case CPU bound. The target matches the inventory's aggregate comparison-encoding size,
-not an estimated Finance archive. The resulting encrypted notebook file is 897,082 bytes.
+not an estimated Finance archive. The resulting encrypted test app file is 897,082 bytes.
 
 The diagnostic driver constructs the fixture before timing, then invokes the already-qualified
 XState export, envelope-open and complete-restore owners. Those actors retain their existing
@@ -51,7 +51,7 @@ restore issued 635 destination writes: preparation,
 633 records and activation. The benchmark imposes no CI latency threshold; each record measurement
 has a finite 600-second test-runner deadline.
 
-Memory uses the same approximate sampling as the [binary baseline](notebook-performance.md):
+Memory uses the same approximate sampling as the [binary baseline](test-app-performance.md):
 CDP JS heap every 25 ms and summed renderer RSS every 100 ms, including fixture construction.
 RSS covers two Chromium renderer processes and can double-count shared pages; it excludes the
 browser process, test runner and local authority. Sampling can miss short peaks and does not prove
@@ -109,7 +109,7 @@ and was closed after sampling.
 
 Source inspection is consistent with this sample: journal load/update, successor checks and intent
 matching repeatedly parse, validate, encode or compare the retained plan and growing checkpoint.
-The notebook also uses one batch per record. Counts and byte size alone do not characterize these
+The test app also uses one batch per record. Counts and byte size alone do not characterize these
 costs. No validation, CAS check, exact comparison or durability requirement was relaxed to obtain
 the measurement.
 
@@ -120,7 +120,7 @@ run only the first unthrottled case in a new test invocation with a fresh dispos
 
 ```sh
 DLF_BACKUP_RECORD_MEASURE=1 pnpm exec vitest run \
-  --config fixtures/backup-notebook/restore.vitest.config.ts \
+  --config fixtures/test-app/restore.vitest.config.ts \
   -t 'measures record workload 633, CPU 1x, run 1' --disableConsoleIntercept
 ```
 
@@ -168,10 +168,10 @@ The following commands describe the retired experiment; the comparison option no
 
 ```sh
 DLF_BACKUP_RECORD_MEASURE=1 DLF_BACKUP_JOURNAL_COMPARE=main pnpm exec vitest run \
-  --config fixtures/backup-notebook/restore.vitest.config.ts \
+  --config fixtures/test-app/restore.vitest.config.ts \
   -t 'measures record workload 633, CPU 1x, run 1' --disableConsoleIntercept
 DLF_BACKUP_RECORD_MEASURE=1 DLF_BACKUP_JOURNAL_COMPARE=worker pnpm exec vitest run \
-  --config fixtures/backup-notebook/restore.vitest.config.ts \
+  --config fixtures/test-app/restore.vitest.config.ts \
   -t 'measures record workload 633, CPU 1x, run 1' --disableConsoleIntercept
 ```
 
@@ -270,7 +270,7 @@ Run sequentially, with fresh disposable authorities and no overlapping browser/b
 
 ```sh
 DLF_BACKUP_RECORD_MEASURE=1 DLF_BACKUP_REVIEW_LABEL=final-633-1 pnpm exec vitest run \
-  --config fixtures/backup-notebook/restore.vitest.config.ts \
+  --config fixtures/test-app/restore.vitest.config.ts \
   -t 'measures record workload 633, CPU 1x, run 1' --disableConsoleIntercept
 ```
 
@@ -332,7 +332,7 @@ separate concern from the retired journal worker.
 T004 remains open for actual Finance profile/capture/interaction (T008), isolated domain restore
 (T009), supported platforms and maximum aggregate sizes. T010 still requires independently opening
 an actual retained deployed backup and exact fresh-session recovery while preserving the original.
-The synthetic notebook does not provide that evidence, even when count/size targets match T007.
+The synthetic test app does not provide that evidence, even when count/size targets match T007.
 No production Finance code, schema, credentials or deployed data changed.
 
 ## Final validation
@@ -342,3 +342,7 @@ and static checks, including the unrelated avatar browser failure from the broad
 Historical baseline/reuse/worker test counts belong to their corresponding revisions. All completed
 record and binary measurements above pass exact restore/comparison/activation; the historical
 600-second stress timeout remains recorded rather than overwritten. No commit or deployment made.
+
+Naming follow-up: this example consumer is now **test app**, under `fixtures/test-app`.
+Historical raw artifacts retain the original `notebook-performance-*` filenames; current
+diagnostics write `test-app-performance-*`. Historical measurements remain as recorded; the sample record types and coverage are preserved.

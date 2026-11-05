@@ -23,7 +23,7 @@ import {
 } from './export-api.js'
 
 const binding: BackupBinding = Object.freeze({
-	applicationId: 'notebook-app',
+	applicationId: 'test-app',
 	environment: 'disposable',
 	identityId: 'owner',
 	workspaceId: 'source-book',

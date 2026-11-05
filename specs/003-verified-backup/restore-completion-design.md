@@ -1,4 +1,4 @@
-# Notebook restore completion
+# Test app restore completion
 
 Authorized scope: full destination comparison, activation, complete coordination, tests and
 large-file experiments in one PR. Finance adoption and new platform/size guarantees stay separate.
@@ -49,7 +49,7 @@ tests. Run the full repository checks and browser suites.
 Measure browser seal/open and restore latency, sampled memory, and event-loop delay at several
 bounded sizes, including the current maximum attachment size. Record environment and methodology;
 sampled heap is not total process peak memory and desktop measurements do not qualify phones.
-Read-only Finance size inventory remains T007, so these establish a notebook baseline only.
+Read-only Finance size inventory remains T007, so these establish a test app baseline only.
 
 The invocation/action distinction follows the installed XState 5.33.2 contracts and
 [Stately invocation guidance](https://stately.ai/docs/invoke): invoked children own asynchronous
@@ -109,14 +109,14 @@ client-side NotObserved rejection as a server authorization result.
 The user authorized implementation, experiments and tests together for this PR. Final local checks:
 
 - `pnpm verify`: formatting, lint, Svelte/TypeScript, **923 unit cases**, strict package/Publint,
-  public consumer type/runtime/build checks, **17 independent reader cases**, **18 notebook export
+  public consumer type/runtime/build checks, **17 independent reader cases**, **18 test app export
   cases**, and Storybook build pass.
 - `pnpm check:backup-restore`: **60 actual Jazz/Chromium cases pass**. Three opt-in measurement
   cases are skipped in this functional command and passed separately with `pnpm measure:backup`.
 - `pnpm test:storybook`: **65 cases pass**.
 - Private-creation fixture TypeScript and native Vitest suite: **10 cases pass**.
 - `pnpm measure:backup`: all **three 1/4/8 MiB encrypted export/open/full-restore experiments pass**.
-  See [measurements and methodology](notebook-performance.md).
+  See [measurements and methodology](test-app-performance.md).
 - `git diff --check` passes. The branch descends from merged main `7816b88`.
 
 That is 1,093 functional cases plus three measured experiments. The new cases cover complete

@@ -6,7 +6,7 @@
 > See [current cleanup and qualification](pr23-coordinator-cleanup.md). Changes remain uncommitted.
 
 Review base: main at PR #22, PR #23 head `062d6fc`. Scope includes all changed library machines,
-contracts/journal discovery, notebook planning/request/writers/schema, qualification harness and
+contracts/journal discovery, test app planning/request/writers/schema, qualification harness and
 public package/CI wiring. The user requested removal of thin wrappers and a broader reuse review.
 The user subsequently approved runtime qualification with “continue with tests”; the completed
 evidence below supersedes historical pending-test notes. No new asynchronous workflow is introduced.
@@ -23,11 +23,11 @@ evidence below supersedes historical pending-test notes. No new asynchronous wor
    file restore-write-step, and pass the actual descriptor as actor input. Keep the meaningful public
    preparation/batch coordinators; do not add factory aliases to preserve unused internal names.
 3. **Remove the attachment request specialization.** It only spreads options and sets resume.
-   The bound attachment host factory and test host can call prepareNotebookRestore with resume
+   The bound attachment host factory and test host can call prepareTestAppRestore with resume
    explicitly. Keep the actual resource-owning root and bound unstarted host factory.
 4. **Simplify single-use request admission.** An available-data variable plus a stored claim closure
    exists solely to implement a boolean claim. Store the claim fact with the private capsule and
-   perform the check directly in claimNotebookRestore. This is capability admission, not a second
+   perform the check directly in claimTestAppRestore. This is capability admission, not a second
    workflow or a change to resource disposal/drain.
 5. **Reuse the repeated journal-write success predicate.** The write actor repeats updated-or-existing
    plus record-present checks in five checkpoints. Give that actual domain predicate one definition;
@@ -55,7 +55,7 @@ acceptance inference. Representation and journal wire formats remain unchanged.
 
 Existing test imports/construction must mechanically follow the removed internal symbols for strict
 compilation; no assertions or new test behavior are added before review, and no tests run. Static
-validation covers root TypeScript, package/strict Publint, consumer/notebook declarations, lint,
+validation covers root TypeScript, package/strict Publint, consumer/test app declarations, lint,
 formatting and whitespace. After review re-run the 41 focused cases, full units and native browser
 qualification, then propagate the accepted cleanup through #24/#25. Earlier passing counts do not
 qualify this changed tree. Full comparison/activation and Finance adoption remain outside scope.
@@ -63,7 +63,7 @@ qualify this changed tree. Full comparison/activation and Finance adoption remai
 ## Static validation — completed
 
 Root Svelte/strict TypeScript, package build/strict Publint, public consumer TypeScript against rebuilt
-declarations, notebook TypeScript, Oxlint, Oxfmt and whitespace checks pass. Searches find no remaining
+declarations, test app TypeScript, Oxlint, Oxfmt and whitespace checks pass. Searches find no remaining
 source/fixture callers of the deleted symbols or old shared-machine filename. No implementation tests
 were run, no assertions added, no server started, and nothing committed/pushed. Historical design
 notes retain the names used at their qualification points; they are not current imports.
@@ -84,7 +84,7 @@ module export or mock behavior for it. Focused and full suites pass after that c
 acceptance/replay, transaction, journal-wire or destination-policy behavior was changed.
 
 Package/strict Publint, public consumer compilation/imports/builds/runtime checks (17 independent
-reader and 18 notebook export tests), notebook and root Svelte/strict TypeScript, lint, formatting
+reader and 18 test app export tests), test app and root Svelte/strict TypeScript, lint, formatting
 and whitespace checks pass. The disposable browser, Vite host at http://127.0.0.1:6199/restore.html,
 Jazz authority and per-test contexts were closed by teardown.
 

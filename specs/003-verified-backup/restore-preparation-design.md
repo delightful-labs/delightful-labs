@@ -1,6 +1,6 @@
-# T006 notebook restore preparation — implementation slice
+# T006 test app restore preparation — implementation slice
 
-> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> Historical slice/research record. The complete test app workflow, fresh comparison and activation
 > are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
 > [completion evidence](restore-completion-design.md) for present status; bounded single-step
 > descriptions and dated test totals below describe their original scope.
@@ -19,15 +19,15 @@ for those covered operations. It does not establish destination restore qualific
 ## Bounded scope
 
 Implement one isolated Jazz destination control row, not note/attachment writes or activation.
-The notebook host receives an existing immutable integrity-checked archive and either new allocation
-or the allocation retained in its journal intent. It validates the exact notebook profile and derives
+The test app host receives an existing immutable integrity-checked archive and either new allocation
+or the allocation retained in its journal intent. It validates the exact test app profile and derives
 the full expected immutable intent anew. No file password or decrypted contents enter the journal.
 All mappings, batch identities and digests are fixed before effects. The host supplies the existing
 same-browser journal namespace; this workflow does not silently initialize missing storage.
 
 ## Owners and finite states
 
-Notebook preparation owner:
+Test app preparation owner:
 
 - validate checked profile -> construct mapped graph/control/activation projections -> hash plan
   components -> invoke shared preparation -> release checked archive -> finite result.
@@ -64,8 +64,8 @@ including generation; it immediately blocks later effects while issued calls dra
 
 ## Future continuation
 
-Notebook plan v1 partitions mappings into deterministic one-record/one-attachment steps. Preparation
-owns only the destination control row. Notebook/note graph relationships are inserted only after
+Test app plan v1 partitions mappings into deterministic one-record/one-attachment steps. Preparation
+owns only the destination control row. Test app/note graph relationships are inserted only after
 prerequisite destination records exist; no policy-dependent cycle is split. Data writers, fresh
 full graph/relationship/byte comparison and activation remain unimplemented. A future resumed
 activation must recompare actual data; journal comparison metadata alone is insufficient.
@@ -77,18 +77,18 @@ reissue, automatic rejected-attempt retry, process-crash claim or generalized re
 mean policy-hidden. A crash between issued checkpoint and backend call may remain unresolved. Remote
 match without required local-persistence evidence stays incomplete; a local read is not invented as
 a persistence receipt. Global observation can be interrupted without claiming the SDK write was
-cancelled. Web Locks availability is required for this browser slice. Notebook schema/policies are
+cancelled. Web Locks availability is required for this browser slice. Test app schema/policies are
 disposable qualification assets, not a Finance policy lane or production restore safety proof.
 
 ## Implementation review boundary
 
 Implemented shared factories under `backup/restore/preparation/workflow`, with contracts under
 `backup/restore/preparation`. `createRestorePreparationMachine(writer)` accepts trusted complete
-intent metadata; the notebook root is the concrete archive-validation/plan owner. The same workflow
-subpath exposes the finite journal-step child for notebook recovery discovery. These factories are
+intent metadata; the test app root is the concrete archive-validation/plan owner. The same workflow
+subpath exposes the finite journal-step child for test app recovery discovery. These factories are
 unstarted; the application invokes them or starts its own root.
 
-`fixtures/backup-notebook/restore.ts` privately owns the transferred checked archive and canonical
+`fixtures/test-app/restore.ts` privately owns the transferred checked archive and canonical
 projections. Pure projection functions map exact source tuples to fixed destination IDs. Explicit
 hashing states derive graph, preparation, each deterministic batch, activation and full plan digests.
 The control row binds the original payload and mapped graph digest; hashing the plan inside its own
@@ -96,7 +96,7 @@ preparation contents would be circular. No source membership or credentials ente
 
 The browser journal now supports `discover`: validate the stored codec and complete live binding,
 then return metadata without requiring the not-yet-reconstructed expected intent. Discovery cannot
-write, initialize or repair the namespace. The notebook root takes only its mappings, reconstructs
+write, initialize or repair the namespace. The test app root takes only its mappings, reconstructs
 all expected intent fields from the checked archive, then the shared owner acquires the operation
 lock and loads again with full intent comparison before any effect. Missing/malformed discovery
 never falls back to new allocation. The host supplies the existing operation reference (including
@@ -112,7 +112,7 @@ that session while issued native mutation calls remain outstanding.
 
 `restore-schema.ts` and `restore-writer.ts` are consumer-owned disposable Jazz assets. Inserts are
 owner-bound and incomplete-only; updates/deletes are denied in this slice. Ordinary discovery uses
-the active-only query; no data tables, active notebook route or activation mutation is implemented.
+the active-only query; no data tables, active test app route or activation mutation is implemented.
 This is not evidence for Finance's incomplete-data isolation or protection from legacy clients.
 
 Review the entire changed actor tree before runtime qualification. Relevant later checks are
@@ -123,9 +123,9 @@ integration with actual disposable Jazz. No tests may be added/run before implem
 
 ### Static validation before implementation review
 
-Package build/strict Publint, root Svelte/TypeScript, notebook TypeScript, public-consumer declaration
+Package build/strict Publint, root Svelte/TypeScript, test app TypeScript, public-consumer declaration
 compilation, Oxlint, Oxfmt and whitespace checks pass. Public-consumer compilation includes the new
-notebook preparation and Jazz writer against rebuilt package declarations. No implementation tests
+test app preparation and Jazz writer against rebuilt package declarations. No implementation tests
 were added or executed, no server/session was started, and no Jazz data or deployed configuration was
 changed. These checks establish static integration only; preparation, recovery, native settlement,
 locking and cancellation still require the review-approved runtime qualification above.
@@ -158,10 +158,10 @@ delegates to `NativeRuntimeAdapter.requestInsertPermissionAdvice`, whose
 `withPermissionAdviceTimeout` returns unknown when its runtime has neither server transport/carrier
 nor a configured native upstream. `DefaultRuntimeSource` creates a non-durable foreground peer for
 persistent browsers and connects a separate durable browser worker. The observed foreground advice
-is not usable as this notebook's affirmative creation gate. This is a source-based explanation plus
+is not usable as this test app's affirmative creation gate. This is a source-based explanation plus
 the actual browser observation; it is not a universal claim about every SDK configuration.
 
-A design question is pending: use current session identity plus the notebook's owner-bound creation
+A design question is pending: use current session identity plus the test app's owner-bound creation
 policy for admitting a first journaled insert, with the real server accepting/rejecting that insert,
 or retain the advice gate and record that this persistent-browser path cannot prepare destinations.
 The recommended bounded adjustment concerns first-write admission only. It must not turn an issued
@@ -174,7 +174,7 @@ zero destination writes. Both delete their disposable journal databases with blo
 assertions to detect leaked connections. The full new browser suite is not qualified.
 
 Package/strict Publint, Svelte/TypeScript, public-consumer builds, all 17 independent-reader cases,
-all 18 existing notebook cases and lint pass. These are separate from the blocked concrete restore
+all 18 existing test app cases and lint pass. These are separate from the blocked concrete restore
 qualification. The fixture server at localhost:6199 and disposable Jazz authorities are shut down
 after each run. No commits, pushes, production data or production configuration changes are included.
 
@@ -183,15 +183,15 @@ CAS/reload, cancellation settlement, rejected-attempt/content-match metadata, ma
 storage, synchronous schema approval, stop/release cleanup and unsupported-schema preservation.
 The task-owned preview on localhost:6027 was shut down. Storybook build, final formatting and
 whitespace checks pass. These 14 regressions plus the two new discovery cases do not qualify the
-blocked notebook destination-preparation happy path.
+blocked test app destination-preparation happy path.
 
 ### Concrete proposed admission adjustment for discussion
 
-Change only the notebook writer's `checkAuthority` leaf: observe the original bound database's
+Change only the test app writer's `checkAuthority` leaf: observe the original bound database's
 current session account and require equality with the intent's restoring identity. The actor still
 requires a validated complete intent, exclusive operation ownership, a not-yet-issued preparation,
 remote reconciliation and durable issuance before opening/staging. The staged row always uses that
-identity as owner and `status: incomplete`; the actual authority enforces the deployed notebook
+identity as owner and `status: incomplete`; the actual authority enforces the deployed test app
 insert policy. Neither the identity check nor the insert call is an acceptance receipt. Success
 still requires the separately observed persistence/acceptance and durable checkpoints.
 
@@ -203,7 +203,7 @@ the user decision requested during qualification remains pending.
 
 ### Owner-bound first-write admission — approved continuation
 
-The user approved the concrete admission adjustment above. The notebook writer now observes the
+The user approved the concrete admission adjustment above. The test app writer now observes the
 bound database's current session identity for first-insert admission. The existing machine guard
 continues to own issuance eligibility; the adapter performs no retry or destination selection.
 The stage leaf rechecks identity at the mutation boundary, inserts only the incomplete owner-bound
@@ -214,10 +214,10 @@ permission-advice blocker is historical; qualification continues against this ap
 ## Preparation qualification — completed
 
 The approved owner-bound first-write admission is implemented. The real persistent-browser path now
-prepares its destination through the actual notebook root, generic coordinator, native IndexedDB
+prepares its destination through the actual test app root, generic coordinator, native IndexedDB
 journal and Jazz writer; tests do not replace admission with an always-true capability. The row is
 owned by the restoring identity, remains incomplete and is excluded by ordinary active-only
-notebook discovery. Server policy still rejects forged ownership and premature activation, with
+test app discovery. Server policy still rejects forged ownership and premature activation, with
 assertions requiring the actual `PersistedWriteRejectedError` / `permission_denied` evidence rather
 than classifying every exception as rejection.
 
@@ -239,7 +239,7 @@ Eight real Jazz/Chromium cases pass:
 - Discovery binds identity, operation and destination; mismatches do not reset the original row.
 - A different restoring identity is refused before transaction issuance, retaining `notIssued`.
 
-Qualification found a second concrete bug after the native Web Locks option fix: the notebook
+Qualification found a second concrete bug after the native Web Locks option fix: the test app
 parent's `preparingDestination.always` interruption transition stopped the child before its drained
 output reached the parent. The interruption guard now runs only when admitting that child, in
 `buildingIntent.onDone`. Once invoked, cancellation is forwarded and the parent awaits the finite
@@ -249,7 +249,7 @@ cancel/reload/content-match case covers this correction.
 The full unit regression passed all 902 cases across 36 files, including 19 preparation-owner cases.
 The eight browser cases run through `pnpm check:backup-restore`, now included in CI. All 14 existing
 native journal browser regressions pass against the rebuilt package. Package/strict Publint,
-public-consumer declaration/bundle checks, 17 independent-reader cases, 18 existing notebook cases,
+public-consumer declaration/bundle checks, 17 independent-reader cases, 18 existing test app cases,
 Storybook build, Svelte/TypeScript, lint, formatting and whitespace checks pass. These local results
 are not a claim of remote GitHub CI for uncommitted work.
 

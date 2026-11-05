@@ -6,7 +6,7 @@ type NotebookRecord = { key: string; attempt: { notebookId: string; title: strin
 declare global {
 	interface Window {
 		DLFJournal: Pick<typeof import('xstate'), 'createActor' | 'toPromise'> & {
-			createNotebookJournal: (
+			createTestAppJournal: (
 				name: string
 			) => ReturnType<
 				typeof import('../../src/lib/machines/workspaces/journal.js').createWorkspaceJournal<NotebookRecord>
@@ -23,9 +23,9 @@ test('public journal persists notebook records and clears only the selected atte
 	page
 }) => {
 	const result = await page.evaluate(async () => {
-		const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+		const { createActor, toPromise, createTestAppJournal } = window.DLFJournal
 		const name = `dlf-journal-test-${crypto.randomUUID()}`
-		const machine = createNotebookJournal(name)
+		const machine = createTestAppJournal(name)
 		const record = { key: 'member', attempt: { notebookId: 'stable', title: 'notes' } }
 		async function run(input: WorkspaceJournalInput<NotebookRecord>) {
 			const actor = createActor(machine, { input }).start()
@@ -66,9 +66,9 @@ test('native cancellation aborts staged journal data before reporting cancelled'
 	page
 }) => {
 	const result = await page.evaluate(async () => {
-		const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+		const { createActor, toPromise, createTestAppJournal } = window.DLFJournal
 		const name = `dlf-journal-test-${crypto.randomUUID()}`,
-			machine = createNotebookJournal(name)
+			machine = createTestAppJournal(name)
 		const record = { key: 'member', attempt: { notebookId: 'cancelled', title: 'notes' } }
 		const actor = createActor(machine, {
 			input: { mode: 'write', key: record.key, record }
@@ -124,9 +124,9 @@ test('abort during native commit waits for actual completion and preserves the f
 	page
 }) => {
 	const result = await page.evaluate(async () => {
-		const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+		const { createActor, toPromise, createTestAppJournal } = window.DLFJournal
 		const name = `dlf-journal-test-${crypto.randomUUID()}`,
-			machine = createNotebookJournal(name)
+			machine = createTestAppJournal(name)
 		const record = { key: 'member', attempt: { notebookId: 'committing', title: 'notes' } }
 		let aborted = false,
 			completed = false,
@@ -206,7 +206,7 @@ test('a real incompatible IndexedDB version fails without reporting cancellation
 	page
 }) => {
 	const result = await page.evaluate(async () => {
-		const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+		const { createActor, toPromise, createTestAppJournal } = window.DLFJournal
 		const name = `dlf-journal-test-${crypto.randomUUID()}`
 		const db = await new Promise<IDBDatabase>((done, fail) => {
 			const request = indexedDB.open(name, 2)
@@ -214,7 +214,7 @@ test('a real incompatible IndexedDB version fails without reporting cancellation
 			request.onerror = () => fail(request.error)
 		})
 		db.close()
-		const actor = createActor(createNotebookJournal(name), {
+		const actor = createActor(createTestAppJournal(name), {
 			input: { mode: 'read', key: 'member' }
 		}).start()
 		try {
@@ -242,9 +242,9 @@ test('a real constraint error still fails and rolls back the journal transaction
 	page
 }) => {
 	const result = await page.evaluate(async () => {
-		const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+		const { createActor, toPromise, createTestAppJournal } = window.DLFJournal
 		const name = `dlf-journal-test-${crypto.randomUUID()}`,
-			machine = createNotebookJournal(name)
+			machine = createTestAppJournal(name)
 		const record = { key: 'member', attempt: { notebookId: 'duplicate', title: 'notes' } }
 		const actor = createActor(machine, { input: { mode: 'write', key: record.key, record } })
 		let injected = false,
@@ -304,9 +304,9 @@ test('a real constraint error still fails and rolls back the journal transaction
 for (const stage of ['opening', 'acquired', 'first-opening']) {
 	test(`abrupt stop during ${stage} releases native journal handles`, async ({ page }) => {
 		const result = await page.evaluate(async (stage) => {
-			const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+			const { createActor, toPromise, createTestAppJournal } = window.DLFJournal
 			const name = `dlf-journal-stop-${crypto.randomUUID()}`
-			const machine = createNotebookJournal(name)
+			const machine = createTestAppJournal(name)
 			// Establish the existing store so the stopped open exercises late onsuccess, not upgrade abort.
 			if (stage !== 'first-opening') {
 				const seed = createActor(machine, { input: { mode: 'read', key: 'member' } }).start()
@@ -363,9 +363,9 @@ test('abrupt stop aborts a staged journal transaction and releases its database'
 	page
 }) => {
 	const result = await page.evaluate(async () => {
-		const { createActor, toPromise, createNotebookJournal } = window.DLFJournal
+		const { createActor, toPromise, createTestAppJournal } = window.DLFJournal
 		const name = `dlf-journal-stop-staged-${crypto.randomUUID()}`
-		const machine = createNotebookJournal(name)
+		const machine = createTestAppJournal(name)
 		const record = { key: 'member', attempt: { notebookId: 'stopped', title: 'notes' } }
 		let stopped = false
 		let abortObserved: Promise<void> | undefined

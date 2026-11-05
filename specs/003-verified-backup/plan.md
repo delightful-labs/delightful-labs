@@ -3,13 +3,13 @@
 **Branch**: `feat/verified-backup` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
 
 **Status (2026-11-05)**: Shared archive, envelope, independent inspection, capture/export,
-versioned journal and complete notebook restore are implemented and qualified. PR #26 adds fresh
+versioned journal and complete test app restore are implemented and qualified. PR #26 adds fresh
 full-content comparison, activation, complete coordination and native event-routing cleanup.
 PR #26 is merged. All 1,097 functional cases, static/package/consumer checks and GitHub CI pass on `d69fe4c`.
 See [the active handoff](tasks.md#current-handoff), [restore evidence](restore-completion-design.md),
-[routing audit](native-event-routing-review.md) and [performance baseline](notebook-performance.md).
+[routing audit](native-event-routing-review.md) and [performance baseline](test-app-performance.md).
 
-T006/T012 are complete for the notebook reference. T007's read-only deployed Finance inventory is
+T006/T012 are complete for the test app reference. T007's read-only deployed Finance inventory is
 complete. Remaining gates are T004 consumer/platform performance, Finance capture/isolated
 restore/rehearsal (T008–T010), and the accepted explicit
 permission-repair retry integration (T014). No Finance deployment or identity/storage change is implied.
@@ -17,12 +17,12 @@ permission-repair retry integration (T014). No Finance deployment or identity/st
 ## Summary
 
 The implemented foundation separates the bounded archive/independent inspector from stateful
-export/restore coordination. The notebook reference demonstrates the complete flow. The next adoption
+export/restore coordination. The test app reference demonstrates the complete flow. The next adoption
 is Finance’s domain profile against its existing `jazz-tools@2.0.0-alpha.59` deployment. A newer Jazz release and AT Protocol sign-in are not prerequisites.
 
 Finance capture uses an explicitly quiescent single-user maintenance procedure, remote reads for supported complete graph coverage, and comparison with local-first results to detect unsynchronized differences. This is a scoped operational capture, not a claim of SDK snapshot isolation. Do not accept a capture when writer quiescence, full owner authority, or required graph coverage cannot be established. Details and limits appear in [Finance adoption](contracts/finance-adoption.md).
 
-Restore requires an additive Finance isolation design before destination writes: durable operation identity, stable destination IDs, incomplete status, ordinary workflow exclusion, and authoritative reconciliation. The notebook supplies a qualified reference for these capabilities; Finance-specific schema, policy,
+Restore requires an additive Finance isolation design before destination writes: durable operation identity, stable destination IDs, incomplete status, ordinary workflow exclusion, and authoritative reconciliation. The test app supplies a qualified reference for these capabilities; Finance-specific schema, policy,
 consumer interaction and deployment compatibility remain unimplemented and require their own evidence.
 
 ## Technical Context
@@ -45,7 +45,7 @@ Pre-design and post-design checks pass for the proposed boundaries:
 - Pure archive transforms may be functions. Stateful operations use explicitly owned XState children; see [workflow contract](contracts/workflow.md).
 - Unknown writes retain durable operation identity and require authoritative reconciliation. Local acceptance and remote confirmation remain distinct.
 - No private/offline/platform guarantees exceed recorded evidence. File inspection can be independent; source completeness and destination recovery require qualification.
-- The user explicitly authorized notebook completion, tests and experiments together, followed by
+- The user explicitly authorized test app completion, tests and experiments together, followed by
   the routing cleanup. Future work follows repository review gates unless separately overridden.
 - Publication of PR #26 is authorized; its merge is the user’s action. No Finance deployment, live
   data migration or identity/storage configuration change is authorized by this documentation.
@@ -62,7 +62,7 @@ Implemented layout:
 src/lib/backup/                  # Portable codecs, opaque resources, contracts, journal schemas
 src/lib/machines/backup/         # Capture/export, inspection, crypto and journaled write owners
 fixtures/backup-reader/          # Independent retained-file reader without Jazz/login
-fixtures/backup-notebook/        # Consumer profile, source, full Jazz restore and qualification
+fixtures/test-app/        # Consumer profile, source, full Jazz restore and qualification
 fixtures/package-consumer/       # Public-subpath type/runtime/browser checks
 ```
 
@@ -82,7 +82,7 @@ projections and zero observed tracked pending writes identify the current worklo
 archive or capture protocol. Repeat inventory if source/deployment/device changes before adoption.
 
 1. **T004, consumer performance:** measure that supported workload/platform and address unacceptable
-   blocking or memory use before claiming responsiveness or increasing bounds. The notebook baseline
+   blocking or memory use before claiming responsiveness or increasing bounds. The test app baseline
    and [record workload investigation](record-performance.md) expose distinct archive and journal/
    per-record costs. T004 spans this shared baseline and actual profile/interaction/restore checks
    after T008/T009; it must not block disposable consumer implementation needed to measure those paths.
@@ -113,7 +113,7 @@ engine is planned.
 T007 records actual production frontend/catalogue/policy identity and scoped live graph/size
 measurements. Finance capture consistency and full profile/envelope size, explicit writer drain,
 additive isolation with cached-client compatibility and an actual retained-file recovery remain
-required. Notebook success does not establish consumer
+required. Test app success does not establish consumer
 completeness or production safety. Report a specific alpha.59 limitation rather than silently upgrading
 or deleting data. Browser-process crash, cleared journal, offline restart and cross-device recovery
-remain outside the qualified notebook claims; expanding those claims requires scoped evidence.
+remain outside the qualified test app claims; expanding those claims requires scoped evidence.
