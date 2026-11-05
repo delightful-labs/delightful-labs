@@ -1,8 +1,9 @@
 import {
-	assign,
-	fromPromise,
+	sendTo,
 	raise,
 	and,
+	assign,
+	fromPromise,
 	setup,
 	stateIn,
 	type Snapshot,
@@ -174,20 +175,7 @@ export function createScopedFormMachine<
 			idle: stateIn({ open: { workflow: 'idle' } })
 		}
 	})
-	const forwardObservation = workflow.enqueueActions(({ self, context, enqueue }) => {
-		const children = self.getSnapshot().children
-		const observation = context.observation
-		if (!observation) return
-		if (children.availability?.getSnapshot().status === 'active')
-			enqueue.sendTo(children.availability, { type: 'OBSERVE', observation })
-		if (children.submission?.getSnapshot().status === 'active')
-			enqueue.sendTo(children.submission, { type: 'OBSERVE', observation })
-	})
-	const command = (type: 'INVALIDATE' | 'CANCEL' | 'SHUTDOWN') =>
-		workflow.enqueueActions(({ self, enqueue }) => {
-			const child = self.getSnapshot().children.submission
-			if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, { type })
-		})
+
 	// Recovery belongs to the current scope lifetime, independently of feedback.
 	const acceptCheckpoint = (context: Context, result: FormResult<Result, Reason>) => {
 		if (context.request?.scopeRevision !== context.scopeRevision) return undefined
@@ -256,8 +244,7 @@ export function createScopedFormMachine<
 									result: undefined
 								}),
 								raise({ type: 'INVALIDATE' }),
-								raise({ type: 'OBSERVATION_CHANGED' }),
-								forwardObservation
+								raise({ type: 'OBSERVATION_CHANGED' })
 							]
 						},
 						{
@@ -269,8 +256,7 @@ export function createScopedFormMachine<
 										facts: event.observation
 									})
 								}),
-								raise({ type: 'OBSERVATION_CHANGED' }),
-								forwardObservation
+								raise({ type: 'OBSERVATION_CHANGED' })
 							]
 						}
 					],
@@ -347,7 +333,13 @@ export function createScopedFormMachine<
 								},
 								on: {
 									SHUTDOWN: 'closed',
-									OBSERVATION_CHANGED: '.awaiting',
+									OBSERVATION_CHANGED: {
+										target: '.awaiting',
+										actions: sendTo('availability', ({ context }) => ({
+											type: 'OBSERVE',
+											observation: requireObservation(context)
+										}))
+									},
 									CAPABILITY_ACCEPTED: '.current'
 								}
 							},
@@ -692,10 +684,28 @@ export function createScopedFormMachine<
 									]
 								},
 								on: {
-									INVALIDATE: { target: '.invalidated', actions: command('INVALIDATE') },
-									AVAILABILITY_FAILED: { target: '.invalidated', actions: command('INVALIDATE') },
-									CANCEL: { target: '.cancelling', actions: command('CANCEL') },
-									SHUTDOWN: { target: '.closing', actions: command('SHUTDOWN') }
+									INVALIDATE: {
+										target: '.invalidated',
+										actions: sendTo('submission', { type: 'INVALIDATE' })
+									},
+									AVAILABILITY_FAILED: {
+										target: '.invalidated',
+										actions: sendTo('submission', { type: 'INVALIDATE' })
+									},
+									CANCEL: {
+										target: '.cancelling',
+										actions: sendTo('submission', { type: 'CANCEL' })
+									},
+									SHUTDOWN: {
+										target: '.closing',
+										actions: sendTo('submission', { type: 'SHUTDOWN' })
+									},
+									OBSERVATION_CHANGED: {
+										actions: sendTo('submission', ({ context }) => ({
+											type: 'OBSERVE',
+											observation: requireObservation(context)
+										}))
+									}
 								},
 								states: {
 									pending: {

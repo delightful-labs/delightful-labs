@@ -1,4 +1,5 @@
 import {
+	forwardTo,
 	assign,
 	fromPromise,
 	setup,
@@ -108,10 +109,7 @@ export function createScopedFormSubmissionMachine<
 		observation: ({ context, event }) =>
 			event.type === 'OBSERVE' ? event.observation : context.observation
 	})
-	const forward = workflow.enqueueActions(({ self, event, enqueue }) => {
-		const child = self.getSnapshot().children.operation
-		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
-	})
+
 	const clearPayloads = workflow.assign({
 		request: ({ context }) => ({ ...context.request, values: undefined, checkpoint: undefined }),
 		validated: undefined,
@@ -280,10 +278,10 @@ export function createScopedFormSubmissionMachine<
 					]
 				},
 				on: {
-					OBSERVE: { actions: [observe, forward] },
-					INVALIDATE: { target: '.invalidated', actions: forward },
-					CANCEL: { target: '.cancelling', actions: forward },
-					SHUTDOWN: { target: '.closing', actions: forward }
+					OBSERVE: { actions: [observe, forwardTo('operation')] },
+					INVALIDATE: { target: '.invalidated', actions: forwardTo('operation') },
+					CANCEL: { target: '.cancelling', actions: forwardTo('operation') },
+					SHUTDOWN: { target: '.closing', actions: forwardTo('operation') }
 				},
 				states: {
 					pending: {},

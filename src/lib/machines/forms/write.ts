@@ -1,6 +1,6 @@
 import { formInterruptionResult } from '../../contracts/scoped-form.js'
 import { createScopedFormReadinessMachine } from './readiness.js'
-import { assign, enqueueActions, fromPromise, setup, stateIn, type Snapshot } from 'xstate'
+import { enqueueActions, assign, fromPromise, setup, stateIn, type Snapshot } from 'xstate'
 import type { ScopedFormAvailabilityLogic } from './readiness.js'
 import type { ScopedFormOperationLogic } from './submission.js'
 import type {
@@ -93,7 +93,7 @@ export function createScopedFormWriteMachine<
 		Event,
 		typeof actors,
 		{},
-		{ observeAssessmentError: undefined; interruptWrite: undefined; forwardObservation: undefined },
+		{ observeAssessmentError: undefined },
 		{
 			closing: undefined
 			invalidated: undefined
@@ -106,23 +106,6 @@ export function createScopedFormWriteMachine<
 	>({
 		actors,
 		actions: {
-			forwardObservation: enqueueActions(({ self, event, enqueue }) => {
-				const child = self.getSnapshot().children.write
-				if (child?.getSnapshot().status === 'active' && event.type === 'OBSERVE')
-					enqueue.sendTo(child, event)
-			}),
-			interruptWrite: enqueueActions(({ self, event, enqueue }) => {
-				const child = self.getSnapshot().children.write
-				if (
-					child?.getSnapshot().status === 'active' &&
-					(event.type === 'OBSERVE' ||
-						event.type === 'INVALIDATE' ||
-						event.type === 'CANCEL' ||
-						event.type === 'SHUTDOWN')
-				) {
-					enqueue.sendTo(child, event.type === 'OBSERVE' ? { type: 'INVALIDATE' } : event)
-				}
-			}),
 			observeAssessmentError: enqueueActions(({ self, context, enqueue }) => {
 				enqueue.assign({
 					assessmentError:
@@ -406,9 +389,18 @@ export function createScopedFormWriteMachine<
 					]
 				},
 				on: {
-					CANCEL: { target: '.cancelling', actions: 'interruptWrite' },
-					INVALIDATE: { target: '.invalidated', actions: 'interruptWrite' },
-					SHUTDOWN: { target: '.closing', actions: 'interruptWrite' },
+					CANCEL: {
+						target: '.cancelling',
+						actions: options.persistence ? form.sendTo('write', ({ event }) => event) : []
+					},
+					INVALIDATE: {
+						target: '.invalidated',
+						actions: options.persistence ? form.sendTo('write', ({ event }) => event) : []
+					},
+					SHUTDOWN: {
+						target: '.closing',
+						actions: options.persistence ? form.sendTo('write', ({ event }) => event) : []
+					},
 					OBSERVE: [
 						{
 							guard: ({ context, event }) =>
@@ -417,9 +409,17 @@ export function createScopedFormWriteMachine<
 									options.scopeOf(event.observation.facts)
 								),
 							target: '.invalidated',
-							actions: [observe, 'interruptWrite']
+							actions: [
+								observe,
+								...(options.persistence ? [form.sendTo('write', { type: 'INVALIDATE' })] : [])
+							]
 						},
-						{ actions: [observe, 'forwardObservation'] }
+						{
+							actions: [
+								observe,
+								...(options.persistence ? [form.sendTo('write', ({ event }) => event)] : [])
+							]
+						}
 					]
 				},
 				states: {

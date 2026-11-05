@@ -25,8 +25,10 @@ below apply only to the stated boundary. The Jazz-only MVP is not complete.
 then authorized regression qualification on 2026-11-03. The follow-up adds 38 unit cases and five
 native Chromium IndexedDB cases, and fixes two reproduced retry/abort regressions in
 [PR #20](https://github.com/delightful-labs/delightful-local-first/pull/20). Implementation-head
-CI passed on `82cc5e4`; PR #20 is awaiting merge. No further scoped cleanup tasks remain before
-[backup T006](../003-verified-backup/tasks.md#current-handoff-2026-11-03). See
+CI passed on `82cc5e4`; PR #20 is merged. The later native-routing audit in PR #26 reviews all 45
+machine-bearing modules and qualifies 19 module cleanups with four added regressions. The notebook
+backup path is complete; remaining Finance/performance/retry work is in
+[the active backup ledger](../003-verified-backup/tasks.md#current-handoff). See
 [review evidence, migration notes and verification](cleanup-review.md#regression-qualification-completed).
 Checked items cover these shared contracts; deployed Finance adoption remains separate.
 

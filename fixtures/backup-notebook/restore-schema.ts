@@ -1,6 +1,6 @@
 import { schema as s } from 'jazz-tools'
 
-/** Disposable restore-control lane, outside DLF domain exports. Activation follows later. */
+/** Disposable restore-control lane, outside DLF domain exports. Activation is an owner-only phase transition. */
 export const notebookRestoreApp = s.defineApp({
 	restoreDestinations: s.table(
 		{
@@ -65,7 +65,21 @@ export const notebookRestorePermissions = s.definePermissions(
 			ownerId: session.user.account,
 			status: 'incomplete'
 		})
-		policy.restoreDestinations.allowUpdate.never()
+		policy.restoreDestinations.allowUpdate
+			.whereOld({ ownerId: session.user.account, status: 'incomplete' })
+			.whereNew((row) =>
+				allOf([
+					{ ownerId: session.user.account, status: 'active' },
+					policy.restoreDestinations.exists.where({
+						id: row.id,
+						ownerId: row.ownerId,
+						operationId: row.operationId,
+						payloadSha256: row.payloadSha256,
+						graphSha256: row.graphSha256,
+						status: 'incomplete'
+					})
+				])
+			)
 		policy.restoreDestinations.allowDelete.never()
 		policy.restoreNotes.allowRead.where((row) =>
 			allOf([

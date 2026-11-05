@@ -1,5 +1,10 @@
 # T006 next slice — one notebook attachment batch
 
+> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
+> [completion evidence](restore-completion-design.md) for present status; bounded single-step
+> descriptions and dated test totals below describe their original scope.
+
 > Current API: the unmerged preparation/batch specializations described historically below were
 > replaced by `createRestoreMachine(native, destination)` at `backup/restore/workflow`, contracts at
 > `backup/restore`, with explicit `writeId` input. Both concrete destination writers are machines.

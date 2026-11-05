@@ -74,9 +74,10 @@ The [plan](plan.md) permits concrete generic implementation now while keeping th
 
 ## Restore limitation investigation — 2026-11-03
 
-User requested real-code research and temporary tests before further implementation. The
-[specification gate](spec.md#known-restore-limitations-and-implementation-gate) remains in effect.
-No production behavior or retry policy was changed during this investigation.
+The user requested real-code research and temporary tests before further implementation. This
+investigation preceded the notebook coordinator and writers; it changed no production behavior or
+retry policy. See the [current limitations](spec.md#known-restore-limitations-and-remaining-implementation-gates)
+and [active tasks](tasks.md#current-handoff) for subsequent implementation and the retry follow-up.
 
 ### Method and scope
 

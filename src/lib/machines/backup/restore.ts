@@ -1,4 +1,4 @@
-import { assign, sendTo, setup, type Snapshot } from 'xstate'
+import { forwardTo, sendTo, assign, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
 import {
 	createRestoreJournalRecord,
@@ -80,18 +80,6 @@ export function createRestoreMachine<
 		intent: context.intent,
 		writeId: context.writeId
 	})
-	const forward = model.enqueueActions(({ self, event, enqueue }) => {
-		const child = self.getSnapshot().children.write
-		if (
-			child?.getSnapshot().status === 'active' &&
-			(event.type === 'CANCEL' || event.type === 'SHUTDOWN' || event.type === 'INVALIDATE')
-		)
-			enqueue.sendTo(child, event)
-	})
-	const shutdownWriter = model.enqueueActions(({ self, enqueue }) => {
-		const child = self.getSnapshot().children.write
-		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, { type: 'SHUTDOWN' })
-	})
 
 	return model.createMachine({
 		id: 'restore',
@@ -109,9 +97,9 @@ export function createRestoreMachine<
 			record: context.record
 		}),
 		on: {
-			CANCEL: { actions: ['interrupt', forward] },
-			SHUTDOWN: { actions: ['interrupt', forward] },
-			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] }
+			CANCEL: { actions: 'interrupt' },
+			SHUTDOWN: { actions: 'interrupt' },
+			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
 		},
 		states: {
 			validating: {
@@ -156,7 +144,7 @@ export function createRestoreMachine<
 						actions: assign({ outcome: 'incomplete', interruption: undefined })
 					}
 				},
-				on: { LOCK_FAILED: { actions: [assign({ interruption: 'closed' }), shutdownWriter] } },
+				on: { LOCK_FAILED: { actions: assign({ interruption: 'closed' }) } },
 				states: {
 					releasing: { id: 'release-restore-lock', entry: sendTo('lock', { type: 'RELEASE' }) },
 					acquiring: {
@@ -256,13 +244,25 @@ export function createRestoreMachine<
 							{
 								guard: ({ context }) =>
 									context.writeId === context.intent.plan.preparation.writeId ||
-									requestedBatchIsCurrent(context.record, context.writeId),
+									requestedBatchIsCurrent(context.record, context.writeId) ||
+									((context.record?.checkpoint.kind === 'activating' ||
+										context.record?.checkpoint.kind === 'complete') &&
+										context.writeId === context.intent.plan.activation.writeId),
 								target: 'writing'
 							},
 							{ target: '#release-restore-lock', actions: assign({ outcome: 'incomplete' }) }
 						]
 					},
 					writing: {
+						on: {
+							LOCK_FAILED: {
+								actions: [assign({ interruption: 'closed' }), sendTo('write', { type: 'SHUTDOWN' })]
+							},
+							CANCEL: { actions: ['interrupt', forwardTo('write')] },
+							SHUTDOWN: { actions: ['interrupt', forwardTo('write')] },
+							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('write')] }
+						},
+
 						invoke: {
 							id: 'write',
 							src: 'write',
@@ -279,6 +279,16 @@ export function createRestoreMachine<
 									target: '#release-restore-lock',
 									actions: assign({
 										outcome: 'prepared',
+										record: ({ event }) => event.output.record
+									})
+								},
+								{
+									guard: ({ context, event }) =>
+										event.output.outcome === 'written' &&
+										context.writeId === context.intent.plan.activation.writeId,
+									target: '#release-restore-lock',
+									actions: assign({
+										outcome: 'complete',
 										record: ({ event }) => event.output.record
 									})
 								},

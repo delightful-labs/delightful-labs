@@ -31,6 +31,11 @@ the write boundary after the modeled decision. Inspect actor helpers recursively
 - Use typed events/reports for continuing observations and invocation output for finite results.
   Actor input initializes; subsequent facts arrive through events. Child context/state paths remain
   private. Do not introduce a global registry, bus, or supervisor without a demonstrated need.
+- Use native `forwardTo`/`sendTo` actions in the state that owns the recipient invocation.
+  Do not rediscover a fixed child's lifetime through `self.getSnapshot().children` for routing.
+  Nested handlers must include the parent's interruption/binding actions explicitly. Send only
+  commands the child can receive; promise leaves settle under the owner's drain protocol. In
+  parallel regions, keep existing control-state precedence when the work state sends commands.
 - Give each readiness/access decision one owner. Context holds observed facts, payloads, references,
   and results; states own lifecycle. Do not duplicate lifecycle in phase fields or pending flags.
 - Correlate reports by dependency binding and generation, not just workspace ID. A → B → A must

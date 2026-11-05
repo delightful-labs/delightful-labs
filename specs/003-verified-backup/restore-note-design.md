@@ -1,5 +1,10 @@
 # T006 next slice — one mapped note and its relationships
 
+> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
+> [completion evidence](restore-completion-design.md) for present status; bounded single-step
+> descriptions and dated test totals below describe their original scope.
+
 Base: PR #24 (`feat/notebook-restore-record`). The user explicitly authorized implementation and
 tests together while away; this overrides review-before-tests for this slice only. No merge is authorized.
 

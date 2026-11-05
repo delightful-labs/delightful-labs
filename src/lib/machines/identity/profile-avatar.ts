@@ -1,6 +1,9 @@
 import {
+	forwardTo,
+	sendTo,
+	and,
+	not,
 	assign,
-	enqueueActions,
 	fromPromise,
 	setup,
 	stateIn,
@@ -90,7 +93,7 @@ export function createProfileAvatarMachine<
 		Event,
 		typeof actors,
 		{},
-		{ forward: undefined; fail: undefined },
+		{ fail: undefined },
 		{
 			interrupted: undefined
 			closing: undefined
@@ -103,27 +106,7 @@ export function createProfileAvatarMachine<
 		Result
 	>({
 		actors,
-		actions: {
-			fail: assign({ result: (): Result => failed }),
-			forward: enqueueActions(({ context, self, event, enqueue }) => {
-				const child = self.getSnapshot().children.write
-				const processor = self.getSnapshot().children.processImage
-				if (processor?.getSnapshot().status === 'active' && event.type !== 'OBSERVE') {
-					enqueue.sendTo(
-						processor,
-						event.type === 'SHUTDOWN' ? { type: 'SHUTDOWN' } : { type: 'CANCEL' }
-					)
-				}
-				if (child?.getSnapshot().status !== 'active') return
-				const changed =
-					event.type === 'OBSERVE' &&
-					!options.sameScope(
-						required(context.request).scope,
-						options.scopeOf(event.observation.facts)
-					)
-				enqueue.sendTo(child, changed ? { type: 'INVALIDATE' } : event)
-			})
-		},
+		actions: { fail: assign({ result: (): Result => failed }) },
 		guards: {
 			interrupted: stateIn({ running: { control: 'interrupted' } }),
 			closing: stateIn({ running: { control: { interrupted: 'closed' } } }),
@@ -180,9 +163,9 @@ export function createProfileAvatarMachine<
 					control: {
 						initial: 'active',
 						on: {
-							CANCEL: { target: '.interrupted.cancelled', actions: 'forward' },
-							INVALIDATE: { target: '.interrupted.scopeChanged', actions: 'forward' },
-							SHUTDOWN: { target: '.interrupted.closed', actions: 'forward' },
+							CANCEL: { target: '.interrupted.cancelled' },
+							INVALIDATE: { target: '.interrupted.scopeChanged' },
+							SHUTDOWN: { target: '.interrupted.closed' },
 							OBSERVE: [
 								{
 									guard: ({ context, event }) =>
@@ -191,9 +174,9 @@ export function createProfileAvatarMachine<
 											options.scopeOf(event.observation.facts)
 										),
 									target: '.interrupted.scopeChanged',
-									actions: ['forward', observe]
+									actions: observe
 								},
-								{ actions: ['forward', observe] }
+								{ actions: observe }
 							]
 						},
 						states: {
@@ -225,6 +208,21 @@ export function createProfileAvatarMachine<
 								]
 							},
 							processingImage: {
+								on: {
+									CANCEL: {
+										guard: not('interrupted'),
+										actions: sendTo('processImage', { type: 'CANCEL' })
+									},
+									INVALIDATE: {
+										guard: and([not('closing'), not('invalidated')]),
+										actions: sendTo('processImage', { type: 'CANCEL' })
+									},
+									SHUTDOWN: {
+										guard: not('closing'),
+										actions: sendTo('processImage', { type: 'SHUTDOWN' })
+									}
+								},
+
 								invoke: {
 									id: 'processImage',
 									src: 'processImage',
@@ -286,6 +284,26 @@ export function createProfileAvatarMachine<
 								]
 							},
 							saving: {
+								on: {
+									CANCEL: { guard: not('interrupted'), actions: forwardTo('write') },
+									INVALIDATE: {
+										guard: and([not('closing'), not('invalidated')]),
+										actions: forwardTo('write')
+									},
+									SHUTDOWN: { guard: not('closing'), actions: forwardTo('write') },
+									OBSERVE: {
+										guard: and([not('closing'), not('invalidated')]),
+										actions: sendTo('write', ({ context, event }) =>
+											!options.sameScope(
+												required(context.request).scope,
+												options.scopeOf(event.observation.facts)
+											)
+												? { type: 'INVALIDATE' }
+												: event
+										)
+									}
+								},
+
 								invoke: {
 									id: 'write',
 									src: 'write',

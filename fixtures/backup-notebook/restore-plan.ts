@@ -83,15 +83,18 @@ function remapValue(value: ArchiveValue, mappings: readonly Mapping[]): ArchiveV
 		return { ...value, id: mappedId(mappings, { kind: 'attachment', sourceId: value.id }) }
 	return value
 }
-export function projectNotebookGraph(data: NotebookRestorePlanData): void {
-	const payload = data.archive.readPayload()
-	const records = payload.records.map((record) => ({
+export function projectNotebookRecords(data: NotebookRestorePlanData) {
+	return data.archive.readPayload().records.map((record) => ({
 		type: record.type,
 		id: mappedId(data.mappings, { kind: 'record', type: record.type, sourceId: record.id }),
 		fields: Object.fromEntries(
 			Object.entries(record.fields).map(([key, value]) => [key, remapValue(value, data.mappings)])
 		)
 	}))
+}
+export function projectNotebookGraph(data: NotebookRestorePlanData): void {
+	const payload = data.archive.readPayload()
+	const records = projectNotebookRecords(data)
 	const attachments = payload.attachments.map((attachment) => ({
 		...attachment,
 		id: mappedId(data.mappings, { kind: 'attachment', sourceId: attachment.id })

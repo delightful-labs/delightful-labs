@@ -4,7 +4,17 @@ import {
 	type Transaction,
 	type WriteHandle
 } from 'jazz-tools'
-import { and, assign, fromCallback, fromPromise, not, raise, setup, stateIn } from 'xstate'
+import {
+	forwardTo,
+	raise,
+	and,
+	not,
+	assign,
+	fromCallback,
+	fromPromise,
+	setup,
+	stateIn
+} from 'xstate'
 import type { RestoreJournalIntent } from 'delightful-local-first/backup/restore/journal'
 import {
 	restoreTransactionAccess,
@@ -284,10 +294,7 @@ export function createNotebookPreparationWriter(
 		Input,
 		RestoreDestinationResult
 	>({ actors })
-	const forward = model.enqueueActions(({ self, event, enqueue }) => {
-		const child = self.getSnapshot().children.write
-		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
-	})
+
 	const input = ({ context }: { context: Context }) => context.input
 	return model.createMachine({
 		id: 'notebook-preparation-destination',
@@ -296,23 +303,14 @@ export function createNotebookPreparationWriter(
 		output: ({ context }) => context.interruption ?? context.result,
 		on: {
 			CANCEL: {
-				actions: [
-					assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' }),
-					forward
-				]
+				actions: assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' })
 			},
 			SHUTDOWN: {
-				actions: [
-					assign({ interruption: ({ context }) => context.interruption ?? 'closed' }),
-					forward
-				]
+				actions: assign({ interruption: ({ context }) => context.interruption ?? 'closed' })
 			},
 			INVALIDATE: {
 				guard: ({ context, event }) => sameBackupBinding(context.input.binding, event.binding),
-				actions: [
-					assign({ interruption: ({ context }) => context.interruption ?? 'invalidated' }),
-					forward
-				]
+				actions: assign({ interruption: ({ context }) => context.interruption ?? 'invalidated' })
 			}
 		},
 		states: {
@@ -355,6 +353,28 @@ export function createNotebookPreparationWriter(
 				}
 			},
 			writing: {
+				on: {
+					CANCEL: {
+						actions: [
+							assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' }),
+							forwardTo('write')
+						]
+					},
+					SHUTDOWN: {
+						actions: [
+							assign({ interruption: ({ context }) => context.interruption ?? 'closed' }),
+							forwardTo('write')
+						]
+					},
+					INVALIDATE: {
+						guard: ({ context, event }) => sameBackupBinding(context.input.binding, event.binding),
+						actions: [
+							assign({ interruption: ({ context }) => context.interruption ?? 'invalidated' }),
+							forwardTo('write')
+						]
+					}
+				},
+
 				invoke: {
 					id: 'write',
 					src: 'write',

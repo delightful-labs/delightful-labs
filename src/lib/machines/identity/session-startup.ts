@@ -1,4 +1,4 @@
-import { assign, enqueueActions, fromCallback, sendTo, setup, stateIn } from 'xstate'
+import { sendTo, assign, fromCallback, setup, stateIn } from 'xstate'
 import type { ActorRef, Snapshot } from 'xstate'
 import type {
 	SessionFailure,
@@ -94,20 +94,18 @@ export function createSessionStartupMachine<Session extends object>() {
 					scope: required(context.scope)
 				})
 			),
-			acquire: enqueueActions(({ context, self, enqueue }) => {
-				enqueue.sendTo(required(context.owner), {
-					type: 'ACQUIRE',
-					scope: required(context.scope),
-					replyTo: self
-				})
-			}),
-			retryAcquire: enqueueActions(({ context, self, enqueue }) => {
-				enqueue.sendTo(required(context.owner), {
+			acquire: sendTo(
+				({ context }) => required(context.owner),
+				({ context, self }) => ({ type: 'ACQUIRE', scope: required(context.scope), replyTo: self })
+			),
+			retryAcquire: sendTo(
+				({ context }) => required(context.owner),
+				({ context, self }) => ({
 					type: 'RETRY_ACQUIRE',
 					scope: required(context.scope),
 					replyTo: self
 				})
-			}),
+			),
 			reportAcquired: sendTo(
 				({ context }) => context.reportTo,
 				({ context }): SessionStartupReport<Session> => ({
@@ -124,13 +122,10 @@ export function createSessionStartupMachine<Session extends object>() {
 					reason: required(context.reason)
 				})
 			),
-			release: enqueueActions(({ context, self, enqueue }) => {
-				enqueue.sendTo(required(context.owner), {
-					type: 'RELEASE',
-					scope: required(context.scope),
-					replyTo: self
-				})
-			})
+			release: sendTo(
+				({ context }) => required(context.owner),
+				({ context, self }) => ({ type: 'RELEASE', scope: required(context.scope), replyTo: self })
+			)
 		}
 	})
 	const replyTransitions = {

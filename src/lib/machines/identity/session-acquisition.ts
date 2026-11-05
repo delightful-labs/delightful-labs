@@ -1,4 +1,4 @@
-import { assign, enqueueActions, fromPromise, setup } from 'xstate'
+import { sendTo, enqueueActions, assign, fromPromise, setup } from 'xstate'
 import type { ActorRef, Snapshot, SnapshotFrom } from 'xstate'
 import type {
 	SessionOpenCapability,
@@ -143,13 +143,14 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 					})
 				}
 			}),
-			rejectRequest: enqueueActions(({ event, enqueue }) => {
-				enqueue.sendTo(event.replyTo, {
+			rejectRequest: sendTo(
+				({ event }) => event.replyTo,
+				({ event }): SessionOwnerReply<Session> => ({
 					type: 'ACQUISITION_FAILED',
 					scope: event.scope,
 					reason: 'invalidRequest'
 				})
-			}),
+			),
 			release: assign(({ context, event }) => {
 				context.released.add(event.scope.attachment)
 				return {
@@ -158,9 +159,10 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 					)
 				}
 			}),
-			acknowledgeRelease: enqueueActions(({ event, enqueue }) => {
-				enqueue.sendTo(event.replyTo, { type: 'RELEASED', scope: event.scope })
-			})
+			acknowledgeRelease: sendTo(
+				({ event }) => event.replyTo,
+				({ event }) => ({ type: 'RELEASED', scope: event.scope })
+			)
 		}
 	})
 

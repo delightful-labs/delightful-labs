@@ -186,7 +186,7 @@ function deferred<T>() {
 	})
 	return { promise, resolve }
 }
-function fixture(record = parseRestoreJournalRecord(wire)) {
+function fixture(record = parseRestoreJournalRecord(wire), step = record.intent.plan.preparation) {
 	journal.record = record
 	journal.commands = []
 	journal.failRevision = undefined
@@ -227,8 +227,8 @@ function fixture(record = parseRestoreJournalRecord(wire)) {
 		binding,
 		intent: record.intent,
 		record,
-		step: record.intent.plan.preparation,
-		writeId: record.intent.plan.preparation.writeId,
+		step,
+		writeId: step.writeId,
 		databaseName: 'unit-journal'
 	}
 	const actor = createActor(createRestoreWriteStepMachine(writer, testDestination(writer)), {
@@ -926,5 +926,111 @@ describe('operation lock actor and coordinator release ownership', () => {
 		expect(result.outcome).toBe('conflict')
 		expect(completed(result.record)).toEqual(completed(input.record))
 		expect(writer.commit).not.toHaveBeenCalled()
+	})
+})
+
+function activationRecord() {
+	const record = parseRestoreJournalRecord(wire)
+	const completed = [record.intent.plan.preparation, ...record.intent.plan.batches].map((step) => ({
+		writeId: step.writeId,
+		issuance: 1,
+		transactionId: step.writeId + '-transaction',
+		settlement: { local: 'persisted', remote: 'accepted' }
+	}))
+	return parseRestoreJournalRecord({
+		...record,
+		revision: 10,
+		checkpoint: {
+			kind: 'activating',
+			completed,
+			comparison: {
+				payloadSha256: record.intent.archive.payloadSha256,
+				graphSha256: record.intent.plan.expectedGraphSha256
+			},
+			current: { status: 'notIssued', writeId: record.intent.plan.activation.writeId, issuance: 0 }
+		}
+	})
+}
+
+describe('restore activation ownership', () => {
+	it('settles activation without adding it to the domain write prefix', async () => {
+		const record = activationRecord(),
+			step = { ...record.intent.plan.activation, mappingIndexes: [] }
+		const { actor, writer } = fixture(record, step)
+		actor.start()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('written')
+		expect(result.record?.checkpoint).toMatchObject({
+			kind: 'complete',
+			completed: record.checkpoint.kind === 'activating' ? record.checkpoint.completed : [],
+			activation: { writeId: 'activate', settlement: { local: 'persisted', remote: 'accepted' } }
+		})
+		expect(writer.commit).toHaveBeenCalledOnce()
+		expect(writer.retainDetached).not.toHaveBeenCalled()
+	})
+	for (const local of ['persisted', 'unobserved']) {
+		it(`reconciles uncertain activation only with retained required local evidence (${local})`, async () => {
+			const initial = activationRecord()
+			if (initial.checkpoint.kind !== 'activating') throw new Error('Invalid test record')
+			const record = parseRestoreJournalRecord({
+				...initial,
+				revision: 12,
+				checkpoint: {
+					...initial.checkpoint,
+					current: {
+						status: 'issued',
+						writeId: 'activate',
+						issuance: 1,
+						transactionId: 'activation-transaction',
+						settlement: { local, remote: 'unobserved' }
+					}
+				}
+			})
+			const { actor, writer } = fixture(record, {
+				...record.intent.plan.activation,
+				mappingIndexes: []
+			})
+			writer.readRemote.mockResolvedValue('match')
+			actor.start()
+			const result = await toPromise(actor)
+			expect(result.outcome).toBe(local === 'persisted' ? 'written' : 'incomplete')
+			expect(result.record?.checkpoint.kind).toBe(local === 'persisted' ? 'complete' : 'activating')
+			if (result.record?.checkpoint.kind === 'complete')
+				expect(result.record.checkpoint.activation).toMatchObject({
+					basis: 'remoteContentMatch',
+					localPersistence: 'persisted'
+				})
+			expect(writer.open).not.toHaveBeenCalled()
+			expect(writer.commit).not.toHaveBeenCalled()
+		})
+	}
+	it('never replays an issued activation merely because the active destination was not observed', async () => {
+		const initial = activationRecord()
+		if (initial.checkpoint.kind !== 'activating') throw new Error('Invalid test record')
+		const record = issueWriteStep(initial, {
+			...initial.intent.plan.activation,
+			mappingIndexes: []
+		})
+		const { actor, writer } = fixture(record, {
+			...record.intent.plan.activation,
+			mappingIndexes: []
+		})
+		actor.start()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(writer.open).not.toHaveBeenCalled()
+		expect(journal.record).toEqual(record)
+	})
+	it('does not report completion when the final activation checkpoint cannot be persisted', async () => {
+		const record = activationRecord()
+		const { actor, writer } = fixture(record, {
+			...record.intent.plan.activation,
+			mappingIndexes: []
+		})
+		journal.failRevision = record.revision + 4
+		actor.start()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('incomplete')
+		expect(result.record?.checkpoint.kind).toBe('activating')
+		expect(writer.commit).toHaveBeenCalledOnce()
 	})
 })
