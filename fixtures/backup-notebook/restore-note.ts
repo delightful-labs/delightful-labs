@@ -24,7 +24,7 @@ export function notebookCurrentStepIsNote(input: Input): boolean {
 	return mapping?.kind === 'record' && mapping.type === 'note'
 }
 /** Pure projection of the checked exact profile and retained plan, no I/O or step selection. */
-function prepareNotebookNote(input: Input): void {
+export function prepareNotebookNote(input: Input): void {
 	const value = data(input),
 		intent = required(value.intent),
 		batch = required(currentNotebookBatch(input))

@@ -1,15 +1,14 @@
 # Notebook backup consumer
 
-This disposable nonfinancial consumer exercises the public backup contracts without Jazz, identity
-credentials, UI or financial models. After implementation review, local tests qualify notebook
-export and independent inspection of real retained files. Restore and its durable journal remain
-unimplemented; no full export/restore round-trip or Finance readiness is claimed.
+This disposable nonfinancial consumer exercises export/inspection and a complete isolated Jazz
+restore. The source is an in-memory notebook actor; the restore destination uses actual Jazz
+storage and policies. It is a reusable integration example, not Finance adoption.
 
 `profile.ts` is a trusted exact `dlf-notebook` v1 registration for the existing inspector. Its validator
 must receive a generically validated payload; it does not hash attachments or grant permissions.
 `dataset.ts` supplies a notebook and three notes: shared notebook/attachment relationships, archived
 content, combining Unicode, line breaks, embedded NUL, an empty body and four binary attachment bytes.
-The source codec preserves these contents exactly; a later round-trip must prove destination fidelity.
+The retained-file round-trip checks exact destination fidelity and preserves the source.
 
 `source.ts` supplies leaf adapters for the fixture-owned state machine under `machines/source.ts`.
 The chart owns available/leased state, binding invalidation and current-owner release. Payloads stay
@@ -69,9 +68,53 @@ suite. The normal package-consumer TypeScript check covers the notebook implemen
 entrypoint; Node test types are checked by the notebook project. Root unit/source checks do not depend
 on prebuilt package output.
 
-See [qualification evidence](../../specs/003-verified-backup/lifecycle-design.md#export-qualification)
-for full counts and limitations. Restore/write owners and a concrete versioned Zod journal (T012)
-are the subsequent implementation slice.
+## Complete restore
+
+`restore-workflow.ts` provides `createNotebookRestore({ db, retainDetached, mode, binding,
+databaseName, archive })`, returning an unstarted root actor and its single-use request. The
+archive is already integrity-checked; the root validates the exact notebook profile. `new`
+initializes the journal namespace, plans once and invokes preparation plus all pending mapped
+attachment/notebook/note writes. `resume` requires the same operation/destination, retained browser
+journal and reselected archive; it reconstructs the same mappings and verifies the intent.
+Use a fresh binding generation after reload. Resume never allocates another destination.
+
+The root freshly reads the complete graph, compares all records and exact attachment bytes, saves
+the comparison with CAS, then invokes activation through the shared write/transaction owner.
+Activation rechecks the graph in its transaction before changing the destination to `active`.
+Only `complete` means comparison and activation completed; `incomplete`, `conflict` and
+`unavailable` preserve recovery facts. `activeNotebookDestinations(ownerId)` excludes incomplete
+work. Consumer discovery must use this gate.
+
+Jazz policies allow only the owner to transition `incomplete` to `active` with unchanged destination
+provenance. Domain rows remain immutable and further inserts are denied after activation. The
+permission boundary enforces owner, scope and phase, while the trusted restore actor owns the
+archive-content comparison. It is not a server-side assertion that arbitrary owner-authored clients
+performed verification. Capture/restore assumes quiescent single-user data, as declared in the file.
+
+Send `CANCEL`, `SHUTDOWN`, or scoped `INVALIDATE` and await the finite output before stopping the
+root/session. Request `release()` while active requests cancellation and retains the file until
+the current child drains. Identity loss is latched across the whole root, including A → B → A.
+The host supplies `retainDetached` for unexpected owner-stop custody, as with the other writers.
+Unknown issued activation is not replayed: a fresh exact active-graph match plus retained required
+local-persistence evidence may complete its checkpoint. Otherwise recovery stays incomplete.
+
+```sh
+pnpm package
+pnpm check:backup-notebook
+pnpm check:backup-restore
+pnpm measure:backup # optional desktop memory/latency experiment
+```
+
+See [completion design and evidence](../../specs/003-verified-backup/restore-completion-design.md)
+and [performance measurements](../../specs/003-verified-backup/notebook-performance.md). The
+functional suite includes a real retained export, independent network-disabled inspection,
+isolated restore, fresh-session comparison, original source/file preservation, comparison conflict,
+reload/resume, uncertain activation without replay, privacy/draining and actual policy checks.
+Browser-process crashes, cleared journal storage, offline restart and cross-browser recovery remain
+outside the qualified restore boundary. Finance integration is T007–T010.
+
+The following sections record earlier bounded slices and their historical test totals; the complete
+workflow above supersedes their statements that comparison/activation remain unimplemented.
 
 ## Restore preparation — qualified bounded slice
 

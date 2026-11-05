@@ -23,6 +23,7 @@ export type RestoreEvent =
 export type RestoreOutcome =
 	| 'prepared'
 	| 'batchWritten'
+	| 'complete'
 	| 'incomplete'
 	| 'conflict'
 	| 'unavailable'
@@ -41,7 +42,7 @@ export type RestoreWriteInput = RestoreScope & {
 	step: RestorePlannedWrite
 }
 export type RestoreWriteResult = Omit<RestoreResult, 'outcome'> & {
-	outcome: Exclude<RestoreOutcome, 'prepared' | 'batchWritten'> | 'written'
+	outcome: Exclude<RestoreOutcome, 'prepared' | 'batchWritten' | 'complete'> | 'written'
 }
 export type RestoreTransactionWriter<Transaction, Write> = {
 	open(): Transaction | Promise<Transaction>
@@ -101,14 +102,19 @@ export function validateRestoreInput(input: RestoreInput) {
 	)
 		throw new Error('Restore binding mismatch')
 	const step = requireRestoreValue(
-		[record.intent.plan.preparation, ...record.intent.plan.batches].find(
-			(step) => step.writeId === input.writeId
-		)
+		[
+			record.intent.plan.preparation,
+			...record.intent.plan.batches,
+			{ ...record.intent.plan.activation, mappingIndexes: [] }
+		].find((step) => step.writeId === input.writeId)
 	)
 	return { binding, record, step }
 }
 export function writeStepPending(record: RestoreJournalRecord, step: RestorePlannedWrite): boolean {
-	return record.checkpoint.kind === 'writing' && record.checkpoint.current.writeId === step.writeId
+	return (
+		(record.checkpoint.kind === 'writing' || record.checkpoint.kind === 'activating') &&
+		record.checkpoint.current.writeId === step.writeId
+	)
 }
 export function writeStepNotIssued(
 	record: RestoreJournalRecord,
@@ -116,7 +122,7 @@ export function writeStepNotIssued(
 ): boolean {
 	return (
 		writeStepPending(record, step) &&
-		record.checkpoint.kind === 'writing' &&
+		(record.checkpoint.kind === 'writing' || record.checkpoint.kind === 'activating') &&
 		record.checkpoint.current.status === 'notIssued'
 	)
 }
@@ -126,7 +132,9 @@ export function writeStepCompleted(
 ): boolean {
 	return (
 		record.checkpoint.kind !== 'conflict' &&
-		record.checkpoint.completed.some((receipt) => receipt.writeId === step.writeId)
+		(record.checkpoint.completed.some((receipt) => receipt.writeId === step.writeId) ||
+			(record.checkpoint.kind === 'complete' &&
+				record.checkpoint.activation.writeId === step.writeId))
 	)
 }
 export function writeStepAttempt(
@@ -135,7 +143,7 @@ export function writeStepAttempt(
 ): RestoreJournalReceipt {
 	const checkpoint = record.checkpoint
 	if (
-		checkpoint.kind !== 'writing' ||
+		(checkpoint.kind !== 'writing' && checkpoint.kind !== 'activating') ||
 		checkpoint.current.writeId !== step.writeId ||
 		checkpoint.current.status !== 'issued'
 	)
@@ -147,7 +155,10 @@ export function issueWriteStep(
 	record: RestoreJournalRecord,
 	step: RestorePlannedWrite
 ): RestoreJournalRecord {
-	if (!writeStepNotIssued(record, step) || record.checkpoint.kind !== 'writing')
+	if (
+		!writeStepNotIssued(record, step) ||
+		(record.checkpoint.kind !== 'writing' && record.checkpoint.kind !== 'activating')
+	)
 		throw new Error('Expected unissued restore step')
 	return parseRestoreJournalRecord({
 		...record,
@@ -171,7 +182,8 @@ export function observeWriteStep(
 	settlement: RestoreJournalReceipt['settlement']
 ): RestoreJournalRecord {
 	const receipt = writeStepAttempt(record, step)
-	if (record.checkpoint.kind !== 'writing') throw new Error('Expected writing checkpoint')
+	if (record.checkpoint.kind !== 'writing' && record.checkpoint.kind !== 'activating')
+		throw new Error('Expected writing checkpoint')
 	return parseRestoreJournalRecord({
 		...record,
 		revision: record.revision + 1,
@@ -186,8 +198,22 @@ export function completeWriteStep(
 	step: RestorePlannedWrite,
 	completion: RestoreJournalCompletion
 ): RestoreJournalRecord {
-	if (!writeStepPending(record, step) || record.checkpoint.kind !== 'writing')
+	if (
+		!writeStepPending(record, step) ||
+		(record.checkpoint.kind !== 'writing' && record.checkpoint.kind !== 'activating')
+	)
 		throw new Error('Expected current restore step')
+	if (record.checkpoint.kind === 'activating')
+		return parseRestoreJournalRecord({
+			...record,
+			revision: record.revision + 1,
+			checkpoint: {
+				kind: 'complete',
+				completed: record.checkpoint.completed,
+				comparison: record.checkpoint.comparison,
+				activation: completion
+			}
+		})
 	const completed = [...record.checkpoint.completed, completion]
 	const next = record.intent.plan.batches[record.checkpoint.completed.length]
 	return parseRestoreJournalRecord({

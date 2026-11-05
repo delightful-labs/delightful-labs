@@ -4,7 +4,22 @@ Implementation authorized 2026-11-03 after the user merged PR #15. Work proceeds
 and focused review cycles. No production deployment, commit or publication is implied. Tests are
 added/run only after review approval of the implementation they cover.
 
-## Current handoff (2026-11-04)
+## Current handoff (2026-11-04, after PRs #23–#25 merged)
+
+The user authorized one PR for full comparison, activation, workflow coordination and performance
+experiments, including tests. The notebook workflow now owns those phases in XState and reuses the
+existing journal, operation lock and transaction/write actors. Expected restore failures remain
+finite results. The complete retained-file/fresh-session path, exact-content comparison, interruption,
+resume, unknown activation without replay and storage policies are qualified in
+[the completion design](restore-completion-design.md). Performance observations and their limits
+are in [the measurement report](notebook-performance.md).
+
+T006/T012 are implemented for the notebook integration. T004 now has a bounded desktop measurement
+baseline; actual consumer/platform performance qualification stays open pending T007 inventory.
+Finance adoption (T007–T010) and the separate sign-in delivery work remain. No deployed data,
+identity or storage configuration is changed. This branch is for PR review, not merge/deployment.
+
+## Historical handoffs (superseded by the current status above)
 
 **PR #23 coordinator and writer cleanup locally qualified.** The user authorized this cleanup and
 its tests together. One `createRestoreMachine(native, destination)` now owns selected-step admission,
@@ -249,7 +264,7 @@ reviewed implementation, qualification and limitation documentation; no deployme
 - [x] T003 — **Implemented; the user authorized review and tests on 2026-11-03.** Design resource ownership/statecharts and implement the envelope/crypto slice: strict
       envelope validation, independent password derivation, authenticated encryption, actual payload
       and attachment digests, and releasable immutable integrity-checked resources. See [envelope design/review notes](envelope-design.md). Present for review; profile validation and restore authority remain separate.
-- [ ] T004 — **Functional verification complete; large-file memory/latency qualification remains.**
+- [ ] T004 — **Functional verification and 1/4/8 MiB desktop measurements complete; actual consumer/platform performance qualification remains.** See [measured latency, memory and responsiveness](notebook-performance.md).
       After T003 approval, verify vectors/interoperability, corruption/wrong-password handling,
       bounds and resource release. 52 envelope cases, fixed external v1 vector, independent Node
       crypto interop and Chromium public-package encryption/opening pass. Measure peak memory and
@@ -260,7 +275,7 @@ reviewed implementation, qualification and limitation documentation; no deployme
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; one attachment batch qualified; notebook-root and single-note writers locally qualified; full comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
+- [x] T006 — **Implemented and qualified for the notebook integration: complete export/inspection/restore, fresh graph comparison, activation, reload/resume and conservative uncertain-activation recovery.** See [completion evidence](restore-completion-design.md). Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,
@@ -297,7 +312,7 @@ runtime guard or to finish unrelated refactors before backup work continues.
       existing `parseAsync` and injected `validationIssues` contracts so consumers may use other
       validators. Map issue paths/codes without copying input values or automatically exposing raw
       Zod messages; localization stays consumer-owned. Review the implementation before tests.
-- [ ] T012 — **Started: record/codec verified; browser owner/CAS store now exercised by 14 Chromium cases including native reload and schema approval; complete restore workflow remains unbuilt.** When implementing the concrete restore-operation journal in T006/T009, define its
+- [x] T012 — **Implemented and exercised through notebook restore completion: versioned Zod journal, retained mappings, CAS progress, fresh comparison and activation receipts/reconciliation.** Consumer-specific Finance integration remains T009. When implementing the concrete restore-operation journal in T006/T009, define its
       persisted record/version schema with Zod and infer its types. Validate unknown stored data
       before reuse; reject malformed/unsupported records without resetting storage, inventing a new
       operation or replaying unknown writes. Reuse existing schema-injection boundaries; do not
@@ -327,5 +342,5 @@ These statuses concern the reviewed cleanup, not completion of backup restore/jo
 Reader/journal follow-up qualification: the stream lifecycle passes 17 Node checks, and the rebuilt
 journal public package passes 14 distinct Chromium cases, including the synchronous upgrade handshake
 and existing native CAS/reload regressions. These results supersede earlier unqualified-browser-store
-notes for the covered behavior; they do not complete T006/T009/T012 or qualify the pending notebook
-finite-operation correction. Details are in implementation-notes.md.
+notes for the covered behavior. The current completion handoff above supersedes their historical
+T006/T012 status; Finance qualification remains T009. Details are in implementation-notes.md.

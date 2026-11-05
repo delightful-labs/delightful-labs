@@ -1,3 +1,11 @@
+import { createNotebookSource } from './source.js'
+import { notebookProfile } from './profile.js'
+import { prepareArchiveExport } from 'delightful-local-first/backup/export'
+import { createArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'
+import { createNotebookRestorePlanningMachine } from './restore-planning.js'
+import { createNotebookExport } from './export.js'
+import { createNotebookRestore, createNotebookRestoreWorkflow } from './restore-workflow.js'
+import { compareNotebookDestination, notebookDestinationGraphQuery } from './restore-comparison.js'
 import { createJazzSession, PersistedWriteRejectedError } from 'jazz-tools'
 import {
 	fromCallback,
@@ -93,6 +101,16 @@ const notePending: {
 	staged?: boolean
 } = {}
 const api = {
+	createNotebookSource,
+	notebookProfile,
+	prepareArchiveExport,
+	createArchiveExportMachine,
+	createNotebookRestorePlanningMachine,
+	createNotebookExport,
+	createNotebookRestore,
+	createNotebookRestoreWorkflow,
+	compareNotebookDestination,
+	notebookDestinationGraphQuery,
 	notePending,
 	createNotebookNoteRestore,
 	createNotebookNoteWriter,

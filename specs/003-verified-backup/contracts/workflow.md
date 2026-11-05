@@ -2,6 +2,13 @@
 
 The public factory APIs will be typed from this protocol during implementation; this document does not pretend an unreviewed full TypeScript signature is final. Pure archive handling and stateful lifecycle exports are separate. No Finance or Jazz types appear in the shared profile contract.
 
+The notebook reference implementation now supplies complete sequencing in
+`fixtures/backup-notebook/restore-workflow.ts`. Shared `backup/restore/workflow` owns one selected
+journaled write, including activation, with consumer-owned finite destination actors. The notebook
+root coordinates planning, all mapped writes, complete content comparison and activation without
+moving its domain schema or policy into the foundation. See
+[completion design and qualification](../restore-completion-design.md).
+
 ## Actor ownership
 
 Consumer integration owns the existing session binding, access observations, browser file input/download effects, and the lifetime of one backup operation. DLF owns the generic export/inspection/restore coordinators. Consumer capture and destination adapters are child actor logic where they have multiple meaningful steps, not promise functions hiding a whole workflow. Promise actors may perform one bounded leaf operation (one read, one digest, one journal lookup).

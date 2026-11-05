@@ -96,7 +96,9 @@
 				"fixtures/backup-notebook/restore-browser.test.ts",
 				"fixtures/backup-notebook/restore-attachment-writer.ts",
 				"fixtures/backup-notebook/restore-notebook-writer.ts",
-				"fixtures/backup-notebook/restore-note-writer.ts"
+				"fixtures/backup-notebook/restore-note-writer.ts",
+				"fixtures/backup-notebook/restore-comparison.ts",
+				"fixtures/backup-notebook/restore-workflow.ts"
 			],
 			"rules": {
 				"no-restricted-imports": [

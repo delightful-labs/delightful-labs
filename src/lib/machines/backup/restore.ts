@@ -256,7 +256,10 @@ export function createRestoreMachine<
 							{
 								guard: ({ context }) =>
 									context.writeId === context.intent.plan.preparation.writeId ||
-									requestedBatchIsCurrent(context.record, context.writeId),
+									requestedBatchIsCurrent(context.record, context.writeId) ||
+									((context.record?.checkpoint.kind === 'activating' ||
+										context.record?.checkpoint.kind === 'complete') &&
+										context.writeId === context.intent.plan.activation.writeId),
 								target: 'writing'
 							},
 							{ target: '#release-restore-lock', actions: assign({ outcome: 'incomplete' }) }
@@ -279,6 +282,16 @@ export function createRestoreMachine<
 									target: '#release-restore-lock',
 									actions: assign({
 										outcome: 'prepared',
+										record: ({ event }) => event.output.record
+									})
+								},
+								{
+									guard: ({ context, event }) =>
+										event.output.outcome === 'written' &&
+										context.writeId === context.intent.plan.activation.writeId,
+									target: '#release-restore-lock',
+									actions: assign({
+										outcome: 'complete',
 										record: ({ event }) => event.output.record
 									})
 								},

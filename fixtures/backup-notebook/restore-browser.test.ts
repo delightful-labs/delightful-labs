@@ -1,3 +1,14 @@
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { createNotebookExport } from './export.js'
+import { toPromise } from 'xstate'
+import {
+	payloadLimits,
+	encodeArchivePayload,
+	parseArchivePayload
+} from 'delightful-local-first/backup/archive'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
@@ -330,7 +341,7 @@ it('reconciles actual Jazz contents after local checkpoint/reload without fabric
 	await page.context().close()
 })
 
-it('enforces owner-only recovery and denies premature activation at the real storage boundary', async () => {
+it('enforces owner-only recovery and rejects activation with changed ownership at the real storage boundary', async () => {
 	const page = await open(),
 		value = await sample(page)
 	await initialize(page, value)
@@ -371,7 +382,10 @@ it('enforces owner-only recovery and denies premature activation at the real sto
 		const api = window.DLFRestoreQualification
 		try {
 			await api.db
-				.update(api.notebookRestoreApp.restoreDestinations, id, { status: 'active' })
+				.update(api.notebookRestoreApp.restoreDestinations, id, {
+					status: 'active',
+					ownerId: crypto.randomUUID()
+				})
 				.wait({ tier: 'global' })
 			return 'accepted'
 		} catch (error) {
@@ -2306,5 +2320,714 @@ it('returns unavailable for a note destination with no owned expected content', 
 		{ value, record: prepared.record }
 	)
 	expect(outcome).toBe('unavailable')
+	await deleteJournal(page, value)
+})
+
+async function fullRestore(page: Page, value: Sample, mode: 'new' | 'resume', pause = false) {
+	return page.evaluate(
+		async ({ value, mode, pause }) => {
+			const api = window.DLFRestoreQualification
+			const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+			const envelope = api
+				.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+				.start()
+			const checked = await api.toPromise(envelope)
+			if (checked.outcome !== 'integrityChecked') throw new Error('Invalid test file')
+			const request = api.prepareNotebookRestore({ ...value, mode, archive: checked.archive })
+			const actor = api.createActor(
+				api.createNotebookRestoreWorkflow(api.db, api.writer, request),
+				{ input: { request } }
+			)
+			const states: string[] = []
+			let interrupted = false
+			actor.subscribe((snapshot) => {
+				states.push(JSON.stringify(snapshot.value))
+				if (pause && !interrupted && snapshot.matches({ working: 'comparing' })) {
+					interrupted = true
+					actor.send({ type: 'CANCEL' })
+				}
+			})
+			actor.start()
+			const output = await api.toPromise(actor)
+			const rows = await api.db.one(api.notebookDestinationGraphQuery(value.binding.workspaceId), {
+				tier: 'remote'
+			})
+			const active = await api.db.all(api.activeNotebookDestinations(value.binding.identityId), {
+				tier: 'remote'
+			})
+			request.release()
+			actor.stop()
+			open.release()
+			envelope.stop()
+			return { output, rows, active, states, issued: api.issued() }
+		},
+		{ value, mode, pause }
+	)
+}
+
+it('completes the full notebook restore with exact graph verification and activation', async () => {
+	const page = await open(),
+		value = await sample(page)
+	const restored = await fullRestore(page, value, 'new')
+	expect(restored.output.outcome, JSON.stringify(restored)).toBe('complete')
+	expect(restored.states.at(-1)).toBe(JSON.stringify('succeeded'))
+	expect(restored.output.record?.checkpoint.kind).toBe('complete')
+	expect(restored.rows?.status).toBe('active')
+	expect(restored.rows?.notes).toHaveLength(3)
+	expect(restored.active.map((row) => row.id)).toContain(value.binding.workspaceId)
+	expect(restored.issued).toBe(7)
+	const resumed = await fullRestore(page, value, 'resume')
+	expect(resumed.output.outcome).toBe('complete')
+	expect(resumed.issued).toBe(restored.issued)
+	expect(resumed.output.record).toEqual(restored.output.record)
+	await deleteJournal(page, value)
+})
+
+it('compares exact fields, relationships, attachment bytes and complete object sets', async () => {
+	const page = await open(),
+		value = await sample(page)
+	await fullRestore(page, value, 'new')
+	const result = await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid file')
+		const request = api.prepareNotebookRestore({
+			...value,
+			mode: 'resume',
+			archive: checked.archive
+		})
+		const planner = api
+			.createActor(api.createNotebookRestorePlanningMachine(), { input: { request } })
+			.start()
+		if ((await api.toPromise(planner)).outcome !== 'planned') throw new Error('Missing plan')
+		const row = await api.db.one(api.notebookDestinationGraphQuery(value.binding.workspaceId), {
+			tier: 'remote'
+		})
+		if (!row) throw new Error('Missing restored graph')
+		const note = row.notes[0],
+			file = row.attachments[0]
+		if (!note || !file) throw new Error('Missing content')
+		const cases = [
+			{ ...row, notebooks: row.notebooks.map((book) => ({ ...book, title: book.title + 'x' })) },
+			{ ...row, notes: row.notes.map((note) => ({ ...note, body: note.body + 'x' })) },
+			{ ...row, notes: row.notes.map((note) => ({ ...note, archived: !note.archived })) },
+			{ ...row, notes: row.notes.map((note) => ({ ...note, notebookId: crypto.randomUUID() })) },
+			{ ...row, notes: row.notes.map((note) => ({ ...note, attachmentId: null })) },
+			{ ...row, notes: row.notes.slice(1) },
+			{ ...row, notes: [...row.notes, { ...note, id: crypto.randomUUID() }] },
+			{ ...row, attachments: [{ ...file, contents: Uint8Array.of(0, 255, 128, 11) }] },
+			{ ...row, attachments: [{ ...file, fileName: 'different.bin' }] },
+			{ ...row, attachments: [] },
+			{ ...row, attachments: [...row.attachments, { ...file, id: crypto.randomUUID() }] },
+			{ ...row, notes: row.notes.map((note) => ({ ...note, operationId: 'foreign' })) }
+		]
+		const result = {
+			exact: api.compareNotebookDestination(row, request),
+			changed: cases.map((candidate) => api.compareNotebookDestination(candidate, request))
+		}
+		request.release()
+		planner.stop()
+		open.release()
+		envelope.stop()
+		return result
+	}, value)
+	expect(result.exact).toBe('activeMatch')
+	expect(result.changed).toEqual(Array.from({ length: 12 }, () => 'conflict'))
+	await deleteJournal(page, value)
+})
+
+it('resumes after comparison cancellation and rejects an actual extra row before activation', async () => {
+	const page = await open(),
+		value = await sample(page)
+	const paused = await fullRestore(page, value, 'new', true)
+	expect(paused.output.outcome).toBe('cancelled')
+	expect(paused.output.record?.checkpoint.kind).toBe('comparing')
+	expect(paused.rows?.status).toBe('incomplete')
+	expect(paused.active).toEqual([])
+	const notebookId = paused.rows?.notebooks[0]?.id
+	if (!notebookId) throw new Error('Missing notebook')
+	await page.evaluate(
+		async ({ value, notebookId }) => {
+			const api = window.DLFRestoreQualification
+			await api.db
+				.insert(
+					api.notebookRestoreApp.restoreNotes,
+					{
+						destinationId: value.binding.workspaceId,
+						ownerId: value.binding.identityId,
+						operationId: value.binding.operationId,
+						notebookId,
+						attachmentId: null,
+						body: 'unexpected',
+						archived: false
+					},
+					{ id: crypto.randomUUID() }
+				)
+				.wait({ tier: 'global' })
+		},
+		{ value, notebookId }
+	)
+	const resumed = await fullRestore(page, value, 'resume')
+	expect(resumed.output.outcome).toBe('conflict')
+	expect(resumed.output.record?.checkpoint.kind).toBe('comparing')
+	expect(resumed.rows?.status).toBe('incomplete')
+	expect(resumed.active).toEqual([])
+	expect(resumed.issued).toBe(paused.issued)
+	expect(resumed.rows?.notes).toHaveLength(4)
+	await deleteJournal(page, value)
+})
+
+it('resumes the same mapped graph after a page reload and freezes content after activation', async () => {
+	const page = await open(),
+		value = await sample(page)
+	const paused = await fullRestore(page, value, 'new', true)
+	const provenance = await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const outcomes: string[] = []
+		for (const changes of [
+			{ operationId: 'changed' },
+			{ payloadSha256: '0'.repeat(64) },
+			{ graphSha256: '0'.repeat(64) },
+			{ ownerId: crypto.randomUUID() }
+		]) {
+			try {
+				await api.db
+					.update(api.notebookRestoreApp.restoreDestinations, value.binding.workspaceId, {
+						...changes,
+						status: 'active'
+					})
+					.wait({ tier: 'global' })
+				outcomes.push('accepted')
+			} catch (error) {
+				if (error instanceof api.PersistedWriteRejectedError && error.code === 'permission_denied')
+					outcomes.push('denied')
+				else throw error
+			}
+		}
+		return outcomes
+	}, value)
+	expect(provenance).toEqual(['denied', 'denied', 'denied', 'denied'])
+	await page.reload()
+	await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
+	const resumed = await fullRestore(page, value, 'resume')
+	expect(resumed.output.outcome).toBe('complete')
+	expect(resumed.output.record?.intent).toEqual(paused.output.record?.intent)
+	expect(resumed.issued).toBe(1)
+	expect(resumed.rows?.notes).toEqual(paused.rows?.notes)
+	const attempts = await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const row = await api.db.one(api.notebookDestinationGraphQuery(value.binding.workspaceId), {
+			tier: 'remote'
+		})
+		const book = row?.notebooks[0],
+			note = row?.notes[0]
+		if (!book || !note) throw new Error('Missing active graph')
+		const outcomes: string[] = []
+		const writes = [
+			() =>
+				api.db.update(api.notebookRestoreApp.restoreDestinations, value.binding.workspaceId, {
+					status: 'incomplete'
+				}),
+			() =>
+				api.db.update(api.notebookRestoreApp.restoreDestinations, value.binding.workspaceId, {
+					operationId: 'changed'
+				}),
+			() =>
+				api.db.insert(
+					api.notebookRestoreApp.restoreNotes,
+					{
+						destinationId: note.destinationId,
+						ownerId: note.ownerId,
+						operationId: note.operationId,
+						notebookId: book.id,
+						attachmentId: null,
+						body: 'late',
+						archived: false
+					},
+					{ id: crypto.randomUUID() }
+				),
+			() => api.db.update(api.notebookRestoreApp.restoreNotes, note.id, { body: 'changed' })
+		]
+		for (const write of writes) {
+			try {
+				await write().wait({ tier: 'global' })
+				outcomes.push('accepted')
+			} catch (error) {
+				if (error instanceof api.PersistedWriteRejectedError && error.code === 'permission_denied')
+					outcomes.push('denied')
+				else throw error
+			}
+		}
+		return outcomes
+	}, value)
+	expect(attempts).toEqual(['denied', 'denied', 'denied', 'denied'])
+	await deleteJournal(page, value)
+})
+
+it('restores a retained exported file after independent inspection and preserves its original source', async () => {
+	const page = await open(),
+		ownerId = await page.evaluate(() => window.DLFRestoreQualification.ownerId)
+	const directory = await mkdtemp(join(tmpdir(), 'dlf-roundtrip-')),
+		path = join(directory, 'notebook.dlfbackup')
+	const binding = {
+		applicationId: 'notebook-roundtrip',
+		environment: 'disposable',
+		identityId: ownerId,
+		workspaceId: crypto.randomUUID(),
+		operationId: crypto.randomUUID(),
+		generation: 1
+	}
+	const exported = createNotebookExport({
+		binding,
+		protection: { kind: 'none' },
+		handoff: {
+			dispatch: (file, _binding, signal) =>
+				writeFile(path, file.copyBytes(), { signal }).then<'dispatched'>(() => 'dispatched')
+		}
+	})
+	try {
+		exported.actor.start()
+		expect((await toPromise(exported.actor)).outcome).toBe('exported')
+		const readSource = async () => {
+			const signal = new AbortController().signal,
+				lease = await exported.source.acquire(binding, signal)
+			try {
+				return parseArchivePayload(encodeArchivePayload(await lease.read(signal, payloadLimits)))
+			} finally {
+				await lease.release()
+			}
+		}
+		const original = await readSource()
+		const retained = await readFile(path)
+		const inspection = spawnSync(
+			process.execPath,
+			[
+				'--import',
+				resolve('fixtures/backup-reader/no-network.mjs'),
+				'--input-type=module',
+				'--eval',
+				`
+			import { createActor, toPromise } from 'xstate'
+			import { prepareArchiveInspection } from 'delightful-local-first/backup/inspection'
+			import { createArchiveInspectionMachine } from 'delightful-local-first/backup/inspection/workflow'
+			import { fileSource } from './fixtures/backup-reader/io.mjs'
+			import { notebookProfile } from './.svelte-kit/backup-notebook/profile.js'
+			const request = prepareArchiveInspection({ source: fileSource(process.argv[1]), profiles: [notebookProfile] })
+			const actor = createActor(createArchiveInspectionMachine(), { input: { request } }).start()
+			const output = await toPromise(actor)
+			console.log(output.outcome)
+			if ('report' in output) output.report.release()
+			request.release(); actor.stop()
+		`,
+				path
+			],
+			{ encoding: 'utf8', env: { PATH: process.env.PATH ?? '' }, timeout: 15000 }
+		)
+		expect(inspection.status, inspection.stderr).toBe(0)
+		expect(inspection.stdout.trim()).toBe('profileValid')
+		const value = {
+			binding: { ...binding, workspaceId: crypto.randomUUID(), operationId: crypto.randomUUID() },
+			file: Array.from(retained),
+			databaseName: 'roundtrip-' + crypto.randomUUID()
+		}
+		const restored = await fullRestore(page, value, 'new')
+		expect(restored.output.outcome).toBe('complete')
+		expect(restored.rows?.notebooks[0]?.title).toBe('Notebook fixture')
+		expect(restored.rows?.notes.map((note) => [note.body, note.archived]).sort()).toEqual(
+			original.records
+				.filter((record) => record.type === 'note')
+				.map((record) => [
+					record.fields.body?.kind === 'text' ? record.fields.body.value : '',
+					record.fields.archived?.kind === 'boolean' ? record.fields.archived.value : false
+				])
+				.sort()
+		)
+		await page.reload()
+		await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
+		const fresh = await fullRestore(page, value, 'resume')
+		expect(fresh.output.outcome).toBe('complete')
+		expect(fresh.rows).toEqual(restored.rows)
+		expect(fresh.issued).toBe(0)
+		expect(await readSource()).toMatchObject({
+			records: original.records,
+			attachments: original.attachments,
+			references: original.references,
+			coverage: original.coverage,
+			profile: original.profile,
+			source: original.source
+		})
+		expect(await readFile(path)).toEqual(retained)
+		await deleteJournal(page, value)
+	} finally {
+		exported.request.release()
+		exported.actor.stop()
+		exported.source.actor.stop()
+		await rm(directory, { recursive: true, force: true })
+	}
+})
+
+it('reconciles a remotely accepted activation after cancellation without issuing it again', async () => {
+	const page = await open(),
+		value = await sample(page)
+	const result = await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid file')
+		const request = api.prepareNotebookRestore({ ...value, mode: 'new', archive: checked.archive })
+		let signal = () => {},
+			release = () => {}
+		const pending = new Promise<void>((yes) => {
+			signal = yes
+		})
+		const gate = new Promise<void>((yes) => {
+			release = yes
+		})
+		let acceptance: Promise<void> = Promise.resolve()
+		const writer: typeof api.writer = {
+			...api.writer,
+			acceptRemote: (write) => {
+				const accepted = api.writer.acceptRemote(write)
+				if (api.issued() !== 7) return accepted
+				acceptance = accepted
+				signal()
+				return gate
+			}
+		}
+		const actor = api
+			.createActor(api.createNotebookRestoreWorkflow(api.db, writer, request), {
+				input: { request }
+			})
+			.start()
+		await pending
+		actor.send({ type: 'CANCEL' })
+		const output = await api.toPromise(actor)
+		await acceptance
+		release()
+		request.release()
+		actor.stop()
+		open.release()
+		envelope.stop()
+		return { output, issued: api.issued() }
+	}, value)
+	expect(result.output.outcome).toBe('cancelled')
+	expect(result.output.record?.checkpoint).toMatchObject({
+		kind: 'activating',
+		current: { status: 'issued', settlement: { local: 'persisted', remote: 'unobserved' } }
+	})
+	const resumed = await fullRestore(page, value, 'resume')
+	expect(resumed.output.outcome).toBe('complete')
+	expect(resumed.issued).toBe(result.issued)
+	if (resumed.output.record?.checkpoint.kind !== 'complete')
+		throw new Error('Missing activation completion')
+	expect(resumed.output.record.checkpoint.activation).toMatchObject({
+		basis: 'remoteContentMatch',
+		localPersistence: 'persisted'
+	})
+	await deleteJournal(page, value)
+})
+
+// Opt-in measurements have no timing pass/fail threshold. CI runs the functional suite separately.
+for (const mebibytes of [1, 4, 8]) {
+	it.skipIf(!process.env.DLF_BACKUP_MEASURE)(
+		`measures encrypted export/open/restore at ${mebibytes} MiB`,
+		async () => {
+			const page = await open()
+			const cdp = await page.context().newCDPSession(page)
+			await cdp.send('Performance.enable')
+			const heaps: number[] = [],
+				resident: number[] = []
+			const system = await browser.newBrowserCDPSession()
+			const processes = await system.send('SystemInfo.getProcessInfo')
+			const renderers = processes.processInfo
+				.filter((entry) => entry.type === 'renderer')
+				.map((entry) => entry.id)
+			await system.detach()
+			const sampleResident = () => {
+				const result = spawnSync('ps', ['-o', 'rss=', '-p', renderers.join(',')], {
+					encoding: 'utf8'
+				})
+				if (result.status === 0)
+					resident.push(
+						result.stdout
+							.trim()
+							.split(/\s+/)
+							.reduce((total, value) => total + Number(value) * 1024, 0)
+					)
+			}
+			sampleResident()
+			const sampleHeap = async () => {
+				const result = await cdp.send('Performance.getMetrics')
+				const used = result.metrics.find((metric) => metric.name === 'JSHeapUsedSize')?.value
+				if (used !== undefined) heaps.push(used)
+			}
+			await sampleHeap()
+			const rssSampler = setInterval(sampleResident, 100)
+			const sampler = setInterval(() => {
+				void sampleHeap()
+			}, 25)
+			try {
+				const result = await page.evaluate(async (mebibytes) => {
+					const api = window.DLFRestoreQualification
+					const bytes = Uint8Array.from({ length: mebibytes * 1024 * 1024 }, (_, i) => i % 251)
+					const sha256 = Array.from(
+						new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+						(byte) => byte.toString(16).padStart(2, '0')
+					).join('')
+					const pieces: string[] = []
+					for (let index = 0; index < bytes.length; index += 16384) {
+						pieces.push(String.fromCharCode(...bytes.subarray(index, index + 16384)))
+					}
+					const raw = api.createNotebookDataset({
+						applicationId: 'notebook-measurement',
+						workspaceId: 'original'
+					})
+					const payload = {
+						...raw,
+						attachments: [
+							{
+								id: 'binary',
+								mediaType: 'application/octet-stream',
+								fileName: 'large.bin',
+								sizeBytes: bytes.length,
+								sha256,
+								data: btoa(pieces.join(''))
+							}
+						]
+					}
+					const binding = {
+						applicationId: 'notebook-measurement',
+						environment: 'disposable',
+						identityId: api.ownerId,
+						workspaceId: crypto.randomUUID(),
+						operationId: crypto.randomUUID(),
+						generation: 1
+					}
+					const source = api.createNotebookSource(payload, { ...binding, workspaceId: 'original' })
+					source.actor.start()
+					let file: Uint8Array | undefined
+					let largestDelayMs = 0,
+						last = performance.now()
+					const timer = setInterval(() => {
+						const now = performance.now()
+						largestDelayMs = Math.max(largestDelayMs, now - last - 16)
+						last = now
+					}, 16)
+					const password = 'disposable measurement password'
+					const start = performance.now()
+					const exporting = api.prepareArchiveExport({
+						binding: { ...binding, workspaceId: 'original' },
+						source,
+						profile: api.notebookProfile,
+						protection: { kind: 'password', password },
+						handoff: {
+							dispatch: (archive) => {
+								file = archive.copyBytes()
+								return Promise.resolve('dispatched')
+							}
+						}
+					})
+					const exporter = api
+						.createActor(api.createArchiveExportMachine(), { input: { request: exporting } })
+						.start()
+					if ((await api.toPromise(exporter)).outcome !== 'exported' || !file)
+						throw new Error('Export failed')
+					const exportedAt = performance.now()
+					const opening = api.prepareArchiveOpen(file, password)
+					const envelope = api
+						.createActor(api.createArchiveEnvelopeMachine(), { input: { request: opening } })
+						.start()
+					const checked = await api.toPromise(envelope)
+					if (checked.outcome !== 'integrityChecked') throw new Error('Open failed')
+					const openedAt = performance.now()
+					const databaseName = 'measure-' + crypto.randomUUID()
+					const restoring = api.createNotebookRestore({
+						db: api.db,
+						binding,
+						databaseName,
+						mode: 'new',
+						archive: checked.archive,
+						retainDetached: () => {}
+					})
+					restoring.actor.start()
+					const output = await api.toPromise(restoring.actor)
+					const restoredAt = performance.now()
+					await new Promise<void>((yes) => setTimeout(yes, 20))
+					clearInterval(timer)
+					const metrics = {
+						mebibytes,
+						fileBytes: file.length,
+						exportMs: exportedAt - start,
+						openMs: openedAt - exportedAt,
+						restoreMs: restoredAt - openedAt,
+						largestDelayMs,
+						outcome: output.outcome
+					}
+					restoring.request.release()
+					restoring.actor.stop()
+					opening.release()
+					envelope.stop()
+					exporting.release()
+					exporter.stop()
+					source.actor.stop()
+					file.fill(0)
+					await new Promise<void>((yes, no) => {
+						const removal = indexedDB.deleteDatabase(databaseName)
+						removal.onsuccess = () => yes()
+						removal.onerror = () => no(removal.error)
+					})
+					return metrics
+				}, mebibytes)
+				await sampleHeap()
+				const metrics = {
+					...result,
+					browser: browser.version(),
+					platform: process.platform,
+					architecture: process.arch,
+					heapBaselineBytes: heaps[0],
+					sampledPeakJsHeapBytes: Math.max(...heaps),
+					heapSamples: heaps.length,
+					rendererRssBaselineBytes: resident[0],
+					sampledPeakRendererRssBytes: Math.max(...resident),
+					rssSamples: resident.length,
+					rendererProcesses: renderers.length
+				}
+				expect(metrics.outcome).toBe('complete')
+				await writeFile(
+					resolve(`.svelte-kit/notebook-performance-${mebibytes}.json`),
+					JSON.stringify(metrics, null, 2) + '\n'
+				)
+				console.log('Notebook measurement:', JSON.stringify(metrics))
+			} finally {
+				clearInterval(sampler)
+				clearInterval(rssSampler)
+				await cdp.detach()
+			}
+		},
+		120000
+	)
+}
+
+for (const interruption of ['release', 'identity']) {
+	it(`drains a pending complete-graph read before clearing the request (${interruption})`, async () => {
+		const page = await open(),
+			value = await sample(page)
+		const result = await page.evaluate(
+			async ({ value, interruption }) => {
+				const api = window.DLFRestoreQualification
+				const opening = api.prepareArchiveOpen(new Uint8Array(value.file))
+				const envelope = api
+					.createActor(api.createArchiveEnvelopeMachine(), { input: { request: opening } })
+					.start()
+				const checked = await api.toPromise(envelope)
+				if (checked.outcome !== 'integrityChecked') throw new Error('Invalid test file')
+				const request = api.prepareNotebookRestore({
+					...value,
+					mode: 'new',
+					archive: checked.archive
+				})
+				let ready = () => {},
+					release = () => {},
+					report = (_identityId: string | undefined) => {}
+				const pending = new Promise<void>((yes) => {
+						ready = yes
+					}),
+					gate = new Promise<void>((yes) => {
+						release = yes
+					})
+				const machine = api.createNotebookRestoreWorkflow(api.db, api.writer, request).provide({
+					actors: {
+						identity: api.fromCallback(({ input, sendBack }) => {
+							report = (identityId) => sendBack({ type: 'IDENTITY', binding: input, identityId })
+							report(input.identityId)
+						}),
+						compare: api.fromPromise(async ({ input }) => {
+							const row = await api.db.one(
+								api.notebookDestinationGraphQuery(value.binding.workspaceId),
+								{ tier: 'remote' }
+							)
+							const result = api.compareNotebookDestination(row, input.request)
+							ready()
+							await gate
+							return result
+						})
+					}
+				})
+				const actor = api.createActor(machine, { input: { request } }).start()
+				await pending
+				actor.send({ type: 'INVALIDATE', binding: { ...value.binding, generation: 2 } })
+				if (interruption === 'release') request.release()
+				else {
+					report(undefined)
+					report(value.binding.identityId)
+				}
+				const draining = actor.getSnapshot().status
+				const retained = checked.archive.readPayload().records.length
+				const snapshot = JSON.stringify(actor.getSnapshot())
+				release()
+				const output = await api.toPromise(actor)
+				let cleared = false
+				try {
+					checked.archive.readPayload()
+				} catch {
+					cleared = true
+				}
+				actor.stop()
+				opening.release()
+				envelope.stop()
+				return { output, draining, retained, cleared, snapshot }
+			},
+			{ value, interruption }
+		)
+		expect(result.draining).toBe('active')
+		expect(result.retained).toBe(4)
+		expect(result.cleared).toBe(true)
+		expect(result.snapshot).not.toContain('First line')
+		expect(result.snapshot).not.toContain('AP+ACg==')
+		expect(result.output.outcome).toBe(interruption === 'release' ? 'cancelled' : 'invalidated')
+		expect(result.output.record?.checkpoint.kind).toBe('comparing')
+		const resumed = await fullRestore(page, value, 'resume')
+		expect(resumed.output.outcome).toBe('complete')
+		expect(resumed.issued).toBe(7)
+		await deleteJournal(page, value)
+	})
+}
+
+it('finishes a failed graph read incomplete and resumes without replaying domain writes', async () => {
+	const page = await open(),
+		value = await sample(page)
+	const result = await page.evaluate(async (value) => {
+		const api = window.DLFRestoreQualification
+		const open = api.prepareArchiveOpen(new Uint8Array(value.file))
+		const envelope = api
+			.createActor(api.createArchiveEnvelopeMachine(), { input: { request: open } })
+			.start()
+		const checked = await api.toPromise(envelope)
+		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid test file')
+		const request = api.prepareNotebookRestore({ ...value, mode: 'new', archive: checked.archive })
+		const machine = api.createNotebookRestoreWorkflow(api.db, api.writer, request).provide({
+			actors: { compare: api.fromPromise(() => Promise.reject(new Error('Read failed'))) }
+		})
+		const actor = api.createActor(machine, { input: { request } }).start()
+		const result = await api.toPromise(actor)
+		request.release()
+		actor.stop()
+		open.release()
+		envelope.stop()
+		return { ...result, finalState: actor.getSnapshot().value }
+	}, value)
+	expect(result.outcome).toBe('incomplete')
+	expect(result.finalState).toBe('incomplete')
+	expect(result.record?.checkpoint.kind).toBe('comparing')
+	const resumed = await fullRestore(page, value, 'resume')
+	expect(resumed.output.outcome).toBe('complete')
+	expect(resumed.issued).toBe(7)
 	await deleteJournal(page, value)
 })
