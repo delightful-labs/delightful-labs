@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { assign, fromPromise, raise, setup } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
 import type { RestoreEvent } from 'delightful-local-first/backup/restore'
 import { createRestoreJournalStepMachine } from 'delightful-local-first/backup/restore/workflow'
@@ -58,7 +58,7 @@ export function createNotebookRestorePlanningMachine() {
 	}
 	const model = setup<
 		Context,
-		RestoreEvent,
+		RestoreEvent | { type: 'PLANNING_DONE'; success: boolean } | { type: 'PLANNING_APPLIED' },
 		typeof actors,
 		{},
 		{ interrupt: undefined },
@@ -86,6 +86,10 @@ export function createNotebookRestorePlanningMachine() {
 			})
 		}
 	})
+	const synchronous = (operation: (context: Context) => boolean | void) =>
+		model.createAction(({ context, self }) => {
+			self.send({ type: 'PLANNING_DONE', success: planningSucceeded(() => operation(context)) })
+		})
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
 	const failed = '#notebook-restore-plan.complete'
 	const interrupted = { guard: 'interrupted', target: failed } satisfies {
@@ -111,25 +115,35 @@ export function createNotebookRestorePlanningMachine() {
 		},
 		output: ({ context }) => ({ outcome: context.interruption ?? context.outcome }),
 		on: {
+			PLANNING_DONE: {
+				actions: [
+					assign({
+						planningSucceeded: ({ context, event }) =>
+							event.type === 'PLANNING_DONE' ? event.success : context.planningSucceeded
+					}),
+					raise({ type: 'PLANNING_APPLIED' })
+				]
+			},
 			CANCEL: { actions: 'interrupt' },
 			SHUTDOWN: { actions: 'interrupt' },
 			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
 		},
 		states: {
 			validating: {
-				entry: assign({
-					planningSucceeded: ({ context }) =>
-						planningSucceeded(() => notebookProfile.validate(data(context).archive.readPayload()))
-				}),
-				always: [
-					interrupted,
-					{
-						guard: ({ context }) => context.planningSucceeded && context.mode === 'new',
-						target: 'allocating'
-					},
-					{ guard: ({ context }) => context.planningSucceeded, target: 'discovering' },
-					{ target: failed }
-				]
+				entry: synchronous((context) =>
+					notebookProfile.validate(data(context).archive.readPayload())
+				),
+				on: {
+					PLANNING_APPLIED: [
+						interrupted,
+						{
+							guard: ({ context }) => context.planningSucceeded && context.mode === 'new',
+							target: 'allocating'
+						},
+						{ guard: ({ context }) => context.planningSucceeded, target: 'discovering' },
+						{ target: failed }
+					]
+				}
 			},
 			discovering: {
 				invoke: {
@@ -157,31 +171,29 @@ export function createNotebookRestorePlanningMachine() {
 				}
 			},
 			allocating: {
-				entry: assign({
-					planningSucceeded: ({ context }) =>
-						planningSucceeded(() => {
-							const value = data(context)
-							value.mappings = allocateNotebookMappings(value.archive.readPayload())
-						})
+				entry: synchronous((context) => {
+					const value = data(context)
+					value.mappings = allocateNotebookMappings(value.archive.readPayload())
 				}),
-				always: [
-					interrupted,
-					{ guard: ({ context }) => context.planningSucceeded, target: 'projecting' },
-					{ target: failed }
-				]
+				on: {
+					PLANNING_APPLIED: [
+						interrupted,
+						{ guard: ({ context }) => context.planningSucceeded, target: 'projecting' },
+						{ target: failed }
+					]
+				}
 			},
 			projecting: {
-				entry: assign({
-					planningSucceeded: ({ context }) =>
-						planningSucceeded(() => {
-							projectNotebookGraph(data(context))
-						})
+				entry: synchronous((context) => {
+					projectNotebookGraph(data(context))
 				}),
-				always: [
-					interrupted,
-					{ guard: ({ context }) => context.planningSucceeded, target: 'hashingGraph' },
-					{ target: failed }
-				]
+				on: {
+					PLANNING_APPLIED: [
+						interrupted,
+						{ guard: ({ context }) => context.planningSucceeded, target: 'hashingGraph' },
+						{ target: failed }
+					]
+				}
 			},
 			hashingGraph: {
 				invoke: {
@@ -200,17 +212,16 @@ export function createNotebookRestorePlanningMachine() {
 				}
 			},
 			projectingControl: {
-				entry: assign({
-					planningSucceeded: ({ context }) =>
-						planningSucceeded(() => {
-							projectNotebookControl(data(context))
-						})
+				entry: synchronous((context) => {
+					projectNotebookControl(data(context))
 				}),
-				always: [
-					interrupted,
-					{ guard: ({ context }) => context.planningSucceeded, target: 'hashingPreparation' },
-					{ target: failed }
-				]
+				on: {
+					PLANNING_APPLIED: [
+						interrupted,
+						{ guard: ({ context }) => context.planningSucceeded, target: 'hashingPreparation' },
+						{ target: failed }
+					]
+				}
 			},
 			hashingPreparation: {
 				invoke: {
@@ -286,18 +297,17 @@ export function createNotebookRestorePlanningMachine() {
 				}
 			},
 			buildingIntent: {
-				entry: assign({
-					planningSucceeded: ({ context }) =>
-						planningSucceeded(() => {
-							const value = data(context)
-							value.intent = buildNotebookIntent(value, context.planSha256)
-						})
+				entry: synchronous((context) => {
+					const value = data(context)
+					value.intent = buildNotebookIntent(value, context.planSha256)
 				}),
-				always: [
-					interrupted,
-					{ guard: ({ context }) => context.planningSucceeded, target: 'planned' },
-					{ target: failed }
-				]
+				on: {
+					PLANNING_APPLIED: [
+						interrupted,
+						{ guard: ({ context }) => context.planningSucceeded, target: 'planned' },
+						{ target: failed }
+					]
+				}
 			},
 			planned: { type: 'final', entry: assign({ outcome: 'planned' }) },
 			complete: { type: 'final' }

@@ -10,7 +10,19 @@ export const notebookRestoreApp = s.defineApp({
 			graphSha256: s.string(),
 			status: s.enum('incomplete', 'active')
 		},
-		{ attachments: s.reverse('restoreAttachments', 'destination') }
+		{
+			attachments: s.reverse('restoreAttachments', 'destination'),
+			notebooks: s.reverse('restoreNotebooks', 'destination')
+		}
+	),
+	restoreNotebooks: s.table(
+		{
+			destinationId: s.uuid(),
+			ownerId: s.uuid(),
+			operationId: s.string(),
+			title: s.string()
+		},
+		{ destination: s.rel('restoreDestinations', 'destinationId') }
 	),
 	restoreAttachments: s.table(
 		{
@@ -37,6 +49,30 @@ export const notebookRestorePermissions = s.definePermissions(
 		})
 		policy.restoreDestinations.allowUpdate.never()
 		policy.restoreDestinations.allowDelete.never()
+		policy.restoreNotebooks.allowRead.where((row) =>
+			allOf([
+				{ ownerId: session.user.account },
+				policy.restoreDestinations.exists.where({
+					id: row.destinationId,
+					ownerId: session.user.account,
+					operationId: row.operationId
+				})
+			])
+		)
+		policy.restoreNotebooks.allowInsert.where((row) =>
+			allOf([
+				{ ownerId: session.user.account },
+				policy.restoreDestinations.exists.where({
+					id: row.destinationId,
+					ownerId: session.user.account,
+					operationId: row.operationId,
+					status: 'incomplete'
+				})
+			])
+		)
+		policy.restoreNotebooks.allowUpdate.never()
+		policy.restoreNotebooks.allowDelete.never()
+
 		policy.restoreAttachments.allowRead.where((row) =>
 			allOf([
 				{ ownerId: session.user.account },

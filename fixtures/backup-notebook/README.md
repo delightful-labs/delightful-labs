@@ -153,3 +153,44 @@ and 1 MiB contents, Unicode filenames, conflicting bytes with matching declared 
 without replay and reconciliation of an uncertain attachment preserving its original attempt.
 See [qualification and material limits](../../specs/003-verified-backup/restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
 The destination remains incomplete; notebook/note writing, full comparison and activation are open.
+
+## One notebook-root batch — stacked implementation review
+
+`restore-notebook-writer.ts` exposes `createNotebookRootRestore({ db, retainDetached, binding,
+databaseName, archive })`, returning an unstarted actor and its private single-use request. Open and
+integrity-check the same backup again; use the same operation/destination and current live binding.
+The finite root requires the exact retained intent and current `record/notebook` batch, writes at the
+existing mapping, and stops after one step. It preserves the exact title and links the new immutable
+row to the owner/operation-bound incomplete control. Run the attachment continuation first when the
+plan has pending attachments; neither factory skips another step or selects another destination.
+
+`restore-continuation.ts` owns the shared admission/planning/current-step/projection/batch lifecycle.
+The attachment entry points and result vocabulary remain available. `restore-step-data.ts` holds
+common pure predicates; SDK reads and mutation leaves remain in their concrete adapters. The new
+notebook schema, policies, shared continuation and title recovery await qualification after review.
+Earlier passing totals qualify PR #23 rather than this working tree. No new implementation tests
+were added or run. Notes, full comparison and activation remain open. See
+[design and review](../../specs/003-verified-backup/restore-notebook-design.md).
+
+### Notebook-root qualification (2026-11-04)
+
+Following implementation review and user authorization, all 22 real Jazz/Chromium cases pass:
+13 preparation/attachment regressions and nine notebook-root cases. They cover exact empty and
+Unicode/control-character titles, mapped identity and prefix/reload, step admission, actual-title
+conflict, uncertain-write recovery without replay, native-stage cancellation/invalidation drain and
+rollback, plus server-enforced owner/control scope and immutable rows. All 914 units and
+package/consumer/static checks pass. This supersedes the pending-qualification status above.
+
+A staged rollback still leaves its issued marker unresolved; later continuation remains incomplete
+rather than replaying. One-step completion does not reverify previously completed steps, restore
+notes/relationships, compare the full graph or activate the destination. See
+[evidence and limits](../../specs/003-verified-backup/restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).
+
+### Update after PR #23 merged
+
+The notebook destination now invokes the shared live-identity admission/staging actor through
+the consolidated restore API. Continuation claim/projection and planner capsule mutations are
+synchronous machine actions, with finite failures. Request release drains its owner before
+clearing private content. All 37 restore-browser cases and 918 units pass, plus the package,
+consumer, private-creation and Storybook checks. Current evidence and limits are recorded in
+[the updated design](../../specs/003-verified-backup/restore-notebook-design.md#post-merge-machine-review-2026-11-04).

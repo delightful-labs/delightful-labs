@@ -10,14 +10,17 @@ preparation coordinator and concrete Jazz destination-control writer are now loc
 19 focused preparation unit cases and eight real Jazz/Chromium cases pass. This prepares an isolated
 incomplete destination with durable intent and mappings, separate settlement observations and
 same-browser reload reconciliation. A one-attachment continuation and the shared owner/planner are now locally qualified:
-914 unit tests and 13 real Jazz/Chromium preparation/attachment cases pass. Notebook/note writers, fresh full-content
-comparison and activation remain unimplemented. T006/T012 and Finance adoption remain incomplete; no successful
+914 unit tests and 13 real Jazz/Chromium preparation/attachment cases pass for PR #23.
+The one-notebook-root batch stacked in PR #24 and its extracted continuation/schema/writer are now
+locally qualified: 914 units and 22 actual Jazz/Chromium preparation/attachment/notebook cases pass. Note writers, fresh full-content comparison and
+activation remain unimplemented. T006/T012 and Finance adoption remain incomplete; no successful
 full restore or production restore safety is claimed. See the
 [preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
 and [current handoff](tasks.md#current-handoff-2026-11-04).
 
 The subsequent PR #23 operation-lock ownership correction is qualified after review with 924 units
-and 13 native Jazz/Chromium cases; later stacked slices require requalification after propagation. See [lock design](restore-lock-design.md).
+and 13 native Jazz/Chromium cases. Propagation to the notebook-root branch passes 22 browser cases;
+the note branch still requires propagation and qualification. See [lock design](restore-lock-design.md).
 
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
 

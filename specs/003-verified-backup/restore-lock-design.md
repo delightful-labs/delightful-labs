@@ -85,3 +85,11 @@ checks (17 reader and 18 notebook export tests), notebook TypeScript, lint, form
 checks pass. Disposable Vite/Jazz/Chromium resources were shut down. Later stacked notebook/note
 qualification follows propagation; these 13 cases do not establish their changed-tree qualification.
 No complete restore, Finance completeness or production safety claim follows.
+
+## PR #24 propagation qualification
+
+The parent correction was carried into the notebook-root branch without rewriting history. All
+22 actual Jazz/Chromium preparation/attachment/notebook-root cases pass on the propagated tree.
+No source correction was required; the existing 924-unit shared suite (41 focused cases) and
+package/consumer checks cover the same unchanged shared implementation. Only the handoff notes
+needed conflict reconciliation. The later note branch still requires propagation and qualification.

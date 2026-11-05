@@ -12,12 +12,15 @@ import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/enve
 import { prepareBrowserRestoreJournal } from 'delightful-local-first/backup/restore/journal/browser'
 import { createBrowserRestoreJournalMachine } from 'delightful-local-first/backup/restore/journal/workflow'
 import { parseRestoreJournalRecord } from 'delightful-local-first/backup/restore/journal'
+import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
+import { notebookRestoreRoot } from './restore-request.js'
 import { createNotebookDataset } from './dataset.js'
 import { createNotebookRestorePreparationMachine, prepareNotebookRestore } from './restore.js'
 import { notebookRestoreApp, activeNotebookDestinations } from './restore-schema.js'
 import {
 	createNotebookPreparationWriter,
 	createNotebookPreparationWriteMachine,
+	createNotebookDestinationWriteMachine,
 	createNotebookTransactionWriter
 } from './restore-writer.js'
 import { createNotebookRestoreAttachmentMachine } from './restore-attachment.js'
@@ -25,6 +28,9 @@ import {
 	createNotebookAttachmentWriter,
 	createNotebookAttachmentRestore
 } from './restore-attachment-writer.js'
+
+import { createNotebookRootRestore, createNotebookRootWriter } from './restore-notebook-writer.js'
+import { createNotebookRestoreRootMachine, prepareNotebookRootRestore } from './restore-notebook.js'
 
 type Writer = ReturnType<typeof createNotebookTransactionWriter>
 const config = new URLSearchParams(location.search)
@@ -65,7 +71,24 @@ const attachmentPending: {
 	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreAttachmentMachine>>
 	cleanup?: () => void
 } = {}
+const rootPending: {
+	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreRootMachine>>
+	cleanup?: () => void
+	releaseStage?: () => void
+	releaseRequest?: () => void
+	hasExpected?: () => boolean
+	reportIdentity?: (failed: boolean) => void
+	staged?: boolean
+} = {}
 const api = {
+	rootPending,
+	restoreTransactionAccess,
+	notebookRestoreRoot,
+	createNotebookDestinationWriteMachine,
+	createNotebookRootRestore,
+	createNotebookRootWriter,
+	createNotebookRestoreRootMachine,
+	prepareNotebookRootRestore,
 	attachmentPending,
 	createNotebookTransactionWriter,
 	createNotebookAttachmentWriter,

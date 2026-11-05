@@ -45,8 +45,17 @@ explicit acquisition/held/release/failure machine with a minimal Web Locks bridg
 batch coordinators drain work, explicitly release and await native settlement before returning.
 All 924 units (41 focused cases), 13 actual Jazz/Chromium cases, package/consumer and static checks
 pass. See [design and qualification](restore-lock-design.md). The browser harness correction from
-PR #24 is backported without weakening byte assertions. Propagation and qualification on #24/#25
-follow separately; their earlier totals do not qualify the new tree. No PR merge is authorized.
+PR #24 is backported without weakening byte assertions. Propagation to #24 is now qualified by
+22 native browser cases; #25 propagation/qualification follows separately. No PR merge is authorized.
+
+**PR #24 stacked on PR #23: one notebook-root batch locally qualified.** After implementation
+review, the user authorized qualification. All 22 actual Jazz/Chromium cases pass (13 prior regressions
+and nine notebook-root cases), alongside the 924-unit shared suite and package/consumer/static checks. Exact title,
+mapped IDs/prefix/reload, no step skipping, conflict, uncertain-write reconciliation, staged-write
+drain/rollback and actual notebook policy denials are covered. See
+[qualification and limits](restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).
+Destinations remain incomplete. Note writers, fresh full comparison and activation remain open.
+The user authorized this stacked PR; no merge is authorized.
 
 **Current T006 slice locally qualified: one attachment batch.** Following implementation review,
 the user authorized qualification. All 914 units (31 focused write-owner cases), 13 real Jazz/Chromium
@@ -240,7 +249,7 @@ reviewed implementation, qualification and limitation documentation; no deployme
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; one attachment batch qualified; notebook/note writers/comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
+- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; one attachment batch qualified; notebook-root writer locally qualified; note writers/comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,

@@ -8,7 +8,7 @@ import type {
 } from 'delightful-local-first/backup/restore/journal'
 import type { NotebookRestorePlanData } from './restore-plan.js'
 
-export type NotebookAttachmentExpected = {
+type NotebookMappedExpected = {
 	id: string
 	sourceId: string
 	writeId: string
@@ -17,12 +17,15 @@ export type NotebookAttachmentExpected = {
 	destinationId: string
 	ownerId: string
 	operationId: string
+}
+export type NotebookAttachmentExpected = NotebookMappedExpected & {
 	mediaType: string
 	fileName: string
 	sizeBytes: number
 	sha256: string
 	contents: Uint8Array<ArrayBuffer>
 }
+export type NotebookRootExpected = NotebookMappedExpected & { title: string }
 export interface NotebookRestoreRequest {
 	release(): void
 	toJSON(): { kind: 'notebookRestoreRequest' }
@@ -39,6 +42,7 @@ export type NotebookRestoreData = NotebookRestorePlanData & {
 	releaseControl: (() => void) | undefined
 	observedJournal: RestoreJournalRecord | undefined
 	attachment: NotebookAttachmentExpected | undefined
+	notebook: NotebookRootExpected | undefined
 }
 const requests = new WeakMap<
 	NotebookRestoreRequest,
@@ -79,11 +83,15 @@ export function prepareNotebookRestore(options: NotebookRestoreOptions): Noteboo
 		intent: undefined,
 		releaseControl: undefined,
 		observedJournal: undefined,
-		attachment: undefined
+		attachment: undefined,
+		notebook: undefined
 	}
 	const request: NotebookRestoreRequest = {
 		release() {
-			data.releaseControl?.()
+			if (data.releaseControl) {
+				data.releaseControl()
+				return
+			}
 			clear(data)
 		},
 		toJSON: () => ({ kind: 'notebookRestoreRequest' })
@@ -102,6 +110,7 @@ function clear(data: NotebookRestoreData) {
 	data.intent = undefined
 	data.observedJournal = undefined
 	data.attachment = undefined
+	data.notebook = undefined
 }
 export function requiredNotebookRestoreValue<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Missing notebook restore resource')
@@ -112,13 +121,17 @@ export function notebookRestoreData(input: { request: NotebookRestoreRequest }) 
 	return prepared(input.request).data
 }
 /** Optional observation of root-owned data; absence is a destination admission decision. */
+export function notebookRestoreRoot(request: NotebookRestoreRequest) {
+	return requests.get(request)?.data.notebook
+}
 export function notebookRestoreAttachment(request: NotebookRestoreRequest) {
 	return requests.get(request)?.data.attachment
 }
-export function claimNotebookRestore(input: { request: NotebookRestoreRequest }) {
-	const value = prepared(input.request)
-	if (value.claimed || !value.data.options) throw new Error('Notebook restore request unavailable')
+export function claimNotebookRestore(input: { request: NotebookRestoreRequest }): boolean {
+	const value = requests.get(input.request)
+	if (!value || value.claimed || !value.data.options) return false
 	value.claimed = true
+	return true
 }
 export const notebookRestoreResources = fromCallback<
 	{ type: string },

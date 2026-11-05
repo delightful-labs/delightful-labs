@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup, type Snapshot } from 'xstate'
+import { assign, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
 import type {
 	RestoreEvent,
@@ -36,17 +36,13 @@ export function createNotebookRestorePreparationMachine<
 		result: RestoreResult
 	}
 	const actors = {
-		claim: fromPromise<void, Input>(({ input }) => {
-			claimNotebookRestore(input)
-			return Promise.resolve()
-		}),
 		resources: notebookRestoreResources,
 		plan: createNotebookRestorePlanningMachine(),
 		prepare: createRestoreMachine(writer, destination)
 	}
 	const model = setup<
 		Context,
-		RestoreEvent | { type: 'RELEASE' },
+		RestoreEvent | { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' },
 		typeof actors,
 		{},
 		{ interrupt: undefined },
@@ -77,20 +73,26 @@ export function createNotebookRestorePreparationMachine<
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
 	const forward = model.enqueueActions(({ self, event, enqueue }) => {
 		const child = self.getSnapshot().children.effect
-		if (child?.getSnapshot().status === 'active')
+		if (
+			(event.type === 'CANCEL' ||
+				event.type === 'SHUTDOWN' ||
+				event.type === 'INVALIDATE' ||
+				event.type === 'RELEASE') &&
+			child?.getSnapshot().status === 'active'
+		)
 			enqueue.sendTo(child, event.type === 'RELEASE' ? { type: 'CANCEL' } : event)
 	})
 	return model.createMachine({
 		id: 'notebook-restore-preparation',
 		initial: 'claiming',
 		context: ({ input }) => {
-			const options = required(data(input).options)
+			const value = data(input)
 			return {
 				request: input.request,
-				binding: options.binding,
-				databaseName: options.databaseName,
+				binding: value.binding,
+				databaseName: value.options?.databaseName ?? '',
 				interruption: undefined,
-				result: { binding: options.binding, outcome: 'unavailable', record: undefined }
+				result: { binding: value.binding, outcome: 'unavailable', record: undefined }
 			}
 		},
 		output: ({ context }) => ({
@@ -104,7 +106,11 @@ export function createNotebookRestorePreparationMachine<
 			RELEASE: { actions: ['interrupt', forward] }
 		},
 		states: {
-			claiming: { invoke: { src: 'claim', input, onDone: 'working', onError: 'complete' } },
+			claiming: {
+				entry: ({ context, self }) =>
+					self.send({ type: claimNotebookRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' }),
+				on: { CLAIMED: 'working', CLAIM_FAILED: 'complete' }
+			},
 			working: {
 				initial: 'planning',
 				invoke: { src: 'resources', input, onError: 'complete' },
