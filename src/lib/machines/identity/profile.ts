@@ -4,8 +4,7 @@ import type {
 	FormCapability,
 	FormChildEvent,
 	FormObservation,
-	FormSchema,
-	FormOperationResult
+	FormSchema
 } from '../../contracts/scoped-form.js'
 import {
 	createProfileAvatarMachine,
@@ -15,13 +14,10 @@ import {
 	type ProfileAvatarValues
 } from './profile-avatar.js'
 import type { ScopedFormOptions } from '../forms/scoped-form.js'
+import { createProfilePersistenceMachine } from './profile-persistence.js'
 import { createSingleWriteFormOptions } from '../forms/policy.js'
-export function profileScope(f: ProfileObservation): ProfileScope {
-	return { identityId: f.identityId, profileId: f.profile?.id ?? null, binding: f.binding }
-}
-export function sameProfileScope(a: ProfileScope, b: ProfileScope) {
-	return a.identityId === b.identityId && a.profileId === b.profileId && a.binding === b.binding
-}
+export { profileScope, sameProfileScope } from '../../contracts/profile.js'
+import { profileScope, sameProfileScope } from '../../contracts/profile.js'
 export function createProfileAvailability(binding: object) {
 	return setup<
 		{ observation: FormObservation<ProfileObservation> },
@@ -93,11 +89,13 @@ export function selectProfileAvailability(
 ): FormCapability<ProfileScope, ProfileReason> {
 	const { revision, facts } = s.context.observation
 	const state = s.value
-	if (state === 'checking') throw new Error('Unassessed profile')
 	return {
 		revision,
 		scope: profileScope(facts),
-		readiness: state === 'ready' ? { kind: 'ready' } : { kind: 'blocked', reason: state }
+		readiness:
+			state === 'ready'
+				? { kind: 'ready' }
+				: { kind: 'blocked', reason: state === 'checking' ? 'loading' : state }
 	}
 }
 type NameValues = { displayName: string | null }
@@ -133,6 +131,14 @@ export function createProfileFormOptions<
 		settlement: deps.saveSettlement,
 		classifyBlocked: (): 'unavailable' => 'unavailable'
 	}
+	const namePersistence = createProfilePersistenceMachine<NameValues>({
+		settlement: deps.saveSettlement,
+		save: (id, user, values) => deps.saveName(id, user, values.displayName ?? null)
+	})
+	const avatarPersistence = createProfilePersistenceMachine<ProfileAvatarValues>({
+		settlement: deps.saveSettlement,
+		save: deps.saveAvatar
+	})
 	const name = createSingleWriteFormOptions<
 		NameValues,
 		void,
@@ -140,7 +146,7 @@ export function createProfileFormOptions<
 		ProfileScope,
 		ProfileObservation,
 		SnapshotFrom<typeof availability>,
-		Snapshot<FormOperationResult<void, ProfileReason>>,
+		SnapshotFrom<typeof namePersistence>,
 		NameSchema
 	>({
 		...common,
@@ -154,11 +160,7 @@ export function createProfileFormOptions<
 			'displayName' in draft &&
 			typeof draft.displayName === 'string' &&
 			(draft.displayName.trim() || null) === (initial.displayName ?? null),
-		write: async ({ request }) => {
-			const { profileId, identityId } = request.scope
-			if (profileId === null || identityId === null) throw new Error('Missing authorized profile')
-			await deps.saveName(profileId, identityId, request.values.displayName ?? null)
-		}
+		persistence: namePersistence
 	})
 	const avatarWrite = createSingleWriteFormOptions<
 		ProfileAvatarValues,
@@ -167,16 +169,12 @@ export function createProfileFormOptions<
 		ProfileScope,
 		ProfileObservation,
 		SnapshotFrom<typeof availability>,
-		Snapshot<FormOperationResult<void, ProfileReason>>,
+		SnapshotFrom<typeof avatarPersistence>,
 		ValueSchema
 	>({
 		...common,
 		schema: deps.avatarValuesSchema,
-		write: async ({ request }) => {
-			const { profileId, identityId } = request.scope
-			if (profileId === null || identityId === null) throw new Error('Missing authorized profile')
-			await deps.saveAvatar(profileId, identityId, request.values)
-		}
+		persistence: avatarPersistence
 	})
 	const avatarOperation = createProfileAvatarMachine({
 		processImage: deps.processImage,

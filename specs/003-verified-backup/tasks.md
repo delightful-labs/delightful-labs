@@ -6,6 +6,80 @@ added/run only after review approval of the implementation they cover.
 
 ## Current handoff (2026-11-04)
 
+**PR #23 coordinator and writer cleanup locally qualified.** The user authorized this cleanup and
+its tests together. One `createRestoreMachine(native, destination)` now owns selected-step admission,
+journal initialization/load and operation-lock drain/release; both dependencies are mandatory.
+Preparation and attachment destinations are finite machines sharing the native transaction leaves.
+The duplicated coordinators and unmerged specialization APIs are removed; planner synchronous work
+no longer uses fake promise actors, and attachment observation routing uses ordered guards.
+All **926 units (43 focused)** and **16 actual Jazz/Chromium cases**, package/consumer and static
+checks pass. Added tests cover missing batch journals, unknown selected writes, identity denial and
+unexpected identity-read failure. See [design, API migration and qualification](pr23-coordinator-cleanup.md).
+This supersedes the following awaiting-review/runtime-pending notes for this local tree. No commit,
+push or propagation to #24/#25; full comparison/activation and Finance adoption remain open.
+
+**PR #23 attachment destination machine prepared for review.** Following the user's request,
+createNotebookAttachmentWriter now returns a real finite statechart. Guards own scope/mapping,
+identity, observed control and exact content decisions; SDK read/insert leaves do not select the
+workflow. The shared write actor invokes this destination actor, forwards interruption and retains
+journal/transaction/settlement/rollback/lock ownership. A borrowed tracked transaction port preserves
+native custody; observations remain private and are cleared on completion, stop or owner error.
+Native transaction leaves are reused directly rather than constructing a preparation writer.
+See [actor design and review](restore-attachment-actor-review.md). Root/package/notebook/public
+consumer static checks pass. No tests run, no commit/push and no stack propagation for this correction;
+the prior 924-unit/14-browser cleanup evidence does not qualify this changed actor tree.
+
+**PR #23 simplification locally qualified after review.** The ten-function forwarding file,
+preparation write specialization, selector callbacks and attachment request wrapper are removed;
+callers pass the selected step/options directly. The shared write chart has one local journal-update
+predicate, and request claim admission stores one claim fact instead of a separate closure.
+All 924 units (41 focused cases), 14 actual Jazz/Chromium cases and package/consumer/static checks
+pass, including a new native second-claim/first-owner-resource test. See
+[review findings and qualification](pr23-simplification-review.md). The duplicated preparation/batch
+coordinator is documented as a separate candidate. Changes remain local and uncommitted; this
+tests-only step did not publish or propagate the cleanup to #24/#25. Their previous passing totals
+do not qualify this changed tree. Full comparison/activation remain open.
+
+**PR #23 operation-lock correction locally qualified after review.** `operationLock` is now an
+explicit acquisition/held/release/failure machine with a minimal Web Locks bridge. Preparation and
+batch coordinators drain work, explicitly release and await native settlement before returning.
+All 924 units (41 focused cases), 13 actual Jazz/Chromium cases, package/consumer and static checks
+pass. See [design and qualification](restore-lock-design.md). The browser harness correction from
+PR #24 is backported without weakening byte assertions. Propagation and qualification on #24/#25
+follow separately; their earlier totals do not qualify the new tree. No PR merge is authorized.
+
+**Current T006 slice locally qualified: one attachment batch.** Following implementation review,
+the user authorized qualification. All 914 units (31 focused write-owner cases), 13 real Jazz/Chromium
+preparation/attachment cases, package/consumer and static checks pass. The attachment root writes one
+file with durable intent, separate local/remote evidence, exact-byte conflict detection and same-browser
+uncertain-write reconciliation without replay. Destinations remain incomplete. See
+[qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
+Notebook/note writers, fresh full comparison and activation remain open. The user subsequently
+authorized committing and pushing this qualified slice for pull-request review.
+
+**Preparation committed; next slice proposed.** The user authorized the local preparation commit
+`bba5f49` (`feat(backup): qualify isolated notebook restore preparation`). Nothing was pushed.
+The [next bounded attachment design](restore-attachment-design.md) proposes advancing one existing
+attachment batch with actual bytes and the retained journal prefix. The user subsequently authorized implementation, now awaiting review above. At the user’s request, [isolated actual-SDK research](attachment-research.md)
+now passes 14 disposable Chromium cases, informing scalar-byte storage and bounded include reads.
+Those probes are not attachment-restore implementation tests. Data writers,
+full comparison, activation and Finance adoption remain incomplete.
+
+**New active T006 slice: notebook restore preparation.** PR #22 is merged; work continues on
+`feat/notebook-restore-preparation` from `08f4c38`. The user approved beginning the bounded design.
+See [preparation design and implementation review](restore-preparation-design.md). Shared preparation
+coordination, a write-owner contract, scoped journal discovery and the concrete notebook Jazz control
+row/writer are implemented and locally qualified after review. All 902 unit cases pass, including
+19 focused preparation cases; eight real Jazz/Chromium cases and all 14 existing native journal
+browser regressions pass. The user approved owner-bound first-write admission; server acceptance
+remains separately observed. The earlier permission-advice blocker is resolved, and cancellation now
+retains the active child's drained result. See the
+[completed preparation qualification](restore-preparation-design.md#preparation-qualification--completed).
+Note/attachment
+writes, fresh full-content comparison and activation remain unimplemented; T006/T012 stay open.
+Later qualification entries below supersede historical awaiting-review notes only for their covered
+behavior. No unrelated cleanup, Finance adoption, commit or publication is included.
+
 **Current correction awaiting review: notebook finite operations.** Following the user's review,
 REPLACE/READ now have explicit validation/capture and success/failure states with named single-leaf
 actions. State-specific rejection handlers replace root defaults; the source adapter projects an
@@ -166,7 +240,7 @@ reviewed implementation, qualification and limitation documentation; no deployme
 
 - [x] T005 — **Implemented and locally verified after user authorization to proceed.** Implement the independent file inspector, with generic integrity distinguished from
       recognized-profile/domain validation. See [inspector design](inspector-design.md) and the headless tool under `fixtures/backup-reader`. 30 inspector unit cases and 11 separate-process reader cases pass, including disabled common network APIs/no app credentials, profile outcomes, bounds, signals and cleanup. Included in normal CI checks; no Finance validator or restore proof is claimed.
-- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store reviewed with focused Chromium checks; restore coordinator/writers remain unimplemented.** Implement shared export/restore actor protocols and a small
+- [ ] T006 — **In progress: capture/export and pure journal codec qualified; browser journal owner/store and notebook preparation/control writer qualified; one attachment batch qualified; notebook/note writers/comparison/activation remain unimplemented.** Implement shared export/restore actor protocols and a small
       nonfinancial notebook profile. Use the existing archive/envelope/inspection resources and
       focused workflow boundaries; keep domain capture, authority and destination operations
       consumer-owned. Model generation/operation binding, resource ownership, cancellation/drain,

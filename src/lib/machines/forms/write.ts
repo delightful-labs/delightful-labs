@@ -67,25 +67,33 @@ export function createScopedFormWriteMachine<
 	const review = createScopedFormReadinessMachine<Scope, Reason, Observation, AvailabilitySnapshot>(
 		options
 	)
+	const effect = options.write
+	const nativeWrite = effect
+		? fromPromise<Output, Input>(async ({ input }) => ({
+				outcome: 'succeeded',
+				value: await effect(input),
+				settlement: options.settlement
+			}))
+		: setup<{}, FormChildEvent<Observation>, {}, {}, {}, {}, never, string, Input, Output>(
+				{}
+			).createMachine({
+				initial: 'failed',
+				output: () => ({ outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }),
+				states: { failed: { type: 'final' } }
+			})
 	const actors = {
-		refresh: fromPromise<FormObservation<Observation>, FormObservation<Observation>>(
-			async ({ input }) => ({ revision: input.revision, facts: options.observe() })
+		refresh: fromPromise<FormObservation<Observation>, FormObservation<Observation>>(({ input }) =>
+			Promise.resolve({ revision: input.revision, facts: options.observe() })
 		),
 		review,
-		write:
-			options.persistence ??
-			fromPromise<Output, Input>(async ({ input }) => {
-				if (!options.write) throw new Error('Missing persistence operation')
-				const value = await options.write(input)
-				return { outcome: 'succeeded', value, settlement: options.settlement }
-			})
+		write: options.persistence ?? nativeWrite
 	}
 	const form = setup<
 		Context,
 		Event,
 		typeof actors,
 		{},
-		{ observeAssessmentError: undefined; interruptWrite: undefined },
+		{ observeAssessmentError: undefined; interruptWrite: undefined; forwardObservation: undefined },
 		{
 			closing: undefined
 			invalidated: undefined
@@ -98,9 +106,20 @@ export function createScopedFormWriteMachine<
 	>({
 		actors,
 		actions: {
+			forwardObservation: enqueueActions(({ self, event, enqueue }) => {
+				const child = self.getSnapshot().children.write
+				if (child?.getSnapshot().status === 'active' && event.type === 'OBSERVE')
+					enqueue.sendTo(child, event)
+			}),
 			interruptWrite: enqueueActions(({ self, event, enqueue }) => {
 				const child = self.getSnapshot().children.write
-				if (child?.getSnapshot().status === 'active') {
+				if (
+					child?.getSnapshot().status === 'active' &&
+					(event.type === 'OBSERVE' ||
+						event.type === 'INVALIDATE' ||
+						event.type === 'CANCEL' ||
+						event.type === 'SHUTDOWN')
+				) {
 					enqueue.sendTo(child, event.type === 'OBSERVE' ? { type: 'INVALIDATE' } : event)
 				}
 			}),
@@ -155,7 +174,8 @@ export function createScopedFormWriteMachine<
 					result: ({ context }): Output => {
 						if (context.result) return context.result
 						const readiness = context.capability?.readiness
-						if (readiness?.kind !== 'blocked') throw new Error('Missing write capability')
+						if (readiness?.kind !== 'blocked')
+							return { outcome: 'failed', code: 'availabilityFailed', settlement: 'notStarted' }
 						return { outcome, reason: readiness.reason, settlement: 'notStarted' }
 					}
 				}),
@@ -177,7 +197,7 @@ export function createScopedFormWriteMachine<
 	}
 	return form.createMachine({
 		id: 'scoped-form-write',
-		initial: 'refreshing',
+		initial: 'admittingInput',
 		context: ({ input }) => ({
 			request: input.request,
 			observation: input.observation,
@@ -186,12 +206,19 @@ export function createScopedFormWriteMachine<
 			capability: undefined,
 			result: undefined
 		}),
-		output: ({ context }) => {
-			if (!context.result) throw new Error('Missing write result')
-			return context.result
-		},
+		output: ({ context }) => context.result ?? failure('failed'),
 		on: { CANCEL: '.cancelled', INVALIDATE: '.scopeChanged', SHUTDOWN: '.closed' },
 		states: {
+			admittingInput: {
+				always: [
+					{
+						guard: ({ context }) =>
+							context.request !== undefined && context.observation !== undefined,
+						target: 'refreshing'
+					},
+					{ target: 'failed', actions: assign({ result: () => prewriteFailure }) }
+				]
+			},
 			refreshing: {
 				invoke: {
 					src: 'refresh',
@@ -200,7 +227,7 @@ export function createScopedFormWriteMachine<
 						target: 'checkingScope',
 						actions: assign({
 							observation: ({ context, event }) =>
-								event.output.revision === observation(context).revision
+								event.output.revision === context.observation?.revision
 									? event.output
 									: context.observation
 						})
@@ -211,6 +238,12 @@ export function createScopedFormWriteMachine<
 			},
 			checkingScope: {
 				always: [
+					{
+						guard: ({ context }) =>
+							context.request === undefined || context.observation === undefined,
+						target: 'failed',
+						actions: assign({ result: () => prewriteFailure })
+					},
 					{
 						guard: ({ context }) =>
 							!options.sameScope(
@@ -293,6 +326,12 @@ export function createScopedFormWriteMachine<
 			deciding: {
 				always: [
 					{
+						guard: ({ context }) =>
+							context.request === undefined || context.observation === undefined,
+						target: 'failed',
+						actions: assign({ result: () => prewriteFailure })
+					},
+					{
 						guard: ({ context }) => context.capability?.readiness.kind === 'ready',
 						target: 'writing'
 					},
@@ -306,7 +345,11 @@ export function createScopedFormWriteMachine<
 						},
 						target: 'denied'
 					},
-					{ target: 'unavailable' }
+					{
+						guard: ({ context }) => context.capability?.readiness.kind === 'blocked',
+						target: 'unavailable'
+					},
+					{ target: 'failed', actions: assign({ result: () => prewriteFailure }) }
 				]
 			},
 			writing: {
@@ -376,7 +419,7 @@ export function createScopedFormWriteMachine<
 							target: '.invalidated',
 							actions: [observe, 'interruptWrite']
 						},
-						{ actions: observe }
+						{ actions: [observe, 'forwardObservation'] }
 					]
 				},
 				states: {

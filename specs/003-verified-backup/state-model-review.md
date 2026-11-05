@@ -1,5 +1,9 @@
 # Repository state-model review
 
+> The authorized 2026-11-04 implementation below supersedes the historical review-only status and
+> approval gates in this document. The user requested all remaining fixes and all tests together.
+> The original findings remain as review history, not current qualification claims.
+
 Reviewed the working tree based on `e978c35`, including the pending notebook source
 correction. Review only: no new implementation, runtime tests, commits, or pushes.
 
@@ -8,6 +12,41 @@ meaningful decisions, stages, and resource ownership belong in charts. Pure tran
 predicates, atomic staging, and narrow native completion/disposal remain functions.
 
 ## Findings
+
+Qualification completed for the authorized follow-up: 918 unit tests, 17 independent-reader
+tests, 18 notebook-export tests, 22 Jazz/Chromium restore tests, 10 private-creation tests,
+and 65 Storybook browser tests passed (1,050 total). Formatting, lint, Svelte and TypeScript
+checks, package validation, consumer checks/builds, and the Storybook build passed.
+Backup synchronous stages use ordinary actions so constructing an unstarted actor cannot
+claim resources or perform I/O. Expected missing-data paths enter admission/failure states;
+guarded generic invocation assertions remain as type invariants. Recovery hosts must adopt
+the new finite `restorationChildFailed` completion result. No commits or pushes were made.
+
+## Authorized follow-up implementation (2026-11-04)
+
+The user authorized all remaining fixes and their tests together. Preserve existing ownership,
+settlement evidence and native cleanup receipts. Work through these changes as one reviewed set:
+
+- Profile persistence: invoke a domain machine for scope admission -> one save -> finite result.
+  Missing identity/profile stops unavailable before SDK issue. Observation/invalidation during save
+  enters draining states; completion preserves the actual settlement rather than claiming rollback.
+- Forms: admission guards precede child invocation; missing request, observation or validated values
+  reaches a finite not-started failure. Missing blocked capability becomes availability failure.
+  Outputs are total; failures after issue retain unknown settlement. Payload cleanup remains owned
+  by existing terminal states; pure injected normalizers retain their documented contract.
+- Workspace startup: capture admitted user and initialization provenance once, validate before
+  invoking initialization/seed, and report failed/waiting without throwing from input/entry builders.
+  Replacement and shutdown continue to drain existing children. Local readiness stays independent
+  of optional seed success.
+- Backup: synchronous claim/parse/prepare/build/clear operations execute as bounded machine actions
+  with typed result admission and explicit failure transitions, rather than synthetic promise leaves.
+  Stateful mode selection, eligibility, cleanup and interruption remain in the owning statechart.
+  Crypto, SDK/file I/O and native custody receipts retain their external actor boundaries.
+
+Qualify recovery finite failure/uncertainty, profile no-write admission and save draining, form
+missing-prerequisite failure and cleanup, startup empty identity/replacement/seeding, backup duplicate
+claims/release/parse failures/crypto cancellation, and restore write identity loss/observer failure
+while staging. Run the complete unit and browser suites plus package/consumer/static checks.
 
 ### 1. Envelope preparation still contains operation routing (P2)
 
@@ -42,6 +81,25 @@ crop acceptance, removal versus draft clearing, and profile/reset changes after 
 implementation is approved. No stale crop result was reproduced in this review.
 
 ### 3. Recovery child failure has no modeled cleanup outcome (P2)
+
+Implementation review update (2026-11-04): replace the coordinator's intentional output throw
+and queued `PROPAGATE_FAILURE` turn with a final `restorationChildFailed` state and public typed
+result. The coordinator records whether it sent the child's `PREPARED` permit as a protocol fact.
+An unexpected child failure before that permit reports `mutation: notStarted`; after the permit,
+report `mutation: unknown`, because neither issue nor settlement can be inferred from a crash.
+Normal restoration results retain their existing mutation evidence. The transition exits the
+restoring scope and invalidates/releases the binding before final completion; clear the request
+and never navigate or retry. Shutdown during an issued restoration still drains the child, and
+an unexpected child failure takes precedence over ordinary closed completion.
+
+Machine output must be total and sanitized, with no raw child error, phrase or credential. Hosts
+must route `restorationChildFailed` through `invoke.onDone` to their failure/uncertainty handling;
+the coordinator no longer deliberately triggers `invoke.onError`. Keep `onError` for genuinely
+unexpected coordinator crashes. This public-protocol change requires consumer review before
+adoption. Existing unit assertions expecting parent-error propagation need revision after
+implementation approval; cover crashes before/after permit, cleanup before completion, shutdown,
+cleared sensitive references, and unchanged ordinary success/rejection. The user subsequently
+authorized the tests; all six coordinator cases pass with the revised finite-result protocol.
 
 `src/lib/machines/identity/session-recovery.ts:201` handles an unexpected restoration
 child error by throwing from an action. The coordinator therefore errors instead of

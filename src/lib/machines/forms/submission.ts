@@ -137,10 +137,8 @@ export function createScopedFormSubmissionMachine<
 			validated: undefined,
 			result: undefined
 		}),
-		output: ({ context }) => {
-			if (!context.result) throw new Error('Missing form result')
-			return context.result
-		},
+		output: ({ context }): FormResult<Result, Reason> =>
+			context.result ?? { outcome: 'failed', code: 'unexpected', settlement: 'unknown' },
 		states: {
 			validating: {
 				entry: publishProgress('validating'),
@@ -154,7 +152,7 @@ export function createScopedFormSubmissionMachine<
 						{ guard: 'invalidated', target: 'scopeChanged' },
 						{ guard: 'cancelling', target: 'cancelled' },
 						{
-							target: 'operating',
+							target: 'admittingOperation',
 							actions: assign({ validated: ({ event }) => ({ value: event.output }) })
 						}
 					],
@@ -190,6 +188,21 @@ export function createScopedFormSubmissionMachine<
 						on: { CANCEL: {}, INVALIDATE: {}, SHUTDOWN: {}, OBSERVE: {} }
 					}
 				}
+			},
+			admittingOperation: {
+				always: [
+					{
+						guard: ({ context }) =>
+							context.validated !== undefined && context.observation !== undefined,
+						target: 'operating'
+					},
+					{
+						target: 'failed',
+						actions: assign({
+							result: { outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }
+						})
+					}
+				]
 			},
 			operating: {
 				entry: publishProgress('operating'),

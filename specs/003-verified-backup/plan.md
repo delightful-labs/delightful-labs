@@ -2,31 +2,29 @@
 
 **Branch**: `feat/verified-backup` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
 
-**Status**: Archive codec, envelope/integrity handling and independent inspector are implemented
-and functionally verified. Large-file browser memory/latency qualification remains. Shared-library
-cleanup implementation merged in PR #19; regression qualification and two reproduced fixes are in
-merged PR #20. Shared capture/export actors and a disposable notebook source are merged in PR #21
-and locally qualified in T006. The pure restore journal model/codec is implemented and locally verified.
-The browser journal owner/store is reviewed with focused Chromium checks; restore coordination and
-destination writes remain unimplemented. No deployed
-consumer export or verified restore is qualified. See the [current handoff](tasks.md#current-handoff-2026-11-03),
-[payload review notes](implementation-notes.md), [envelope ownership/design](envelope-design.md)
-and [inspector design](inspector-design.md).
+**Status**: Archive codec, envelope/integrity handling, independent inspection and capture/export
+are implemented and locally qualified. PR #22 merged the restore journal and ownership corrections.
+The notebook preparation coordinator and concrete Jazz control-row writer are now locally qualified;
+see [preparation design and qualification](restore-preparation-design.md#preparation-qualification--completed).
+The user approved replacing unusable browser permission advice with owner-bound first-insert
+admission; actual server policy still enforces acceptance. Issued/uncertain attempts retain the
+existing reconciliation rules. Preparation leaves the destination incomplete.
 
-The [restore journal identity/model](restore-journal-design.md) has pure-codec qualification.
-The [browser journal owner/concrete store](browser-journal-design.md) has focused native transaction/page-reload qualification; destination effects remain unimplemented.
-Record parsing alone supplies no persistence, authority or replay guarantee.
+Current qualification passes all 914 unit cases, 13 real Jazz/Chromium preparation/attachment cases,
+and package/consumer/static checks. See [attachment qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
+The one-attachment continuation and extracted owner/planner are qualified within that scope. No full
+restore is claimed: notebook/note writers, fresh graph/relationship/byte comparison and activation
+remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
+T007–T010 remain open. See the [current handoff](tasks.md#current-handoff-2026-11-04).
 
-Following research and user discussion of the
-[known restore limitations](spec.md#known-restore-limitations-and-implementation-gate), the user
-authorized a focused journal attempt/completion change, then approved testing. It is implemented
-and locally qualified: 833 unit tests and 51 Chromium tests pass along with package/consumer and
-static checks. Restore coordination and destination writes remain paused.
+Journal metadata alone supplies no destination authority, actual content evidence or replay
+permission. Historical per-slice journal/ownership review and qualification remain in their design
+notes; the preparation evidence supersedes earlier blanket statements that no coordinator/control
+writer exists.
 
-The subsequent machine-first ownership correction is implemented for review. Earlier green CI does
-not qualify the rewritten browser owner. See the
-[ownership correction](browser-journal-design.md#machine-first-ownership-correction--implementation-design).
-No coordinator/destination work is included, and no new runtime tests have been run before review.
+The PR #23 lock-owner review correction is qualified after review: 924 units (41 focused cases),
+13 native Jazz/Chromium cases and package/consumer/static checks pass for the explicit lock chart
+and coordinator release handshake. Later stacked slices require requalification after propagation. See [lock design](restore-lock-design.md).
 
 ## Summary
 

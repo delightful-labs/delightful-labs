@@ -22,7 +22,8 @@
 		"backup:inspect": "node fixtures/backup-reader/inspect.mjs",
 		"check:backup-reader": "tsc --noEmit --project fixtures/backup-reader/tsconfig.json",
 		"check:backup-notebook": "tsc --project fixtures/backup-notebook/tsconfig.json --noEmit false --rootDir fixtures/backup-notebook --outDir .svelte-kit/backup-notebook && node --test .svelte-kit/backup-notebook/export.test.js",
-		"test:storybook": "playwright test --config playwright.config.ts"
+		"test:storybook": "playwright test --config playwright.config.ts",
+		"check:backup-restore": "tsc --noEmit --project fixtures/backup-notebook/tsconfig.json && vitest run --config fixtures/backup-notebook/restore.vitest.config.ts"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "2.27.0",
@@ -332,6 +333,16 @@
 		"./diagnostics/logger": {
 			"types": "./dist/diagnostics/logger.d.ts",
 			"default": "./dist/diagnostics/logger.js"
+		},
+		"./backup/restore": {
+			"types": "./dist/backup/restore-api.d.ts",
+			"svelte": "./dist/backup/restore-api.js",
+			"default": "./dist/backup/restore-api.js"
+		},
+		"./backup/restore/workflow": {
+			"types": "./dist/machines/backup/restore.d.ts",
+			"svelte": "./dist/machines/backup/restore.js",
+			"default": "./dist/machines/backup/restore.js"
 		}
 	},
 	"svelte": "./dist/index.js",

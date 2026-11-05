@@ -72,3 +72,84 @@ on prebuilt package output.
 See [qualification evidence](../../specs/003-verified-backup/lifecycle-design.md#export-qualification)
 for full counts and limitations. Restore/write owners and a concrete versioned Zod journal (T012)
 are the subsequent implementation slice.
+
+## Restore preparation — qualified bounded slice
+
+`restore.ts` adds a separate unstarted notebook preparation machine and a single-use request:
+`prepareNotebookRestore({ mode: 'new' | 'resume', binding, databaseName, archive })`. The archive is
+an existing immutable integrity-checked resource; this request takes ownership and validates its
+exact notebook profile before destination work. Start the host-owned root with `{ request }` input.
+`mode: 'new'` allocates mappings once. `mode: 'resume'` discovers the original mappings from the
+existing browser journal, reconstructs the complete expected intent from the selected checked file,
+and compares it again under exclusive operation ownership. Retain the original operation/destination
+reference; a fresh live generation is required after reload. The host explicitly initializes its
+journal namespace using the existing journal workflow before starting a new restore.
+
+`restore-schema.ts` declares a disposable Jazz app and policies; `restore-writer.ts` supplies single
+SDK leaves to the shared preparation actor. Inject `createNotebookPreparationWriter(db,
+retainDetached)` into `createNotebookRestorePreparationMachine`. The host owns the persistent Jazz
+session/schema setup and the detached-native-receipt recipient; no listener, schema deployment,
+credentials or browser session is created implicitly by these factories. The transaction owner
+journals issuance before its effect, stages only an incomplete owner-bound control row, and records
+local persistence separately from remote acceptance. Web Locks is required; unavailable ownership
+blocks writes. Ordinary notebook discovery uses the active-only query.
+
+For teardown, send CANCEL/SHUTDOWN or a scoped INVALIDATE and await completion before stopping.
+`request.release()` is the abrupt reference-revocation fallback, not a drain acknowledgement. Keep
+the host/session alive for detached native receipts. Remote null, uncertain writes and missing
+required local evidence remain incomplete; neither replacement destinations nor automatic retries
+are provided. A `prepared` result still has no restored notes/attachment bytes and cannot activate.
+
+Qualification after implementation review passes: 19 focused machine cases, eight real Jazz/Chromium
+preparation cases and the existing journal browser regressions. First-write admission checks the
+current bound session identity; real server policy enforces ownership and incomplete-only creation.
+Local persistence and remote acceptance are observed and journaled separately. Same-browser reload
+recovers the same mappings and reconciles remotely matching contents without another write.
+`pnpm check:backup-restore` runs the disposable browser suite on localhost:6199 and is included in CI.
+The suite owns and shuts down its browser, Vite host and disposable Jazz authority. It also verifies
+wrong-file/identity refusal, cross-tab exclusion, malformed metadata preservation, and real server
+rejection of forged ownership and premature activation.
+
+Qualification found/fixed incompatible Web Locks options and a parent cancellation guard that stopped
+the active destination child before its drained result. Browser-process crash, offline restore,
+notes/attachment writing and full-content verification remain outside this evidence. See the
+[preparation qualification](../../specs/003-verified-backup/restore-preparation-design.md#preparation-qualification--completed).
+
+## One attachment batch — implementation review
+
+`createNotebookAttachmentRestore` in `restore-attachment-writer.ts` creates an unstarted root and a
+single-use request from `{ db, retainDetached, binding, databaseName, archive }`. The archive is a
+new immutable integrity-checked resource for the original file; ownership transfers to the request.
+Start the returned actor and await its finite output through XState. The host continues to own the
+SDK session and detached native receipts. The function does not initialize storage, create a
+replacement operation or start any child manually.
+
+The resume-only root rebuilds the entire expected intent, requires completed preparation, selects
+only the current attachment batch and rechecks the journal under exclusive operation ownership.
+A stale selection stops incomplete. The concrete writer inserts native bytes plus metadata in one
+transaction and compares actual returned bytes on reconciliation. `batchWritten` means one step
+was checkpointed; `noAttachmentStep` means this root cannot execute the current step. Neither result
+activates a destination or establishes a full restore.
+
+The common write owner and notebook planner are extracted from preparation for reuse. Consequently,
+the preceding preparation qualification is evidence for commit `bba5f49`, not this revised actor tree.
+This new slice awaits implementation review before tests. Static compilation/package checks do not
+prove runtime byte, checkpoint or cancellation behavior. The isolated SDK probes informed the design
+but do not qualify this implementation. See the
+[review notes](../../specs/003-verified-backup/restore-attachment-design.md#implementation-prepared-for-review).
+
+Send CANCEL/SHUTDOWN/scoped INVALIDATE and await completion before stopping. Pre-write SDK reads can
+delay graceful cancellation until their actual settlement; the owner keeps expected bytes until
+that drain. `request.release()` is abrupt reference revocation, not cancellation of issued native
+I/O. Unknown issued attempts still do not replay. Note/title writers, final full graph/relationship/
+byte comparison, activation and Finance adoption remain unimplemented.
+
+### Attachment qualification (2026-11-04)
+
+After user-authorized implementation review, 914 units (31 focused write-owner cases) and 13 actual
+Jazz/Chromium preparation/attachment cases pass, along with package/consumer and static checks.
+This supersedes the pending-review status above. Actual attachment tests cover exact bytes, empty
+and 1 MiB contents, Unicode filenames, conflicting bytes with matching declared digest, reload
+without replay and reconciliation of an uncertain attachment preserving its original attempt.
+See [qualification and material limits](../../specs/003-verified-backup/restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
+The destination remains incomplete; notebook/note writing, full comparison and activation are open.

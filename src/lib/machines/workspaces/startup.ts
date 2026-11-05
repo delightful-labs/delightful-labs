@@ -54,6 +54,7 @@ export function createWorkspaceStartupMachine<
 		operation: InitializationRequest | undefined
 		result: WorkspaceInitializationResult | undefined
 		seedResult: WorkspaceFakeDataResult | undefined
+		provenance: { profileId: string; organizationId: string } | undefined
 	}
 
 	type WorkspaceInitializationResult = Initialization
@@ -108,7 +109,8 @@ export function createWorkspaceStartupMachine<
 			...input,
 			operation: undefined,
 			result: undefined,
-			seedResult: undefined
+			seedResult: undefined,
+			provenance: undefined
 		}),
 		initial: 'checking',
 		on: {
@@ -121,8 +123,7 @@ export function createWorkspaceStartupMachine<
 			checking: {
 				always: [
 					{
-						guard: ({ context }) =>
-							context.request.status === 'ready' && context.request.userId !== undefined,
+						guard: ({ context }) => context.request.status === 'ready' && !!context.request.userId,
 						target: 'initializing'
 					},
 					{ target: 'waitingForSession' }
@@ -138,7 +139,8 @@ export function createWorkspaceStartupMachine<
 					assign({
 						operation: ({ context }) => context.request,
 						result: undefined,
-						seedResult: undefined
+						seedResult: undefined,
+						provenance: undefined
 					}),
 					report(() => ({ kind: 'checking' }))
 				],
@@ -161,20 +163,17 @@ export function createWorkspaceStartupMachine<
 				invoke: {
 					id: 'initialize',
 					src: 'initialize',
-					input: ({ context }) => {
-						if (!context.operation?.userId)
-							throw new Error('Initialization requires a session identity')
-						return { db, userId: context.operation.userId }
-					},
+					input: ({ context }) => ({ db, userId: context.operation?.userId ?? '' }),
 					onDone: [
 						{ guard: 'closing', target: 'closed' },
 						{ guard: 'replacing', target: 'checking' },
 						{
-							guard: ({ event }) => options.ready(event.output) !== undefined,
-							target: 'ready',
-							actions: assign({ result: ({ event }) => event.output })
-						},
-						{ target: 'failed', actions: assign({ result: ({ event }) => event.output }) }
+							target: 'admittingReady',
+							actions: assign({
+								result: ({ event }) => event.output,
+								provenance: ({ event }) => options.ready(event.output)
+							})
+						}
 					],
 					onError: [
 						{ guard: 'closing', target: 'closed' },
@@ -189,13 +188,25 @@ export function createWorkspaceStartupMachine<
 					]
 				}
 			},
+			admittingReady: {
+				always: [
+					{
+						guard: ({ context }) =>
+							!!context.operation?.userId &&
+							!!context.provenance?.profileId &&
+							!!context.provenance.organizationId,
+						target: 'ready'
+					},
+					{ target: 'failed' }
+				]
+			},
 			ready: {
 				initial: 'seeding',
-				entry: report((context) => {
-					const result = options.ready(context.result)
-					if (!result) throw new Error('Expected initialized profile')
-					return { kind: 'ready', profileId: result.profileId }
-				}),
+				entry: report((context) =>
+					context.provenance
+						? { kind: 'ready', profileId: context.provenance.profileId }
+						: { kind: 'failed' }
+				),
 				on: {
 					REEVALUATE: {
 						guard: 'identityChanged',
@@ -239,16 +250,11 @@ export function createWorkspaceStartupMachine<
 				invoke: {
 					id: 'seed',
 					src: 'seed',
-					input: ({ context }) => {
-						const result = options.ready(context.result)
-						if (!result || !context.operation?.userId)
-							throw new Error('Seeding requires initialized workspace provenance')
-						return {
-							db,
-							userId: context.operation.userId,
-							organizationId: result.organizationId
-						}
-					},
+					input: ({ context }) => ({
+						db,
+						userId: context.operation?.userId ?? '',
+						organizationId: context.provenance?.organizationId ?? ''
+					}),
 					onDone: [
 						{
 							guard: 'seedClosing',

@@ -4,16 +4,20 @@
 
 **Created**: 2026-11-03
 
-**Status**: Journal semantics were locally verified; machine-first browser ownership correction now
-awaits implementation review and runtime qualification. Restore coordination
-and destination writes remain paused. The bounded archive codec, envelope/integrity handling and
-independent file inspector are implemented and verified. Shared capture/export actors and a disposable
-notebook source are implemented and locally verified in T006. Restore coordination and Finance adoption remain
-unbuilt. The pure restore journal model/codec is implemented and locally verified. The browser journal
-owner/store has focused Chromium transaction/page-reload qualification; browser-process crash and
-actual restore remain unqualified. No live backup
-or successful restore is claimed. See
-[tasks and current handoff](tasks.md#current-handoff-2026-11-03).
+**Status**: Archive, envelope, independent inspection, shared capture/export and the browser
+restore journal are implemented and locally qualified; PR #22 is merged. The bounded notebook
+preparation coordinator and concrete Jazz destination-control writer are now locally qualified:
+19 focused preparation unit cases and eight real Jazz/Chromium cases pass. This prepares an isolated
+incomplete destination with durable intent and mappings, separate settlement observations and
+same-browser reload reconciliation. A one-attachment continuation and the shared owner/planner are now locally qualified:
+914 unit tests and 13 real Jazz/Chromium preparation/attachment cases pass. Notebook/note writers, fresh full-content
+comparison and activation remain unimplemented. T006/T012 and Finance adoption remain incomplete; no successful
+full restore or production restore safety is claimed. See the
+[preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
+and [current handoff](tasks.md#current-handoff-2026-11-04).
+
+The subsequent PR #23 operation-lock ownership correction is qualified after review with 924 units
+and 13 native Jazz/Chromium cases; later stacked slices require requalification after propagation. See [lock design](restore-lock-design.md).
 
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
 
@@ -137,11 +141,12 @@ As an application developer, I can use the same backup machinery with another ap
 
 ## Known restore limitations and implementation gate
 
-**Only the focused journal attempt/completion change is authorized following research and discussion.**
-The attempt/completion semantics were locally verified after implementation review. The subsequent
-machine-first ownership correction is implemented but awaits review and new runtime qualification.
-Restore coordination/destination writes remain paused. Further work must stay within the supported
-behavior agreed below; this gate does not require covering unlikely edge cases.
+**Current authorized slice: notebook restore preparation, now locally qualified.** The earlier
+journal-only gate was superseded by the user's authorization to implement and qualify this bounded
+slice, including owner-bound first-write admission. The journal changes merged in PR #22. The
+[preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
+records the actual machine/native evidence and remaining limits. Further data writers, full-content
+comparison, activation and Finance adoption require their own review slices.
 
 - **Retry representation is implemented and locally qualified; writer integration is unbuilt.** A new transaction attempt
   can follow a confirmed remote rejection with a known transaction ID, retaining the same operation,
@@ -156,7 +161,7 @@ behavior agreed below; this gate does not require covering unlikely edge cases.
 - **Qualification is limited.** Chromium page reload, atomic journal updates and cancellation around
   commit are tested. Browser-process crash recovery and actual Jazz destination restoration are
   unqualified. Journal commit does not establish Jazz local persistence, remote acceptance or a
-  verified restore. The coordinator and destination writers remain unimplemented.
+  verified restore. The preparation coordinator/control writer is now qualified; data writers and activation remain unimplemented.
 
 The [real-code limitation investigation](research.md#restore-limitation-investigation--2026-11-03)
 reproduced a Jazz retry after permission repair at the same destination IDs, which the current
