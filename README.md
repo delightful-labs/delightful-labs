@@ -107,10 +107,10 @@ Button defaults to `variant="raised"`. Use `variant="flat"` for square bordered 
 
 ```svelte
 <FloatingActionLink href={resolvedHref} aria-label={addLabel} title={addLabel}>
-    <Icon icon={AddIcon} />
+	<Icon icon={AddIcon} />
 </FloatingActionLink>
 <FloatingActionButton aria-label={addLabel} onclick={addItem}>
-    <Icon icon={AddIcon} />
+	<Icon icon={AddIcon} />
 </FloatingActionButton>
 ```
 
@@ -242,6 +242,8 @@ Supply translated `label` and `removeLabel` strings. Native attributes and callb
 ```
 
 This custom component has no tag-input dependency. Enter or the Add button adds a trimmed tag; empty values and case-insensitive duplicates are rejected. Commas remain part of tag text. Duplicate drafts remain available for correction, and blur does not commit a draft. Optional `suggestions` appear in a native popover filtered by the draft, excluding tags already selected. Clicking a suggestion adds it immediately. Arrow keys select an option, Enter adds it, and Escape dismisses the list; typing again reopens it. Focus stays in the input. The list follows the input on scroll and resize, opens above it when space below is limited, and stays within the viewport. Browsers without the Popover API retain free-text entry and the Add button.
+
+Optional `normalizeTag(tag)` supplies the comparison key used consistently for duplicate detection, suggestion deduplication, selected-suggestion exclusion and draft filtering. It receives trimmed text, including empty or incomplete drafts; use a pure function that accepts any string. The default is lowercase comparison. It never rewrites displayed tags, bound values, form submissions or announcement labels. Applications retain validation and persistence policies; custom Unicode normalization needs no additional DUI dependency.
 
 Optional `bind:value` reads and updates a string array. `defaultValue` defaults to an empty array and supplies initial/reset tags; reset also clears the draft. Caller-supplied arrays are copied when edited. Supply translated `addLabel`, `removeLabel(tag)`, `selectedTagsLabel`, `addedMessage(tag)`, `removedMessage(tag)`, and `duplicateMessage(tag)` text. These labels and message callbacks are required. `id` and `placeholder` are optional.
 
@@ -416,8 +418,8 @@ Use `variant="error"` for a failed startup without a spinner. The message uses S
 
 ```svelte
 <LoadingContent loading={pending} text={loadingMessage}>
-    <InputText label={draftLabel} bind:value={draft} />
-    <Button type="button" onclick={save}>{saveLabel}</Button>
+	<InputText label={draftLabel} bind:value={draft} />
+	<Button type="button" onclick={save}>{saveLabel}</Button>
 </LoadingContent>
 ```
 
@@ -469,11 +471,11 @@ Children supply visually hidden supplementary text. Native span attributes pass 
 
 ```svelte
 <ul>
-    <LinkedListRow href={resolvedHref} label={destinationLabel}>
-        <Text as="span"><strong>{title}</strong></Text>
-        <Text as="span">{description}</Text>
-        {#snippet trailing()}<Text as="span">{formattedMetadata}</Text>{/snippet}
-    </LinkedListRow>
+	<LinkedListRow href={resolvedHref} label={destinationLabel}>
+		<Text as="span"><strong>{title}</strong></Text>
+		<Text as="span">{description}</Text>
+		{#snippet trailing()}<Text as="span">{formattedMetadata}</Text>{/snippet}
+	</LinkedListRow>
 </ul>
 ```
 
