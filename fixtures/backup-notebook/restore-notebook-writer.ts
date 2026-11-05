@@ -1,23 +1,31 @@
 import { z } from 'zod'
-import { createActor } from 'xstate'
+import { assign, not, createActor, fromCallback, fromPromise, setup } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { payloadLimits } from 'delightful-local-first/backup/archive'
 import type { RestoreJournalIntent } from 'delightful-local-first/backup/restore/journal'
 import type {
 	RestorePlannedWrite,
-	RestoreStepPresence,
-	RestoreStepWriter
-} from 'delightful-local-first/backup/restore/batch'
+	RestoreDestinationInput,
+	RestoreDestinationResult,
+	RestoreTransactionWriter,
+	RestoreEvent
+} from 'delightful-local-first/backup/restore'
+import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
+import { sameBackupBinding } from 'delightful-local-first/backup/export'
 import { notebookRestoreApp } from './restore-schema.js'
-import { createNotebookPreparationWriter } from './restore-writer.js'
 import {
-	notebookRestoreData,
+	createNotebookTransactionWriter,
+	createNotebookDestinationWriteMachine
+} from './restore-writer.js'
+import {
+	prepareNotebookRestore,
+	notebookRestoreRoot,
 	requiredNotebookRestoreValue as required,
 	type NotebookRestoreRequest,
 	type NotebookRestoreOptions,
 	type NotebookRootExpected
 } from './restore-request.js'
-import { createNotebookRestoreRootMachine, prepareNotebookRootRestore } from './restore-notebook.js'
+import { createNotebookRestoreRootMachine } from './restore-notebook.js'
 
 const identifier = z.string().min(1).max(256)
 const digest = z.string().regex(/^[0-9a-f]{64}$/)
@@ -90,93 +98,264 @@ function notebookMatches(
 		row.title === expected.title
 	)
 }
-/** Pure decoding/content classification only; no I/O, retries or workflow advancement. */
-function presence(
-	raw: unknown,
-	expected: NotebookRootExpected,
-	intent: RestoreJournalIntent,
-	step: RestorePlannedWrite
-): RestoreStepPresence {
-	const observed = destinationObservation.safeParse(raw)
-	if (!observed.success) return 'unavailable'
-	if (
-		!expectedScopeMatches(expected, intent, step) ||
-		!expectedMappingMatches(expected, intent, step)
-	)
-		return 'conflict'
-	if (!destinationMatches(observed.data, intent)) return 'conflict'
-	const row = observed.data.notebooks[0]
-	if (!row) return 'missingOrHidden'
-	return notebookMatches(row, expected) ? 'match' : 'conflict'
-}
 function query(intent: RestoreJournalIntent, expected: NotebookRootExpected) {
 	return notebookRestoreApp.restoreDestinations
 		.where({ id: intent.operation.destinationWorkspaceId })
 		.include({ notebooks: notebookRestoreApp.restoreNotebooks.where({ id: expected.id }) })
 }
-/** Every asynchronous method performs one SDK leaf against the original bound database. */
-export function createNotebookRootWriter(
-	db: Db,
-	request: NotebookRestoreRequest,
-	retainDetached: RestoreStepWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached']
-): RestoreStepWriter<Transaction<'mergeable'>, WriteHandle> {
-	const native = createNotebookPreparationWriter(db, retainDetached)
-	const expected = () => required(notebookRestoreData({ request }).notebook)
-	return {
-		...native,
-		readRemote: (intent, step) => {
-			const row = expected()
-			return db
-				.one(query(intent, row), { tier: 'remote' })
-				.then((observed) => presence(observed, row, intent, step))
-		},
-		checkAuthority: (intent, step) =>
-			Promise.resolve(
-				db.getAuthState().session?.user.account === intent.operation.identityId &&
-					expectedScopeMatches(expected(), intent, step) &&
-					expectedMappingMatches(expected(), intent, step)
-			),
-		readTransaction: (transaction, intent, step) => {
-			const row = expected()
-			return transaction
-				.one(query(intent, row))
-				.then((observed) => presence(observed, row, intent, step))
-		},
-		stage(transaction, intent, step) {
-			const row = expected()
-			// Recheck atomic scope beside the mutation; the chart owns issuance eligibility.
-			if (
-				db.getAuthState().session?.user.account !== intent.operation.identityId ||
-				!expectedScopeMatches(row, intent, step) ||
-				!expectedMappingMatches(row, intent, step)
+/** The destination actor borrows a transaction; the shared write actor owns its full lifetime. */
+export function createNotebookRootWriter(db: Db, request: NotebookRestoreRequest) {
+	type Input = RestoreDestinationInput<Transaction<'mergeable'>>
+	type Handle = { toJSON(): { kind: 'notebookRootObservation' } }
+	type Context = {
+		input: Input
+		handle: Handle
+		interruption: 'cancelled' | 'closed' | 'invalidated' | undefined
+		result: RestoreDestinationResult
+	}
+	const observations = new WeakMap<Handle, { observed: DestinationObservation | undefined }>()
+	const expected = () => required(notebookRestoreRoot(request))
+	const observed = (context: Context) => observations.get(context.handle)?.observed
+	// This is result admission into an owned observation buffer, not workflow classification.
+	const consume = (handle: Handle, raw: unknown) => {
+		const cell = observations.get(handle)
+		if (!cell) return
+		const parsed = destinationObservation.safeParse(raw)
+		cell.observed = parsed.success ? parsed.data : undefined
+	}
+	const actors = {
+		observations: fromCallback<
+			{ type: string },
+			{
+				handle: Handle
+				owner: { subscribe(observer: { error: (error: unknown) => void }): { unsubscribe(): void } }
+			}
+		>(({ input }) => {
+			// As with transaction custody, owner failure must also release private observations.
+			const clear = () => {
+				observations.delete(input.handle)
+			}
+			const subscription = input.owner.subscribe({ error: clear })
+			return () => {
+				subscription.unsubscribe()
+				clear()
+			}
+		}),
+		remote: fromPromise<void, Context>(({ input }) =>
+			db
+				.one(query(input.input.intent, expected()), { tier: 'remote' })
+				.then((row) => consume(input.handle, row))
+		),
+		read: fromPromise<void, Context>(({ input }) => {
+			const access = restoreTransactionAccess(input.input)
+			return access.call((transaction) =>
+				transaction
+					.one(query(input.input.intent, expected()))
+					.then((row) => consume(input.handle, row))
 			)
-				throw new Error('Notebook write scope changed')
+		}),
+		write: createNotebookDestinationWriteMachine(db, (transaction) => {
+			const file = expected()
 			transaction.insert(
 				notebookRestoreApp.restoreNotebooks,
 				{
-					destinationId: row.destinationId,
-					ownerId: row.ownerId,
-					operationId: row.operationId,
-					title: row.title
+					destinationId: file.destinationId,
+					ownerId: file.ownerId,
+					operationId: file.operationId,
+					title: file.title
 				},
-				{ id: row.id }
+				{ id: file.id }
 			)
-		}
+		})
 	}
+	const model = setup<
+		Context,
+		RestoreEvent,
+		typeof actors,
+		{},
+		{ interrupt: undefined },
+		{
+			interrupted: undefined
+			currentBinding: undefined
+			scopeMatches: undefined
+			hasExpected: undefined
+			remoteOperation: undefined
+			authorityOperation: undefined
+			readOperation: undefined
+			stageOperation: undefined
+			hasObservation: undefined
+			controlMatches: undefined
+			filePresent: undefined
+			contentMatches: undefined
+		},
+		never,
+		string,
+		Input,
+		RestoreDestinationResult
+	>({
+		actors,
+		guards: {
+			interrupted: ({ context }) => context.interruption !== undefined,
+			currentBinding: ({ context, event }) =>
+				event.type === 'INVALIDATE' && sameBackupBinding(context.input.binding, event.binding),
+			scopeMatches: ({ context }) => {
+				const file = notebookRestoreRoot(request)
+				return (
+					file !== undefined &&
+					expectedScopeMatches(file, context.input.intent, context.input.step) &&
+					expectedMappingMatches(file, context.input.intent, context.input.step)
+				)
+			},
+			hasExpected: () => notebookRestoreRoot(request) !== undefined,
+			remoteOperation: ({ context }) => context.input.operation === 'remote',
+			authorityOperation: ({ context }) => context.input.operation === 'authority',
+			readOperation: ({ context }) => context.input.operation === 'read',
+			stageOperation: ({ context }) => context.input.operation === 'stage',
+			hasObservation: ({ context }) => observed(context) !== undefined,
+			controlMatches: ({ context }) => {
+				const row = observed(context)
+				return row !== undefined && destinationMatches(row, context.input.intent)
+			},
+			filePresent: ({ context }) => observed(context)?.notebooks.length === 1,
+			contentMatches: ({ context }) => {
+				const file = observed(context)?.notebooks[0]
+				const expectation = notebookRestoreRoot(request)
+				return file !== undefined && expectation !== undefined && notebookMatches(file, expectation)
+			}
+		},
+		actions: {
+			interrupt: assign({
+				interruption: ({ context, event }) =>
+					context.interruption ??
+					(event.type === 'SHUTDOWN'
+						? 'closed'
+						: event.type === 'INVALIDATE'
+							? 'invalidated'
+							: 'cancelled')
+			})
+		}
+	})
+	const forward = model.enqueueActions(({ self, event, enqueue }) => {
+		const child = self.getSnapshot().children.write
+		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
+	})
+	const input = ({ context }: { context: Context }) => context
+	return model.createMachine({
+		id: 'notebook-root-destination',
+		initial: 'working',
+		context: ({ input }) => {
+			const handle: Handle = { toJSON: () => ({ kind: 'notebookRootObservation' }) }
+			observations.set(handle, { observed: undefined })
+			return { input, handle, interruption: undefined, result: 'unavailable' }
+		},
+		output: ({ context }) => context.interruption ?? context.result,
+		on: {
+			CANCEL: { actions: ['interrupt', forward] },
+			SHUTDOWN: { actions: ['interrupt', forward] },
+			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] }
+		},
+		states: {
+			working: {
+				initial: 'admitting',
+				invoke: {
+					src: 'observations',
+					input: ({ context, self }) => ({ handle: context.handle, owner: self }),
+					onError: 'unavailable'
+				},
+				states: {
+					admitting: {
+						always: [
+							{ guard: 'interrupted', target: '#notebook-root-destination.complete' },
+							{ guard: not('hasExpected'), target: '#notebook-root-destination.unavailable' },
+							{ guard: 'scopeMatches', target: 'selectingOperation' },
+							{ target: '#notebook-root-destination.conflict' }
+						]
+					},
+					selectingOperation: {
+						always: [
+							{ guard: 'remoteOperation', target: 'readingRemote' },
+							{ guard: 'authorityOperation', target: 'writing' },
+							{ guard: 'readOperation', target: 'readingTransaction' },
+							{ guard: 'stageOperation', target: 'writing' },
+							{ target: '#notebook-root-destination.unavailable' }
+						]
+					},
+					readingRemote: {
+						invoke: {
+							src: 'remote',
+							input,
+							onDone: [
+								{ guard: 'interrupted', target: '#notebook-root-destination.complete' },
+								{ target: 'checkingObservation' }
+							],
+							onError: '#notebook-root-destination.unavailable'
+						}
+					},
+					readingTransaction: {
+						invoke: {
+							src: 'read',
+							input,
+							onDone: [
+								{ guard: 'interrupted', target: '#notebook-root-destination.complete' },
+								{ target: 'checkingObservation' }
+							],
+							onError: '#notebook-root-destination.unavailable'
+						}
+					},
+					checkingObservation: {
+						always: [
+							{
+								guard: not('hasObservation'),
+								target: '#notebook-root-destination.unavailable'
+							},
+							{ guard: not('controlMatches'), target: '#notebook-root-destination.conflict' },
+							{ guard: not('filePresent'), target: '#notebook-root-destination.missing' },
+							{ guard: 'contentMatches', target: '#notebook-root-destination.match' },
+							{ target: '#notebook-root-destination.conflict' }
+						]
+					},
+					writing: {
+						invoke: {
+							id: 'write',
+							src: 'write',
+							input: ({ context }) => context.input,
+							onDone: {
+								target: '#notebook-root-destination.complete',
+								actions: assign({ result: ({ event }) => event.output })
+							},
+							onError: '#notebook-root-destination.unavailable'
+						}
+					}
+				}
+			},
+			match: { type: 'final', entry: assign({ result: 'match' }) },
+			missing: { type: 'final', entry: assign({ result: 'missingOrHidden' }) },
+			conflict: { type: 'final', entry: assign({ result: 'conflict' }) },
+			unavailable: { type: 'final' },
+			complete: { type: 'final' }
+		}
+	})
 }
 /** Creates an unstarted host root, binding its writer and private checked-file request together. */
 export function createNotebookRootRestore(
 	options: Omit<NotebookRestoreOptions, 'mode'> & {
 		db: Db
-		retainDetached: RestoreStepWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached']
+		retainDetached: RestoreTransactionWriter<
+			Transaction<'mergeable'>,
+			WriteHandle
+		>['retainDetached']
 	}
 ) {
-	const request = prepareNotebookRootRestore({
+	const request = prepareNotebookRestore({
+		mode: 'resume',
 		archive: options.archive,
 		binding: options.binding,
 		databaseName: options.databaseName
 	})
-	const writer = createNotebookRootWriter(options.db, request, options.retainDetached)
-	const actor = createActor(createNotebookRestoreRootMachine(writer), { input: { request } })
+	const destination = createNotebookRootWriter(options.db, request)
+	const writer = createNotebookTransactionWriter(options.db, options.retainDetached)
+	const actor = createActor(createNotebookRestoreRootMachine(writer, destination), {
+		input: { request }
+	})
 	return { actor, request }
 }

@@ -1,11 +1,13 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { assign, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
 import type {
-	RestoreBatchEvent,
-	RestoreStepWriter,
-	RestoreWriteResult
-} from 'delightful-local-first/backup/restore/batch'
-import { createRestoreBatchMachine } from 'delightful-local-first/backup/restore/batch/workflow'
+	RestoreEvent,
+	RestoreTransactionWriter,
+	RestoreResult,
+	RestoreDestinationLogic,
+	RestoreDestinationResult
+} from 'delightful-local-first/backup/restore'
+import { createRestoreMachine } from 'delightful-local-first/backup/restore/workflow'
 import {
 	claimNotebookRestore,
 	notebookRestoreData as data,
@@ -21,10 +23,10 @@ import {
 } from './restore-step-data.js'
 
 export type NotebookContinuationResult<NotApplicable extends string> = Omit<
-	RestoreWriteResult<'batchWritten'>,
+	RestoreResult,
 	'outcome'
 > & {
-	outcome: RestoreWriteResult<'batchWritten'>['outcome'] | NotApplicable
+	outcome: RestoreResult['outcome'] | NotApplicable
 }
 type Continuation<NotApplicable extends string> = {
 	currentStep(input: { request: NotebookRestoreRequest }): boolean
@@ -36,8 +38,13 @@ type Continuation<NotApplicable extends string> = {
 export function createNotebookRestoreContinuationMachine<
 	Transaction,
 	Write,
-	NotApplicable extends string
->(writer: RestoreStepWriter<Transaction, Write>, continuation: Continuation<NotApplicable>) {
+	NotApplicable extends string,
+	S extends Snapshot<RestoreDestinationResult>
+>(
+	writer: RestoreTransactionWriter<Transaction, Write>,
+	destination: RestoreDestinationLogic<Transaction, S>,
+	continuation: Continuation<NotApplicable>
+) {
 	type Input = { request: NotebookRestoreRequest }
 	type Context = Input & {
 		binding: BackupBinding
@@ -46,21 +53,14 @@ export function createNotebookRestoreContinuationMachine<
 		result: NotebookContinuationResult<NotApplicable>
 	}
 	const actors = {
-		claim: fromPromise<void, Input>(({ input }) => {
-			claimNotebookRestore(input)
-			return Promise.resolve()
-		}),
 		resources: notebookRestoreResources,
 		plan: createNotebookRestorePlanningMachine(),
-		expected: fromPromise<void, Input>(({ input }) => {
-			continuation.prepareExpected(input)
-			return Promise.resolve()
-		}),
-		batch: createRestoreBatchMachine(writer)
+		batch: createRestoreMachine(writer, destination)
 	}
 	const model = setup<
 		Context,
-		RestoreBatchEvent | { type: 'RELEASE' },
+		| RestoreEvent
+		| { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' | 'EXPECTED_READY' | 'EXPECTED_FAILED' },
 		typeof actors,
 		{},
 		{ interrupt: undefined },
@@ -104,20 +104,26 @@ export function createNotebookRestoreContinuationMachine<
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
 	const forward = model.enqueueActions(({ self, event, enqueue }) => {
 		const child = self.getSnapshot().children.effect
-		if (child?.getSnapshot().status === 'active')
+		if (
+			(event.type === 'CANCEL' ||
+				event.type === 'SHUTDOWN' ||
+				event.type === 'INVALIDATE' ||
+				event.type === 'RELEASE') &&
+			child?.getSnapshot().status === 'active'
+		)
 			enqueue.sendTo(child, event.type === 'RELEASE' ? { type: 'CANCEL' } : event)
 	})
 	return model.createMachine({
 		id: 'notebook-restore-continuation',
 		initial: 'claiming',
 		context: ({ input }) => {
-			const options = required(data(input).options)
+			const value = data(input)
 			return {
 				request: input.request,
-				binding: options.binding,
-				databaseName: options.databaseName,
+				binding: value.binding,
+				databaseName: value.options?.databaseName ?? '',
 				interruption: undefined,
-				result: { binding: options.binding, outcome: 'unavailable', record: undefined }
+				result: { binding: value.binding, outcome: 'unavailable', record: undefined }
 			}
 		},
 		output: ({ context }) => ({
@@ -131,7 +137,12 @@ export function createNotebookRestoreContinuationMachine<
 			RELEASE: { actions: ['interrupt', forward] }
 		},
 		states: {
-			claiming: { invoke: { src: 'claim', input, onDone: 'working', onError: 'complete' } },
+			claiming: {
+				entry: ({ context, self }) => {
+					self.send({ type: claimNotebookRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' })
+				},
+				on: { CLAIMED: 'working', CLAIM_FAILED: 'complete' }
+			},
 			working: {
 				initial: 'admittingResume',
 				invoke: { src: 'resources', input, onError: 'complete' },
@@ -186,14 +197,20 @@ export function createNotebookRestoreContinuationMachine<
 						]
 					},
 					preparingExpected: {
-						invoke: {
-							src: 'expected',
-							input,
-							onDone: [
+						entry: ({ context, self }) => {
+							try {
+								continuation.prepareExpected(context)
+								self.send({ type: 'EXPECTED_READY' })
+							} catch {
+								self.send({ type: 'EXPECTED_FAILED' })
+							}
+						},
+						on: {
+							EXPECTED_READY: [
 								{ guard: 'interrupted', target: '#notebook-restore-continuation.complete' },
 								{ target: 'writingBatch' }
 							],
-							onError: '#notebook-restore-continuation.complete'
+							EXPECTED_FAILED: '#notebook-restore-continuation.complete'
 						}
 					},
 					writingBatch: {

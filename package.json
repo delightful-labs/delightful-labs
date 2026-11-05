@@ -334,21 +334,15 @@
 			"types": "./dist/diagnostics/logger.d.ts",
 			"default": "./dist/diagnostics/logger.js"
 		},
-		"./backup/restore/preparation": {
-			"types": "./dist/backup/restore-preparation-api.d.ts",
-			"default": "./dist/backup/restore-preparation-api.js"
+		"./backup/restore": {
+			"types": "./dist/backup/restore-api.d.ts",
+			"svelte": "./dist/backup/restore-api.js",
+			"default": "./dist/backup/restore-api.js"
 		},
-		"./backup/restore/preparation/workflow": {
-			"types": "./dist/machines/backup/restore-preparation.d.ts",
-			"default": "./dist/machines/backup/restore-preparation.js"
-		},
-		"./backup/restore/batch": {
-			"types": "./dist/backup/restore-batch-api.d.ts",
-			"default": "./dist/backup/restore-batch-api.js"
-		},
-		"./backup/restore/batch/workflow": {
-			"types": "./dist/machines/backup/restore-batch.d.ts",
-			"default": "./dist/machines/backup/restore-batch.js"
+		"./backup/restore/workflow": {
+			"types": "./dist/machines/backup/restore.d.ts",
+			"svelte": "./dist/machines/backup/restore.js",
+			"default": "./dist/machines/backup/restore.js"
 		}
 	},
 	"svelte": "./dist/index.js",

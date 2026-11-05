@@ -1,4 +1,4 @@
-import { assign, fromPromise, sendTo, setup } from 'xstate'
+import { raise, assign, sendTo, setup } from 'xstate'
 import {
 	buildCheckedArchive,
 	buildSealedArchive,
@@ -8,8 +8,7 @@ import {
 	envelopeFailure,
 	requireEnvelopeValue,
 	type ArchiveEnvelopeRequest,
-	type ArchiveEnvelopeResult,
-	type EnvelopeSuccess
+	type ArchiveEnvelopeResult
 } from '../../backup/envelope-operation.js'
 import { envelopeCrypto, type EnvelopeCryptoEvent } from '../../backup/envelope-native.js'
 import { decodeBase64 } from '../../backup/binary.js'
@@ -18,7 +17,7 @@ import { parseArchivePayload } from '../../backup/payload.js'
 
 export type ArchiveEnvelopeInput = { request: ArchiveEnvelopeRequest }
 export type ArchiveEnvelopeEvent = { type: 'CANCEL' | 'SHUTDOWN' }
-type Event = ArchiveEnvelopeEvent | EnvelopeCryptoEvent
+type Event = ArchiveEnvelopeEvent | EnvelopeCryptoEvent | SynchronousEvent
 type Context = ArchiveEnvelopeInput & {
 	mode: EnvelopeMode | undefined
 	attachmentIndex: number
@@ -27,56 +26,12 @@ type Context = ArchiveEnvelopeInput & {
 	interruption: 'cancelled' | 'closed' | undefined
 	result: ArchiveEnvelopeResult | undefined
 }
-function leaf<T>(run: (input: ArchiveEnvelopeInput) => T) {
-	return fromPromise<T, ArchiveEnvelopeInput>(({ input }) => Promise.resolve(run(input)))
-}
+type SynchronousEvent =
+	| { type: 'SYNC_COMPLETED'; patch: Partial<Context> }
+	| { type: 'SYNC_APPLIED' }
 /** Single-use envelope owner. Native crypto drains on cancellation; actor stop only detaches it. */
 export function createArchiveEnvelopeMachine() {
-	const actors = {
-		crypto: envelopeCrypto,
-		cleanup: leaf(({ request }) => clearEnvelopeData(request)),
-		claim: leaf(({ request }) => {
-			claimEnvelopeRequest(request)
-			return requireEnvelopeValue(envelopeData(request).initialMode)
-		}),
-		parseEnvelope: leaf(({ request }) => {
-			const data = envelopeData(request)
-			const envelope = parseEnvelope(requireEnvelopeValue(data.file), data.limits)
-			data.parsedEnvelope = envelope
-			data.file?.fill(0)
-			data.file = undefined
-			return envelope.protection
-		}),
-		decodePlainEnvelope: leaf(({ request }) => {
-			const data = envelopeData(request)
-			const envelope = requireEnvelopeValue(data.parsedEnvelope)
-			if (envelope.protection !== 'none') throw new Error('Expected plain envelope')
-			data.bytes = decodeBase64(envelope.payload, data.limits.payloadBytes)
-			data.expectedDigest = envelope.sha256
-			data.parsedEnvelope = undefined
-		}),
-		decodePasswordEnvelope: leaf(({ request }) => {
-			const data = envelopeData(request)
-			const envelope = requireEnvelopeValue(data.parsedEnvelope)
-			if (envelope.protection !== 'password') throw new Error('Expected password envelope')
-			const { payload, ...header } = envelope
-			data.ciphertext = decodeBase64(payload, data.limits.payloadBytes + 16)
-			data.header = Object.freeze(header)
-			data.parsedEnvelope = undefined
-		}),
-		createPasswordHeader: leaf(({ request }) => {
-			envelopeData(request).header = newPasswordHeader()
-		}),
-		parsePayload: leaf(({ request }) => {
-			const data = envelopeData(request)
-			data.payload = parseArchivePayload(requireEnvelopeValue(data.bytes), data.limits)
-			return data.payload.attachments.length
-		}),
-		buildEnvelope: fromPromise<EnvelopeSuccess, ArchiveEnvelopeInput & { mode: EnvelopeMode }>(
-			({ input }) => Promise.resolve(buildSealedArchive(input.request, input.mode))
-		),
-		buildChecked: leaf(({ request }) => buildCheckedArchive(request))
-	}
+	const actors = { crypto: envelopeCrypto }
 	const model = setup<
 		Context,
 		Event,
@@ -92,7 +47,9 @@ export function createArchiveEnvelopeMachine() {
 		actors,
 		guards: {
 			interrupted: ({ context }) =>
-				context.interruption !== undefined || context.result?.outcome === 'failed'
+				context.interruption !== undefined ||
+				context.result?.outcome === 'failed' ||
+				(context.acquired && envelopeData(context.request).initialMode === undefined)
 		},
 		actions: {
 			fail: assign({
@@ -105,15 +62,29 @@ export function createArchiveEnvelopeMachine() {
 			})
 		}
 	})
+	// Admit bounded synchronous transform failures; the chart selects cleanup and outcomes.
+	const synchronous = (run: (context: Context) => Partial<Context>) =>
+		model.createAction(({ context, self }) => {
+			try {
+				self.send({ type: 'SYNC_COMPLETED', patch: run(context) })
+			} catch (error) {
+				self.send({ type: 'SYNC_COMPLETED', patch: { result: envelopeFailure(error) } })
+			}
+		})
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
 	const failed = { target: '#archive-envelope.cleaning', actions: 'fail' } satisfies {
 		target: string
 		actions: 'fail'
 	}
-	const interrupted = { guard: 'interrupted', target: '#archive-envelope.cleaning' } satisfies {
-		guard: 'interrupted'
-		target: string
-	}
+	const interrupted = {
+		guard: 'interrupted',
+		target: '#archive-envelope.cleaning',
+		actions: model.assign(({ context }) =>
+			context.interruption === undefined && context.result?.outcome !== 'failed'
+				? { result: { outcome: 'failed', code: 'resourceReleased' } }
+				: {}
+		)
+	} satisfies { guard: 'interrupted'; target: string; actions: unknown }
 	const advance = (target: string) => [interrupted, { target }]
 	return model.createMachine({
 		id: 'archive-envelope',
@@ -132,28 +103,36 @@ export function createArchiveEnvelopeMachine() {
 				? { outcome: context.interruption }
 				: (context.result ?? { outcome: 'failed', code: 'cryptoFailed' }),
 		on: {
+			SYNC_COMPLETED: {
+				actions: [
+					model.assign(({ event }) => (event.type === 'SYNC_COMPLETED' ? event.patch : {})),
+					raise({ type: 'SYNC_APPLIED' })
+				]
+			},
 			CANCEL: { actions: assign({ interruption: 'cancelled' }) },
 			SHUTDOWN: { actions: assign({ interruption: 'closed' }) },
 			RELEASE: { actions: assign({ result: { outcome: 'failed', code: 'resourceReleased' } }) }
 		},
 		states: {
 			claiming: {
-				invoke: {
-					src: 'claim',
-					input,
-					onDone: [
-						{ guard: 'interrupted', target: 'cleaning', actions: assign({ acquired: true }) },
+				entry: synchronous((context) => {
+					claimEnvelopeRequest(context.request)
+					return {
+						acquired: true,
+						mode: requireEnvelopeValue(envelopeData(context.request).initialMode)
+					}
+				}),
+				on: {
+					SYNC_APPLIED: [
+						{ guard: ({ context }) => !context.acquired, target: 'complete' },
+						{ guard: 'interrupted', target: 'cleaning' },
 						{
-							guard: ({ event }) => event.output === 'sealPlain' || event.output === 'sealPassword',
-							target: 'working.parsingPayload',
-							actions: assign({ acquired: true, mode: ({ event }) => event.output })
+							guard: ({ context }) =>
+								context.mode === 'sealPlain' || context.mode === 'sealPassword',
+							target: 'working.parsingPayload'
 						},
-						{
-							target: 'working.parsingEnvelope',
-							actions: assign({ acquired: true, mode: ({ event }) => event.output })
-						}
-					],
-					onError: failed
+						{ target: 'working.parsingEnvelope' }
+					]
 				}
 			},
 			working: {
@@ -162,47 +141,58 @@ export function createArchiveEnvelopeMachine() {
 				on: { CRYPTO_FAILED: failed },
 				states: {
 					parsingEnvelope: {
-						invoke: {
-							src: 'parseEnvelope',
-							input,
-							onError: failed,
-							onDone: [
+						entry: synchronous(({ request }) => {
+							const data = envelopeData(request)
+							const envelope = parseEnvelope(requireEnvelopeValue(data.file), data.limits)
+							data.parsedEnvelope = envelope
+							data.file?.fill(0)
+							data.file = undefined
+							return { mode: envelope.protection === 'none' ? 'openPlain' : 'openPassword' }
+						}),
+						on: {
+							SYNC_APPLIED: [
 								interrupted,
 								{
-									guard: ({ event }) => event.output === 'none',
-									target: 'decodingPlainEnvelope',
-									actions: assign({ mode: 'openPlain' })
+									guard: ({ context }) => context.mode === 'openPlain',
+									target: 'decodingPlainEnvelope'
 								},
-								{
-									target: 'decodingPasswordEnvelope',
-									actions: assign({ mode: 'openPassword' })
-								}
+								{ target: 'decodingPasswordEnvelope' }
 							]
 						}
 					},
 					decodingPlainEnvelope: {
-						invoke: {
-							src: 'decodePlainEnvelope',
-							input,
-							onDone: advance('hashingPayload'),
-							onError: failed
-						}
+						entry: synchronous(({ request }) => {
+							const data = envelopeData(request),
+								envelope = data.parsedEnvelope
+							if (envelope?.protection !== 'none')
+								return { result: { outcome: 'failed', code: 'invalidEnvelope' } }
+							data.bytes = decodeBase64(envelope.payload, data.limits.payloadBytes)
+							data.expectedDigest = envelope.sha256
+							data.parsedEnvelope = undefined
+							return {}
+						}),
+						on: { SYNC_APPLIED: advance('hashingPayload') }
 					},
 					decodingPasswordEnvelope: {
-						invoke: {
-							src: 'decodePasswordEnvelope',
-							input,
-							onDone: advance('importingPassword'),
-							onError: failed
-						}
+						entry: synchronous(({ request }) => {
+							const data = envelopeData(request),
+								envelope = data.parsedEnvelope
+							if (envelope?.protection !== 'password')
+								return { result: { outcome: 'failed', code: 'invalidEnvelope' } }
+							const { payload, ...header } = envelope
+							data.ciphertext = decodeBase64(payload, data.limits.payloadBytes + 16)
+							data.header = Object.freeze(header)
+							data.parsedEnvelope = undefined
+							return {}
+						}),
+						on: { SYNC_APPLIED: advance('importingPassword') }
 					},
 					creatingPasswordHeader: {
-						invoke: {
-							src: 'createPasswordHeader',
-							input,
-							onDone: advance('checkingAttachments'),
-							onError: failed
-						}
+						entry: synchronous(({ request }) => {
+							envelopeData(request).header = newPasswordHeader()
+							return {}
+						}),
+						on: { SYNC_APPLIED: advance('checkingAttachments') }
 					},
 					checkingAttachments: {
 						always: [
@@ -286,7 +276,7 @@ export function createArchiveEnvelopeMachine() {
 							interrupted,
 							{
 								guard: ({ context }) =>
-									requireEnvelopeValue(envelopeData(context.request).bytes).length <=
+									(envelopeData(context.request).bytes?.length ?? Infinity) <=
 									envelopeData(context.request).limits.payloadBytes,
 								target: 'hashingPayload'
 							},
@@ -316,87 +306,54 @@ export function createArchiveEnvelopeMachine() {
 						]
 					},
 					parsingPayload: {
-						invoke: {
-							src: 'parsePayload',
-							input,
-							onError: failed,
-							onDone: [
+						entry: synchronous(({ request }) => {
+							const data = envelopeData(request)
+							data.payload = parseArchivePayload(requireEnvelopeValue(data.bytes), data.limits)
+							return { attachmentCount: data.payload.attachments.length }
+						}),
+						on: {
+							SYNC_APPLIED: [
 								interrupted,
 								{
 									guard: ({ context }) => context.mode === 'sealPassword',
-									target: 'creatingPasswordHeader',
-									actions: assign({ attachmentCount: ({ event }) => event.output })
+									target: 'creatingPasswordHeader'
 								},
-								{
-									target: 'checkingAttachments',
-									actions: assign({ attachmentCount: ({ event }) => event.output })
-								}
+								{ target: 'checkingAttachments' }
 							]
 						}
 					},
 					transferring: {
-						entry: ({ context }) => clearEnvelopeData(context.request, true),
-						always: '#archive-envelope.cleaning'
+						entry: synchronous(({ request }) => {
+							clearEnvelopeData(request, true)
+							return {}
+						}),
+						on: { SYNC_APPLIED: '#archive-envelope.cleaning' }
 					},
 					buildingEnvelope: {
-						invoke: {
-							src: 'buildEnvelope',
-							input: ({ context }) => ({
-								request: context.request,
-								mode: requireEnvelopeValue(context.mode)
-							}),
-							onError: failed,
-							onDone: [
-								interrupted,
-								{ target: 'transferring', actions: assign({ result: ({ event }) => event.output }) }
-							]
-						}
+						entry: synchronous(({ request, mode }) => ({
+							result: buildSealedArchive(request, requireEnvelopeValue(mode))
+						})),
+						on: { SYNC_APPLIED: [interrupted, { target: 'transferring' }] }
 					},
 					buildingChecked: {
-						invoke: {
-							src: 'buildChecked',
-							input,
-							onError: failed,
-							onDone: [
-								interrupted,
-								{ target: 'transferring', actions: assign({ result: ({ event }) => event.output }) }
-							]
-						}
+						entry: synchronous(({ request }) => ({ result: buildCheckedArchive(request) })),
+						on: { SYNC_APPLIED: [interrupted, { target: 'transferring' }] }
 					}
 				},
 				// Dispose before the native child stops; successful output is transferred, all other data revoked.
 				exit: ({ context }) => clearEnvelopeData(context.request)
 			},
 			cleaning: {
-				always: { guard: ({ context }) => !context.acquired, target: 'complete' },
-				invoke: {
-					src: 'cleanup',
-					input,
-					onDone: {
-						target: 'complete',
-						actions: ({ context }) => {
-							if (
-								context.interruption &&
-								(context.result?.outcome === 'sealed' ||
-									context.result?.outcome === 'integrityChecked')
-							)
-								context.result.archive.release()
-						}
-					},
-					onError: {
-						target: 'complete',
-						actions: [
-							({ context }) => {
-								if (
-									context.result?.outcome === 'sealed' ||
-									context.result?.outcome === 'integrityChecked'
-								)
-									context.result.archive.release()
-							},
-							'fail'
-						]
-					}
-				}
+				entry: synchronous((context) => {
+					if (context.acquired) clearEnvelopeData(context.request)
+					if (
+						context.interruption &&
+						(context.result?.outcome === 'sealed' || context.result?.outcome === 'integrityChecked')
+					)
+						context.result.archive.release()
+					return {}
+				}),
+				on: { SYNC_APPLIED: 'complete' }
 			},
 			complete: { type: 'final' }
 		}

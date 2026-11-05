@@ -1,23 +1,107 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { assign, createActor, fromPromise, setup, toPromise, waitFor } from 'xstate'
 import wire from '../../../tests/fixtures/restore-journal-v1.json'
-import {
-	createRestoreWriteStepMachine,
-	createRestorePreparationWriteMachine
-} from '../machines/backup/restore-preparation-write.js'
-import { createRestorePreparationMachine } from '../machines/backup/restore-preparation.js'
+import { createRestoreWriteStepMachine } from '../machines/backup/restore-write-step.js'
+import { createRestoreMachine } from '../machines/backup/restore.js'
 import { isRestoreJournalSuccessor } from './restore-journal-successor.js'
 import { parseRestoreJournalRecord, type RestoreJournalRecord } from './restore-journal.js'
 import type { BrowserJournalConfiguration } from './restore-journal-browser.js'
-import type { RestorePreparationWriter } from './restore-preparation.js'
-import { issuePreparation, observePreparation } from './restore-preparation-record.js'
+import {
+	restoreTransactionAccess,
+	type RestoreTransactionWriter,
+	type RestoreDestinationInput,
+	type RestoreDestinationResult,
+	type RestoreEvent
+} from './restore.js'
 import {
 	issueWriteStep,
 	observeWriteStep,
 	type RestoreWriteInput,
 	type RestoreStepPresence
-} from './restore-write-step.js'
-import { createRestoreBatchMachine } from '../machines/backup/restore-batch.js'
+} from './restore.js'
+
+type TestWriter<T, W> = RestoreTransactionWriter<T, W> & {
+	readRemote(...args: unknown[]): Promise<RestoreStepPresence>
+	checkAuthority(...args: unknown[]): Promise<boolean>
+	readTransaction(...args: unknown[]): Promise<RestoreStepPresence>
+	stage(...args: unknown[]): void | Promise<void>
+}
+function testDestination<T, W>(writer: TestWriter<T, W>) {
+	type Input = RestoreDestinationInput<T>
+	type Context = { input: Input; result: RestoreDestinationResult }
+	const actors = {
+		remote: fromPromise(({ input }: { input: Input }) =>
+			writer.readRemote(input.intent, input.step)
+		),
+		authority: fromPromise(({ input }: { input: Input }) =>
+			writer.checkAuthority(input.intent, input.step)
+		),
+		read: fromPromise(({ input }: { input: Input }) =>
+			restoreTransactionAccess(input).call((tx) =>
+				writer.readTransaction(tx, input.intent, input.step)
+			)
+		),
+		stage: fromPromise(({ input }: { input: Input }) =>
+			restoreTransactionAccess(input).call((tx) => writer.stage(tx, input.intent, input.step))
+		)
+	}
+	const input = ({ context }: { context: Context }) => context.input
+	return setup<
+		Context,
+		RestoreEvent,
+		typeof actors,
+		{},
+		{},
+		{},
+		never,
+		string,
+		Input,
+		RestoreDestinationResult
+	>({ actors }).createMachine({
+		initial: 'selecting',
+		context: ({ input }) => ({ input, result: 'unavailable' }),
+		output: ({ context }) => context.result,
+		states: {
+			selecting: {
+				always: [
+					{ guard: ({ context }) => context.input.operation === 'remote', target: 'remote' },
+					{ guard: ({ context }) => context.input.operation === 'authority', target: 'authority' },
+					{ guard: ({ context }) => context.input.operation === 'read', target: 'read' },
+					{ target: 'stage' }
+				]
+			},
+			remote: {
+				invoke: {
+					src: 'remote',
+					input,
+					onDone: { target: 'complete', actions: assign({ result: ({ event }) => event.output }) },
+					onError: 'complete'
+				}
+			},
+			authority: {
+				invoke: {
+					src: 'authority',
+					input,
+					onDone: [{ guard: ({ event }) => event.output, target: 'allowed' }, { target: 'denied' }],
+					onError: 'complete'
+				}
+			},
+			read: {
+				invoke: {
+					src: 'read',
+					input,
+					onDone: { target: 'complete', actions: assign({ result: ({ event }) => event.output }) },
+					onError: 'complete'
+				}
+			},
+			stage: { invoke: { src: 'stage', input, onDone: 'staged', onError: 'complete' } },
+			allowed: { type: 'final', entry: assign({ result: 'allowed' }) },
+			denied: { type: 'final', entry: assign({ result: 'denied' }) },
+			staged: { type: 'final', entry: assign({ result: 'staged' }) },
+			complete: { type: 'final' }
+		}
+	})
+}
 
 const journal = vi.hoisted(() => {
 	const state: {
@@ -136,15 +220,20 @@ function fixture(record = parseRestoreJournalRecord(wire)) {
 		isRemoteRejection: vi.fn((error: unknown, _id: string) => error === 'confirmed-rejection'),
 		rollback: vi.fn(() => Promise.resolve(true)),
 		retainDetached: vi.fn(
-			(
-				_receipt: Parameters<
-					RestorePreparationWriter<{ id: string }, { id: string }>['retainDetached']
-				>[0]
-			) => {}
+			(_receipt: Parameters<TestWriter<{ id: string }, { id: string }>['retainDetached']>[0]) => {}
 		)
-	} satisfies RestorePreparationWriter<{ id: string }, { id: string }>
-	const input = { binding, intent: record.intent, record, databaseName: 'unit-journal' }
-	const actor = createActor(createRestorePreparationWriteMachine(writer), { input })
+	} satisfies TestWriter<{ id: string }, { id: string }>
+	const input = {
+		binding,
+		intent: record.intent,
+		record,
+		step: record.intent.plan.preparation,
+		writeId: record.intent.plan.preparation.writeId,
+		databaseName: 'unit-journal'
+	}
+	const actor = createActor(createRestoreWriteStepMachine(writer, testDestination(writer)), {
+		input
+	})
 	return { actor, writer, input }
 }
 afterEach(() => vi.unstubAllGlobals())
@@ -154,7 +243,7 @@ describe('restore preparation attempt ownership', () => {
 		const { actor, writer } = fixture()
 		actor.start()
 		const result = await toPromise(actor)
-		expect(result.outcome).toBe('prepared')
+		expect(result.outcome).toBe('written')
 		expect(
 			journal.commands
 				.filter((command) => command.mode === 'update')
@@ -199,7 +288,8 @@ describe('restore preparation attempt ownership', () => {
 	})
 	for (const observation of ['missingOrHidden', 'conflict', 'match']) {
 		it(`never replays an issued outcome on ${observation} without required local evidence`, async () => {
-			const { actor, writer } = fixture(issuePreparation(parseRestoreJournalRecord(wire)))
+			const initial = parseRestoreJournalRecord(wire)
+			const { actor, writer } = fixture(issueWriteStep(initial, initial.intent.plan.preparation))
 			if (observation === 'match' || observation === 'conflict')
 				writer.readRemote.mockResolvedValue(observation)
 			actor.start()
@@ -212,8 +302,10 @@ describe('restore preparation attempt ownership', () => {
 		})
 	}
 	it('reconciles a remote match retaining unknown transaction acceptance and separate local evidence', async () => {
-		const record = observePreparation(
-			issuePreparation(parseRestoreJournalRecord(wire)),
+		const initial = parseRestoreJournalRecord(wire)
+		const record = observeWriteStep(
+			issueWriteStep(initial, initial.intent.plan.preparation),
+			initial.intent.plan.preparation,
 			'original',
 			{ local: 'persisted', remote: 'unobserved' }
 		)
@@ -221,7 +313,7 @@ describe('restore preparation attempt ownership', () => {
 		writer.readRemote.mockResolvedValue('match')
 		actor.start()
 		const result = await toPromise(actor)
-		expect(result.outcome).toBe('prepared')
+		expect(result.outcome).toBe('written')
 		expect(result.record?.checkpoint).toMatchObject({
 			completed: [
 				{
@@ -267,7 +359,10 @@ describe('restore preparation attempt ownership', () => {
 		const { input, writer } = fixture()
 		const opening = deferred<{ id: string }>()
 		const actor = createActor(
-			createRestorePreparationWriteMachine({ ...writer, open: () => opening.promise }),
+			createRestoreWriteStepMachine(
+				{ ...writer, open: () => opening.promise },
+				testDestination(writer)
+			),
 			{ input }
 		).start()
 		await waitFor(actor, (snapshot) => snapshot.matches({ working: 'opening' }))
@@ -281,7 +376,10 @@ describe('restore preparation attempt ownership', () => {
 		const { input, writer } = fixture()
 		const stage = deferred<void>()
 		const actor = createActor(
-			createRestorePreparationWriteMachine({ ...writer, stage: () => stage.promise }),
+			createRestoreWriteStepMachine(
+				writer,
+				testDestination({ ...writer, stage: () => stage.promise })
+			),
 			{ input }
 		).start()
 		await waitFor(actor, (snapshot) => snapshot.matches({ working: 'staging' }))
@@ -298,7 +396,7 @@ describe('restore preparation attempt ownership', () => {
 			type: 'INVALIDATE',
 			binding: { ...input.binding, generation: input.binding.generation - 1 }
 		})
-		expect((await toPromise(actor)).outcome).toBe('prepared')
+		expect((await toPromise(actor)).outcome).toBe('written')
 	})
 	it('cancels a global observation after durably recording local persistence, without rollback', async () => {
 		const { actor, writer } = fixture()
@@ -316,7 +414,10 @@ describe('restore preparation attempt ownership', () => {
 		const { input, writer } = fixture()
 		const open = deferred<{ id: string }>()
 		const actor = createActor(
-			createRestorePreparationWriteMachine({ ...writer, open: () => open.promise }),
+			createRestoreWriteStepMachine(
+				{ ...writer, open: () => open.promise },
+				testDestination(writer)
+			),
 			{ input }
 		).start()
 		await waitFor(actor, (snapshot) => snapshot.matches({ working: 'opening' }))
@@ -339,7 +440,9 @@ describe('restore preparation attempt ownership', () => {
 	it('blocks the coordinator when browser exclusive ownership is unavailable', async () => {
 		const { input, writer } = fixture()
 		vi.stubGlobal('navigator', undefined)
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		expect((await toPromise(actor)).outcome).toBe('unavailable')
 		expect(writer.readRemote).not.toHaveBeenCalled()
 	})
@@ -355,7 +458,7 @@ it('recovers a missed completion checkpoint from a fresh remote match without is
 	const recovery = fixture(incomplete.record)
 	recovery.writer.readRemote.mockResolvedValue('match')
 	recovery.actor.start()
-	expect((await toPromise(recovery.actor)).outcome).toBe('prepared')
+	expect((await toPromise(recovery.actor)).outcome).toBe('written')
 	expect(recovery.writer.commit).not.toHaveBeenCalled()
 })
 
@@ -372,7 +475,9 @@ it('requests nonqueued exclusive ownership without the incompatible AbortSignal 
 		}
 	)
 	vi.stubGlobal('navigator', { locks: { request } })
-	const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+	const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+		input
+	}).start()
 	expect((await toPromise(actor)).outcome).toBe('prepared')
 	expect(request).toHaveBeenCalledOnce()
 })
@@ -421,11 +526,14 @@ function batchFixture(record = batchRecord()) {
 			record.checkpoint.kind === 'writing' && entry.writeId === record.checkpoint.current.writeId
 	)
 	if (!step) throw new Error('Missing test batch')
-	const select = (_input: RestoreWriteInput) => step
-	const actor = createActor(createRestoreWriteStepMachine(base.writer, select, 'batchWritten'), {
-		input: base.input
-	})
-	return { ...base, actor, step }
+	const input = { ...base.input, step }
+	const actor = createActor(
+		createRestoreWriteStepMachine(base.writer, testDestination(base.writer)),
+		{
+			input
+		}
+	)
+	return { ...base, actor, input }
 }
 describe('single batch ownership and retained journal prefix', () => {
 	for (const prefix of [1, 2]) {
@@ -433,7 +541,7 @@ describe('single batch ownership and retained journal prefix', () => {
 			const { actor, writer, input } = batchFixture(batchRecord(prefix))
 			actor.start()
 			const result = await toPromise(actor)
-			expect(result.outcome).toBe('batchWritten')
+			expect(result.outcome).toBe('written')
 			const before = input.record.checkpoint
 			if (before.kind !== 'writing') throw new Error('Expected writing')
 			expect(completed(result.record).slice(0, prefix)).toEqual(before.completed)
@@ -458,8 +566,8 @@ describe('single batch ownership and retained journal prefix', () => {
 	it('reconciles remote content while retaining the prefix and unknown original transaction fate', async () => {
 		const base = batchFixture()
 		const issued = observeWriteStep(
-			issueWriteStep(base.input.record, base.step),
-			base.step,
+			issueWriteStep(base.input.record, base.input.step),
+			base.input.step,
 			'original-batch-tx',
 			{ local: 'persisted', remote: 'unobserved' }
 		)
@@ -467,7 +575,7 @@ describe('single batch ownership and retained journal prefix', () => {
 		writer.readRemote.mockResolvedValue('match')
 		actor.start()
 		const result = await toPromise(actor)
-		expect(result.outcome).toBe('batchWritten')
+		expect(result.outcome).toBe('written')
 		expect(completed(result.record)[0]).toEqual(completed(issued)[0])
 		expect(completed(result.record)[1]).toMatchObject({
 			basis: 'remoteContentMatch',
@@ -482,7 +590,9 @@ describe('single batch ownership and retained journal prefix', () => {
 	for (const observation of ['match', 'missingOrHidden', 'conflict']) {
 		it(`does not replay an unknown batch on ${observation} with missing local evidence`, async () => {
 			const base = batchFixture()
-			const { actor, writer, input } = batchFixture(issueWriteStep(base.input.record, base.step))
+			const { actor, writer, input } = batchFixture(
+				issueWriteStep(base.input.record, base.input.step)
+			)
 			if (observation === 'match' || observation === 'conflict')
 				writer.readRemote.mockResolvedValue(observation)
 			actor.start()
@@ -493,12 +603,14 @@ describe('single batch ownership and retained journal prefix', () => {
 		})
 	}
 	it('blocks unavailable destination control without interpreting it as missing attachment', async () => {
-		const { input, writer, step } = batchFixture()
+		const { input, writer } = batchFixture()
 		const actor = createActor(
 			createRestoreWriteStepMachine(
-				{ ...writer, readRemote: () => Promise.resolve<RestoreStepPresence>('unavailable') },
-				() => step,
-				'batchWritten'
+				writer,
+				testDestination({
+					...writer,
+					readRemote: () => Promise.resolve<RestoreStepPresence>('unavailable')
+				})
 			),
 			{ input }
 		).start()
@@ -508,19 +620,18 @@ describe('single batch ownership and retained journal prefix', () => {
 	})
 	for (const leaf of ['remote', 'authority']) {
 		it(`drains ${leaf} observation after cancellation before completing`, async () => {
-			const { writer, input, step } = batchFixture()
+			const { writer, input } = batchFixture()
 			const gate = deferred<void>()
 			const actor = createActor(
 				createRestoreWriteStepMachine(
-					{
+					writer,
+					testDestination({
 						...writer,
 						readRemote: () =>
 							leaf === 'remote' ? gate.promise.then(() => 'missingOrHidden') : writer.readRemote(),
 						checkAuthority: () =>
 							leaf === 'authority' ? gate.promise.then(() => true) : writer.checkAuthority()
-					},
-					() => step,
-					'batchWritten'
+					})
 				),
 				{ input }
 			).start()
@@ -552,7 +663,7 @@ describe('single batch ownership and retained journal prefix', () => {
 					callback({})
 			}
 		})
-		const actor = createActor(createRestoreBatchMachine(writer), {
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
 			input: { ...input, writeId: 'batch-one' }
 		}).start()
 		const result = await toPromise(actor)
@@ -603,7 +714,9 @@ describe('operation lock actor and coordinator release ownership', () => {
 	it('does not complete preparation until native release is acknowledged', async () => {
 		const { input, writer } = fixture(),
 			native = nativeLockFixture()
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		const { hold } = await native.offer()
 		await waitFor(actor, (snapshot) => snapshot.matches({ owned: 'releasing' }))
 		await hold
@@ -615,7 +728,9 @@ describe('operation lock actor and coordinator release ownership', () => {
 	it('cancels a delayed acquisition without admitting a late grant or touching the journal', async () => {
 		const { input, writer } = fixture(),
 			native = nativeLockFixture()
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		await native.requested
 		actor.send({ type: 'CANCEL' })
 		expect(actor.getSnapshot().matches({ owned: 'releasing' })).toBe(true)
@@ -630,7 +745,9 @@ describe('operation lock actor and coordinator release ownership', () => {
 	it('releases a late browser callback even after abrupt owner disposal', async () => {
 		const { input, writer } = fixture(),
 			native = nativeLockFixture()
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		await native.requested
 		actor.stop()
 		const { hold } = await native.offer()
@@ -642,7 +759,9 @@ describe('operation lock actor and coordinator release ownership', () => {
 	it('waits for settlement of a refused native request without doing unlocked work', async () => {
 		const { input, writer } = fixture(),
 			native = nativeLockFixture()
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		const { hold } = await native.offer(false)
 		await hold
 		expect(actor.getSnapshot().status).toBe('active')
@@ -654,7 +773,9 @@ describe('operation lock actor and coordinator release ownership', () => {
 	it('reports native request rejection without acquiring or writing', async () => {
 		const { input, writer } = fixture(),
 			native = nativeLockFixture()
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		await native.requested
 		native.fail()
 		expect((await toPromise(actor)).outcome).toBe('incomplete')
@@ -670,14 +791,18 @@ describe('operation lock actor and coordinator release ownership', () => {
 				}
 			}
 		})
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		expect((await toPromise(actor)).outcome).toBe('incomplete')
 		expect(writer.readRemote).not.toHaveBeenCalled()
 	})
 	it('retains completed evidence but reports incomplete when native release fails', async () => {
 		const { input, writer } = fixture(),
 			native = nativeLockFixture()
-		const actor = createActor(createRestorePreparationMachine(writer), { input }).start()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input
+		}).start()
 		const { hold } = await native.offer()
 		await waitFor(actor, (snapshot) => snapshot.matches({ owned: 'releasing' }))
 		await hold
@@ -694,13 +819,16 @@ describe('operation lock actor and coordinator release ownership', () => {
 			staged = deferred<void>()
 		const held = vi.fn()
 		const actor = createActor(
-			createRestorePreparationMachine({
-				...writer,
-				stage: () => {
-					staged.resolve()
-					return stage.promise
-				}
-			}),
+			createRestoreMachine(
+				writer,
+				testDestination({
+					...writer,
+					stage: () => {
+						staged.resolve()
+						return stage.promise
+					}
+				})
+			),
 			{ input }
 		).start()
 		const { hold } = await native.offer()
@@ -719,10 +847,40 @@ describe('operation lock actor and coordinator release ownership', () => {
 		expect(writer.commit).not.toHaveBeenCalled()
 		expect(result.record?.checkpoint).toMatchObject({ current: { status: 'issued' } })
 	})
+	it('refuses a batch when its journal is missing without creating intent or effects', async () => {
+		const { input, writer } = batchFixture(),
+			native = nativeLockFixture()
+		journal.record = undefined
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input: { ...input, writeId: 'batch-one' }
+		}).start()
+		const { hold } = await native.offer()
+		await waitFor(actor, (s) => s.matches({ owned: 'releasing' }))
+		await hold
+		native.finish()
+		const result = await toPromise(actor)
+		expect(result.outcome).toBe('unavailable')
+		expect(result.record).toBeUndefined()
+		expect(journal.commands.map((command) => command.mode)).toEqual(['load'])
+		expect(writer.readRemote).not.toHaveBeenCalled()
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	it('rejects an unknown selected write before acquiring ownership or reading the journal', async () => {
+		const { input, writer } = fixture(),
+			native = nativeLockFixture()
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
+			input: { ...input, writeId: 'unknown-write' }
+		}).start()
+		expect((await toPromise(actor)).outcome).toBe('unavailable')
+		expect(native.request).not.toHaveBeenCalled()
+		expect(journal.commands).toEqual([])
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+
 	it('waits for native release after one batch, preserving the earlier prefix', async () => {
 		const { input, writer } = batchFixture(),
 			native = nativeLockFixture()
-		const actor = createActor(createRestoreBatchMachine(writer), {
+		const actor = createActor(createRestoreMachine(writer, testDestination(writer)), {
 			input: { ...input, writeId: 'batch-one' }
 		}).start()
 		const { hold } = await native.offer()
@@ -743,13 +901,16 @@ describe('operation lock actor and coordinator release ownership', () => {
 		writer.readTransaction.mockResolvedValue('conflict')
 		const released = vi.fn()
 		const actor = createActor(
-			createRestoreBatchMachine({
-				...writer,
-				rollback: () => {
-					rollingBack.resolve()
-					return rollback.promise
-				}
-			}),
+			createRestoreMachine(
+				{
+					...writer,
+					rollback: () => {
+						rollingBack.resolve()
+						return rollback.promise
+					}
+				},
+				testDestination(writer)
+			),
 			{ input: { ...input, writeId: 'batch-one' } }
 		).start()
 		const { hold } = await native.offer()

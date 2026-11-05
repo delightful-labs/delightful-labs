@@ -1,4 +1,4 @@
-import { assign, fromPromise, not, sendTo, setup } from 'xstate'
+import { assign, not, sendTo, setup } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from '../../backup/export.js'
 import {
 	browserJournalBinding,
@@ -28,7 +28,11 @@ export type BrowserJournalInput = { request: BrowserJournalRequest }
 export type BrowserJournalControl =
 	| { type: 'CANCEL' | 'SHUTDOWN' }
 	| { type: 'INVALIDATE'; binding: BackupBinding }
-type Event = BrowserJournalControl | BrowserJournalNativeEvent
+type Event =
+	| BrowserJournalControl
+	| BrowserJournalNativeEvent
+	| { type: 'REQUEST_CLAIMED' }
+	| { type: 'CLAIM_FAILED'; code: BrowserJournalErrorCode }
 type Context = BrowserJournalInput & {
 	binding: BackupBinding
 	claimed: boolean
@@ -89,10 +93,6 @@ function facts(context: Context): Pick<BrowserJournalResult, 'binding' | 'journa
 /** The single lifecycle owner. Native callbacks report observations; this chart makes every decision. */
 export function createBrowserRestoreJournalMachine() {
 	const actors = {
-		claim: fromPromise<void, BrowserJournalInput>(({ input }) => {
-			claimBrowserJournalRequest(input.request)
-			return Promise.resolve()
-		}),
 		native: browserJournalNativeActor
 	}
 	const model = setup<
@@ -246,10 +246,16 @@ export function createBrowserRestoreJournalMachine() {
 		},
 		states: {
 			claiming: {
-				invoke: {
-					src: 'claim',
-					input,
-					onDone: [
+				entry: ({ context, self }) => {
+					try {
+						claimBrowserJournalRequest(context.request)
+						self.send({ type: 'REQUEST_CLAIMED' })
+					} catch (error) {
+						self.send({ type: 'CLAIM_FAILED', code: browserJournalFailure(error) })
+					}
+				},
+				on: {
+					REQUEST_CLAIMED: [
 						{
 							guard: ({ context }) => !configuration(context),
 							target: 'finishing',
@@ -258,9 +264,9 @@ export function createBrowserRestoreJournalMachine() {
 						{ guard: 'interrupted', target: 'finishing', actions: assign({ claimed: true }) },
 						{ target: 'active', actions: assign({ claimed: true }) }
 					],
-					onError: {
+					CLAIM_FAILED: {
 						target: 'finishing',
-						actions: assign({ failure: ({ event }) => browserJournalFailure(event.error) })
+						actions: assign({ failure: ({ event }) => event.code })
 					}
 				}
 			},

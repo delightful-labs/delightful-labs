@@ -1,18 +1,29 @@
 import { createJazzSession, PersistedWriteRejectedError } from 'jazz-tools'
-import { createActor, toPromise, waitFor, type ActorRefFrom } from 'xstate'
+import {
+	fromCallback,
+	fromPromise,
+	createActor,
+	toPromise,
+	waitFor,
+	type ActorRefFrom
+} from 'xstate'
 import { prepareArchiveOpen, prepareArchiveSeal } from 'delightful-local-first/backup/envelope'
 import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
 import { prepareBrowserRestoreJournal } from 'delightful-local-first/backup/restore/journal/browser'
 import { createBrowserRestoreJournalMachine } from 'delightful-local-first/backup/restore/journal/workflow'
 import { parseRestoreJournalRecord } from 'delightful-local-first/backup/restore/journal'
+import { restoreTransactionAccess } from 'delightful-local-first/backup/restore'
+import { notebookRestoreRoot } from './restore-request.js'
 import { createNotebookDataset } from './dataset.js'
 import { createNotebookRestorePreparationMachine, prepareNotebookRestore } from './restore.js'
 import { notebookRestoreApp, activeNotebookDestinations } from './restore-schema.js'
-import { createNotebookPreparationWriter } from './restore-writer.js'
 import {
-	createNotebookRestoreAttachmentMachine,
-	prepareNotebookAttachmentRestore
-} from './restore-attachment.js'
+	createNotebookPreparationWriter,
+	createNotebookPreparationWriteMachine,
+	createNotebookDestinationWriteMachine,
+	createNotebookTransactionWriter
+} from './restore-writer.js'
+import { createNotebookRestoreAttachmentMachine } from './restore-attachment.js'
 import {
 	createNotebookAttachmentWriter,
 	createNotebookAttachmentRestore
@@ -21,7 +32,7 @@ import {
 import { createNotebookRootRestore, createNotebookRootWriter } from './restore-notebook-writer.js'
 import { createNotebookRestoreRootMachine, prepareNotebookRootRestore } from './restore-notebook.js'
 
-type Writer = ReturnType<typeof createNotebookPreparationWriter>
+type Writer = ReturnType<typeof createNotebookTransactionWriter>
 const config = new URLSearchParams(location.search)
 const appId = config.get('appId'),
 	serverUrl = config.get('serverUrl')
@@ -33,7 +44,7 @@ const db = client.db
 const ownerId = client.session?.user.account
 if (!ownerId) throw new Error('Missing qualification owner')
 const detached: Parameters<Writer['retainDetached']>[0][] = []
-const native = createNotebookPreparationWriter(db, (receipt) => {
+const native = createNotebookTransactionWriter(db, (receipt) => {
 	detached.push(receipt)
 })
 let issued = 0
@@ -48,7 +59,9 @@ db.beginTransaction = () => {
 	return transaction
 }
 const writer: Writer = native
-const machine = createNotebookRestorePreparationMachine(writer)
+const preparationWrite = createNotebookPreparationWriteMachine(db)
+const preparationDestination = createNotebookPreparationWriter(db, preparationWrite)
+const machine = createNotebookRestorePreparationMachine(writer, preparationDestination)
 const pending: {
 	actor: ActorRefFrom<typeof machine> | undefined
 	cleanup: (() => void) | undefined
@@ -62,18 +75,24 @@ const rootPending: {
 	actor?: ActorRefFrom<ReturnType<typeof createNotebookRestoreRootMachine>>
 	cleanup?: () => void
 	releaseStage?: () => void
+	releaseRequest?: () => void
+	hasExpected?: () => boolean
+	reportIdentity?: (failed: boolean) => void
 	staged?: boolean
 } = {}
 const api = {
 	rootPending,
+	restoreTransactionAccess,
+	notebookRestoreRoot,
+	createNotebookDestinationWriteMachine,
 	createNotebookRootRestore,
 	createNotebookRootWriter,
 	createNotebookRestoreRootMachine,
 	prepareNotebookRootRestore,
 	attachmentPending,
+	createNotebookTransactionWriter,
 	createNotebookAttachmentWriter,
 	createNotebookRestoreAttachmentMachine,
-	prepareNotebookAttachmentRestore,
 	createNotebookAttachmentRestore,
 	PersistedWriteRejectedError,
 	createActor,
@@ -91,6 +110,10 @@ const api = {
 	notebookRestoreApp,
 	activeNotebookDestinations,
 	db,
+	fromPromise,
+	preparationDestination,
+	preparationWrite,
+	fromCallback,
 	writer,
 	ownerId,
 	pending,

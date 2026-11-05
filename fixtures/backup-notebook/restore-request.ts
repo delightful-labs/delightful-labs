@@ -44,7 +44,10 @@ export type NotebookRestoreData = NotebookRestorePlanData & {
 	attachment: NotebookAttachmentExpected | undefined
 	notebook: NotebookRootExpected | undefined
 }
-const requests = new WeakMap<NotebookRestoreRequest, { data: NotebookRestoreData; claim(): void }>()
+const requests = new WeakMap<
+	NotebookRestoreRequest,
+	{ data: NotebookRestoreData; claimed: boolean }
+>()
 function prepared(request: NotebookRestoreRequest) {
 	const value = requests.get(request)
 	if (!value) throw new Error('Invalid notebook restore request')
@@ -83,21 +86,17 @@ export function prepareNotebookRestore(options: NotebookRestoreOptions): Noteboo
 		attachment: undefined,
 		notebook: undefined
 	}
-	let available: NotebookRestoreData | undefined = data
 	const request: NotebookRestoreRequest = {
 		release() {
-			data.releaseControl?.()
+			if (data.releaseControl) {
+				data.releaseControl()
+				return
+			}
 			clear(data)
 		},
 		toJSON: () => ({ kind: 'notebookRestoreRequest' })
 	}
-	requests.set(request, {
-		data,
-		claim() {
-			if (!available || !data.options) throw new Error('Notebook restore request unavailable')
-			available = undefined
-		}
-	})
+	requests.set(request, { data, claimed: false })
 	return request
 }
 function clear(data: NotebookRestoreData) {
@@ -121,8 +120,18 @@ export function requiredNotebookRestoreValue<T>(value: T | undefined): T {
 export function notebookRestoreData(input: { request: NotebookRestoreRequest }) {
 	return prepared(input.request).data
 }
-export function claimNotebookRestore(input: { request: NotebookRestoreRequest }) {
-	prepared(input.request).claim()
+/** Optional observation of root-owned data; absence is a destination admission decision. */
+export function notebookRestoreRoot(request: NotebookRestoreRequest) {
+	return requests.get(request)?.data.notebook
+}
+export function notebookRestoreAttachment(request: NotebookRestoreRequest) {
+	return requests.get(request)?.data.attachment
+}
+export function claimNotebookRestore(input: { request: NotebookRestoreRequest }): boolean {
+	const value = requests.get(input.request)
+	if (!value || value.claimed || !value.data.options) return false
+	value.claimed = true
+	return true
 }
 export const notebookRestoreResources = fromCallback<
 	{ type: string },

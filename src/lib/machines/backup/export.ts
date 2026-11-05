@@ -1,4 +1,4 @@
-import { assign, fromPromise, setup } from 'xstate'
+import { raise, assign, fromPromise, setup } from 'xstate'
 import {
 	exportFailure,
 	exportData,
@@ -38,6 +38,9 @@ type Context = ArchiveExportInput & {
 	handoff: ArchiveHandoffObservation | 'notStarted'
 }
 
+type SynchronousEvent =
+	| { type: 'SYNC_COMPLETED'; patch: Partial<Context> }
+	| { type: 'SYNC_APPLIED' }
 function mergeHandoff(
 	previous: Context['handoff'],
 	observation: ArchiveHandoffObservation
@@ -51,14 +54,7 @@ function mergeHandoff(
 export function createArchiveExportMachine() {
 	const actors = {
 		resources: exportResources,
-		claim: fromPromise<void, ArchiveExportInput>(({ input }) => {
-			claimExportRequest(input.request)
-			return Promise.resolve()
-		}),
 		capture: createArchiveCaptureMachine(),
-		prepare: fromPromise<ArchiveEnvelopeRequest, ArchiveExportInput>(({ input }) =>
-			Promise.resolve(prepareExportEnvelope(input.request))
-		),
 		seal: createArchiveEnvelopeMachine(),
 		handoff: fromPromise<ArchiveHandoffObservation, ArchiveExportInput>(({ input }) =>
 			dispatchExportFile(input.request)
@@ -67,17 +63,11 @@ export function createArchiveExportMachine() {
 			abortExport(input.request)
 			return drainExport(input.request)
 		}),
-		release: fromPromise<void, ArchiveExportInput>(({ input }) =>
-			releaseExportLease(input.request)
-		),
-		cleanup: fromPromise<void, ArchiveExportInput>(({ input }) => {
-			finishExport(input.request)
-			return Promise.resolve()
-		})
+		release: fromPromise<void, ArchiveExportInput>(({ input }) => releaseExportLease(input.request))
 	}
 	const model = setup<
 		Context,
-		ArchiveExportEvent | { type: 'RELEASE' },
+		ArchiveExportEvent | { type: 'RELEASE' } | SynchronousEvent,
 		typeof actors,
 		{},
 		{ fail: undefined; interrupt: undefined },
@@ -118,6 +108,14 @@ export function createArchiveExportMachine() {
 		if (child?.getSnapshot().status !== 'active') return
 		enqueue.sendTo(child, { type: event.type === 'SHUTDOWN' ? 'SHUTDOWN' : 'CANCEL' })
 	})
+	const synchronous = (run: (context: Context) => Partial<Context>) =>
+		model.createAction(({ context, self }) => {
+			try {
+				self.send({ type: 'SYNC_COMPLETED', patch: run(context) })
+			} catch (error) {
+				self.send({ type: 'SYNC_COMPLETED', patch: { failure: exportFailure(error) } })
+			}
+		})
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
 	const failed = { target: 'cleaning', actions: 'fail' } satisfies {
 		target: string
@@ -148,6 +146,12 @@ export function createArchiveExportMachine() {
 			return { ...facts, outcome: 'exported' }
 		},
 		on: {
+			SYNC_COMPLETED: {
+				actions: [
+					model.assign(({ event }) => (event.type === 'SYNC_COMPLETED' ? event.patch : {})),
+					raise({ type: 'SYNC_APPLIED' })
+				]
+			},
 			CANCEL: { actions: ['interrupt', forward] },
 			SHUTDOWN: { actions: ['interrupt', forward] },
 			INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forward] },
@@ -157,18 +161,16 @@ export function createArchiveExportMachine() {
 		},
 		states: {
 			claiming: {
-				invoke: {
-					src: 'claim',
-					input,
-					onDone: [
-						{
-							guard: 'interrupted',
-							target: 'working.cleaning',
-							actions: assign({ claimed: true })
-						},
-						{ target: 'working', actions: assign({ claimed: true }) }
-					],
-					onError: { target: 'complete', actions: 'fail' }
+				entry: synchronous(({ request }) => {
+					claimExportRequest(request)
+					return { claimed: true }
+				}),
+				on: {
+					SYNC_APPLIED: [
+						{ guard: ({ context }) => !context.claimed, target: 'complete' },
+						{ guard: 'interrupted', target: 'working.cleaning' },
+						{ target: 'working' }
+					]
 				}
 			},
 			working: {
@@ -206,18 +208,17 @@ export function createArchiveExportMachine() {
 						}
 					},
 					preparing: {
-						tags: 'protecting',
-						invoke: {
-							src: 'prepare',
-							input,
-							onDone: [
-								{ guard: 'interrupted', target: 'cleaning' },
-								{ target: 'sealing', actions: assign({ envelope: ({ event }) => event.output }) }
-							],
-							onError: failed
+						entry: synchronous(({ request }) => ({ envelope: prepareExportEnvelope(request) })),
+						on: {
+							SYNC_APPLIED: [{ guard: 'interrupted', target: 'cleaning' }, { target: 'sealing' }]
 						}
 					},
 					sealing: {
+						always: {
+							guard: ({ context }) => context.envelope === undefined,
+							target: 'cleaning',
+							actions: assign({ failure: exportFailure(undefined) })
+						},
 						tags: 'protecting',
 						invoke: {
 							id: 'effect',
@@ -313,12 +314,11 @@ export function createArchiveExportMachine() {
 					},
 					clearing: {
 						tags: 'cleaning',
-						invoke: {
-							src: 'cleanup',
-							input,
-							onDone: '#archive-export.complete',
-							onError: { target: '#archive-export.complete', actions: 'fail' }
-						}
+						entry: synchronous(({ request }) => {
+							finishExport(request)
+							return {}
+						}),
+						on: { SYNC_APPLIED: '#archive-export.complete' }
 					}
 				}
 			},

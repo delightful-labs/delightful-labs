@@ -1,23 +1,16 @@
-import type { EnvelopeMode } from './envelope.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, fromPromise, toPromise, waitFor } from 'xstate'
+import { createActor, toPromise, waitFor } from 'xstate'
 import {
 	createArchiveExportMachine,
 	createArchiveExportCleanupMachine
 } from '../machines/backup/export.js'
 import { createArchiveCaptureMachine } from '../machines/backup/capture.js'
-import {
-	createArchiveEnvelopeMachine,
-	type ArchiveEnvelopeInput
-} from '../machines/backup/envelope.js'
+import { createArchiveEnvelopeMachine } from '../machines/backup/envelope.js'
 import { createArchiveInspectionMachine } from '../machines/backup/inspection.js'
 import { prepareArchiveInspection } from './inspection-api.js'
 import { prepareArchiveOpen } from './envelope-api.js'
-import {
-	buildSealedArchive,
-	type EnvelopeSuccess,
-	type SealedArchive
-} from './envelope-operation.js'
+import * as envelopeOperations from './envelope-operation.js'
+import type { SealedArchive } from './envelope-operation.js'
 import { encodeArchivePayload, parseArchivePayload, type ArchivePayload } from './archive.js'
 import {
 	prepareArchiveExport,
@@ -427,6 +420,18 @@ describe('handoff and binding ownership', () => {
 })
 
 describe('capture drain and resource lifetime', () => {
+	it('does not claim or acquire native resources before an export actor starts', async () => {
+		const h = harness(),
+			request = h.request()
+		const dormant = createActor(createArchiveExportMachine(), { input: { request } })
+		expect(h.checkAuthority).not.toHaveBeenCalled()
+		expect(h.acquire).not.toHaveBeenCalled()
+		const result = await toPromise(
+			createActor(createArchiveExportMachine(), { input: { request } }).start()
+		)
+		expect(result.outcome).toBe('exported')
+		dormant.stop()
+	})
 	it.each([
 		'checkingAuthority',
 		'acquiring',
@@ -469,37 +474,31 @@ describe('capture drain and resource lifetime', () => {
 		expect(h.release).toHaveBeenCalledTimes(h.acquire.mock.calls.length)
 		unsubscribe?.()
 	})
-	it.each([
-		'claiming',
-		'preparing',
-		'sealing',
-		'handingOff',
-		'handoffRetry',
-		'cleaning',
-		'releasing',
-		'clearing'
-	])('cancels at export %s and clears completed resources', async (stage) => {
-		const h = harness(),
-			request = h.request()
-		if (stage === 'handoffRetry') h.dispatch.mockResolvedValue('rejected')
-		const actor = createActor(createArchiveExportMachine(), { input: { request } })
-		let reached = false
-		actor.subscribe((snapshot) => {
-			if (
-				!reached &&
-				(snapshot.value === stage ||
-					(typeof snapshot.value === 'object' && snapshot.value.working === stage))
-			) {
-				reached = true
-				actor.send({ type: 'CANCEL' })
-			}
-		})
-		actor.start()
-		expect((await toPromise(actor)).outcome).toBe('cancelled')
-		expect(reached).toBe(true)
-		if (h.dispatch.mock.calls[0])
-			expect(() => h.dispatch.mock.calls[0]?.[0].copyBytes()).toThrow('resourceReleased')
-	})
+	it.each(['sealing', 'handingOff', 'handoffRetry', 'cleaning', 'releasing'])(
+		'cancels at export %s and clears completed resources',
+		async (stage) => {
+			const h = harness(),
+				request = h.request()
+			if (stage === 'handoffRetry') h.dispatch.mockResolvedValue('rejected')
+			const actor = createActor(createArchiveExportMachine(), { input: { request } })
+			let reached = false
+			actor.subscribe((snapshot) => {
+				if (
+					!reached &&
+					(snapshot.value === stage ||
+						(typeof snapshot.value === 'object' && snapshot.value.working === stage))
+				) {
+					reached = true
+					actor.send({ type: 'CANCEL' })
+				}
+			})
+			actor.start()
+			expect((await toPromise(actor)).outcome).toBe('cancelled')
+			expect(reached).toBe(true)
+			if (h.dispatch.mock.calls[0])
+				expect(() => h.dispatch.mock.calls[0]?.[0].copyBytes()).toThrow('resourceReleased')
+		}
+	)
 	it.each(['CANCEL', 'SHUTDOWN', 'INVALIDATE'])(
 		'collects a lease acquired after %s and awaits release',
 		async (type) => {
@@ -740,58 +739,22 @@ describe('capture drain and resource lifetime', () => {
 		expect((await toPromise(actor)).outcome).toBe('cancelled')
 		expect(h.dispatch).not.toHaveBeenCalled()
 	})
-	it.each(['buildingEnvelope', 'cleaning'])(
-		'retains sealed output across abrupt teardown in envelope %s',
-		async (stage) => {
-			const h = harness(),
-				request = h.request()
-			let acquired: SealedArchive | undefined
-			const seal = createArchiveEnvelopeMachine().provide({
-				actors: {
-					buildEnvelope: fromPromise<
-						EnvelopeSuccess,
-						ArchiveEnvelopeInput & { mode: EnvelopeMode }
-					>(({ input }) => {
-						const output = buildSealedArchive(input.request, input.mode)
-						if (output.outcome === 'sealed') acquired = output.archive
-						return Promise.resolve(output)
-					})
-				}
-			})
-			const actor = createActor(createArchiveExportMachine().provide({ actors: { seal } }), {
-				input: { request }
-			})
-			let attached = false,
-				stopped = false
-			let unsubscribe: (() => void) | undefined
-			actor.subscribe((snapshot) => {
-				if (!attached && snapshot.matches({ working: 'sealing' }) && snapshot.children.effect) {
-					attached = true
-					const child = snapshot.children.effect
-					const subscription = child.subscribe((value) => {
-						if (
-							!stopped &&
-							'value' in value &&
-							(value.value === stage ||
-								(typeof value.value === 'object' &&
-									value.value !== null &&
-									'working' in value.value &&
-									value.value.working === stage))
-						) {
-							stopped = true
-							request.release()
-							actor.stop()
-						}
-					})
-					unsubscribe = () => subscription.unsubscribe()
-				}
-			})
-			actor.start()
-			await vi.waitFor(() => expect(stopped).toBe(true))
-			expect(acquired).toBeDefined()
-			expect(() => acquired?.copyBytes()).toThrow('resourceReleased')
-			expect(h.dispatch).not.toHaveBeenCalled()
-			unsubscribe?.()
-		}
-	)
+	it('releases sealed output when stopped during synchronous output construction', async () => {
+		const h = harness(),
+			request = h.request()
+		let acquired: SealedArchive | undefined
+		const build = envelopeOperations.buildSealedArchive
+		vi.spyOn(envelopeOperations, 'buildSealedArchive').mockImplementation((childRequest, mode) => {
+			const output = build(childRequest, mode)
+			if (output.outcome === 'sealed') acquired = output.archive
+			request.release()
+			actor.stop()
+			return output
+		})
+		const actor = createActor(createArchiveExportMachine(), { input: { request } })
+		actor.start()
+		await vi.waitFor(() => expect(acquired).toBeDefined())
+		expect(() => acquired?.copyBytes()).toThrow('resourceReleased')
+		expect(h.dispatch).not.toHaveBeenCalled()
+	})
 })

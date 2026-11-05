@@ -185,3 +185,12 @@ A staged rollback still leaves its issued marker unresolved; later continuation 
 rather than replaying. One-step completion does not reverify previously completed steps, restore
 notes/relationships, compare the full graph or activate the destination. See
 [evidence and limits](../../specs/003-verified-backup/restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04).
+
+### Update after PR #23 merged
+
+The notebook destination now invokes the shared live-identity admission/staging actor through
+the consolidated restore API. Continuation claim/projection and planner capsule mutations are
+synchronous machine actions, with finite failures. Request release drains its owner before
+clearing private content. All 37 restore-browser cases and 918 units pass, plus the package,
+consumer, private-creation and Storybook checks. Current evidence and limits are recorded in
+[the updated design](../../specs/003-verified-backup/restore-notebook-design.md#post-merge-machine-review-2026-11-04).

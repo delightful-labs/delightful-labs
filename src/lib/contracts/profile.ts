@@ -21,3 +21,10 @@ export type ProfileObservation = {
 	profile: Profile | null | undefined
 }
 export type ProfileView = ScopedFormView<void, ProfileReason>
+
+export function profileScope(f: ProfileObservation): ProfileScope {
+	return { identityId: f.identityId, profileId: f.profile?.id ?? null, binding: f.binding }
+}
+export function sameProfileScope(a: ProfileScope, b: ProfileScope) {
+	return a.identityId === b.identityId && a.profileId === b.profileId && a.binding === b.binding
+}

@@ -1,48 +1,61 @@
-import { assign, fromPromise, sendTo, setup } from 'xstate'
+import { assign, sendTo, setup, type Snapshot } from 'xstate'
 import { sameBackupBinding } from '../../backup/export.js'
-import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
 import {
-	requirePreparationValue,
-	validatePreparationInput,
-	type RestorePreparationEvent,
-	type RestorePreparationInput,
-	type RestorePreparationOutcome,
-	type RestorePreparationResult,
-	type RestorePreparationWriter
-} from '../../backup/restore-preparation.js'
+	createRestoreJournalRecord,
+	type RestoreJournalRecord
+} from '../../backup/restore-journal.js'
 import { createRestoreJournalStepMachine } from './restore-journal-step.js'
-import { createRestorePreparationWriteMachine } from './restore-preparation-write.js'
+import { createRestoreWriteStepMachine } from './restore-write-step.js'
+import {
+	requireRestoreValue,
+	validateRestoreInput,
+	requestedBatchIsCurrent,
+	type RestoreInput,
+	type RestoreEvent,
+	type RestoreResult,
+	type RestoreOutcome,
+	type RestorePlannedWrite,
+	type RestoreDestinationResult,
+	type RestoreDestinationLogic,
+	type RestoreTransactionWriter
+} from '../../backup/restore.js'
 
 import { operationLock, type LockEvent } from './restore-operation-lock.js'
 
-/** Preparation only. A prepared destination remains incomplete and unavailable for ordinary use. */
-export function createRestorePreparationMachine<Transaction, Write>(
-	writer: RestorePreparationWriter<Transaction, Write>
+/** One selected write per invocation. Only preparation may initialize a missing durable intent. */
+export function createRestoreMachine<
+	Transaction,
+	Write,
+	S extends Snapshot<RestoreDestinationResult>
+>(
+	writer: RestoreTransactionWriter<Transaction, Write>,
+	destination: RestoreDestinationLogic<Transaction, S>
 ) {
-	type Context = RestorePreparationInput & {
+	type Context = RestoreInput & {
+		step: RestorePlannedWrite | undefined
 		record: RestoreJournalRecord | undefined
-		outcome: RestorePreparationOutcome
+		outcome: RestoreOutcome
 		interruption: 'cancelled' | 'closed' | 'invalidated' | undefined
 	}
 	const actors = {
-		validate: fromPromise(({ input }: { input: RestorePreparationInput }) =>
-			Promise.resolve(validatePreparationInput(input))
-		),
 		lock: operationLock,
 		journal: createRestoreJournalStepMachine(),
-		write: createRestorePreparationWriteMachine(writer)
+		write: createRestoreWriteStepMachine(writer, destination)
 	}
 	const model = setup<
 		Context,
-		RestorePreparationEvent | LockEvent,
+		| RestoreEvent
+		| LockEvent
+		| { type: 'INPUT_VALIDATED'; value: ReturnType<typeof validateRestoreInput> }
+		| { type: 'INPUT_INVALID' },
 		typeof actors,
 		{},
 		{ interrupt: undefined },
 		{ interrupted: undefined; currentBinding: undefined },
 		never,
 		string,
-		RestorePreparationInput,
-		RestorePreparationResult
+		RestoreInput,
+		RestoreResult
 	>({
 		actors,
 		guards: {
@@ -64,11 +77,16 @@ export function createRestorePreparationMachine<Transaction, Write>(
 	const input = ({ context }: { context: Context }) => ({
 		binding: context.binding,
 		databaseName: context.databaseName,
-		intent: context.intent
+		intent: context.intent,
+		writeId: context.writeId
 	})
 	const forward = model.enqueueActions(({ self, event, enqueue }) => {
 		const child = self.getSnapshot().children.write
-		if (child?.getSnapshot().status === 'active') enqueue.sendTo(child, event)
+		if (
+			child?.getSnapshot().status === 'active' &&
+			(event.type === 'CANCEL' || event.type === 'SHUTDOWN' || event.type === 'INVALIDATE')
+		)
+			enqueue.sendTo(child, event)
 	})
 	const shutdownWriter = model.enqueueActions(({ self, enqueue }) => {
 		const child = self.getSnapshot().children.write
@@ -76,10 +94,11 @@ export function createRestorePreparationMachine<Transaction, Write>(
 	})
 
 	return model.createMachine({
-		id: 'restore-preparation',
+		id: 'restore',
 		context: ({ input }) => ({
 			...input,
 			record: undefined,
+			step: undefined,
 			outcome: 'unavailable',
 			interruption: undefined
 		}),
@@ -96,21 +115,26 @@ export function createRestorePreparationMachine<Transaction, Write>(
 		},
 		states: {
 			validating: {
-				invoke: {
-					src: 'validate',
-					input,
-					onDone: [
+				entry: ({ context, self }) => {
+					try {
+						self.send({ type: 'INPUT_VALIDATED', value: validateRestoreInput(input({ context })) })
+					} catch {
+						self.send({ type: 'INPUT_INVALID' })
+					}
+				},
+				on: {
+					INPUT_VALIDATED: [
 						{ guard: 'interrupted', target: 'complete' },
 						{
 							target: 'owned',
 							actions: assign({
-								record: ({ event }) => event.output.record,
-								binding: ({ event }) => event.output.binding,
-								intent: ({ event }) => event.output.record.intent
+								step: ({ event }) => event.value.step,
+								binding: ({ event }) => event.value.binding,
+								intent: ({ event }) => event.value.record.intent
 							})
 						}
 					],
-					onError: 'complete'
+					INPUT_INVALID: 'complete'
 				}
 			},
 			owned: {
@@ -134,21 +158,21 @@ export function createRestorePreparationMachine<Transaction, Write>(
 				},
 				on: { LOCK_FAILED: { actions: [assign({ interruption: 'closed' }), shutdownWriter] } },
 				states: {
-					releasing: { id: 'release-preparation-lock', entry: sendTo('lock', { type: 'RELEASE' }) },
+					releasing: { id: 'release-restore-lock', entry: sendTo('lock', { type: 'RELEASE' }) },
 					acquiring: {
 						on: {
 							LOCK_ACQUIRED: [
 								{
 									guard: 'interrupted',
-									target: '#release-preparation-lock'
+									target: '#release-restore-lock'
 								},
 								{ target: 'loading' }
 							],
-							CANCEL: { target: '#release-preparation-lock', actions: 'interrupt' },
-							SHUTDOWN: { target: '#release-preparation-lock', actions: 'interrupt' },
+							CANCEL: { target: '#release-restore-lock', actions: 'interrupt' },
+							SHUTDOWN: { target: '#release-restore-lock', actions: 'interrupt' },
 							INVALIDATE: {
 								guard: 'currentBinding',
-								target: '#release-preparation-lock',
+								target: '#release-restore-lock',
 								actions: 'interrupt'
 							}
 						}
@@ -164,7 +188,7 @@ export function createRestorePreparationMachine<Transaction, Write>(
 							onDone: [
 								{
 									guard: 'interrupted',
-									target: '#release-preparation-lock',
+									target: '#release-restore-lock',
 									actions: assign({ record: ({ event }) => event.output.record })
 								},
 								{
@@ -172,21 +196,25 @@ export function createRestorePreparationMachine<Transaction, Write>(
 										event.output.outcome === 'loaded' && event.output.record !== undefined,
 									target: 'admittingWrite',
 									actions: assign({
-										record: ({ event }) => requirePreparationValue(event.output.record)
+										record: ({ event }) => requireRestoreValue(event.output.record)
 									})
 								},
+
 								{
-									guard: ({ event }) => event.output.outcome === 'missing',
+									guard: ({ context, event }) =>
+										event.output.outcome === 'missing' &&
+										context.writeId === context.intent.plan.preparation.writeId,
 									target: 'creatingIntent'
 								},
+
 								{
 									guard: ({ event }) => event.output.outcome === 'conflict',
-									target: '#release-preparation-lock',
+									target: '#release-restore-lock',
 									actions: assign({ outcome: 'conflict' })
 								},
-								{ target: '#release-preparation-lock' }
+								{ target: '#release-restore-lock' }
 							],
-							onError: '#release-preparation-lock'
+							onError: '#release-restore-lock'
 						}
 					},
 					creatingIntent: {
@@ -195,7 +223,7 @@ export function createRestorePreparationMachine<Transaction, Write>(
 							input: ({ context }) => ({
 								databaseName: context.databaseName,
 								binding: context.binding,
-								command: { mode: 'create', record: requirePreparationValue(context.record) }
+								command: { mode: 'create', record: createRestoreJournalRecord(context.intent) }
 							}),
 							onDone: [
 								{
@@ -204,28 +232,34 @@ export function createRestorePreparationMachine<Transaction, Write>(
 										event.output.record !== undefined,
 									target: 'admittingWrite',
 									actions: assign({
-										record: ({ event }) => requirePreparationValue(event.output.record)
+										record: ({ event }) => requireRestoreValue(event.output.record)
 									})
 								},
 								{
 									guard: ({ event }) => event.output.outcome === 'conflict',
-									target: '#release-preparation-lock',
+									target: '#release-restore-lock',
 									actions: assign({ outcome: 'conflict' })
 								},
-								{ target: '#release-preparation-lock' }
+								{ target: '#release-restore-lock' }
 							],
-							onError: '#release-preparation-lock'
+							onError: '#release-restore-lock'
 						}
 					},
 					admittingWrite: {
 						always: [
-							{ guard: 'interrupted', target: '#release-preparation-lock' },
+							{ guard: 'interrupted', target: '#release-restore-lock' },
 							{
 								guard: ({ context }) => context.record?.checkpoint.kind === 'conflict',
-								target: '#release-preparation-lock',
+								target: '#release-restore-lock',
 								actions: assign({ outcome: 'conflict' })
 							},
-							{ target: 'writing' }
+							{
+								guard: ({ context }) =>
+									context.writeId === context.intent.plan.preparation.writeId ||
+									requestedBatchIsCurrent(context.record, context.writeId),
+								target: 'writing'
+							},
+							{ target: '#release-restore-lock', actions: assign({ outcome: 'incomplete' }) }
 						]
 					},
 					writing: {
@@ -234,17 +268,46 @@ export function createRestorePreparationMachine<Transaction, Write>(
 							src: 'write',
 							input: ({ context }) => ({
 								...input({ context }),
-								record: requirePreparationValue(context.record)
+								record: requireRestoreValue(context.record),
+								step: requireRestoreValue(context.step)
 							}),
-							onDone: {
-								target: '#release-preparation-lock',
-								actions: assign({
-									outcome: ({ event }) => event.output.outcome,
-									record: ({ event }) => event.output.record
-								})
-							},
+							onDone: [
+								{
+									guard: ({ context, event }) =>
+										event.output.outcome === 'written' &&
+										context.writeId === context.intent.plan.preparation.writeId,
+									target: '#release-restore-lock',
+									actions: assign({
+										outcome: 'prepared',
+										record: ({ event }) => event.output.record
+									})
+								},
+								{
+									guard: ({ event }) => event.output.outcome === 'written',
+									target: '#release-restore-lock',
+									actions: assign({
+										outcome: 'batchWritten',
+										record: ({ event }) => event.output.record
+									})
+								},
+								{
+									guard: ({ event }) => event.output.outcome === 'conflict',
+									target: '#release-restore-lock',
+									actions: assign({
+										outcome: 'conflict',
+										record: ({ event }) => event.output.record
+									})
+								},
+								{
+									target: '#release-restore-lock',
+									actions: assign({
+										outcome: 'incomplete',
+										record: ({ event }) => event.output.record
+									})
+								}
+							],
 							onError: {
-								target: '#release-preparation-lock',
+								target: '#release-restore-lock',
 								actions: assign({ outcome: 'incomplete' })
 							}
 						}

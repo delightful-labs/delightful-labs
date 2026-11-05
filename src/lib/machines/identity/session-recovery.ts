@@ -30,11 +30,14 @@ export type RecoveryResult =
 			mutation: 'notStarted' | 'settled'
 			navigation: RecoveryNavigation | undefined
 	  }
+	| {
+			outcome: 'restorationChildFailed'
+			/** A permit allows issue; a child crash cannot establish mutation settlement. */
+			mutation: 'notStarted' | 'unknown'
+	  }
 export type RecoveryNotice =
 	| { type: 'RECOVERY_VALIDATED'; attempt: number }
 	| { type: 'RECOVERY_DRAIN_REQUESTED'; attempt: number }
-// Internal failure evidence preserves the host's invocation-error protocol, not a settled result.
-type RecoveryCompletion = RecoveryResult | { outcome: 'restorationChildFailed' }
 type Input = {
 	attempt: number
 	request: RecoveryRequest
@@ -54,14 +57,24 @@ type Context = {
 	destination: string
 	identity: string | undefined
 	mutation: 'notStarted' | 'settled'
-	result: RecoveryCompletion | undefined
+	/** Records the PREPARED command, not whether the child actually issued the SDK mutation. */
+	permitIssued: boolean
+	result: RecoveryResult | undefined
 }
 type Event =
 	| RestorationReport
 	| { type: 'WORKSPACE_DRAINED' }
 	| { type: 'SHUTDOWN' }
 	| { type: 'RELEASE_REQUEST' }
-	| { type: 'PROPAGATE_FAILURE' }
+
+function childFailure(
+	context: Context
+): Extract<RecoveryResult, { outcome: 'restorationChildFailed' }> {
+	return {
+		outcome: 'restorationChildFailed',
+		mutation: context.permitIssued ? 'unknown' : 'notStarted'
+	}
+}
 
 const actors = {
 	restoration: restorationMachine,
@@ -134,13 +147,10 @@ export const sessionRecoveryMachine = model.createMachine({
 		destination: input.request.destination,
 		identity: input.request.kind === 'navigate' ? input.request.identity : undefined,
 		mutation: 'notStarted',
+		permitIssued: false,
 		result: undefined
 	}),
-	output: ({ context }) => {
-		const result = required(context.result)
-		if (result.outcome === 'restorationChildFailed') throw new Error('Restoration child failed')
-		return result
-	},
+	output: ({ context }) => context.result ?? childFailure(context),
 	on: { SHUTDOWN: '.closed' },
 	states: {
 		choosing: {
@@ -205,7 +215,7 @@ export const sessionRecoveryMachine = model.createMachine({
 						actions: assign({ mutation: ({ event }) => event.output.mutation })
 					}
 				],
-				// Exit this scope before propagating failure, so binding cleanup actually executes.
+				// Exit the owned binding scope before publishing a finite, sanitized failure.
 				onError: 'restorationChildFailed'
 			},
 			on: {
@@ -236,11 +246,14 @@ export const sessionRecoveryMachine = model.createMachine({
 					on: {
 						WORKSPACE_DRAINED: {
 							target: 'operating',
-							actions: sendTo('restoration', ({ context }) => ({
-								type: 'PREPARED',
-								binding: required(context.restorationBinding).binding,
-								attempt: context.attempt
-							}))
+							actions: [
+								assign({ permitIssued: true }),
+								sendTo('restoration', ({ context }) => ({
+									type: 'PREPARED',
+									binding: required(context.restorationBinding).binding,
+									attempt: context.attempt
+								}))
+							]
 						}
 					}
 				},
@@ -284,14 +297,9 @@ export const sessionRecoveryMachine = model.createMachine({
 		restored: finish('restored'),
 		closed: finish('closed'),
 		restorationChildFailed: {
-			entry: [
-				assign({ request: undefined, result: { outcome: 'restorationChildFailed' } }),
-				// Queue a new actor turn so the cleared snapshot is committed before output throws.
-				({ self }) => self.send({ type: 'PROPAGATE_FAILURE' })
-			],
-			on: { PROPAGATE_FAILURE: 'failed', SHUTDOWN: {} }
+			type: 'final',
+			entry: assign({ request: undefined, result: ({ context }) => childFailure(context) })
 		},
-		failed: { type: 'final' },
 		navigationFailed: { type: 'final', entry: assign({ request: undefined }) }
 	}
 })
