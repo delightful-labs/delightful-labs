@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { ReadTier } from 'jazz-tools'
-import { createQuerySubscription, createQuerySubscriptionOne } from './data.svelte.js'
+import {
+	createQuerySubscription,
+	createQuerySubscriptionOne,
+	QuerySubscription,
+	QuerySubscriptionOne
+} from './data.svelte.js'
 
 // SDK constructors remain the lifecycle boundary. These stand-ins observe delegation only.
 const native = vi.hoisted(() => ({
@@ -18,6 +23,19 @@ vi.mock('jazz-tools/svelte', () => ({
 beforeEach(() => vi.clearAllMocks())
 
 describe('Jazz subscription function boundary', () => {
+	it.each([
+		{ constructor: QuerySubscription, nativeConstructor: native.many },
+		{ constructor: QuerySubscriptionOne, nativeConstructor: native.one }
+	])(
+		'preserves the original generic constructor API with native ownership',
+		({ constructor, nativeConstructor }) => {
+			const subscription = new constructor<{ id: string; title: string }>(undefined)
+			expect(subscription).toBe(nativeConstructor.mock.results[0]?.value)
+			const options = nativeConstructor.mock.calls[0]?.[1]
+			if (typeof options !== 'function') throw new Error('Expected lazy native options')
+			expect(options()).toEqual({ tier: ReadTier.LocalFirst })
+		}
+	)
 	it.each([
 		{ create: createQuerySubscription, constructor: native.many },
 		{ create: createQuerySubscriptionOne, constructor: native.one }

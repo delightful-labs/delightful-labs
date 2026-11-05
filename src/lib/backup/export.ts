@@ -32,21 +32,39 @@ export const backupBindingSchema = z
 	.readonly()
 export type BackupBinding = z.infer<typeof backupBindingSchema>
 
-export interface ArchiveCaptureLease {
+export interface ArchiveCaptureControlLease {
 	/** One acknowledgement that the consumer's existing writers have drained. */
 	drain(signal: AbortSignal): Promise<void>
-	/** One bounded read of the complete supported graph. No lazy SDK objects or accessors. */
-	read(signal: AbortSignal, limits: PayloadLimits): Promise<unknown>
 	/** One observation proving the lease's captured graph stayed consistent and authorized. */
 	checkConsistency(signal: AbortSignal): Promise<boolean>
 	/** Release only this lease; idempotent, and never interrupted by cancellation. */
 	release(): Promise<void>
 }
+export interface ArchiveCaptureLease extends ArchiveCaptureControlLease {
+	/** One bounded read of the complete supported graph. No lazy SDK objects or accessors. */
+	read(signal: AbortSignal, limits: PayloadLimits): Promise<unknown>
+}
+/** Private capture capabilities passed to an invoked domain reader. Put graph/native data in
+ * consumer-private custody, not snapshots. Use issue for every native leaf so a reader crash
+ * cannot discard its outstanding receipts. accept discards results after cancellation.
+ */
+export interface ArchiveCaptureReaderInput {
+	binding: BackupBinding
+	signal: AbortSignal
+	limits: PayloadLimits
+	issue<Value>(read: () => Promise<Value>): Promise<Value>
+	accept(payload: unknown): void
+}
+export type ArchiveCaptureReaderResult =
+	| { outcome: 'read' | 'cancelled' }
+	| ReturnType<typeof exportFailure>
 export interface ArchiveCaptureSource {
 	/** One current authority observation for this exact generation, never cached UUID equality. */
 	checkAuthority(binding: BackupBinding, signal: AbortSignal): Promise<boolean>
-	/** Must recheck authority at acquisition; late acquired leases still transfer ownership. */
-	acquire(binding: BackupBinding, signal: AbortSignal): Promise<ArchiveCaptureLease>
+	/** Late acquired leases still transfer ownership. The capture owner rechecks authority
+	 * after acquisition/drain and after consistency verification, before producing an archive.
+	 */
+	acquire(binding: BackupBinding, signal: AbortSignal): Promise<ArchiveCaptureControlLease>
 }
 export type ArchiveHandoffObservation = 'dispatched' | 'rejected' | 'unknown'
 export type ArchiveHandoffFile = Pick<SealedArchive, 'copyBytes' | 'toJSON'>
@@ -158,14 +176,14 @@ type ExportInputData = {
 	profile: ArchiveProfileValidator
 	protection: ArchiveProtection | undefined
 }
-export type ExportCleanupCustody = { lease: ArchiveCaptureLease | undefined }
+export type ExportCleanupCustody = { lease: ArchiveCaptureControlLease | undefined }
 /** Payload/native resource facts only; the charts own admission, sequencing and drain. */
 type ExportData = {
 	readonly binding: BackupBinding
 	readonly limits: PayloadLimits
 	input: ExportInputData | undefined
-	lease: ArchiveCaptureLease | undefined
-	failedLease: ArchiveCaptureLease | undefined
+	lease: ArchiveCaptureControlLease | undefined
+	failedLease: ArchiveCaptureControlLease | undefined
 	captured: unknown
 	payload: ArchivePayload | undefined
 	envelope: ArchiveEnvelopeRequest | undefined

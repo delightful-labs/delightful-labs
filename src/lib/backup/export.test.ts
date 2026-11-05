@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, toPromise, waitFor } from 'xstate'
+import { assign, createActor, fromPromise, setup, toPromise, waitFor } from 'xstate'
 import {
 	createArchiveExportMachine,
 	createArchiveExportCleanupMachine
@@ -21,6 +21,15 @@ import {
 	type ArchiveHandoffObservation,
 	type BackupBinding
 } from './export-api.js'
+import {
+	createAdmittedArchiveSource,
+	type ArchiveCaptureReaderInput,
+	type ArchiveCaptureReaderResult
+} from './export-api.js'
+import {
+	createMutationAdmission,
+	type MutationAdmissionResult
+} from '../machines/data/admission.js'
 
 const binding: BackupBinding = Object.freeze({
 	applicationId: 'test-app',
@@ -34,6 +43,70 @@ const testProfile = {
 	id: 'test.graph',
 	version: 1,
 	validate: (payload: ArchivePayload) => payload.records.length === 2
+}
+function admitted<Lease>(result: MutationAdmissionResult<Lease>): Lease {
+	if (result.outcome !== 'admitted') throw new Error(result.reason)
+	return result.lease
+}
+
+function domainReader(read: () => Promise<unknown>, crashOnCancel = false) {
+	type ReaderContext = ArchiveCaptureReaderInput & {
+		failure: ArchiveCaptureReaderResult | undefined
+	}
+	const actors = {
+		metadata: fromPromise<void, ArchiveCaptureReaderInput>(({ input }) =>
+			input.issue(() => Promise.resolve()).then(() => undefined)
+		),
+		graph: fromPromise<void, ArchiveCaptureReaderInput>(({ input }) =>
+			input.issue(read).then((graph) => input.accept(graph))
+		)
+	}
+	return setup<
+		ReaderContext,
+		{ type: 'CANCEL' | 'SHUTDOWN' },
+		typeof actors,
+		{},
+		{},
+		{},
+		never,
+		string,
+		ArchiveCaptureReaderInput,
+		ArchiveCaptureReaderResult
+	>({ actors }).createMachine({
+		context: ({ input }) => ({ ...input, failure: undefined }),
+		output: ({ context }) => context.failure ?? { outcome: 'read' },
+		initial: 'metadata',
+		on: {
+			CANCEL: {
+				actions: () => {
+					if (crashOnCancel) throw new Error('private-reader-crash')
+				}
+			}
+		},
+		states: {
+			metadata: {
+				invoke: {
+					src: 'metadata',
+					input: ({ context }) => context,
+					onDone: 'graph',
+					onError: 'failed'
+				}
+			},
+			graph: {
+				invoke: {
+					src: 'graph',
+					input: ({ context }) => context,
+					onDone: 'complete',
+					onError: 'failed'
+				}
+			},
+			complete: { type: 'final' },
+			failed: {
+				type: 'final',
+				entry: assign({ failure: { outcome: 'failed', code: 'exportFailed' } })
+			}
+		}
+	})
 }
 async function retryCleanup(request: ArchiveExportRequest) {
 	const actor = createActor(createArchiveExportCleanupMachine(), { input: { request } })
@@ -757,4 +830,175 @@ describe('capture drain and resource lifetime', () => {
 		expect(() => acquired?.copyBytes()).toThrow('resourceReleased')
 		expect(h.dispatch).not.toHaveBeenCalled()
 	})
+})
+
+describe('admitted domain reader integration', () => {
+	function source(h: ReturnType<typeof harness>, admission = createMutationAdmission()) {
+		const value = createAdmittedArchiveSource({
+			admission,
+			checkAuthority: h.checkAuthority,
+			checkConsistency: (_binding, signal) => h.checkConsistency(signal)
+		})
+		return {
+			admission,
+			value: { ...value, acquire: vi.fn(value.acquire) }
+		}
+	}
+	it('releases admission for an initially-final cancelled reader', async () => {
+		const h = harness(),
+			s = source(h)
+		const reader = setup<
+			{},
+			{ type: 'CANCEL' | 'SHUTDOWN' },
+			{},
+			{},
+			{},
+			{},
+			never,
+			string,
+			ArchiveCaptureReaderInput,
+			ArchiveCaptureReaderResult
+		>({}).createMachine({
+			initial: 'cancelled',
+			output: () => ({ outcome: 'cancelled' }),
+			states: { cancelled: { type: 'final' } }
+		})
+		const request = h.request({ source: s.value })
+		const actor = createActor(createArchiveExportMachine({ reader }), { input: { request } })
+		actor.start()
+		expect(await toPromise(actor)).toMatchObject({ outcome: 'cancelled', archiveProduced: false })
+		expect(h.dispatch).not.toHaveBeenCalled()
+		admitted(s.admission.write()).release()
+		s.admission.close()
+	})
+	it('preserves an explicit reader failure and reopens writes', async () => {
+		const h = harness(),
+			s = source(h)
+		const reader = domainReader(() => Promise.reject(new Error('private-native-failure')))
+		const request = h.request({ source: s.value })
+		const actor = createActor(createArchiveExportMachine({ reader }), { input: { request } })
+		actor.start()
+		expect(await toPromise(actor)).toMatchObject({
+			outcome: 'failed',
+			code: 'exportFailed',
+			archiveProduced: false
+		})
+		expect(h.dispatch).not.toHaveBeenCalled()
+		admitted(s.admission.write()).release()
+		s.admission.close()
+	})
+	it('invokes the domain reader after operation and receipt drain, without snapshotting the graph', async () => {
+		const h = harness(),
+			s = source(h),
+			pending = deferred<void>()
+		const writer = admitted(s.admission.write())
+		writer.retain(pending.promise)
+		const reader = vi.fn(() => Promise.resolve<unknown>(h.payload))
+		const request = h.request({ source: s.value })
+		const actor = createActor(createArchiveExportMachine({ reader: domainReader(reader) }), {
+			input: { request }
+		})
+		actor.start()
+		await vi.waitFor(() => expect(s.value.acquire).toHaveBeenCalledOnce())
+		writer.release()
+		expect(reader).not.toHaveBeenCalled()
+		pending.resolve()
+		expect(await toPromise(actor)).toMatchObject({ outcome: 'exported', handoff: 'dispatched' })
+		expect(h.checkAuthority).toHaveBeenCalledTimes(3)
+		expect(h.read).not.toHaveBeenCalled()
+		expect(JSON.stringify(actor.getSnapshot())).not.toContain('private-title')
+		admitted(s.admission.write()).release()
+		s.admission.close()
+	})
+	it.each(['drain', 'read'])(
+		'rejects authority replacement during %s and reopens writes',
+		async (stage) => {
+			const h = harness(),
+				s = source(h),
+				pending = deferred<unknown>()
+			const writer = stage === 'drain' ? admitted(s.admission.write()) : undefined
+			const reader = vi.fn(() => pending.promise)
+			const request = h.request({ source: s.value })
+			const actor = createActor(createArchiveExportMachine({ reader: domainReader(reader) }), {
+				input: { request }
+			})
+			actor.start()
+			if (stage === 'drain') {
+				await vi.waitFor(() => expect(s.value.acquire).toHaveBeenCalledOnce())
+				h.checkAuthority.mockResolvedValue(false)
+				writer?.release()
+			} else {
+				await vi.waitFor(() => expect(reader).toHaveBeenCalled())
+				h.checkAuthority.mockResolvedValue(false)
+				pending.resolve(h.payload)
+			}
+			expect(await toPromise(actor)).toMatchObject({
+				outcome: 'failed',
+				code: 'authorityDenied',
+				archiveProduced: false
+			})
+			if (stage === 'drain') expect(reader).not.toHaveBeenCalled()
+			expect(h.dispatch).not.toHaveBeenCalled()
+			admitted(s.admission.write()).release()
+			s.admission.close()
+		}
+	)
+	it.each(['cancel', 'crash', 'stop'])(
+		'releases admission directly after %s while issued native reads drain',
+		async (mode) => {
+			const h = harness(),
+				s = source(h),
+				pending = deferred<unknown>()
+			const reader = vi.fn(() => pending.promise)
+			const request = h.request({ source: s.value })
+			const actor = createActor(
+				createArchiveExportMachine({ reader: domainReader(reader, mode === 'crash') }),
+				{ input: { request } }
+			)
+			actor.start()
+			await vi.waitFor(() => expect(reader).toHaveBeenCalled())
+			if (mode === 'stop') {
+				request.release()
+				actor.stop()
+			} else actor.send({ type: 'CANCEL' })
+			admitted(s.admission.write()).release()
+			if (mode !== 'stop') expect(actor.getSnapshot().status).toBe('active')
+			pending.resolve(h.payload)
+			if (mode !== 'stop')
+				expect(await toPromise(actor)).toMatchObject({
+					outcome: 'cancelled',
+					archiveProduced: false
+				})
+			else
+				await vi.waitFor(async () => {
+					await retryCleanup(request)
+				})
+			expect(h.dispatch).not.toHaveBeenCalled()
+			s.admission.close()
+		}
+	)
+})
+
+describe('authority observation custody', () => {
+	it.each([2, 3])(
+		'retains the lease across abrupt stop during authority observation %s',
+		async (observation) => {
+			const h = harness(),
+				pending = deferred<boolean>()
+			let calls = 0
+			h.checkAuthority.mockImplementation(() => {
+				calls += 1
+				return calls === observation ? pending.promise : Promise.resolve(true)
+			})
+			const request = h.request(),
+				actor = start(request)
+			await vi.waitFor(() => expect(h.checkAuthority).toHaveBeenCalledTimes(observation))
+			actor.stop()
+			expect(h.release).not.toHaveBeenCalled()
+			pending.resolve(true)
+			await vi.waitFor(() => expect(h.release).toHaveBeenCalledOnce())
+			await retryCleanup(request)
+			expect(h.dispatch).not.toHaveBeenCalled()
+		}
+	)
 })

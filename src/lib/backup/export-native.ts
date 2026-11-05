@@ -5,7 +5,9 @@ import {
 	exportData,
 	publishExportCleanup,
 	requireExportValue,
+	type ArchiveCaptureControlLease,
 	type ArchiveCaptureLease,
+	type ArchiveCaptureReaderInput,
 	type ArchiveExportRequest,
 	type ArchiveHandoffFile,
 	type ArchiveHandoffObservation
@@ -37,7 +39,10 @@ function issue<T, Output>(
 	return call
 }
 /** One native disposal; failed custody is retained, never automatically retried. */
-function disposeLease(request: ArchiveExportRequest, lease: ArchiveCaptureLease): Promise<void> {
+function disposeLease(
+	request: ArchiveExportRequest,
+	lease: ArchiveCaptureControlLease
+): Promise<void> {
 	return Promise.resolve()
 		.then(() => lease.release())
 		.catch(() => {
@@ -58,11 +63,10 @@ export function drainExport(request: ArchiveExportRequest): Promise<void> {
 export function observeExportAuthority(request: ArchiveExportRequest): Promise<boolean> {
 	const data = exportData(request)
 	const source = requireExportValue(data.input).source
-	return issue(
-		request,
-		() => source.checkAuthority(data.binding, data.abort.signal),
-		(value) => value
-	)
+	const read = () => source.checkAuthority(data.binding, data.abort.signal)
+	// Later authority observations borrow the acquired lease just like every other source read.
+	if (data.lease !== undefined) return leaseCall(request, read, (value) => value)
+	return issue(request, read, (value) => value)
 }
 export function acquireExportLease(request: ArchiveExportRequest): Promise<void> {
 	const data = exportData(request)
@@ -82,7 +86,7 @@ export function acquireExportLease(request: ArchiveExportRequest): Promise<void>
 /** Loan the actual lease into this one call; no idle owner may release a borrowed resource. */
 function leaseCall<T, Output>(
 	request: ArchiveExportRequest,
-	run: (lease: ArchiveCaptureLease) => Promise<T>,
+	run: (lease: ArchiveCaptureControlLease) => Promise<T>,
 	accept: (value: T) => Output
 ): Promise<Output> {
 	const data = exportData(request)
@@ -113,11 +117,29 @@ export function readExportGraph(request: ArchiveExportRequest): Promise<void> {
 	const data = exportData(request)
 	return leaseCall(
 		request,
-		(lease) => lease.read(data.abort.signal, data.limits),
+		(lease) => {
+			if (!readable(lease)) throw createArchiveExportError('invalidExportConfiguration')
+			return lease.read(data.abort.signal, data.limits)
+		},
 		(value) => {
 			if (data.input !== undefined && !data.abort.signal.aborted) data.captured = value
 		}
 	)
+}
+function readable(lease: ArchiveCaptureControlLease): lease is ArchiveCaptureLease {
+	return 'read' in lease && typeof lease.read === 'function'
+}
+export function exportReaderInput(request: ArchiveExportRequest): ArchiveCaptureReaderInput {
+	const data = exportData(request)
+	return Object.freeze({
+		binding: data.binding,
+		signal: data.abort.signal,
+		limits: data.limits,
+		issue: <Value>(read: () => Promise<Value>) => leaseCall(request, read, (value) => value),
+		accept(payload: unknown) {
+			if (data.input !== undefined && !data.abort.signal.aborted) data.captured = payload
+		}
+	})
 }
 export function observeExportConsistency(request: ArchiveExportRequest): Promise<boolean> {
 	return leaseCall(

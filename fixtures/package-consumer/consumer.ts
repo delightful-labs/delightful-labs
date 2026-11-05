@@ -1,5 +1,30 @@
 // Resolve declarations through package exports, never through src/lib or a source alias.
 import * as foundation from 'delightful-local-first'
+import { setup } from 'xstate'
+import { createArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'
+import type {
+	ArchiveCaptureReaderInput,
+	ArchiveCaptureReaderResult
+} from 'delightful-local-first/backup/export'
+
+// A real consumer machine, including an initially-final reader, satisfies built public declarations.
+const cancelledReader = setup<
+	{},
+	{ type: 'CANCEL' | 'SHUTDOWN' },
+	{},
+	{},
+	{},
+	{},
+	never,
+	string,
+	ArchiveCaptureReaderInput,
+	ArchiveCaptureReaderResult
+>({}).createMachine({
+	initial: 'cancelled',
+	output: () => ({ outcome: 'cancelled' }),
+	states: { cancelled: { type: 'final' } }
+})
+export const consumerExport = createArchiveExportMachine({ reader: cancelledReader })
 
 export const publicEntryPoint: object = foundation
 

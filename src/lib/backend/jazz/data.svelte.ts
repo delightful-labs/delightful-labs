@@ -23,6 +23,25 @@ export function createQuerySubscriptionOne<Row extends { id: string }>(
 ) {
 	return new NativeQuerySubscriptionOne<Row>(query, localFirstOptions(options))
 }
+/** Preserve the original constructor API while delegating ownership to native SDK instances. */
+export const QuerySubscription = new Proxy(NativeQuerySubscription, {
+	construct<Row extends { id: string }>(
+		_target: typeof NativeQuerySubscription,
+		args: ConstructorParameters<typeof NativeQuerySubscription<Row>>
+	) {
+		return createQuerySubscription<Row>(...args)
+	}
+})
+export type QuerySubscription<Row extends { id: string }> = NativeQuerySubscription<Row>
+export const QuerySubscriptionOne = new Proxy(NativeQuerySubscriptionOne, {
+	construct<Row extends { id: string }>(
+		_target: typeof NativeQuerySubscriptionOne,
+		args: ConstructorParameters<typeof NativeQuerySubscriptionOne<Row>>
+	) {
+		return createQuerySubscriptionOne<Row>(...args)
+	}
+})
+export type QuerySubscriptionOne<Row extends { id: string }> = NativeQuerySubscriptionOne<Row>
 /** Issue and settlement are separate leaves. A local receipt never implies remote acceptance. */
 export function issueLocalWrite<Receipt>(issue: () => Receipt): { write: Receipt } {
 	return { write: issue() }
