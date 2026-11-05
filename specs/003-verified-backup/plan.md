@@ -2,41 +2,27 @@
 
 **Branch**: `feat/verified-backup` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
 
-**Status**: Archive codec, envelope/integrity handling, independent inspection and capture/export
-are implemented and locally qualified. PR #22 merged the restore journal and ownership corrections.
-The notebook preparation coordinator and concrete Jazz control-row writer are now locally qualified;
-see [preparation design and qualification](restore-preparation-design.md#preparation-qualification--completed).
-The user approved replacing unusable browser permission advice with owner-bound first-insert
-admission; actual server policy still enforces acceptance. Issued/uncertain attempts retain the
-existing reconciliation rules. Preparation leaves the destination incomplete.
+**Status (2026-11-05)**: Shared archive, envelope, independent inspection, capture/export,
+versioned journal and complete notebook restore are implemented and qualified. PR #26 adds fresh
+full-content comparison, activation, complete coordination and native event-routing cleanup.
+All 1,097 functional cases, static/package/consumer checks and GitHub CI pass on `d69fe4c`.
+See [the active handoff](tasks.md#current-handoff), [restore evidence](restore-completion-design.md),
+[routing audit](native-event-routing-review.md) and [performance baseline](notebook-performance.md).
 
-Current qualification passes all 924 unit cases and 30 actual Jazz/Chromium
-preparation/attachment/notebook/note cases on the propagated stack.
-and package/consumer/static checks. See [attachment qualification and limits](restore-attachment-design.md#attachment-qualification--completed-2026-11-04).
-The one-attachment continuation and extracted owner/planner are qualified within that scope. No full
-restore is claimed. The one-notebook-root batch stacked in PR #24, extracted continuation and
-additive schema/writer are now qualified with 914 units and 22 actual Jazz/Chromium cases; see
-[notebook-root evidence and limits](restore-notebook-design.md#notebook-root-qualification--completed-2026-11-04). A one-note continuation with mapped notebook/nullable attachment relationships is also locally
-qualified; see [note evidence and limits](restore-note-design.md). Fresh graph/relationship/byte
-comparison and activation remain unimplemented. T004 large-file measurements, T006/T012 completion and Finance
-T007–T010 remain open. See the [current handoff](tasks.md#current-handoff-2026-11-04).
-
-Journal metadata alone supplies no destination authority, actual content evidence or replay
-permission. Historical per-slice journal/ownership review and qualification remain in their design
-notes; the preparation evidence supersedes earlier blanket statements that no coordinator/control
-writer exists.
-
-The PR #23 lock-owner review correction is qualified after review: 924 units (41 focused cases),
-13 native Jazz/Chromium cases and package/consumer/static checks pass for the explicit lock chart
-and coordinator release handshake. The propagated notebook-root tree passes all 22 browser cases, and the note tree passes all 30. See [lock design](restore-lock-design.md).
+T006/T012 are complete for the notebook reference. Remaining gates are T004 consumer/platform
+performance, Finance inventory/capture/isolated restore/rehearsal (T007–T010), and the accepted explicit
+permission-repair retry integration (T014). No Finance deployment or identity/storage change is implied.
 
 ## Summary
 
-Start implementation with a standalone, bounded DLF archive codec and independent file inspector. It has no Jazz, Finance, login, or UI dependency. Add the stateful export/restore coordination separately, then Finance’s domain profile against its existing `jazz-tools@2.0.0-alpha.59` deployment. A newer Jazz release and AT Protocol sign-in are not prerequisites.
+The implemented foundation separates the bounded archive/independent inspector from stateful
+export/restore coordination. The notebook reference demonstrates the complete flow. The next adoption
+is Finance’s domain profile against its existing `jazz-tools@2.0.0-alpha.59` deployment. A newer Jazz release and AT Protocol sign-in are not prerequisites.
 
 Finance capture uses an explicitly quiescent single-user maintenance procedure, remote reads for supported complete graph coverage, and comparison with local-first results to detect unsynchronized differences. This is a scoped operational capture, not a claim of SDK snapshot isolation. Do not accept a capture when writer quiescence, full owner authority, or required graph coverage cannot be established. Details and limits appear in [Finance adoption](contracts/finance-adoption.md).
 
-Restore requires an additive Finance isolation design before destination writes: durable operation identity, stable destination IDs, incomplete status, ordinary workflow exclusion, and authoritative reconciliation. These capabilities are absent today. The archive and inspector are independently implementable while the Finance-specific qualification work proceeds.
+Restore requires an additive Finance isolation design before destination writes: durable operation identity, stable destination IDs, incomplete status, ordinary workflow exclusion, and authoritative reconciliation. The notebook supplies a qualified reference for these capabilities; Finance-specific schema, policy,
+consumer interaction and deployment compatibility remain unimplemented and require their own evidence.
 
 ## Technical Context
 
@@ -45,8 +31,8 @@ Restore requires an additive Finance isolation design before destination writes:
 - **Storage**: portable bounded JSON envelope; consumer-owned domain database; durable consumer-owned restore journal. Do not persist decrypted records or passwords in machine snapshots.
 - **Platform**: secure-context desktop browsers first. Browser compatibility and memory behavior must be qualified before platform claims. Independent reader uses standard cryptographic primitives without a Jazz session.
 - **Verification**: static checks during implementation review; unit, package-consumer, browser, real Jazz permissions and restart checks after the user approves the corresponding implementation, per repository policy.
-- **Scale**: initial conservative bounds: 64 MiB outer file, 32 MiB decoded payload, 16 MiB aggregate raw attachments, 8 MiB per attachment, 50,000 records, 32 nesting levels. These are proposed limits, not evidence the real workspace fits. Refuse oversized captures before success; measure deployed requirements before adoption.
-- **Performance**: input bounds prevent unbounded work; no streaming or compression in v1. Measure peak memory and KDF responsiveness on supported browsers. Move CPU/file parsing to a dedicated worker if qualification shows unacceptable main-thread blocking; do not describe current APIs as cancellable cryptographic operations.
+- **Scale**: initial conservative bounds: 64 MiB outer file, 32 MiB decoded payload, 16 MiB aggregate raw attachments, 8 MiB per attachment, 50,000 records, 32 nesting levels. These are implemented bounds, not evidence the deployed workspace fits or every permitted maximum is performance-qualified. Refuse oversized captures before success; measure deployed requirements before adoption.
+- **Performance**: input bounds prevent unbounded work; no streaming or compression in v1. Desktop 1/4/8 MiB measurements are complete; 8 MiB recorded a 684 ms timer delay. Qualify actual consumer sizes/platforms under T004 and decide whether CPU/file parsing needs a dedicated worker before responsiveness claims; do not describe current APIs as cancellable cryptographic operations.
 - **Scope**: one workspace, explicit application profile, current supported application graph. No scheduled backup service, whole engine history, generic ORM, second backend, or migration automation.
 
 ## Constitution Check
@@ -58,8 +44,10 @@ Pre-design and post-design checks pass for the proposed boundaries:
 - Pure archive transforms may be functions. Stateful operations use explicitly owned XState children; see [workflow contract](contracts/workflow.md).
 - Unknown writes retain durable operation identity and require authoritative reconciliation. Local acceptance and remote confirmation remain distinct.
 - No private/offline/platform guarantees exceed recorded evidence. File inspection can be independent; source completeness and destination recovery require qualification.
-- Implementation review precedes implementation tests. The payload-codec slice is synchronous; the user authorized proceeding with review/tests and the implementation notes record passing verification. Subsequent code follows focused review cycles.
-- The user subsequently authorized beginning backup archive implementation after merging PR #15. No deployment, data migration, commit, or publication is implied by that instruction.
+- The user explicitly authorized notebook completion, tests and experiments together, followed by
+  the routing cleanup. Future work follows repository review gates unless separately overridden.
+- Publication of PR #26 is authorized; its merge is the user’s action. No Finance deployment, live
+  data migration or identity/storage configuration change is authorized by this documentation.
 
 Finance’s missing isolation and capture qualification are concrete required implementation work, not exceptions to these principles. Dependent consumer operations must not pretend those capabilities exist.
 
@@ -67,32 +55,49 @@ Finance’s missing isolation and capture qualification are concrete required im
 
 Documentation: this plan, [research](research.md), [data model](data-model.md), [archive contract](contracts/archive-v1.md), [workflow contract](contracts/workflow.md), [Finance adoption](contracts/finance-adoption.md), and [validation guide](quickstart.md).
 
-Proposed DLF source additions:
+Implemented layout:
 
 ```text
-src/lib/backup/                  # Pure bounded archive codec, crypto, validation
-src/lib/contracts/backup.ts      # Profile, reports, safe opaque-resource contracts
-src/lib/machines/backup/         # Export, file inspection, restore coordination
-src/lib/integrations/backup/     # Browser file/resource ownership, later UI binding
-fixtures/backup-reader/         # Independent reader without Jazz/login dependencies
-fixtures/package-consumer/      # Public backup subpath checks
+src/lib/backup/                  # Portable codecs, opaque resources, contracts, journal schemas
+src/lib/machines/backup/         # Capture/export, inspection, crypto and journaled write owners
+fixtures/backup-reader/          # Independent retained-file reader without Jazz/login
+fixtures/backup-notebook/        # Consumer profile, source, full Jazz restore and qualification
+fixtures/package-consumer/       # Public-subpath type/runtime/browser checks
 ```
 
-Proposed public subpaths: `./backup/archive`, `./backup/contracts`, `./backup/workflow`. Keep pure archive imports independent of XState, Svelte, and Jazz. Do not conflate this with the existing identity-restoration exports.
+Public subpaths: `backup/archive`; `backup/envelope`, `backup/inspection`, `backup/export` and
+`backup/restore` with their `/workflow` entries; `backup/restore/journal` with `/browser` and
+`/workflow`. Pure archive imports remain independent of XState, Svelte and Jazz. These are distinct
+from the existing identity-restoration exports; no proposed `backup/contracts` entry is published.
 
 Finance additions live in a separate Finance feature branch/PR: a consumer profile, domain capture/restore actors, durable restore schema/policies, and one consumer-owned interaction per review cycle. Existing workspace creation is not reused unchanged. Source names and exact schema changes are finalized in that consumer design review.
 
-## Delivery sequence
+## Remaining delivery sequence
 
-1. **Archive core**: implement bounded encoding/decoding, exact value validation, plaintext digest, authenticated password encryption/decryption, and immutable validated-archive resources. Present focused implementation for review; then add/run meaningful crypto/format/limit tests.
-2. **Independent inspector**: read an actual retained file, validate its generic structure, report domain profile compatibility separately, and release secrets/resources. Review then verify without Jazz or original login.
-3. **Shared lifecycle**: implement export and restore workflow contracts with a small nonfinancial profile and explicit ownership/cancellation. Review then test failures, stale reports, and uncertain writes.
-4. **Finance capture**: first read-only deployment/schema inventory; then implement all allowlisted released graph coverage, owner authority, maintenance/drain handling, file assembly, local/remote comparison, and domain archive validation. Export does not change the source schema. Review and qualify before using real data.
-5. **Finance restore**: independently design/review additive durable operation/isolation fields and backend rules on a disposable app. Implement stable mapping, journal, exact reconciliation, phased graph staging, content comparison, and activation. Qualify restart, rejection, permissions, and old-client behavior before a live additive deployment is proposed.
-6. **Actual recovery rehearsal**: retain the real exported file; validate and restore into a new isolated destination; verify every declared record value/reference and attachment byte; confirm original unchanged. Record evidence without private contents. Only then proceed to the separate identity/storage work.
+1. **T007, read-only inventory:** verify published Finance revisions, schema/permissions, all released
+   graph/attachment coverage, pending local writes and actual sizes.
+2. **T004, consumer performance:** measure that supported workload/platform and address unacceptable
+   blocking or memory use before claiming responsiveness or increasing bounds. The notebook baseline
+   is already recorded; a worker is a decision based on qualification, not an assumed redesign.
+3. **T008, Finance capture/profile/interaction:** allowlisted complete graph, owner authority,
+   maintenance/drain, exact bytes, local/remote comparison and disposable-data qualification.
+4. **T009, Finance isolated restore:** additive schema/policy lane, stable mappings/journal,
+   reconciliation, domain staging, fresh comparison and activation. Qualify policies, cached clients,
+   restart and uncertain outcomes before proposing live additive deployment.
+5. **T010, actual recovery rehearsal:** retain the deployed file, inspect independently, restore into
+   a new isolated destination, compare every supported value/reference/byte in a fresh session and
+   preserve the original. This precedes separate identity/storage work.
 
-Each numbered item is a review boundary, not permission to batch the entire implementation. The user authorized implementation after merging the design. [Tasks](tasks.md) split archive item 1 into structural codec and cryptographic/resource review slices; no whole-feature completion is implied.
+**T014** separately integrates the already accepted explicit same-operation retry after a confirmed
+rejection and repaired authority. The journal representation is ready; the writer currently stops
+conservatively. Generic errors or unknown/hidden results never authorize replay. No automatic retry
+engine is planned.
 
 ## Remaining evidence requirements
 
-These do not prevent starting archive implementation: current production revision and catalogue/permission hashes; real data size/type inventory; Jazz remote/local read and unknown-write qualification; exact Finance restore isolation policy with cached-client compatibility. They prevent claiming consumer completeness or successful recovery until actually resolved. If alpha.59 cannot satisfy an operation, report the specific limitation and adjust that operation openly rather than requiring an unexamined upgrade or deleting data.
+Actual production revisions/catalogue/permission hashes, released graph and size inventory, Finance
+capture consistency and local/remote differences, additive isolation with cached-client compatibility,
+and an actual retained-file recovery remain required. Notebook success does not establish consumer
+completeness or production safety. Report a specific alpha.59 limitation rather than silently upgrading
+or deleting data. Browser-process crash, cleared journal, offline restart and cross-device recovery
+remain outside the qualified notebook claims; expanding those claims requires scoped evidence.

@@ -4,25 +4,19 @@
 
 **Created**: 2026-11-03
 
-**Status**: Archive, envelope, independent inspection, shared capture/export and the browser
-restore journal are implemented and locally qualified; PR #22 is merged. The bounded notebook
-preparation coordinator and concrete Jazz destination-control writer are now locally qualified:
-19 focused preparation unit cases and eight real Jazz/Chromium cases pass. This prepares an isolated
-incomplete destination with durable intent and mappings, separate settlement observations and
-same-browser reload reconciliation. A one-attachment continuation and the shared owner/planner are now locally qualified:
-914 unit tests and 13 real Jazz/Chromium preparation/attachment cases pass for PR #23.
-The one-notebook-root batch stacked in PR #24 and its extracted continuation/schema/writer are now
-locally qualified: 914 units and 22 actual Jazz/Chromium preparation/attachment/notebook cases pass.
-The next single-note continuation and actual mapped relationships are now locally qualified with
-924 units and 30 real Jazz/Chromium cases. Fresh full-content comparison and activation remain
-unimplemented; reaching the comparing checkpoint is not a verified restore. T006/T012 and Finance adoption remain incomplete; no successful
-full restore or production restore safety is claimed. See the
-[preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
-and [current handoff](tasks.md#current-handoff-2026-11-04).
+**Status (2026-11-05)**: Shared archive/envelope, independent inspection, capture/export and the
+versioned browser restore journal are implemented. The complete notebook reference now writes all
+mapped content, freshly compares exact fields/relationships/attachment bytes and activates the
+isolated destination. Same-browser resume and conservative uncertain-activation recovery are
+qualified. PRs #23–#25 are merged; [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
+is ready for the user's merge, with 1,097 functional cases and GitHub CI passing on `d69fe4c`.
+The routing review covers all 45 machine-bearing modules.
 
-The subsequent PR #23 operation-lock ownership correction is qualified after review with 924 units
-and 13 native Jazz/Chromium cases. Propagation to the notebook-root branch passes 22 browser cases;
-the note branch passes all 30 browser cases and 924 units after propagation. See [lock design](restore-lock-design.md).
+This establishes the notebook reference, not Finance production recovery. Remaining work is actual
+consumer/platform performance qualification (T004), deployed Finance inventory/adoption/rehearsal
+(T007–T010), and explicit retry integration after confirmed rejection (T014). See
+[the active TODOs](tasks.md#current-handoff), [restore qualification](restore-completion-design.md),
+[routing audit](native-event-routing-review.md) and [desktop measurements](notebook-performance.md).
 
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
 
@@ -142,37 +136,38 @@ As an application developer, I can use the same backup machinery with another ap
 - Full offline export is not promised when the device lacks required data. Independent file inspection can work offline; remote destination restoration requires its normal connectivity and authorization.
 - Clipper can adopt the generic contract later. This feature does not implement Clipper capture or reader workflows.
 - Encryption password loss makes that encrypted file unrecoverable. Existing identity recovery remains separate.
-- Implementation review and subsequent tests follow repository agreements. This specification does not claim that a usable backup exists yet.
+- Implementation review and tests follow repository agreements and explicit user authorization. The notebook path is qualified; a retained backup and verified restore of actual deployed Finance data have not been demonstrated.
 
-## Known restore limitations and implementation gate
+## Known restore limitations and remaining implementation gates
 
-**Current authorized slice: notebook restore preparation, now locally qualified.** The earlier
-journal-only gate was superseded by the user's authorization to implement and qualify this bounded
-slice, including owner-bound first-write admission. The journal changes merged in PR #22. The
-[preparation qualification](restore-preparation-design.md#preparation-qualification--completed)
-records the actual machine/native evidence and remaining limits. Further data writers, full-content
-comparison, activation and Finance adoption require their own review slices.
-
-- **Retry representation is implemented and locally qualified; writer integration is unbuilt.** A new transaction attempt
-  can follow a confirmed remote rejection with a known transaction ID, retaining the same operation,
-  destination and mappings. Preserve the most recent rejected attempt and the attempt counter;
-  this is bounded recovery metadata, not a complete audit history. A generic exception or uncertain
-  outcome cannot increase the counter. The future writer still needs corrected authority before
-  actually issuing a retry. FR-010 and SC-004 remain unfulfilled until restore integration is qualified.
-- **Recovery is scoped to the same browser and origin with retained journal storage.** The user
-  approved this scope. Resuming requires selecting the backup file again. IndexedDB holds operation
-  identity, mappings and progress; Jazz holds restored application data. Clearing or losing browser
-  storage removes that local recovery metadata. Cross-browser/device recovery is outside this scope.
-- **Qualification is limited.** Chromium page reload, atomic journal updates and cancellation around
-  commit are tested. Browser-process crash recovery and actual Jazz destination restoration are
-  unqualified. Journal commit does not establish Jazz local persistence, remote acceptance or a
-  verified restore. The preparation coordinator/control writer is now qualified; data writers and activation remain unimplemented.
-
-The [real-code limitation investigation](research.md#restore-limitation-investigation--2026-11-03)
-reproduced a Jazz retry after permission repair at the same destination IDs, which the current
-journal previously could not represent. It also demonstrated pending acceptance across disconnect/reconnect,
-permission-filtered remote null results and journal retention across graceful Chromium process
-restart. These findings do not qualify actual Jazz recovery after restart.
+- **Notebook restore is implemented and qualified.** The reference coordinates the complete retained
+  plan, freshly reads all restored records and actual attachment bytes, compares exact sets/values
+  and relationships, journals comparison and activates through the existing transaction owner.
+  Active reconciliation compares the graph again; counts and stored digests alone are insufficient.
+- **Retry representation is implemented; explicit rejected-write retry integration remains T014.**
+  The journal supports bounded prior-rejection evidence and a new attempt after a confirmed remote
+  rejection with a known transaction ID. The current write owner conservatively returns incomplete
+  after rejection/uncertainty and does not issue a new attempt when permissions are repaired.
+  Implement the accepted explicit same-operation behavior below without automatic retry heuristics.
+- **Recovery is same-browser/origin with retained journal storage.** Resume requires reselecting the
+  matching file and supplying its password when applicable. IndexedDB holds operation identity,
+  mappings and progress; Jazz holds destination data. Clearing storage loses local recovery metadata.
+  Cross-browser/device recovery is outside this qualified scope.
+- **The qualified source is quiescent single-user data.** Actual Jazz destination policies enforce
+  owner, scope, immutable provenance and the incomplete-to-active phase boundary. The trusted client
+  owns content verification; the server does not attest that arbitrary owner clients ran it. This is
+  not a cross-client serializable graph snapshot guarantee.
+- **Qualification has concrete limits.** Retained-file independent inspection, exact notebook restore,
+  page reload/fresh session, cancellation/drain and uncertain activation without replay are tested.
+  Browser-process crash, cleared journal and offline restart are not qualified full-restore claims.
+  Journal commit alone proves neither Jazz local persistence nor remote acceptance.
+- **Consumer/platform performance remains T004.** The 1/4/8 MiB desktop measurements are recorded,
+  including a substantial 8 MiB timer delay and memory footprint. They do not qualify phones,
+  maximum aggregate archives or the deployed Finance graph.
+- **Finance remains T007–T010.** Inventory actual deployment/data read-only, implement and qualify
+  its capture/profile and isolated restore, then demonstrate an actual retained-file recovery before
+  identity/storage changes. Shared code and notebook evidence do not fulfill the Finance success
+  criteria or its consumer-owned interactions.
 
 ### Accepted retry behavior — 2026-11-03
 
@@ -186,13 +181,14 @@ write is issued. A generic exception or permission-filtered missing result is no
 for replay. A new destination is not the recovery action for this permission-failure case.
 
 The user subsequently authorized the focused journal representation change after the follow-up
-research. It is implemented for review: current attempt plus the most recent rejected attempt, and
+research. The journal representation is implemented and qualified: current attempt plus the most recent rejected attempt, and
 completion by either a settled transaction receipt or an exact remote content match retaining the
 unchanged attempt evidence. Reconciliation cannot silently satisfy a separately required local
 persistence observation. No generalized retry engine or unbounded attempt history is required.
-No restore coordinator or destination writer is authorized by this slice.
+The later notebook coordinator/writer authorization is implemented in PR #26. Its explicit
+permission-repair retry path remains T014; the representation alone is not writer retry qualification.
 
-### Follow-up recovery evidence — 2026-11-03
+### Historical recovery evidence — 2026-11-03
 
 [Persistent-browser probes](research.md#persistent-jazz-write-recovery-investigation--2026-11-03)
 recovered an accepted-but-uncheckpointed write and a locally persisted pending write after graceful
@@ -207,19 +203,20 @@ as an invented acceptance receipt for the original transaction. The focused jour
 represents that completion basis separately, with the exact planned digest and unchanged attempt
 facts. After review approval, 105 journal unit cases and six journal Chromium cases pass (full suites:
 833 unit and 51 Chromium tests). These checks qualify the representation and journal storage, not
-production destination comparison or the unbuilt restore coordinator/writers.
+production destination comparison. Later notebook coordinator/writer qualification is recorded in
+[the completion evidence](restore-completion-design.md); full browser-process restart remains outside it.
 
 See the [reviewed browser journal design](browser-journal-design.md) for implementation evidence.
 
 ## Evidence and implementation investigation
 
-See [source findings and unresolved implementation work](research.md). Detailed contracts, archive encoding, cryptography parameters, consistency proof, and restore persistence must be resolved in planning before dependent implementation.
+See [historical source investigations](research.md), the implemented [archive contract](contracts/archive-v1.md),
+[workflow contract](contracts/workflow.md) and [current implementation plan](plan.md). Remaining
+Finance consistency/isolation and consumer performance evidence are tracked in [tasks](tasks.md).
 
 ## Zod follow-up TODOs
 
-The user selected Zod for internal archive schemas. Track the additional repository opportunities
-in [T011–T013](tasks.md#zod-follow-ups-from-repository-review): optional form-error adaptation,
-concrete persisted restore-journal schemas, and a bounded review of profile draft checks. Preserve
-library-neutral consumer contracts and simple workflow guards. Sign-in external-input/configuration
-validation is tracked in [its delivery TODOs](../002-shared-delightful-sign-in/delivery.md#zod-validation-todos).
-These follow-ups are not prerequisites for reviewing the current payload codec.
+T011–T013 are complete: the optional form-error adapter, concrete versioned restore-journal schemas,
+and profile draft-check review. Consumer contracts remain library-neutral; simple workflow guards
+remain ordinary code. Finance's journal integration is T009. Sign-in configuration/external-input
+validation remains in [its separate delivery TODOs](../002-shared-delightful-sign-in/delivery.md#zod-validation-todos).

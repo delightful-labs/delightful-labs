@@ -1,5 +1,10 @@
 # T006 stacked slice — one notebook root record
 
+> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
+> [completion evidence](restore-completion-design.md) for present status; bounded single-step
+> descriptions and dated test totals below describe their original scope.
+
 Base: PR #23, `feat/notebook-restore-preparation` at `8b64ea7`. Implementation authorized
 by “continue. make a pr stacked on 23”. Review before tests remains in force.
 

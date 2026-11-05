@@ -1,5 +1,10 @@
 # PR #23 review correction — explicit restore-operation lock actor
 
+> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
+> [completion evidence](restore-completion-design.md) for present status; bounded single-step
+> descriptions and dated test totals below describe their original scope.
+
 The review identified that operationLock placed availability/acquisition/release decisions in one
 callback. Replace that owner with a finite state machine; keep a callback only at the Web Locks
 protocol boundary. The user subsequently approved this correction for qualification with “continue”. The earlier

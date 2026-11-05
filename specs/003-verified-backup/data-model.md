@@ -1,14 +1,25 @@
 # Backup data and lifecycle model
 
-See [archive contract](contracts/archive-v1.md) for exact portable fields and validation.
+See [archive contract](contracts/archive-v1.md) for exact portable fields and validation. The shared
+journal schema is implemented in `src/lib/backup/restore-journal-schemas.ts`; the complete notebook
+integration and qualification are in [the completion design](restore-completion-design.md).
+Finance-specific schema/policy adoption remains T009.
 
 ## Durable data
 
 **Archive**: immutable encoded bytes identified by archive ID and SHA-256 of the exact decoded payload. Re-encrypting the same payload changes envelope bytes; restore identity binds the payload digest and profile, not encryption randomness.
 
-**Restore operation**: consumer-owned durable metadata: operation ID, payload digest, profile ID/version, restoring identity, destination workspace ID, stable mapping seed or explicit mapping entries, expected graph fingerprint, next work descriptors, and status (`incomplete`, `verifying`, `complete`, `conflict`). No password or decoded financial values belong in this journal. Its data has permissions and is not public telemetry.
+**Restore operation**: consumer-owned durable metadata: operation ID, payload digest, profile ID/version, restoring identity, destination workspace ID, explicit stable mapping entries, expected graph fingerprint and planned write descriptors. The
+implemented checkpoint variants are `writing`, `comparing`, `activating`, `complete` and `conflict`.
+The separate notebook destination row has `incomplete` / `active` status; journal progress and
+destination visibility are different facts. No password or decoded financial values belong in this journal. Its data has permissions and is not public telemetry.
 
 **Mapping**: source `(record type, ID)` to allocated fresh destination ID. Allocate and durably retain the complete mapping before corresponding writes; never generate replacement IDs after an unknown outcome. Finance source audit and bank provenance remain inert records with mapped references, separate from live memberships or integration tables.
+
+**Comparison and activation**: the journal enters `activating` only after fresh complete content
+comparison and CAS. It records correlated payload/graph digests, then a separately settled activation
+receipt or an exact remote-content reconciliation retaining required local-persistence evidence.
+Comparison metadata alone grants no authority and cannot replace a fresh active-graph read on resume.
 
 **Batch receipt**: operation ID, batch identity, expected mapped IDs and expected content digests, confirmed transaction identifier when supported, and settlement. A receipt missing after an accepted write is not proof of absence. Reconcile actual authoritative rows and fields using stored expected identities.
 

@@ -1,5 +1,10 @@
 # Attachment scalar investigation
 
+> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
+> [completion evidence](restore-completion-design.md) for present status; bounded single-step
+> descriptions and dated test totals below describe their original scope.
+
 Requested after preparation commit `bba5f49`, before attachment-writer implementation.
 The user explicitly authorized isolated tests and inspection of the actual pinned SDK code.
 This is research, not implementation qualification or permission to skip implementation review.
