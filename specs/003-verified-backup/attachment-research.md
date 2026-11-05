@@ -1,6 +1,6 @@
 # Attachment scalar investigation
 
-> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> Historical slice/research record. The complete test app workflow, fresh comparison and activation
 > are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
 > [completion evidence](restore-completion-design.md) for present status; bounded single-step
 > descriptions and dated test totals below describe their original scope.
@@ -66,7 +66,7 @@ its temporary Jazz authority, Vite server, Chromium process and persistent profi
 removed by teardown. Raw synthetic evidence remains in
 `.svelte-kit/attachment-research/evidence.json`, alongside the probe test, schema and browser host.
 The policy fixture deliberately permits its owner to activate the control row solely to test a
-read/stage/commit race; this is not a change to the notebook's production-candidate policies.
+read/stage/commit race; this is not a change to the test app's production-candidate policies.
 
 | Question                                                           | Actual observation                                                                                                                                                                                                                                                                                                                                            | Consequence                                                                                                                                                                                                             |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -108,8 +108,8 @@ requirement.
 ## Qualification limits
 
 These are isolated SDK/policy investigations. They do not qualify an attachment restore coordinator,
-journal prefix advancement, full notebook round-trip or Finance adoption. The actual implementation
-must be reviewed and tested through the built package and concrete notebook entry point later.
+journal prefix advancement, full test app round-trip or Finance adoption. The actual implementation
+must be reviewed and tested through the built package and concrete test app entry point later.
 
 The largest scalar round-trip was 8 MiB; the joined-read case used four bytes and the stopped-authority
 restart case used 1 MiB. No peak-memory or responsiveness measurements were taken. Existing T004

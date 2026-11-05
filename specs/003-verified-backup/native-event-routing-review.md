@@ -34,15 +34,15 @@ forwarding to an absent named child errors, and native sends preserve the child 
 ## Repository audit
 
 Reviewed the event-routing topology of all 45 machine-bearing modules: the 35 shared statechart
-modules and 10 notebook fixture statechart modules (47 statecharts and 146 invocation sites). Also inspected the five shared support modules
-(feedback projection, form lifecycle/policy, native journal and transaction custody), the notebook
+modules and 10 test app fixture statechart modules (47 statecharts and 146 invocation sites). Also inspected the five shared support modules
+(feedback projection, form lifecycle/policy, native journal and transaction custody), the test app
 continuation factories and SDK callback adapters. This is an actor communication/lifetime review,
 not a claim that unrelated domain algorithms need rewriting.
 
 | Area                                                                     | Changes / review outcome                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Notebook workflow, preparation, continuation                             | Native state-scoped sends to planning/write children; RELEASE and identity reports normalize once with raise. Journal and read leaves retain interruption in their owner.                                                                                                    |
-| Notebook preparation, attachment, root, note and activation destinations | Only the writing state forwards controls to its identity/staging child. Reads drain without ineffective messages to promise actors.                                                                                                                                          |
+| Test app workflow, preparation, continuation                             | Native state-scoped sends to planning/write children; RELEASE and identity reports normalize once with raise. Journal and read leaves retain interruption in their owner.                                                                                                    |
+| Test app preparation, attachment, root, note and activation destinations | Only the writing state forwards controls to its identity/staging child. Reads drain without ineffective messages to promise actors.                                                                                                                                          |
 | Shared restore coordinator/write owner                                   | Native sends in the states invoking write/destination; lock failure requests shutdown only while the writer is owned. Journal, transaction acquisition/commit/settlement/rollback remain draining leaves.                                                                    |
 | Export/capture/envelope/inspection                                       | Export now sends directly in capture/seal states and retains its native host abort. Capture/envelope/inspection already expose explicit ownership and native sends; no redesign.                                                                                             |
 | Restore journal, journal step, operation lock, export cleanup            | Already use explicit native commands and resource lifetimes; retained.                                                                                                                                                                                                       |
@@ -71,7 +71,7 @@ The public actor event types, state topology, output contracts and transaction o
 Final local results:
 
 - `pnpm verify`: 927 units in 39 files; formatting/lint/Svelte/TypeScript, strict package/consumer
-  checks, 17 independent-reader cases, 18 notebook export cases and Storybook build pass.
+  checks, 17 independent-reader cases, 18 test app export cases and Storybook build pass.
 - `pnpm check:backup-restore`: all 60 actual Jazz/Chromium cases pass. The three optional size
   measurements remain separate; the earlier performance report records their measured baseline.
 - `pnpm test:storybook`: all 65 cases pass.

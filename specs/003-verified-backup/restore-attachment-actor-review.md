@@ -5,7 +5,7 @@
 > shared coordinator and renamed API supersede the historical pending/default-path notes below.
 > See [current cleanup and qualification](pr23-coordinator-cleanup.md). Changes remain uncommitted.
 
-The user requested createNotebookAttachmentWriter be a machine. This correction follows the locally
+The user requested createTestAppAttachmentWriter be a machine. This correction follows the locally
 qualified wrapper cleanup, preserves that work, and awaits implementation review before tests.
 
 ## State and ownership design before implementation
@@ -65,7 +65,7 @@ child starts an actor manually or obtains its own commit/rollback/settlement cap
 staged output permits commit. Every new invoked operation/resource has an error path, and control
 messages are forwarded at active-child admission while issued native leaves drain.
 
-Root Svelte/strict TypeScript, package/strict Publint, notebook TypeScript, public package-consumer
+Root Svelte/strict TypeScript, package/strict Publint, test app TypeScript, public package-consumer
 TypeScript against rebuilt declarations, lint, formatting and whitespace checks pass. Existing
 browser test construction was updated to supply the domain actor and separate native adapter;
 no assertions were added or run for this correction. No server was started, nothing committed or

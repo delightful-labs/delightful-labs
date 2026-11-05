@@ -1,4 +1,4 @@
-// An independent notebook app owns its provenance and opaque database binding.
+// An independent test app owns its provenance and opaque database binding.
 import { createActor, setup, toPromise } from 'xstate'
 import { createWorkspaceInitialization } from 'delightful-local-first/workspace/initialization'
 import { observeRow } from 'delightful-local-first/data/observations'
@@ -29,13 +29,13 @@ const initialization = createWorkspaceInitialization({
 		reads++
 		if (tier !== 'cache') throw new Error('Unexpected remote preflight')
 		return {
-			identities: [{ id: 'reader', initialWorkspaceId: 'notebook' }],
+			identities: [{ id: 'reader', initialWorkspaceId: 'test-app' }],
 			workspaces: [],
 			serverConfigured: true
 		}
 	},
 	prepareInitial: async () => {
-		throw new Error('Existing notebook must not be replaced')
+		throw new Error('Existing test app must not be replaced')
 	},
 	selectReady: (attempt) => attempt,
 	transaction
@@ -46,7 +46,7 @@ try {
 	if (
 		result.outcome !== 'ready' ||
 		!('workspaceId' in result) ||
-		result.workspaceId !== 'notebook' ||
+		result.workspaceId !== 'test-app' ||
 		reads !== 1
 	)
 		throw new Error('Packaged local provenance changed')

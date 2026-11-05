@@ -4,7 +4,7 @@
 > approval gates in this document. The user requested all remaining fixes and all tests together.
 > The original findings remain as review history, not current qualification claims.
 
-Reviewed the working tree based on `e978c35`, including the pending notebook source
+Reviewed the working tree based on `e978c35`, including the pending test app source
 correction. Review only: no new implementation, runtime tests, commits, or pushes.
 
 The criterion is the recursive machine-first gate in `.specify/memory/xstate.md`:
@@ -14,7 +14,7 @@ predicates, atomic staging, and narrow native completion/disposal remain functio
 ## Findings
 
 Qualification completed for the authorized follow-up: 918 unit tests, 17 independent-reader
-tests, 18 notebook-export tests, 22 Jazz/Chromium restore tests, 10 private-creation tests,
+tests, 18 test app-export tests, 22 Jazz/Chromium restore tests, 10 private-creation tests,
 and 65 Storybook browser tests passed (1,050 total). Formatting, lint, Svelte and TypeScript
 checks, package validation, consumer checks/builds, and the Storybook build passed.
 Backup synchronous stages use ordinary actions so constructing an unstarted actor cannot
@@ -171,19 +171,19 @@ and Python suffixes: 98 non-test library files, 42 non-test fixture files, 8 sto
 dependencies, vendored packages, generated Paraglide code, build output, and Git data.
 
 The review traced the runtime machine families, their backend/helper/native boundaries,
-the notebook source, reader I/O, and component workflow ownership. Contracts and pure
+the test app source, reader I/O, and component workflow ownership. Contracts and pure
 code were classified separately. Tests, consumer harnesses, stories, and tooling were
 screened for orchestration and consulted for intended behavior; this was not an
 assertion-by-assertion test audit or a shell-tooling correctness/security audit. Inventory
 and text searches alone are not evidence of runtime correctness.
 
-The pending notebook correction now models write validation/commit/rejection and read
+The pending test app correction now models write validation/commit/rejection and read
 capture/return/rejection as states. Its runtime qualification still awaits implementation
 review. This review does not qualify the rewritten backup restore-journal native owner,
 replace pending regression checks, or establish that every injected consumer capability
 is a leaf. No new runtime tests were added or run.
 
-Suggested sequence: review and qualify the pending notebook change, then address
+Suggested sequence: review and qualify the pending test app change, then address
 envelope preparation as one bounded slice. Discuss avatar ownership and the two failure/
 teardown contracts before undertaking those changes. These findings do not authorize
 implementing all four at once.

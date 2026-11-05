@@ -32,20 +32,20 @@ const transactions = {
 const capability = {
 	admit: (credentials) =>
 		credentials.proof === 'synthetic-proof'
-			? { outcome: 'admitted', accountId: 'notebook-reader', transactions }
+			? { outcome: 'admitted', accountId: 'test-app-reader', transactions }
 			: { outcome: 'unauthenticated' },
 	read: async (tx, identity, accountId) => {
 		if (
 			tx !== transaction ||
-			identity.invitationId !== 'notebook-invite' ||
-			accountId !== 'notebook-reader'
+			identity.invitationId !== 'test-app-invite' ||
+			accountId !== 'test-app-reader'
 		)
 			throw new Error('Unexpected authority scope')
 		return {
 			outcome: 'observed',
 			records: {
 				invitation: {
-					id: 'notebook-invite',
+					id: 'test-app-invite',
 					workspaceId: 'notebook',
 					role: 'collaborator',
 					codeDigest: 'synthetic-digest',
@@ -60,7 +60,7 @@ const capability = {
 	},
 	verifyCode: (code, digest) => code === 'synthetic-code' && digest === 'synthetic-digest',
 	now: () => 5000,
-	newMembershipId: () => 'notebook-membership',
+	newMembershipId: () => 'test-app-membership',
 	stage: (tx, plan) => {
 		if (tx !== transaction) throw new Error('Unexpected transaction')
 		staged.push(plan)
@@ -70,8 +70,8 @@ const actor = createActor(createInvitationAuthorityMachine(capability), {
 	input: {
 		credentials: { proof: 'synthetic-proof' },
 		request: {
-			operationId: 'notebook-redemption',
-			invitationId: 'notebook-invite',
+			operationId: 'test-app-redemption',
+			invitationId: 'test-app-invite',
 			code: 'synthetic-code'
 		}
 	}
@@ -83,15 +83,15 @@ try {
 		result.outcome !== 'completed' ||
 		result.settlement.decision.outcome !== 'joined' ||
 		!('membershipId' in result.settlement.decision) ||
-		result.settlement.decision.membershipId !== 'notebook-membership'
+		result.settlement.decision.membershipId !== 'test-app-membership'
 	)
 		throw new Error('Packaged authority did not confirm its result')
 	const plan = staged[0]
 	if (
 		staged.length !== 1 ||
-		plan?.accountId !== 'notebook-reader' ||
+		plan?.accountId !== 'test-app-reader' ||
 		plan.role !== 'collaborator' ||
-		plan.operationId !== 'notebook-redemption' ||
+		plan.operationId !== 'test-app-redemption' ||
 		plan.acceptedAt !== 5000
 	)
 		throw new Error('Packaged authority lost its verified staging plan')

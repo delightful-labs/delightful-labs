@@ -1,0 +1,70 @@
+import type { Snapshot } from 'xstate'
+import type {
+	RestoreTransactionWriter,
+	RestoreDestinationLogic,
+	RestoreDestinationResult
+} from 'delightful-local-first/backup/restore'
+import { createTestAppRestoreContinuationMachine } from './restore-continuation.js'
+import { currentTestAppBatch } from './restore-step-data.js'
+import {
+	testAppRestoreData as data,
+	prepareTestAppRestore,
+	requiredTestAppRestoreValue as required,
+	type TestAppRestoreRequest,
+	type TestAppRestoreOptions
+} from './restore-request.js'
+
+type Input = { request: TestAppRestoreRequest }
+export function testAppCurrentStepIsRoot(input: Input): boolean {
+	const value = data(input),
+		batch = currentTestAppBatch(input)
+	if (!batch || batch.mappingIndexes.length !== 1) return false
+	const index = batch.mappingIndexes[0]
+	const mapping = index === undefined ? undefined : value.intent?.plan.mappings[index]
+	return mapping?.kind === 'record' && mapping.type === 'notebook'
+}
+/** Pure projection of the checked exact profile and retained plan, no I/O or step selection. */
+export function prepareTestAppRoot(input: Input): void {
+	const value = data(input),
+		intent = required(value.intent),
+		batch = required(currentTestAppBatch(input))
+	const mapping = required(intent.plan.mappings[required(batch.mappingIndexes[0])])
+	if (batch.mappingIndexes.length !== 1 || mapping.kind !== 'record' || mapping.type !== 'notebook')
+		throw new Error('Expected notebook root batch')
+	const source = required(
+		value.archive
+			.readPayload()
+			.records.find((record) => record.type === 'notebook' && record.id === mapping.sourceId)
+	)
+	const title = source.fields.title
+	if (title?.kind !== 'text') throw new Error('Expected checked notebook title')
+	value.notebook = {
+		id: mapping.destinationId,
+		sourceId: mapping.sourceId,
+		writeId: batch.writeId,
+		contentSha256: batch.expectedContentSha256,
+		payloadSha256: intent.archive.payloadSha256,
+		destinationId: intent.operation.destinationWorkspaceId,
+		ownerId: intent.operation.identityId,
+		operationId: intent.operation.operationId,
+		title: title.value
+	}
+}
+export function prepareTestAppRootRestore(options: Omit<TestAppRestoreOptions, 'mode'>) {
+	return prepareTestAppRestore({ ...options, mode: 'resume' })
+}
+export function createTestAppRestoreRootMachine<
+	Transaction,
+	Write,
+	S extends Snapshot<RestoreDestinationResult>
+>(
+	writer: RestoreTransactionWriter<Transaction, Write>,
+	destination: RestoreDestinationLogic<Transaction, S>
+) {
+	return createTestAppRestoreContinuationMachine(writer, destination, {
+		currentStep: testAppCurrentStepIsRoot,
+		prepareExpected: prepareTestAppRoot,
+		writeId: (input) => required(data(input).notebook).writeId,
+		notApplicable: 'noNotebookStep'
+	})
+}

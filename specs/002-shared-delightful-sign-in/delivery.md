@@ -20,16 +20,18 @@ prerequisite for implementation or adoption.
 
 ## Implementation handoff (2026-11-05)
 
-The shared backup foundation and complete notebook reference are implemented and qualified through
-[PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26), ready for the user's merge.
-PR #20 and PRs #23–#25 are already merged. The current [backup specification](../003-verified-backup/spec.md)
-and [task ledger](../003-verified-backup/tasks.md#current-handoff) track what remains: T007 deployed
-Finance inventory, T004 consumer/platform performance, T008 capture/profile/interaction, T009 isolated
+The shared backup foundation and complete test app reference are implemented and qualified through
+[PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26), now merged.
+PR #20 and PRs #23–#25 are also merged. T007's
+[deployed Finance inventory](../003-verified-backup/finance-deployment-inventory.md) is complete.
+The current [backup specification](../003-verified-backup/spec.md)
+and [task ledger](../003-verified-backup/tasks.md#current-handoff) track what remains:
+T004 consumer/platform performance, T008 capture/profile/interaction, T009 isolated
 restore and T010 actual retained-file recovery. T014 separately tracks explicit confirmed-rejection
-retry integration; conservative notebook resume already avoids unknown-write replay.
+retry integration; conservative test app resume already avoids unknown-write replay.
 
 Finance adoption and the authentication changes below remain unimplemented. Complete actual deployed
-backup/recovery before changing deployed identity or storage; the notebook fixture is not that proof.
+backup/recovery before changing deployed identity or storage; the test app fixture is not that proof.
 Resume from the active backup ledger rather than the historical research branch below.
 
 ## Research-time observations and missing inventory
@@ -162,4 +164,4 @@ they do not prevent preparing the source build and existing-user preservation wo
 
 These tasks apply when the corresponding backend slices are implemented. They do not expand the
 current archive implementation or require Zod-specific public consumer contracts. See the
-[completed shared-library follow-ups](../003-verified-backup/tasks.md#completed-shared-and-notebook-work).
+[completed shared-library follow-ups](../003-verified-backup/tasks.md#completed-shared-and-test app-work).

@@ -75,7 +75,7 @@ The [plan](plan.md) permits concrete generic implementation now while keeping th
 ## Restore limitation investigation — 2026-11-03
 
 The user requested real-code research and temporary tests before further implementation. This
-investigation preceded the notebook coordinator and writers; it changed no production behavior or
+investigation preceded the test app coordinator and writers; it changed no production behavior or
 retry policy. See the [current limitations](spec.md#known-restore-limitations-and-remaining-implementation-gates)
 and [active tasks](tasks.md#current-handoff) for subsequent implementation and the retry follow-up.
 

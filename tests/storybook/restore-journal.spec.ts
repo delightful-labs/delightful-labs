@@ -2,13 +2,62 @@ import { expect, test } from '@playwright/test'
 import { resolve } from 'node:path'
 import wire from '../fixtures/restore-journal-v1.json' with { type: 'json' }
 
+test('public journal reuse keeps encoded buffers independent and revalidates foreign input in Chromium', async ({
+	page
+}) => {
+	await page.goto('/')
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
+	const result = await page.evaluate((wire) => {
+		const api = window.DLFTestApp
+		const record = api.parseRestoreJournalRecord(wire)
+		const first = api.encodeRestoreJournalRecord(record)
+		const expected = first.slice()
+		const second = api.encodeRestoreJournalRecord(record)
+		first.fill(0)
+		const foreign = Object.freeze({ ...record, revision: -1 })
+		const errors: string[] = []
+		try {
+			api.parseRestoreJournalRecord(foreign)
+		} catch (error) {
+			errors.push(error instanceof Error ? error.message : 'unexpected')
+		}
+		const input = second.slice()
+		const reopened = api.decodeRestoreJournalRecord(input)
+		input.fill(0)
+		try {
+			api.decodeRestoreJournalRecord(input)
+		} catch (error) {
+			errors.push(error instanceof Error ? error.message : 'unexpected')
+		}
+		const last = api.encodeRestoreJournalRecord(record)
+		return {
+			reused: api.parseRestoreJournalRecord(record) === record,
+			detachedDecode: reopened !== record,
+			independentBuffers: first.buffer !== second.buffer && second.buffer !== last.buffer,
+			preservedBytes:
+				second.every((byte, i) => byte === expected[i]) &&
+				last.every((byte, i) => byte === expected[i]),
+			preservedMetadata: JSON.stringify(reopened) === JSON.stringify(wire),
+			errors
+		}
+	}, wire)
+	expect(result).toEqual({
+		reused: true,
+		detachedDecode: true,
+		independentBuffers: true,
+		preservedBytes: true,
+		preservedMetadata: true,
+		errors: ['invalidJournal', 'invalidJournalEncoding']
+	})
+})
+
 test('public journal codec preserves unknown-write facts and rejects malformed wire data in Chromium', async ({
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const result = await page.evaluate((wire) => {
-		const api = window.DLFNotebook,
+		const api = window.DLFTestApp,
 			utf8 = new TextEncoder()
 		const record = api.decodeRestoreJournalRecord(utf8.encode(JSON.stringify(wire)))
 		const pending = api.parseRestoreJournalRecord({
@@ -69,11 +118,11 @@ test('browser journal resumes after reload and atomically rejects stale revision
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const databaseName = `dlf-journal-review-${crypto.randomUUID()}`
 	const result = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook
+			const api = window.DLFTestApp
 			const initial = api.parseRestoreJournalRecord(wire)
 			const binding = {
 				applicationId: initial.intent.operation.applicationId,
@@ -144,10 +193,10 @@ test('browser journal resumes after reload and atomically rejects stale revision
 		privateSnapshot: true
 	})
 	await page.reload()
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const resumed = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook,
+			const api = window.DLFTestApp,
 				initial = api.parseRestoreJournalRecord(wire)
 			const request = api.prepareBrowserRestoreJournal({
 				databaseName,
@@ -199,10 +248,10 @@ test('browser journal resumes after reload and atomically rejects stale revision
 for (const stage of ['staging', 'committing']) {
 	test(`cancellation during ${stage} retains native commit facts`, async ({ page }) => {
 		await page.goto('/')
-		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 		const result = await page.evaluate(
 			async ({ wire, stage }) => {
-				const api = window.DLFNotebook,
+				const api = window.DLFTestApp,
 					initial = api.parseRestoreJournalRecord(wire)
 				const databaseName = `dlf-journal-cancel-${crypto.randomUUID()}`
 				const binding = {
@@ -271,9 +320,9 @@ for (const stage of ['staging', 'committing']) {
 
 test('missing storage is not recreated and malformed rows are preserved', async ({ page }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const result = await page.evaluate(async (wire) => {
-		const api = window.DLFNotebook,
+		const api = window.DLFTestApp,
 			initial = api.parseRestoreJournalRecord(wire)
 		const databaseName = `dlf-journal-invalid-${crypto.randomUUID()}`
 		const binding = {
@@ -357,11 +406,11 @@ test('native journal CAS retains a rejected retry and content-match completion a
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const databaseName = `dlf-journal-attempt-${crypto.randomUUID()}`
 	const result = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook,
+			const api = window.DLFTestApp,
 				initial = api.parseRestoreJournalRecord(wire),
 				scope = initial.intent.operation
 			const binding = {
@@ -488,10 +537,10 @@ test('native journal CAS retains a rejected retry and content-match completion a
 	])
 	expect(result.settlement).toBe('committed')
 	await page.reload()
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const resumed = await page.evaluate(
 		async ({ wire, databaseName }) => {
-			const api = window.DLFNotebook,
+			const api = window.DLFTestApp,
 				initial = api.parseRestoreJournalRecord(wire),
 				scope = initial.intent.operation
 			const request = api.prepareBrowserRestoreJournal({
@@ -549,9 +598,9 @@ test('only explicit initialization creates schema, synchronously within the upgr
 	page
 }) => {
 	await page.goto('/')
-	await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+	await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 	const result = await page.evaluate(async (wire) => {
-		const api = window.DLFNotebook,
+		const api = window.DLFTestApp,
 			record = api.parseRestoreJournalRecord(wire),
 			scope = record.intent.operation
 		const binding = {
@@ -645,10 +694,10 @@ for (const interruption of ['CANCEL', 'SHUTDOWN', 'release', 'stop', 'creationFa
 		page
 	}) => {
 		await page.goto('/')
-		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 		const result = await page.evaluate(
 			async ({ wire, interruption }) => {
-				const api = window.DLFNotebook,
+				const api = window.DLFTestApp,
 					record = api.parseRestoreJournalRecord(wire),
 					scope = record.intent.operation
 				const databaseName = `dlf-upgrade-interrupt-${crypto.randomUUID()}`
@@ -744,10 +793,10 @@ for (const version of [1, 2]) {
 		page
 	}) => {
 		await page.goto('/')
-		await page.addScriptTag({ path: resolve('.svelte-kit/notebook-browser/notebook.js') })
+		await page.addScriptTag({ path: resolve('.svelte-kit/test-app-browser/test-app.js') })
 		const result = await page.evaluate(
 			async ({ wire, version }) => {
-				const api = window.DLFNotebook,
+				const api = window.DLFTestApp,
 					record = api.parseRestoreJournalRecord(wire),
 					scope = record.intent.operation
 				const databaseName = `dlf-upgrade-existing-${crypto.randomUUID()}`

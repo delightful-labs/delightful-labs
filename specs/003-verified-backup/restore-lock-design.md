@@ -1,6 +1,6 @@
 # PR #23 review correction — explicit restore-operation lock actor
 
-> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> Historical slice/research record. The complete test app workflow, fresh comparison and activation
 > are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
 > [completion evidence](restore-completion-design.md) for present status; bounded single-step
 > descriptions and dated test totals below describe their original scope.
@@ -66,7 +66,7 @@ review. Follow-up qualification must include delayed native settlement so parent
 silently regress to release-on-disposal, plus prior native two-tab exclusion/reacquisition cases.
 
 Static checks pass: root Svelte/strict TypeScript, package build/strict Publint, public consumer and
-notebook TypeScript, Oxlint, Oxfmt and whitespace checks. No tests added/run, no server started, and
+test app TypeScript, Oxlint, Oxfmt and whitespace checks. No tests added/run, no server started, and
 no commit/push made for this review correction. Changes are local on PR #23's branch; propagation
 to the later stacked PRs follows review and qualification.
 
@@ -86,15 +86,15 @@ qualified large-attachment harness correction from PR #24 was backported to keep
 comparison in Chromium, dispose per-test contexts and bound only the 1 MiB case at 90 seconds.
 
 Root Svelte/strict TypeScript, package/strict Publint, public consumer compilation/builds/runtime
-checks (17 reader and 18 notebook export tests), notebook TypeScript, lint, formatting and whitespace
+checks (17 reader and 18 test app export tests), test app TypeScript, lint, formatting and whitespace
 checks pass. Disposable Vite/Jazz/Chromium resources were shut down. Later stacked notebook/note
 qualification follows propagation; these 13 cases do not establish their changed-tree qualification.
 No complete restore, Finance completeness or production safety claim follows.
 
 ## PR #24 propagation qualification
 
-The parent correction was carried into the notebook-root branch without rewriting history. All
-22 actual Jazz/Chromium preparation/attachment/notebook-root cases pass on the propagated tree.
+The parent correction was carried into the test app-root branch without rewriting history. All
+22 actual Jazz/Chromium preparation/attachment/test app-root cases pass on the propagated tree.
 No source correction was required; the existing 924-unit shared suite (41 focused cases) and
 package/consumer checks cover the same unchanged shared implementation. Only the handoff notes
 needed conflict reconciliation. The later note branch still requires propagation and qualification.
@@ -103,7 +103,7 @@ needed conflict reconciliation. The later note branch still requires propagation
 
 All **30 actual Jazz/Chromium cases** pass after carrying the correction through the full note stack,
 including note/relationship admission, exact content, reload reconciliation and staged interruption.
-All **924 units** (41 focused cases), full public consumer/runtime checks, root/notebook TypeScript,
+All **924 units** (41 focused cases), full public consumer/runtime checks, root/test app TypeScript,
 lint, formatting and whitespace checks also pass on this combined tree. No additional source change
 was needed. Propagation to both later PRs is now qualified; pending-propagation notes above describe
 earlier steps. Only handoff/status documentation needed conflict reconciliation; no PR was merged

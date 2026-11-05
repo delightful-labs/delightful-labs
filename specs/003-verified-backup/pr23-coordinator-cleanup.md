@@ -74,8 +74,8 @@ Qualification passed on this tree:
   reload/no-replay reconciliation, cancellation, cross-tab locking and second-claim isolation.
   Two added cases inject identity denial and identity-observation failure in the concrete preparation
   destination actor: zero transactions, no destination row, retained not-issued journal, no advance.
-- Root Svelte/strict TypeScript, notebook TypeScript, package/strict Publint, public consumer imports,
-  compilation and builds, **17 independent reader + 18 notebook export tests**, Oxlint, Oxfmt and
+- Root Svelte/strict TypeScript, test app TypeScript, package/strict Publint, public consumer imports,
+  compilation and builds, **17 independent reader + 18 test app export tests**, Oxlint, Oxfmt and
   whitespace checks pass. Package build completed before browser servers started.
 
 The disposable Vite host at http://127.0.0.1:6199/restore.html, Jazz authority, Chromium and contexts

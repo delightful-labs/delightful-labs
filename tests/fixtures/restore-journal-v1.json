@@ -4,7 +4,7 @@
 	"revision": 0,
 	"intent": {
 		"operation": {
-			"applicationId": "notebook",
+			"applicationId": "test-app",
 			"environment": "disposable",
 			"identityId": "restoring-owner",
 			"operationId": "restore-one",
@@ -13,11 +13,11 @@
 		"archive": {
 			"archiveId": "12345678-1234-4234-8234-123456789abc",
 			"payloadSha256": "1111111111111111111111111111111111111111111111111111111111111111",
-			"profile": { "id": "notebook-profile", "version": 1 },
-			"source": { "applicationId": "notebook", "workspaceId": "source-workspace" }
+			"profile": { "id": "test-app-profile", "version": 1 },
+			"source": { "applicationId": "test-app", "workspaceId": "source-workspace" }
 		},
 		"plan": {
-			"id": "notebook-plan",
+			"id": "test-app-plan",
 			"version": 1,
 			"sha256": "2222222222222222222222222222222222222222222222222222222222222222",
 			"expectedGraphSha256": "3333333333333333333333333333333333333333333333333333333333333333",

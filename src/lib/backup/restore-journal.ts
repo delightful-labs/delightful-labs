@@ -9,16 +9,6 @@ import {
 	type RestoreJournalRecord
 } from './restore-journal-schemas.js'
 
-export { restoreJournalLimits } from './restore-journal-schemas.js'
-export type {
-	RestoreJournalIntent,
-	RestoreJournalRecord,
-	RestoreJournalCheckpoint,
-	RestoreJournalAttempt,
-	RestoreJournalCompletion,
-	RestoreJournalReceipt
-} from './restore-journal-schemas.js'
-
 export type RestoreJournalErrorCode =
 	| 'invalidJournal'
 	| 'invalidJournalEncoding'
@@ -51,6 +41,16 @@ const limits = resolvePayloadLimits({
 	jsonValues: restoreJournalLimits.jsonValues,
 	depth: restoreJournalLimits.depth
 })
+const utf8 = new TextEncoder()
+// Only codec-produced deeply frozen values qualify. No serialized strings/bytes are retained.
+const records = new WeakSet<object>()
+const intents = new WeakSet<object>()
+function knownRecord(input: unknown): input is RestoreJournalRecord {
+	return typeof input === 'object' && input !== null && records.has(input)
+}
+function knownIntent(input: unknown): input is RestoreJournalIntent {
+	return typeof input === 'object' && input !== null && intents.has(input)
+}
 function bounded<T>(run: () => T): T {
 	try {
 		return run()
@@ -62,12 +62,17 @@ function bounded<T>(run: () => T): T {
 	}
 }
 function intent(input: unknown): RestoreJournalIntent {
-	return bounded(() => {
+	if (knownIntent(input)) return input
+	const value = bounded(() => {
 		checkPayloadBudget(input, limits)
 		const result = restoreIntentSchema.safeParse(input)
 		if (!result.success) throw createRestoreJournalError('invalidJournal')
+		// Track only detached immutable output, independently of caller-owned input behavior.
+		checkPayloadBudget(result.data, limits)
 		return result.data
 	})
+	intents.add(value)
+	return value
 }
 function validatedRecord(input: unknown): RestoreJournalRecord {
 	return bounded(() => {
@@ -85,22 +90,30 @@ function validatedRecord(input: unknown): RestoreJournalRecord {
 			throw createRestoreJournalError('unsupportedJournalVersion')
 		const result = restoreJournalSchema.safeParse(input)
 		if (!result.success) throw createRestoreJournalError('invalidJournal')
+		checkPayloadBudget(result.data, limits)
 		return result.data
 	})
 }
-function serialize(value: RestoreJournalRecord): Uint8Array<ArrayBuffer> {
-	const bytes = new TextEncoder().encode(JSON.stringify(value))
+function serialize(value: RestoreJournalRecord) {
+	const json = JSON.stringify(value)
+	const bytes = utf8.encode(json)
 	if (bytes.byteLength > restoreJournalLimits.bytes) {
 		bytes.fill(0)
 		throw createRestoreJournalError('journalLimitExceeded')
 	}
 	return bytes
 }
-/** Unknown stored metadata only. A successful parse supplies no identity, authority or write grant. */
+/**
+ * Detach/validate unknown metadata; already-normalized immutable outputs may be returned by identity.
+ * A successful parse supplies no identity, authority or write grant.
+ */
 export function parseRestoreJournalRecord(input: unknown): RestoreJournalRecord {
+	if (knownRecord(input)) return input
 	const record = validatedRecord(input)
-	// Preflight bounds object values; also bound actual JSON syntax before returning metadata.
-	serialize(record).fill(0)
+	const bytes = serialize(record)
+	bytes.fill(0)
+	records.add(record)
+	intents.add(record.intent)
 	return record
 }
 /** Proposed initial metadata, not a durably created operation. Persist before destination effects. */
@@ -127,9 +140,9 @@ export function matchRestoreJournalIntent(input: unknown, expected: unknown): bo
 	const stored = parseRestoreJournalRecord(input)
 	return JSON.stringify(stored.intent) === JSON.stringify(intent(expected))
 }
-/** Stable schema-key ordering only; no general JSON canonicalization or digest proof is claimed. */
+/** Fresh owned UTF-8 bytes in stable schema-key order; no digest proof is claimed. */
 export function encodeRestoreJournalRecord(input: unknown): Uint8Array<ArrayBuffer> {
-	return serialize(validatedRecord(input))
+	return serialize(knownRecord(input) ? input : validatedRecord(input))
 }
 /** Strict, bounded UTF-8/JSON; unsupported and malformed records are rejected without repair. */
 export function decodeRestoreJournalRecord(bytes: Uint8Array): RestoreJournalRecord {
@@ -148,3 +161,13 @@ export function decodeRestoreJournalRecord(bytes: Uint8Array): RestoreJournalRec
 	}
 	return parseRestoreJournalRecord(raw)
 }
+
+export { restoreJournalLimits } from './restore-journal-schemas.js'
+export type {
+	RestoreJournalIntent,
+	RestoreJournalRecord,
+	RestoreJournalCheckpoint,
+	RestoreJournalAttempt,
+	RestoreJournalCompletion,
+	RestoreJournalReceipt
+} from './restore-journal-schemas.js'

@@ -1,8 +1,8 @@
 # Shared backup lifecycle — T006 ownership review
 
 Based on merged PR #20 (`afc92fd`), on branch `feat/backup-workflow`. The first review slice defined
-actor/resource boundaries and implemented the pure notebook validator. After the user requested
-continuation, this slice implements the shared capture/export machines and a disposable notebook
+actor/resource boundaries and implemented the pure test app validator. After the user requested
+continuation, this slice implements the shared capture/export machines and a disposable test app
 source/dataset. The user subsequently authorized continuation from that implementation review;
 export qualification is recorded below. Restore machines, persisted journal and full round-trip
 qualification remain unimplemented. Restore protocols below remain design requirements; implemented
@@ -32,7 +32,7 @@ consumer application lifetime
 All children are invoked, with typed finite output or correlated observations; no manually started
 actor/promise bridges. Consumer-owned children with multiple steps are machines. Promise actors
 perform one leaf read/write/hash only. The shared machines live under `src/lib/machines/backup/`.
-This fixture's domain rules live under `fixtures/backup-notebook/`, outside shared library exports.
+This fixture's domain rules live under `fixtures/test-app/`, outside shared library exports.
 
 Every operation binds an immutable session identity, workspace identity, generation and operation ID.
 The layout owns monotonically advancing generations, including A → B → A. Child reports include
@@ -56,7 +56,7 @@ authority → acquiring → draining → reading → validating profile → chec
 Source methods are individual leaf capabilities: one authority observation, one lease acquisition,
 one writer-drain acknowledgement, one bounded graph read and one consistency observation. Consumers
 needing additional stages must expose them through a reviewed actor instead of hiding orchestration
-in those methods. The notebook adapter uses an exclusive in-memory lease and an already supplied
+in those methods. The test app adapter uses an exclusive in-memory lease and an already supplied
 archive-shaped dataset; it does not claim Jazz capture or durable storage.
 
 The request retains acquired leases and sealed output before promise/child completion reports.
@@ -168,15 +168,15 @@ Only qualified not-found permits initial intent creation. Invalid records preser
 the operation; no reset, new ID or default progress. Use create-if-absent and revision-checked writes,
 with one operation owner across attachments/tabs. Failure to acquire exclusive ownership leaves the
 operation unavailable for writes. Storage guarantees and restart behavior need concrete qualification;
-an in-memory notebook adapter alone cannot establish durable recovery.
+an in-memory test app adapter alone cannot establish durable recovery.
 
-## Notebook profile v1
+## Test app profile v1
 
-`fixtures/backup-notebook/profile.ts` registers the exact trusted `dlf-notebook` version 1 validator.
+`fixtures/test-app/profile.ts` registers the exact trusted `dlf-test-app` version 1 validator.
 It consumes already bounded, generically validated payloads; envelope integrity remains separate.
-It requires one notebook record with a text title, and note records with an exact notebook reference,
+It requires one test app record with a text title, and note records with an exact test app reference,
 text body, explicit archived boolean and either an attachment reference or typed null. Unknown types,
-fields, inert records, foreign notebook references and unreferenced attachments fail validation.
+fields, inert records, foreign test app references and unreferenced attachments fail validation.
 Empty notebooks and empty text remain valid; attachments may be shared by notes. No strings are
 trimmed or normalized. Types come from the fixture's Zod schemas.
 
@@ -189,13 +189,13 @@ validator remains domain-only. No persisted destination, restore authority or ro
 
 ## Review and later qualification
 
-The export implementation and notebook source have been reviewed and locally verified after the
+The export implementation and test app source have been reviewed and locally verified after the
 user authorized continuation. Next implement restore/write/journal owners within focused review cycles. Keep T006
-open until both lifecycles and the notebook round-trip are implemented and verified. T004's large-file
+open until both lifecycles and the test app round-trip are implemented and verified. T004's large-file
 measurements and Finance T007–T010 remain outstanding.
 
 The export → retained file → independent exact profile inspection portion is now qualified for the
-disposable notebook below. After restore implementation approval, qualify isolated restore and fresh
+disposable test app below. After restore implementation approval, qualify isolated restore and fresh
 reader content comparison, wrong digest/profile on resume, malformed journal, concurrent owner,
 missing/denied authority, local-only settlement, lost commit/checkpoint responses, conflict and unknown
 activation. Demonstrate stable operation/record IDs and zero blind replay; export tests cannot
@@ -212,7 +212,7 @@ precedence over cancellation and retains the lease for explicit caller cleanup r
 
 Static validation passed: `pnpm check` (zero Svelte errors/warnings plus strict TypeScript), package
 build/strict Publint, standalone notebook and public-consumer TypeScript, the browser bundle including
-the new public export factories, full Oxlint/Oxfmt and Git whitespace checks. The notebook retains
+the new public export factories, full Oxlint/Oxfmt and Git whitespace checks. The test app retains
 the root's strict source options and `skipLibCheck`; the existing consumer project independently
 checks package declarations with its established dependency-compatible compiler settings. No lockfile,
 dependency version, UI, consumer deployment or live storage changed.
@@ -221,7 +221,7 @@ dependency version, UI, consumer deployment or live storage changed.
 
 Local qualification completed on 2026-11-03 after the user requested continuation from the presented
 implementation. Tests required no changes to production capture/export logic. The verification setup
-keeps root unit/source checks independent of `dist`; notebook implementation/Node checks and browser
+keeps root unit/source checks independent of `dist`; test app implementation/Node checks and browser
 bundles consume the actual built public package. A clean check with `dist` temporarily absent passed.
 
 - **51 export unit cases** pass. These cover cancellation at all seven capture stages and eight
@@ -233,16 +233,16 @@ bundles consume the actual built public package. A clean check with `dist` tempo
   pending native digest drain; redacted persisted snapshots; and exact opened graph/attachment bytes.
   Abrupt-stop cases retain late leases, wait for late graph reads, retain borrowed files until the
   handoff settles and release sealed output in both construction and child cleanup handoff windows.
-- **13 notebook/public-package cases** pass through `pnpm check:backup-notebook`, included in normal
+- **13 test app/public-package cases** pass through `pnpm check:test-app`, included in normal
   `check:consumer`. Plaintext/password exports write real disposable files. Independent child processes
-  use the built inspector, the existing bounded file/password sources, a statically registered notebook
+  use the built inspector, the existing bounded file/password sources, a statically registered test app
   validator, common network APIs disabled and only PATH in their environment. Both report profile-valid
   integrity matching the exact payload digest. Fresh opening compares every record/value/relationship,
   archived content, empty body, Unicode/newlines/NUL, attachment metadata and bytes, coverage and inert
   records. Original source content and retained file bytes remain unchanged. Additional cases cover
   lease exclusion/idempotent release/late old-owner cleanup, binding/limit checks, empty notebooks,
   shared files and nine generically valid but domain-invalid payloads.
-- **Three new Chromium cases** pass against the public-package-backed notebook browser fixture.
+- **Three new Chromium cases** pass against the public-package-backed test app browser fixture.
   Plaintext/password exports trigger actual downloads; Playwright saves the files and compares exact
   saved bytes against the produced bytes. Native Web Crypto opening and trusted profile inspection
   validate the archived/Unicode/empty content, shared attachment references and binary bytes. A delayed
@@ -344,29 +344,29 @@ All 144 focused unit cases pass. Existing acquisition/read/handoff late-disposal
 crypto drain, cancellation/invalidation, output retention and safe failure cases still pass.
 No production fixes were needed during this qualification.
 
-After rebuilding the package, all 14 notebook/package integration cases pass. The added case imports
+After rebuilding the package, all 14 test app/package integration cases pass. The added case imports
 the new cleanup factory through backup/export/workflow, forces initial lease release to fail, proves
 fixture writers remain excluded while custody is retained, then runs cleanup and proves writers can
 resume without dispatching an archive. All 11 independent reader cases also pass. Fresh public-export
 browser bundles pass all four focused Chromium cases: standalone envelope protection/integrity,
-plain/password notebook file dispatch and inspection, and invalidation/drain/stale binding rejection.
+plain/password test app file dispatch and inspection, and invalidation/drain/stale binding rejection.
 Playwright owned a temporary localhost preview on port 6014 for that run.
 
 Svelte/TypeScript, package/strict Publint, public-consumer/reader declarations, lint, formatting and
 whitespace checks pass. No full repository unit/browser suite was run. These results qualify the
-export correction with the current notebook source; they do not qualify its forthcoming owner
+export correction with the current test app source; they do not qualify its forthcoming owner
 rewrite, the older workspace journal disposal finding or the committed restore-journal correction.
 Cleanup custody remains in-memory; this is not a durable recovery journal. Graceful drain still
 requires issued consumer calls to settle, and native release cannot be cancelled by stopping an
 actor. No new commit, push or merge was performed.
 
-## Notebook source ownership correction — design before implementation (2026-11-04)
+## Test app source ownership correction — design before implementation (2026-11-04)
 
 The user requested committing the qualified export correction and completing the next cleanup,
 including tests. The prior correction is committed locally as 77b008f. This instruction explicitly
 authorizes implementation and tests together for this fixture slice.
 
-The notebook source is a fixture-owned root whose lifetime spans writes and successive exports:
+The test app source is a fixture-owned root whose lifetime spans writes and successive exports:
 available -> leased.current -> leased.invalidated -> available. The chart owns acquisition,
 writer exclusion, exact binding/current-owner checks, invalidation and release. An observed binding
 replacement invalidates the current lease until its own release, even if the binding later returns
@@ -377,7 +377,7 @@ synchronous; this does not qualify real Jazz capture, durability or remote accep
 The factory returns an unstarted source actor and leaf adapter methods. The fixture host explicitly
 starts/stops this independent source root; it is not a hidden child started by the shared library.
 Its lifetime outlasts a single export so the host can write and export again. The machine belongs
-under fixtures/backup-notebook/machines, not the reusable DLF machine exports: notebook domain
+under fixtures/test-app/machines, not the reusable DLF machine exports: test app domain
 models stay outside the foundation. The host exposes the source actor for explicit disposal.
 
 Synchronous typed request/reply events keep the existing leaf API: one actor event is processed
@@ -390,10 +390,10 @@ resource requiring asynchronous stop cleanup. Hosts drain exports before stoppin
 
 Qualify existing content/lease/public package tests plus focused invalidation, wrong-owner release,
 writer rejection, failed write preservation and explicit host-stop behavior. Rebuild and run focused
-shared backup units, reader/notebook integrations and Chromium checks. No commit/push/merge of this
+shared backup units, reader/test app integrations and Chromium checks. No commit/push/merge of this
 new slice is implied by committing the preceding correction.
 
-### Notebook source correction qualification (2026-11-04)
+### Test app source correction qualification (2026-11-04)
 
 Implemented the fixture-owned source chart and removed NotebookSource. The source factory returns
 an unstarted actor with synchronous leaf adapters. The fixture host starts it explicitly and Node/
@@ -402,16 +402,16 @@ initial snapshot as active before start, so initializing waits for the start-ent
 admitting adapter calls. No private started flag is used, and early calls cannot queue later writes
 or acquisition. Context contains only binding, opaque data and lease references.
 
-All 18 notebook/package integration cases pass, including four added cases for pre-start admission,
+All 18 test app/package integration cases pass, including four added cases for pre-start admission,
 A -> B -> A invalidation without revival, failed-write preservation/opaque snapshots, and stopped
 source/harmless old release. Existing exact file content, writer exclusion, old-owner release,
 reduced bounds and explicit cleanup recovery cases pass. All 144 focused shared backup unit cases,
-11 independent reader cases and four Chromium cases pass with the rebuilt notebook bundle. Chromium
+11 independent reader cases and four Chromium cases pass with the rebuilt test app bundle. Chromium
 host paths explicitly stop the new source root after drain. Playwright owned a temporary preview on
 localhost port 6014 for its run. Svelte/TypeScript, public-consumer declarations, lint, formatting
 and whitespace checks pass. The browser host declaration was updated to include actor.stop().
 
-This only qualifies the disposable, synchronous in-memory notebook fixture. It does not prove
+This only qualifies the disposable, synchronous in-memory test app fixture. It does not prove
 Jazz capture/quiescence, persistence, remote acceptance or production completeness. Hosts must drain
 exports before stopping their source. Synchronous replies are confined to the fixture's immediate
 leaf adapter boundary; no asynchronous actor/promise bridge or hidden child start was introduced.
@@ -419,7 +419,7 @@ The source chart and payload policy remain in the fixture, outside DLF's reusabl
 The new cleanup is uncommitted; prior export/capture work is committed locally as 77b008f. No push
 or merge. Older workspace journal disposal and restore-journal qualification remain separate work.
 
-## Notebook finite-operation correction — design before implementation (2026-11-04)
+## Test app finite-operation correction — design before implementation (2026-11-04)
 
 The user identified that the source conversion still embeds fallible read/write work and response
 routing inside event actions. Correct that ownership rather than treating the presence of a machine

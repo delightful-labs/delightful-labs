@@ -121,7 +121,7 @@ CI is checked separately before reporting completion; merge remains the user’s
 ## Machine-first ownership correction — design before implementation
 
 The user continued after envelope qualification. This slice corrects only inspection ownership;
-export/capture, notebook lease ownership and the older workspace journal remain separate slices.
+export/capture, test app lease ownership and the older workspace journal remain separate slices.
 The earlier class-backed inspector test totals do not qualify this correction.
 
 ```text
@@ -178,17 +178,17 @@ once the native read owner is attached. Existing source/password cancellation, s
 concurrent claims, profile outcomes, snapshot secrecy and child output retention cases still pass.
 All 140 focused unit cases pass. No production implementation changes were needed in qualification.
 
-After rebuilding the package, all 11 independent reader cases and 13 notebook/public-package
+After rebuilding the package, all 11 independent reader cases and 13 test app/public-package
 integration cases pass. These include real retained plaintext/encrypted files, exact stdin password
 bytes, invalid/bounded inputs, sanitized errors, SIGINT/SIGTERM during pending password input and
-independent retained notebook content inspection. Fresh public-export browser bundles pass all four
-focused Chromium cases: standalone envelope crypto/integrity, plain/password notebook downloads and
+independent retained test app content inspection. Fresh public-export browser bundles pass all four
+focused Chromium cases: standalone envelope crypto/integrity, plain/password test app downloads and
 inspection, and invalidation/drain/stale binding handling. Playwright owned a temporary preview on
 localhost port 6014 and stopped it after the run.
 
 Svelte/TypeScript, package/strict Publint, reader/public-consumer declarations, lint, formatting and
 whitespace checks pass. These focused checks qualify this inspection correction with the existing
-export/notebook owners; they do not qualify the pending export/notebook rewrites or journal
+export/test app owners; they do not qualify the pending export/test app rewrites or journal
 correction. No full repository unit/browser suite was run. Graceful drain still depends on a
 provider eventually settling when it ignores AbortSignal; password string zeroization, large-file
 memory/latency and additional browsers remain unqualified. No commit, publication or merge.

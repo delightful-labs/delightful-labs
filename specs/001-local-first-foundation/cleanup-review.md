@@ -84,7 +84,7 @@ Finance remains pinned to its existing package until a separate adoption change.
   `workspaces` and `serverConfigured`. `selectReady(attempt)` projects prepared IDs into
   `{ identityId, workspaceId }`. Ready outcomes use those generic names; unavailable reasons use
   `identityMissing` and `duplicateIdentities`. Finance's wrapper can translate these into its current
-  public result names. The notebook compile-only consumer shows generic creation composition.
+  public result names. The test app compile-only consumer shows generic creation composition.
 - `createSingleWriteFormOptions` requires `settlement: 'locallyPersisted' | 'confirmed'`.
   `createProfileFormOptions` requires `saveSettlement` for both save callbacks. This is a declared
   host guarantee, not an SDK receipt inferred from arbitrary promise completion. For Jazz local
@@ -114,7 +114,7 @@ add machinery without simplifying these checks. No Zod conversion or behavioral 
 - Form policy/profile: declared guarantee passed through; host receipt resolution before local
   durability must not be used as a valid locallyPersisted save implementation.
 - Zod adapter: field/array paths and codes, unknown errors, absence of values/messages; built public
-  subpath and notebook type compatibility. Keep the current profile dirty checks unchanged.
+  subpath and test app type compatibility. Keep the current profile dirty checks unchanged.
 
 No new regression tests were added or run before this implementation review. Existing initialization
 examples/assertions were mechanically adapted to the renamed contract. Static Svelte/TypeScript,
@@ -141,7 +141,7 @@ The user reviewed/merged PR #19 and authorized the testing follow-up on 2026-11-
   original binding/record, rejected retries under another binding, known-settlement replacement,
   known notStarted retry, absent/verified recovery, late journal results, read errors, cancellation
   before issuance and drain through each reported settlement. Terminal context, state and output
-  agree. A notebook-shaped bootstrap uses the host ID projection without Finance fields.
+  agree. A test app-shaped bootstrap uses the host ID projection without Finance fields.
 - Seven form/Zod cases cover explicit local/confirmed host guarantees, delayed host promises for
   name/avatar removal, exact save arguments, and issue paths/codes without values/messages.
   Local wait uses the existing persistLocal adapter. Confirmed tests verify declared host-result
@@ -173,8 +173,8 @@ all-browser qualification or a completed backup/restore feature. T006 remains th
 
 ## Workspace journal native disposal correction — design (2026-11-04)
 
-The user requested committing the notebook cleanup and continuing the established cleanup workflow.
-Notebook correction committed locally as 8e5efe0. This slice addresses the audit's older workspace
+The user requested committing the test app cleanup and continuing the established cleanup workflow.
+Test app correction committed locally as 8e5efe0. This slice addresses the audit's older workspace
 journal resource-disposal finding; it does not rewrite journal policy or qualify the separate restore
 journal. Follow the preceding cleanup workflow, including focused tests.
 
@@ -225,5 +225,5 @@ request may still settle; late connections close, and late upgrade callbacks abo
 transaction. Graceful CANCEL/SHUTDOWN continues to wait for actual native settlement. The separate
 backup restore-journal correction is not qualified by these workspace journal results.
 
-Notebook source correction is committed locally as 8e5efe0. This workspace journal correction is
+Test app source correction is committed locally as 8e5efe0. This workspace journal correction is
 uncommitted. No push or merge.

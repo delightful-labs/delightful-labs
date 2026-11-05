@@ -2,9 +2,9 @@
 import { createActor, toPromise } from 'xstate'
 import { createInvitationRedemptionMachine } from 'delightful-local-first/workspace/invitations/workflow'
 
-/** @typedef {{attachment:object;generation:number;app:'notebook'}} Scope */
+/** @typedef {{attachment:object;generation:number;app:'test-app'}} Scope */
 /** @type {Scope} */
-const scope = { attachment: {}, generation: 2, app: 'notebook' }
+const scope = { attachment: {}, generation: 2, app: 'test-app' }
 /** @type {import('delightful-local-first/workspace/invitations/contracts').InvitationRequest<Scope>} */
 const request = {
 	operationId: 'redemption',
@@ -23,7 +23,7 @@ const capability = {
 		calls++
 		if (input.operationId !== request.operationId || input.code !== request.code)
 			throw new Error('Unexpected request')
-		return { outcome: 'joined', membershipId: 'notebook-member' }
+		return { outcome: 'joined', membershipId: 'test-app-member' }
 	}
 }
 const actor = createActor(createInvitationRedemptionMachine(), { input: { request, capability } })
@@ -34,7 +34,7 @@ try {
 		result.outcome !== 'completed' ||
 		result.settlement.decision.outcome !== 'joined' ||
 		!('membershipId' in result.settlement.decision) ||
-		result.settlement.decision.membershipId !== 'notebook-member' ||
+		result.settlement.decision.membershipId !== 'test-app-member' ||
 		result.scope !== scope ||
 		calls !== 1
 	)

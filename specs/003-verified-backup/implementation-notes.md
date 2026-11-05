@@ -105,7 +105,7 @@ The journal rewrite already in the worktree remains a separate, uncommitted revi
 ### Scope and method
 
 Re-read `.specify/memory/xstate.md` and constitution III/VII. Inventoried 104 non-test source/config
-files: 93 under `src/lib` (excluding generated Paraglide/declarations) and 11 under the notebook,
+files: 93 under `src/lib` (excluding generated Paraglide/declarations) and 11 under the test app,
 independent reader and private-creation fixtures. Included TypeScript in Svelte integrations. Used
 syntax inventory for classes, native promises, async functions and actor starts, then traced the
 actual helper bodies beneath backup and foundation actors. Also reviewed the eight Svelte story/
@@ -156,7 +156,7 @@ remain functions. A class-to-closure rewrite alone does not correct a hidden wor
    disposal boundary; do not add a second lifecycle or claim the existing cancellation tests prove
    abrupt-stop cleanup. This is a source-level ownership finding, not a reproduced runtime failure.
 
-5. **Notebook fixture lease: `fixtures/backup-notebook/source.ts:29`.** `NotebookSource` owns available/
+5. **Test app fixture lease: `fixtures/test-app/source.ts:29`.** `NotebookSource` owns available/
    leased source state through `#owner`, rejects writers while leased, checks binding changes and
    permits release only for the matching owner token. If this mutable lease/writer demonstration is
    retained, model ACQUIRE/RELEASE/REPLACE/BINDING_CHANGED with an explicit fixture owner instead of
@@ -170,7 +170,7 @@ as leaves do not make the hidden lifecycle acceptable.
 ### Remaining application-owned classes
 
 The inventory found 13 remaining class declarations after the journal correction. Three are the
-production lifecycle owners above; one is the notebook fixture. The other nine are:
+production lifecycle owners above; one is the test app fixture. The other nine are:
 
 - `SealedResource` and `CheckedResource` in `backup/envelope-operation.ts:56` / `:73`, and `Report`
   in `backup/inspection.ts:81`: replace with ordinary opaque data/reference factories. These getters,
@@ -189,7 +189,7 @@ production lifecycle owners above; one is the notebook fixture. The other nine a
 
 | Area                                                                                                                                                         | Source conclusion                                                                                                                                                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Payload/envelope wire parsing, JSON tokenizer, binary conversion, budgets, Zod schemas, journal intent/successor predicates, notebook dataset/profile        | Synchronous bounded transformations/validation. Local parser cursors are algorithm data, not an operation lifecycle. Keep functions; replace only the custom error classes listed above.                                                                                             |
+| Payload/envelope wire parsing, JSON tokenizer, binary conversion, budgets, Zod schemas, journal intent/successor predicates, test app dataset/profile        | Synchronous bounded transformations/validation. Local parser cursors are algorithm data, not an operation lifecycle. Keep functions; replace only the custom error classes listed above.                                                                                             |
 | Form readiness/submission/write, profile/avatar, workspace naming/creation/persistence/initialization/invitations, identity restoration/session coordination | Meaningful phases are already modeled in their machines. The in-repo promise bodies delegate individual effects or normalize one result/error. No additional concrete hidden multi-effect workflow was found in those inspected bodies.                                              |
 | Jazz session/acquisition/readiness, recovery phrase/restoration and invitation-authority adapters                                                            | Single SDK calls, synchronous binding/generation projections, current-binding rechecks and event subscriptions. SDK-owned internal workflows stay behind the documented boundary; no new app lifecycle machine is indicated for these adapter bodies.                                |
 | `backend/jazz/startup.ts`, Svelte form/recovery bindings and reader CLI entrypoint                                                                           | Start application/host-owned root actors, rather than manually starting hidden children. The startup registry retains an actor reference, not an acquisition promise cache.                                                                                                          |
@@ -208,7 +208,7 @@ this audit; its internal workflows cannot be certified by inspecting DLF's deleg
 
 Keep the current journal ownership correction as its own review slice. Then correct envelope
 ownership first (inspection and export both depend on it), followed by inspection, export/capture,
-and the notebook fixture. Address the older workspace journal's disposal boundary as a separate
+and the test app fixture. Address the older workspace journal's disposal boundary as a separate
 foundation slice. Remove the remaining helper/error/SDK wrapper classes with their owning slice,
 including public consumer API updates. Do not turn every predicate or native call into a machine.
 
@@ -248,7 +248,7 @@ lint and formatting are the static checks; they do not establish race, wire inte
 cleanup or browser correctness for this implementation. Prior test/CI totals qualify the previous
 implementation only. Implementation review must precede runtime qualification under AGENTS.md.
 
-Remaining audited owners: inspection, export/capture, notebook fixture and the older workspace
+Remaining audited owners: inspection, export/capture, test app fixture and the older workspace
 journal disposal boundary. Their findings remain open; pure helper and SDK wrapper cleanup follows
 its owning review slice.
 
@@ -258,7 +258,7 @@ The user continued from the implementation review above. Runtime qualification f
 non-idempotent revocation: request release now returns when the prepared input reference is already
 revoked. The existing snapshot test explicitly asserts one report for repeated release without
 creating an unbounded subscriber loop. Focused validation passes: 134 envelope/inspection/export
-unit cases, 13 notebook/package integration cases, standalone public envelope consumer, four
+unit cases, 13 test app/package integration cases, standalone public envelope consumer, four
 Chromium cases using fresh public-export bundles, and the static checks listed above. See
 [qualification](envelope-design.md#ownership-correction-qualification-after-implementation-review).
 The earlier static-only status is historical; the journal correction and remaining owner rewrites
@@ -292,14 +292,14 @@ Public inspection errors now use createArchiveInspectionError/isArchiveInspectio
 adapter's constructor calls were mechanically migrated. CLI outcomes, exit statuses, metadata and
 wire format remain the same. Existing unit tests received only state-path compatibility updates;
 no new cases were added and no implementation tests were run for this slice. Affected runtime
-qualification after review is inspection/envelope/export units, independent reader and notebook
-consumers, and public envelope/notebook Chromium cases. The previous envelope totals qualify the
+qualification after review is inspection/envelope/export units, independent reader and test app
+consumers, and public envelope/test app Chromium cases. The previous envelope totals qualify the
 prior inspector integration, not this new owner.
 
 Static checks cover Svelte/TypeScript, package/strict Publint, public consumer declarations, reader
 adapter types, lint, formatting and whitespace. These do not establish read cancellation/drain,
 late-result disposal, output handoff or native crypto correctness for this owner. Export/capture,
-notebook lease ownership and the older workspace journal disposal finding remain separate follow-ups.
+test app lease ownership and the older workspace journal disposal finding remain separate follow-ups.
 No commit, publication or merge was performed.
 
 ### Inspection correction — reviewed continuation and focused qualification
@@ -308,7 +308,7 @@ The user continued from implementation review. All existing 134 focused envelope
 unit cases passed. Six additional focused cases cover the newly exposed cancellation stages,
 idempotent release during a pending source read, envelope drain after request release and late
 source disposal on actor stop without explicit release after native ownership attaches. All 140
-focused cases, 11 independent reader cases, 13 notebook/package integration cases and four Chromium
+focused cases, 11 independent reader cases, 13 test app/package integration cases and four Chromium
 cases pass. Package/strict Publint and static checks pass. No production fixes were needed.
 See [qualification](inspector-design.md#ownership-correction-qualification-after-implementation-review).
 The static-only status above is historical. The pending journal correction remains separately
@@ -363,34 +363,34 @@ lease for another explicit cleanup actor; an already cleaned request is a no-op.
 cleanup actor drops reports but does not claim to cancel an issued native release. The request's
 retryCleanup() method is removed as approved. Existing test callers were mechanically migrated to
 run that root actor, preserving their existing throw-on-failure expectations in a test host helper.
-The notebook README records the public API migration. Export errors now use factory/guard functions.
+The test app README records the public API migration. Export errors now use factory/guard functions.
 
 No implementation tests were added/run for this correction. Existing test edits only migrate the
 cleanup API and nested root scope paths. Static checks cover Svelte/TypeScript, package/strict
-Publint, public-consumer and notebook declaration checks, lint, formatting and whitespace. Review
+Publint, public-consumer and test app declaration checks, lint, formatting and whitespace. Review
 must precede runtime checks of capture release, native drain, late lease/read/handoff disposal,
-cleanup admission/concurrency/failure recovery and existing notebook/browser integrations. Earlier
-140-unit/reader/notebook/browser totals qualify the preceding implementation, not this correction.
+cleanup admission/concurrency/failure recovery and existing test app/browser integrations. Earlier
+140-unit/reader/test app/browser totals qualify the preceding implementation, not this correction.
 
 The lease and cleanup custody are in-memory resources, not persisted recovery or a restore journal.
 Providers that ignore AbortSignal still must eventually settle for graceful drain. Native lease
 release cannot be cancelled or proven successful from actor.stop(). Consumer-retained file copies
-cannot be recalled. Notebook source ownership, older workspace journal disposal and the committed
+cannot be recalled. Test app source ownership, older workspace journal disposal and the committed
 restore-journal correction remain separate unqualified follow-ups. No new commit/push/merge.
 
 ### Export/capture correction — reviewed continuation and focused qualification
 
 The user continued from implementation review. All 140 existing focused units passed. Four new
 cleanup protocol cases cover concurrency, synchronous/asynchronous retry failure, stopped actor
-custody and late settlement. All 144 focused units pass. A new built-public-package notebook case
+custody and late settlement. All 144 focused units pass. A new built-public-package test app case
 proves retained lease cleanup actually restores writer access without replaying export; all 14
-notebook/package, 11 independent reader and four Chromium cases pass. Static/package checks pass.
+test app/package, 11 independent reader and four Chromium cases pass. Static/package checks pass.
 No production fixes were needed. See [qualification](lifecycle-design.md#export-ownership-correction-qualification-after-implementation-review).
 The preceding static-only status is historical. These changes remain uncommitted; f50a97c is the
-prior ownership commit. Notebook source ownership is next. Journal corrections remain separately
+prior ownership commit. Test app source ownership is next. Journal corrections remain separately
 unqualified. No push/merge.
 
-## Notebook source ownership correction — implemented and tested (2026-11-04)
+## Test app source ownership correction — implemented and tested (2026-11-04)
 
 The user authorized committing the preceding export correction and doing this next cleanup including
 tests. Committed export/capture work as 77b008f; no push/merge. Removed NotebookSource in favor of a
@@ -406,16 +406,16 @@ handles XState's pre-start active snapshot without queuing work. Binding replace
 an existing lease even when the binding returns to the same value. Failed writes preserve the prior
 data and keep the actor usable. These are bounded fixture rules, not new persistence/recovery scope.
 
-All 18 notebook/package cases (four added ownership cases), 144 focused shared backup units,
+All 18 test app/package cases (four added ownership cases), 144 focused shared backup units,
 11 independent reader cases and four Chromium cases pass. Static/declaration/lint/format checks
-pass. See [qualification](lifecycle-design.md#notebook-source-correction-qualification-2026-11-04).
+pass. See [qualification](lifecycle-design.md#test app-source-correction-qualification-2026-11-04).
 No full repository suite was run. The new source cleanup remains uncommitted. Next audited source
 finding: the older workspace journal's native disposal boundary. The committed restore-journal
 correction still requires separate review/qualification; these tests do not qualify it.
 
 ## Older workspace journal native disposal correction — implemented and tested (2026-11-04)
 
-At the user's request, committed the preceding notebook source cleanup as 8e5efe0, then corrected
+At the user's request, committed the preceding test app source cleanup as 8e5efe0, then corrected
 the audited workspace journal disposal boundary. A fixed invoked native owner retains database/
 transaction handles before delivery, closes a late successful open after stop and aborts a late
 upgrade after disposal. Transaction teardown detaches callbacks and attempts native abort without
@@ -461,7 +461,7 @@ for both factories without importing SDK types outside the permitted integration
 mocked tests verify delegation/options, not native Jazz data/session behavior or Svelte disposal.
 
 Package/strict Publint, Svelte consumer bundling, standalone codec/envelope public consumers,
-18 notebook/package cases, 11 independent reader cases and four focused Chromium cases pass.
+18 test app/package cases, 11 independent reader cases and four focused Chromium cases pass.
 Svelte/TypeScript, public consumer declarations, lint, formatting and whitespace checks pass. No
 full repository suite was run. A source/fixture declaration scan finds no remaining app-owned
 classes; SDK implementations/dependencies and TypeScript generic constraints are not app classes.
@@ -472,9 +472,9 @@ No push/merge. The original code-cleanup audit items are addressed; separate res
 validation and full regression/PR qualification still remain, and cannot be inferred from these
 focused codec tests.
 
-## Notebook finite-operation correction — awaiting implementation review (2026-11-04)
+## Test app finite-operation correction — awaiting implementation review (2026-11-04)
 
-The user correctly identified that eliminating classes did not finish the notebook's state modeling:
+The user correctly identified that eliminating classes did not finish the test app's state modeling:
 REPLACE/READ still combined fallible work, branch selection and replies in large inline actions.
 Those operations now have explicit validatingWrite -> committingWrite/rejectingWrite and
 capturingRead -> returningRead/rejectingRead states. Named actions perform a single transform,
@@ -488,7 +488,7 @@ state tag rather than matching internal initialization paths; it keeps no lease-
 synchronous API remains unchanged. No async promise actor or reply waiter was added for pure,
 synchronous fixture transforms.
 
-Svelte/TypeScript, notebook/public-consumer declaration checks, lint, formatting and whitespace
+Svelte/TypeScript, test app/public-consumer declaration checks, lint, formatting and whitespace
 checks pass. No implementation tests added/run for this correction before review, per AGENTS.md.
 Existing qualification totals apply to the preceding implementation only. Review should precede
 checks of both success/failure state branches, data preservation, response cleanup and existing
@@ -528,13 +528,13 @@ passes publint, consumer declarations and the Node envelope consumer. Its freshl
 passes the Chromium envelope integration (one test). Playwright's temporary localhost preview on
 port 6015 required sandbox escalation for socket binding and shut down after the run.
 Svelte/TypeScript, lint, formatting and whitespace checks pass. No implementation adjustment was
-needed after testing. No commit/push; the separate notebook correction and backup journal owner
+needed after testing. No commit/push; the separate test app correction and backup journal owner
 still have their previously recorded qualification limits. Remaining review findings are unbuilt.
 
 ## Avatar selection correction — awaiting implementation review
 
-Committed the preceding notebook/envelope correction and repository review as a16cdaf at the user's
-request. No push. Notebook runtime qualification remains pending; the envelope checks above passed.
+Committed the preceding test app/envelope correction and repository review as a16cdaf at the user's
+request. No push. Test app runtime qualification remains pending; the envelope checks above passed.
 
 Implemented review finding 2 as a separate local slice. The selection machine owns ready,
 validating, invalid, cropping and closed states. Guarded transitions decide validation outcome,
@@ -578,7 +578,7 @@ not additions to the product catalog. No production change was needed after test
 The normal consumer check now builds this browser fixture for CI, and root Svelte checking includes
 test components. The package fixture build and root Svelte/TypeScript checks pass. Playwright owned
 a temporary preview on localhost port 6015, with sandbox escalation for socket binding, and stopped
-it after the run. Runtime checks apply to avatar selection only; notebook/journal qualification
+it after the run. Runtime checks apply to avatar selection only; test app/journal qualification
 limits remain as previously recorded. No commit/push of this avatar slice.
 
 ## Recovery child failure correction — awaiting implementation review
@@ -649,7 +649,7 @@ Validation: all 883 unit cases in 35 files pass, including the new real-SDK case
 stronger assertions for uncertain creation commit/persistence receipts, the focused creation suite
 also passes. Root Svelte/TypeScript, lint, formatting and whitespace checks pass. Package/publint,
 public consumer declarations, three affected Node consumers, and consumer Vite build pass. This
-qualifies these two changes; it does not replace the separately pending notebook/journal native
+qualifies these two changes; it does not replace the separately pending test app/journal native
 qualification or claim arbitrary host recovery correctness. No commit/push of this slice.
 
 ## Independent-reader stream owner — awaiting implementation review
@@ -706,7 +706,7 @@ stdin completes at EOF without destroying its host stream, premature close fails
 for close/discards late data, abort after EOF drains close, and oversize input destroys/clears data.
 Success also verifies detached listeners and zeroed source chunks with independent returned bytes.
 
-Rebuilt the package and notebook browser IIFE from current source. Fourteen distinct Chromium
+Rebuilt the package and test app browser IIFE from current source. Fourteen distinct Chromium
 journal tests pass: twelve in the main run, then two additional unsupported-schema/version checks.
 The baseline verifies native create/update/CAS, reload recovery, cancellation settlement and
 malformed-row preservation. New tests wrap the native upgrade handler to prove schema mutation
@@ -720,7 +720,7 @@ formatting, whitespace, package build and publint checks pass. Playwright owned 
 preview at port 6015 with sandbox escalation for listener/browser execution and stopped it after
 each run. No production changes were needed during this qualification, and no tests were weakened.
 This qualifies the covered stream/schema/native store behavior, not the full planned restore workflow,
-arbitrary browser support, or the separately pending notebook finite-operation runtime correction.
+arbitrary browser support, or the separately pending test app finite-operation runtime correction.
 No commit or push of the journal change or these tests.
 
 ### Fresh-checkout CI type-resolution correction

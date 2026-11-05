@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { wellFormed } from './schemas.js'
+import { utf8ByteLength } from './utf8.js'
 
 export const restoreJournalLimits = Object.freeze({
 	bytes: 8 * 1024 * 1024,
@@ -11,14 +12,13 @@ export const restoreJournalLimits = Object.freeze({
 	batches: 55_000
 })
 
-const utf8 = new TextEncoder()
 const exactText = (maximum: number) =>
 	z
 		.string()
 		.min(1)
 		.max(maximum)
 		.refine(wellFormed)
-		.refine((value) => utf8.encode(value).byteLength <= maximum)
+		.refine((value) => utf8ByteLength(value) <= maximum)
 const id = exactText(256)
 const name = exactText(128)
 const count = z

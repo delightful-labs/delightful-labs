@@ -1,6 +1,6 @@
-# T006 next slice — one notebook attachment batch
+# T006 next slice — one test app attachment batch
 
-> Historical slice/research record. The complete notebook workflow, fresh comparison and activation
+> Historical slice/research record. The complete test app workflow, fresh comparison and activation
 > are now implemented in PR #26. Use [the current task ledger](tasks.md#current-handoff) and
 > [completion evidence](restore-completion-design.md) for present status; bounded single-step
 > descriptions and dated test totals below describe their original scope.
@@ -18,8 +18,8 @@ implementation review and subsequent user-authorized runtime qualification. The
 
 ## Outcome and scope
 
-Restore the current attachment batch into the existing isolated notebook destination, advance that
-one step's journal checkpoint, and stop. Keep the destination incomplete. Notebook/title and note
+Restore the current attachment batch into the existing isolated test app destination, advance that
+one step's journal checkpoint, and stop. Keep the destination incomplete. Test app/title and note
 record writers, full-graph comparison and activation follow in separate reviewed slices.
 
 The qualified plan already orders attachments before notebook and note records. Continue that exact
@@ -49,7 +49,7 @@ service, alternate backend or chunk protocol is needed for this disposable slice
 Consumer policies require the attachment owner to match the current session and the linked control
 row's owner/operation. Insertion additionally requires the control row to remain incomplete.
 Updates/deletes are denied in this slice. Recovery reads can see the owner's stored bytes; ordinary
-notebook discovery continues to exclude the incomplete destination. This does not establish Finance
+test app discovery continues to exclude the incomplete destination. This does not establish Finance
 isolation or safety against an older production client.
 
 First-write admission keeps the approved owner-bound rule. The actual server decides acceptance.
@@ -70,7 +70,7 @@ notebook attachment continuation root
     read -> stage -> commit -> separate settlement/checkpoint states
 ```
 
-The root takes ownership of a newly opened immutable checked archive, validates the exact notebook
+The root takes ownership of a newly opened immutable checked archive, validates the exact test app
 profile, discovers the retained mappings, reconstructs the complete expected intent, then loads it
 again under exclusive operation ownership. Reuse the existing planning states through a focused
 invoked planning child instead of duplicating their asynchronous sequence in a helper. Private
@@ -90,7 +90,7 @@ adding a generic job runner.
 
 ### Write-boundary identity denial (2026-11-04)
 
-The destination owns scope/content eligibility and invokes a shared notebook write-admission
+The destination owns scope/content eligibility and invokes a shared test app write-admission
 machine for authority or staging. The shared transaction owner retains acquisition, commit,
 settlement, rollback and detached custody. No promise wrapper owns an application workflow.
 
@@ -222,11 +222,11 @@ remain unqualified. No new application lifecycle, streaming protocol or retry en
 
 The user authorized implementing this suggestion after the isolated research. Implementation tests
 remain gated on review of the resulting implementation. The concrete entry point will be a resume-only
-notebook attachment request: it reopens/checks the same file, discovers/rebuilds the immutable intent,
+test app attachment request: it reopens/checks the same file, discovers/rebuilds the immutable intent,
 selects only the current attachment batch, then reloads under the operation lock before effects.
 A changed step between discovery and admission stops incomplete; it cannot silently select new data.
 
-Extract the notebook plan into a finite invoked child and keep checked-archive/expected-byte ownership
+Extract the test app plan into a finite invoked child and keep checked-archive/expected-byte ownership
 in the root request capsule. The root supplies its private expected attachment through a bound getter
 to the concrete writer; no global registry or content-bearing actor input is introduced. Extract the
 native operation-lock callback for reuse. The preparation API keeps its existing finite behavior.
@@ -253,10 +253,10 @@ been added or run. The 14 prior probes remain isolated research, not qualificati
 - `createRestoreBatchMachine` loads an existing exact-intent journal under the same operation lock;
   it cannot initialize/create intent or replace a destination. The requested write ID must still be
   the current batch after lock acquisition. Stale selection stops incomplete without switching data.
-- Notebook planning is now a finite invoked child. The root owns the checked archive and expected
+- Test app planning is now a finite invoked child. The root owns the checked archive and expected
   bytes throughout planning and the write child. Requests remain single-use opaque capabilities;
   no content-bearing SDK rows/byte arrays are placed in snapshots.
-- `createNotebookAttachmentRestore` binds an unstarted host root, resume-only request and concrete
+- `createTestAppAttachmentRestore` binds an unstarted host root, resume-only request and concrete
   Jazz writer. The root requires completed preparation and selects only the current attachment batch.
   `noAttachmentStep` reports a different/no current data step without advancing it. Pending
   preparation instead remains incomplete.
@@ -285,7 +285,7 @@ cases through the built public package. No assertion of an integrated working re
 
 ### Static validation before implementation review
 
-Root Svelte/strict TypeScript, package build/strict Publint, notebook TypeScript and the public
+Root Svelte/strict TypeScript, package build/strict Publint, test app TypeScript and the public
 package-consumer declaration check pass. The public consumer now includes the concrete attachment
 entry point against rebuilt package declarations. Oxlint, Oxfmt and Git whitespace checks pass.
 No implementation tests, browser/server runs or live data operations were performed in this slice.
@@ -303,7 +303,7 @@ pending qualification statements in the historical review above:
   cases preserve completed prefixes, advance exactly one batch, block failed issuance checkpoints,
   retain uncertain attempts, avoid blind replay, drain cancelled remote/authority observations,
   roll back transaction conflicts and reject stale requested steps.
-- All **13 real Jazz/Chromium tests** pass against the rebuilt public package and actual notebook
+- All **13 real Jazz/Chromium tests** pass against the rebuilt public package and actual test app
   adapter, schema, permission policy and IndexedDB journal. This includes the eight preparation
   regressions and five attachment cases: exact bytes/prefix/reload without replay; empty bytes;
   1 MiB bytes with Unicode filename; conflicting bytes despite a matching declared digest; and
@@ -311,8 +311,8 @@ pending qualification statements in the historical review above:
   only the acceptance observation after a real commit/local checkpoint and proves actual remote
   contents before cancellation. Recovery records remoteContentMatch while preserving the original
   transaction/issuance/settlement; it does not fabricate remote acceptance of that attempt.
-- Root Svelte/TypeScript, notebook TypeScript, package/strict Publint, public consumer builds and
-  runtime checks (including 17 independent reader and 18 notebook export tests), lint, formatting
+- Root Svelte/TypeScript, test app TypeScript, package/strict Publint, public consumer builds and
+  runtime checks (including 17 independent reader and 18 test app export tests), lint, formatting
   and whitespace checks pass. Browser services and Chromium are disposed by the harness.
 
 The prior preparation browser lock test now releases its deliberately held authority observation
@@ -328,6 +328,6 @@ The earlier 14 journal browser regressions and 14 isolated SDK research probes a
 not rerun totals for this qualification. No forced-crash, cross-device/browser, performance, full
 restore, Finance completeness or production safety claim follows. An issued write without sufficient
 local/fresh-content evidence remains incomplete; there is no automatic replay or destination replacement.
-Notebook/note writers, fresh comparison of the full restored graph/relationships/bytes and activation
+Test app/note writers, fresh comparison of the full restored graph/relationships/bytes and activation
 remain separate reviewable work. The user subsequently authorized committing and pushing this
 qualified slice for pull-request review.

@@ -13,7 +13,7 @@ below apply only to the stated boundary. The Jazz-only MVP is not complete.
       Request admission is stubbed; actual bearer cryptography is not qualified.
 - [x] Implement and qualify the server redemption owner: 71 tests covering policy decisions,
       interruption, expiry, replay/removal, settlement uncertainty and resource handoff.
-- [x] Add a disposable notebook schema outside the package and qualify its native client access
+- [x] Add a disposable test app schema outside the package and qualify its native client access
       boundary: 15 policy tests. Private updates fail the SDK read guard; private inserts/deletes
       are rejected by authority. This is not a production schema or end-to-end security claim.
 - [x] Review and simplify shared workflow/types/data option handling; preserve avatar drafts on
@@ -26,7 +26,7 @@ then authorized regression qualification on 2026-11-03. The follow-up adds 38 un
 native Chromium IndexedDB cases, and fixes two reproduced retry/abort regressions in
 [PR #20](https://github.com/delightful-labs/delightful-local-first/pull/20). Implementation-head
 CI passed on `82cc5e4`; PR #20 is merged. The later native-routing audit in PR #26 reviews all 45
-machine-bearing modules and qualifies 19 module cleanups with four added regressions. The notebook
+machine-bearing modules and qualifies 19 module cleanups with four added regressions. The test app
 backup path is complete; remaining Finance/performance/retry work is in
 [the active backup ledger](../003-verified-backup/tasks.md#current-handoff). See
 [review evidence, migration notes and verification](cleanup-review.md#regression-qualification-completed).

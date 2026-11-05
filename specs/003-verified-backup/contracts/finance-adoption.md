@@ -1,12 +1,30 @@
 # Finance backup profile and adoption procedure
 
-**Source inspected**: Finance `3eec71727d337a1845ea00ee61c5c9ad9d3e505c`, not a proven production revision. Initial SDK target: `jazz-tools@2.0.0-alpha.59`.
+**Source inspected**: deployed Finance frontend `31f70cb3c5603dac244debe7c9fe726c60014a89`,
+verified through read-only Netlify metadata and public asset comparisons on 2026-11-05.
+SDK target: `jazz-tools@2.0.0-alpha.59`. Authenticated backend schema/policy comparison and the
+selected workspace's read-only inventory are complete; capture and restore remain unqualified.
 
 ## Deployment evidence
 
-Finance `specs/001-finance-mvp/status.md:122–130` records a replacement Jazz app, served bigint/independent-Check client, and successful historical structural catalogue comparison. This supersedes earlier retired-app findings. It does not establish the current frontend revision or schema/permission head. Current source has 23 tables; older validation notes described 19.
+The [T007 inventory](../finance-deployment-inventory.md) identifies published Netlify deploy
+`6aea8e723a9b9fba60621b7a` and the served replacement Jazz namespace. The deployed source compiles
+to **22 tables**, correcting the earlier count of 23. The backend schema matches source hash
+`e5a4d82f60137eccad6e82481f77c943177118ca1d722ddda28b896cd5f5cc0a`; head v8 policies match after
+normalizing optional null defaults. Owner-scoped remote/local reads found 633 projected records,
+zero reachable attachments, no projected differences and no observed tracked pending writes.
+The comparison encoding is 672,633 bytes; the eventual Finance archive has not been implemented.
 
-Read-only Netlify project lookup on 2026-11-03 returned `Authentication required`. No deployment metadata or private data was obtained. Before adoption, record the actual published frontend commit/assets and authenticated backend schema/permission hashes in a private verification record. Compare them with the explicit profile. Do not run `deploy:jazz`, a production build that publishes schema, or a dev server with auto-publication merely to inspect compatibility.
+Read-only Netlify lookup now succeeds, superseding the 2026-11-03 authentication failure for
+frontend metadata. Finance `specs/001-finance-mvp/status.md:122–130` records historical authenticated
+verification of the replacement backend's former 19-table catalogue. T007 now records the current
+authenticated catalogue/policy comparison, browser runtime identity, aggregate sizes and scope limits.
+Finance accepts 10 MiB image inputs but resizes/re-encodes before storage; input size alone does not
+prove the 8 MiB per-file archive limit is exceeded. No attachment bytes are present in this observed
+graph. Future image-heavy data needs actual stored-byte qualification without changing existing bytes.
+Repeat inventory if the deployment, permissions, workspace or device changes before adoption.
+Do not run `deploy:jazz`, a production build that publishes schema, or a dev server with
+auto-publication merely to inspect compatibility.
 
 ## Initial profile inventory
 
