@@ -7,7 +7,7 @@ import {
 	commitJazzExport,
 	confirmJazzExport,
 	protectJazzExport,
-	dispatchJazzExport,
+	requestJazzExportHandoff,
 	jazzExportBinding,
 	jazzExportFacts,
 	abortJazzExport,
@@ -53,7 +53,7 @@ export function createJazzArchiveExportMachine<
 		confirm: leaf(confirmJazzExport),
 		prepare: leaf(protectJazzExport),
 		seal: createArchiveEnvelopeMachine(),
-		handoff: leaf(dispatchJazzExport),
+		handoff: leaf(requestJazzExportHandoff),
 		cleanup: leaf((request) => request.release())
 	}
 	const model = setup<
@@ -140,6 +140,11 @@ export function createJazzArchiveExportMachine<
 					src: 'claim',
 					input,
 					onDone: [
+						{
+							guard: ({ event }) => !event.output,
+							target: 'complete',
+							actions: assign({ failure: 'inUse' })
+						},
 						{
 							guard: ({ context }) => context.interruption !== undefined,
 							target: 'working.cleaning'

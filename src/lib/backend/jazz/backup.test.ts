@@ -16,7 +16,12 @@ import {
 	readGraph,
 	type Graph
 } from '../../../../fixtures/native-capture/schema.js'
-import { prepareJazzArchiveExport, type JazzArchiveReaderInput } from './backup-api.js'
+import {
+	classifyJazzArchiveFailure,
+	prepareJazzArchiveExport,
+	type JazzArchiveReaderInput
+} from './backup-api.js'
+import { jazzExportFacts, requestJazzExportHandoff } from './backup.js'
 import { createJazzArchiveExportMachine } from '../../machines/backup/export.js'
 import { createArchiveEnvelopeMachine } from '../../machines/backup/envelope.js'
 import { prepareArchiveOpen, type ArchiveProtection } from '../../backup/envelope-api.js'
@@ -290,6 +295,56 @@ describe('native Jazz archive export', () => {
 		const replay = createActor(machine, { input: { request: h.request } }).start()
 		expect(await toPromise(replay)).toMatchObject({ outcome: 'failed', code: 'inUse' })
 		expect(h.value.handoff.dispatch).toHaveBeenCalledTimes(1)
+	})
+	it('admits exactly one of two concurrent starts for the same request', async () => {
+		const graph = await seed(),
+			input = options(graph)
+		const request = prepareJazzArchiveExport(input.value)
+		const machine = createJazzArchiveExportMachine(reader(graph))
+		const first = createActor(machine, { input: { request } }).start()
+		const second = createActor(machine, { input: { request } }).start()
+		const results = await Promise.all([toPromise(first), toPromise(second)])
+		expect(results).toMatchObject([{ outcome: 'exported' }, { outcome: 'failed', code: 'inUse' }])
+		expect(input.value.handoff.dispatch).toHaveBeenCalledTimes(1)
+	})
+	it('refuses duplicate handoffs while dispatching and after release', async () => {
+		const graph = await seed(),
+			input = options(graph),
+			started = deferred<void>(),
+			finish = deferred<void>()
+		input.value.handoff.dispatch.mockImplementation(async () => {
+			started.resolve()
+			await finish.promise
+			return 'dispatched'
+		})
+		const h = start(graph, input)
+		await started.promise
+		const failure = () => requestJazzExportHandoff(h.request).catch(classifyJazzArchiveFailure)
+		expect(await failure()).toBe('inUse')
+		finish.resolve()
+		expect(await toPromise(h.actor)).toMatchObject({ outcome: 'exported', handoff: 'dispatched' })
+		expect(await failure()).toBe('inUse')
+		expect(input.value.handoff.dispatch).toHaveBeenCalledTimes(1)
+	})
+	it('records an unknown receipt and releases borrowed bytes when the provider throws', async () => {
+		const graph = await seed(),
+			input = options(graph)
+		let borrowed: ArchiveHandoffFile | undefined
+		input.value.handoff.dispatch.mockImplementation(async (file) => {
+			borrowed = file
+			throw new Error('synthetic-private-provider-error')
+		})
+		const h = start(graph, input)
+		expect(await toPromise(h.actor)).toMatchObject({
+			outcome: 'failed',
+			code: 'failed',
+			archiveProduced: true,
+			handoff: 'unknown'
+		})
+		expect(input.value.handoff.dispatch).toHaveBeenCalledTimes(1)
+		expect(() => borrowed?.copyBytes()).toThrow('resourceReleased')
+		expect(JSON.stringify(h.actor.getSnapshot())).not.toContain('synthetic-private-provider-error')
+		await expect(h.request.release()).resolves.toBeUndefined()
 	})
 	it('rejects a domain-invalid payload before issuing a native commit or handoff', async () => {
 		const graph = await seed(),
@@ -634,5 +689,38 @@ describe('native Jazz archive export', () => {
 			archiveProduced: true
 		})
 		expect(() => borrowed?.copyBytes()).toThrow('resourceReleased')
+	})
+	it('retains a pending handoff after export stop and joins repeated release', async () => {
+		const graph = await seed(),
+			input = options(graph),
+			started = deferred<void>(),
+			finish = deferred<void>()
+		let borrowed: ArchiveHandoffFile | undefined
+		input.value.handoff.dispatch.mockImplementation(async (file) => {
+			borrowed = file
+			started.resolve()
+			await finish.promise
+			return 'dispatched'
+		})
+		const h = start(graph, input)
+		await started.promise
+		h.actor.stop()
+		const released = h.request.release()
+		expect(h.request.release()).toBe(released)
+		let settled = false
+		void released.then(() => {
+			settled = true
+		})
+		await Promise.resolve()
+		expect(settled).toBe(false)
+		expect(borrowed?.copyBytes().length).toBeGreaterThan(0)
+		finish.resolve()
+		await released
+		expect(jazzExportFacts(h.request)).toMatchObject({
+			archiveProduced: true,
+			handoff: 'dispatched'
+		})
+		expect(() => borrowed?.copyBytes()).toThrow('resourceReleased')
+		expect(input.value.handoff.dispatch).toHaveBeenCalledTimes(1)
 	})
 })

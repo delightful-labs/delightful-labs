@@ -81,6 +81,12 @@ type Options = {
 	isCurrent(): boolean
 	limits?: PayloadLimitOverrides
 }
+export type JazzArchiveExportOwner = {
+	claim(): Promise<boolean>
+	dispatch(): Promise<ArchiveHandoffObservation>
+	handoff(): ArchiveHandoffObservation | 'notStarted'
+	release(): Promise<void>
+}
 type Data = {
 	binding: BackupBinding
 	limits: PayloadLimits
@@ -94,11 +100,9 @@ type Data = {
 	envelope: ArchiveEnvelopeRequest | undefined
 	sealed: SealedArchive | undefined
 	archiveProduced: boolean
-	handoff: ArchiveHandoffObservation | 'notStarted'
-	release: (() => Promise<void>) | undefined
+	owner: JazzArchiveExportOwner | undefined
 }
 const operations = new WeakMap<JazzArchiveExportRequest, Data>()
-const available = new WeakSet<JazzArchiveExportRequest>()
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw createJazzExportError('failed')
 	return value
@@ -144,14 +148,13 @@ export function assertJazzExportCurrent(request: JazzArchiveExportRequest) {
 		throw createJazzExportError('permissionDenied')
 }
 export function claimJazzExport(request: JazzArchiveExportRequest) {
-	if (!available.delete(request)) throw createJazzExportError('inUse')
+	return required(data(request).owner).claim()
 }
 export function endJazzReader(request: JazzArchiveExportRequest) {
 	data(request).reader = undefined
 }
 export function abortJazzExport(request: JazzArchiveExportRequest) {
 	const scope = data(request)
-	available.delete(request)
 	scope.abort.abort()
 	scope.reader = undefined
 	scope.captured = undefined
@@ -281,7 +284,6 @@ export function dispatchJazzExport(
 	const scope = data(request),
 		archive = required(scope.sealed),
 		input = required(scope.input)
-	scope.handoff = 'unknown'
 	return track(
 		scope,
 		Promise.resolve().then(() => {
@@ -295,20 +297,13 @@ export function dispatchJazzExport(
 				scope.abort.signal
 			)
 		})
-	).then(
-		(result) => {
-			scope.handoff = result === 'dispatched' || result === 'rejected' ? result : 'unknown'
-			return scope.handoff
-		},
-		() => {
-			scope.handoff = 'unknown'
-			return scope.handoff
-		}
-	)
+	).catch(() => {
+		throw createJazzExportError('failed')
+	})
 }
 export function jazzExportFacts(request: JazzArchiveExportRequest) {
 	const scope = data(request)
-	return { archiveProduced: scope.archiveProduced, handoff: scope.handoff }
+	return { archiveProduced: scope.archiveProduced, handoff: required(scope.owner).handoff() }
 }
 export function jazzExportBinding(request: JazzArchiveExportRequest) {
 	return data(request).binding
@@ -329,23 +324,24 @@ export function createJazzArchiveExportRequest(options: Options): JazzArchiveExp
 		envelope: undefined,
 		sealed: undefined,
 		archiveProduced: false,
-		handoff: 'notStarted',
-		release: undefined
+		owner: undefined
 	}
 	const request: JazzArchiveExportRequest = Object.freeze({
-		release: () => required(scope.release)(),
+		release: () => required(scope.owner).release(),
 		toJSON: (): { kind: 'jazzArchiveExport' } => ({ kind: 'jazzArchiveExport' })
 	})
 	operations.set(request, scope)
-	available.add(request)
 	return request
 }
 /** Attach the retained state-machine owner at the public composition boundary. */
-export function attachJazzExportRelease(
+export function attachJazzExportOwner(
 	request: JazzArchiveExportRequest,
-	release: () => Promise<void>
+	owner: JazzArchiveExportOwner
 ) {
-	data(request).release = release
+	data(request).owner = owner
+}
+export function requestJazzExportHandoff(request: JazzArchiveExportRequest) {
+	return required(data(request).owner).dispatch()
 }
 /** One batch observation of already-issued native receipts. */
 export function drainJazzExport(request: JazzArchiveExportRequest): Promise<void> {

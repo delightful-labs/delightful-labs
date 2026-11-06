@@ -26,6 +26,19 @@ applicable coverage on the sole native owner. No compatibility aliases or altern
 
 ## Ownership and statechart before implementation
 
+The subsequent audit consolidates request admission and handoff in that same retained owner.
+Its states are available → claimed → handing off → handoff settled → drain/rollback/dispose. Claim
+commands grant one owner or reject reuse through chart transitions. During handoff, a release
+command revokes inputs but keeps the issued effect invoked in a releasing substate until its
+receipt arrives. The chart records the actual dispatched/rejected/unknown observation before
+draining. The adapter no longer keeps a separate availability set or provisional handoff phase.
+The public API bridges commands to this one retained actor; it starts no per-call child actors.
+
+The audit also covers encryption, inspection, journal/restore adapters and restore locks. Their
+native callbacks issue individual operations and protect input/output custody; their sequencing,
+retry/confirmation decisions and cancellation already belong to their owning charts. Pure codec,
+schema, profile and byte-budget checks remain functions.
+
 The PR's pending review identifies reader setup and capture validation as workflow boundaries.
 The reader is now an invoked finite scope: check binding → prepare capabilities → hydrate/capture
 through the invoked consumer → revoke capabilities → finish. The native capabilities remain single
@@ -35,7 +48,7 @@ Capture preparation and profile validation are separate invoked steps in the exp
 native boundary prepares bounded private data or returns a pure validation result; chart guards
 decide whether a commit is permitted.
 
-Release has a finite retained resource owner: waiting → drain issued receipts → roll back an
+Release uses that retained scope owner: drain issued receipts → roll back an
 uncommitted transaction when present → dispose private resources → cleaned/failed. The public
 composition factory starts that request-scoped owner, whose lifetime deliberately survives the
 export actor. `release()` sends its command and observes its one terminal receipt. The export's
@@ -109,9 +122,9 @@ readable for existing archives. Neither declaration is an authority signature ov
 
 Cleanup qualification on 2026-11-05 with pinned Jazz `2.0.0-alpha.59`:
 
-- Formatting/lint, strict Svelte/TypeScript, **927 unit cases**, package/publint, built-package
+- Formatting/lint, strict Svelte/TypeScript, **931 unit cases**, package/publint, built-package
   consumers, independent-reader checks, 12 retained-file/profile cases and Storybook build pass.
-- Twenty-eight native export-owner cases cover protection, exact bytes/source preservation, conflicts and
+- Thirty-two native export-owner cases cover protection, exact bytes/source preservation, conflicts and
   fresh attempts, interruptions, stale binding, late reads, offline confirmation, reader/owner crashes,
   abrupt stop, single use, invalid profiles, identity/permission changes and handoff custody/outcomes.
 - Review regressions hold key derivation pending during CANCEL/SHUTDOWN/invalidation and require
@@ -121,6 +134,9 @@ Cleanup qualification on 2026-11-05 with pinned Jazz `2.0.0-alpha.59`:
 - Finite-scope regressions cover release before export start, one shared release receipt, late I/O
   after owner stop, unconfirmed/rejected rollback without retry and revocation before preparation.
   A rejected profile explicitly issues no commit; reader and export-owner crashes retain cleanup.
+  Concurrent starts admit one owner; duplicate handoffs are refused during dispatch and after release.
+  Provider failure records an unknown receipt and clears borrowed bytes. Abrupt export stop during
+  handoff keeps that invocation alive through repeated release, then retains the actual receipt.
 - `pnpm check:native-backup`: 18 independent SDK probes plus two real persistent-Chromium downloads
   through the built public package pass; both files reopen in Node with exact bytes and unchanged source.
 - `pnpm check:backup-restore`: **69 functional cases pass**; seven opt-in performance cases are skipped.
