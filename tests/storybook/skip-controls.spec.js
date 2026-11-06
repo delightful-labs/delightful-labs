@@ -5,6 +5,11 @@ async function open(page, story) {
 	await page.goto(
 		`/iframe.html?id=accessibility-skiplink--${story}&viewMode=story`
 	)
+	await expect(
+		story === 'skip-to-content'
+			? page.getByRole('link', { name: 'Skip to main content', exact: true })
+			: page.getByRole('button', { name: 'Open tools', exact: true })
+	).toBeAttached()
 }
 
 test('Tab reveals the accessible skip link and leaving focus hides it again', async ({
