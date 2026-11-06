@@ -49,3 +49,12 @@
 		</div>
 	{/snippet}
 </Story>
+
+<Story name="Word wrapping">
+	{#snippet template()}
+		<div style="width: 8ch; font-family: monospace">
+			<Text>alpha beta gamma</Text>
+			<Text>uninterruptedword</Text>
+		</div>
+	{/snippet}
+</Story>
