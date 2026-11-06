@@ -24,6 +24,39 @@ extraction are not planned tasks. Keep them in Finance and reconsider only when 
 a concrete need. The earlier app-specific candidate the user chose to skip remains excluded.
 This completion does not close unrelated historical review or accessibility-verification work.
 
+## SkipLink and SkipButton — reviewed, verified in connected Chrome
+
+This is a new extraction requested after the earlier batch closed. Share Finance's
+keyboard-revealed developer trigger presentation without transferring its diagnostics behavior.
+Provide separate native anchor and button components, consistent with the floating actions.
+SkipLink requires a caller-owned href; SkipButton defaults to type="button". Both receive
+caller-translated children and forward native attributes, events, class and style to the control.
+
+A private frame stays fixed at the logical top/start corner, clips its contents while unfocused,
+and reveals them on focus-within. It uses existing spacing/background tokens with fallbacks.
+No hidden/inert state removes the control from keyboard navigation or assistive technology.
+Callers own document order, fragment targets, dialog state and focus restoration.
+
+Storybook provides fragment-navigation, dialog-action and disabled-action examples. The user
+approved implementation and focused testing. Four SSR checks pass for native semantics,
+attributes, disabled state and form submission attributes. Four Storybook scenarios cover
+Tab reveal, re-hiding on blur, fragment target focus, Enter/Space activation, disabled state
+and dialog focus restoration. The Playwright runner could not start: the sandbox denies
+server binding and Chromium startup, and the session rejects sandbox approval requests.
+Static Svelte/TypeScript, changed-file ESLint/Prettier, package validation and Storybook build pass.
+Finance's existing debugging and pagination developer-menu scenarios retain their button contract.
+
+The connected Chrome browser verified the same scenarios against a standalone local HTML
+preview compiled from the source components. Native keyboard events confirm Tab reveal,
+blur hiding, fragment target focus and continuation inside main, Enter/Space dialog activation,
+Escape/Close return focus and disabled-button focus/click suppression. IntersectionObserver
+reports zero visible intersection while clipped and full intersection while focused.
+The preview also mounts Finance's actual DeveloperMenuDialog with its vendored DUI package;
+its existing label, ARIA association, diagnostic fields, inspector callback/link, caller-provided
+content and dialog return focus pass. This component verification does not replace the full
+Finance application scenarios or a completed Playwright run. Preview artifacts are under
+test-results/skip-controls-review and are excluded from the published package.
+
 ## StatusMessage — reviewed and verified
 
 Expose a public Svelte 5 component with required string `text` and optional `variant`: `info` (default), `loading`, `success` or `error`. Forward native div attributes/events, class and style. Render visible text in all variants, with the existing compact LoadingSpinner only for loading. Use status semantics for info/loading/success and alert semantics for errors; allow an explicit native role override. The spinner is decorative, with no second announcement. LoadingSpinner renders hidden text only when supplied a nonempty text prop; omit it in this composition. Do not add state management, translations, retry actions, icons, timers or dismissal.
