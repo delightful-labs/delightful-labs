@@ -1,10 +1,9 @@
-import { assign, fromPromise, sendTo, setup, type ActorLogic, type Snapshot } from 'xstate'
+import { assign, fromPromise, sendTo, setup, type Snapshot } from 'xstate'
 import {
 	claimJazzExport,
-	jazzReaderInput,
-	endJazzReader,
 	openJazzExport,
-	validateJazzExport,
+	prepareJazzExportPayload,
+	validateJazzExportPayload,
 	commitJazzExport,
 	confirmJazzExport,
 	protectJazzExport,
@@ -21,6 +20,8 @@ import {
 	type JazzExportErrorCode
 } from '../../backend/jazz/backup.js'
 import { createArchiveEnvelopeMachine } from './envelope.js'
+import { createJazzArchiveReaderMachine, type JazzArchiveReader } from './reader.js'
+export type { JazzArchiveReader } from './reader.js'
 import type { ArchiveEnvelopeRequest } from '../../backup/envelope-operation.js'
 import type { BackupBinding } from '../../backup/binding.js'
 
@@ -32,9 +33,6 @@ type Context = Input & {
 	failure: JazzExportErrorCode | undefined
 	envelope: ArchiveEnvelopeRequest | undefined
 }
-export type JazzArchiveReader<ReaderSnapshot extends Snapshot<JazzArchiveReaderResult>> =
-	ActorLogic<ReaderSnapshot, { type: 'CANCEL' | 'SHUTDOWN' }, JazzArchiveReaderInput>
-
 /** Native Jazz capture: hydrate -> exclusive read -> validate -> native verdict -> seal -> handoff. */
 export function createJazzArchiveExportMachine<
 	ReaderSnapshot extends Snapshot<JazzArchiveReaderResult>
@@ -47,9 +45,10 @@ export function createJazzArchiveExportMachine<
 	const actors = {
 		claim: leaf(claimJazzExport),
 		resources: jazzExportResources,
-		reader,
+		reader: createJazzArchiveReaderMachine(reader),
 		open: leaf(openJazzExport),
-		validate: leaf(validateJazzExport),
+		preparePayload: leaf(prepareJazzExportPayload),
+		validate: leaf(validateJazzExportPayload),
 		commit: leaf(commitJazzExport),
 		confirm: leaf(confirmJazzExport),
 		prepare: leaf(protectJazzExport),
@@ -93,10 +92,9 @@ export function createJazzArchiveExportMachine<
 	const abort = model.createAction(({ context }) => abortJazzExport(context.request))
 	const readerDone = (mode: JazzArchiveReaderInput['mode'], next: string) =>
 		model.createStateConfig({
-			exit: ({ context }) => endJazzReader(context.request),
 			invoke: {
 				src: 'reader',
-				input: ({ context }) => jazzReaderInput(context.request, mode),
+				input: ({ context }) => ({ request: context.request, mode }),
 				onDone: [
 					{ guard: ({ event }) => event.output?.outcome === 'ready', target: next },
 					{
@@ -166,8 +164,21 @@ export function createJazzArchiveExportMachine<
 				states: {
 					hydrating: readerDone('hydrate', 'opening'),
 					opening: { invoke: { src: 'open', input, onDone: 'reading', onError: failed } },
-					reading: readerDone('capture', 'validating'),
-					validating: { invoke: { src: 'validate', input, onDone: 'committing', onError: failed } },
+					reading: readerDone('capture', 'preparingPayload'),
+					preparingPayload: {
+						invoke: { src: 'preparePayload', input, onDone: 'validating', onError: failed }
+					},
+					validating: {
+						invoke: {
+							src: 'validate',
+							input,
+							onDone: [
+								{ guard: ({ event }) => event.output, target: 'committing' },
+								{ target: 'cleaning', actions: assign({ failure: 'invalidData' }) }
+							],
+							onError: failed
+						}
+					},
 					committing: { invoke: { src: 'commit', input, onDone: 'confirming', onError: failed } },
 					confirming: { invoke: { src: 'confirm', input, onDone: 'preparing', onError: failed } },
 					preparing: {

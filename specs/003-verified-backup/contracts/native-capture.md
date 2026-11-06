@@ -26,6 +26,25 @@ applicable coverage on the sole native owner. No compatibility aliases or altern
 
 ## Ownership and statechart before implementation
 
+The PR's pending review identifies reader setup and capture validation as workflow boundaries.
+The reader is now an invoked finite scope: check binding → prepare capabilities → hydrate/capture
+through the invoked consumer → revoke capabilities → finish. The native capabilities remain single
+protected query/digest operations; they do not choose the reader's phase or advance capture.
+
+Capture preparation and profile validation are separate invoked steps in the export chart. The
+native boundary prepares bounded private data or returns a pure validation result; chart guards
+decide whether a commit is permitted.
+
+Release has a finite retained resource owner: waiting → drain issued receipts → roll back an
+uncommitted transaction when present → dispose private resources → cleaned/failed. The public
+composition factory starts that request-scoped owner, whose lifetime deliberately survives the
+export actor. `release()` sends its command and observes its one terminal receipt. The export's
+normal cleanup requests that same owner; abrupt stop and reader/owner error do too. Repeated release
+joins the same result, never a failed/stopped consumer acknowledgement or a new rollback attempt.
+The Jazz adapter exposes only the individual drain, rollback, disposal, read and transform leaves;
+it contains no asynchronous drain/rollback/finally sequence. Payloads, SDK handles and passwords
+stay in the private data boundary, outside either machine's snapshots.
+
 Review fixes: during protection, CANCEL/SHUTDOWN/invalidation keep the encryption child invoked,
 revoke private inputs and forward its existing cancellation command. The parent enters cleanup
 only after that child finishes draining native crypto. Abrupt actor stop still detaches native
@@ -44,7 +63,7 @@ remote tier. Capture queries one native exclusive transaction. The reader receiv
 capabilities, binding, limits and an AbortSignal; it never receives a writable Db/transaction.
 It keeps domain data privately and deposits a payload only during capture.
 
-`hydrate -> open exclusive -> read -> validate -> commit with zero application mutations ->
+`hydrate -> open exclusive -> read -> prepare payload -> validate profile -> commit with zero application mutations ->
 await native verdict -> prepare protection -> protect -> hand off -> clean -> complete`.
 
 The reader owns schema-specific queries, bounded byte reads, owner authorization and domain
@@ -90,15 +109,18 @@ readable for existing archives. Neither declaration is an authority signature ov
 
 Cleanup qualification on 2026-11-05 with pinned Jazz `2.0.0-alpha.59`:
 
-- Formatting/lint, strict Svelte/TypeScript, **922 unit cases**, package/publint, built-package
+- Formatting/lint, strict Svelte/TypeScript, **927 unit cases**, package/publint, built-package
   consumers, independent-reader checks, 12 retained-file/profile cases and Storybook build pass.
-- Twenty-three native export-owner cases cover protection, exact bytes/source preservation, conflicts and
+- Twenty-eight native export-owner cases cover protection, exact bytes/source preservation, conflicts and
   fresh attempts, interruptions, stale binding, late reads, offline confirmation, reader/owner crashes,
   abrupt stop, single use, invalid profiles, identity/permission changes and handoff custody/outcomes.
 - Review regressions hold key derivation pending during CANCEL/SHUTDOWN/invalidation and require
   protection to finish draining before the root completes. Both protection modes prepare once with
   no payload reparsing; independent reopening still parses. Additional envelope checks cover caller
   mutation after preparation, exact escaped-JSON byte limits and immediate clearing on release.
+- Finite-scope regressions cover release before export start, one shared release receipt, late I/O
+  after owner stop, unconfirmed/rejected rollback without retry and revocation before preparation.
+  A rejected profile explicitly issues no commit; reader and export-owner crashes retain cleanup.
 - `pnpm check:native-backup`: 18 independent SDK probes plus two real persistent-Chromium downloads
   through the built public package pass; both files reopen in Node with exact bytes and unchanged source.
 - `pnpm check:backup-restore`: **69 functional cases pass**; seven opt-in performance cases are skipped.

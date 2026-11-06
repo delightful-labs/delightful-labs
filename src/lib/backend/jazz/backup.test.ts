@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi, type MockInstance } from 'vitest'
 import * as payloadCodec from '../../backup/payload.js'
 import { createActor, toPromise, waitFor } from 'xstate'
 import {
@@ -8,7 +8,7 @@ import {
 import { createJazzSession, type JazzClient } from 'jazz-tools/backend'
 import { startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
 import type { JazzSession } from 'jazz-tools/client'
-import type { Db } from 'jazz-tools'
+import type { Db, Transaction } from 'jazz-tools'
 import {
 	app,
 	permissions,
@@ -153,7 +153,125 @@ function start(
 	return { actor, request, ...input }
 }
 
+function observeTransaction() {
+	const begin = db.beginExclusiveTransaction.bind(db)
+	let opened: Transaction<'exclusive'> | undefined
+	vi.spyOn(db, 'beginExclusiveTransaction').mockImplementationOnce(() => {
+		opened = begin()
+		return opened
+	})
+	return () => {
+		if (!opened) throw new Error('Capture transaction not opened')
+		return opened
+	}
+}
+
 describe('native Jazz archive export', () => {
+	it('releases an unstarted request once and rejects later use', async () => {
+		const graph = await seed(),
+			input = options(graph)
+		const reads = vi.spyOn(db, 'all')
+		const request = prepareJazzArchiveExport(input.value)
+		const first = request.release(),
+			second = request.release()
+		expect(second).toBe(first)
+		await first
+		const actor = createActor(createJazzArchiveExportMachine(reader(graph)), {
+			input: { request }
+		}).start()
+		expect(await toPromise(actor)).toMatchObject({ outcome: 'failed', code: 'inUse' })
+		expect(reads).not.toHaveBeenCalled()
+		expect(input.value.handoff.dispatch).not.toHaveBeenCalled()
+		expect(request.release()).toBe(first)
+	})
+	it('retained release drains a late capture call after owner stop before rolling back', async () => {
+		const graph = await seed(),
+			transaction = observeTransaction(),
+			reached = deferred<void>(),
+			resume = deferred<void>(),
+			pending = deferred<never[]>()
+		let capture: JazzArchiveReaderInput | undefined
+		const h = start(graph, options(graph), (input) => {
+			capture = input
+			reached.resolve()
+			return resume.promise
+		})
+		await reached.promise
+		if (!capture) throw new Error('Capture capabilities missing')
+		vi.spyOn(transaction(), 'all').mockImplementationOnce(() => pending.promise)
+		const rollback = vi.spyOn(transaction(), 'rollback')
+		const late = capture.all(app.workspaces.where({ id: graph.workspace })).then(
+			() => 'ready',
+			() => 'revoked'
+		)
+		try {
+			h.actor.stop()
+			const released = h.request.release()
+			expect(h.request.release()).toBe(released)
+			await new Promise<void>((resolve) => setImmediate(resolve))
+			expect(rollback).not.toHaveBeenCalled()
+			pending.resolve([])
+			await released
+			expect(await late).toBe('revoked')
+			expect(rollback).toHaveBeenCalledTimes(1)
+			expect(h.files).toHaveLength(0)
+		} finally {
+			pending.resolve([])
+			resume.resolve()
+			await h.request.release()
+		}
+	})
+	it.each(['unconfirmed', 'rejected'])(
+		'keeps %s rollback as cleanup failure without retrying',
+		async (kind) => {
+			const graph = await seed(),
+				transaction = observeTransaction(),
+				reached = deferred<void>(),
+				resume = deferred<void>()
+			const h = start(graph, options(graph), () => {
+				reached.resolve()
+				return resume.promise
+			})
+			await reached.promise
+			const tx = transaction(),
+				rollback = vi.spyOn(tx, 'rollback')
+			if (kind === 'unconfirmed') rollback.mockResolvedValueOnce(false)
+			else rollback.mockRejectedValueOnce(new Error('Synthetic native rollback failure'))
+			try {
+				h.actor.send({ type: 'CANCEL' })
+				expect(await toPromise(h.actor)).toMatchObject({ outcome: 'failed', code: 'cleanupFailed' })
+				const released = h.request.release()
+				await expect(released).rejects.toThrow('cleanupFailed')
+				expect(h.request.release()).toBe(released)
+				expect(rollback).toHaveBeenCalledTimes(1)
+				expect(h.files).toHaveLength(0)
+			} finally {
+				rollback.mockRestore()
+				await tx.rollback()
+				resume.resolve()
+			}
+		}
+	)
+	it('revokes capture capabilities before the preparation state runs', async () => {
+		const graph = await seed(),
+			prepare = payloadCodec.prepareArchivePayload
+		let capture: JazzArchiveReaderInput | undefined,
+			revoked = false
+		vi.spyOn(payloadCodec, 'prepareArchivePayload').mockImplementation((...args) => {
+			if (!capture) throw new Error('Capture capabilities missing')
+			try {
+				void capture.all(app.workspaces.where({ id: graph.workspace })).catch(() => {})
+			} catch {
+				revoked = true
+			}
+			return prepare(...args)
+		})
+		const h = start(graph, options(graph), async (input) => {
+			capture = input
+		})
+		expect(await toPromise(h.actor)).toMatchObject({ outcome: 'exported' })
+		expect(revoked).toBe(true)
+	})
 	it('rejects duplicate owners without releasing or replaying the active export', async () => {
 		const graph = await seed(),
 			reached = deferred<void>(),
@@ -176,6 +294,8 @@ describe('native Jazz archive export', () => {
 	it('rejects a domain-invalid payload before issuing a native commit or handoff', async () => {
 		const graph = await seed(),
 			input = options(graph)
+		const transaction = observeTransaction()
+		let commit: MockInstance<Transaction<'exclusive'>['commit']> | undefined
 		const prepare = payloadCodec.prepareArchivePayload
 		let encoded: Uint8Array | undefined
 		vi.spyOn(payloadCodec, 'prepareArchivePayload').mockImplementation((...args) => {
@@ -184,7 +304,9 @@ describe('native Jazz archive export', () => {
 			return prepared
 		})
 		input.value.profile = { ...profile, validate: () => false }
-		const h = start(graph, input)
+		const h = start(graph, input, async () => {
+			commit = vi.spyOn(transaction(), 'commit')
+		})
 		expect(await toPromise(h.actor)).toMatchObject({
 			outcome: 'failed',
 			code: 'invalidData',
@@ -193,10 +315,13 @@ describe('native Jazz archive export', () => {
 		})
 		expect(h.files).toHaveLength(0)
 		expect(encoded?.every((byte) => byte === 0)).toBe(true)
+		expect(commit).toBeDefined()
+		expect(commit).not.toHaveBeenCalled()
 	})
 	it('rejects a different authenticated identity before reading', async () => {
 		const graph = await seed(),
 			input = options(graph)
+		const reads = vi.spyOn(db, 'all')
 		input.value.binding.identityId = crypto.randomUUID()
 		const h = start(graph, input)
 		expect(await toPromise(h.actor)).toMatchObject({
@@ -205,6 +330,7 @@ describe('native Jazz archive export', () => {
 			archiveProduced: false
 		})
 		expect(h.files).toHaveLength(0)
+		expect(reads).not.toHaveBeenCalled()
 	})
 	it('discards a captured view when native read permission is revoked', async () => {
 		const graph = await seed(),
@@ -436,9 +562,15 @@ describe('native Jazz archive export', () => {
 	})
 	it('keeps cleanup ownership when the export owner itself errors', async () => {
 		const graph = await seed(),
-			input = options(graph),
-			request = prepareJazzArchiveExport(input.value)
-		const machine = createJazzArchiveExportMachine(reader(graph, undefined, true)).provide({
+			input = options(graph)
+		input.value.profile = {
+			...profile,
+			validate: () => {
+				throw new Error('Synthetic profile failure')
+			}
+		}
+		const request = prepareJazzArchiveExport(input.value)
+		const machine = createJazzArchiveExportMachine(reader(graph)).provide({
 			actions: {
 				fail: () => {
 					throw new Error('Synthetic owner crash')

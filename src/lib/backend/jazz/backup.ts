@@ -57,7 +57,9 @@ export interface JazzArchiveReaderInput {
 	accept(payload: unknown): void
 }
 export interface JazzArchiveExportRequest {
-	/** Abort, discard secrets immediately, then drain native I/O and release owned resources. */
+	/** Revoke private inputs, drain reader/Jazz calls and dispose resources.
+	 * Graceful crypto drain uses CANCEL/SHUTDOWN and export completion.
+	 */
 	release(): Promise<void>
 	toJSON(): { kind: 'jazzArchiveExport' }
 }
@@ -93,15 +95,15 @@ type Data = {
 	sealed: SealedArchive | undefined
 	archiveProduced: boolean
 	handoff: ArchiveHandoffObservation | 'notStarted'
-	cleanup: Promise<void> | undefined
+	release: (() => Promise<void>) | undefined
 }
 const operations = new WeakMap<JazzArchiveExportRequest, Data>()
 const available = new WeakSet<JazzArchiveExportRequest>()
 function required<Value>(value: Value | undefined): Value {
-	if (value === undefined) throw fault('failed')
+	if (value === undefined) throw createJazzExportError('failed')
 	return value
 }
-function fault(code: JazzExportErrorCode) {
+export function createJazzExportError(code: JazzExportErrorCode) {
 	return Object.assign(new Error(code), { name: 'JazzExportError', code })
 }
 export function jazzExportFailure(error: unknown): JazzExportErrorCode {
@@ -137,25 +139,27 @@ function track<Value>(scope: Data, call: Promise<Value>): Promise<Value> {
 export function assertJazzExportCurrent(request: JazzArchiveExportRequest) {
 	const scope = data(request),
 		input = required(scope.input)
-	if (scope.abort.signal.aborted || !input.isCurrent()) throw fault('sourceChanged')
+	if (scope.abort.signal.aborted || !input.isCurrent()) throw createJazzExportError('sourceChanged')
 	if (input.db.getAuthState().session?.user.account !== scope.binding.identityId)
-		throw fault('permissionDenied')
+		throw createJazzExportError('permissionDenied')
 }
 export function claimJazzExport(request: JazzArchiveExportRequest) {
-	if (!available.delete(request)) throw fault('inUse')
+	if (!available.delete(request)) throw createJazzExportError('inUse')
 }
 export function endJazzReader(request: JazzArchiveExportRequest) {
 	data(request).reader = undefined
 }
 export function abortJazzExport(request: JazzArchiveExportRequest) {
 	const scope = data(request)
+	available.delete(request)
 	scope.abort.abort()
 	scope.reader = undefined
 	scope.captured = undefined
 	if (scope.input) scope.input.protection = undefined
 	scope.envelope?.release()
 }
-export function jazzReaderInput(
+/** Construct single-call capabilities; the reader machine grants and revokes the scope. */
+export function prepareJazzReaderInput(
 	request: JazzArchiveExportRequest,
 	mode: JazzArchiveReaderInput['mode']
 ): JazzArchiveReaderInput {
@@ -167,22 +171,22 @@ export function jazzReaderInput(
 		signal: scope.abort.signal,
 		all<Row>(query: QueryBuilder<Row>) {
 			assertJazzExportCurrent(request)
-			if (scope.reader !== reader) throw fault('failed')
+			if (scope.reader !== reader) throw createJazzExportError('failed')
 			const source = mode === 'hydrate' ? required(scope.input).db : required(scope.transaction)
 			return track(scope, source.all(query, { tier: 'remote' })).then(
 				(rows) => {
-					if (scope.abort.signal.aborted) throw fault('sourceChanged')
+					if (scope.abort.signal.aborted) throw createJazzExportError('sourceChanged')
 					return rows
 				},
 				(error: unknown) => {
-					throw fault(jazzExportFailure(error))
+					throw createJazzExportError(jazzExportFailure(error))
 				}
 			)
 		},
 		sha256(bytes: Uint8Array) {
 			assertJazzExportCurrent(request)
 			if (scope.reader !== reader || bytes.byteLength > scope.limits.attachmentBytes)
-				throw fault('invalidData')
+				throw createJazzExportError('invalidData')
 			const copy = Uint8Array.from(bytes)
 			return track(
 				scope,
@@ -191,7 +195,7 @@ export function jazzReaderInput(
 					.then(hex)
 					.finally(() => copy.fill(0))
 			).then((value) => {
-				if (scope.abort.signal.aborted) throw fault('sourceChanged')
+				if (scope.abort.signal.aborted) throw createJazzExportError('sourceChanged')
 				return value
 			})
 		},
@@ -200,35 +204,46 @@ export function jazzReaderInput(
 				scope.captured = payload
 		}
 	})
-	scope.reader = reader
 	return reader
 }
 export function openJazzExport(request: JazzArchiveExportRequest) {
 	assertJazzExportCurrent(request)
 	data(request).transaction = required(data(request).input).db.beginExclusiveTransaction()
 }
-export function validateJazzExport(request: JazzArchiveExportRequest) {
+export function activateJazzReader(
+	request: JazzArchiveExportRequest,
+	reader: JazzArchiveReaderInput
+) {
+	data(request).reader = reader
+}
+export function prepareJazzExportPayload(request: JazzArchiveExportRequest) {
 	const scope = data(request),
 		captured = scope.captured
-	scope.reader = undefined
 	scope.captured = undefined
 	try {
 		const input = required(scope.input)
 		scope.envelope = prepareArchiveSeal(captured, required(input.protection), scope.limits)
 		input.protection = undefined
-		const payload = required(envelopeData(scope.envelope).payload),
-			profile = input.profile
-		if (
-			payload.profile.id !== profile.id ||
-			payload.profile.version !== profile.version ||
-			payload.source.applicationId !== scope.binding.applicationId ||
-			payload.source.workspaceId !== scope.binding.workspaceId ||
-			payload.coverage.consistency !== 'jazz-exclusive-transaction' ||
-			!profile.validate(payload)
-		)
-			throw fault('invalidData')
 	} catch {
-		throw fault('invalidData')
+		throw createJazzExportError('invalidData')
+	}
+}
+/** Pure profile/binding predicate; the export chart decides whether commit is permitted. */
+export function validateJazzExportPayload(request: JazzArchiveExportRequest): boolean {
+	const scope = data(request)
+	try {
+		const payload = required(envelopeData(required(scope.envelope)).payload),
+			profile = required(scope.input).profile
+		return (
+			payload.profile.id === profile.id &&
+			payload.profile.version === profile.version &&
+			payload.source.applicationId === scope.binding.applicationId &&
+			payload.source.workspaceId === scope.binding.workspaceId &&
+			payload.coverage.consistency === 'jazz-exclusive-transaction' &&
+			profile.validate(payload)
+		)
+	} catch {
+		throw createJazzExportError('invalidData')
 	}
 }
 export function commitJazzExport(request: JazzArchiveExportRequest) {
@@ -241,7 +256,7 @@ export function commitJazzExport(request: JazzArchiveExportRequest) {
 	scope.verdict = track(
 		scope,
 		Promise.resolve(write.wait()).catch((error: unknown) => {
-			throw fault(jazzExportFailure(error))
+			throw createJazzExportError(jazzExportFailure(error))
 		})
 	)
 }
@@ -300,7 +315,7 @@ export function jazzExportBinding(request: JazzArchiveExportRequest) {
 }
 
 /** One request owns the native transaction and data. No writer registry or consumer lease protocol. */
-export function prepareJazzArchiveExport(options: Options): JazzArchiveExportRequest {
+export function createJazzArchiveExportRequest(options: Options): JazzArchiveExportRequest {
 	const scope: Data = {
 		binding: backupBindingSchema.parse(options.binding),
 		limits: resolvePayloadLimits(options.limits),
@@ -315,39 +330,49 @@ export function prepareJazzArchiveExport(options: Options): JazzArchiveExportReq
 		sealed: undefined,
 		archiveProduced: false,
 		handoff: 'notStarted',
-		cleanup: undefined
+		release: undefined
 	}
 	const request: JazzArchiveExportRequest = Object.freeze({
-		release() {
-			abortJazzExport(request)
-			if (scope.cleanup) return scope.cleanup
-			available.delete(request)
-			scope.cleanup = Promise.allSettled(scope.pending)
-				.then(async () => {
-					const transaction = scope.transaction
-					if (transaction) {
-						try {
-							await transaction.rollback()
-							scope.transaction = undefined
-						} catch {
-							throw fault('cleanupFailed')
-						}
-					}
-				})
-				.finally(() => {
-					scope.sealed?.release()
-					scope.sealed = undefined
-					scope.envelope = undefined
-					scope.input = undefined
-					scope.verdict = undefined
-				})
-			return scope.cleanup
-		},
+		release: () => required(scope.release)(),
 		toJSON: (): { kind: 'jazzArchiveExport' } => ({ kind: 'jazzArchiveExport' })
 	})
 	operations.set(request, scope)
 	available.add(request)
 	return request
+}
+/** Attach the retained state-machine owner at the public composition boundary. */
+export function attachJazzExportRelease(
+	request: JazzArchiveExportRequest,
+	release: () => Promise<void>
+) {
+	data(request).release = release
+}
+/** One batch observation of already-issued native receipts. */
+export function drainJazzExport(request: JazzArchiveExportRequest): Promise<void> {
+	return Promise.allSettled(data(request).pending).then(() => {})
+}
+export function hasJazzExportTransaction(request: JazzArchiveExportRequest): boolean {
+	return data(request).transaction !== undefined
+}
+/** One native rollback; retain the handle when its result is unconfirmed. */
+export function rollbackJazzExport(request: JazzArchiveExportRequest): Promise<boolean> {
+	const transaction = required(data(request).transaction)
+	return Promise.resolve()
+		.then(() => transaction.rollback())
+		.catch(() => {
+			throw createJazzExportError('cleanupFailed')
+		})
+}
+export function forgetJazzExportTransaction(request: JazzArchiveExportRequest) {
+	data(request).transaction = undefined
+}
+export function clearJazzExport(request: JazzArchiveExportRequest) {
+	const scope = data(request)
+	scope.sealed?.release()
+	scope.sealed = undefined
+	scope.envelope = undefined
+	scope.input = undefined
+	scope.verdict = undefined
 }
 /** Direct native custody survives a failed reader and XState's unexpected-error stop ordering. */
 export const jazzExportResources = fromCallback<
