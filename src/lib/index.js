@@ -17,7 +17,6 @@ import StatusMessage from './Components/StatusMessage.svelte'
 import LoadingScreen from './Components/LoadingScreen.svelte'
 import LoadingContent from './Components/LoadingContent.svelte'
 import Table from './Components/Table.svelte'
-import LinkedListRow from './Components/LinkedListRow.svelte'
 import SwipeActions from './Components/SwipeActions.svelte'
 import Navigation from './Components/Navigation.svelte'
 import Stepper from './Components/Stepper.svelte'
@@ -81,7 +80,6 @@ export {
 	LoadingScreen,
 	LoadingContent,
 	Table,
-	LinkedListRow,
 	SwipeActions,
 	Navigation,
 	Stepper,

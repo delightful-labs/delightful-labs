@@ -580,7 +580,7 @@ leaving caller-owned content available.
 
 The root is a `div`: place it inside the consuming app's `li` when building a
 list. Supply the row's anchor/content as children; do not wrap SwipeActions in a
-link or nest the `li` produced by LinkedListRow inside it. Native root attributes,
+link or another list item inside it. Native root attributes,
 class and style pass through. Customize `--dui-swipe-background-color` (defaults to
 the theme background), `--dui-swipe-action-width` (5.5rem) and
 `--dui-swipe-duration` (180ms). Button variants and focus styles use the existing
@@ -594,32 +594,6 @@ single chosen-action emission. The Svelte wrapper owns native event listeners,
 pointer capture, measurement, focus, and actor teardown. Storybook includes both
 directions, three progressive actions, full-swipe dismissal with reset, one-sided actions, disabled actions,
 disabling, and a scrollable mobile list.
-
-## LinkedListRow
-
-```svelte
-<ul>
-	<LinkedListRow href={resolvedHref} label={destinationLabel}>
-		<Text as="span"><strong>{title}</strong></Text>
-		<Text as="span">{description}</Text>
-		{#snippet trailing()}<Text as="span">{formattedMetadata}</Text>{/snippet}
-	</LinkedListRow>
-</ul>
-```
-
-Renders a native `li` containing one anchor covering the row, with main content, optional trailing
-metadata, and a decorative chevron. Use it within `ul` or `ol`. The supplied translated `label`
-provides the link's accessible name; include the visible title in that name. Children and trailing
-content must be non-interactive: do not put other links, buttons, or form controls inside the row.
-The row has one native tab stop and retains normal browser link activation and context-menu behavior.
-
-The caller owns URL resolution, routing, query parameters, labels, formatting, and domain state.
-Native anchor attributes and callbacks (including class/style) apply to the anchor. A supplied
-`target` or `download` retains native behavior; labels for deliberate new-window navigation should
-communicate that behavior. The component does not synthesize clicks or manage application state.
-
-Customize `--dui-linked-list-row-gap`, `--dui-linked-list-row-padding`, and
-`--dui-linked-list-row-font-size`. Colors and focus treatment use the existing DUI theme.
 
 ## Table
 
@@ -755,7 +729,7 @@ its repository integration. Branch protection can require the
 
 ## Packaging and publishing
 
-Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, RadioGroup, RadioItem, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, LinkedListRow, SwipeActions, Navigation, Drawer, and ScreenReaderText.
+Import components from `delightful-ui`: Text, Heading, Button, FloatingActionLink, FloatingActionButton, NumberKeypad, Details, Dialog, Popover, InputText, InputNumber, InputCurrency, InputDate, InputImage, InputAvatar, FieldFeedback, Select, Textarea, Checkbox, RadioGroup, RadioItem, TagInput, LoadingSpinner, StatusMessage, LoadingScreen, LoadingContent, Table, SwipeActions, Navigation, Drawer, and ScreenReaderText.
 
 The root package exports `dist/index.js` and `dist/index.d.ts`. Internal library aliases are rewritten by Svelte's package tooling. Consumers require Svelte 5.57.2 or newer within Svelte 5.
 

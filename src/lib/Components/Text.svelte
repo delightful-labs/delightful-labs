@@ -71,6 +71,5 @@
 		);
 		line-height: var(--dui-text-line-height, 1.5);
 		color: var(--dui-text-color, var(--dui-color-foreground, inherit));
-		overflow-wrap: anywhere;
 	}
 </style>

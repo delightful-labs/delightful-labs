@@ -10,7 +10,6 @@ The agreed extraction batch is merged in both repositories:
 | ---------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
 | NavigationLink, NavigationGroup, DrawerSection | [#9](https://github.com/delightful-labs/delightful-ui/pull/9)   | [#47](https://github.com/delightful-labs/delightful-finances/pull/47) |
 | LoadingContent                                 | [#10](https://github.com/delightful-labs/delightful-ui/pull/10) | [#48](https://github.com/delightful-labs/delightful-finances/pull/48) |
-| LinkedListRow                                  | [#11](https://github.com/delightful-labs/delightful-ui/pull/11) | [#49](https://github.com/delightful-labs/delightful-finances/pull/49) |
 | FloatingActionLink, FloatingActionButton       | [#12](https://github.com/delightful-labs/delightful-ui/pull/12) | [#50](https://github.com/delightful-labs/delightful-finances/pull/50) |
 
 DUI owns generic presentation and native control behavior. Finance retains routing/query
