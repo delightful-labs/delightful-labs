@@ -2,14 +2,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { createTestAppExport } from './export.js'
-import { toPromise } from 'xstate'
-import {
-	payloadLimits,
-	encodeArchivePayload,
-	parseArchivePayload,
-	type ArchiveRecord
-} from 'delightful-local-first/backup/archive'
+import { createTestAppDataset } from './dataset.js'
+import { prepareArchiveSeal } from 'delightful-local-first/backup/envelope'
+import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
+import { createActor, toPromise } from 'xstate'
+import type { ArchiveRecord } from 'delightful-local-first/backup/archive'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
@@ -2628,7 +2625,7 @@ it('resumes the same mapped graph after a page reload and freezes content after 
 	await deleteJournal(page, value)
 })
 
-it('restores a retained exported file after independent inspection and preserves its original source', async () => {
+it('restores a retained archive fixture after independent inspection and preserves its input', async () => {
 	const page = await open(),
 		ownerId = await page.evaluate(() => window.DLFRestoreQualification.ownerId)
 	const directory = await mkdtemp(join(tmpdir(), 'dlf-roundtrip-')),
@@ -2641,27 +2638,23 @@ it('restores a retained exported file after independent inspection and preserves
 		operationId: crypto.randomUUID(),
 		generation: 1
 	}
-	const exported = createTestAppExport({
-		binding,
-		protection: { kind: 'none' },
-		handoff: {
-			dispatch: (file, _binding, signal) =>
-				writeFile(path, file.copyBytes(), { signal }).then<'dispatched'>(() => 'dispatched')
-		}
+	const original = createTestAppDataset({
+		applicationId: binding.applicationId,
+		workspaceId: binding.workspaceId
 	})
+	const originalJson = JSON.stringify(original)
+	const request = prepareArchiveSeal(original, { kind: 'none' })
+	const sealing = createActor(createArchiveEnvelopeMachine(), { input: { request } }).start()
 	try {
-		exported.actor.start()
-		expect((await toPromise(exported.actor)).outcome).toBe('exported')
-		const readSource = async () => {
-			const signal = new AbortController().signal,
-				lease = await exported.source.acquire(binding, signal)
-			try {
-				return parseArchivePayload(encodeArchivePayload(await lease.read(signal, payloadLimits)))
-			} finally {
-				await lease.release()
-			}
+		const sealed = await toPromise(sealing)
+		if (sealed.outcome !== 'sealed') throw new Error('Fixture sealing failed')
+		const copy = sealed.archive.copyBytes()
+		try {
+			await writeFile(path, copy)
+		} finally {
+			copy.fill(0)
+			sealed.archive.release()
 		}
-		const original = await readSource()
 		const retained = await readFile(path)
 		const inspection = spawnSync(
 			process.execPath,
@@ -2712,20 +2705,12 @@ it('restores a retained exported file after independent inspection and preserves
 		expect(fresh.output.outcome).toBe('complete')
 		expect(fresh.rows).toEqual(restored.rows)
 		expect(fresh.issued).toBe(0)
-		expect(await readSource()).toMatchObject({
-			records: original.records,
-			attachments: original.attachments,
-			references: original.references,
-			coverage: original.coverage,
-			profile: original.profile,
-			source: original.source
-		})
+		expect(JSON.stringify(original)).toBe(originalJson)
 		expect(await readFile(path)).toEqual(retained)
 		await deleteJournal(page, value)
 	} finally {
-		exported.request.release()
-		exported.actor.stop()
-		exported.source.actor.stop()
+		request.release()
+		sealing.stop()
 		await rm(directory, { recursive: true, force: true })
 	}
 })
@@ -3227,7 +3212,7 @@ for (const workload of measurements) {
 			: process.env.DLF_BACKUP_RECORD_MEASURE
 	const label =
 		workload.kind === 'attachment'
-			? `encrypted export/open/restore at ${workload.mebibytes} MiB`
+			? `encrypted seal/open/restore at ${workload.mebibytes} MiB`
 			: `record workload ${workload.records}, CPU ${workload.cpuRate}x, run ${workload.run}`
 	const deadlineMs = workload.kind === 'attachment' ? 120000 : recordMeasurementDeadline
 	it.skipIf(!enabled)(
@@ -3387,16 +3372,11 @@ for (const workload of measurements) {
 							operationId: crypto.randomUUID(),
 							generation: 1
 						}
-						const source = api.createTestAppSource(payload, {
-							...binding,
-							workspaceId: 'original'
-						})
-						source.actor.start()
 						let file: Uint8Array | undefined
 						let largestDelayMs = 0,
 							last = performance.now()
-						let phase: 'export' | 'open' | 'restore' = 'export'
-						const phaseDelays = { export: 0, open: 0, restore: 0 }
+						let phase: 'seal' | 'open' | 'restore' = 'seal'
+						const phaseDelays = { seal: 0, open: 0, restore: 0 }
 						const restoreTimer = { samples: 0, over50Ms: 0, over100Ms: 0, totalExcessMs: 0 }
 						const timer = setInterval(() => {
 							const now = performance.now()
@@ -3416,24 +3396,17 @@ for (const workload of measurements) {
 						}, 15000)
 						const password = 'disposable measurement password'
 						const start = performance.now()
-						const exporting = api.prepareArchiveExport({
-							binding: { ...binding, workspaceId: 'original' },
-							source,
-							profile: api.testAppProfile,
-							protection: { kind: 'password', password },
-							handoff: {
-								dispatch: (archive) => {
-									file = archive.copyBytes()
-									return Promise.resolve('dispatched')
-								}
-							}
-						})
-						const exporter = api
-							.createActor(api.createArchiveExportMachine(), { input: { request: exporting } })
+						const sealingRequest = api.prepareArchiveSeal(payload, { kind: 'password', password })
+						const sealingActor = api
+							.createActor(api.createArchiveEnvelopeMachine(), {
+								input: { request: sealingRequest }
+							})
 							.start()
-						if ((await api.toPromise(exporter)).outcome !== 'exported' || !file)
-							throw new Error('Export failed')
-						const exportedAt = performance.now()
+						const sealed = await api.toPromise(sealingActor)
+						if (sealed.outcome !== 'sealed') throw new Error('Fixture sealing failed')
+						file = sealed.archive.copyBytes()
+						sealed.archive.release()
+						const sealedAt = performance.now()
 						await new Promise<void>((yes) => setTimeout(yes, 20))
 						phase = 'open'
 						const openStartedAt = performance.now()
@@ -3510,7 +3483,7 @@ for (const workload of measurements) {
 							payloadJsonBytes,
 							attachmentCount: payload.attachments.length,
 							fileBytes: file.length,
-							exportMs: exportedAt - start,
+							sealMs: sealedAt - start,
 							openMs: openedAt - openStartedAt,
 							restoreMs: restoredAt - restoreStartedAt,
 							largestDelayMs,
@@ -3528,9 +3501,8 @@ for (const workload of measurements) {
 						restoring.actor.stop()
 						opening.release()
 						envelope.stop()
-						exporting.release()
-						exporter.stop()
-						source.actor.stop()
+						sealingRequest.release()
+						sealingActor.stop()
 						file.fill(0)
 						await new Promise<void>((yes, no) => {
 							const removal = indexedDB.deleteDatabase(databaseName)

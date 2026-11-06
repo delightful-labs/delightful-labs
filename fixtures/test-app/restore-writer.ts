@@ -23,7 +23,7 @@ import {
 	type RestoreDestinationResult,
 	type RestoreEvent
 } from 'delightful-local-first/backup/restore'
-import { sameBackupBinding } from 'delightful-local-first/backup/export'
+import { sameBackupBinding } from 'delightful-local-first/backup/binding'
 import { testAppRestoreApp } from './restore-schema.js'
 
 type DestinationInput = RestoreDestinationInput<Transaction<'mergeable'>>

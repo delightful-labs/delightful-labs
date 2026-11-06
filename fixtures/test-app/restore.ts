@@ -1,5 +1,5 @@
 import { forwardTo, raise, assign, setup, type Snapshot } from 'xstate'
-import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/export'
+import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
 	RestoreEvent,
 	RestoreResult,

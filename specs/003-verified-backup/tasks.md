@@ -6,6 +6,14 @@ combined authorization does not authorize Finance deployment or identity/storage
 
 ## Current handoff
 
+**Native capture revision (2026-11-05):** the user requested a fresh smaller implementation after
+the [native Jazz experiment](../../fixtures/native-capture/README.md). The
+[replacement contract and evidence](contracts/native-capture.md) supersede writer admission,
+quiescence confirmation and repeated graph comparison for the new Finance export path. Hydrate the
+complete scope, capture through one exclusive transaction, validate and await a zero-application-
+mutation commit verdict before protection/download. Ordinary writers need no registration.
+The shared replacement is implemented; Finance integration and actual-size qualification remain open.
+
 **Updated 2026-11-05.** PRs #23–#26 are merged. [PR #26](https://github.com/delightful-labs/delightful-local-first/pull/26)
 implements complete test app restore and native actor routing.
 The test app root coordinates the retained plan, all mapped writes, fresh exact-content comparison,
@@ -90,8 +98,8 @@ or a prerequisite to recognizing the already qualified conservative test app pat
       Consumer implementation can proceed on disposable data while T004 stays a readiness gate;
       desktop/throttled test app results do not qualify phones or actual Finance recovery.
 - [ ] **T008:** implement Finance's allowlisted capture/profile and consumer-owned backup interaction
-      against its existing Jazz alpha.59 setup, including owner authority, quiescent/drained capture,
-      exact complete attachment bytes, local/remote comparison and disposable-data qualification.
+      against its existing Jazz alpha.59 setup, including owner authority, complete hydration and
+      exclusive capture/verdict, exact attachment bytes and disposable-data qualification.
 - [ ] **T009:** implement Finance's additive incomplete-destination lane, policies, journal/mappings,
       inert provenance, domain writes, comparison and activation. Qualify real policies, cached clients,
       restart and uncertain outcomes on disposable data before proposing deployment.
@@ -108,7 +116,8 @@ or a prerequisite to recognizing the already qualified conservative test app pat
 
 ## Qualification boundary
 
-The test app source is an in-memory actor; destination/policy checks use actual Jazz. Recovery is
+The test app restore input is a known prebuilt archive; destination/policy checks use actual Jazz.
+Actual capture uses the sole native Jazz export workflow; the old in-memory source simulator is removed. Recovery is
 qualified for the same browser/origin with retained IndexedDB and a reselected matching archive,
 including page reload/fresh session. Browser-process crash, cleared journal, offline restart and
 cross-device/browser recovery are not qualified product claims. Additional platform guarantees need

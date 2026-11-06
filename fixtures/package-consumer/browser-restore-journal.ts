@@ -5,7 +5,7 @@ import {
 	type BrowserJournalRecordView
 } from 'delightful-local-first/backup/restore/journal/browser'
 import { createBrowserRestoreJournalMachine } from 'delightful-local-first/backup/restore/journal/workflow'
-import type { BackupBinding } from 'delightful-local-first/backup/export'
+import type { BackupBinding } from 'delightful-local-first/backup/binding'
 
 // Static consumer declaration checks only. Native effects are exercised separately in the Chromium fixture.
 export function browserJournalActor(

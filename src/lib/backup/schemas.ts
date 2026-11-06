@@ -84,7 +84,7 @@ export function createPayloadSchemas(limits: PayloadLimits) {
 					recordTypes: z.array(name).min(1).max(limits.records).readonly(),
 					history: z.literal('current-data'),
 					deletedRecords: z.literal('excluded'),
-					consistency: z.literal('quiescent-single-user')
+					consistency: z.enum(['quiescent-single-user', 'jazz-exclusive-transaction'])
 				})
 				.readonly(),
 			records: z.array(record).max(limits.records).readonly(),

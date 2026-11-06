@@ -1,7 +1,7 @@
 import { fromCallback } from 'xstate'
 import { z } from 'zod'
 import type { IntegrityCheckedArchive } from 'delightful-local-first/backup/envelope'
-import type { BackupBinding } from 'delightful-local-first/backup/export'
+import type { BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
 	RestoreJournalIntent,
 	RestoreJournalRecord

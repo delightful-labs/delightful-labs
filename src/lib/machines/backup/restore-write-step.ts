@@ -1,5 +1,5 @@
 import { forwardTo, assign, fromPromise, setup, type Snapshot } from 'xstate'
-import { sameBackupBinding } from '../../backup/export.js'
+import { sameBackupBinding } from '../../backup/binding.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
 import {
 	completeWriteStep,

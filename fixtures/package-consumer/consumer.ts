@@ -254,3 +254,17 @@ export type {
 export { createArchiveInspectionMachine } from 'delightful-local-first/backup/inspection/workflow'
 
 export { zodFormIssues } from 'delightful-local-first/forms/zod'
+
+export { prepareJazzArchiveExport } from 'delightful-local-first/backend/jazz/backup'
+export { sameBackupBinding } from 'delightful-local-first/backup/binding'
+export type { BackupBinding } from 'delightful-local-first/backup/binding'
+export type {
+	ArchiveFileHandoff,
+	ArchiveHandoffFile,
+	ArchiveHandoffObservation,
+	JazzArchiveExportRequest,
+	JazzArchiveExportResult,
+	JazzArchiveReaderInput,
+	JazzArchiveReaderResult
+} from 'delightful-local-first/backend/jazz/backup'
+export { createJazzArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'

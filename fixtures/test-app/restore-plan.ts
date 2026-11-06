@@ -1,6 +1,6 @@
 import type { ArchivePayload, ArchiveValue } from 'delightful-local-first/backup/archive'
 import type { IntegrityCheckedArchive } from 'delightful-local-first/backup/envelope'
-import type { BackupBinding } from 'delightful-local-first/backup/export'
+import type { BackupBinding } from 'delightful-local-first/backup/binding'
 import {
 	createRestoreJournalRecord,
 	type RestoreJournalIntent

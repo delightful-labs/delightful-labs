@@ -83,6 +83,9 @@
 		},
 		{
 			"files": [
+				"fixtures/native-capture/schema.ts",
+				"fixtures/native-capture/experiment.test.ts",
+				"fixtures/native-capture/export-browser.test.ts",
 				"fixtures/package-consumer/jazz.js",
 				"tests/fixtures/invitations/schema.ts",
 				"fixtures/private-creation/schema.ts",

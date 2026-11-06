@@ -153,6 +153,12 @@ export function encodeArchivePayload(
 	input: unknown,
 	overrides: PayloadLimitOverrides = {}
 ): Uint8Array<ArrayBuffer> {
+	return prepareArchivePayload(input, overrides).bytes
+}
+
+/** Internal preparation keeps the validated graph paired with its bounded encoding. */
+export function prepareArchivePayload(input: unknown, overrides: PayloadLimitOverrides = {}) {
 	const limits = resolvePayloadLimits(overrides)
-	return serialize(normalize(input, limits), limits)
+	const payload = normalize(input, limits)
+	return { payload, bytes: serialize(payload, limits) }
 }
