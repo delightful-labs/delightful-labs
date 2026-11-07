@@ -1,7 +1,11 @@
 # Validation and recovery rehearsal guide
 
-**Updated 2026-11-05.** The shared archive, inspector and complete test app reference are executable
-and qualified. Finance capture/restore and an actual deployed-data rehearsal remain unimplemented.
+**Updated 2026-11-07.** The shared archive, inspector and complete test app reference are executable
+and qualified. Finance capture/restore/UI are merged in PRs #54/#57. Actual-size/platform
+qualification work (T004) is closed with the user's acceptance of the documented SDK slowdown and
+intermittent failures; reopen investigation if they occur in production. T014 remains the functional
+same-operation retry follow-up. The deployed fake-data rehearsal (T010) passed on a
+120-transaction graph; see the task ledger for evidence and its qualification boundary.
 Use [the task ledger](tasks.md#current-handoff) for current work and
 [the qualification boundary](spec.md#known-restore-limitations-and-remaining-implementation-gates)
 for limitations. These fixture commands do not operate on production Finance.
@@ -76,8 +80,8 @@ port 6199. The three optional 1/4/8 MiB cases measure encrypted export/open/full
 renderer RSS and event-loop delay. They are separate from the normal functional command and have no
 CI timing thresholds. See [measured results and limits](test-app-performance.md). T007's
 [Finance inventory](finance-deployment-inventory.md) records 633 projected records, about 0.64 MiB
-of comparison encoding and no reachable attachments. Actual profile/envelope size and platform
-responsiveness still need T008/T004 qualification; the desktop run does not qualify phones.
+of comparison encoding and no reachable attachments. Later Finance measurements and their accepted
+limits are in the task ledger; the desktop run does not qualify phones. T004 is closed for this delivery.
 
 The opt-in record command runs three desktop 633-record/672,633-byte synthetic test app cases and
 one Chrome 4× CPU stress case. The final implementation uses bounded note transactions; the earlier
@@ -112,20 +116,20 @@ saved version 2; resume rejects older/unknown versions without changing the jour
 
 1. **T007, complete:** [read-only deployed inventory](finance-deployment-inventory.md) verifies
    frontend/backend schema/policy identity, released graph, scoped sizes and observable pending-write
-   state. Repeat if source/deployment/device changes before adoption; source schemas alone are insufficient.
-2. **T008:** qualify an allowlisted profile and owner-authorized quiescent/drained capture against
-   alpha.59, including local/remote comparison and exact complete bytes. Use disposable data first.
-3. **T009:** qualify the additive isolation/policy lane and consumer interaction. Exercise complete
-   restore, scope loss, uncertain writes, explicit confirmed-rejection retry where supported, cached
-   clients and restart. Direct routes and backend operations must exclude incomplete destinations.
-4. **T010:** retain the actual deployed file, reopen it independently, restore into a new isolated
-   destination, compare all declared values/references/bytes in a fresh session and preserve the
-   original. No previous grants, active bank links or seeded categories may appear implicitly.
+   state. This is historical evidence; this task does not refresh or access production data.
+2. **T008/T009, implemented:** Finance PRs [#54](https://github.com/delightful-labs/delightful-finances/pull/54)
+   and [#57](https://github.com/delightful-labs/delightful-finances/pull/57) provide the actual capture,
+   isolated restore, UI and disposable-data evidence. T004 measurements/accepted limitations are recorded.
+3. **T010, passed for the recorded fake graph:** use a deployed Finance preview with its own Jazz app and a fresh test identity. Populate
+   fake data, retain the downloaded file, reopen independently, restore into a new workspace, compare
+   all declared values/references/bytes after a fresh session and preserve the fake source. No previous
+   grants, active bank links or seeded categories may appear implicitly.
 
-Complete [Finance adoption requirements](contracts/finance-adoption.md) before touching real data.
-Record safe revision/profile identifiers, aggregate coverage and comparison outcomes without private
-records, passwords or credentials. Keep the original workspace and file before later identity/storage
-changes. An application archive does not preserve the entire engine history or account registry.
+Production workspace data, browser sessions and admin credentials are excluded from this task.
+The earlier request to connect the user's production tab is withdrawn. Record safe revision/profile
+identifiers, aggregate coverage and comparison outcomes without passwords or credentials. Preserve
+the fake source and retained file. An application archive does not preserve the entire engine history
+or account registry.
 
 ## Recovery limits and explicit retry follow-up
 
