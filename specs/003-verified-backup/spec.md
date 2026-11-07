@@ -4,7 +4,13 @@
 
 **Created**: 2026-11-03
 
-**Status (2026-11-05)**: Shared archive/envelope, independent inspection, capture/export and the
+**Status (2026-11-07)**: Finance capture/restore/UI and deployed fake-data rehearsal are complete.
+T004 is closed with the user's acceptance of the known performance limitation below. One functional
+follow-up remains, T014 (explicit same-operation retry after confirmed rejection and repaired
+authority); the broader shared spec is not yet complete. Review/publication of the existing
+uncommitted Finance capacity change is separate.
+
+**Implementation baseline (2026-11-05)**: Shared archive/envelope, independent inspection, capture/export and the
 versioned browser restore journal are implemented. The complete test app reference now writes all
 mapped content, freshly compares exact fields/relationships/attachment bytes and activates the
 isolated destination. Same-browser resume and conservative uncertain-activation recovery are
@@ -16,12 +22,31 @@ T007's [read-only Finance inventory](finance-deployment-inventory.md) is complet
 matching 22-table backend schema/policy head v8, 633 scoped projected records, zero reachable
 attachments and no observed tracked pending writes or projected local/remote differences.
 This establishes inventory and the test app reference, not Finance production recovery. Remaining
-work is consumer/platform performance qualification (T004), Finance adoption/rehearsal (T008–T010),
-and explicit retry integration after confirmed rejection (T014). See
+work is explicit retry integration after confirmed rejection (T014). T004 is closed by acceptance
+of its documented limitations. T010 passed on the user-directed deployed fake graph below. See
 [the active TODOs](tasks.md#current-handoff), [restore qualification](restore-completion-design.md),
 [routing audit](native-event-routing-review.md) and [desktop measurements](test-app-performance.md).
 
 **Input**: Back up the deployed Finance app before identity or storage changes. Put reusable backup capabilities in DLF, using Finance’s approved backup requirements as the first consumer.
+
+**Scope correction (2026-11-07):** the user requires qualification on a deployed Finance preview
+filled with fake data and backed by a separate Jazz app. T010 uses that environment and a fresh test
+identity/browser. Do not access production workspace data or its admin credential. Production-data
+backup or migration is outside this task; older references to actual deployed source data do not
+authorize it.
+
+**Finance adoption merged (2026-11-07):** [Finance PR #54](https://github.com/delightful-labs/delightful-finances/pull/54)
+and [Finance PR #57](https://github.com/delightful-labs/delightful-finances/pull/57) implement
+T008 capture/profile/UI and T009 isolated restore, comparison, recovery and UI on Jazz alpha.59,
+using DLF `ad99117`. The final PR CI run
+[42376826034](https://github.com/delightful-labs/delightful-finances/actions/runs/42376826034)
+passed, including the three-browser restore recovery job. Finance's
+[implementation and evidence](https://github.com/delightful-labs/delightful-finances/blob/ab6c85073b0fbb2187283965a547eb50928f166c/specs/015-workspace-backup/spec.md)
+records the disposable-data qualification. T004 is closed with accepted limitations; T014
+confirmed-rejection retry remains open. T010 passed on the PR57 deployed preview with 120 fake
+transactions, three accounts, eight categories and zero original attachments. The independent
+reader, full browser restart, exact business/reference comparison, byte-exact retained source,
+original preservation and duplicate prevention passed. See the task ledger for evidence and limits.
 
 ## User Scenarios & Testing
 
@@ -129,7 +154,7 @@ As an application developer, I can use the same backup machinery with another ap
 - **SC-005**: Inspected archives contain zero login recovery secrets or bank credentials, and restore activates zero previous grants.
 - **SC-006**: A retained file can be opened and checked without the original service or login; a fresh destination can subsequently be restored and compared in full.
 - **SC-007**: Finance and one small nonfinancial example use the shared capability without financial concepts in its generic contract.
-- **SC-008**: Before changing deployed Finance identity or storage, the user has retained a backup of the actual deployed workspace and demonstrated verified restoration into an isolated destination, with the original preserved.
+- **SC-008**: A deployed Finance preview with a separate Jazz app and fake data demonstrates retained-file independent validation, isolated restoration and fresh-session exact comparison, preserving its fake source. Production-data backup and identity/storage changes are outside this task.
 
 ## Assumptions
 
@@ -139,7 +164,21 @@ As an application developer, I can use the same backup machinery with another ap
 - Full offline export is not promised when the device lacks required data. Independent file inspection can work offline; remote destination restoration requires its normal connectivity and authorization.
 - Clipper can adopt the generic contract later. This feature does not implement Clipper capture or reader workflows.
 - Encryption password loss makes that encrypted file unrecoverable. Existing identity recovery remains separate.
-- Implementation review and tests follow repository agreements and explicit user authorization. The test app path is qualified; a retained backup and verified restore of actual deployed Finance data have not been demonstrated.
+- Implementation review and tests follow repository agreements and explicit user authorization. The test app and deployed Finance fake-data rehearsal are qualified within their recorded scope. No production-data rehearsal is required or authorized by this task.
+
+## Accepted performance limitation — 2026-11-07
+
+The user accepts Jazz alpha.59's measured slowdown as unrelated backend data accumulates and its
+intermittent `not_observed` read failures. Successful backup/restore and exact source preservation
+are qualified by the recorded tests; some larger/repeated attempts failed. The SDK defect is not
+fixed, and those failures remain in the evidence. T004 is closed for this delivery by acceptance,
+not by a claim of universal reliability or responsiveness. Reopen investigation if these symptoms
+occur in real production use. No further SDK/performance work is scheduled now.
+
+Phones, maximum aggregate archives and storage pressure remain unqualified claims outside the
+accepted delivery scope. The existing limits, failure feedback, native validation and cleanup stay
+in place. Production workspace data remains outside this task. See the task ledger and Finance's
+`specs/015-workspace-backup/spec.md` / `qualification.json` for measurements and limits.
 
 ## Known restore limitations and remaining implementation gates
 
@@ -164,13 +203,13 @@ As an application developer, I can use the same backup machinery with another ap
   page reload/fresh session, cancellation/drain and uncertain activation without replay are tested.
   Browser-process crash, cleared journal and offline restart are not qualified full-restore claims.
   Journal commit alone proves neither Jazz local persistence nor remote acceptance.
-- **Consumer/platform performance remains T004.** The 1/4/8 MiB desktop measurements are recorded,
-  including a substantial 8 MiB timer delay and memory footprint. They do not qualify phones,
-  maximum aggregate archives or the deployed Finance graph.
-- **Finance inventory T007 is complete; adoption remains T008–T010.** Implement and qualify
-  capture/profile and isolated restore, then demonstrate an actual retained-file recovery before
-  identity/storage changes. Shared code and test app evidence do not fulfill the Finance success
-  criteria or its consumer-owned interactions.
+- **T004 is closed with accepted performance limitations.** The 1/4/8 MiB desktop and deployed
+  fake-data measurements, SDK scaling and intermittent failures are retained. Phone, maximum
+  aggregate and storage-pressure guarantees are not claimed. Reopen only upon production occurrence.
+- **Finance T008/T009 are merged; scoped T010 passed.** Use a deployed Finance preview with fake
+  data and a separate Jazz app to demonstrate retained-file recovery and fresh-session comparison.
+  Local development and shared test app results do not substitute for that deployed rehearsal.
+  Do not use the user's production data, session or admin credential.
 
 ### Accepted retry behavior — 2026-11-03
 
