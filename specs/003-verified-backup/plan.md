@@ -4,8 +4,9 @@
 
 **Status (2026-11-07)**: T004 is closed with accepted performance limitations; further investigation
 is deferred until a production occurrence. Finance's delivered capture/restore/UI and fake-data
-rehearsal are complete. T014 is the remaining functional implementation, so the broader shared
-spec remains open. The existing uncommitted Finance capacity change still needs review/publication.
+rehearsal are complete. T014 is implemented and locally qualified, completing the shared
+implementation scope. Publication, Finance's package update and the existing uncommitted Finance
+capacity change still need their separate review/publication.
 
 **Implementation baseline (2026-11-05)**: Shared archive, envelope, independent inspection, capture/export,
 versioned journal and complete test app restore are implemented and qualified. PR #26 adds fresh
@@ -16,8 +17,8 @@ See [the active handoff](tasks.md#current-handoff), [restore evidence](restore-c
 
 T006/T012 are complete for the test app reference. T007's read-only deployed Finance inventory is
 complete. Finance capture and isolated restore (T008/T009) are merged. The user-directed T010
-deployed fake-data rehearsal passed; see the task ledger. The remaining functional gate is explicit
-permission-repair retry integration (T014). T004's limitation is accepted. No production-data access or
+deployed fake-data rehearsal passed; see the task ledger. Explicit permission-repair retry (T014)
+is implemented and locally qualified. T004's limitation is accepted. No production-data access or
 identity/storage change is implied.
 
 **Finance adoption merged (2026-11-07):** [Finance PR #54](https://github.com/delightful-labs/delightful-finances/pull/54)
@@ -28,7 +29,7 @@ using DLF `ad99117`. The final PR CI run
 passed, including the three-browser restore recovery job. Finance's
 [implementation and evidence](https://github.com/delightful-labs/delightful-finances/blob/ab6c85073b0fbb2187283965a547eb50928f166c/specs/015-workspace-backup/spec.md)
 records the disposable-data qualification. T004 is closed with accepted limitations; T014
-confirmed-rejection retry remains open. T010 passed on a deployed preview with fake data and a
+confirmed-rejection retry is locally qualified and awaits package adoption. T010 passed on a deployed preview with fake data and a
 separate Jazz app; production data and credentials are excluded.
 
 ## Summary
@@ -127,10 +128,10 @@ archive or capture protocol. Repeat inventory if source/deployment/device change
    restore into a new workspace, compare every supported value/reference/byte after a fresh session
    and preserve the fake source. No production browser, data or admin credential is required or used.
 
-**T014** separately integrates the already accepted explicit same-operation retry after a confirmed
-rejection and repaired authority. The journal representation is ready; the writer currently stops
-conservatively. Generic errors or unknown/hidden results never authorize replay. No automatic retry
-engine is planned.
+**T014** integrates the accepted explicit same-operation retry after a confirmed rejection and
+repaired authority into the existing write machine. It is locally qualified with machine and native
+Jazz/Chromium tests. Generic errors or unknown/hidden results never authorize replay. No automatic
+retry engine is added. Publication and Finance's package adoption remain pending.
 
 ## Remaining evidence requirements
 
@@ -138,8 +139,9 @@ T007 preserves historical production inventory; refreshing it is outside this ta
 evidence qualifies capture consistency, native verdicts, additive isolation and cached-client
 compatibility. T010 adds deployed fake-data retained-file recovery and a complete browser restart.
 T004 is closed by the user's acceptance of its documented limitations. Further SDK/performance
-investigation waits for production occurrence; the failed experiments are retained. T014 remains
-the functional follow-up. Review/publication of the uncommitted capacity change is separate.
+investigation waits for production occurrence; the failed experiments are retained. T014's shared
+implementation is complete and locally qualified. Review/publication and Finance's package adoption
+remain separate from the uncommitted capacity change.
 Report a specific alpha.59 limitation rather than silently upgrading or deleting data. Cleared journal,
 offline restart and cross-device recovery remain outside the qualified claims; expanding those claims
 requires scoped evidence. No production-data access or credential use is authorized by these documents.

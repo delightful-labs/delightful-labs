@@ -5,10 +5,10 @@
 **Created**: 2026-11-03
 
 **Status (2026-11-07)**: Finance capture/restore/UI and deployed fake-data rehearsal are complete.
-T004 is closed with the user's acceptance of the known performance limitation below. One functional
-follow-up remains, T014 (explicit same-operation retry after confirmed rejection and repaired
-authority); the broader shared spec is not yet complete. Review/publication of the existing
-uncommitted Finance capacity change is separate.
+T004 is closed with the user's acceptance of the known performance limitation below. T014's explicit
+same-operation retry is implemented and locally qualified, completing the shared implementation
+scope. Publication and Finance's adoption of the updated package remain pending; review/publication
+of the existing uncommitted Finance capacity change is separate.
 
 **Implementation baseline (2026-11-05)**: Shared archive/envelope, independent inspection, capture/export and the
 versioned browser restore journal are implemented. The complete test app reference now writes all
@@ -21,8 +21,8 @@ The routing review covers all 45 machine-bearing modules.
 T007's [read-only Finance inventory](finance-deployment-inventory.md) is complete: frontend `31f70cb`,
 matching 22-table backend schema/policy head v8, 633 scoped projected records, zero reachable
 attachments and no observed tracked pending writes or projected local/remote differences.
-This establishes inventory and the test app reference, not Finance production recovery. Remaining
-work is explicit retry integration after confirmed rejection (T014). T004 is closed by acceptance
+This establishes inventory and the test app reference, not Finance production recovery. T014's
+explicit retry integration is implemented and locally qualified. T004 is closed by acceptance
 of its documented limitations. T010 passed on the user-directed deployed fake graph below. See
 [the active TODOs](tasks.md#current-handoff), [restore qualification](restore-completion-design.md),
 [routing audit](native-event-routing-review.md) and [desktop measurements](test-app-performance.md).
@@ -42,8 +42,8 @@ using DLF `ad99117`. The final PR CI run
 [42376826034](https://github.com/delightful-labs/delightful-finances/actions/runs/42376826034)
 passed, including the three-browser restore recovery job. Finance's
 [implementation and evidence](https://github.com/delightful-labs/delightful-finances/blob/ab6c85073b0fbb2187283965a547eb50928f166c/specs/015-workspace-backup/spec.md)
-records the disposable-data qualification. T004 is closed with accepted limitations; T014
-confirmed-rejection retry remains open. T010 passed on the PR57 deployed preview with 120 fake
+records the disposable-data qualification. T004 is closed with accepted limitations; T014's
+confirmed-rejection retry is locally qualified and awaits package adoption. T010 passed on the PR57 deployed preview with 120 fake
 transactions, three accounts, eight categories and zero original attachments. The independent
 reader, full browser restart, exact business/reference comparison, byte-exact retained source,
 original preservation and duplicate prevention passed. See the task ledger for evidence and limits.
@@ -186,11 +186,12 @@ in place. Production workspace data remains outside this task. See the task ledg
   plan, freshly reads all restored records and actual attachment bytes, compares exact sets/values
   and relationships, journals comparison and activates through the existing transaction owner.
   Active reconciliation compares the graph again; counts and stored digests alone are insufficient.
-- **Retry representation is implemented; explicit rejected-write retry integration remains T014.**
-  The journal supports bounded prior-rejection evidence and a new attempt after a confirmed remote
-  rejection with a known transaction ID. The current write owner conservatively returns incomplete
-  after rejection/uncertainty and does not issue a new attempt when permissions are repaired.
-  Implement the accepted explicit same-operation behavior below without automatic retry heuristics.
+- **Explicit rejected-write retry is implemented and locally qualified (T014).** A new invocation
+  reconciles remote contents, then checks current authority before retrying a confirmed remote
+  rejection with a known transaction ID. It retains the same destination/mappings and bounded
+  rejection evidence. Uncertain outcomes stay incomplete or reconcile without replay. Real Jazz
+  permission denial/repair, page reload, graceful Chromium restart and completion are qualified in
+  the test app; Finance still pins the earlier package. No automatic retry loop is added.
 - **Recovery is same-browser/origin with retained journal storage.** Resume requires reselecting the
   matching file and supplying its password when applicable. IndexedDB holds operation identity,
   mappings and progress; Jazz holds destination data. Clearing storage loses local recovery metadata.
@@ -227,8 +228,9 @@ research. The journal representation is implemented and qualified: current attem
 completion by either a settled transaction receipt or an exact remote content match retaining the
 unchanged attempt evidence. Reconciliation cannot silently satisfy a separately required local
 persistence observation. No generalized retry engine or unbounded attempt history is required.
-The later test app coordinator/writer authorization is implemented in PR #26. Its explicit
-permission-repair retry path remains T014; the representation alone is not writer retry qualification.
+The later test app coordinator/writer authorization is implemented in PR #26. T014 now integrates
+explicit permission-repair retry into that shared writer. See the
+[implementation and native qualification](restore-journal-design.md#t014-writer-integration--qualified-2026-11-07).
 
 ### Historical recovery evidence — 2026-11-03
 

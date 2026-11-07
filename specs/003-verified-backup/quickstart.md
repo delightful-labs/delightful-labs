@@ -3,8 +3,9 @@
 **Updated 2026-11-07.** The shared archive, inspector and complete test app reference are executable
 and qualified. Finance capture/restore/UI are merged in PRs #54/#57. Actual-size/platform
 qualification work (T004) is closed with the user's acceptance of the documented SDK slowdown and
-intermittent failures; reopen investigation if they occur in production. T014 remains the functional
-same-operation retry follow-up. The deployed fake-data rehearsal (T010) passed on a
+intermittent failures; reopen investigation if they occur in production. T014's explicit
+same-operation retry is implemented and locally qualified, pending publication and Finance's package
+adoption. The deployed fake-data rehearsal (T010) passed on a
 120-transaction graph; see the task ledger for evidence and its qualification boundary.
 Use [the task ledger](tasks.md#current-handoff) for current work and
 [the qualification boundary](spec.md#known-restore-limitations-and-remaining-implementation-gates)
@@ -24,10 +25,14 @@ pnpm check:backup-restore
 pnpm test:storybook
 ```
 
-`verify` builds the public package, checks consumers, runs 927 units, 17 independent-reader cases
-and 18 test app-export cases, and builds Storybook. The native/browser commands add 10 private-creation,
-60 restore and 65 Storybook cases, for 1,097 functional cases. Jazz/Chromium fixtures create disposable
-local servers and browser contexts; the restore harness uses `127.0.0.1:6199` and Storybook uses
+`verify` builds the public package, checks consumers, runs units, independent-reader and test app-export
+cases, and builds Storybook. The native/browser commands add private-creation, restore and Storybook
+cases. T014's validation passed 947 units and a full 71-case restore browser regression run, with
+seven optional measurement cases skipped. The final focused run passed three permission-repair
+cases through completion, including the added Chromium process restart case. The separate
+Storybook/private-creation suites were not rerun for T014.
+Jazz/Chromium fixtures create disposable local servers and browser contexts; the restore harness
+binds to `0.0.0.0:6199` (browser URL `http://localhost:6199`) and Storybook uses
 `127.0.0.1:6008`. Do not run tests against the user's app/origin or an auto-publishing production server.
 
 The user authorized the implemented test app work and its tests together. Future implementation
@@ -137,7 +142,11 @@ Same-browser/origin recovery requires retained IndexedDB and the same archive. P
 fresh session are qualified; browser-process crash, cleared journal, offline restart and cross-device
 recovery are not full-restore guarantees. Never infer non-commit from a hidden/null/incomplete read.
 
-T014 tracks the accepted explicit retry after a confirmed remote rejection and repaired authority.
-The journal representation exists; the current writer leaves rejection/uncertainty incomplete and
-issues no replacement attempt. Keep the same operation/mappings and bounded rejection evidence when
-that integration is implemented. No generic automatic retry or repair engine is required.
+T014 implements explicit retry after a confirmed remote rejection with a known transaction ID.
+Invoke the same selected write again after repairing authority. The existing machine reconciles
+remote content and checks current authority before journaling another attempt and issuing a write.
+It keeps the same operation/mappings and the latest rejection evidence. Unknown outcomes do not
+permit replay, and rejection does not trigger an automatic retry loop. The three new native browser
+cases change only a disposable local server's insertion policy, then repair permission, resume
+in the same session, after page reload and after graceful Chromium process restart, and complete the
+same restore. Finance must adopt the updated package before using this behavior.

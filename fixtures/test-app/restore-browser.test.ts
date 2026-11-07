@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
 import { jazzPlugin } from 'jazz-tools/dev/vite'
-import { startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
+import { deploy, startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
 import { resolve } from 'node:path'
 import { testAppRestoreApp, testAppRestorePermissions } from './restore-schema.js'
 import type {} from './restore-browser.js'
@@ -29,7 +29,7 @@ beforeAll(async () => {
 		cacheDir: resolve('node_modules/.vite/test-app-restore'),
 		root: resolve('fixtures/test-app'),
 		plugins: [jazzPlugin({ server: false, appId: authority.appId, inspector: false })],
-		server: { host: '127.0.0.1', port: 6199, strictPort: true, fs: { allow: [process.cwd()] } }
+		server: { host: '0.0.0.0', port: 6199, strictPort: true, fs: { allow: [process.cwd()] } }
 	})
 	await web.listen()
 	url = `http://127.0.0.1:6199/restore.html?appId=${authority.appId}&serverUrl=${encodeURIComponent(authority.url)}`
@@ -44,8 +44,10 @@ afterAll(async () => {
 afterEach(async () => {
 	await Promise.all(contexts.splice(0).map((context) => context.close()))
 })
-async function open() {
-	const context = await browser.newContext()
+async function open(profile?: string) {
+	const context = profile
+		? await chromium.launchPersistentContext(profile, { headless: true, channel: 'chromium' })
+		: await browser.newContext()
 	contexts.push(context)
 	const page = await context.newPage()
 	await page.goto(url)
@@ -273,6 +275,116 @@ it('prepares an isolated real Jazz destination, retains exact mappings across re
 	await deleteJournal(page, value)
 	await page.context().close()
 })
+for (const recovery of ['same session', 'page reload', 'browser restart']) {
+	it(`resumes a server-rejected preparation after permission repair: ${recovery}`, async () => {
+		const profile =
+			recovery === 'browser restart'
+				? await mkdtemp(join(tmpdir(), 'dlf-retry-browser-'))
+				: undefined
+		let page = await open(profile)
+		const value = await sample(page)
+		try {
+			await initialize(page, value)
+			await deploy({
+				appId: authority.appId,
+				serverUrl: authority.url,
+				adminSecret: authority.adminSecret,
+				schema: testAppRestoreApp,
+				permissions: {
+					...testAppRestorePermissions,
+					restoreDestinations: {
+						...testAppRestorePermissions.restoreDestinations,
+						insert: { with_check: { type: 'False' } }
+					}
+				}
+			})
+			const rejected = await run(page, value, 'new')
+			expect(rejected.outcome).toBe('incomplete')
+			expect(rejected.issued).toBe(1)
+			const checkpoint = rejected.record?.checkpoint
+			if (checkpoint?.kind !== 'writing' || checkpoint.current.status !== 'issued')
+				throw new Error('Expected retained issued preparation')
+			expect(checkpoint.current.settlement.remote).toBe('rejected')
+			expect(checkpoint.current.transactionId).toEqual(expect.any(String))
+			await deploy({
+				appId: authority.appId,
+				serverUrl: authority.url,
+				adminSecret: authority.adminSecret,
+				schema: testAppRestoreApp,
+				permissions: testAppRestorePermissions
+			})
+			if (recovery === 'browser restart') {
+				await page.context().close()
+				page = await open(profile)
+			} else if (recovery === 'page reload') {
+				await page.reload()
+				await page.waitForFunction(() => Boolean(window.DLFRestoreQualification))
+			}
+			const resumed = await run(
+				page,
+				{
+					...value,
+					binding: { ...value.binding, generation: 2 }
+				},
+				'resume'
+			)
+			expect(resumed.outcome).toBe('prepared')
+			expect(resumed.issued).toBe(recovery === 'same session' ? 2 : 1)
+			expect(resumed.record?.intent).toEqual(rejected.record?.intent)
+			expect(resumed.record?.checkpoint).toMatchObject({
+				completed: [
+					{
+						issuance: 2,
+						settlement: { local: 'persisted', remote: 'accepted' },
+						lastRejectedAttempt: {
+							issuance: 1,
+							transactionId: checkpoint.current.transactionId,
+							settlement: checkpoint.current.settlement
+						}
+					}
+				]
+			})
+			const repeated = await run(page, value, 'resume')
+			expect(repeated.record).toEqual(resumed.record)
+			expect(repeated.issued).toBe(resumed.issued)
+			const rows = await page.evaluate(async (id) => {
+				const api = window.DLFRestoreQualification
+				return api.db.all(api.testAppRestoreApp.restoreDestinations.where({ id }), {
+					tier: 'remote'
+				})
+			}, value.binding.workspaceId)
+			expect(rows).toHaveLength(1)
+			expect(rows[0]).toMatchObject({
+				id: value.binding.workspaceId,
+				operationId: value.binding.operationId,
+				ownerId: value.binding.identityId,
+				status: 'incomplete'
+			})
+			const complete = await fullRestore(page, value, 'resume')
+			expect(complete.output.outcome).toBe('complete')
+			expect(complete.output.record?.intent).toEqual(rejected.record?.intent)
+			const finished = complete.output.record?.checkpoint
+			if (finished?.kind !== 'complete') throw new Error('Expected complete restore')
+			expect(finished.completed[0]).toMatchObject({
+				lastRejectedAttempt: { transactionId: checkpoint.current.transactionId }
+			})
+			expect(complete.rows?.status).toBe('active')
+			expect(complete.rows?.notes).toHaveLength(3)
+		} finally {
+			await deploy({
+				appId: authority.appId,
+				serverUrl: authority.url,
+				adminSecret: authority.adminSecret,
+				schema: testAppRestoreApp,
+				permissions: testAppRestorePermissions
+			})
+			await deleteJournal(page, value)
+			await page.context().close()
+			if (profile) await rm(profile, { recursive: true, force: true })
+		}
+	})
+}
+
 it('refuses resume without a journal or with a different checked file, and preserves the original operation', async () => {
 	const page = await open(),
 		value = await sample(page)

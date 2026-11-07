@@ -126,6 +126,20 @@ export function writeStepNotIssued(
 		record.checkpoint.current.status === 'notIssued'
 	)
 }
+/** Eligibility for an explicit invocation; current authority is checked by the write machine. */
+export function writeStepCanIssue(
+	record: RestoreJournalRecord,
+	step: RestorePlannedWrite
+): boolean {
+	const checkpoint = record.checkpoint
+	return (
+		(checkpoint.kind === 'writing' || checkpoint.kind === 'activating') &&
+		checkpoint.current.writeId === step.writeId &&
+		(checkpoint.current.status === 'notIssued' ||
+			(checkpoint.current.transactionId !== null &&
+				checkpoint.current.settlement.remote === 'rejected'))
+	)
+}
 export function writeStepCompleted(
 	record: RestoreJournalRecord,
 	step: RestorePlannedWrite
@@ -156,10 +170,11 @@ export function issueWriteStep(
 	step: RestorePlannedWrite
 ): RestoreJournalRecord {
 	if (
-		!writeStepNotIssued(record, step) ||
+		!writeStepCanIssue(record, step) ||
 		(record.checkpoint.kind !== 'writing' && record.checkpoint.kind !== 'activating')
 	)
-		throw new Error('Expected unissued restore step')
+		throw new Error('Expected eligible restore step')
+	const current = record.checkpoint.current
 	return parseRestoreJournalRecord({
 		...record,
 		revision: record.revision + 1,
@@ -168,9 +183,18 @@ export function issueWriteStep(
 			current: {
 				status: 'issued',
 				writeId: step.writeId,
-				issuance: record.checkpoint.current.issuance + 1,
+				issuance: current.issuance + 1,
 				transactionId: null,
-				settlement: { local: 'unobserved', remote: 'unobserved' }
+				settlement: { local: 'unobserved', remote: 'unobserved' },
+				...(current.status === 'issued'
+					? {
+							lastRejectedAttempt: {
+								issuance: current.issuance,
+								transactionId: current.transactionId,
+								settlement: current.settlement
+							}
+						}
+					: {})
 			}
 		}
 	})

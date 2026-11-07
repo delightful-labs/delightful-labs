@@ -7,8 +7,8 @@ import {
 	observeWriteStep,
 	writeStepAttempt,
 	writeStepCanReconcile,
+	writeStepCanIssue,
 	writeStepCompleted,
-	writeStepNotIssued,
 	writeStepSettlementSatisfied,
 	reconcileWriteStep,
 	type RestoreDestinationResult,
@@ -232,7 +232,7 @@ export function createRestoreWriteStepMachine<
 								{
 									guard: ({ context, event }) =>
 										event.output === 'missingOrHidden' &&
-										writeStepNotIssued(context.record, context.step),
+										writeStepCanIssue(context.record, context.step),
 									target: 'checkingAuthority'
 								},
 								{ target: '#restore-write-step.complete' }
