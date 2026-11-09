@@ -14,7 +14,8 @@ using DLF `ad99117`. The final PR CI run
 passed, including the three-browser restore recovery job. Finance's
 [implementation and evidence](https://github.com/delightful-labs/delightful-finances/blob/ab6c85073b0fbb2187283965a547eb50928f166c/specs/015-workspace-backup/spec.md)
 records the disposable-data qualification. T008/T009 and the scoped T010 deployed fake-data rehearsal
-are complete. T004 is closed with accepted limitations; T014 confirmed-rejection retry remains open.
+are complete. T004 is closed with accepted limitations; T014 confirmed-rejection retry is implemented
+and locally qualified, pending publication and Finance's package adoption.
 Production workspace data is outside the authorized test scope.
 
 **Closure decision (2026-11-07):** the user accepts the measured Jazz alpha.59 scaling slowdown and
@@ -23,11 +24,17 @@ for this delivery. Reopen that work if the symptoms occur in real production use
 this scope/acceptance decision, not by turning failed experiments into passes or claiming a fix.
 Phone, maximum-aggregate and storage-pressure guarantees remain outside the measured claims.
 
-**One functional follow-up remains: T014.** The accepted same-operation retry after confirmed
-rejection and repaired permissions is represented in the journal but not integrated into the writer.
-The broader spec therefore remains open for that task. Finance's delivered T008/T009/T010 scope is
-complete with the accepted limitation. The uncommitted Finance capacity change still needs review
-and publication; closing this investigation does not commit, merge or deploy it.
+**T014 completes the shared implementation scope.** Explicit same-operation retry after confirmed
+rejection and repaired permissions is implemented and locally qualified. The user reviewed the
+implementation and authorized testing. All 947 unit tests pass, including 16 new writer cases.
+The full native restore regression run passed 71 cases, with seven optional measurement cases skipped.
+The final focused run passed three permission-denial/repair cases through full restore completion:
+same session, page reload and a graceful Chromium process restart with a temporary persistent profile.
+They preserve destination/mappings and rejected-attempt evidence, and repeated resume issues no
+duplicate write. See the
+[qualification record](restore-journal-design.md#t014-writer-integration--qualified-2026-11-07).
+Publication and Finance's package adoption remain pending. The uncommitted Finance capacity change
+still needs separate review and publication; this work does not commit, merge or deploy it.
 
 ### Investigation record before closure
 
@@ -182,17 +189,16 @@ no tracked pending writes were observed in the existing browser. The comparison 
 
 ## Next work
 
-1. **T014:** integrate explicit same-operation retry after confirmed rejection and repaired authority.
-   Preserve the existing destination/mappings, recheck authority and retain rejected evidence.
-   Unknown outcomes must reconcile without replay. This is the remaining functional implementation.
+1. **Publish T014 and update Finance's package:** the shared implementation and local qualification
+   are complete. Finance still pins the earlier package; adoption needs its own consumer checks.
 2. **Finance capacity change:** review the existing uncommitted change and its tests before publication.
    No additional performance experiments or SDK changes are scheduled. Reopen T004 only if the known
    slowdown/failure occurs in real production use; preserve current safety and validation behavior.
 
 T008/T009 are implemented and qualified on disposable Finance data in the merged PRs above.
 
-**T014** is a separate explicit retry integration follow-up. It is not an automatic retry engine
-or a prerequisite to recognizing the already qualified conservative test app path.
+**T014** adds explicit retry to the existing writer. It does not add an automatic retry engine or
+change the qualified treatment of uncertain outcomes.
 
 ## Completed shared, test app and inventory work
 
@@ -238,13 +244,14 @@ or a prerequisite to recognizing the already qualified conservative test app pat
       separate Jazz app. The 120-transaction deployed rehearsal above passed. Never substitute a
       download alone or shared test app results for this evidence.
       Do not access production data, identities, storage or admin credentials for this task.
-- [ ] **T014:** integrate an explicit same-operation retry after a confirmed remote rejection and
+- [x] **T014:** integrate an explicit same-operation retry after a confirmed remote rejection and
       corrected authority, as accepted in [the spec](spec.md#accepted-retry-behavior--2026-11-03).
-      The journal already represents a new attempt and bounded prior rejection. The current write
-      owner deliberately retains rejection/uncertainty without issuing another transaction; permission
-      repair alone does not resume it. Reuse the same destination/mappings, recheck authority, retain
-      rejected evidence and qualify the actual writer. Generic exceptions, hidden/null reads and unknown
-      outcomes must never authorize replay. No automatic retries or repair heuristics are required.
+      The existing write machine now admits a new explicit invocation after a confirmed rejection and
+      known transaction ID. It checks current authority and journals a new attempt before any write,
+      retaining the same destination/mappings and latest rejection evidence. Sixteen new machine cases
+      and three real Jazz permission-repair cases qualify the behavior; full unit/restore regressions pass.
+      Generic exceptions, hidden/null reads and unknown outcomes never authorize replay. No automatic
+      retries or repair heuristics are added. Finance's pinned package adoption remains separate.
 
 ## Qualification boundary
 
@@ -255,8 +262,9 @@ including page reload/fresh session. Browser-process crash, cleared journal, off
 cross-device/browser recovery are not qualified product claims. Additional platform guarantees need
 an explicit scoped requirement and evidence; they are not implied TODOs for this PR.
 
-Finance's delivered backup/restore scope is complete with accepted limitations. The broader shared
-spec remains incomplete only for T014; publication of the uncommitted capacity change is separate.
+Finance's delivered backup/restore scope is complete with accepted limitations. The shared
+implementation scope is complete and locally qualified, pending T014 publication and Finance's
+package adoption; publication of the uncommitted capacity change is separate.
 Sign-in implementation and its Zod
 configuration/external-input TODOs remain in
 [the separate delivery plan](../002-shared-delightful-sign-in/delivery.md#zod-validation-todos).

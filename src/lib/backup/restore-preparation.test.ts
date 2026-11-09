@@ -210,7 +210,14 @@ function fixture(record = parseRestoreJournalRecord(wire), step = record.intent.
 		),
 		stage: vi.fn(() => {
 			expect(journal.record?.checkpoint).toMatchObject({
-				current: { status: 'issued', issuance: 1 }
+				current: {
+					status: 'issued',
+					issuance:
+						(record.checkpoint.kind === 'writing' || record.checkpoint.kind === 'activating') &&
+						record.checkpoint.current.status === 'issued'
+							? record.checkpoint.current.issuance + 1
+							: 1
+				}
 			})
 		}),
 		commit: vi.fn(() => ({ id: 'write' })),
@@ -951,6 +958,196 @@ function activationRecord() {
 		}
 	})
 }
+
+describe('explicit retry of a confirmed remote rejection', () => {
+	const preparation = () => parseRestoreJournalRecord(wire)
+	const batch = () => batchRecord()
+	const activation = () => activationRecord()
+	function rejected(
+		record = preparation(),
+		remote: 'rejected' | 'unobserved' | 'accepted' = 'rejected'
+	) {
+		const step =
+			record.checkpoint.kind === 'activating'
+				? { ...record.intent.plan.activation, mappingIndexes: [] }
+				: (record.intent.plan.batches.find(
+						(step) =>
+							record.checkpoint.kind === 'writing' &&
+							step.writeId === record.checkpoint.current.writeId
+					) ?? record.intent.plan.preparation)
+		return {
+			step,
+			record: observeWriteStep(issueWriteStep(record, step), step, 'rejected-transaction', {
+				local: 'persisted',
+				remote
+			})
+		}
+	}
+	for (const initial of [preparation, batch, activation]) {
+		it(`retries ${initial.name} with the same intent and retains its rejected attempt`, async () => {
+			const { record, step } = rejected(initial())
+			const { actor, writer } = fixture(record, step)
+			writer.transactionId.mockResolvedValue('replacement-transaction')
+			writer.open.mockImplementation(() => {
+				expect(writer.checkAuthority).toHaveBeenCalledOnce()
+				expect(journal.record?.checkpoint).toMatchObject({
+					current: {
+						issuance: 2,
+						transactionId: null,
+						settlement: { local: 'unobserved', remote: 'unobserved' },
+						lastRejectedAttempt: {
+							issuance: 1,
+							transactionId: 'rejected-transaction',
+							settlement: { local: 'persisted', remote: 'rejected' }
+						}
+					}
+				})
+				return { id: 'transaction' }
+			})
+			actor.start()
+			const result = await toPromise(actor)
+			expect(result.outcome).toBe('written')
+			expect(result.record?.intent).toEqual(record.intent)
+			const checkpoint = result.record?.checkpoint
+			const receipt =
+				checkpoint?.kind === 'complete'
+					? checkpoint.activation
+					: completed(result.record).find((receipt) => receipt.writeId === step.writeId)
+			expect(receipt).toMatchObject({
+				issuance: 2,
+				transactionId: 'replacement-transaction',
+				lastRejectedAttempt: {
+					issuance: 1,
+					transactionId: 'rejected-transaction',
+					settlement: { local: 'persisted', remote: 'rejected' }
+				}
+			})
+			expect(completed(result.record).slice(0, completed(record).length)).toEqual(completed(record))
+			expect(writer.commit).toHaveBeenCalledOnce()
+			expect(writer.retainDetached).not.toHaveBeenCalled()
+		})
+	}
+	for (const authority of ['denied', 'unavailable']) {
+		it(`preserves the rejected checkpoint when current authority is ${authority}`, async () => {
+			const { record, step } = rejected()
+			const { actor, writer } = fixture(record, step)
+			if (authority === 'denied') writer.checkAuthority.mockResolvedValue(false)
+			else writer.checkAuthority.mockRejectedValue(new Error('Authority unavailable'))
+			actor.start()
+			expect((await toPromise(actor)).record).toEqual(record)
+			expect(journal.commands).toEqual([])
+			expect(writer.open).not.toHaveBeenCalled()
+		})
+	}
+	for (const remote of ['unobserved', 'accepted'] satisfies ('unobserved' | 'accepted')[]) {
+		it(`does not replay a ${remote} transaction even with a known ID and affirmative authority`, async () => {
+			const { record, step } = rejected(preparation(), remote)
+			const { actor, writer } = fixture(record, step)
+			actor.start()
+			expect((await toPromise(actor)).outcome).toBe('incomplete')
+			expect(writer.checkAuthority).not.toHaveBeenCalled()
+			expect(writer.open).not.toHaveBeenCalled()
+			expect(journal.record).toEqual(record)
+		})
+	}
+	for (const observation of ['match', 'conflict'] satisfies RestoreStepPresence[]) {
+		it(`handles ${observation} before admitting another rejected-write attempt`, async () => {
+			const { record, step } = rejected()
+			const { actor, writer } = fixture(record, step)
+			writer.readRemote.mockResolvedValue(observation)
+			actor.start()
+			const result = await toPromise(actor)
+			expect(result.outcome).toBe(observation === 'match' ? 'written' : 'conflict')
+			if (observation === 'match')
+				expect(completed(result.record)[0]).toMatchObject({
+					basis: 'remoteContentMatch',
+					attempt: { issuance: 1, settlement: { remote: 'rejected' } }
+				})
+			expect(writer.checkAuthority).not.toHaveBeenCalled()
+			expect(writer.open).not.toHaveBeenCalled()
+		})
+	}
+	it('does not retry rejection without a known transaction ID', async () => {
+		const initial = rejected()
+		if (initial.record.checkpoint.kind !== 'writing') throw new Error('Expected writing')
+		const record = parseRestoreJournalRecord({
+			...initial.record,
+			checkpoint: {
+				...initial.record.checkpoint,
+				current: { ...initial.record.checkpoint.current, transactionId: null }
+			}
+		})
+		const { actor, writer } = fixture(record, initial.step)
+		actor.start()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(writer.checkAuthority).not.toHaveBeenCalled()
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	it('does not open a transaction when saving the retry intent fails', async () => {
+		const { record, step } = rejected()
+		const { actor, writer } = fixture(record, step)
+		journal.failRevision = record.revision + 1
+		actor.start()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(journal.record).toEqual(record)
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	it('does not issue a retry after a concurrent journal update wins the CAS', async () => {
+		const { record, step } = rejected()
+		const { actor, writer } = fixture(record, step)
+		writer.checkAuthority.mockImplementation(() => {
+			journal.record = parseRestoreJournalRecord({ ...record, revision: record.revision + 1 })
+			return Promise.resolve(true)
+		})
+		actor.start()
+		expect((await toPromise(actor)).outcome).toBe('incomplete')
+		expect(journal.record?.checkpoint).toEqual(record.checkpoint)
+		expect(writer.open).not.toHaveBeenCalled()
+	})
+	for (const type of ['CANCEL', 'SHUTDOWN', 'INVALIDATE'] satisfies RestoreEvent['type'][]) {
+		it(`drains authority and preserves the rejected checkpoint on ${type}`, async () => {
+			const { record, step } = rejected()
+			const { input, writer } = fixture(record, step)
+			const gate = deferred<boolean>()
+			writer.checkAuthority.mockReturnValue(gate.promise)
+			const actor = createActor(createRestoreWriteStepMachine(writer, testDestination(writer)), {
+				input
+			}).start()
+			await waitFor(actor, (snapshot) => snapshot.matches({ working: 'checkingAuthority' }))
+			actor.send(type === 'INVALIDATE' ? { type, binding: input.binding } : { type })
+			gate.resolve(true)
+			expect((await toPromise(actor)).outcome).toBe(
+				type === 'CANCEL' ? 'cancelled' : type === 'SHUTDOWN' ? 'closed' : 'invalidated'
+			)
+			expect(journal.record).toEqual(record)
+			expect(writer.open).not.toHaveBeenCalled()
+		})
+	}
+	it('requires another explicit invocation after repeated rejection and keeps only the latest evidence', async () => {
+		const { record, step } = rejected()
+		const first = fixture(record, step)
+		first.writer.transactionId.mockResolvedValue('second-rejected-transaction')
+		first.writer.acceptRemote.mockRejectedValue('confirmed-rejection')
+		first.actor.start()
+		const result = await toPromise(first.actor)
+		expect(result.outcome).toBe('incomplete')
+		expect(first.writer.commit).toHaveBeenCalledOnce()
+		if (!result.record) throw new Error('Missing rejected checkpoint')
+		const next = fixture(result.record, step)
+		next.actor.start()
+		const output = await toPromise(next.actor)
+		expect(output.outcome).toBe('written')
+		expect(completed(output.record)[0]).toMatchObject({
+			issuance: 3,
+			lastRejectedAttempt: {
+				issuance: 2,
+				transactionId: 'second-rejected-transaction',
+				settlement: { remote: 'rejected' }
+			}
+		})
+		expect(next.writer.commit).toHaveBeenCalledOnce()
+	})
+})
 
 describe('restore activation ownership', () => {
 	it('settles activation without adding it to the domain write prefix', async () => {

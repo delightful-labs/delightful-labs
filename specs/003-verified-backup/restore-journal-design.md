@@ -234,6 +234,53 @@ never fabricates a global transaction receipt. Comparison/activation ordering, n
 ownership, revision CAS, cancellation and same-browser scope remain unchanged. No coordinator,
 destination writer, UI, retry scheduler, history collection or new asynchronous owner is added.
 
+### T014 writer integration — qualified 2026-11-07
+
+Use the existing shared write statechart and journal format. A caller explicitly invokes the
+selected write again after a previous invocation returned incomplete; there is no in-machine retry
+loop, timer or new destination allocation. The operation lock and immutable intent retain the same
+destination, mappings and write ID across invocations.
+
+The write owner keeps this order:
+
+1. Reconcile actual remote content. Exact matches use the existing completion path, including any
+   separately required local-persistence evidence; conflicts stop the operation.
+2. A missing-or-hidden result can reach the existing authority check only for an unissued step or
+   an issued step whose journal records a confirmed remote rejection and a known transaction ID.
+   Missing/hidden content, unknown settlement and generic errors alone never permit another attempt.
+3. Only an affirmative current authority result constructs a new issued checkpoint. Increment the
+   attempt number and retain the previous attempt's number, transaction ID and settlement as
+   `lastRejectedAttempt`. Repeated rejection retains only the latest rejected attempt.
+4. Commit that checkpoint through the existing journal CAS before opening a transaction. Then reuse
+   transactional reread, staging, commit and separate local/remote settlement checkpoints. A rejected
+   new attempt returns incomplete; another explicit invocation is required to try again.
+
+No new async helpers, owners or resources are needed. The destination child owns the current
+authority observation; the shared write owner retains transaction custody; the outer restore owner
+retains the operation lock. Cancellation/invalidation/shutdown drain existing work and block later
+effects through the existing protocol. Failed CAS does not open a transaction. An unknown attempt
+is still unresolved, including the existing crash window after intent issuance and before commit.
+
+The user reviewed this implementation and authorized testing. Sixteen new machine cases cover
+preparation/batch/activation retry, evidence retention, repeated rejection without an automatic loop,
+denied/unavailable authority, uncertain/accepted/missing-ID attempts without replay, remote-content
+reconciliation, failed checkpoint/CAS and cancellation/shutdown/invalidation during authority checks.
+
+Three real Jazz/Chromium cases deploy an insert-denying policy only to the disposable local server,
+observe the actual correlated remote rejection, repair its policy and resume in the same session,
+after page reload and after graceful Chromium process restart with a temporary persistent profile.
+They retain the identical intent/mappings, persist the prior rejected attempt, write one
+destination row, refuse duplicate writes on repeated resume, and complete the remaining graph writes,
+content comparison and activation. No synthetic rejection or production app/data/credential is used.
+
+Validation: all 947 unit cases pass. The full native restore regression run passed 71 cases (seven
+optional measurement cases skipped); the final focused run passed all three permission-repair cases
+through full restore completion, including the added Chromium process restart case.
+Root and test app TypeScript, Oxlint, package/strict Publint and public-consumer declaration checks
+pass. The runtime changes remain two existing source files; tests reuse two existing suites. No new
+states, journal format, resource owner, UI or files are added. Publication and Finance's pinned-package
+adoption are still pending; the uncommitted Finance capacity work is untouched.
+
 ### Attempt/completion qualification — completed 2026-11-03
 
 The user approved testing after implementation review. The reviewed production implementation
