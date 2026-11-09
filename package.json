@@ -20,6 +20,7 @@
     "test:build": "node scripts/verify-build.mjs"
   },
   "dependencies": {
+    "@paper-design/shaders": "0.0.82",
     "@standard-reader/renderer-core": "0.4.0",
     "@standard-reader/renderer-svelte": "0.4.0",
     "@vercel/blob": "2.8.2",
