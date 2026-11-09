@@ -7,7 +7,7 @@
 
 ## Foundation
 
-- [x] T003 Define validated content types and rich-text/block normalization in src/lib/leaflet/.
+- [x] T003 Use Standard Reader types/rendering and shared safe URL/value helpers in src/lib/leaflet/.
 - [x] T004 Test the public loader and unsafe/malformed content behavior in tests/reader.test.ts before implementing src/lib/server/leaflet/reader.ts.
 - [x] T005 Implement bounded identity/PDS reads, cursors, filtering and cache failures in src/lib/server/leaflet/.
 
@@ -18,7 +18,7 @@
 
 ## US2 — native reading
 
-- [x] T008 [US2] Implement safe semantic block rendering and direct article route in src/lib/components/ and src/routes/open-thoughts/[rkey]/.
+- [x] T008 [US2] Integrate the accepted Standard Reader package and direct article route in src/lib/components/ and src/routes/open-thoughts/[rkey]/.
 - [x] T009 [US2] Add canonical/document metadata and publication verification endpoint in src/routes/.
 - [x] T010 [US2] Verify real public text/link/image rendering in an isolated local process and record evidence in verification.md.
 

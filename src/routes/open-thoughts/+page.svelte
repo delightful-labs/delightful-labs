@@ -1,12 +1,8 @@
 <script lang="ts">
   import { Heading, Text } from "delightful-ui";
+  import { formatDate } from "#lib/date.ts";
   import type { PageData } from "./$types";
   let { data }: { data: PageData } = $props();
-  const date = (value: string) =>
-    new Intl.DateTimeFormat("en", {
-      dateStyle: "long",
-      timeZone: "UTC",
-    }).format(new Date(value));
 </script>
 
 <svelte:head><title>Open Thoughts · Delightful Labs</title></svelte:head>
@@ -17,7 +13,8 @@
       {#each data.articles as article (article.uri)}
         <li>
           <a href={article.path}>{article.title}</a>
-          <time datetime={article.publishedAt}>{date(article.publishedAt)}</time
+          <time datetime={article.publishedAt}
+            >{formatDate(article.publishedAt)}</time
           >
           {#if article.description}<Text>{article.description}</Text>{/if}
         </li>

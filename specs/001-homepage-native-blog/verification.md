@@ -1,109 +1,63 @@
 # Foundation Verification
 
 **Date**: 2026-11-09
-**Scope**: Basic site and read-only native reader. This is not a completed
-publication migration or hosting cutover.
+**Scope**: Basic site and read-only native reader. Publication migration and
+hosting cutover are not complete.
 
-## Checks
+## Current checks
 
-- `pnpm install --frozen-lockfile`: reproducible installation from the committed
-  local UI artifact and lockfile.
-- `pnpm test`: 38 checks covering record pagination and validation, configuration,
-  cache freshness/stale limits, deletion/repository-change safeguards, all XState
-  loading stages and cancellation, blob-page hydration, and HTTP boundaries.
-  Two SSR integration checks exercise Standard Reader with DUI components,
-  resolved PDS image URLs, safe URL overrides, and iframe fallback.
-  Tests for custom facet parsing/traversal were removed with that implementation;
-  the package's documented constraints are accepted rather than patched.
-- `pnpm check`: no errors or warnings.
-- `pnpm build`: successful Vercel adapter output; generated function config
-  identifies Node.js 24 and SvelteKit 3.1.1. This is a local build, not deployment.
-- Chromium: three passing checks for empty homepage/navigation, direct 404,
-  mobile-width navigation and keyboard use. No page errors were observed.
-- Source scan found no added font family, font sizes, weights, line heights,
-  letter spacing, or font-face declarations. Existing Delightful UI defaults
-  were used; no source library files were changed.
+- Frozen-lockfile installation uses a pinned portable DUI artifact and exact
+  application dependencies. Local execution uses Node 25.2.1; CI and the Vercel
+  function target Node 24.
+- `pnpm test`: 63 tests covering reader/cache behavior, snapshot-stage failures
+  and cancellation, a hard refresh deadline, metadata and blob hydration,
+  validated socket DNS answers, IP/URL restrictions, response cleanup/size limits,
+  native renderer integration, and configuration-only publication verification.
+- `pnpm check`: zero errors and warnings.
+- `pnpm build`: successful Node 24 Vercel adapter output.
+- `pnpm test:browser`: three Chromium checks for the empty homepage, writing
+  navigation, direct unknown-article 404, keyboard interaction, and mobile width.
+- No font, size, weight, line-height, letter-spacing, or typography overrides
+  were introduced. Existing Delightful UI defaults are used.
 
-Local execution used the installed Node.js 25.2.1. The repository pins Node.js 24
-for CI and the Vercel runtime; an actual hosted Node.js 24 release is not claimed.
-Browser verification used installed Playwright Chromium because the Chrome
-DevTools connector was unavailable.
+## Native public-source proof
 
-## XState v6 follow-up
+The explicit read-only proof uses the Leaflet Lab Notes publication owned by
+`did:plc:btxrwcaeyodrap5mnjw2fvmz`, publication key `3lppk75kw7k26`, article key
+`3mwehnrqsf22g`. This is never the application default or committed site content.
 
-The owner requested v6 after reviewing the server reader. The exact version is
-`6.0.0-beta.1`; it is a direct dependency, independent of Delightful UI's internal
-v5 dependency. New implementation uses the bundled v6 APIs (`createAsyncLogic`,
-`schemas`/`types`, context patches and queued effects), not v5 compatibility code.
-`reader.ts` is now a small Promise adapter. Fetching, schemas, pagination,
-identity resolution, article conversion and lifecycle are separate modules.
-See [the lifecycle contract](contracts/reader-lifecycle.md).
+After Standard Reader adoption, the article rendered in initial HTML with 3,217
+text characters, 15 links, one loaded PDS image with supplied alt text, zero
+frames, correct canonical/document links, and zero browser errors.
+`scripts/verify-native.mjs` repeats the check against an explicit local URL.
+Screenshots are ignored under `test-results/`; third-party article bodies and
+images are not committed. Run this proof after other dev/build/browser processes
+in this checkout have stopped: they share SvelteKit's generated environment files.
 
-The native public-source proof and all three Chromium route checks passed again
-after the migration. No homepage content, typography, source publication settings,
-or production hosting configuration changed as part of this refactor.
-During the final proof, a second validation process rewrote the checkout's shared
-SvelteKit development environment files, leaving the proof process unconfigured
-(404). Restarting the explicit-source process after the other checks completed
-restored the expected native result. The final proof was run sequentially; local
-instructions now warn against sharing generated state between concurrent modes.
+## Review fixes
 
-## Live native source proof
+- Replaced preflight DNS plus independent fetch resolution with an Undici agent
+  whose socket lookup validates and returns the same addresses. Reused ipaddr.js
+  classification instead of maintaining a partial IP blocklist.
+- A single 40-second deadline cancels the whole refresh, including stalled work;
+  five-second connection and twelve-second request limits remain separate.
+- Snapshot stages require their prior results through XState v6 state schemas;
+  removed non-null assertions and renamed preparation to match its role.
+- Article preparation hydrates Leaflet blobs and preserves other content payloads
+  for the accepted renderer instead of manufacturing placeholder pages.
+- Removed redundant configuration identity tracking and duplicate date formatters.
+- Publication verification reads validated configuration without loading posts.
 
-An isolated local process on port 5184 explicitly overrode both author DID and
-publication URI with the public Leaflet Lab Notes publication. The default app
-on port 5183 kept an unset publication and displayed no posts. Overrides were
-process-only; no `.env.local` or demonstration default was committed.
-
-- Author: `did:plc:btxrwcaeyodrap5mnjw2fvmz`.
-- Publication: `at://did:plc:btxrwcaeyodrap5mnjw2fvmz/site.standard.publication/3lppk75kw7k26`.
-- Document: `at://did:plc:btxrwcaeyodrap5mnjw2fvmz/site.standard.document/3mwehnrqsf22g`.
-- Source article: [Back to School — Leaflet for Learning](https://lab.leaflet.pub/3mwehnrqsf22g).
-- Local article response: HTTP 200, native article body and image in initial HTML.
-- Browser evidence: 3,272 article-text characters, 17 article links, one loaded
-  image with source alternative text, zero frames, and zero page errors.
-- Canonical and `site.standard.document` link tags were present. The canonical
-  pointed to the native route as configured locally; upstream Leaflet canonical
-  settings were not changed or validated by this check.
-- The writing index loaded source metadata; direct unknown article requests on
-  the default app returned 404. Default homepage/index requests returned 200.
-
-`scripts/verify-native.mjs` reproduces the browser/direct-HTML check against an
-explicit local article URL. Screenshots are ignored under `test-results/`;
-third-party article bodies and images are not committed as site content.
+Standard Reader Svelte/core 0.4.0 owns content rendering. The owner accepted its
+[evaluated constraints](evaluations/standard-reader/README.md); custom block,
+facet, and page parsing and the standalone evaluation harness are removed.
+Ongoing SSR tests exercise the actual application integration.
 
 ## Remaining gates
 
-- The real Open Thoughts publication has not been created; Matt's account has
-  not been authenticated or mutated by this implementation.
-- Hosted Leaflet external canonical `/open-thoughts/` configuration, editable
-  archive import, original anchors/assets, feeds and final redirects need their
-  designated integration proofs. No redirects to missing articles are enabled.
-- The initial cache is process-local, not durable across Vercel instances.
-  Persistent snapshots and cross-instance reconciliation must precede migration.
-- Vercel project inspection returned HTTP 403 for the connected team. A consent
-  link was supplied; no Vercel project or deployment was created and no domains
-  or DNS records were changed. The GitHub CI run will be separate hosted evidence.
-
-## Snapshot machine follow-up
-
-Snapshot loading now uses six explicit XState v6 stages. Thirteen additional
-checks verify ordered completion and error/cancellation at every stage. All 42
-tests and Svelte/TypeScript checks pass. The Vercel adapter build succeeds.
-
-## Standard Reader adoption
-
-The owner accepted the evaluation constraints and chose the published Svelte/core
-0.4.0 packages without parser changes. Custom block/facet/page rendering and
-its semantic model were removed. The app passes hydrated Leaflet content and
-author DID to the package. Existing DUI component snippets, safe URL overrides,
-resolved PDS images, and no-iframe fallbacks remain app integration concerns.
-Earlier custom-renderer facet/member/reachability claims in this document are
-historical and superseded by this decision. No homepage copy or typography was
-added. The evaluation fixtures remain isolated from application routes.
-
-The live proof was repeated after package adoption: article body in initial HTML,
-3,217 text characters, 15 links, one loaded image with supplied alt, zero frames,
-and zero page errors. Canonical and standard-document links remained correct.
-This is read-only evidence from the explicit demonstration publication, not
-committed content or a configured Open Thoughts publication.
+- Owner-created Leaflet publication and external canonical/edit workflow proof.
+- Durable snapshots and reconciliation across Vercel instances; the current
+  five-minute-fresh/24-hour-stale cache remains process-local.
+- Editable archive import, preserved assets/anchors, feeds, and final redirects.
+- Hosted preview and production cutover. Connected Vercel project access returned
+  403; no project, deployment, publication settings, or DNS records were changed.

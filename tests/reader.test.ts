@@ -221,6 +221,15 @@ describe("native record reads", () => {
     await expect(reader.read()).rejects.toThrow("stopped");
     expect(signal?.aborted).toBe(true);
   });
+  it("passes unsupported content through without fabricating Leaflet pages", async () => {
+    const h = harness();
+    const record = document("other");
+    const content = { $type: "blog.pckt.content", body: "Original payload" };
+    h.records([{ ...record, value: { ...record.value, content } }]);
+    const result = await h.reader.read();
+    expect(result?.articles[0].document.content).toEqual(content);
+  });
+
   it("loads blob-backed pages instead of the inline stub", async () => {
     const h = harness(),
       record = document("blob");
@@ -269,7 +278,7 @@ describe("HTTP transport boundary", () => {
     const controller = new AbortController();
     controller.abort(new Error("Cancelled"));
     await expect(
-      readJson("https://example.com", undefined, controller.signal),
+      readJson("https://example.com", controller.signal),
     ).rejects.toThrow("Cancelled");
   });
 });

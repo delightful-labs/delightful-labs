@@ -1,13 +1,9 @@
 <script lang="ts">
   import { Heading } from "delightful-ui";
   import LeafletDocument from "#lib/components/LeafletDocument.svelte";
+  import { formatDate } from "#lib/date.ts";
   import type { PageData } from "./$types";
   let { data }: { data: PageData } = $props();
-  const date = (value: string) =>
-    new Intl.DateTimeFormat("en", {
-      dateStyle: "long",
-      timeZone: "UTC",
-    }).format(new Date(value));
 </script>
 
 <svelte:head>
@@ -23,7 +19,7 @@
   <header>
     <Heading level="h1">{data.article.title}</Heading>
     <time datetime={data.article.publishedAt}
-      >{date(data.article.publishedAt)}</time
+      >{formatDate(data.article.publishedAt)}</time
     >
   </header>
   <LeafletDocument

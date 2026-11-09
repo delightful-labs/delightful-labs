@@ -70,7 +70,7 @@ export const pageBlobSchema = z.object({
   mimeType: z.literal("application/json"),
   size: z.number().int().nonnegative().max(5_000_000),
 });
-export const contentSchema = z.object({
+export const contentSchema = z.looseObject({
   $type: z.literal("pub.leaflet.content"),
   pages: z.array(z.unknown()).max(1000).optional(),
   blobPages: pageBlobSchema.nullish(),

@@ -43,7 +43,7 @@ not a durable production cache. Stages 2–3 remain explicit gates.
 
 ## Project Structure
 
-src/lib/leaflet contains the validated read model and rich-text normalization;
+src/lib/leaflet contains shared value/URL helpers for the renderer integration;
 src/lib/server/leaflet contains identity/PDS loading and configuration;
 src/lib/components contains a small Standard Reader Svelte integration;
 src/routes contains the shell, writing index, article, and verification routes;
@@ -52,7 +52,7 @@ tests contains isolated fixtures; vendor contains the pinned UI artifact.
 ## Validation
 
 Svelte/TypeScript checks, behavior tests for public record loading, publication
-filtering, pagination, rich text, gated/unknown content, cache failures/removals,
+filtering, pagination, transport limits, renderer integration, cache failures/removals,
 then a build and browser/direct-initial-HTML proof. No typography CSS assertions.
 
 ## Post-design Check

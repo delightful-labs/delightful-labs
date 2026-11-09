@@ -9,13 +9,10 @@ export type Rpc = (
 export function createRpc(
   endpoint: URL,
   json: JsonReader,
-  now: () => number,
-  startedAt: number,
   signal: AbortSignal,
 ): Rpc {
   return (method, params) => {
     signal.throwIfAborted();
-    if (now() - startedAt > 40_000) throw new Error("Archive refresh timeout");
     const url = new URL(`/xrpc/${method}`, endpoint);
     for (const [name, value] of Object.entries(params))
       url.searchParams.set(name, value);

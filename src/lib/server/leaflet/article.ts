@@ -9,20 +9,20 @@ import {
   type DocumentRecord,
 } from "./schemas";
 
-async function readPages(
+async function readContent(
   raw: unknown,
   rpc: Rpc,
   did: string,
-): Promise<unknown[]> {
-  if (object(raw).$type !== "pub.leaflet.content") return [{}];
+): Promise<unknown> {
+  if (object(raw).$type !== "pub.leaflet.content") return raw;
   const content = contentSchema.parse(raw);
-  if (content.blobPages) {
-    const cid = content.blobPages.ref.$link;
-    return pagesSchema.parse(
-      await rpc("com.atproto.sync.getBlob", { did, cid }),
-    );
-  }
-  return pagesSchema.parse(content.pages);
+  const pages = content.blobPages
+    ? await rpc("com.atproto.sync.getBlob", {
+        did,
+        cid: content.blobPages.ref.$link,
+      })
+    : content.pages;
+  return { ...content, pages: pagesSchema.parse(pages) };
 }
 
 export async function readArticle(
@@ -33,7 +33,7 @@ export async function readArticle(
 ): Promise<Article> {
   const key = parseDocumentKey(record.uri, config.ownerDid);
   const metadata = articleMetadataSchema.parse(record.value);
-  const pages = await readPages(record.value.content, rpc, config.ownerDid);
+  const content = await readContent(record.value.content, rpc, config.ownerDid);
   return {
     uri: record.uri,
     cid: record.cid,
@@ -45,7 +45,7 @@ export async function readArticle(
     path: `/open-thoughts/${encodeURIComponent(key)}/`,
     sourceUrl: `https://leaflet.pub/lish/${encodeURIComponent(config.ownerDid)}/${encodeURIComponent(config.publicationKey)}/${encodeURIComponent(key)}`,
     document: {
-      content: { $type: "pub.leaflet.content", pages },
+      content,
       authorDid: config.ownerDid,
     },
     pds: pds.origin,

@@ -10,33 +10,27 @@ type Input = {
   config: ConfiguredReader;
   json: JsonReader;
   now: () => number;
-  startedAt: number;
 };
-type Connection = { pds: URL };
 type Publication = Snapshot["publication"];
-type Context = Input & {
-  connection?: Connection;
-  commit?: string;
-  publication?: Publication;
-  records?: DocumentRecord[];
-  articles?: Article[];
-  snapshot?: Snapshot;
-};
+type Connected = Input & { pds: URL };
+type Committed = Connected & { commit: string };
+type Published = Committed & { publication: Publication };
+type Enumerated = Published & { records: DocumentRecord[] };
+type Prepared = Published & { articles: Article[] };
+type Context = Input & Partial<Enumerated & Prepared & { snapshot: Snapshot }>;
 
 const connect = createAsyncLogic({
   schemas: { input: types<Input>() },
-  run: async ({ input, signal }): Promise<Connection> => {
-    const pds = await resolvePds(input.config.ownerDid, input.json, signal);
-    return { pds };
-  },
+  run: ({ input, signal }) =>
+    resolvePds(input.config.ownerDid, input.json, signal),
 });
 const commit = createAsyncLogic({
-  schemas: { input: types<Context>() },
+  schemas: { input: types<Connected>() },
   run: ({ input, signal }) =>
     readCommit(rpc(input, signal), input.config.ownerDid),
 });
 const publication = createAsyncLogic({
-  schemas: { input: types<Context>() },
+  schemas: { input: types<Committed>() },
   run: async ({ input, signal }): Promise<Publication> => {
     const record = publicationSchema.parse(
       await rpc(input, signal)("com.atproto.repo.getRecord", {
@@ -55,24 +49,20 @@ const publication = createAsyncLogic({
   },
 });
 const enumerate = createAsyncLogic({
-  schemas: { input: types<Context>() },
+  schemas: { input: types<Published>() },
   run: ({ input, signal }) =>
     readDocumentRecords(rpc(input, signal), input.config.ownerDid),
 });
-const normalize = createAsyncLogic({
-  schemas: { input: types<Context>() },
+const prepare = createAsyncLogic({
+  schemas: { input: types<Enumerated>() },
   run: async ({ input, signal }): Promise<Article[]> => {
     const articles: Article[] = [];
-    for (const record of input.records!) {
+    const request = rpc(input, signal);
+    for (const record of input.records) {
       signal.throwIfAborted();
       if (record.value.site === input.config.publicationUri)
         articles.push(
-          await readArticle(
-            record,
-            input.config,
-            input.connection!.pds,
-            rpc(input, signal),
-          ),
+          await readArticle(record, input.config, input.pds, request),
         );
     }
     return articles.sort(
@@ -83,7 +73,7 @@ const normalize = createAsyncLogic({
   },
 });
 const verify = createAsyncLogic({
-  schemas: { input: types<Context>() },
+  schemas: { input: types<Prepared>() },
   run: async ({ input, signal }): Promise<Snapshot> => {
     if (
       input.commit !==
@@ -92,8 +82,8 @@ const verify = createAsyncLogic({
       throw new Error("Repository changed during scan; retry later");
     signal.throwIfAborted();
     return {
-      publication: input.publication!,
-      articles: input.articles!,
+      publication: input.publication,
+      articles: input.articles,
       verifiedAt: input.now(),
       stale: false,
     };
@@ -101,20 +91,22 @@ const verify = createAsyncLogic({
 });
 
 // Bind RPC cancellation to the active stage, rather than a completed actor.
-function rpc(context: Context, signal: AbortSignal): Rpc {
-  return createRpc(
-    context.connection!.pds,
-    context.json,
-    context.now,
-    context.startedAt,
-    signal,
-  );
+function rpc(context: Connected, signal: AbortSignal): Rpc {
+  return createRpc(context.pds, context.json, signal);
 }
 export const snapshotMachine = setup({
   schemas: {
     context: types<Context>(),
     input: types<Input>(),
     output: types<Snapshot>(),
+  },
+  states: {
+    readingInitialCommit: { schemas: { context: types<Connected>() } },
+    readingPublication: { schemas: { context: types<Committed>() } },
+    enumeratingRecords: { schemas: { context: types<Published>() } },
+    preparingArticles: { schemas: { context: types<Enumerated>() } },
+    verifyingCommit: { schemas: { context: types<Prepared>() } },
+    complete: { schemas: { context: types<{ snapshot: Snapshot }>() } },
   },
 }).createMachine({
   id: "snapshotLoad",
@@ -127,7 +119,7 @@ export const snapshotMachine = setup({
         input: ({ context }) => context,
         onDone: ({ event }) => ({
           target: "readingInitialCommit",
-          context: { connection: event.output },
+          context: { pds: event.output },
         }),
       },
     },
@@ -156,14 +148,14 @@ export const snapshotMachine = setup({
         src: enumerate,
         input: ({ context }) => context,
         onDone: ({ event }) => ({
-          target: "normalizingArticles",
+          target: "preparingArticles",
           context: { records: event.output },
         }),
       },
     },
-    normalizingArticles: {
+    preparingArticles: {
       invoke: {
-        src: normalize,
+        src: prepare,
         input: ({ context }) => context,
         onDone: ({ event }) => ({
           target: "verifyingCommit",
@@ -181,7 +173,7 @@ export const snapshotMachine = setup({
         }),
       },
     },
-    complete: { type: "final" },
+    complete: { type: "final", output: ({ context }) => context.snapshot },
   },
-  output: ({ context }) => context.snapshot!,
+  output: ({ output }) => output,
 });

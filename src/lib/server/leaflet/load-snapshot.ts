@@ -9,23 +9,31 @@ export async function loadSnapshot(
   signal: AbortSignal,
 ): Promise<Snapshot> {
   signal.throwIfAborted();
+  const deadline = new AbortController();
+  const timer = setTimeout(
+    () => deadline.abort(new Error("Archive refresh timeout")),
+    40_000,
+  );
+  timer.unref();
+  const cancellation = AbortSignal.any([signal, deadline.signal]);
   const actor = createActor(snapshotMachine, {
-    input: { config, json, now, startedAt: now() },
+    input: { config, json, now },
   });
-  let onAbort: () => void;
+  let onAbort = () => {};
   const aborted = new Promise<never>((_, reject) => {
     onAbort = () => {
-      reject(signal.reason);
+      reject(cancellation.reason);
       actor.stop();
     };
-    signal.addEventListener("abort", onAbort, { once: true });
+    cancellation.addEventListener("abort", onAbort, { once: true });
   });
   try {
     const result = toPromise(actor);
     actor.start();
     return await Promise.race([result, aborted]);
   } finally {
-    signal.removeEventListener("abort", onAbort!);
+    cancellation.removeEventListener("abort", onAbort);
+    clearTimeout(timer);
     actor.stop();
   }
 }

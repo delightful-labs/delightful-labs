@@ -1,5 +1,5 @@
 import { createActor, toPromise } from "xstate";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { snapshotMachine } from "../src/lib/server/leaflet/snapshot-machine";
 import { loadSnapshot } from "../src/lib/server/leaflet/load-snapshot";
 import type { JsonReader } from "../src/lib/server/leaflet/model";
@@ -14,7 +14,7 @@ const stages = [
   "readingInitialCommit",
   "readingPublication",
   "enumeratingRecords",
-  "normalizingArticles",
+  "preparingArticles",
   "verifyingCommit",
 ];
 function fixture(
@@ -84,7 +84,7 @@ function fixture(
 describe("snapshot loading machine", () => {
   it("exposes ordered stages and publishes only a verified snapshot", async () => {
     const actor = createActor(snapshotMachine, {
-      input: { config, json: fixture(), now: () => 123, startedAt: 123 },
+      input: { config, json: fixture(), now: () => 123 },
     });
     const visited: unknown[] = [];
     actor.subscribe((snapshot) => visited.push(snapshot.value));
@@ -96,6 +96,29 @@ describe("snapshot loading machine", () => {
       articles: [{ key: "post" }],
     });
     expect(visited).toEqual([...stages, "complete"]);
+  });
+
+  it("aborts a stalled refresh at the overall deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      let activeSignal: AbortSignal | undefined;
+      const pending = loadSnapshot(
+        config,
+        async (_, signal) => {
+          activeSignal = signal;
+          return new Promise(() => {});
+        },
+        () => 0,
+        new AbortController().signal,
+      );
+      const failed = expect(pending).rejects.toThrow("Archive refresh timeout");
+      await vi.advanceTimersByTimeAsync(40_000);
+      await failed;
+      expect(activeSignal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each(stages)(

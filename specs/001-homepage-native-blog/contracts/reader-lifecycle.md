@@ -53,8 +53,8 @@ aborts the invoked async actor. Late completions cannot replace the cache.
   snapshots and coordination across Vercel instances remain a later integration.
 
 `PublicationReader.stop()` is idempotent and must be used for production disposal
-so queued callers are settled before the actor ends. Configuration replacement
-and development hot reload dispose the previous reader.
+so queued callers are settled before the actor ends. Development hot reload disposes the previous reader; deployment environment
+values remain fixed for the process lifetime.
 
 ## Verification
 
@@ -76,8 +76,8 @@ stateDiagram-v2
     resolvingIdentity --> readingInitialCommit
     readingInitialCommit --> readingPublication
     readingPublication --> enumeratingRecords
-    enumeratingRecords --> normalizingArticles
-    normalizingArticles --> verifyingCommit
+    enumeratingRecords --> preparingArticles
+    preparingArticles --> verifyingCommit
     verifyingCommit --> complete
     complete --> [*]
 ```
@@ -86,14 +86,18 @@ Any stage error terminates the load and propagates the original error to the
 reader's refresh lifecycle. Cancellation aborts the current stage and rejects the
 load without starting later stages. No intermediate result becomes a snapshot.
 The final stage checks the repository commit before assigning `verifiedAt`.
-The original refresh start time is shared by all RPC stages, preserving the
-existing total time budget. Pagination and article preparation remain focused functions;
+A single 40-second deadline aborts the complete load, including an in-flight
+request, independently of the per-request timeout. Pagination and article preparation remain focused functions;
 the machine coordinates their lifetimes rather than modeling each record as a
 state. No automatic stage retries or partial-scan resumption are introduced.
 
 Tests cover ordered completion, failure at every stage, and cancellation at every
-stage (including blob loading during article normalization).
+stage (including blob loading during article preparation).
 
-After Standard Reader adoption, `normalizingArticles` prepares metadata and
+`preparingArticles` prepares metadata and
 hydrates content blobs into the package document input; the package performs
 block and inline normalization when rendering. The lifecycle is unchanged.
+
+Each snapshot stage declares its required context using v6 state schemas.
+Transitions must provide missing results before entering the next stage; actor
+inputs need no non-null assertions for prior-stage output.

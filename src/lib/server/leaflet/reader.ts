@@ -13,8 +13,7 @@ export class PublicationReader {
 
   constructor(config: ReaderConfig, dependencies: ReaderDependencies = {}) {
     const parsed = parseReaderConfig(config);
-    const json =
-      dependencies.json ?? ((url, signal) => readJson(url, 6_000_000, signal));
+    const json = dependencies.json ?? readJson;
     this.now = dependencies.now ?? Date.now;
     this.actor = createActor(readerMachine, {
       input: {

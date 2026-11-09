@@ -3,21 +3,19 @@ import {
   LEAFLET_PUBLICATION_URI,
   SITE_ORIGIN,
 } from "$app/env/private";
+import { parseReaderConfig } from "./config";
 import { PublicationReader } from "./reader";
 
-export const OWNER_DID = "did:plc:226m7t4kp7d7sg2qsdresypm";
+const config = {
+  ownerDid: LEAFLET_AUTHOR_DID,
+  publicationUri: LEAFLET_PUBLICATION_URI || undefined,
+};
 let reader: PublicationReader | undefined;
-let identity = "";
 export function publicationReader(): PublicationReader {
-  const ownerDid = LEAFLET_AUTHOR_DID || OWNER_DID;
-  const publicationUri = LEAFLET_PUBLICATION_URI || undefined;
-  const key = JSON.stringify([ownerDid, publicationUri]);
-  if (!reader || key !== identity) {
-    reader?.stop();
-    reader = new PublicationReader({ ownerDid, publicationUri });
-    identity = key;
-  }
-  return reader;
+  return (reader ??= new PublicationReader(config));
+}
+export function configuredPublicationUri(): string | undefined {
+  return parseReaderConfig(config)?.publicationUri;
 }
 
 if (import.meta.hot) import.meta.hot.dispose(() => reader?.stop());
