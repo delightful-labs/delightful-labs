@@ -143,3 +143,59 @@ shared reads, concurrent first creation, deletion races, storage errors, CAS
 preconditions, bounded stale/future times, cancellation, validation, and isolation.
 Blob consistency/conditional-write behavior follows the
 [SDK contracts](https://vercel.com/docs/vercel-blob/using-blob-sdk).
+
+## Durable cache and Blob operation machines
+
+Both layers now use the installed XState v6 contracts. `durable-loader.ts` and
+`blob-store.ts` adapt their existing Promise APIs to short-lived actors.
+`snapshot-codec.ts` owns envelope encoding, validation and stable object keys;
+these data operations are separate from lifecycle transitions.
+
+```mermaid
+stateDiagram-v2
+    [*] --> reading
+    reading --> fresh: valid fresh snapshot
+    reading --> refreshing: missing or stale snapshot
+    refreshing --> committing: complete scan
+    refreshing --> recovering: scan error
+    committing --> saved: conditional write accepted
+    committing --> recovering: conflict or write error
+    recovering --> winner: fresh authoritative snapshot
+    recovering --> stale: bounded authoritative fallback
+    recovering --> failed: absent, invalid, expired or unreadable
+    reading --> failed: invalid or unreadable
+```
+
+Freshness decisions use an age captured after each storage read by an async
+actor. Transition functions do not read clocks, perform I/O or log. Successful
+terminal outcomes preserve the existing log names and verification timestamp.
+A lost commit still recovers from shared storage and discards its candidate.
+
+```mermaid
+stateDiagram-v2
+    [*] --> selecting
+    selecting --> reading: read operation
+    reading --> readComplete: decoded snapshot or absence
+    reading --> failed: read or validation error
+    selecting --> preparing: write operation
+    preparing --> writing: bounded envelope encoded
+    preparing --> failed: serialization or size error
+    writing --> saved: upload accepted
+    writing --> conflict: ETag precondition failed
+    writing --> checkingFirstWriter: initial upload error
+    writing --> failed: other replacement error
+    checkingFirstWriter --> conflict: authoritative object exists
+    checkingFirstWriter --> failed: absent or check failed
+```
+
+Write preparation fails before network work. Initial-writer recovery retains the
+original upload error when no object exists, and propagates a failed check as an
+error rather than declaring a conflict. Existing SDK options, key format and
+serialized schema remain unchanged.
+
+`run-actor.ts` centralizes cancellation/disposal for these two machines and the
+snapshot-loading machine. It rejects cancellation before stopping the actor,
+settles the caller, aborts active child work, removes its listener, and stops the
+actor on every exit. Cancellation does not enter stale/conflict recovery. The
+source scan retains its existing outer 40-second deadline. No actor snapshots or
+callbacks are persisted to Blob.

@@ -9,7 +9,7 @@ hosting cutover are not complete.
 - Frozen-lockfile installation uses a pinned portable DUI artifact and exact
   application dependencies. Local execution uses Node 25.2.1; CI and the Vercel
   function target Node 24.
-- `pnpm test`: 93 tests covering reader/cache behavior, snapshot-stage failures
+- `pnpm test`: 103 tests covering reader/cache behavior, snapshot-stage failures
   and cancellation, a hard refresh deadline, metadata and blob hydration,
   validated socket DNS answers, IP/URL restrictions, response cleanup/size limits,
   native renderer integration, and configuration-only publication verification.
@@ -111,3 +111,13 @@ Both deployments ran on Node 24 against the real empty Open Thoughts publication
 This proves real private-store persistence and readback across deployments.
 Deletion/conflict/error cases use isolated fixture tests; no test posts were
 published or removed from the owner's publication.
+
+## Cache lifecycle refactor
+
+Blob operations and the durable loader now use XState v6 machines, with typed
+state prerequisites and explicit terminal outcomes. All original 93 checks remain;
+ten additional lifecycle/cancellation checks cover first-writer verification,
+failed recovery reads, CAS recovery, stale-state transitions, and cancellation
+during Blob and durable read/write work. Shared actor cleanup also retains all
+existing snapshot-stage cancellation/deadline coverage. Serialized snapshots,
+namespace keys, SDK consistency options and freshness limits are unchanged.

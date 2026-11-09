@@ -1,3 +1,6 @@
+import { createActor } from "xstate";
+import { blobStoreMachine } from "../src/lib/server/leaflet/blob-store-machine";
+import { runActor } from "../src/lib/server/leaflet/run-actor";
 import { randomUUID } from "node:crypto";
 import {
   BlobPreconditionFailedError,
@@ -164,6 +167,7 @@ describe("private Blob snapshot adapter", () => {
       "size limit",
     );
     expect(put).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
   });
 
   it("isolates environments, branches and publications while keeping stable deployment keys", () => {
@@ -189,4 +193,102 @@ describe("private Blob snapshot adapter", () => {
     expect(get).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
   });
+});
+
+describe("Blob operation lifecycle", () => {
+  it("finishes an absent read without starting write work", async () => {
+    const actor = createActor(blobStoreMachine, {
+      input: { kind: "read", read: async () => null },
+    });
+    const states: unknown[] = [];
+    actor.subscribe((state) => states.push(state.value));
+    expect(await runActor(actor, signal())).toEqual({
+      ok: true,
+      snapshot: null,
+      written: false,
+    });
+    expect(states).toEqual(["reading", "readComplete"]);
+  });
+
+  it("makes first-writer conflict recovery an explicit state", async () => {
+    const actor = createActor(blobStoreMachine, {
+      input: {
+        kind: "write",
+        version: null,
+        prepare: () => "body",
+        upload: async () => {
+          throw new Error("already exists");
+        },
+        read: async () => ({ snapshot: snapshot(100), version: "winner" }),
+      },
+    });
+    const states: unknown[] = [];
+    actor.subscribe((state) => states.push(state.value));
+    expect(await runActor(actor, signal())).toMatchObject({
+      ok: true,
+      written: false,
+    });
+    expect(states).toEqual([
+      "preparing",
+      "writing",
+      "checkingFirstWriter",
+      "conflict",
+    ]);
+  });
+
+  it("propagates an unreadable first-writer check instead of calling it a conflict", async () => {
+    const failure = new Error("check unavailable");
+    const actor = createActor(blobStoreMachine, {
+      input: {
+        kind: "write",
+        version: null,
+        prepare: () => "body",
+        upload: async () => {
+          throw new Error("upload failed");
+        },
+        read: async () => {
+          throw failure;
+        },
+      },
+    });
+    expect(await runActor(actor, signal())).toEqual({
+      ok: false,
+      error: failure,
+    });
+    expect(actor.getSnapshot().value).toBe("failed");
+  });
+
+  it.each(["read", "write"] as const)(
+    "aborts active %s work without starting recovery",
+    async (operation) => {
+      const controller = new AbortController();
+      const entered = Promise.withResolvers<void>();
+      let activeSignal: AbortSignal | undefined;
+      const wait = async (
+        _: unknown,
+        options?: { abortSignal?: AbortSignal },
+      ) => {
+        activeSignal = options?.abortSignal;
+        entered.resolve();
+        return new Promise<never>(() => {});
+      };
+      if (operation === "read") vi.mocked(get).mockImplementation(wait);
+      else
+        vi.mocked(put).mockImplementation(async (_, __, options) =>
+          wait(null, options),
+        );
+      const pending =
+        operation === "read"
+          ? store().read(controller.signal)
+          : store().write(snapshot(100), null, controller.signal);
+      const failure = new Error("cancelled active operation");
+      const rejected = expect(pending).rejects.toBe(failure);
+      await entered.promise;
+      controller.abort(failure);
+      await rejected;
+      expect(activeSignal?.aborted).toBe(true);
+      if (operation === "write") expect(get).not.toHaveBeenCalled();
+      else expect(put).not.toHaveBeenCalled();
+    },
+  );
 });

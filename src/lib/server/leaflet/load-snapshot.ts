@@ -1,5 +1,6 @@
-import { createActor, toPromise } from "xstate";
+import { createActor } from "xstate";
 import type { ConfiguredReader, JsonReader, Snapshot } from "./model";
+import { runActor } from "./run-actor";
 import { snapshotMachine } from "./snapshot-machine";
 
 export async function loadSnapshot(
@@ -19,21 +20,9 @@ export async function loadSnapshot(
   const actor = createActor(snapshotMachine, {
     input: { config, json, now },
   });
-  let onAbort = () => {};
-  const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => {
-      reject(cancellation.reason);
-      actor.stop();
-    };
-    cancellation.addEventListener("abort", onAbort, { once: true });
-  });
   try {
-    const result = toPromise(actor);
-    actor.start();
-    return await Promise.race([result, aborted]);
+    return await runActor(actor, cancellation);
   } finally {
-    cancellation.removeEventListener("abort", onAbort);
     clearTimeout(timer);
-    actor.stop();
   }
 }

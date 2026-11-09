@@ -1,3 +1,6 @@
+import { createActor } from "xstate";
+import { durableMachine } from "../src/lib/server/leaflet/durable-machine";
+import { runActor } from "../src/lib/server/leaflet/run-actor";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { durableLoader } from "../src/lib/server/leaflet/durable-loader";
 import { PublicationReader } from "../src/lib/server/leaflet/reader";
@@ -209,4 +212,98 @@ describe("durable publication snapshots", () => {
       )(controller.signal),
     ).rejects.toThrow("cancelled");
   });
+});
+
+describe("durable snapshot lifecycle", () => {
+  it("moves through recovery after losing a commit and returns the authoritative winner", async () => {
+    const store = new MemorySnapshotStore(snapshot(0));
+    vi.spyOn(store, "write").mockImplementation(async () => {
+      store.current = { snapshot: snapshot(301_000, []), version: "winner" };
+      return false;
+    });
+    const actor = createActor(durableMachine, {
+      input: { store, load: async () => snapshot(301_000), now: () => 301_000 },
+    });
+    const states: unknown[] = [];
+    actor.subscribe((state) => states.push(state.value));
+    const result = await runActor(actor, signal());
+    expect(result).toMatchObject({
+      ok: true,
+      outcome: "winner",
+      snapshot: { articles: [] },
+    });
+    expect(states).toEqual([
+      "reading",
+      "refreshing",
+      "committing",
+      "recovering",
+      "winner",
+    ]);
+  });
+
+  it("enters stale after a failed refresh without resetting verification time", async () => {
+    const actor = createActor(durableMachine, {
+      input: {
+        store: new MemorySnapshotStore(snapshot(0)),
+        now: () => 301_000,
+        load: async () => {
+          throw new Error("upstream unavailable");
+        },
+      },
+    });
+    const states: unknown[] = [];
+    actor.subscribe((state) => states.push(state.value));
+    expect(await runActor(actor, signal())).toMatchObject({
+      ok: true,
+      outcome: "stale",
+      snapshot: { stale: true, verifiedAt: 0 },
+    });
+    expect(states).toEqual(["reading", "refreshing", "recovering", "stale"]);
+  });
+
+  it("fails when recovery storage is unreadable rather than returning the old body", async () => {
+    const store = new MemorySnapshotStore(snapshot(0));
+    await expect(
+      durableLoader(
+        store,
+        async () => {
+          store.failure = new Error("recovery unavailable");
+          throw new Error("upstream unavailable");
+        },
+        () => 301_000,
+      )(signal()),
+    ).rejects.toThrow("recovery unavailable");
+  });
+
+  it.each(["reading", "committing"] as const)(
+    "cancels durable %s work",
+    async (stage) => {
+      const store = new MemorySnapshotStore();
+      const entered = Promise.withResolvers<void>();
+      const controller = new AbortController();
+      let activeSignal: AbortSignal | undefined;
+      const wait = async (signal: AbortSignal) => {
+        activeSignal = signal;
+        entered.resolve();
+        return new Promise<never>(() => {});
+      };
+      if (stage === "reading") vi.spyOn(store, "read").mockImplementation(wait);
+      else
+        vi.spyOn(store, "write").mockImplementation(async (_, __, signal) =>
+          wait(signal),
+        );
+      const pending = durableLoader(
+        store,
+        async () => snapshot(0),
+        () => 0,
+      )(controller.signal);
+      const failure = new Error("cancelled durable operation");
+      const rejected = expect(pending).rejects.toBe(failure);
+      await entered.promise;
+      controller.abort(failure);
+      await rejected;
+      expect(activeSignal?.aborted).toBe(true);
+      expect(store.current).toBeNull();
+    },
+  );
 });
