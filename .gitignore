@@ -17,3 +17,6 @@ vite.config.ts.timestamp-*
 debug-storybook.log
 
 /.vercel
+
+# Automatically shrunk failures; promote regressions to tracked fixtures.
+/.xstate-test/
