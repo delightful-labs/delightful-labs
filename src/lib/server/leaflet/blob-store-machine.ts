@@ -1,37 +1,36 @@
-import { BlobPreconditionFailedError } from "@vercel/blob";
+import { BlobPreconditionFailedError, get, put } from "@vercel/blob";
 import { createAsyncLogic, setup, types } from "xstate";
+import type { ConfiguredReader, Snapshot } from "./model";
+import {
+  decodeSnapshot,
+  encodeSnapshot,
+  MAX_SNAPSHOT_BYTES,
+  snapshotPath,
+} from "./snapshot-codec";
 import type { StoredSnapshot } from "./snapshot-store";
 
-type Read = (signal: AbortSignal) => Promise<StoredSnapshot | null>;
-type Write = {
-  kind: "write";
-  read: Read;
-  version: string | null;
-  prepare: () => string;
-  upload: (body: string, signal: AbortSignal) => Promise<void>;
+type Location = {
+  config: ConfiguredReader;
+  storeId: string;
+  namespace: string;
 };
-export type BlobOperation = { kind: "read"; read: Read } | Write;
+type Write = Location & {
+  kind: "write";
+  snapshot: Snapshot;
+  version: string | null;
+};
+export type BlobOperation = (Location & { kind: "read" }) | Write;
+type Downloaded = { body: string; version: string };
 type Context = {
   operation: BlobOperation;
   body?: string;
+  downloaded?: Downloaded;
   snapshot: StoredSnapshot | null;
   error: unknown;
 };
 type Result =
   | { ok: true; snapshot: StoredSnapshot | null; written: boolean }
   | { ok: false; error: unknown };
-const read = createAsyncLogic({
-  schemas: { input: types<{ read: Read }>() },
-  run: ({ input, signal }) => input.read(signal),
-});
-const prepare = createAsyncLogic({
-  schemas: { input: types<Write>() },
-  run: async ({ input }) => input.prepare(),
-});
-const upload = createAsyncLogic({
-  schemas: { input: types<{ operation: Write; body: string }>() },
-  run: ({ input, signal }) => input.operation.upload(input.body, signal),
-});
 
 export const blobStoreMachine = setup({
   schemas: {
@@ -39,10 +38,75 @@ export const blobStoreMachine = setup({
     context: types<Context>(),
     output: types<Result>(),
   },
+  actors: {
+    downloadSnapshot: createAsyncLogic({
+      schemas: { input: types<Location>() },
+      run: async ({ input, signal }): Promise<Downloaded | null> => {
+        const result = await get(snapshotPath(input.config, input.namespace), {
+          storeId: input.storeId,
+          access: "private",
+          useCache: false,
+          abortSignal: AbortSignal.any([signal, AbortSignal.timeout(4_000)]),
+        });
+        if (!result) return null;
+        if (result.statusCode !== 200)
+          throw new Error("Unexpected snapshot response");
+        let size = 0;
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of result.stream) {
+          size += chunk.length;
+          if (size > MAX_SNAPSHOT_BYTES)
+            throw new Error("Durable snapshot size limit");
+          chunks.push(chunk);
+        }
+        return {
+          body: Buffer.concat(chunks).toString("utf8"),
+          version: result.blob.etag,
+        };
+      },
+    }),
+    validateSnapshot: createAsyncLogic({
+      schemas: { input: types<Location & { downloaded: Downloaded }>() },
+      run: async ({ input }): Promise<StoredSnapshot> => ({
+        snapshot: decodeSnapshot(
+          JSON.parse(input.downloaded.body),
+          input.config,
+          input.namespace,
+        ),
+        version: input.downloaded.version,
+      }),
+    }),
+    prepareSnapshot: createAsyncLogic({
+      schemas: { input: types<Write>() },
+      run: async ({ input }) =>
+        encodeSnapshot(input.snapshot, input.config, input.namespace),
+    }),
+    uploadSnapshot: createAsyncLogic({
+      schemas: { input: types<Write & { body: string }>() },
+      run: async ({ input, signal }) => {
+        await put(snapshotPath(input.config, input.namespace), input.body, {
+          storeId: input.storeId,
+          access: "private",
+          abortSignal: AbortSignal.any([signal, AbortSignal.timeout(4_000)]),
+          addRandomSuffix: false,
+          contentType: "application/json",
+          cacheControlMaxAge: 60,
+          allowOverwrite: input.version !== null,
+          ...(input.version ? { ifMatch: input.version } : {}),
+        });
+      },
+    }),
+  },
   states: {
     preparing: { schemas: { context: types<{ operation: Write }>() } },
     writing: {
       schemas: { context: types<{ operation: Write; body: string }>() },
+    },
+    validatingRead: {
+      schemas: { context: types<{ downloaded: Downloaded }>() },
+    },
+    validatingFirstWriter: {
+      schemas: { context: types<{ downloaded: Downloaded }>() },
     },
   },
 }).createMachine({
@@ -63,8 +127,28 @@ export const blobStoreMachine = setup({
     },
     reading: {
       invoke: {
-        src: read,
+        src: "downloadSnapshot",
         input: ({ context }) => context.operation,
+        onDone: ({ event }) =>
+          event.output
+            ? {
+                target: "validatingRead",
+                context: { downloaded: event.output },
+              }
+            : { target: "readComplete" },
+        onError: ({ event }) => ({
+          target: "failed",
+          context: { error: event.error },
+        }),
+      },
+    },
+    validatingRead: {
+      invoke: {
+        src: "validateSnapshot",
+        input: ({ context }) => ({
+          ...context.operation,
+          downloaded: context.downloaded,
+        }),
         onDone: ({ event }) => ({
           target: "readComplete",
           context: { snapshot: event.output },
@@ -77,7 +161,7 @@ export const blobStoreMachine = setup({
     },
     preparing: {
       invoke: {
-        src: prepare,
+        src: "prepareSnapshot",
         input: ({ context }) => context.operation,
         onDone: ({ event }) => ({
           target: "writing",
@@ -91,11 +175,8 @@ export const blobStoreMachine = setup({
     },
     writing: {
       invoke: {
-        src: upload,
-        input: ({ context }) => ({
-          operation: context.operation,
-          body: context.body,
-        }),
+        src: "uploadSnapshot",
+        input: ({ context }) => ({ ...context.operation, body: context.body }),
         onDone: { target: "saved" },
         onError: ({ context, event }) => {
           if (event.error instanceof BlobPreconditionFailedError)
@@ -112,11 +193,29 @@ export const blobStoreMachine = setup({
     },
     checkingFirstWriter: {
       invoke: {
-        src: read,
+        src: "downloadSnapshot",
         input: ({ context }) => context.operation,
-        onDone: ({ event }) => ({
-          target: event.output ? "conflict" : "failed",
+        onDone: ({ event }) =>
+          event.output
+            ? {
+                target: "validatingFirstWriter",
+                context: { downloaded: event.output },
+              }
+            : { target: "failed" },
+        onError: ({ event }) => ({
+          target: "failed",
+          context: { error: event.error },
         }),
+      },
+    },
+    validatingFirstWriter: {
+      invoke: {
+        src: "validateSnapshot",
+        input: ({ context }) => ({
+          ...context.operation,
+          downloaded: context.downloaded,
+        }),
+        onDone: { target: "conflict" },
         onError: ({ event }) => ({
           target: "failed",
           context: { error: event.error },

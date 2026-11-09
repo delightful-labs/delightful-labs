@@ -9,7 +9,7 @@ hosting cutover are not complete.
 - Frozen-lockfile installation uses a pinned portable DUI artifact and exact
   application dependencies. Local execution uses Node 25.2.1; CI and the Vercel
   function target Node 24.
-- `pnpm test`: 103 tests covering reader/cache behavior, snapshot-stage failures
+- `pnpm test`: 104 tests covering reader/cache behavior, snapshot-stage failures
   and cancellation, a hard refresh deadline, metadata and blob hydration,
   validated socket DNS answers, IP/URL restrictions, response cleanup/size limits,
   native renderer integration, and configuration-only publication verification.
@@ -121,3 +121,8 @@ failed recovery reads, CAS recovery, stale-state transitions, and cancellation
 during Blob and durable read/write work. Shared actor cleanup also retains all
 existing snapshot-stage cancellation/deadline coverage. Serialized snapshots,
 namespace keys, SDK consistency options and freshness limits are unchanged.
+
+The Blob adapter now sends data-only operations to registered SDK actors.
+Lifecycle tests mock the actual SDK rather than injecting operational callbacks
+into machine input. An additional check verifies the explicit download → validate
+→ complete path; all 104 tests and emitted-server checks pass.

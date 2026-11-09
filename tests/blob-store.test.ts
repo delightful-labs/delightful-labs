@@ -197,8 +197,9 @@ describe("private Blob snapshot adapter", () => {
 
 describe("Blob operation lifecycle", () => {
   it("finishes an absent read without starting write work", async () => {
+    vi.mocked(get).mockResolvedValue(null);
     const actor = createActor(blobStoreMachine, {
-      input: { kind: "read", read: async () => null },
+      input: { config, storeId: "store_fixture", namespace, kind: "read" },
     });
     const states: unknown[] = [];
     actor.subscribe((state) => states.push(state.value));
@@ -210,16 +211,31 @@ describe("Blob operation lifecycle", () => {
     expect(states).toEqual(["reading", "readComplete"]);
   });
 
+  it("makes validation visible after downloading a snapshot", async () => {
+    vi.mocked(get).mockResolvedValue(response(envelope()));
+    const actor = createActor(blobStoreMachine, {
+      input: { config, storeId: "store_fixture", namespace, kind: "read" },
+    });
+    const states: unknown[] = [];
+    actor.subscribe((state) => states.push(state.value));
+    expect(await runActor(actor, signal())).toMatchObject({
+      ok: true,
+      snapshot: { snapshot: snapshot(100) },
+    });
+    expect(states).toEqual(["reading", "validatingRead", "readComplete"]);
+  });
+
   it("makes first-writer conflict recovery an explicit state", async () => {
+    vi.mocked(put).mockRejectedValue(new Error("already exists"));
+    vi.mocked(get).mockResolvedValue(response(envelope()));
     const actor = createActor(blobStoreMachine, {
       input: {
+        config,
+        storeId: "store_fixture",
+        namespace,
         kind: "write",
         version: null,
-        prepare: () => "body",
-        upload: async () => {
-          throw new Error("already exists");
-        },
-        read: async () => ({ snapshot: snapshot(100), version: "winner" }),
+        snapshot: snapshot(100),
       },
     });
     const states: unknown[] = [];
@@ -232,23 +248,23 @@ describe("Blob operation lifecycle", () => {
       "preparing",
       "writing",
       "checkingFirstWriter",
+      "validatingFirstWriter",
       "conflict",
     ]);
   });
 
   it("propagates an unreadable first-writer check instead of calling it a conflict", async () => {
     const failure = new Error("check unavailable");
+    vi.mocked(put).mockRejectedValue(new Error("upload failed"));
+    vi.mocked(get).mockRejectedValue(failure);
     const actor = createActor(blobStoreMachine, {
       input: {
+        config,
+        storeId: "store_fixture",
+        namespace,
         kind: "write",
         version: null,
-        prepare: () => "body",
-        upload: async () => {
-          throw new Error("upload failed");
-        },
-        read: async () => {
-          throw failure;
-        },
+        snapshot: snapshot(100),
       },
     });
     expect(await runActor(actor, signal())).toEqual({

@@ -175,8 +175,11 @@ A lost commit still recovers from shared storage and discards its candidate.
 stateDiagram-v2
     [*] --> selecting
     selecting --> reading: read operation
-    reading --> readComplete: decoded snapshot or absence
-    reading --> failed: read or validation error
+    reading --> readComplete: absent
+    reading --> validatingRead: downloaded body
+    reading --> failed: download error
+    validatingRead --> readComplete: valid snapshot
+    validatingRead --> failed: validation error
     selecting --> preparing: write operation
     preparing --> writing: bounded envelope encoded
     preparing --> failed: serialization or size error
@@ -184,8 +187,10 @@ stateDiagram-v2
     writing --> conflict: ETag precondition failed
     writing --> checkingFirstWriter: initial upload error
     writing --> failed: other replacement error
-    checkingFirstWriter --> conflict: authoritative object exists
-    checkingFirstWriter --> failed: absent or check failed
+    checkingFirstWriter --> validatingFirstWriter: authoritative object exists
+    checkingFirstWriter --> failed: absent or download failed
+    validatingFirstWriter --> conflict: valid competing snapshot
+    validatingFirstWriter --> failed: validation error
 ```
 
 Write preparation fails before network work. Initial-writer recovery retains the
@@ -199,3 +204,12 @@ settles the caller, aborts active child work, removes its listener, and stops th
 actor on every exit. Cancellation does not enter stale/conflict recovery. The
 source scan retains its existing outer 40-second deadline. No actor snapshots or
 callbacks are persisted to Blob.
+
+Blob operation inputs are data only: location/configuration, operation kind,
+snapshot and expected version. `blobSnapshotStore` never supplies read, prepare
+or upload callbacks. The machine registers `downloadSnapshot`,
+`validateSnapshot`, `prepareSnapshot` and `uploadSnapshot` under `setup.actors`;
+the download/upload actors call the Blob SDK directly with visible options.
+Validation is a separate state on both normal reads and first-writer checks.
+The download actor owns the request and full bounded stream consumption, keeping
+them under one cancellation lifetime before handing plain data to validation.
