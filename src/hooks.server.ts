@@ -1,5 +1,5 @@
 import type { Handle } from "@sveltejs/kit/hooks";
-import { legacyLocation } from "#lib/server/publication/archive.ts";
+import { legacyLocation } from "#lib/server/publication/legacy.ts";
 import { canonicalOrigin } from "#lib/server/leaflet/service.ts";
 
 export const handle: Handle = ({ event, resolve }) => {

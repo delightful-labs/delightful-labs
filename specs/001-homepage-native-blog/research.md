@@ -210,4 +210,4 @@ The foundation now has an [implementation plan](plan.md), [data model](data-mode
 verified; see [verification.md](verification.md). Publication mutation, hosted
 canonical settings, archive import and production cutover remain separate gates.
 Durable caching is verified in Preview. Preserved public archive inputs are in
-[migration/open-thoughts](../../migration/open-thoughts/README.md).
+the old blog repository (the temporary local migration archive was removed after import).

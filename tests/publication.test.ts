@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { xml2js } from "xml-js";
 import {
-  archivePosts,
+  legacyPosts,
   legacyLocation,
-} from "../src/lib/server/publication/archive";
+} from "../src/lib/server/publication/legacy";
 import { publicationFeed } from "../src/lib/server/publication/feeds";
 import { publicationSitemap } from "../src/lib/server/publication/sitemap";
 import { snapshot } from "./fixtures/snapshots";
@@ -11,7 +11,7 @@ import { snapshot } from "./fixtures/snapshots";
 const origin = "https://delightfullabs.com";
 
 describe("legacy URL routing", () => {
-  it.each(archivePosts)(
+  it.each(legacyPosts)(
     "maps $slug directly to the record route with its query intact",
     (post) => {
       const source = new URL(post.legacyUrl + "?source=old");
@@ -63,9 +63,9 @@ describe("native publication feeds", () => {
   function publication() {
     const value = snapshot(123);
     const article = value.articles[0];
-    article.uri = archivePosts[0].uri;
-    article.key = archivePosts[0].key!;
-    article.path = archivePosts[0].path;
+    article.uri = legacyPosts[0].uri;
+    article.key = legacyPosts[0].key!;
+    article.path = legacyPosts[0].path;
     article.title = "A <title> & text";
     article.document.content = {
       $type: "pub.leaflet.content",
@@ -98,7 +98,7 @@ describe("native publication feeds", () => {
     const feed = JSON.parse(publicationFeed(value, origin, "feed.json"));
     expect(feed.title).toBe(value.publication.name);
     expect(feed.items[0]).toMatchObject({
-      id: archivePosts[0].atomId,
+      id: legacyPosts[0].atomId,
       url: origin + value.articles[0].path,
       title: "A <title> & text",
     });
@@ -111,7 +111,7 @@ describe("native publication feeds", () => {
   });
   it("uses the full AT URI for a new article instead of matching a legacy record key alone", () => {
     const value = publication();
-    value.articles[0].uri = `at://did:plc:other/site.standard.document/${archivePosts[0].key}`;
+    value.articles[0].uri = `at://did:plc:other/site.standard.document/${legacyPosts[0].key}`;
     const feed = JSON.parse(publicationFeed(value, origin, "feed.json"));
     expect(feed.items[0].id).toBe(value.articles[0].uri);
   });
@@ -132,8 +132,8 @@ describe("native publication feeds", () => {
           ? "A &lt;title&gt; &amp; text"
           : "A <title> & text",
       );
-      expect(text).toContain(archivePosts[0].atomId);
-      expect(text).toContain(origin + archivePosts[0].path);
+      expect(text).toContain(legacyPosts[0].atomId);
+      expect(text).toContain(origin + legacyPosts[0].path);
       expect(text).not.toContain("https://example.com/</link>");
     },
   );

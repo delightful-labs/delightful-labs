@@ -7,8 +7,8 @@ explicitly deferred. No new homepage content or typography is included.
 
 - All six archive posts published quietly, original dates and text retained.
 - Native article routes, slug aliases, Atom/RSS/JSON feeds, sitemap and direct
-  legacy-host redirects implemented. Original generated images remain at their
-  old paths. Unknown legacy paths are not redirected indiscriminately.
+  legacy-host redirects implemented. Article images load from the PDS; old generated image assets are no longer
+  hosted by this repository. Unknown legacy paths are not redirected indiscriminately.
 - Vercel project `delightful-labs`, team `mjamesderochers-projects`.
 - Node build/runtime 24; Production publication URI and `BLOB_STORE_ID` configured.
 - Existing private store `delightful-labs-snapshots` reused. Production keys are
@@ -35,7 +35,7 @@ explicitly deferred. No new homepage content or typography is included.
    `www` is used and preserve its current behavior before making any changes.
 4. Wait for DNS/TLS readiness and check both public hosts over HTTPS. Verify all
    six old article URLs redirect once to native record-key URLs, query strings
-   survive, assets return unchanged bytes, and `/feed/feed.xml` redirects to the
+   survive, article images load, and `/feed/feed.xml` redirects to the
    native Atom feed. Check subscription IDs, dates and destinations, source-view
    links, document references, sitemap and unknown-path 404s.
 5. Record final deployment, DNS observation, runtime checks and rollback evidence.

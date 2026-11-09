@@ -35,11 +35,15 @@ const sitemap = await server.respond(
 );
 assert.equal(sitemap.status, 200);
 assert.match(await sitemap.text(), /<urlset/);
-const { default: archive } = await import(
-  "../migration/open-thoughts/manifest.json",
+const { default: posts } = await import(
+  "../src/lib/server/publication/legacy.json",
   { with: { type: "json" } }
 );
-for (const row of archive.routePlan.articleRedirects) {
+for (const post of posts) {
+  const row = {
+    from: `https://thoughts.delightfullabs.com/blog/${post.slug}/`,
+    to: `https://delightfullabs.com/open-thoughts/${post.key}/`,
+  };
   const response = await server.respond(
     new Request(row.from + "?from=archive"),
     { getClientAddress: () => "127.0.0.1" },

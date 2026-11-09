@@ -118,13 +118,10 @@ See [the spec](specs/001-homepage-native-blog/spec.md),
 [tasks](specs/001-homepage-native-blog/tasks.md), and
 [research](specs/001-homepage-native-blog/research.md).
 
-## Archive preparation
+## Blog content
 
-The six already-public posts, original image and license, live article captures,
-image variants, feed, sitemap, and their checksum/URL manifest are preserved in
-[migration/open-thoughts](migration/open-thoughts/README.md), outside the public
-application. Run `pnpm check:migration` to verify the archive bytes and references.
-The manifest supplies URL mappings; application bodies are loaded from AT Protocol.
-
-Nonblocking canonical research and an unsent support request are documented in the
-[external canonical URL proof](specs/001-homepage-native-blog/canonical-proof.md).
+All posts and images live in Leaflet/AT Protocol. This repository retains no
+archived article bodies, captures, images or import tooling. The old blog
+repository remains the owner's archive. Only six compatibility mappings remain
+in `src/lib/server/publication/legacy.json` for redirects, aliases and stable feed
+IDs. New articles need no repository changes.

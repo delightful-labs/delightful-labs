@@ -230,3 +230,14 @@ still points to Netlify. Canonical alignment is explicitly nonblocking and has
 not been changed. Body-heading fragments remain an accepted package limitation.
 See `cutover.md` for release checks and rollback rather than treating these
 Preview/local checks as evidence of completed production cutover.
+
+## Archive cleanup after verified import
+
+At the owner's request, removed the temporary migration archive, manifest,
+checksum tooling and copied legacy images. The original blog repository remains
+the archive. Earlier archive paths and checksum commands above describe historical
+verification and are no longer available in this checkout. Only six slug/record-key
+pairs remain in `src/lib/server/publication/legacy.json` for URL compatibility and
+stable feed IDs. Bodies, images, publication metadata and dates come from Leaflet.
+Legacy title IDs were also removed. Old generated image paths are no longer served;
+native article images continue to load from the PDS.

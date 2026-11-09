@@ -290,7 +290,7 @@ because source inspection found plausible code paths.
 
 The blog source still resolves to the pinned commit above. The six known-public
 Markdown posts, original chart, license and stylesheet are preserved byte for
-byte in [migration/open-thoughts](../../migration/open-thoughts/README.md).
+byte in the old blog repository (the temporary local migration archive was removed after import).
 Twelve live HTTPS captures preserve the six article HTML pages, three generated
 image variants, Atom feed, sitemap and stylesheet. All returned 200. The manifest
 contains file hashes/sizes/origins and the exact proposed URL/fragment/feed-ID

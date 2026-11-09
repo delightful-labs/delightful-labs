@@ -2,7 +2,7 @@ import { Feed } from "feed";
 import { render } from "svelte/server";
 import LeafletDocument from "../../components/LeafletDocument.svelte";
 import type { Snapshot } from "../leaflet/model";
-import { archivedPost } from "./archive";
+import { legacyPost } from "./legacy";
 
 import type { FeedFormat } from "../../leaflet/feed";
 export { feedFormats, type FeedFormat } from "../../leaflet/feed";
@@ -66,7 +66,7 @@ export function publicationFeed(
     );
     feed.addItem({
       title: format === "atom.xml" ? atomTitle : article.title,
-      id: archivedPost(article.uri)?.atomId ?? article.uri,
+      id: legacyPost(article.uri)?.atomId ?? article.uri,
       link: `${origin}${article.path}`,
       description: article.description || undefined,
       content,
