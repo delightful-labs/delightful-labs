@@ -1,9 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { createActor } from "xstate";
-  import { ShaderMount } from "@paper-design/shaders";
   import { photos, portraitMachine } from "#lib/portraits/machine.ts";
-  import { portraitShader, portraitUniforms } from "#lib/portraits/shader.ts";
 
   let host: HTMLDivElement;
   let rendered = $state(false);
@@ -15,9 +13,8 @@
   onMount(() => {
     const preference = matchMedia("(prefers-reduced-motion: reduce)");
     const actor = createActor(portraitMachine, {
-      input: { reduced: preference.matches },
+      input: { host, reduced: preference.matches },
     });
-    let shader: ShaderMount | undefined;
     let inView = true;
     const activity = () =>
       actor.send({ type: "ACTIVITY", active: inView && !document.hidden });
@@ -31,31 +28,8 @@
       paused = snapshot.context.paused;
       reduced = snapshot.context.reduced;
       current = snapshot.context.index;
-      if (!snapshot.matches("ready")) return;
-      try {
-        const image = snapshot.context.images[current];
-        shader ??= new ShaderMount(
-          host,
-          portraitShader,
-          { ...portraitUniforms(image), u_reveal: 1 },
-          undefined,
-          0,
-          0,
-          1,
-          640_000,
-        );
-        shader.setUniforms({
-          u_image: image,
-          u_reveal: snapshot.context.progress,
-        });
-        rendered = true;
-      } catch {
-        rendered = false;
-        shader?.dispose();
-        host.replaceChildren();
-        shader = undefined;
-        actor.send({ type: "RENDER_FAILED" });
-      }
+      rendered =
+        snapshot.matches("ready") && !snapshot.matches({ ready: "mounting" });
     });
     toggle = () => actor.send({ type: "TOGGLE" });
     actor.start();
@@ -68,7 +42,6 @@
       preference.removeEventListener("change", motion);
       subscription.unsubscribe();
       actor.stop();
-      shader?.dispose();
     };
   });
 </script>

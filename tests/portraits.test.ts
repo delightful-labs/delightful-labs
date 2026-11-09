@@ -5,6 +5,8 @@ import {
   createCallbackLogic,
   SimulatedClock,
 } from "xstate";
+import { portraitRenderer } from "../src/lib/portraits/renderer";
+import type { ShaderMount } from "@paper-design/shaders";
 import { portraitMachine } from "../src/lib/portraits/machine";
 
 async function rotation(reduced = false) {
@@ -17,9 +19,23 @@ async function rotation(reduced = false) {
             Array.from({ length: 4 }, () => ({}) as HTMLImageElement),
         }),
         frames: createCallbackLogic(() => {}),
+        renderer: portraitRenderer.provide({
+          actors: {
+            mount: createCallbackLogic(({ sendBack }) => {
+              sendBack({ type: "MOUNTED", shader: {} as ShaderMount });
+            }),
+            draw: createAsyncLogic({ run: async () => {} }),
+          },
+        }),
       },
     }),
-    { input: { reduced }, clock },
+    {
+      input: {
+        host: { replaceChildren() {} } as unknown as HTMLDivElement,
+        reduced,
+      },
+      clock,
+    },
   );
   actor.start();
   await Promise.resolve();
@@ -68,11 +84,82 @@ describe("portrait rotation", () => {
     expect(actor.getSnapshot().context.progress).toBe(1);
     actor.stop();
   });
-  it("stops rotation when rendering fails", async () => {
-    const { actor, clock } = await rotation();
-    actor.send({ type: "RENDER_FAILED" });
-    clock.increment(10_000);
+  it("falls back when the renderer cannot start", async () => {
+    const host = {
+      replaceChildren: () => {
+        cleared = true;
+      },
+    };
+    let cleared = false;
+    const actor = createActor(
+      portraitMachine.provide({
+        actors: {
+          loadImages: createAsyncLogic({
+            run: async () => [{} as HTMLImageElement],
+          }),
+          renderer: portraitRenderer.provide({
+            actors: {
+              mount: createCallbackLogic(() => {
+                throw new Error("No WebGL");
+              }),
+            },
+          }),
+        },
+      }),
+      { input: { host: host as unknown as HTMLDivElement, reduced: false } },
+    );
+    actor.start();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(actor.getSnapshot().matches("fallback")).toBe(true);
+    expect(cleared).toBe(true);
+    actor.stop();
+  });
+  it("releases the renderer when an image update throws", async () => {
+    let disposed = false;
+    let cleared = false;
+    const actor = createActor(
+      portraitMachine.provide({
+        actors: {
+          loadImages: createAsyncLogic({
+            run: async () => [{} as HTMLImageElement],
+          }),
+          renderer: portraitRenderer.provide({
+            actors: {
+              mount: createCallbackLogic(({ sendBack }) => {
+                sendBack({ type: "MOUNTED", shader: {} as ShaderMount });
+                return () => {
+                  disposed = true;
+                };
+              }),
+              draw: createAsyncLogic({
+                run: async () => {
+                  throw new Error("Texture update failed");
+                },
+              }),
+            },
+          }),
+        },
+      }),
+      {
+        input: {
+          host: {
+            replaceChildren() {
+              cleared = true;
+            },
+          } as unknown as HTMLDivElement,
+          reduced: false,
+        },
+      },
+    );
+    actor.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(actor.getSnapshot().matches("fallback")).toBe(true);
+    expect(disposed).toBe(true);
+    expect(cleared).toBe(true);
     actor.stop();
   });
 });
