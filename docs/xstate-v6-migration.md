@@ -1,7 +1,7 @@
 # XState v6 migration specification
 
-Status: proposed for review, 2026-11-09. Specification only; implementation and
-dependency installation have not started. Inventory baseline: DUI `eaf1b98`.
+Status: implementation ready for review in PR #20, 2026-11-09.
+Inventory baseline: DUI `eaf1b98`; pre-migration specification commit: `b8a52c2`.
 
 ## Purpose and scope
 
@@ -126,3 +126,68 @@ separately so behavior can be reviewed after each.
 
 Recheck these sources against the pinned beta before implementation. The codemod
 is migration assistance, not proof that all manual or behavioral changes are covered.
+
+## Pilot implementation and verification
+
+The runtime dependency and lockfile now pin `xstate@6.0.0-beta.1`. The official
+`@xstate/codemod@0.1.0-beta.1` was run in dry mode and then applied to the machine.
+It reported no manual sites, but static review and `pnpm check` identified two
+generated-code issues: emitted events need a schema map, and the generated
+context-patch helpers did not satisfy v6 action-source signatures. The helpers
+are now typed pure functions outside `setup`; transitions explicitly apply them.
+Independent patches compose directly; dismissal computes the choice before its
+exit offset. Notifications use `enq.emit`. No component changes were required.
+
+The test harness uses `Actor<typeof swipeActionsMachine>` for owned actor roots:
+v6's `ActorRefFrom` does not include root lifecycle methods such as `stop()`.
+Existing assertions and browser tests were retained without weakening expectations.
+
+Relevant runtime-change review: this machine has no parallel regions, invoked
+children, timers, persisted snapshots, final-state output, or asynchronous action
+promises. Its `dismissal.complete` state intentionally remains non-final, preserving
+RESET handling. Named root IDs, eventless transitions, emitted-event timing,
+immutable patches, and component-owned cleanup remain relevant. Mounts create
+fresh actors instead of attempting to restart stopped roots. Existing browser
+and unit coverage exercises interaction, cancellation, reset and dismissal.
+
+Verification completed:
+
+- `pnpm check`: zero errors and warnings.
+- `pnpm package`: declarations, package generation, and publint passed.
+- `pnpm exec vitest run src/swipe-actions.test.ts`: 26 passed, including SSR.
+- Storybook production build with `tests/storybook` configuration: passed.
+- Focused Playwright suite against that build: 73 passed, 11 existing conditional
+  skips across desktop Chromium, mobile Chromium, and mobile WebKit. Native CDP
+  touch tests run in mobile Chromium; skips do not establish native WebKit touch coverage.
+- Codemod comparison: 100 seeded random sequences, 3,100 steps, no differences,
+  missing event cases, unstubbed actors, or nonserializable values. The bundled
+  baseline runtime is v5.33.4, whereas this repo previously locked v5.33.3.
+  Shortest-path traversal reached its context graph limit; simple paths were
+  explicitly disabled. This is sampled equivalence, not exhaustive proof.
+- `pnpm pack --out /tmp/delightful-ui-xstate-v6.tgz`: passed. An isolated temporary
+  consumer imported `SwipeActions` from the extracted package's public export
+  and rendered its supplied link/action through Svelte SSR. The consumer reused
+  installed dependencies; this does not qualify every downstream application's build.
+  The Vite middleware harness printed an EPERM warning for an incidental HMR
+  socket; SSR assertions completed successfully without that socket.
+- Changed-file Prettier and Git whitespace checks passed. The current ESLint
+  configuration skips standalone TypeScript files, so its invocation provides
+  no additional TypeScript lint coverage.
+
+To reproduce the sampled comparison, extract the original machine from `b8a52c2`
+to a temporary `.ts` file, then run these commands from the repository root:
+
+```sh
+pnpm dlx @xstate/codemod@0.1.0-beta.1 baseline /tmp/dui-swipe-v5.ts \
+  --input docs/xstate-migration/input.json \
+  --events docs/xstate-migration/events.json \
+  --out /tmp/dui-swipe-baseline.json --no-simple-paths \
+  --walks 100 --steps 30 --max-sequences 100 --json
+pnpm dlx @xstate/codemod@0.1.0-beta.1 verify \
+  --baseline /tmp/dui-swipe-baseline.json \
+  src/lib/Components/internal/swipe-actions.ts --json
+```
+
+The large generated trace is temporary; the input/event fixtures and reproduction
+instructions are retained here. No package publication or downstream dependency
+updates are included in this PR.

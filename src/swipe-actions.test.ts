@@ -1,4 +1,4 @@
-import { createActor, type ActorRefFrom, type InputFrom } from 'xstate'
+import { createActor, type Actor, type InputFrom } from 'xstate'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createRawSnippet } from 'svelte'
 import { render } from 'svelte/server'
@@ -8,8 +8,8 @@ import {
 	type SwipeActionChosen
 } from './lib/Components/internal/swipe-actions.js'
 
-type Actor = ActorRefFrom<typeof swipeActionsMachine>
-const actors: Actor[] = []
+type SwipeActor = Actor<typeof swipeActionsMachine>
+const actors: SwipeActor[] = []
 afterEach(() => {
 	for (const actor of actors.splice(0)) actor.stop()
 })

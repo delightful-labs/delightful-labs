@@ -1,5 +1,11 @@
 # Agent guidance
 
+## State machines
+
+- Use the pinned XState v6 dependency and its schema/function model for machine changes. See [the migration specification and implementation notes](docs/xstate-v6-migration.md).
+- Keep workflow decisions visible in transitions with descriptive predicates, return immutable context patches, and queue effects with `enq`. Preserve context-update order when composing patches.
+- Interaction machines and their DOM resources belong to the mounting UI component; retain explicit subscription and browser-resource cleanup.
+
 ## Development servers
 
 - Start development servers on the network by default (`0.0.0.0`), unless the user explicitly requests localhost-only access. Provide both localhost and LAN URLs.
