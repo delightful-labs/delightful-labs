@@ -48,22 +48,13 @@ This evaluation did not stress-test pathological recursion, execute malicious
 URLs, test browser hydration, or load a live article. It proves server execution
 and specific compatibility differences, not complete support for all formats.
 
-## Reproduce
+## Evaluation evidence
 
-Copy this directory outside the application checkout, then run:
-
-```sh
-npm install --ignore-scripts --no-audit --no-fund --no-package-lock
-npm run probe
-```
-
-The probe starts Vite in middleware mode with WebSockets disabled; it exposes no
-HTTP server. It compiles the published Svelte components for SSR and prints
-observations. `results.json` records the observed output. `Probe.svelte` uses
-package defaults; `SafeProbe.svelte` demonstrates safe inline-link, iframe, and
-unknown-block overrides, without styles. Those three overrides are a feasibility
-proof, not a complete safe integration. Test content is synthetic and never
-included in application routes.
+The findings above were observed using a temporary SSR harness against the
+published packages. That one-off harness was removed after adoption. Ongoing
+application coverage lives in `tests/renderer.test.ts` and exercises the actual
+`LeafletDocument.svelte` integration rather than a second fixture application.
+Run `pnpm test` from the repository root.
 
 Tarball SHA-1 values reported by npm (artifact identity, not a security claim):
 
