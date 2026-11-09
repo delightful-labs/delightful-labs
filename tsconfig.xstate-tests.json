@@ -1,0 +1,7 @@
+{
+	"extends": "./tsconfig.json",
+	"include": [
+		"src/lib/machines/identity/session-readiness.test.ts",
+		"src/lib/machines/identity/session-readiness.model.test.ts"
+	]
+}

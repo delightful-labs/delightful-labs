@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, fromCallback, waitFor } from 'xstate'
+import { createActor, createCallbackLogic, waitFor } from 'xstate'
 import type { SessionReadinessReport, SessionStatus } from '../../contracts/session.js'
 import { createSessionReadinessMachine } from './session-readiness.js'
 
@@ -11,7 +11,9 @@ afterEach(() => {
 function fixture(bind = true) {
 	const reports: SessionReadinessReport[] = []
 	const recipient = createActor(
-		fromCallback<SessionReadinessReport>(({ receive }) => receive((event) => reports.push(event)))
+		createCallbackLogic<SessionReadinessReport>(({ receive }) =>
+			receive((event) => reports.push(event))
+		)
 	).start()
 	const actor = createActor(createSessionReadinessMachine(), {
 		input: { reportTo: recipient }
@@ -295,12 +297,13 @@ describe('acquired session readiness', () => {
 		}
 	)
 	it.each(['resolved', 'rejected'] satisfies ('resolved' | 'rejected')[])(
-		'retains retry after observer actor crash until %s',
+		'retains retry after an injected observer error report until %s',
 		async (outcome) => {
 			const f = fixture()
 			f.retry()
 			f.actor.send({
-				type: 'xstate.error.actor.observer',
+				// @ts-expect-error Deliberate system-event fault injection, outside the public command API.
+				type: 'xstate.error.actor',
 				actorId: 'observer',
 				error: new Error('PRIVATE_CRASH')
 			})
@@ -330,7 +333,8 @@ describe('acquired session readiness', () => {
 			f.actor.send({ type: 'SHUTDOWN' })
 			f.actor.send({ type: 'SHUTDOWN' })
 			f.actor.send({
-				type: 'xstate.error.actor.observer',
+				// @ts-expect-error Deliberate system-event fault injection, outside the public command API.
+				type: 'xstate.error.actor',
 				actorId: 'observer',
 				error: new Error('PRIVATE_LATE')
 			})
