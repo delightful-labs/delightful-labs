@@ -301,9 +301,8 @@ describe('creation owner retains recovery through drain', () => {
 		const first = deferred<Result>(),
 			next = deferred<Result>()
 		const replacement = { key: 'notebook/member-b' }
-		const started = vi.fn(
-			(input: { binding: { key: string }; request: CreationRequest<Record> }) =>
-				input.binding.key === binding.key ? first.promise : next.promise
+		const started = vi.fn((input: { binding: { key: string }; request: CreationRequest<Record> }) =>
+			input.binding.key === binding.key ? first.promise : next.promise
 		)
 		const operation = child(started)
 		const owner = tracked(
