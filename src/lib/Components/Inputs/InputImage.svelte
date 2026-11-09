@@ -132,7 +132,12 @@
 		box-sizing: border-box;
 		font-family: var(
 			--dui-button-font-family,
-			var(--dui-font-family, 'Source Code Pro', monospace)
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
 		);
 		font-size: var(
 			--dui-button-font-size,
@@ -210,7 +215,15 @@
 		min-width: 0;
 		white-space: normal;
 		overflow-wrap: anywhere;
-		font-family: var(--dui-input-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-input-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 		font-size: var(--dui-input-font-size, inherit);
 		color: var(--dui-input-color, var(--dui-color-foreground, inherit));
 	}

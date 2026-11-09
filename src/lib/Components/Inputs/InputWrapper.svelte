@@ -111,13 +111,29 @@
 	}
 
 	label {
-		font-family: var(--dui-field-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-field-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 		font-size: var(--dui-field-font-size, var(--dui-font-size-sm, 0.875rem));
 		color: var(--dui-field-color, var(--dui-color-foreground, inherit));
 	}
 
 	.wrapper :global(:is(input, select, textarea)) {
-		font-family: var(--dui-input-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-input-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 		font-size: var(--dui-input-font-size, inherit);
 		line-height: 1.25;
 		box-sizing: border-box;

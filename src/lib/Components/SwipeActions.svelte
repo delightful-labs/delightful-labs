@@ -452,6 +452,12 @@
 		padding: 0;
 		min-block-size: 44px;
 		font: inherit;
+		font-family: var(
+			--dui-font-family-interactive,
+			'Cascadia Code',
+			ui-monospace,
+			monospace
+		);
 		line-height: 1.25;
 		overflow-wrap: anywhere;
 		cursor: pointer;

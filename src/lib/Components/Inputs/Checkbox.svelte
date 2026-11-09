@@ -98,7 +98,15 @@
 			var(--dui-field-gap, var(--dui-spacing-xs, 0.5rem))
 		);
 		min-block-size: var(--dui-checkbox-min-height, 44px);
-		font-family: var(--dui-field-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-field-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 		font-size: var(--dui-field-font-size, var(--dui-font-size-sm, 0.875rem));
 		color: var(--dui-field-color, var(--dui-color-foreground, inherit));
 	}

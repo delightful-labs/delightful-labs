@@ -9,6 +9,15 @@
 </span>
 
 <style>
+	.skip-control > :global(:is(a, button)) {
+		font-family: var(
+			--dui-font-family-interactive,
+			'Cascadia Code',
+			ui-monospace,
+			monospace
+		);
+	}
+
 	.skip-control {
 		position: fixed;
 		inset-block-start: var(--dui-spacing-xs, 0.5rem);

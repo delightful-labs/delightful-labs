@@ -111,7 +111,15 @@
 		display: flex;
 		min-inline-size: 0;
 		max-inline-size: 100%;
-		font-family: var(--dui-field-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-field-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 		margin-inline-end: calc(
 			-1 * var(--dui-radio-border-overlap, var(--dui-border-width, 2px))
 		);
