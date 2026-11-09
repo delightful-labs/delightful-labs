@@ -284,3 +284,23 @@ hosted external-subpath canonical workflow and settings persistence; final
 publication/account identity; final Atom reader continuity. These are explicit
 implementation/migration proof gates. They must not be reported as completed
 because source inspection found plausible code paths.
+
+
+## Preparation update — November 9, 2026
+
+The blog source still resolves to the pinned commit above. The six known-public
+Markdown posts, original chart, license and stylesheet are preserved byte for
+byte in [migration/open-thoughts](../../migration/open-thoughts/README.md).
+Twelve live HTTPS captures preserve the six article HTML pages, three generated
+image variants, Atom feed, sitemap and stylesheet. All returned 200. The manifest
+contains file hashes/sizes/origins and the exact proposed URL/fragment/feed-ID
+mapping; these plans are not active redirects.
+
+The ecosystem article's current public date (`2022-11-14`) differs from Write.as
+creation time (`2022-11-12T15:55:33Z`). Preserve the public date during import;
+retain the export timestamp as provenance. The full export is not copied because
+it also contains account fields and eight unclassified entries.
+
+Owner publication identity is now verified and enumeration is empty. The hosted
+external canonical URL/edit/settings workflow is still unproved; current source
+findings and the concrete proof checklist are in [canonical-proof.md](canonical-proof.md).

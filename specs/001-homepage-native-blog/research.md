@@ -1,7 +1,7 @@
 # Technical Research: Native Open Thoughts on Delightful Labs
 
 **Date**: 2026-11-09
-**Status**: Initial technical research complete; implementation proofs and owner-specific setup remain.
+**Status**: Native foundation and durable Preview proofs complete; archive inputs preserved. Hosted external canonical/editing proof, editable import, feeds/redirects and production cutover remain.
 **Related specification**: [spec.md](spec.md)
 
 ## Recorded owner decision
@@ -11,8 +11,7 @@ individual native article pages underneath it. The old blog subdomain's article
 URLs will permanently redirect to their corresponding native pages. This is a
 settled decision and is recorded in the spec's Clarifications section.
 
-Typography remains entirely owner-owned. This research made no application,
-publication, hosting, or DNS changes.
+Typography remains entirely owner-owned. Initial research was read-only; later implementation and Preview proofs are recorded in [verification.md](verification.md). Current canonical findings and the remaining hosted proof are in [canonical-proof.md](canonical-proof.md).
 
 ## Research artifacts and confidence
 
@@ -23,8 +22,9 @@ publication, hosting, or DNS changes.
 | Svelte/Delightful UI and Vercel | Clean local UI source, official platform documentation, read-only Netlify project inspection and public DNS | [Hosting](research-hosting.md) |
 
 Source inspection is not proof that the hosted editor supports every configuration.
-Public data retrieval is not yet a working Svelte renderer. These boundaries are
-deliberate; no completed implementation or production migration is claimed.
+Native Svelte rendering and durable Preview snapshots are now verified separately
+in verification.md. Authenticated authoring and production migration remain
+unproved; those boundaries are tracked explicitly.
 
 ## Decision: use public AT Protocol records directly
 
@@ -44,24 +44,22 @@ database access are unnecessary for public article reading and do not satisfy
 the selected native-ingestion requirement. No public appview dependency is needed
 for the initial archive size. See [live evidence and schemas](research-native-atproto.md).
 
-## Decision: support current records and a bounded semantic renderer
+## Decision: use the accepted Standard Reader package
 
-**Recommendation**: use `site.standard.document` with `pub.leaflet.content` for a
-new publication; add legacy `pub.leaflet.document` only if the actual publication
-requires it. The current publisher does not guarantee duplicate records in both
-collections. Handle inline and blob-backed pages, UTF-8 byte-indexed rich-text
-facets, PDS image blobs, recursive lists, and linked linear subpages. Unsupported
-interactive/canvas content gets a visible source-link fallback. Do not import
-Leaflet theme/font/size settings into the native site.
+**Owner decision**: use exact `@standard-reader/renderer-svelte@0.4.0` and matching
+core with their evaluated constraints. Keep `site.standard.document` ingestion,
+Leaflet inline/blob hydration, native server rendering, safe links and explicit
+source fallbacks. Do not rebuild the package's parser or adopt Leaflet theme and
+font settings. Legacy record support is needed only if actual source data requires it.
 
-**Rationale**: This covers the archive's content and the inspected live linear
-documents while avoiding a promise to reproduce the entire evolving editor.
-Gated text is not available from public records; respect the public boundary and
-reachable-page restrictions, rather than trying to retrieve private source text.
+**Rationale**: the owner accepted the package's rendering, facet, checklist,
+member-delimiter, and anchor limitations before starting to publish. This
+supersedes the earlier custom-renderer recommendation. Public records are the
+input boundary; the package's member delimiters are not an access-control layer.
 
-**Alternatives considered**: A full Leaflet UI clone has unnecessary scope;
-plain-text-only rendering loses meaningful content. The supported-block matrix
-and membership evidence are in [native-loading research](research-native-atproto.md).
+The original schema research remains in [native-loading research](research-native-atproto.md).
+The accepted package evaluation is in
+[evaluations/standard-reader/README.md](evaluations/standard-reader/README.md).
 
 ## Decision: preserve a native canonical address and prove Leaflet configuration
 
@@ -130,8 +128,7 @@ later continuity check. Evidence: [live feed inventory](research-migration.md).
 **Recommendation**: use the explicit Vercel adapter and server-side record loading.
 Start with a five-minute request-driven refresh interval, synchronous refresh on
 stale reads, and a durable last-successful snapshot. Vercel Runtime Cache can
-accelerate this; it cannot guarantee retention by itself. Private Vercel Blob is
-a viable durable-snapshot option, not yet provisioned or a required new database.
+accelerate this; it cannot guarantee retention by itself. Private Vercel Blob is now implemented and provisioned for Preview; cross-deployment persistence and conditional-write behavior are verified. Production enablement remains a cutover step.
 
 **Rationale**: This is enough for the small public archive without an always-on
 consumer. Preserve verification timestamps across cache fills, fail partial scans
@@ -177,7 +174,7 @@ and [exact URL/asset inventory](research-migration.md).
    (owner-confirmed spelling correction). Public handle resolution returned
    `did:plc:226m7t4kp7d7sg2qsdresypm` on 2026-11-09; its DID document confirmed
    `at://derocher.me` and current PDS `https://morel.us-east.host.bsky.network`.
-   Resolve that service dynamically. No publication has been created. The earlier
+   Resolve that service dynamically. The owner has since created Open Thoughts at `https://open-thoughts.leaflet.pub`, verified as `at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.publication/3mzv6a2yk522y`. The earlier
    `@derocer.me` spelling failed resolution and is superseded.
 2. **Deferred by the owner**: Homepage content, positioning, and project selection
    will be addressed after the basic site is set up. Do not ask these questions
@@ -203,8 +200,7 @@ rather than asking the owner to choose infrastructure without evidence.
 
 ### Operational inputs needed later, not blockers to this research
 
-- Correct Vercel team/project/plan and connector authorization. Project reads
-  currently return 403; no account-specific plan or existing project was verified.
+- Vercel project/team connection and Preview store setup are complete; see verification.md. Production configuration and approved domain cutover remain pending.
 - DNS edit access, isolated preview/production configuration, and any snapshot
   store setup before deployment.
 
@@ -212,5 +208,6 @@ The foundation now has an [implementation plan](plan.md), [data model](data-mode
 [reader contracts](contracts/reader.md), [validation guide](quickstart.md), and
 [task tracking](tasks.md). A native Svelte public-source proof is implemented and
 verified; see [verification.md](verification.md). Publication mutation, hosted
-canonical settings, durable caching, archive import and production cutover remain
-separate gates and are not claimed complete by the foundation.
+canonical settings, archive import and production cutover remain separate gates.
+Durable caching is verified in Preview. Preserved public archive inputs are in
+[migration/open-thoughts](../../migration/open-thoughts/README.md).
