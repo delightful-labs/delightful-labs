@@ -426,7 +426,7 @@ export function createWorkspaceCreationOwner<
 					}
 				}
 			},
-			closed: { type: 'final', on: { OBSERVED: {}, REEVALUATE: {}, RETRY: {}, SHUTDOWN: {} } }
+			closed: { type: 'final' }
 		}
 	})
 }
