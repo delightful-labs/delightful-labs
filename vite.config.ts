@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [
     sveltekit({ adapter: adapter({ runtime: "nodejs24.x", maxDuration: 60 }) }),
   ],
+  ssr: { noExternal: ["xstate"] },
   test: {
     include: ["tests/**/*.test.ts"],
     server: {

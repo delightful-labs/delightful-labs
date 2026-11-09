@@ -19,6 +19,7 @@ Use `pnpm dev --port 5183 --strictPort` for an explicit available port.
 pnpm check
 pnpm test
 pnpm build
+pnpm test:build
 pnpm test:browser
 ```
 
@@ -54,6 +55,9 @@ behavior; the owner accepted its current facet, checklist, page, and delimiter
 limitations before starting to publish. See the
 [renderer evaluation](specs/001-homepage-native-blog/evaluations/standard-reader/README.md).
 
+The server bundle includes each dependency's resolved XState version so DUI's v5 internals stay separate from the app's v6 machines. `pnpm test:build`
+executes emitted SSR routes through Node, without Vite's development resolver.
+
 The server reader's cache/refresh lifecycle is an XState v6 machine, pinned to
 `6.0.0-beta.1` as requested. Fetching and Zod validation live in focused modules;
 the machine owns concurrency, freshness, stale fallback, retries and cancellation.
@@ -75,10 +79,10 @@ environment files, even when they use different ports.
 ## Deployment status and remaining gates
 
 `pnpm build` generates `.vercel/output` with the explicit Node.js 24 adapter.
-The build is deployable output, not evidence of a hosted release. The repository
-has no production project link, assigned domains, or publishing credentials.
+The build is deployable output, not evidence of a hosted release. The repository is linked to the `delightful-labs` Vercel project for preview
+verification. No custom domains or publishing credentials are configured.
 
-Before hosted work, authorize and link the intended Vercel team/project. If using
+The Vercel connection is authorized for the selected team/project. If using
 the CLI, link before `vercel env pull .env.local` and keep preview configuration
 separate from production. Do not overwrite an existing local environment file
 without preserving its local settings.

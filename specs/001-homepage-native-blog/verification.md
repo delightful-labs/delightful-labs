@@ -59,5 +59,16 @@ Ongoing SSR tests exercise the actual application integration.
 - Durable snapshots and reconciliation across Vercel instances; the current
   five-minute-fresh/24-hour-stale cache remains process-local.
 - Editable archive import, preserved assets/anchors, feeds, and final redirects.
-- Hosted preview and production cutover. Connected Vercel project access returned
-  403; no project, deployment, publication settings, or DNS records were changed.
+- Hosted preview and production cutover. Vercel access is now authorized and the `delightful-labs` project is linked.
+  The first hosted run exposed a v5/v6 XState module-resolution collision; SSR
+  bundling and a built-output Node smoke check address it. No custom domains,
+  publication settings, or DNS records were changed.
+
+## Hosted SSR correction
+
+DUI uses XState v5 internally while the application uses v6. Externalizing both
+under one bare module name made the emitted server load v5 imports from v6 on
+Vercel. Vite now bundles each resolved XState version. `pnpm test:build` executes
+the emitted server through Node and checks homepage/index 200 and unknown-post
+404 responses. CI runs this after the production build. Development-server tests
+alone do not cover this module-resolution boundary.
