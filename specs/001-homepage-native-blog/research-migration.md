@@ -290,7 +290,7 @@ because source inspection found plausible code paths.
 
 The blog source still resolves to the pinned commit above. The six known-public
 Markdown posts, original chart, license and stylesheet are preserved byte for
-byte in [migration/open-thoughts](../../migration/open-thoughts/README.md).
+byte in the old blog repository (the temporary local migration archive was removed after import).
 Twelve live HTTPS captures preserve the six article HTML pages, three generated
 image variants, Atom feed, sitemap and stylesheet. All returned 200. The manifest
 contains file hashes/sizes/origins and the exact proposed URL/fragment/feed-ID
@@ -304,3 +304,14 @@ it also contains account fields and eight unclassified entries.
 Owner publication identity is now verified and enumeration is empty. The hosted
 external canonical URL/edit/settings workflow is still unproved; current source
 findings and the concrete proof checklist are in [canonical-proof.md](canonical-proof.md).
+
+
+## First quiet publication proved
+
+Following explicit owner approval, the ecosystem article was quietly published
+as `site.standard.document/3mzvkf4zddc2n`. The original public date, complete body,
+links/lists/headings, uploaded image and native Preview initial HTML/browser
+rendering were verified; see [verification.md](verification.md). Its public record
+mapping and proof metadata are now in the migration manifest. The other five
+articles remain unimported. Canonical alignment, old slug/fragment compatibility,
+feeds and production cutover remain separate open work.

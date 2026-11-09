@@ -15,10 +15,12 @@
     document,
     pds,
     sourceUrl,
+    unstyled = false,
   }: {
     document: StandardSiteDocument;
     pds: string;
     sourceUrl: string;
+    unstyled?: boolean;
   } = $props();
   type Props<K extends keyof SvelteSharedComponents> = Parameters<
     NonNullable<SvelteSharedComponents[K]>
@@ -77,8 +79,8 @@
   {options}
   components={{
     shared: {
-      paragraph,
-      heading,
+      paragraph: unstyled ? undefined : paragraph,
+      heading: unstyled ? undefined : heading,
       link,
       website,
       button,

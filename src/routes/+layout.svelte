@@ -5,7 +5,10 @@
   let { children } = $props();
 </script>
 
-<svelte:head><title>Delightful Labs</title></svelte:head>
+<svelte:head>
+  <title>Delightful Labs</title>
+  <link rel="alternate" type="application/atom+xml" title="Open Thoughts" href="/open-thoughts/atom.xml" />
+</svelte:head>
 <div class="site">
   <a href="#main">Skip to content</a>
   <Navigation label="Main" orientation="horizontal">

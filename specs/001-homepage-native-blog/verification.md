@@ -152,3 +152,92 @@ The owner's publication still has URL `https://open-thoughts.leaflet.pub` and ze
 matching documents after complete enumeration. External-subpath persistence is
 not yet proved. See [canonical-proof.md](canonical-proof.md) for source evidence,
 the authenticated workflow still required, and an unsent support request.
+
+
+## First owner-approved quiet publication
+
+The owner explicitly approved publishing the ecosystem article quietly as the
+first integration proof while external canonical URL support remains unresolved.
+The real Leaflet editor created and saved an editable draft from the preserved
+Markdown. The original chart was uploaded through the editor. Title, complete
+body, links and image survived reload; Leaflet's documented read API also returned
+the eight correct heading levels and one image. Draft/edit capability URLs are
+not committed to this public repository.
+
+The publish wizard was set to November 14, 2022 at midnight America/New_York.
+Date and quiet-sharing choices survived a reload. “Post Quietly” was checked;
+Bluesky sharing and Discover were unchecked. The final publish action reported
+“Published!”. Public PDS retrieval then verified:
+
+- URI: `at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvkf4zddc2n`.
+- CID: `bafyreifncz3hegl25dzfajuzaixqgiyht7cp5qclcmbgrnpljslo47eadi`.
+- Exact publication membership and path `/3mzvkf4zddc2n`.
+- `publishedAt: 2022-11-14T05:00:00.000Z`, preserving the public calendar date;
+  this chosen date-only normalization is not a recovered original timestamp.
+- `preferences.showInDiscover: false`; no Bluesky `postRef`.
+- Public source: https://open-thoughts.leaflet.pub/3mzvkf4zddc2n.
+- Explicit Leaflet source-view fallback also returned the full article without
+  redirecting away from that route.
+
+Native Preview:
+https://delightful-labs-gou5e192e-mjamesderochers-projects.vercel.app/open-thoughts/3mzvkf4zddc2n/
+
+The initial HTML returned 200 with the article body, all eight headings, image,
+canonical tag, and exact `rel="site.standard.document"` reference. In the browser,
+the normalized body matched all 6,448 source characters after removing Markdown
+syntax/image markup. It retained four numbered items, five bullet items, nine
+bold spans, one emphasis span, and all three original external links. The chart
+loaded directly from the public PDS at 1280 × 853; there were zero iframes.
+The only browser resource error was the foundation's absent `/favicon.ico`.
+
+Remaining limits: native heading IDs are empty under the accepted renderer, so
+legacy heading fragments are not yet preserved. The planned human-readable slug
+alias is not implemented. Leaflet's source page still declares its Leaflet URL
+canonical while native Preview declares the intended main-site route; this
+owner-approved proof does not resolve that temporary conflict. Native feeds,
+remaining imports, production configuration, DNS and redirects remain outstanding.
+No publication settings, primary URL or DNS records were changed for this proof.
+
+## PR #6 complete archive, routing and feeds — November 9
+
+All six known-public posts now have editable Leaflet drafts and public Standard
+Site records, mapped in `migration/open-thoughts/manifest.json`. Initial paste
+verification checked editor text too early: four newly published records lacked
+their opening text. Those existing drafts were repaired, reloaded to confirm
+persistence, and updated under the same record identities. Public/native output,
+not editor DOM alone, is the final comparison authority. Two Steps and the
+previously proved ecosystem post were intact. Original public dates remain.
+
+The five newly imported bodies were compared from the actual native JSON feed
+HTML against normalized original plaintext: 2,089 / 4,454 / 3,697 / 3,323 / 5,594
+characters respectively, exact matches. The ecosystem body's prior text, list,
+image and link proof remains applicable. All six native record-key routes returned
+200 with their document references and no iframe; all six readable aliases
+returned 308 with preserved query strings. All three feeds returned 200, contained
+six full bodies and retained all six legacy Atom IDs with native destinations.
+Feed output contains no Svelte hydration comments. Live checks used emitted SSR
+modules with the real publication, network access and no Blob configuration;
+hosted durable-cache evidence must be checked independently in Preview.
+
+Local verification: zero type errors/warnings, 147 passing tests, production
+Vercel adapter build, emitted SSR route checks, archive/static-copy hashes, and
+three passing Chromium tests. Emitted SSR checks cover the six one-hop legacy
+article redirects, feed filename matching, aliases, sitemap, unconfigured feeds
+and private archive-file 404s. No typography or new editorial copy was added.
+
+Production environment configuration and domain attachment are prepared; DNS
+still points to Netlify. Canonical alignment is explicitly nonblocking and has
+not been changed. Body-heading fragments remain an accepted package limitation.
+See `cutover.md` for release checks and rollback rather than treating these
+Preview/local checks as evidence of completed production cutover.
+
+## Archive cleanup after verified import
+
+At the owner's request, removed the temporary migration archive, manifest,
+checksum tooling and copied legacy images. The original blog repository remains
+the archive. Earlier archive paths and checksum commands above describe historical
+verification and are no longer available in this checkout. Only six slug/record-key
+pairs remain in `src/lib/server/publication/legacy.json` for URL compatibility and
+stable feed IDs. Bodies, images, publication metadata and dates come from Leaflet.
+Legacy title IDs were also removed. Old generated image paths are no longer served;
+native article images continue to load from the PDS.
