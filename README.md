@@ -64,7 +64,8 @@ The server reader's cache/refresh lifecycle is an XState v6 machine, pinned to
 `6.0.0-beta.1` as requested. Fetching and Zod validation live in focused modules;
 the machine owns concurrency, freshness, stale fallback, retries and cancellation.
 See [the lifecycle contract](specs/001-homepage-native-blog/contracts/reader-lifecycle.md)
-for the state diagram and tested invariants. This machine remains process-local.
+for the state diagram and tested invariants. With `BLOB_STORE_ID` configured, it checks the shared durable snapshot on every
+read; local-only environments retain the original process cache.
 
 ## Local public-source proof
 
@@ -89,10 +90,22 @@ the CLI, link before `vercel env pull .env.local` and keep preview configuration
 separate from production. Do not overwrite an existing local environment file
 without preserving its local settings.
 
-The foundation's cache is process-local: five minutes fresh and at most 24 hours
-of stale content after a failed refresh. It is lost when the process exits. It
-does **not** yet guarantee retention or deletion coordination across serverless
-instances. Complete durable snapshot integration before production migration.
+Durable snapshots use private Vercel Blob (`@vercel/blob@2.8.2`). Set
+`BLOB_STORE_ID` to enable them; Preview uses the connected
+`delightful-labs-snapshots` store. The SDK uses platform OIDC or the project's
+connected storage credentials; none are exposed to the browser. Local use without
+a store still works with the process cache. At production cutover, configure a
+separate private store and the publication URI for Production.
+
+Snapshots stay fresh for five minutes. Failed refreshes can use the latest
+stored snapshot for at most 24 hours from its original verification time. Every
+request checks storage without CDN caching. Conditional writes prevent competing
+refreshes from overwriting a newer snapshot; failures/conflicts re-read the winner.
+A confirmed empty archive replaces the old body. If storage cannot be read,
+requests return unavailable instead of serving an unchecked local copy. Preview
+branches, Production, and publications have distinct versioned keys. Each snapshot
+is bounded to 10 MB. See [the lifecycle contract](specs/001-homepage-native-blog/contracts/reader-lifecycle.md)
+for concurrency, availability, and validation details.
 
 The owner created the Leaflet publication; its URI and ownership are verified. Before cutover,
 prove its external canonical `/open-thoughts/` URL and edit workflow, import one

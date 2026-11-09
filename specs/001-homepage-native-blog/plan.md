@@ -38,8 +38,9 @@ records, no Leaflet frames, no homepage content, no typography changes.
    staged deployment checks, then production domains. Do not redirect to missing
    native articles or publish demonstration content.
 
-The process-local five-minute cache in stage 1 is a replaceable proof mechanism,
-not a durable production cache. Stages 2–3 remain explicit gates.
+The five-minute cache now supports private Blob snapshots with conditional
+writes and original-age stale fallback. Preview storage is configured; production
+storage and cutover remain explicit gates.
 
 ## Project Structure
 
@@ -68,3 +69,12 @@ The owner accepted the evaluation limitations and requested using the package
 without parser fixes. Delete custom block/facet parsing and semantic model.
 Retain AT Protocol discovery, metadata validation, blob page hydration, XState
 lifecycles, and no-iframe/safe-link integration with existing DUI components.
+
+## Durable snapshots
+
+Use the existing Blob recommendation with exact SDK 2.8.2. A single private JSON
+snapshot is sufficient for this small publication; no database, queue, lease,
+Runtime Cache accelerator, or ISR layer is added. Every durable-mode request
+reads current storage; writes use ETag CAS (or create-without-overwrite), and
+failures/conflicts re-read current state before serving a bounded fallback.
+The shared data is plain, versioned, size-bounded, and validated.

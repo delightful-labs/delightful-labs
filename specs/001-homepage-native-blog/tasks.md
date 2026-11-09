@@ -34,7 +34,7 @@
 ## Later stages — not foundation completion claims
 
 - [ ] T014 [US3] Configure an owner-created Leaflet publication and prove external canonical URL persistence; record results in research.md.
-- [ ] T015 [US3] Implement durable cross-instance snapshot/concurrency behavior in src/lib/server/leaflet/ before production use.
+- [x] T015 [US3] Implement durable cross-instance snapshot/concurrency behavior in src/lib/server/leaflet/ and verify in Preview. Production store enablement remains gated.
 - [ ] T016 [US4] Preserve archive inputs/assets, prove editable quiet import, then finalize feeds and redirects using the exact inventory in research-migration.md.
 - [ ] T017 [US5] Verify hosted preview and production cutover using the approved domains; document rollback in README.md.
 

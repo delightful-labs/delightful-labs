@@ -10,7 +10,9 @@ export type JsonReader = (
   url: string,
   signal?: AbortSignal,
 ) => Promise<unknown>;
-export type ReaderDependencies = { json?: JsonReader; now?: () => number };
+export const CACHE_FRESH_MS = 300_000;
+export const CACHE_STALE_MS = 86_400_000;
+export type SnapshotStorage = { storeId: string; namespace: string };
 export type Article = {
   uri: string;
   cid: string;
@@ -30,4 +32,5 @@ export type Snapshot = {
   verifiedAt: number;
   stale: boolean;
 };
-export type SnapshotLoader = (signal: AbortSignal) => Promise<Snapshot>;
+
+export type StoredSnapshot = { snapshot: Snapshot; version: string };

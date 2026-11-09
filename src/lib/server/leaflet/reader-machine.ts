@@ -1,33 +1,26 @@
 import { createAsyncLogic, setup, types, type ActorRefFrom } from "xstate";
-import type { Snapshot, SnapshotLoader } from "./model";
+import { requestMachine } from "./request-machine";
+import {
+  CACHE_FRESH_MS,
+  CACHE_STALE_MS,
+  type Snapshot,
+  type ConfiguredReader,
+  type SnapshotStorage,
+} from "./model";
 
 type Reply = {
   resolve: (snapshot: Snapshot | null) => void;
   reject: (reason: unknown) => void;
 };
 type ReaderInput = {
-  configured: boolean;
-  load: SnapshotLoader;
-  now: () => number;
+  config: ConfiguredReader | null;
+  storage?: SnapshotStorage;
 };
-type ReaderContext = ReaderInput & { cache: Snapshot | null; waiters: Reply[] };
-type LoadFailure = { reason: unknown; at: number };
-const FRESH_FOR = 300_000;
-const STALE_FOR = 86_400_000;
-
-const refresh = createAsyncLogic({
-  schemas: {
-    input: types<Pick<ReaderInput, "load" | "now">>(),
-    error: types<LoadFailure>(),
-  },
-  run: async ({ input, signal }): Promise<Snapshot> => {
-    try {
-      return await input.load(signal);
-    } catch (reason) {
-      throw { reason, at: input.now() } satisfies LoadFailure;
-    }
-  },
-});
+type ReaderContext = ReaderInput & {
+  cache: Snapshot | null;
+  waiters: Reply[];
+  error: unknown;
+};
 
 const readerSetup = setup({
   schemas: {
@@ -35,33 +28,33 @@ const readerSetup = setup({
     input: types<ReaderInput>(),
     events: { READ: types<{ at: number; reply: Reply }>(), STOP: types<{}>() },
   },
-});
-
-const refreshInvocation = readerSetup.createInvoke({
-  src: refresh,
-  input: ({ context }) => ({ load: context.load, now: context.now }),
-  onDone: ({ context, event }, enq) => {
-    for (const waiter of context.waiters) enq(waiter.resolve, event.output);
-    return { target: "ready", context: { cache: event.output, waiters: [] } };
+  states: {
+    stopped: {},
+    empty: { schemas: { context: types<{ config: ConfiguredReader }>() } },
+    loading: { schemas: { context: types<{ config: ConfiguredReader }>() } },
+    ready: { schemas: { context: types<{ config: ConfiguredReader }>() } },
+    stale: { schemas: { context: types<{ config: ConfiguredReader }>() } },
+    unavailable: {
+      schemas: { context: types<{ config: ConfiguredReader }>() },
+    },
+    checkingFailure: {
+      schemas: { context: types<{ config: ConfiguredReader }>() },
+    },
   },
-  onError: ({ context, event }, enq) => {
-    if (
-      context.cache &&
-      event.error.at - context.cache.verifiedAt <= STALE_FOR
-    ) {
-      const stale = { ...context.cache, stale: true };
-      for (const waiter of context.waiters) enq(waiter.resolve, stale);
-      return { target: "stale", context: { waiters: [] } };
-    }
-    for (const waiter of context.waiters)
-      enq(waiter.reject, event.error.reason);
-    return { target: "unavailable", context: { cache: null, waiters: [] } };
+  actors: {
+    requestSnapshot: requestMachine,
+    readClock: createAsyncLogic({ run: async () => Date.now() }),
   },
 });
 
 export const readerMachine = readerSetup.createMachine({
   id: "publicationReader",
-  context: ({ input }) => ({ ...input, cache: null, waiters: [] }),
+  context: ({ input }) => ({
+    ...input,
+    cache: null,
+    waiters: [],
+    error: undefined,
+  }),
   initial: "configuration",
   on: {
     STOP: ({ context }, enq) => {
@@ -74,7 +67,9 @@ export const readerMachine = readerSetup.createMachine({
     configuration: {
       type: "choice",
       choice: ({ context }) =>
-        context.configured ? { target: "empty" } : { target: "unconfigured" },
+        context.config
+          ? { target: "empty", context: { config: context.config } }
+          : { target: "unconfigured" },
     },
     unconfigured: {
       on: {
@@ -92,7 +87,25 @@ export const readerMachine = readerSetup.createMachine({
       },
     },
     loading: {
-      invoke: refreshInvocation,
+      invoke: {
+        src: "requestSnapshot",
+        input: ({ context }) => ({
+          config: context.config,
+          storage: context.storage,
+        }),
+        onDone: ({ context, event }, enq) => {
+          for (const waiter of context.waiters)
+            enq(waiter.resolve, event.output);
+          return {
+            target: event.output.stale ? "stale" : "ready",
+            context: { cache: event.output, waiters: [] },
+          };
+        },
+        onError: ({ event }) => ({
+          target: "checkingFailure",
+          context: { error: event.error },
+        }),
+      },
       on: {
         READ: ({ context, event }) => ({
           context: { waiters: [...context.waiters, event.reply] },
@@ -103,28 +116,21 @@ export const readerMachine = readerSetup.createMachine({
       on: {
         READ: ({ context, event }, enq) => {
           if (
+            !context.storage &&
             context.cache &&
-            event.at - context.cache.verifiedAt < FRESH_FOR
+            event.at - context.cache.verifiedAt < CACHE_FRESH_MS
           ) {
             enq(event.reply.resolve, context.cache);
             return;
           }
-          return { target: "refreshing", context: { waiters: [event.reply] } };
+          return { target: "loading", context: { waiters: [event.reply] } };
         },
-      },
-    },
-    refreshing: {
-      invoke: refreshInvocation,
-      on: {
-        READ: ({ context, event }) => ({
-          context: { waiters: [...context.waiters, event.reply] },
-        }),
       },
     },
     stale: {
       on: {
         READ: ({ event }) => ({
-          target: "refreshing",
+          target: "loading",
           context: { waiters: [event.reply] },
         }),
       },
@@ -134,6 +140,33 @@ export const readerMachine = readerSetup.createMachine({
         READ: ({ event }) => ({
           target: "loading",
           context: { waiters: [event.reply] },
+        }),
+      },
+    },
+    checkingFailure: {
+      invoke: {
+        src: "readClock",
+        onDone: ({ context, event }, enq) => {
+          if (
+            !context.storage &&
+            context.cache &&
+            event.output - context.cache.verifiedAt <= CACHE_STALE_MS
+          ) {
+            const stale = { ...context.cache, stale: true };
+            for (const waiter of context.waiters) enq(waiter.resolve, stale);
+            return { target: "stale", context: { waiters: [] } };
+          }
+          for (const waiter of context.waiters)
+            enq(waiter.reject, context.error);
+          return {
+            target: "unavailable",
+            context: { cache: null, waiters: [] },
+          };
+        },
+      },
+      on: {
+        READ: ({ context, event }) => ({
+          context: { waiters: [...context.waiters, event.reply] },
         }),
       },
     },

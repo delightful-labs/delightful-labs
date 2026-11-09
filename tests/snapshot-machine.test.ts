@@ -1,7 +1,27 @@
 import { createActor, toPromise } from "xstate";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { snapshotMachine } from "../src/lib/server/leaflet/snapshot-machine";
-import { loadSnapshot } from "../src/lib/server/leaflet/load-snapshot";
+import { readJson } from "../src/lib/server/leaflet/http";
+import { runActor } from "./fixtures/run-actor";
+vi.mock("../src/lib/server/leaflet/http", () => ({ readJson: vi.fn() }));
+afterEach(() => vi.restoreAllMocks());
+function loadSnapshot(
+  config: Parameters<typeof createSnapshot>[0],
+  json: JsonReader,
+  now: () => number,
+  signal: AbortSignal,
+) {
+  vi.mocked(readJson).mockImplementation(json);
+  vi.spyOn(Date, "now").mockImplementation(now);
+  return runActor(createSnapshot(config), signal);
+}
+function createSnapshot(config: {
+  ownerDid: string;
+  publicationUri: string;
+  publicationKey: string;
+}) {
+  return createActor(snapshotMachine, { input: { config } });
+}
 import type { JsonReader } from "../src/lib/server/leaflet/model";
 
 const config = {
@@ -83,9 +103,9 @@ function fixture(
 
 describe("snapshot loading machine", () => {
   it("exposes ordered stages and publishes only a verified snapshot", async () => {
-    const actor = createActor(snapshotMachine, {
-      input: { config, json: fixture(), now: () => 123 },
-    });
+    vi.mocked(readJson).mockImplementation(fixture());
+    vi.spyOn(Date, "now").mockReturnValue(123);
+    const actor = createSnapshot(config);
     const visited: unknown[] = [];
     actor.subscribe((snapshot) => visited.push(snapshot.value));
     const result = toPromise(actor);
@@ -95,24 +115,64 @@ describe("snapshot loading machine", () => {
       stale: false,
       articles: [{ key: "post" }],
     });
-    expect(visited).toEqual([...stages, "complete"]);
+    expect(visited).toEqual([...stages, "recordingVerification", "complete"]);
   });
 
-  it("aborts a stalled refresh at the overall deadline", async () => {
+  it.each(stages)(
+    "aborts a stalled %s at the machine deadline",
+    async (blockedStage) => {
+      vi.useFakeTimers();
+      try {
+        let activeSignal: AbortSignal | undefined;
+        const entered = Promise.withResolvers<void>();
+        const pending = loadSnapshot(
+          config,
+          fixture(async (stage, signal) => {
+            if (stage !== blockedStage) return;
+            activeSignal = signal;
+            entered.resolve();
+            await new Promise(() => {});
+          }),
+          () => 0,
+          new AbortController().signal,
+        );
+        const failed = expect(pending).rejects.toThrow(
+          "Archive refresh timeout",
+        );
+        await entered.promise;
+        await vi.advanceTimersByTimeAsync(40_000);
+        await failed;
+        expect(activeSignal?.aborted).toBe(true);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("keeps one deadline across source stages", async () => {
     vi.useFakeTimers();
     try {
       let activeSignal: AbortSignal | undefined;
+      const entered = Promise.withResolvers<void>();
       const pending = loadSnapshot(
         config,
-        async (_, signal) => {
-          activeSignal = signal;
-          return new Promise(() => {});
-        },
+        fixture(async (stage, signal) => {
+          if (stage === stages[0])
+            await new Promise((resolve) => setTimeout(resolve, 30_000));
+          if (stage === stages[1]) {
+            activeSignal = signal;
+            entered.resolve();
+            await new Promise(() => {});
+          }
+        }),
         () => 0,
         new AbortController().signal,
       );
       const failed = expect(pending).rejects.toThrow("Archive refresh timeout");
-      await vi.advanceTimersByTimeAsync(40_000);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await entered.promise;
+      await vi.advanceTimersByTimeAsync(10_000);
       await failed;
       expect(activeSignal?.aborted).toBe(true);
       expect(vi.getTimerCount()).toBe(0);

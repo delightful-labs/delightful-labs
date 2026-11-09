@@ -1,29 +1,30 @@
-import { createActor } from "xstate";
+import {
+  createActor,
+  type InputFrom,
+  type ActorLogic,
+  type SnapshotFrom,
+  type EventFrom,
+} from "xstate";
 import { parseReaderConfig } from "./config";
-import { readJson } from "./http";
-import { loadSnapshot } from "./load-snapshot";
-import type { ReaderConfig, ReaderDependencies, Snapshot } from "./model";
+import type { ReaderConfig, Snapshot, SnapshotStorage } from "./model";
 import { readerMachine, type ReaderActor } from "./reader-machine";
 
 export type { Article, ReaderConfig, Snapshot } from "./model";
 
 export class PublicationReader {
   private readonly actor: ReaderActor;
-  private readonly now: () => number;
 
-  constructor(config: ReaderConfig, dependencies: ReaderDependencies = {}) {
-    const parsed = parseReaderConfig(config);
-    const json = dependencies.json ?? readJson;
-    this.now = dependencies.now ?? Date.now;
-    this.actor = createActor(readerMachine, {
-      input: {
-        configured: parsed !== null,
-        now: this.now,
-        load: async (signal) => {
-          if (!parsed) throw new Error("Unconfigured reader cannot load");
-          return loadSnapshot(parsed, json, this.now, signal);
-        },
-      },
+  constructor(
+    config: ReaderConfig,
+    storage?: SnapshotStorage,
+    logic: ActorLogic<
+      SnapshotFrom<typeof readerMachine>,
+      EventFrom<typeof readerMachine>,
+      InputFrom<typeof readerMachine>
+    > = readerMachine,
+  ) {
+    this.actor = createActor(logic, {
+      input: { config: parseReaderConfig(config), storage },
     }).start();
   }
 
@@ -33,7 +34,7 @@ export class PublicationReader {
     return new Promise((resolve, reject) =>
       this.actor.send({
         type: "READ",
-        at: this.now(),
+        at: Date.now(),
         reply: { resolve, reject },
       }),
     );

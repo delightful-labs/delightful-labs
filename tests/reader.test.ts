@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicationReader } from "../src/lib/server/leaflet/reader";
 import { publicAddress, readJson } from "../src/lib/server/leaflet/http";
+
+vi.mock("../src/lib/server/leaflet/http", async (original) => {
+  const actual =
+    await original<typeof import("../src/lib/server/leaflet/http")>();
+  return { ...actual, readJson: vi.fn(actual.readJson) };
+});
+afterEach(() => vi.restoreAllMocks());
 
 const did = "did:plc:testowner";
 const publication = `at://${did}/site.standard.publication/test`;
@@ -37,47 +44,45 @@ function harness() {
     document("unrelated", `at://${did}/site.standard.publication/other`),
   ];
   const calls: string[] = [];
-  const reader = new PublicationReader(
-    { ownerDid: did, publicationUri: publication },
-    {
-      now: () => now,
-      json: async (input: string) => {
-        calls.push(input);
-        if (fail) throw new Error("network failure");
-        const url = new URL(input);
-        if (url.hostname === "plc.directory")
-          return {
-            id: did,
-            service: [
-              { id: "#atproto_pds", serviceEndpoint: "https://pds.example" },
-            ],
-          };
-        if (url.pathname.endsWith("getLatestCommit"))
-          return {
-            cid: changing ? `commit${commitCount++}` : "commit",
-            rev: "rev",
-          };
-        if (url.pathname.endsWith("getRecord"))
-          return {
-            uri: publication,
-            value: {
-              $type: "site.standard.publication",
-              name: "Test publication",
-              url: "https://test.leaflet.pub",
-            },
-          };
-        if (url.pathname.endsWith("getBlob"))
-          return [page([text("Blob body")])];
-        if (url.searchParams.has("cursor")) return { records: [] };
-        return {
-          records: malformed
-            ? [{ ...document("one"), value: { site: publication } }]
-            : records,
-          cursor: "next",
-        }; // deliberately short page with a cursor
-      },
-    },
-  );
+  vi.spyOn(Date, "now").mockImplementation(() => now);
+  vi.mocked(readJson).mockImplementation(async (input: string) => {
+    calls.push(input);
+    if (fail) throw new Error("network failure");
+    const url = new URL(input);
+    if (url.hostname === "plc.directory")
+      return {
+        id: did,
+        service: [
+          { id: "#atproto_pds", serviceEndpoint: "https://pds.example" },
+        ],
+      };
+    if (url.pathname.endsWith("getLatestCommit"))
+      return {
+        cid: changing ? `commit${commitCount++}` : "commit",
+        rev: "rev",
+      };
+    if (url.pathname.endsWith("getRecord"))
+      return {
+        uri: publication,
+        value: {
+          $type: "site.standard.publication",
+          name: "Test publication",
+          url: "https://test.leaflet.pub",
+        },
+      };
+    if (url.pathname.endsWith("getBlob")) return [page([text("Blob body")])];
+    if (url.searchParams.has("cursor")) return { records: [] };
+    return {
+      records: malformed
+        ? [{ ...document("one"), value: { site: publication } }]
+        : records,
+      cursor: "next",
+    }; // deliberately short page with a cursor
+  });
+  const reader = new PublicationReader({
+    ownerDid: did,
+    publicationUri: publication,
+  });
   return {
     reader,
     calls,
@@ -110,14 +115,8 @@ describe("native record reads", () => {
     expect(h.calls.some((url) => url.includes("cursor=next"))).toBe(true);
   });
   it("does not load sample content when unconfigured", async () => {
-    const reader = new PublicationReader(
-      { ownerDid: did },
-      {
-        json: async () => {
-          throw new Error("must not fetch");
-        },
-      },
-    );
+    vi.mocked(readJson).mockRejectedValue(new Error("must not fetch"));
+    const reader = new PublicationReader({ ownerDid: did });
     expect(await reader.read()).toBeNull();
   });
   it("rejects publication owner mismatch", () => {
@@ -203,15 +202,14 @@ describe("native record reads", () => {
   });
   it("settles in-flight requests when disposed and rejects later reads", async () => {
     let signal: AbortSignal | undefined;
-    const reader = new PublicationReader(
-      { ownerDid: did, publicationUri: publication },
-      {
-        json: async (_, value) => {
-          signal = value;
-          return new Promise(() => {});
-        },
-      },
-    );
+    vi.mocked(readJson).mockImplementation(async (_, value) => {
+      signal = value;
+      return new Promise(() => {});
+    });
+    const reader = new PublicationReader({
+      ownerDid: did,
+      publicationUri: publication,
+    });
     const first = reader.read(),
       second = reader.read();
     reader.stop();
@@ -277,8 +275,11 @@ describe("HTTP transport boundary", () => {
   it("honors cancellation before any transport work", async () => {
     const controller = new AbortController();
     controller.abort(new Error("Cancelled"));
+    const actual = await vi.importActual<
+      typeof import("../src/lib/server/leaflet/http")
+    >("../src/lib/server/leaflet/http");
     await expect(
-      readJson("https://example.com", controller.signal),
+      actual.readJson("https://example.com", controller.signal),
     ).rejects.toThrow("Cancelled");
   });
 });

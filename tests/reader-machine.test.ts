@@ -1,9 +1,8 @@
 import { createActor } from "xstate";
 import { describe, expect, it, vi } from "vitest";
-import {
-  readerMachine,
-  type ReaderActor,
-} from "../src/lib/server/leaflet/reader-machine";
+import { type ReaderActor } from "../src/lib/server/leaflet/reader-machine";
+import { readerLogic } from "./fixtures/machines";
+import { config } from "./fixtures/snapshots";
 import type { Snapshot } from "../src/lib/server/leaflet/model";
 
 const snapshot = (verifiedAt = 0): Snapshot => ({
@@ -25,9 +24,10 @@ function read(actor: ReaderActor, at: number) {
 describe("reader lifecycle", () => {
   it("stays unconfigured without starting work", async () => {
     const load = vi.fn();
-    const actor = createActor(readerMachine, {
-      input: { configured: false, load, now: () => 0 },
-    }).start();
+    const actor = createActor(
+      readerLogic(load, () => 0),
+      { input: { config: null } },
+    ).start();
     expect(actor.getSnapshot().matches("unconfigured")).toBe(true);
     expect(await read(actor, 0)).toBeNull();
     expect(load).not.toHaveBeenCalled();
@@ -36,9 +36,10 @@ describe("reader lifecycle", () => {
   it("shares one invocation while loading and serves fresh cache without fetching", async () => {
     const deferred = Promise.withResolvers<Snapshot>();
     const load = vi.fn(() => deferred.promise);
-    const actor = createActor(readerMachine, {
-      input: { configured: true, load, now: () => 0 },
-    }).start();
+    const actor = createActor(
+      readerLogic(load, () => 0),
+      { input: { config: config } },
+    ).start();
     expect(actor.getSnapshot().matches("empty")).toBe(true);
     const first = read(actor, 0),
       second = read(actor, 0);
@@ -57,9 +58,10 @@ describe("reader lifecycle", () => {
       .mockResolvedValueOnce(snapshot())
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(snapshot(302_000));
-    const actor = createActor(readerMachine, {
-      input: { configured: true, load, now: () => now },
-    }).start();
+    const actor = createActor(
+      readerLogic(load, () => now),
+      { input: { config: config } },
+    ).start();
     await read(actor, now);
     now = 300_000;
     const result = await read(actor, now);
@@ -78,14 +80,15 @@ describe("reader lifecycle", () => {
       .fn()
       .mockResolvedValueOnce(snapshot())
       .mockImplementationOnce(() => deferred.promise);
-    const actor = createActor(readerMachine, {
-      input: { configured: true, load, now: () => now },
-    }).start();
+    const actor = createActor(
+      readerLogic(load, () => now),
+      { input: { config: config } },
+    ).start();
     await read(actor, now);
     now = 300_000;
     const first = read(actor, now),
       second = read(actor, now);
-    expect(actor.getSnapshot().matches("refreshing")).toBe(true);
+    expect(actor.getSnapshot().matches("loading")).toBe(true);
     deferred.resolve(snapshot(now));
     expect(await first).toEqual(await second);
     expect(load).toHaveBeenCalledTimes(2);
@@ -99,13 +102,14 @@ describe("reader lifecycle", () => {
       .fn()
       .mockResolvedValueOnce(snapshot())
       .mockImplementationOnce(() => deferred.promise);
-    const actor = createActor(readerMachine, {
-      input: { configured: true, load, now: () => now },
-    }).start();
+    const actor = createActor(
+      readerLogic(load, () => now),
+      { input: { config: config } },
+    ).start();
     await read(actor, now);
     now = 300_000;
     const pending = read(actor, now);
-    expect(actor.getSnapshot().matches("refreshing")).toBe(true);
+    expect(actor.getSnapshot().matches("loading")).toBe(true);
     now = 86_400_001;
     deferred.reject(new Error("offline"));
     await expect(pending).rejects.toThrow("offline");
@@ -117,9 +121,10 @@ describe("reader lifecycle", () => {
       .fn()
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(snapshot());
-    const actor = createActor(readerMachine, {
-      input: { configured: true, load, now: () => 0 },
-    }).start();
+    const actor = createActor(
+      readerLogic(load, () => 0),
+      { input: { config: config } },
+    ).start();
     await expect(read(actor, 0)).rejects.toThrow("offline");
     expect(actor.getSnapshot().matches("unavailable")).toBe(true);
     await read(actor, 0);
@@ -133,9 +138,10 @@ describe("reader lifecycle", () => {
       signal = value;
       return deferred.promise;
     });
-    const actor = createActor(readerMachine, {
-      input: { configured: true, load, now: () => 0 },
-    }).start();
+    const actor = createActor(
+      readerLogic(load, () => 0),
+      { input: { config: config } },
+    ).start();
     const first = read(actor, 0),
       second = read(actor, 0);
     actor.send({ type: "STOP" });
