@@ -1,5 +1,4 @@
 import { object } from "../../leaflet/values";
-import { normalizePages } from "../../leaflet/pages";
 import type { Rpc } from "./client";
 import { parseDocumentKey } from "./config";
 import type { Article, ConfiguredReader } from "./model";
@@ -45,6 +44,10 @@ export async function readArticle(
     updatedAt: metadata.updatedAt,
     path: `/open-thoughts/${encodeURIComponent(key)}/`,
     sourceUrl: `https://leaflet.pub/lish/${encodeURIComponent(config.ownerDid)}/${encodeURIComponent(config.publicationKey)}/${encodeURIComponent(key)}`,
-    pages: normalizePages(pages, { did: config.ownerDid, pds: pds.origin }),
+    document: {
+      content: { $type: "pub.leaflet.content", pages },
+      authorDid: config.ownerDid,
+    },
+    pds: pds.origin,
   };
 }

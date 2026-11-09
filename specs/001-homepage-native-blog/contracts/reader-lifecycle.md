@@ -87,9 +87,13 @@ reader's refresh lifecycle. Cancellation aborts the current stage and rejects th
 load without starting later stages. No intermediate result becomes a snapshot.
 The final stage checks the repository commit before assigning `verifiedAt`.
 The original refresh start time is shared by all RPC stages, preserving the
-existing total time budget. Pagination and normalization remain focused functions;
+existing total time budget. Pagination and article preparation remain focused functions;
 the machine coordinates their lifetimes rather than modeling each record as a
 state. No automatic stage retries or partial-scan resumption are introduced.
 
 Tests cover ordered completion, failure at every stage, and cancellation at every
 stage (including blob loading during article normalization).
+
+After Standard Reader adoption, `normalizingArticles` prepares metadata and
+hydrates content blobs into the package document input; the package performs
+block and inline normalization when rendering. The lifecycle is unchanged.

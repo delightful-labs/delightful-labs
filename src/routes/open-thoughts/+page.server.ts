@@ -6,7 +6,8 @@ export async function load() {
     const snapshot = await publicationReader().read();
     return {
       articles:
-        snapshot?.articles.map(({ pages, ...article }) => article) ?? [],
+        snapshot?.articles.map(({ document, pds, ...article }) => article) ??
+        [],
     };
   } catch {
     error(503, "Writing is temporarily unavailable. Please try again.");

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { Heading } from "delightful-ui";
-  import Blocks from "#lib/components/Blocks.svelte";
-  import { pageAnchor } from "#lib/leaflet/content.ts";
+  import LeafletDocument from "#lib/components/LeafletDocument.svelte";
   import type { PageData } from "./$types";
   let { data }: { data: PageData } = $props();
   const date = (value: string) =>
@@ -27,11 +26,11 @@
       >{date(data.article.publishedAt)}</time
     >
   </header>
-  {#each data.article.pages as content (content.id)}
-    <section id={pageAnchor(content.id)} aria-label={data.article.title}>
-      <Blocks blocks={content.blocks} sourceUrl={data.article.sourceUrl} />
-    </section>
-  {/each}
+  <LeafletDocument
+    document={data.article.document}
+    pds={data.article.pds}
+    sourceUrl={data.article.sourceUrl}
+  />
   <a href={data.article.sourceUrl}>View on Leaflet</a>
 </article>
 

@@ -12,6 +12,8 @@
 
 ### Session 2026-11-09
 
+- Renderer decision: The owner accepts `@standard-reader/renderer-svelte@0.4.0` and matching core with their evaluated limitations. Replace the custom renderer; do not patch the package or rebuild its parser. Package support defines native content fidelity for this foundation. Overlapping/malformed facets, checklist state, member delimiters, unsupported blocks, and subpage/heading anchors follow package behavior. Keep no-iframe rendering, safe links, existing DUI defaults, and native AT Protocol loading. No existing Leaflet publication requires compatibility work yet. This decision supersedes the earlier custom-renderer preservation requirements below where they conflict; archive migration must still be verified before cutover.
+
 - Q: Where should the blog's primary public address live? → A: Use `https://delightfullabs.com/open-thoughts/`, with individual native articles underneath it and permanent redirects from corresponding `thoughts.delightfullabs.com` URLs.
 - Q: Is there an existing Leaflet publication, and which AT Protocol account should own it? → A: No existing Leaflet publication. The owner confirmed the corrected handle `@derocher.me`. Public resolution and the DID document reverse claim verified owner DID `did:plc:226m7t4kp7d7sg2qsdresypm` on 2026-11-09. No publication has been created.
 - Scope clarification: Set up the basic site first. Do not add homepage content, make positioning decisions, or populate introduction, project, or contact sections. Content work will follow with the owner after setup. Existing article preservation/migration and rendering source records remain in scope; test fixtures must not become public content.
@@ -57,7 +59,7 @@ links against the published source.
 
 1. **Given** a public article belonging to the configured publication, **When** its native URL is requested directly, **Then** the response contains its title, publication date, and readable article body within the site shell; no Leaflet page iframe is used.
 2. **Given** an article containing paragraphs, headings, emphasis, links, ordered and unordered lists, quotations, code, and images, **When** it is displayed, **Then** supported content preserves its meaning, order, link targets, and supplied alternative text using semantic markup.
-3. **Given** an unsupported block or interactive feature, **When** it is encountered, **Then** the rest of the article remains readable and an explicit fallback links to the source content without silently dropping the block.
+3. **Given** an unsupported block or interactive feature, **When** it is encountered, **Then** the rest of the article remains readable and package-supported blocks render and unsupported features may be omitted according to the accepted package constraints; the article retains its source link.
 4. **Given** article metadata and a source publication URL, **When** a reader or crawler loads the article, **Then** the page has a title, description when available, a canonical URL consistent with the chosen canonical policy, and a link to its Leaflet source.
 5. **Given** an unknown article or an article from another publication, **When** its identifier is requested, **Then** the site returns a not-found response rather than displaying unrelated content.
 
@@ -135,7 +137,7 @@ and preview procedure; verify representative routes and the redirect inventory.
 - Upstream services time out, rate limit, return malformed data, or return only part of an archive.
 - A deleted article was previously cached; confirmed removal must take precedence over stale serving.
 - A historical link includes a trailing slash, query string, or heading fragment; preserve meaningful anchors where possible and document unavoidable fragment changes.
-- A Leaflet post is restricted or contains a members-only boundary; the native reader must not expose restricted body content. Unsupported restricted articles link to the source instead.
+- A Leaflet post is restricted or contains a members-only boundary; only public AT Protocol records are fetched. The package does not interpret member delimiters; this is an accepted publishing constraint, not an access-control mechanism.
 
 ## Requirements *(mandatory)*
 
@@ -145,7 +147,7 @@ and preview procedure; verify representative routes and the redirect inventory.
 - **FR-002**: The writing index MUST expose the complete public publication archive in reverse publication order, without duplicate logical articles or truncation to a single upstream page (Stories 1, 3).
 - **FR-003**: Readers MUST be able to open full native article pages directly without authentication. Article content and metadata MUST be readable in the initial page response, without requiring a client-side fetch to reveal the body (Story 2).
 - **FR-004**: The system MUST discover and load published content from public AT Protocol records, resolve the configured publication and author identity, and exclude drafts, other publications, and restricted content. Feed-only ingestion and scraping Leaflet HTML do not satisfy this requirement (Stories 2, 3).
-- **FR-005**: Native rendering MUST preserve the supported content described in Story 2. Unsupported content MUST have an explicit source-link fallback; a Leaflet-page iframe is prohibited (Story 2).
+- **FR-005**: Native rendering MUST use the accepted Standard Reader package support described in Story 2, with an article-level source link; a Leaflet-page iframe is prohibited (Story 2).
 - **FR-006**: Article identity MUST remain stable across title edits and handle changes, and distinguish source record identity from a human-readable route. Alias behavior MUST prevent existing native links from breaking (Stories 2, 3).
 - **FR-007**: New content, edits, and confirmed removals MUST meet the 15-minute refresh window. Cached availability MUST follow the 24-hour maximum and error/deletion distinctions in Story 3 (Story 3).
 - **FR-008**: Article pages MUST expose accurate document metadata and source links, use their native `https://delightfullabs.com/open-thoughts/` addresses as canonical, and provide consistent sitemap and publication/document verification behavior where applicable. Leaflet-generated source/feed/social URLs must be reconciled with this policy before cutover; a second self-canonical source copy is not considered a completed integration (Story 2).

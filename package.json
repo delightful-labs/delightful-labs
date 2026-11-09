@@ -19,6 +19,8 @@
     "prepare": "svelte-kit sync"
   },
   "dependencies": {
+    "@standard-reader/renderer-core": "0.4.0",
+    "@standard-reader/renderer-svelte": "0.4.0",
     "delightful-ui": "file:vendor/delightful-ui-0.0.25.tgz",
     "xstate": "6.0.0-beta.1",
     "zod": "4.6.7"

@@ -199,3 +199,7 @@ can override links, frames, and unsupported blocks. Current release duplicates
 text for overlapping facets, continues past member-only delimiters, and loses
 Leaflet checklist state. Retain the current renderer pending upstream fixes;
 see the [compatibility report and reproducible probes](evaluations/standard-reader/README.md).
+
+Owner decision after evaluation: accept these package constraints and adopt
+0.4.0 without parser patches. This supersedes the initial retain-custom-renderer
+recommendation above and the original custom supported-block matrix.

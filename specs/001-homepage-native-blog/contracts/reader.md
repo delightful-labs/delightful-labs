@@ -19,8 +19,12 @@ read-only proofs. SITE_ORIGIN defaults to https://delightfullabs.com.
 ## Upstream and rendering
 
 Resolve current PDS from DID. Validate HTTPS endpoints and reject private/local
-addresses and redirects. Bound response size, cursors, recursion and time. Follow
+addresses and redirects. Bound response size, page count, cursors and time. Follow
 cursors to exhaustion; filter exact publication; sort by original date. Fetch
-page blobs from the same PDS. Respect member boundaries and reachable subpages.
-Render escaped text and safe semantic elements with existing UI defaults. Do not
+page blobs from the same PDS. Render using the pinned Standard Reader Svelte/core 0.4.0 packages, with the
+owner's accepted constraints documented in the renderer evaluation. Do not
+maintain custom block traversal or facet parsing. Member delimiter, checklist,
+subpage, unknown-block, and facet behavior follow the package; this reader is
+for public records, not an access-control boundary. Use existing DUI defaults
+and safe URL overrides. Do not
 inject authored HTML, adopt source typography, or render iframe blocks.

@@ -45,7 +45,7 @@ not a durable production cache. Stages 2–3 remain explicit gates.
 
 src/lib/leaflet contains the validated read model and rich-text normalization;
 src/lib/server/leaflet contains identity/PDS loading and configuration;
-src/lib/components contains semantic Svelte renderers;
+src/lib/components contains a small Standard Reader Svelte integration;
 src/routes contains the shell, writing index, article, and verification routes;
 tests contains isolated fixtures; vendor contains the pinned UI artifact.
 
@@ -60,3 +60,11 @@ then a build and browser/direct-initial-HTML proof. No typography CSS assertions
 All owner constraints remain in force. Native loading is feasible by prior live
 research. Hosted external canonical settings and publication mutation require
 separate integration proofs and are not claimed by a foundation build.
+
+## Accepted renderer package
+
+Use exact `@standard-reader/renderer-svelte@0.4.0` and `renderer-core@0.4.0`.
+The owner accepted the evaluation limitations and requested using the package
+without parser fixes. Delete custom block/facet parsing and semantic model.
+Retain AT Protocol discovery, metadata validation, blob page hydration, XState
+lifecycles, and no-iframe/safe-link integration with existing DUI components.

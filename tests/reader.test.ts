@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { normalizePages, textRuns, safeLink } from "../src/lib/leaflet/content";
 import { PublicationReader } from "../src/lib/server/leaflet/reader";
 import { publicAddress, readJson } from "../src/lib/server/leaflet/http";
 
@@ -242,116 +241,16 @@ describe("native record reads", () => {
       },
     ]);
     const snapshot = await h.reader.read();
-    expect(JSON.stringify(snapshot?.articles[0].pages)).toContain("Blob body");
-    expect(JSON.stringify(snapshot?.articles[0].pages)).not.toContain(
-      "Original text",
+    expect(JSON.stringify(snapshot?.articles[0].document.content)).toContain(
+      "Blob body",
     );
+    expect(
+      JSON.stringify(snapshot?.articles[0].document.content),
+    ).not.toContain("Original text");
   });
 });
 
-describe("native content boundary", () => {
-  it("uses UTF-8 byte offsets for emoji and preserves overlapping marks", () => {
-    const runs = textRuns({
-      plaintext: "😀Hello",
-      facets: [
-        {
-          index: { byteStart: 4, byteEnd: 9 },
-          features: [{ $type: "pub.leaflet.richtext.facet#bold" }],
-        },
-        {
-          index: { byteStart: 4, byteEnd: 6 },
-          features: [{ $type: "pub.leaflet.richtext.facet#italic" }],
-        },
-      ],
-    });
-    expect(runs.map((r) => r.text).join("")).toBe("😀Hello");
-    expect(runs[1]).toMatchObject({ text: "He", bold: true, italic: true });
-  });
-  it("rejects unsafe links and malformed byte ranges", () => {
-    expect(safeLink("javascript:alert(1)")).toBeUndefined();
-    expect(safeLink("https://example.com/")).toBe("https://example.com/");
-    expect(
-      textRuns({
-        plaintext: "😀",
-        facets: [
-          {
-            index: { byteStart: 1, byteEnd: 2 },
-            features: [{ $type: "x#bold" }],
-          },
-        ],
-      }),
-    ).toEqual([{ text: "😀" }]);
-  });
-  it("does not expose blocks or unlinked pages beyond a member delimiter", () => {
-    const pages = normalizePages(
-      [
-        page([
-          text("Public"),
-          { block: { $type: "pub.leaflet.blocks.membersOnlyDelimiter" } },
-          text("Private"),
-        ]),
-        { ...page([text("Secret page")]), id: "secret" },
-      ],
-      { did, pds: "https://pds.example" },
-    );
-    expect(JSON.stringify(pages)).toContain("Public");
-    expect(JSON.stringify(pages)).not.toMatch(/Private|Secret page/);
-  });
-  it("uses a fallback for unknown blocks, without injecting HTML or iframes", () => {
-    const pages = normalizePages(
-      [
-        page([
-          {
-            block: {
-              $type: "pub.leaflet.blocks.iframe",
-              url: "https://example.com",
-            },
-          },
-        ]),
-      ],
-      { did, pds: "https://pds.example" },
-    );
-    expect(pages[0].blocks).toEqual([{ kind: "fallback" }]);
-  });
-  it("retains a visible source fallback for unsupported annotations", () => {
-    const pages = normalizePages(
-      [
-        page([
-          {
-            block: {
-              $type: "pub.leaflet.blocks.text",
-              plaintext: "Footnote",
-              facets: [
-                {
-                  features: [{ $type: "pub.leaflet.richtext.facet#footnote" }],
-                },
-              ],
-            },
-          },
-        ]),
-      ],
-      { did, pds: "https://pds.example" },
-    );
-    expect(pages[0].blocks.at(-1)).toEqual({ kind: "fallback" });
-  });
-  it("renders only reachable subpages and terminates cycles", () => {
-    const pages = normalizePages(
-      [
-        page([{ block: { $type: "pub.leaflet.blocks.page", id: "child" } }]),
-        {
-          ...page([
-            text("Child"),
-            { block: { $type: "pub.leaflet.blocks.page", id: "root" } },
-          ]),
-          id: "child",
-        },
-        { ...page([text("Unlinked")]), id: "unlinked" },
-      ],
-      { did, pds: "https://pds.example" },
-    );
-    expect(pages.map((p) => p.id)).toEqual(["root", "child"]);
-    expect(JSON.stringify(pages)).not.toContain("Unlinked");
-  });
+describe("HTTP transport boundary", () => {
   it("does not allow local or private upstream addresses", () => {
     for (const ip of [
       "127.0.0.1",

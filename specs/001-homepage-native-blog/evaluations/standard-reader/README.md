@@ -4,12 +4,18 @@ Evaluated 2026-11-09 against the published npm tarballs for
 `@standard-reader/renderer-svelte@0.4.0` and `renderer-core@0.4.0`, with the
 project's Svelte 5.57.3 / Vite 8.3.7 versions on Node 25.2.1.
 
-**Decision: do not replace the current renderer with version 0.4.0.** It is a
+**Owner decision: adopt version 0.4.0 with its current constraints.** The owner
+accepted the findings after this evaluation: there is no existing Leaflet
+publication yet, and no package fixes or compatibility layer are requested.
+The application now uses the package; only URL, no-iframe, PDS image, and DUI
+integration overrides remain.
+
+**Initial evaluation recommendation (superseded by owner decision):** It is a
 useful upstream candidate, but adopting it now would retain substantial custom
 preprocessing and add a dependency whose inline segmentation loses content
 fidelity. Reevaluate after upstream facet fixes and explicit handling of our
-boundary and preservation requirements. No application dependencies or renderer
-code were changed for this evaluation.
+boundary and preservation requirements. The isolated evaluation itself did not change application dependencies; the
+subsequent owner-authorized adoption does.
 
 Sources: [maintainer documentation](https://standard-reader.app/docs/renderers),
 [Svelte package](https://www.npmjs.com/package/@standard-reader/renderer-svelte),

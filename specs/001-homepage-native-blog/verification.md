@@ -8,16 +8,13 @@ publication migration or hosting cutover.
 
 - `pnpm install --frozen-lockfile`: reproducible installation from the committed
   local UI artifact and lockfile.
-- `pnpm test`: 42 behavior checks covering pagination, exact publication
-  filtering, owner mismatch, empty config, failed initial fetch, coalesced reads,
-  stale age limits, confirmed removal, changed/incomplete scans, malformed records,
-  UTF-8/overlapping facets, unsafe links, member boundaries, unknown blocks and
-  annotations, reachable/cyclic subpages, blob-page precedence, and private IPs.
-  This includes explicit XState v6 lifecycle checks for shared loads/refreshes,
-  fresh cache hits, stale recovery, expiry during a pending refresh, retry,
-  cancellation, waiter cleanup, and ignored late results. Regression tests first
-  reproduced missing-site/malformed-envelope false removals in the old reader;
-  the new parser rejects those scans before membership filtering.
+- `pnpm test`: 38 checks covering record pagination and validation, configuration,
+  cache freshness/stale limits, deletion/repository-change safeguards, all XState
+  loading stages and cancellation, blob-page hydration, and HTTP boundaries.
+  Two SSR integration checks exercise Standard Reader with DUI components,
+  resolved PDS image URLs, safe URL overrides, and iframe fallback.
+  Tests for custom facet parsing/traversal were removed with that implementation;
+  the package's documented constraints are accepted rather than patched.
 - `pnpm check`: no errors or warnings.
 - `pnpm build`: successful Vercel adapter output; generated function config
   identifies Node.js 24 and SvelteKit 3.1.1. This is a local build, not deployment.
@@ -93,3 +90,20 @@ third-party article bodies and images are not committed as site content.
 Snapshot loading now uses six explicit XState v6 stages. Thirteen additional
 checks verify ordered completion and error/cancellation at every stage. All 42
 tests and Svelte/TypeScript checks pass. The Vercel adapter build succeeds.
+
+## Standard Reader adoption
+
+The owner accepted the evaluation constraints and chose the published Svelte/core
+0.4.0 packages without parser changes. Custom block/facet/page rendering and
+its semantic model were removed. The app passes hydrated Leaflet content and
+author DID to the package. Existing DUI component snippets, safe URL overrides,
+resolved PDS images, and no-iframe fallbacks remain app integration concerns.
+Earlier custom-renderer facet/member/reachability claims in this document are
+historical and superseded by this decision. No homepage copy or typography was
+added. The evaluation fixtures remain isolated from application routes.
+
+The live proof was repeated after package adoption: article body in initial HTML,
+3,217 text characters, 15 links, one loaded image with supplied alt, zero frames,
+and zero page errors. Canonical and standard-document links remained correct.
+This is read-only evidence from the explicit demonstration publication, not
+committed content or a configured Open Thoughts publication.

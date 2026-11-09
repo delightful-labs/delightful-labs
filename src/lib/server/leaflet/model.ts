@@ -1,4 +1,4 @@
-import type { Page } from "../../leaflet/model";
+import type { StandardSiteDocument } from "@standard-reader/renderer-core";
 
 export type ReaderConfig = { ownerDid: string; publicationUri?: string };
 export type ConfiguredReader = {
@@ -21,7 +21,8 @@ export type Article = {
   updatedAt?: string;
   path: string;
   sourceUrl: string;
-  pages: Page[];
+  document: StandardSiteDocument;
+  pds: string;
 };
 export type Snapshot = {
   publication: { uri: string; name: string; sourceUrl: string };

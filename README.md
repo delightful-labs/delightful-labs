@@ -46,10 +46,13 @@ the DID document, rather than permanently hard-coded.
 
 The index loads public AT Protocol records, follows every cursor, filters exact
 publication membership, and sorts original dates. Articles render semantic native
-HTML, safe rich text, images, lists and reachable subpages. Unsupported blocks or
-annotations link to Leaflet instead of becoming frames or raw HTML. Published
-theme/font settings are not adopted. Missing image alt text remains unchanged
-and is marked in the read model for later content review.
+HTML using `@standard-reader/renderer-svelte@0.4.0` and its matching core.
+The small integration wrapper uses existing Delightful UI defaults, safe links,
+PDS image resolution, and a source link in place of iframe blocks. Source theme
+and font settings are not adopted. Rendering follows the package's supported
+behavior; the owner accepted its current facet, checklist, page, and delimiter
+limitations before starting to publish. See the
+[renderer evaluation](specs/001-homepage-native-blog/evaluations/standard-reader/README.md).
 
 The server reader's cache/refresh lifecycle is an XState v6 machine, pinned to
 `6.0.0-beta.1` as requested. Fetching and Zod validation live in focused modules;
