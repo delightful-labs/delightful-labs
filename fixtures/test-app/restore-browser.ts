@@ -1,5 +1,5 @@
 import type { ActorRef, Snapshot } from 'xstate'
-import type { RestoreEvent } from '../../src/lib/backup/restore.js'
+import type { RestoreEvent } from 'delightful-local-first/backup/restore'
 import type { TestAppContinuationResult } from './restore-continuation.js'
 import { testAppProfile } from './profile.js'
 import { createTestAppRestorePlanningMachine } from './restore-planning.js'

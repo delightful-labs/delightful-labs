@@ -1,4 +1,4 @@
-import { fromCallback } from 'xstate'
+import { createCallbackLogic } from 'xstate'
 import { createArchivePayloadError } from 'delightful-local-first/backup/archive'
 import { createArchiveInspectionError } from 'delightful-local-first/backup/inspection'
 
@@ -59,4 +59,4 @@ const observeStream = ({ input, sendBack, receive }) => {
 		if (input.waitForClose) stream.destroy()
 	}
 }
-export const streamRead = fromCallback(observeStream)
+export const streamRead = createCallbackLogic(observeStream)

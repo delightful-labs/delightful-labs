@@ -1,4 +1,4 @@
-import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
+import type { EventPayload } from './restore-events.js'
 import { setup, createAsyncLogic, types } from 'xstate'
 import type { Db, Transaction, schema } from 'jazz-tools'
 import {

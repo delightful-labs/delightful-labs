@@ -1,5 +1,5 @@
-import type { RestoreEvent, RestoreDestinationInput } from '../../src/lib/backup/restore.js'
-import type { BackupBinding } from '../../src/lib/backup/binding.js'
+import type { RestoreEvent, RestoreDestinationInput } from 'delightful-local-first/backup/restore'
+import type { BackupBinding } from 'delightful-local-first/backup/binding'
 import type { Transaction } from 'jazz-tools'
 import type { TestAppRestoreRequest } from './restore-request.js'
 import type { TestAppComparison } from './restore-comparison.js'

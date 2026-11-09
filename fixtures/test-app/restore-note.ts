@@ -15,9 +15,12 @@ import {
 } from './restore-request.js'
 
 type Input = { request: TestAppRestoreRequest }
-export function testAppCurrentStepIsNote(input: Input): boolean {
+export function testAppCurrentStepIsNote(
+	input: Input,
+	record = data(input).observedJournal
+): boolean {
 	const value = data(input),
-		batch = currentTestAppBatch(input)
+		batch = currentTestAppBatch(input, record)
 	return (
 		batch !== undefined &&
 		batch.mappingIndexes.length > 0 &&

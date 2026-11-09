@@ -1,4 +1,4 @@
-import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
+import type { EventPayload } from './restore-events.js'
 import { setup, type Snapshot, types } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
@@ -148,8 +148,10 @@ export function createTestAppRestoreContinuationMachine<
 		},
 		states: {
 			claiming: {
-				entry: ({ context, self }) => {
-					self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' })
+				entry: ({ context, self }, enq) => {
+					enq(() => {
+						self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' })
+					})
 				},
 				on: { CLAIMED: { target: 'working' }, CLAIM_FAILED: { target: 'complete' } }
 			},
@@ -239,13 +241,15 @@ export function createTestAppRestoreContinuationMachine<
 						}
 					},
 					preparingExpected: {
-						entry: ({ context, self }) => {
-							try {
-								continuation.prepareExpected(context)
-								self.send({ type: 'EXPECTED_READY' })
-							} catch {
-								self.send({ type: 'EXPECTED_FAILED' })
-							}
+						entry: ({ context, self }, enq) => {
+							enq(() => {
+								try {
+									continuation.prepareExpected(context)
+									self.send({ type: 'EXPECTED_READY' })
+								} catch {
+									self.send({ type: 'EXPECTED_FAILED' })
+								}
+							})
 						},
 						on: {
 							EXPECTED_READY: (args) => {

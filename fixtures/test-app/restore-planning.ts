@@ -1,4 +1,4 @@
-import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
+import type { EventPayload } from './restore-events.js'
 import { setup, createAsyncLogic, types } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type { RestoreEvent } from 'delightful-local-first/backup/restore'

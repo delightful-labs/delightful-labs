@@ -174,5 +174,27 @@ formatting and whitespace checks. The user instructed restoration of the missing
 implementation tests. A normal follow-up commit restores both Actions checks;
 no skip marker is used for subsequent qualification commits. The full CI workflow
 remains enabled and unchanged in scope. All 949 unit tests now pass, including
-the production corrections above. Native, consumer and browser qualification
-continues; require green CI before merging.
+the production corrections above. Native, consumer and browser results are recorded below; require green CI before merging.
+
+### Full CI fixture qualification
+
+The complete gates also compile/run JavaScript and `.mjs` consumers. The bounded
+backup reader now declares v6 schemas and queues native chunk handling. Assembly
+is a synchronous callback leaf that reports completion before stream cleanup;
+all 17 reader tests pass. Fixture event payload types live beside the test app,
+so its emitted build uses public package subpaths and stays within its root.
+
+The full restore fixture now queues claim/preparation entry effects and routes
+from the immutable checkpoint already in chart context. It no longer reads a
+queued native metadata update during immediate eventless routing. All 72 restore
+browser tests pass; seven existing opt-in measurement cases remain skipped.
+Native backup qualification passes all 20 tests, private creation passes all 10,
+and the complete consumer gate passes, including its 12 archive checks.
+
+Upgrade interruption tests now hook the actual IndexedDB upgrade event before
+adapter handling; v6 inspection reports after the transition and cannot reproduce
+the old pre-delivery inspection hook. The avatar dismissal/reselection test uses
+the native file chooser and verifies input clearing before reselecting the same
+file; it passes five concurrent repetitions without retries or time sleeps.
+All 63 Storybook browser tests pass.
+The required full checks remain enabled; no qualification commit skips CI.

@@ -1,4 +1,4 @@
-import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
+import type { EventPayload } from './restore-events.js'
 import { createActor, createCallbackLogic, setup, createAsyncLogic, types } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
@@ -148,7 +148,7 @@ export function createTestAppRestoreWorkflow(
 		binding: context.binding,
 		databaseName: context.databaseName,
 		intent: required(data(context).intent),
-		writeId: required(currentTestAppBatch(context)).writeId
+		writeId: required(currentTestAppBatch(context, context.result.record)).writeId
 	})
 	// Retained journal metadata is the only cursor; expected content stays in the private request.
 	const retainRecord = (context: Context, record: RestoreJournalRecord | undefined) => {
@@ -247,8 +247,11 @@ export function createTestAppRestoreWorkflow(
 		},
 		states: {
 			claiming: {
-				entry: ({ context, self }) =>
-					self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' }),
+				entry: ({ context, self }, enq) => {
+					enq(() => {
+						self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' })
+					})
+				},
 				on: { CLAIMED: { target: 'working' }, CLAIM_FAILED: { target: 'reporting' } }
 			},
 			working: {
@@ -354,7 +357,7 @@ export function createTestAppRestoreWorkflow(
 							}
 							if (
 								(({ context }) => {
-									const checkpoint = data(context).observedJournal?.checkpoint
+									const checkpoint = context.result.record?.checkpoint
 									return (
 										!checkpoint ||
 										(checkpoint.kind === 'writing' && checkpoint.completed.length === 0)
@@ -363,22 +366,22 @@ export function createTestAppRestoreWorkflow(
 							) {
 								return { target: 'preparing' }
 							}
-							if (data(context).observedJournal?.checkpoint.kind === 'comparing') {
+							if (context.result.record?.checkpoint.kind === 'comparing') {
 								return { target: 'comparing' }
 							}
 							if (
-								data(context).observedJournal?.checkpoint.kind === 'activating' ||
-								data(context).observedJournal?.checkpoint.kind === 'complete'
+								context.result.record?.checkpoint.kind === 'activating' ||
+								context.result.record?.checkpoint.kind === 'complete'
 							) {
 								return { target: 'activating' }
 							}
-							if (testAppCurrentStepIsAttachment(context)) {
+							if (testAppCurrentStepIsAttachment(context, context.result.record)) {
 								return { target: 'preparingAttachment' }
 							}
-							if (testAppCurrentStepIsRoot(context)) {
+							if (testAppCurrentStepIsRoot(context, context.result.record)) {
 								return { target: 'preparingNotebook' }
 							}
-							if (testAppCurrentStepIsNote(context)) {
+							if (testAppCurrentStepIsNote(context, context.result.record)) {
 								return { target: 'preparingNote' }
 							}
 							return { target: '#test-app-restore-workflow.conflict' }
@@ -431,13 +434,15 @@ export function createTestAppRestoreWorkflow(
 						}
 					},
 					preparingAttachment: {
-						entry: ({ context, self }) => {
-							try {
-								prepareTestAppAttachmentBytes(context)
-								self.send({ type: 'EXPECTED_READY' })
-							} catch {
-								self.send({ type: 'EXPECTED_FAILED' })
-							}
+						entry: ({ context, self }, enq) => {
+							enq(() => {
+								try {
+									prepareTestAppAttachmentBytes(context)
+									self.send({ type: 'EXPECTED_READY' })
+								} catch {
+									self.send({ type: 'EXPECTED_FAILED' })
+								}
+							})
 						},
 						on: {
 							EXPECTED_READY: { target: 'writingAttachment' },
@@ -445,13 +450,15 @@ export function createTestAppRestoreWorkflow(
 						}
 					},
 					preparingNotebook: {
-						entry: ({ context, self }) => {
-							try {
-								prepareTestAppRoot(context)
-								self.send({ type: 'EXPECTED_READY' })
-							} catch {
-								self.send({ type: 'EXPECTED_FAILED' })
-							}
+						entry: ({ context, self }, enq) => {
+							enq(() => {
+								try {
+									prepareTestAppRoot(context)
+									self.send({ type: 'EXPECTED_READY' })
+								} catch {
+									self.send({ type: 'EXPECTED_FAILED' })
+								}
+							})
 						},
 						on: {
 							EXPECTED_READY: { target: 'writingNotebook' },
@@ -459,13 +466,15 @@ export function createTestAppRestoreWorkflow(
 						}
 					},
 					preparingNote: {
-						entry: ({ context, self }) => {
-							try {
-								prepareTestAppNote(context)
-								self.send({ type: 'EXPECTED_READY' })
-							} catch {
-								self.send({ type: 'EXPECTED_FAILED' })
-							}
+						entry: ({ context, self }, enq) => {
+							enq(() => {
+								try {
+									prepareTestAppNote(context)
+									self.send({ type: 'EXPECTED_READY' })
+								} catch {
+									self.send({ type: 'EXPECTED_FAILED' })
+								}
+							})
 						},
 						on: {
 							EXPECTED_READY: { target: 'writingNote' },
@@ -501,7 +510,7 @@ export function createTestAppRestoreWorkflow(
 							id: 'journal',
 							src: 'journal',
 							input: ({ context }) => {
-								const record = required(data(context).observedJournal)
+								const record = required(context.result.record)
 								return {
 									binding: context.binding,
 									databaseName: context.databaseName,
