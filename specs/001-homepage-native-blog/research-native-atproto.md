@@ -190,3 +190,12 @@ headless-CMS integration. No record settings were changed by this research.
 These are concrete technical validation steps. Only the account/publication
 choice inherently requires owner input if it cannot be found in connected
 project context.
+
+## Svelte renderer package evaluation (2026-11-09)
+
+Evaluated the published `@standard-reader/renderer-svelte@0.4.0` and matching
+core in an isolated Svelte SSR harness. Native unstyled SSR works, and snippets
+can override links, frames, and unsupported blocks. Current release duplicates
+text for overlapping facets, continues past member-only delimiters, and loses
+Leaflet checklist state. Retain the current renderer pending upstream fixes;
+see the [compatibility report and reproducible probes](evaluations/standard-reader/README.md).

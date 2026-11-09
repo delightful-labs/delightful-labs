@@ -1,0 +1,132 @@
+{
+  "ssr": {
+    "rendersParagraph": true,
+    "rendersHeading": true,
+    "escapesText": true,
+    "escapedCode": true,
+    "headingAnchor": false
+  },
+  "membersOnly": {
+    "beforeRendered": true,
+    "afterRendered": true
+  },
+  "overlappingFacets": [
+    {
+      "type": "mark",
+      "mark": "strong",
+      "children": [
+        {
+          "type": "text",
+          "value": "abcd"
+        }
+      ]
+    },
+    {
+      "type": "mark",
+      "mark": "emphasis",
+      "children": [
+        {
+          "type": "text",
+          "value": "cdef"
+        }
+      ]
+    }
+  ],
+  "invalidUtf8Facet": [
+    {
+      "type": "text",
+      "value": "A\ufffd"
+    },
+    {
+      "type": "mark",
+      "mark": "strong",
+      "children": [
+        {
+          "type": "text",
+          "value": "\ufffd\ufffd"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "value": "\ufffdB"
+    }
+  ],
+  "validUtf8Facet": [
+    {
+      "type": "text",
+      "value": "A"
+    },
+    {
+      "type": "mark",
+      "mark": "strong",
+      "children": [
+        {
+          "type": "text",
+          "value": "\ud83d\ude00"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "value": "B"
+    }
+  ],
+  "unsafeLink": {
+    "containsJavascriptHref": true
+  },
+  "iframe": {
+    "emitted": true
+  },
+  "unknown": {
+    "fallbackVisible": false
+  },
+  "pages": {
+    "childRendered": true,
+    "orphanRendered": true,
+    "childAnchor": false
+  },
+  "image": [
+    {
+      "type": "image",
+      "src": "https://cdn.bsky.app/img/feed_fullsize/plain/did%3Aplc%3Atestowner/baaaaaaaaaa@png",
+      "alt": "Alt text",
+      "aspectRatio": 1.7777777777777777,
+      "source": {
+        "blob": {
+          "ref": {
+            "$link": "baaaaaaaaaa"
+          },
+          "mimeType": "image/png",
+          "size": 100
+        }
+      }
+    }
+  ],
+  "customImageResolver": [
+    {
+      "type": "image",
+      "src": "https://pds.example/image",
+      "alt": "Alt text",
+      "aspectRatio": 1.7777777777777777,
+      "source": {
+        "blob": {
+          "ref": {
+            "$link": "baaaaaaaaaa"
+          },
+          "mimeType": "image/png",
+          "size": 100
+        }
+      }
+    }
+  ],
+  "snippetOverrides": {
+    "stripsUnsafeLink": true,
+    "noIframe": true,
+    "fallbackCount": 2
+  },
+  "blobPages": null,
+  "checklist": {
+    "nativeCheckbox": false
+  }
+}
