@@ -713,18 +713,21 @@ To test SwipeActions against an already-running development server, use `DUI_STO
 
 ## Deployment and CI
 
-Netlify builds the public Storybook using `pnpm build-storybook` and publishes
-`storybook-static`. The root `netlify.toml` pins Node.js 24 and pnpm 10.22.0;
-production and deploy previews use the same configuration. Link the Netlify site
-to this repository with its base directory left at the repository root.
+Vercel builds the public Storybook using `pnpm build-storybook` and publishes
+`storybook-static`. The root `vercel.json` selects a static build instead of the
+SvelteKit demo. Use Node.js 24 in the Vercel project; `packageManager` pins pnpm
+10.22.0 and installation uses the frozen lockfile. Production and preview builds
+use the same configuration, with the repository root as the build directory.
+Connect `main` for production deployments and feature branches for previews.
+The previous Netlify site is retained with its Git repository disconnected.
 
 The GitHub `CI` workflow runs on pull requests and supports manual runs. It installs
 lockfile-pinned dependencies, checks Svelte/TypeScript, runs unit tests, builds the
 demo/library, runs app Chromium and Storybook Chromium/mobile WebKit tests, and
 builds the public Storybook. Browser tests use one worker and temporary local
 preview servers. Browser reports and failure artifacts are retained for 14 days.
-No Netlify credentials are needed in GitHub: Netlify handles deployments through
-its repository integration. Branch protection can require the
+No Vercel credentials are needed in GitHub when deployments use Vercel's
+repository integration. Branch protection can require the
 `Unit and browser tests` check after the workflow has run.
 
 ## Packaging and publishing
