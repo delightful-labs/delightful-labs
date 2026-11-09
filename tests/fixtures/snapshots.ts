@@ -1,8 +1,13 @@
 import type { Snapshot } from "../../src/lib/server/leaflet/model";
-import type {
-  SnapshotStore,
-  StoredSnapshot,
-} from "../../src/lib/server/leaflet/snapshot-store";
+import type { StoredSnapshot } from "../../src/lib/server/leaflet/model";
+export interface SnapshotStore {
+  read(signal: AbortSignal): Promise<StoredSnapshot | null>;
+  write(
+    snapshot: Snapshot,
+    version: string | null,
+    signal: AbortSignal,
+  ): Promise<boolean>;
+}
 export const config = {
   ownerDid: "did:plc:testowner",
   publicationUri: "at://did:plc:testowner/site.standard.publication/test",

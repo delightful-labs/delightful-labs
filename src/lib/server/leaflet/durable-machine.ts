@@ -3,15 +3,19 @@ import {
   CACHE_FRESH_MS,
   CACHE_STALE_MS,
   type Snapshot,
-  type SnapshotLoader,
+  type ConfiguredReader,
+  type SnapshotStorage,
+  type StoredSnapshot,
 } from "./model";
-import type { SnapshotStore, StoredSnapshot } from "./snapshot-store";
+import { blobStoreMachine } from "./blob-store-machine";
+import { snapshotMachine } from "./snapshot-machine";
 
-type Input = { store: SnapshotStore; load: SnapshotLoader; now: () => number };
+type Input = { config: ConfiguredReader; storage: SnapshotStorage };
 type Observed = { stored: StoredSnapshot | null; age: number | null };
 type Context = Input & {
   baseVersion: string | null;
   current?: Observed;
+  stored: StoredSnapshot | null;
   candidate?: Snapshot;
   result?: Snapshot;
   error: unknown;
@@ -23,37 +27,16 @@ type Result =
       outcome: "fresh" | "saved" | "winner" | "stale";
     }
   | { ok: false; error: unknown };
-const read = createAsyncLogic({
-  schemas: { input: types<Pick<Input, "store" | "now">>() },
-  run: async ({ input, signal }): Promise<Observed> => {
-    const stored = await input.store.read(signal);
-    // Capture age after I/O, outside transition calculations.
-    return {
-      stored,
-      age: stored ? input.now() - stored.snapshot.verifiedAt : null,
-    };
-  },
-});
-const refresh = createAsyncLogic({
-  schemas: { input: types<{ load: SnapshotLoader }>() },
-  run: ({ input, signal }) => input.load(signal),
-});
-const commit = createAsyncLogic({
-  schemas: {
-    input: types<{
-      store: SnapshotStore;
-      candidate: Snapshot;
-      baseVersion: string | null;
-    }>(),
-  },
-  run: ({ input, signal }) =>
-    input.store.write(input.candidate, input.baseVersion, signal),
-});
 export const durableMachine = setup({
   schemas: {
     input: types<Input>(),
     context: types<Context>(),
     output: types<Result>(),
+  },
+  actors: {
+    blobOperation: blobStoreMachine,
+    refreshSnapshot: snapshotMachine,
+    readClock: createAsyncLogic({ run: async () => Date.now() }),
   },
   states: {
     checkingFreshness: { schemas: { context: types<{ current: Observed }>() } },
@@ -69,24 +52,48 @@ export const durableMachine = setup({
   context: ({ input }) => ({
     ...input,
     baseVersion: null,
+    stored: null,
     error: undefined,
   }),
   initial: "reading",
   states: {
     reading: {
       invoke: {
-        src: read,
-        input: ({ context }) => context,
-        onDone: ({ event }) => ({
-          target: "checkingFreshness",
-          context: {
-            current: event.output,
-            baseVersion: event.output.stored?.version ?? null,
-          },
+        src: "blobOperation",
+        input: ({ context }) => ({
+          config: context.config,
+          ...context.storage,
+          kind: "read",
         }),
+        onDone: ({ event }) =>
+          event.output.ok
+            ? {
+                target: "capturingReadTime",
+                context: {
+                  stored: event.output.snapshot,
+                  baseVersion: event.output.snapshot?.version ?? null,
+                },
+              }
+            : { target: "failed", context: { error: event.output.error } },
         onError: ({ event }) => ({
           target: "failed",
           context: { error: event.error },
+        }),
+      },
+    },
+    capturingReadTime: {
+      invoke: {
+        src: "readClock",
+        onDone: ({ context, event }) => ({
+          target: "checkingFreshness",
+          context: {
+            current: {
+              stored: context.stored,
+              age: context.stored
+                ? event.output - context.stored.snapshot.verifiedAt
+                : null,
+            },
+          },
         }),
       },
     },
@@ -110,8 +117,8 @@ export const durableMachine = setup({
     },
     refreshing: {
       invoke: {
-        src: refresh,
-        input: ({ context }) => ({ load: context.load }),
+        src: "refreshSnapshot",
+        input: ({ context }) => ({ config: context.config }),
         onDone: ({ event }) => ({
           target: "committing",
           context: { candidate: event.output },
@@ -124,21 +131,25 @@ export const durableMachine = setup({
     },
     committing: {
       invoke: {
-        src: commit,
+        src: "blobOperation",
         input: ({ context }) => ({
-          store: context.store,
-          candidate: context.candidate,
-          baseVersion: context.baseVersion,
+          config: context.config,
+          ...context.storage,
+          kind: "write",
+          snapshot: context.candidate,
+          version: context.baseVersion,
         }),
         onDone: ({ context, event }) =>
-          event.output
-            ? { target: "saved", context: { result: context.candidate } }
-            : {
-                target: "recovering",
-                context: {
-                  error: new Error("Concurrent snapshot refresh; retry"),
+          !event.output.ok
+            ? { target: "recovering", context: { error: event.output.error } }
+            : event.output.written
+              ? { target: "saved", context: { result: context.candidate } }
+              : {
+                  target: "recovering",
+                  context: {
+                    error: new Error("Concurrent snapshot refresh; retry"),
+                  },
                 },
-              },
         onError: ({ event }) => ({
           target: "recovering",
           context: { error: event.error },
@@ -147,15 +158,38 @@ export const durableMachine = setup({
     },
     recovering: {
       invoke: {
-        src: read,
-        input: ({ context }) => context,
-        onDone: ({ event }) => ({
-          target: "checkingRecovery",
-          context: { current: event.output },
+        src: "blobOperation",
+        input: ({ context }) => ({
+          config: context.config,
+          ...context.storage,
+          kind: "read",
         }),
+        onDone: ({ event }) =>
+          event.output.ok
+            ? {
+                target: "capturingRecoveryTime",
+                context: { stored: event.output.snapshot },
+              }
+            : { target: "failed", context: { error: event.output.error } },
         onError: ({ event }) => ({
           target: "failed",
           context: { error: event.error },
+        }),
+      },
+    },
+    capturingRecoveryTime: {
+      invoke: {
+        src: "readClock",
+        onDone: ({ context, event }) => ({
+          target: "checkingRecovery",
+          context: {
+            current: {
+              stored: context.stored,
+              age: context.stored
+                ? event.output - context.stored.snapshot.verifiedAt
+                : null,
+            },
+          },
         }),
       },
     },

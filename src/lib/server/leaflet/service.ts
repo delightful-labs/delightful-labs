@@ -6,7 +6,6 @@ import {
   VERCEL_ENV,
   VERCEL_GIT_COMMIT_REF,
 } from "$app/env/private";
-import { blobSnapshotStore } from "./blob-store";
 import { parseReaderConfig } from "./config";
 import { PublicationReader } from "./reader";
 
@@ -22,11 +21,11 @@ export function publicationReader(): PublicationReader {
       VERCEL_ENV === "production"
         ? "production"
         : `${VERCEL_ENV}/${VERCEL_GIT_COMMIT_REF}`;
-    const store =
+    const storage =
       parsed && BLOB_STORE_ID
-        ? blobSnapshotStore(parsed, BLOB_STORE_ID, namespace)
+        ? { storeId: BLOB_STORE_ID, namespace }
         : undefined;
-    reader = new PublicationReader(config, { store });
+    reader = new PublicationReader(config, storage);
   }
   return reader;
 }

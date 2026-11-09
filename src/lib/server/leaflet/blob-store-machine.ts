@@ -7,7 +7,7 @@ import {
   MAX_SNAPSHOT_BYTES,
   snapshotPath,
 } from "./snapshot-codec";
-import type { StoredSnapshot } from "./snapshot-store";
+import type { StoredSnapshot } from "./model";
 
 type Location = {
   config: ConfiguredReader;

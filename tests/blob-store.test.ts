@@ -1,6 +1,6 @@
 import { createActor } from "xstate";
 import { blobStoreMachine } from "../src/lib/server/leaflet/blob-store-machine";
-import { runActor } from "../src/lib/server/leaflet/run-actor";
+import { runActor } from "./fixtures/run-actor";
 import { randomUUID } from "node:crypto";
 import {
   BlobPreconditionFailedError,
@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   blobSnapshotStore,
   snapshotPath,
-} from "../src/lib/server/leaflet/blob-store";
+} from "./fixtures/blob-store";
 import { config, snapshot } from "./fixtures/snapshots";
 vi.mock("@vercel/blob", async (original) => ({
   ...(await original<typeof import("@vercel/blob")>()),

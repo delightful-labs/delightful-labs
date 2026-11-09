@@ -1,9 +1,12 @@
 import { createActor } from "xstate";
-import { durableMachine } from "../src/lib/server/leaflet/durable-machine";
-import { runActor } from "../src/lib/server/leaflet/run-actor";
+import { runActor } from "./fixtures/run-actor";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { durableLoader } from "../src/lib/server/leaflet/durable-loader";
-import { PublicationReader } from "../src/lib/server/leaflet/reader";
+import {
+  durableLoader,
+  durableLogic,
+  storedReader,
+  storage,
+} from "./fixtures/machines";
 import { MemorySnapshotStore, config, snapshot } from "./fixtures/snapshots";
 import type { Snapshot } from "../src/lib/server/leaflet/model";
 const signal = () => new AbortController().signal;
@@ -21,11 +24,7 @@ describe("durable publication snapshots", () => {
     const json = vi.fn(async () => {
       throw new Error("must not fetch");
     });
-    const reader = new PublicationReader(config, {
-      store,
-      json,
-      now: () => 200,
-    });
+    const reader = storedReader(config, store, () => 200, json);
     expect((await reader.read())?.articles[0].key).toBe("one");
     expect(json).not.toHaveBeenCalled();
     reader.stop();
@@ -33,7 +32,7 @@ describe("durable publication snapshots", () => {
 
   it("checks shared state even while an instance's local snapshot is fresh", async () => {
     const store = new MemorySnapshotStore(snapshot(100));
-    const reader = new PublicationReader(config, { store, now: () => 200 });
+    const reader = storedReader(config, store, () => 200);
     await reader.read();
     await store.write(snapshot(150, []), "1", signal());
     expect((await reader.read())?.articles).toEqual([]);
@@ -43,7 +42,7 @@ describe("durable publication snapshots", () => {
   it("coalesces simultaneous reads of shared storage", async () => {
     const store = new MemorySnapshotStore(snapshot(100));
     const read = vi.spyOn(store, "read");
-    const reader = new PublicationReader(config, { store, now: () => 200 });
+    const reader = storedReader(config, store, () => 200);
     const [first, second] = await Promise.all([reader.read(), reader.read()]);
     expect(first).toEqual(second);
     expect(read).toHaveBeenCalledOnce();
@@ -52,7 +51,7 @@ describe("durable publication snapshots", () => {
 
   it("does not serve a local copy when shared state is unreadable", async () => {
     const store = new MemorySnapshotStore(snapshot(100));
-    const reader = new PublicationReader(config, { store, now: () => 200 });
+    const reader = storedReader(config, store, () => 200);
     await reader.read();
     store.failure = new Error("storage unavailable");
     await expect(reader.read()).rejects.toThrow("storage unavailable");
@@ -221,9 +220,16 @@ describe("durable snapshot lifecycle", () => {
       store.current = { snapshot: snapshot(301_000, []), version: "winner" };
       return false;
     });
-    const actor = createActor(durableMachine, {
-      input: { store, load: async () => snapshot(301_000), now: () => 301_000 },
-    });
+    const actor = createActor(
+      durableLogic(
+        store,
+        async () => snapshot(301_000),
+        () => 301_000,
+      ),
+      {
+        input: { config, storage },
+      },
+    );
     const states: unknown[] = [];
     actor.subscribe((state) => states.push(state.value));
     const result = await runActor(actor, signal());
@@ -234,23 +240,28 @@ describe("durable snapshot lifecycle", () => {
     });
     expect(states).toEqual([
       "reading",
+      "capturingReadTime",
       "refreshing",
       "committing",
       "recovering",
+      "capturingRecoveryTime",
       "winner",
     ]);
   });
 
   it("enters stale after a failed refresh without resetting verification time", async () => {
-    const actor = createActor(durableMachine, {
-      input: {
-        store: new MemorySnapshotStore(snapshot(0)),
-        now: () => 301_000,
-        load: async () => {
+    const actor = createActor(
+      durableLogic(
+        new MemorySnapshotStore(snapshot(0)),
+        async () => {
           throw new Error("upstream unavailable");
         },
+        () => 301_000,
+      ),
+      {
+        input: { config, storage },
       },
-    });
+    );
     const states: unknown[] = [];
     actor.subscribe((state) => states.push(state.value));
     expect(await runActor(actor, signal())).toMatchObject({
@@ -258,7 +269,14 @@ describe("durable snapshot lifecycle", () => {
       outcome: "stale",
       snapshot: { stale: true, verifiedAt: 0 },
     });
-    expect(states).toEqual(["reading", "refreshing", "recovering", "stale"]);
+    expect(states).toEqual([
+      "reading",
+      "capturingReadTime",
+      "refreshing",
+      "recovering",
+      "capturingRecoveryTime",
+      "stale",
+    ]);
   });
 
   it("fails when recovery storage is unreadable rather than returning the old body", async () => {

@@ -1,104 +1,94 @@
 import { createAsyncLogic, setup, types } from "xstate";
-import { readArticle } from "./article";
-import { createRpc, readCommit, type Rpc } from "./client";
-import { resolvePds } from "./identity";
-import type { Article, ConfiguredReader, JsonReader, Snapshot } from "./model";
-import { readDocumentRecords } from "./records";
-import { publicationSchema, type DocumentRecord } from "./schemas";
+import { articlesMachine } from "./articles-machine";
+import { rpcUrl } from "./client";
+import { readJson } from "./http";
+import { identityUrl } from "./identity";
+import type { Article, ConfiguredReader, Snapshot } from "./model";
+import { recordsMachine } from "./records-machine";
+import {
+  commitSchema,
+  identitySchema,
+  pdsUrlSchema,
+  publicationSchema,
+  type DocumentRecord,
+} from "./schemas";
 
-type Input = {
-  config: ConfiguredReader;
-  json: JsonReader;
-  now: () => number;
-};
-type Publication = Snapshot["publication"];
-type Connected = Input & { pds: URL };
+type Input = { config: ConfiguredReader };
+type Connected = Input & { pds: string };
 type Committed = Connected & { commit: string };
-type Published = Committed & { publication: Publication };
+type Published = Committed & { publication: Snapshot["publication"] };
 type Enumerated = Published & { records: DocumentRecord[] };
 type Prepared = Published & { articles: Article[] };
 type Context = Input & Partial<Enumerated & Prepared & { snapshot: Snapshot }>;
 
-const connect = createAsyncLogic({
-  schemas: { input: types<Input>() },
-  run: ({ input, signal }) =>
-    resolvePds(input.config.ownerDid, input.json, signal),
-});
-const commit = createAsyncLogic({
-  schemas: { input: types<Connected>() },
-  run: ({ input, signal }) =>
-    readCommit(rpc(input, signal), input.config.ownerDid),
-});
-const publication = createAsyncLogic({
-  schemas: { input: types<Committed>() },
-  run: async ({ input, signal }): Promise<Publication> => {
-    const record = publicationSchema.parse(
-      await rpc(input, signal)("com.atproto.repo.getRecord", {
-        repo: input.config.ownerDid,
-        collection: "site.standard.publication",
-        rkey: input.config.publicationKey,
-      }),
-    );
-    if (record.uri !== input.config.publicationUri)
-      throw new Error("Publication mismatch");
-    return {
-      uri: record.uri,
-      name: record.value.name,
-      sourceUrl: new URL(record.value.url).href,
-    };
-  },
-});
-const enumerate = createAsyncLogic({
-  schemas: { input: types<Published>() },
-  run: ({ input, signal }) =>
-    readDocumentRecords(rpc(input, signal), input.config.ownerDid),
-});
-const prepare = createAsyncLogic({
-  schemas: { input: types<Enumerated>() },
-  run: async ({ input, signal }): Promise<Article[]> => {
-    const articles: Article[] = [];
-    const request = rpc(input, signal);
-    for (const record of input.records) {
-      signal.throwIfAborted();
-      if (record.value.site === input.config.publicationUri)
-        articles.push(
-          await readArticle(record, input.config, input.pds, request),
-        );
-    }
-    return articles.sort(
-      (a, b) =>
-        Date.parse(b.publishedAt) - Date.parse(a.publishedAt) ||
-        a.uri.localeCompare(b.uri),
-    );
-  },
-});
-const verify = createAsyncLogic({
-  schemas: { input: types<Prepared>() },
-  run: async ({ input, signal }): Promise<Snapshot> => {
-    if (
-      input.commit !==
-      (await readCommit(rpc(input, signal), input.config.ownerDid))
-    )
-      throw new Error("Repository changed during scan; retry later");
-    signal.throwIfAborted();
-    return {
-      publication: input.publication,
-      articles: input.articles,
-      verifiedAt: input.now(),
-      stale: false,
-    };
-  },
-});
-
-// Bind RPC cancellation to the active stage, rather than a completed actor.
-function rpc(context: Connected, signal: AbortSignal): Rpc {
-  return createRpc(context.pds, context.json, signal);
-}
 export const snapshotMachine = setup({
   schemas: {
     context: types<Context>(),
     input: types<Input>(),
     output: types<Snapshot>(),
+  },
+  actors: {
+    resolveIdentity: createAsyncLogic({
+      schemas: { input: types<Input>() },
+      run: async ({ input, signal }) => {
+        const did = input.config.ownerDid;
+        const identity = identitySchema.parse(
+          await readJson(identityUrl(did), signal),
+        );
+        if (identity.id !== did) throw new Error("DID document mismatch");
+        const service = identity.service.find(
+          (s) => s.id === "#atproto_pds" || s.id === `${did}#atproto_pds`,
+        );
+        return new URL(pdsUrlSchema.parse(service?.serviceEndpoint)).origin;
+      },
+    }),
+    readCommit: createAsyncLogic({
+      schemas: { input: types<Connected>() },
+      run: async ({ input, signal }) =>
+        commitSchema.parse(
+          await readJson(
+            rpcUrl(input.pds, "com.atproto.sync.getLatestCommit", {
+              did: input.config.ownerDid,
+            }),
+            signal,
+          ),
+        ).cid,
+    }),
+    readPublication: createAsyncLogic({
+      schemas: { input: types<Committed>() },
+      run: async ({ input, signal }): Promise<Snapshot["publication"]> => {
+        const record = publicationSchema.parse(
+          await readJson(
+            rpcUrl(input.pds, "com.atproto.repo.getRecord", {
+              repo: input.config.ownerDid,
+              collection: "site.standard.publication",
+              rkey: input.config.publicationKey,
+            }),
+            signal,
+          ),
+        );
+        if (record.uri !== input.config.publicationUri)
+          throw new Error("Publication mismatch");
+        return {
+          uri: record.uri,
+          name: record.value.name,
+          sourceUrl: new URL(record.value.url).href,
+        };
+      },
+    }),
+    enumerateRecords: recordsMachine,
+    prepareArticles: articlesMachine,
+    captureVerificationTime: createAsyncLogic({ run: async () => Date.now() }),
+    failDeadline: createAsyncLogic({
+      run: async () => {
+        throw new Error("Archive refresh timeout");
+      },
+    }),
+    failChangedCommit: createAsyncLogic({
+      run: async () => {
+        throw new Error("Repository changed during scan; retry later");
+      },
+    }),
   },
   states: {
     readingInitialCommit: { schemas: { context: types<Connected>() } },
@@ -106,16 +96,19 @@ export const snapshotMachine = setup({
     enumeratingRecords: { schemas: { context: types<Published>() } },
     preparingArticles: { schemas: { context: types<Enumerated>() } },
     verifyingCommit: { schemas: { context: types<Prepared>() } },
+    recordingVerification: { schemas: { context: types<Prepared>() } },
     complete: { schemas: { context: types<{ snapshot: Snapshot }>() } },
   },
 }).createMachine({
   id: "snapshotLoad",
   context: ({ input }) => ({ ...input }),
   initial: "resolvingIdentity",
+  timeout: 40_000,
+  onTimeout: { target: ".timedOut" },
   states: {
     resolvingIdentity: {
       invoke: {
-        src: connect,
+        src: "resolveIdentity",
         input: ({ context }) => context,
         onDone: ({ event }) => ({
           target: "readingInitialCommit",
@@ -125,7 +118,7 @@ export const snapshotMachine = setup({
     },
     readingInitialCommit: {
       invoke: {
-        src: commit,
+        src: "readCommit",
         input: ({ context }) => context,
         onDone: ({ event }) => ({
           target: "readingPublication",
@@ -135,7 +128,7 @@ export const snapshotMachine = setup({
     },
     readingPublication: {
       invoke: {
-        src: publication,
+        src: "readPublication",
         input: ({ context }) => context,
         onDone: ({ event }) => ({
           target: "enumeratingRecords",
@@ -145,8 +138,11 @@ export const snapshotMachine = setup({
     },
     enumeratingRecords: {
       invoke: {
-        src: enumerate,
-        input: ({ context }) => context,
+        src: "enumerateRecords",
+        input: ({ context }) => ({
+          pds: context.pds,
+          ownerDid: context.config.ownerDid,
+        }),
         onDone: ({ event }) => ({
           target: "preparingArticles",
           context: { records: event.output },
@@ -155,7 +151,7 @@ export const snapshotMachine = setup({
     },
     preparingArticles: {
       invoke: {
-        src: prepare,
+        src: "prepareArticles",
         input: ({ context }) => context,
         onDone: ({ event }) => ({
           target: "verifyingCommit",
@@ -165,14 +161,34 @@ export const snapshotMachine = setup({
     },
     verifyingCommit: {
       invoke: {
-        src: verify,
+        src: "readCommit",
         input: ({ context }) => context,
-        onDone: ({ event }) => ({
-          target: "complete",
-          context: { snapshot: event.output },
+        onDone: ({ context, event }) => ({
+          target:
+            event.output === context.commit
+              ? "recordingVerification"
+              : "changed",
         }),
       },
     },
+    recordingVerification: {
+      invoke: {
+        src: "captureVerificationTime",
+        onDone: ({ context, event }) => ({
+          target: "complete",
+          context: {
+            snapshot: {
+              publication: context.publication,
+              articles: context.articles,
+              verifiedAt: event.output,
+              stale: false,
+            },
+          },
+        }),
+      },
+    },
+    timedOut: { invoke: { src: "failDeadline" } },
+    changed: { invoke: { src: "failChangedCommit" } },
     complete: { type: "final", output: ({ context }) => context.snapshot },
   },
   output: ({ output }) => output,

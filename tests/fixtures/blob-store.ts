@@ -1,9 +1,12 @@
 import { createActor } from "xstate";
-import { blobStoreMachine, type BlobOperation } from "./blob-store-machine";
-import type { ConfiguredReader } from "./model";
+import {
+  blobStoreMachine,
+  type BlobOperation,
+} from "../../src/lib/server/leaflet/blob-store-machine";
+import type { ConfiguredReader } from "../../src/lib/server/leaflet/model";
 import { runActor } from "./run-actor";
-import type { SnapshotStore } from "./snapshot-store";
-export { snapshotPath } from "./snapshot-codec";
+import type { SnapshotStore } from "./snapshots";
+export { snapshotPath } from "../../src/lib/server/leaflet/snapshot-codec";
 
 async function perform(operation: BlobOperation, signal: AbortSignal) {
   const result = await runActor(
