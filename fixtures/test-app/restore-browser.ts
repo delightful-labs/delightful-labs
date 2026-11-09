@@ -1,15 +1,18 @@
+import type { ActorRef, Snapshot } from 'xstate'
+import type { RestoreEvent } from '../../src/lib/backup/restore.js'
+import type { TestAppContinuationResult } from './restore-continuation.js'
 import { testAppProfile } from './profile.js'
 import { createTestAppRestorePlanningMachine } from './restore-planning.js'
 import { createTestAppRestore, createTestAppRestoreWorkflow } from './restore-workflow.js'
 import { compareTestAppDestination, testAppDestinationGraphQuery } from './restore-comparison.js'
 import { createJazzSession, PersistedWriteRejectedError } from 'jazz-tools'
 import {
-	fromCallback,
-	fromPromise,
+	createCallbackLogic,
+	createAsyncLogic,
 	createActor,
 	toPromise,
 	waitFor,
-	type ActorRefFrom
+	type Actor
 } from 'xstate'
 import { prepareArchiveOpen, prepareArchiveSeal } from 'delightful-local-first/backup/envelope'
 import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
@@ -71,16 +74,16 @@ const preparationWrite = createTestAppPreparationWriteMachine(db)
 const preparationDestination = createTestAppPreparationWriter(db, preparationWrite)
 const machine = createTestAppRestorePreparationMachine(writer, preparationDestination)
 const pending: {
-	actor: ActorRefFrom<typeof machine> | undefined
+	actor: Actor<typeof machine> | undefined
 	cleanup: (() => void) | undefined
 	releaseAuthority?: () => void
 } = { actor: undefined, cleanup: undefined }
 const attachmentPending: {
-	actor?: ActorRefFrom<ReturnType<typeof createTestAppRestoreAttachmentMachine>>
+	actor?: ActorRef<Snapshot<TestAppContinuationResult<string>>, RestoreEvent> & { stop(): void }
 	cleanup?: () => void
 } = {}
 const rootPending: {
-	actor?: ActorRefFrom<ReturnType<typeof createTestAppRestoreRootMachine>>
+	actor?: ActorRef<Snapshot<TestAppContinuationResult<string>>, RestoreEvent> & { stop(): void }
 	cleanup?: () => void
 	releaseStage?: () => void
 	releaseRequest?: () => void
@@ -89,7 +92,7 @@ const rootPending: {
 	staged?: boolean
 } = {}
 const notePending: {
-	actor?: ActorRefFrom<ReturnType<typeof createTestAppRestoreNoteMachine>>
+	actor?: ActorRef<Snapshot<TestAppContinuationResult<string>>, RestoreEvent> & { stop(): void }
 	cleanup?: () => void
 	releaseStage?: () => void
 	releaseRequest?: () => void
@@ -140,10 +143,10 @@ const api = {
 	testAppRestoreApp,
 	activeTestAppDestinations,
 	db,
-	fromPromise,
+	createAsyncLogic,
 	preparationDestination,
 	preparationWrite,
-	fromCallback,
+	createCallbackLogic,
 	writer,
 	ownerId,
 	pending,

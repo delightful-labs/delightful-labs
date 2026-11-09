@@ -1,4 +1,5 @@
-import { assign, fromCallback, fromPromise, setup } from 'xstate'
+import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
+import { createCallbackLogic, setup, createAsyncLogic, types } from 'xstate'
 import type {
 	JazzArchiveReaderInput,
 	JazzArchiveReaderResult
@@ -23,7 +24,7 @@ export function createExportReader(
 ) {
 	type ReaderContext = JazzArchiveReaderInput & { result: JazzArchiveReaderResult }
 	const actors = {
-		resources: fromCallback<{ type: string }, JazzArchiveReaderInput>(({ input }) => {
+		resources: createCallbackLogic<{ type: string }, JazzArchiveReaderInput>(({ input }) => {
 			const clear = () => {
 				privateReads.get(input)?.bytes.fill(0)
 				privateReads.delete(input)
@@ -34,56 +35,61 @@ export function createExportReader(
 				clear()
 			}
 		}),
-		read: fromPromise<void, JazzArchiveReaderInput>(({ input }) =>
-			Promise.all([
-				input.all(app.workspaces.where({ id: graph.workspace })),
-				input.all(app.entries.where({ workspaceId: graph.workspace })),
-				input.all(app.files.where({ workspaceId: graph.workspace })),
-				input.all(app.parts.where({ workspaceId: graph.workspace }))
-			]).then(([roots, entries, files, parts]) => {
-				if (input.signal.aborted) return
-				const root = roots[0],
-					part = parts[0]
-				if (!root || !part || entries.length !== 1 || files.length !== 1 || parts.length !== 1)
-					throw new Error('Incomplete scope')
-				privateReads.set(input, { revision: root.revision, bytes: Uint8Array.from(part.data) })
-			})
-		),
-		pause: fromPromise<void, JazzArchiveReaderInput>(({ input }) => pause(input)),
-		digest: fromPromise<void, JazzArchiveReaderInput>(({ input }) => {
-			const values = privateReads.get(input)
-			if (!values) throw new Error('Reader data missing')
-			return input.sha256(values.bytes).then((digest) => {
-				values.digest = digest
-			})
+		read: createAsyncLogic<void, JazzArchiveReaderInput>({
+			run: ({ input }) =>
+				Promise.all([
+					input.all(app.workspaces.where({ id: graph.workspace })),
+					input.all(app.entries.where({ workspaceId: graph.workspace })),
+					input.all(app.files.where({ workspaceId: graph.workspace })),
+					input.all(app.parts.where({ workspaceId: graph.workspace }))
+				]).then(([roots, entries, files, parts]) => {
+					if (input.signal.aborted) return
+					const root = roots[0],
+						part = parts[0]
+					if (!root || !part || entries.length !== 1 || files.length !== 1 || parts.length !== 1)
+						throw new Error('Incomplete scope')
+					privateReads.set(input, { revision: root.revision, bytes: Uint8Array.from(part.data) })
+				})
+		}),
+		pause: createAsyncLogic<void, JazzArchiveReaderInput>({ run: ({ input }) => pause(input) }),
+		digest: createAsyncLogic<void, JazzArchiveReaderInput>({
+			run: ({ input }) => {
+				const values = privateReads.get(input)
+				if (!values) throw new Error('Reader data missing')
+				return input.sha256(values.bytes).then((digest) => {
+					values.digest = digest
+				})
+			}
 		})
 	}
-	return setup<
-		ReaderContext,
-		{ type: 'CANCEL' | 'SHUTDOWN' },
-		typeof actors,
-		{},
-		{},
-		{},
-		never,
-		string,
-		JazzArchiveReaderInput,
-		JazzArchiveReaderResult
-	>({ actors }).createMachine({
+	return setup({
+		schemas: {
+			output: types<JazzArchiveReaderResult>(),
+			context: types<ReaderContext>(),
+			events: {
+				CANCEL: types<EventPayload<{ type: 'CANCEL' | 'SHUTDOWN' }, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<{ type: 'CANCEL' | 'SHUTDOWN' }, 'SHUTDOWN'>>()
+			},
+			input: types<JazzArchiveReaderInput>()
+		},
+		actors
+	}).createMachine({
 		context: ({ input }) => ({ ...input, result: { outcome: 'ready' } }),
 		initial: 'reading',
-		invoke: { src: 'resources', input: ({ context }) => context, onError: '.failed' },
+		invoke: { src: 'resources', input: ({ context }) => context, onError: { target: '.failed' } },
 		output: ({ context }) => context.result,
 		states: {
 			reading: {
 				invoke: {
 					src: 'read',
 					input: ({ context }) => context,
-					onDone: [
-						{ guard: ({ context }) => context.mode === 'hydrate', target: 'done' },
-						{ target: 'pausing' }
-					],
-					onError: 'failed'
+					onDone: (args) => {
+						if (args.context.mode === 'hydrate') {
+							return { target: 'done' }
+						}
+						return { target: 'pausing' }
+					},
+					onError: { target: 'failed' }
 				}
 			},
 			pausing: {
@@ -93,16 +99,16 @@ export function createExportReader(
 				invoke: {
 					src: 'pause',
 					input: ({ context }) => context,
-					onDone: 'hashing',
-					onError: 'failed'
+					onDone: { target: 'hashing' },
+					onError: { target: 'failed' }
 				}
 			},
 			hashing: {
 				invoke: {
 					src: 'digest',
 					input: ({ context }) => context,
-					onDone: 'done',
-					onError: 'failed'
+					onDone: { target: 'done' },
+					onError: { target: 'failed' }
 				}
 			},
 			done: {
@@ -149,12 +155,17 @@ export function createExportReader(
 			},
 			failed: {
 				type: 'final',
-				entry: assign({
-					result: ({ event }): JazzArchiveReaderResult => ({
-						outcome: 'failed',
-						code: classifyJazzArchiveFailure('error' in event ? event.error : undefined)
-					})
-				})
+				entry: (args) => {
+					const { event } = args
+					return {
+						context: {
+							result: {
+								outcome: 'failed',
+								code: classifyJazzArchiveFailure('error' in event ? event.error : undefined)
+							}
+						}
+					}
+				}
 			}
 		}
 	})

@@ -1,5 +1,6 @@
+import type { EventPayload } from '../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assign, createActor, fromPromise, setup, toPromise, waitFor } from 'xstate'
+import { createActor, setup, toPromise, waitFor, createAsyncLogic, types } from 'xstate'
 import wire from '../../../tests/fixtures/restore-journal-v1.json'
 import { createRestoreWriteStepMachine } from '../machines/backup/restore-write-step.js'
 import { createRestoreMachine } from '../machines/backup/restore.js'
@@ -30,74 +31,114 @@ function testDestination<T, W>(writer: TestWriter<T, W>) {
 	type Input = RestoreDestinationInput<T>
 	type Context = { input: Input; result: RestoreDestinationResult }
 	const actors = {
-		remote: fromPromise(({ input }: { input: Input }) =>
-			writer.readRemote(input.intent, input.step)
-		),
-		authority: fromPromise(({ input }: { input: Input }) =>
-			writer.checkAuthority(input.intent, input.step)
-		),
-		read: fromPromise(({ input }: { input: Input }) =>
-			restoreTransactionAccess(input).call((tx) =>
-				writer.readTransaction(tx, input.intent, input.step)
-			)
-		),
-		stage: fromPromise(({ input }: { input: Input }) =>
-			restoreTransactionAccess(input).call((tx) => writer.stage(tx, input.intent, input.step))
-		)
+		remote: createAsyncLogic({
+			run: ({ input }: { input: Input }) => writer.readRemote(input.intent, input.step)
+		}),
+		authority: createAsyncLogic({
+			run: ({ input }: { input: Input }) => writer.checkAuthority(input.intent, input.step)
+		}),
+		read: createAsyncLogic({
+			run: ({ input }: { input: Input }) =>
+				restoreTransactionAccess(input).call((tx) =>
+					writer.readTransaction(tx, input.intent, input.step)
+				)
+		}),
+		stage: createAsyncLogic({
+			run: ({ input }: { input: Input }) =>
+				restoreTransactionAccess(input).call((tx) => writer.stage(tx, input.intent, input.step))
+		})
 	}
 	const input = ({ context }: { context: Context }) => context.input
-	return setup<
-		Context,
-		RestoreEvent,
-		typeof actors,
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		RestoreDestinationResult
-	>({ actors }).createMachine({
+	return setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<RestoreEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<RestoreEvent, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>()
+			},
+			input: types<Input>()
+		},
+		actors
+	}).createMachine({
 		initial: 'selecting',
 		context: ({ input }) => ({ input, result: 'unavailable' }),
 		output: ({ context }) => context.result,
 		states: {
 			selecting: {
-				always: [
-					{ guard: ({ context }) => context.input.operation === 'remote', target: 'remote' },
-					{ guard: ({ context }) => context.input.operation === 'authority', target: 'authority' },
-					{ guard: ({ context }) => context.input.operation === 'read', target: 'read' },
-					{ target: 'stage' }
-				]
+				always: (args) => {
+					const { context } = args
+					if (context.input.operation === 'remote') {
+						return { target: 'remote' }
+					}
+					if (context.input.operation === 'authority') {
+						return { target: 'authority' }
+					}
+					if (context.input.operation === 'read') {
+						return { target: 'read' }
+					}
+					return { target: 'stage' }
+				}
 			},
 			remote: {
 				invoke: {
 					src: 'remote',
 					input,
-					onDone: { target: 'complete', actions: assign({ result: ({ event }) => event.output }) },
-					onError: 'complete'
+					onDone: (args) => {
+						return { target: 'complete', context: { result: args.event.output } }
+					},
+					onError: { target: 'complete' }
 				}
 			},
 			authority: {
 				invoke: {
 					src: 'authority',
 					input,
-					onDone: [{ guard: ({ event }) => event.output, target: 'allowed' }, { target: 'denied' }],
-					onError: 'complete'
+					onDone: (args) => {
+						if (args.event.output) {
+							return { target: 'allowed' }
+						}
+						return { target: 'denied' }
+					},
+					onError: { target: 'complete' }
 				}
 			},
 			read: {
 				invoke: {
 					src: 'read',
 					input,
-					onDone: { target: 'complete', actions: assign({ result: ({ event }) => event.output }) },
-					onError: 'complete'
+					onDone: (args) => {
+						return { target: 'complete', context: { result: args.event.output } }
+					},
+					onError: { target: 'complete' }
 				}
 			},
-			stage: { invoke: { src: 'stage', input, onDone: 'staged', onError: 'complete' } },
-			allowed: { type: 'final', entry: assign({ result: 'allowed' }) },
-			denied: { type: 'final', entry: assign({ result: 'denied' }) },
-			staged: { type: 'final', entry: assign({ result: 'staged' }) },
+			stage: {
+				invoke: {
+					src: 'stage',
+					input,
+					onDone: { target: 'staged' },
+					onError: { target: 'complete' }
+				}
+			},
+			allowed: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'allowed' } }
+				}
+			},
+			denied: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'denied' } }
+				}
+			},
+			staged: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'staged' } }
+				}
+			},
 			complete: { type: 'final' }
 		}
 	})
@@ -121,43 +162,41 @@ function testJournalMachine() {
 	}
 	type Context = { configuration: BrowserJournalConfiguration; result: Result }
 	const actors = {
-		command: fromPromise<Result, BrowserJournalConfiguration>(({ input }) => {
-			const command = input.command
-			journal.commands.push(command)
-			if (command.mode === 'load' || command.mode === 'discover')
-				return Promise.resolve({
-					outcome: journal.record ? 'loaded' : 'missing',
-					record: journal.record
-				})
-			if (command.mode === 'initialize') throw new Error('Unexpected fixture initialization')
-			if (command.mode === 'create') {
-				journal.record ??= command.record
-				return Promise.resolve({ outcome: 'created', record: journal.record })
+		command: createAsyncLogic<Result, BrowserJournalConfiguration>({
+			run: ({ input }) => {
+				const command = input.command
+				journal.commands.push(command)
+				if (command.mode === 'load' || command.mode === 'discover')
+					return Promise.resolve({
+						outcome: journal.record ? 'loaded' : 'missing',
+						record: journal.record
+					})
+				if (command.mode === 'initialize') throw new Error('Unexpected fixture initialization')
+				if (command.mode === 'create') {
+					journal.record ??= command.record
+					return Promise.resolve({ outcome: 'created', record: journal.record })
+				}
+				if (command.record.revision === journal.failRevision)
+					return Promise.resolve({ outcome: 'failed', record: undefined })
+				if (
+					!journal.record ||
+					command.expectedRevision !== journal.record.revision ||
+					!isRestoreJournalSuccessor(journal.record, command.record)
+				)
+					return Promise.resolve({ outcome: 'conflict', record: journal.record })
+				journal.record = command.record
+				return Promise.resolve({ outcome: 'updated', record: journal.record })
 			}
-			if (command.record.revision === journal.failRevision)
-				return Promise.resolve({ outcome: 'failed', record: undefined })
-			if (
-				!journal.record ||
-				command.expectedRevision !== journal.record.revision ||
-				!isRestoreJournalSuccessor(journal.record, command.record)
-			)
-				return Promise.resolve({ outcome: 'conflict', record: journal.record })
-			journal.record = command.record
-			return Promise.resolve({ outcome: 'updated', record: journal.record })
 		})
 	}
-	return setup<
-		Context,
-		{ type: 'UNUSED' },
-		typeof actors,
-		{},
-		{},
-		{},
-		never,
-		string,
-		BrowserJournalConfiguration,
-		Result
-	>({ actors }).createMachine({
+	return setup({
+		schemas: {
+			context: types<Context>(),
+			events: { UNUSED: types<EventPayload<{ type: 'UNUSED' }, 'UNUSED'>>() },
+			input: types<BrowserJournalConfiguration>()
+		},
+		actors
+	}).createMachine({
 		context: ({ input }) => ({
 			configuration: input,
 			result: { outcome: 'failed', record: undefined }
@@ -169,8 +208,10 @@ function testJournalMachine() {
 				invoke: {
 					src: 'command',
 					input: ({ context }) => context.configuration,
-					onDone: { target: 'complete', actions: assign({ result: ({ event }) => event.output }) },
-					onError: 'complete'
+					onDone: (args) => {
+						return { target: 'complete', context: { result: args.event.output } }
+					},
+					onError: { target: 'complete' }
 				}
 			},
 			complete: { type: 'final' }

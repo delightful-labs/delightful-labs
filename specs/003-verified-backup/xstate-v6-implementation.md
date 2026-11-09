@@ -111,8 +111,8 @@ is in progress after merge; earlier static results do not qualify these changes.
 ## Post-merge qualification: session readiness
 
 PR #37 merged at `73de2bc`; the user's merge confirmation clears the
-implementation-test review gate for that merged code. This follow-up changes no
-production implementation. The 25 existing readiness tests now use
+implementation-test review gate for that merged code. The initial readiness slice changed no
+production implementation; CI qualification below expands that scope. The 25 existing readiness tests now use
 `createCallbackLogic` and the v6 `xstate.error.actor` protocol. Two deliberate
 system-event injections remain outside the public command union, with localized
 `@ts-expect-error` annotations. These check error-report handling, not an actual
@@ -140,3 +140,39 @@ changed-test Oxlint passes with denied warnings. Full `pnpm check` remains block
 by 184 errors in 22 other legacy test/consumer files. CI runs the focused target
 before the full check, and retains the full gate. This is not a green repository
 qualification or release-readiness claim.
+
+## PR #38 CI follow-up: implementation review required
+
+The failing Actions run `42644545685` stopped at the full `pnpm check`, with 184
+v5 harness errors. Remaining TypeScript and JavaScript fixtures now use v6
+schemas, function transitions, async/callback/step logic and transition inspection.
+Step-based report collectors ignore initialization; generic fake children retain
+complete immutable context records and their exact public event contracts.
+Fault-injection wrappers preserve the real machine lifecycle and throw at the
+selected transition, replacing overrides of v5 actions that no longer exist.
+No XState package, declaration, or required CI gate is patched or disabled.
+
+Runtime checks against the already merged implementation exposed six production
+corrections prepared in this follow-up:
+
+- `workspaces/creation-owner.ts`: invoke input captures the admitted binding;
+  the operation binding is recorded by entry, which runs after input selection.
+- `forms/write.ts`: the assessment token uses the next generation; entry increments
+  the owner's counter after invoke input is selected.
+- `identity/session-recovery.ts`, `workspaces/invitation-authority.ts` and
+  `workspaces/invitation-redemption.ts`: registered source names preserve supported
+  `provide({ actors })` replacement behavior at these customization boundaries.
+- `backup/restore-write-step.ts`: successful settlement/rollback enters a native
+  custody-clear state while the custodian is still alive. A synchronous callback
+  reports completion before the machine exits and stops its custodian. This avoids
+  handing an already settled transaction to detached recovery. It adds no Promise
+  or await to the transaction path and keeps uncertain/error custody intact.
+
+Static validation passes: full `pnpm check`, library check, test-app/native-capture/
+private-creation/packaged-consumer TypeScript, strict package validation, lint,
+formatting and whitespace checks. The post-fix runtime, native and browser suites
+are **not yet qualified**. The repository's explicit implementation-test review
+gate applies to these new production corrections. The follow-up commit uses
+`[skip ci]` until the user approves this concrete implementation; the full CI
+workflow remains enabled and unchanged in scope. After approval, run the full
+suite, address any further behavior differences, and rerun CI before merging.

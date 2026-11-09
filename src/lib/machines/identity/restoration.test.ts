@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, fromCallback, waitFor } from 'xstate'
+import { createActor, createCallbackLogic, waitFor } from 'xstate'
 import type {
 	RestorationCapability,
 	RestorationEvent,
@@ -34,7 +34,9 @@ function startFixture(overrides: Partial<RestorationCapability>, entry: 'fixed' 
 	let current = true
 	const reports: RestorationReport[] = []
 	const recipient = createActor(
-		fromCallback<RestorationReport>(({ receive }) => receive((report) => reports.push(report)))
+		createCallbackLogic<RestorationReport>(({ receive }) =>
+			receive((report) => reports.push(report))
+		)
 	).start()
 	const parse = vi.fn(async () => 'synthetic credential')
 	const restore = vi.fn(async () => {})

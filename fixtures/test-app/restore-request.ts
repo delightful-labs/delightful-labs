@@ -1,4 +1,4 @@
-import { fromCallback } from 'xstate'
+import { createCallbackLogic } from 'xstate'
 import { z } from 'zod'
 import type { IntegrityCheckedArchive } from 'delightful-local-first/backup/envelope'
 import type { BackupBinding } from 'delightful-local-first/backup/binding'
@@ -145,7 +145,7 @@ export function claimTestAppRestore(input: { request: TestAppRestoreRequest }): 
 	value.claimed = true
 	return true
 }
-export const testAppRestoreResources = fromCallback<
+export const testAppRestoreResources = createCallbackLogic<
 	{ type: string },
 	{ request: TestAppRestoreRequest }
 >(({ input, sendBack }) => {

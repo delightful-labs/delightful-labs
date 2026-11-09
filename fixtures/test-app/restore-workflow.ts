@@ -1,4 +1,5 @@
-import { forwardTo, raise, assign, createActor, fromCallback, fromPromise, setup } from 'xstate'
+import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
+import { createActor, createCallbackLogic, setup, createAsyncLogic, types } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
@@ -57,7 +58,7 @@ export function createTestAppRestoreWorkflow(
 	}
 	const actors = {
 		resources: testAppRestoreResources,
-		identity: fromCallback<RestoreEvent, BackupBinding>(({ input, sendBack }) => {
+		identity: createCallbackLogic<RestoreEvent, BackupBinding>(({ input, sendBack }) => {
 			try {
 				return db.onAuthChanged((state) =>
 					sendBack({ type: 'IDENTITY', binding: input, identityId: state.session?.user.account })
@@ -73,27 +74,42 @@ export function createTestAppRestoreWorkflow(
 		notebook: createRestoreMachine(writer, createTestAppRootWriter(db, request)),
 		note: createRestoreMachine(writer, createTestAppNoteWriter(db, request)),
 		activate: createRestoreMachine(writer, createTestAppActivationDestination(db, request)),
-		compare: fromPromise<TestAppComparison, Input>(({ input }) =>
-			db
-				.one(testAppDestinationGraphQuery(data(input).binding.workspaceId), { tier: 'remote' })
-				.then((row) => compareTestAppDestination(row, input.request))
-		)
+		compare: createAsyncLogic<TestAppComparison, Input>({
+			run: ({ input }) =>
+				db
+					.one(testAppDestinationGraphQuery(data(input).binding.workspaceId), { tier: 'remote' })
+					.then((row) => compareTestAppDestination(row, input.request))
+		})
 	}
-	const model = setup<
-		Context,
+	type Event =
 		| RestoreEvent
-		| { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' | 'EXPECTED_READY' | 'EXPECTED_FAILED' }
+		| {
+				type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' | 'EXPECTED_READY' | 'EXPECTED_FAILED'
+		  }
 		| { type: 'IDENTITY'; binding: BackupBinding; identityId: string | undefined }
-		| { type: 'IDENTITY_FAILED'; binding: BackupBinding },
-		typeof actors,
-		{},
-		{ interrupt: undefined },
-		{ interrupted: undefined; currentBinding: undefined },
-		never,
-		string,
-		Input,
-		RestoreResult
-	>({
+		| { type: 'IDENTITY_FAILED'; binding: BackupBinding }
+	const model = setup({
+		schemas: {
+			children: {
+				journal: types<import('xstate').ActorRefFrom<typeof actors.journal>>(),
+				effect: types<import('xstate').ActorRef<import('xstate').Snapshot<unknown>, RestoreEvent>>()
+			},
+			output: types<RestoreResult>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				RELEASE: types<EventPayload<Event, 'RELEASE'>>(),
+				CLAIMED: types<EventPayload<Event, 'CLAIMED'>>(),
+				CLAIM_FAILED: types<EventPayload<Event, 'CLAIM_FAILED'>>(),
+				EXPECTED_READY: types<EventPayload<Event, 'EXPECTED_READY'>>(),
+				EXPECTED_FAILED: types<EventPayload<Event, 'EXPECTED_FAILED'>>(),
+				IDENTITY: types<EventPayload<Event, 'IDENTITY'>>(),
+				IDENTITY_FAILED: types<EventPayload<Event, 'IDENTITY_FAILED'>>()
+			},
+			input: types<Input>()
+		},
 		actors,
 		guards: {
 			interrupted: ({ context }) => context.interruption !== undefined,
@@ -101,16 +117,28 @@ export function createTestAppRestoreWorkflow(
 				event.type === 'INVALIDATE' && sameBackupBinding(context.binding, event.binding)
 		},
 		actions: {
-			interrupt: assign({
-				interruption: ({ context, event }) =>
-					context.interruption ??
-					(event.type === 'SHUTDOWN'
-						? 'closed'
-						: event.type === 'INVALIDATE' ||
-							  event.type === 'IDENTITY' ||
-							  event.type === 'IDENTITY_FAILED'
-							? 'invalidated'
-							: 'cancelled')
+			interrupt: ({
+				context,
+				event
+			}: {
+				context: Context
+				event:
+					| RestoreEvent
+					| { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' | 'EXPECTED_READY' | 'EXPECTED_FAILED' }
+					| { type: 'IDENTITY'; binding: BackupBinding; identityId: string | undefined }
+					| { type: 'IDENTITY_FAILED'; binding: BackupBinding }
+			}) => ({
+				context: {
+					interruption:
+						context.interruption ??
+						(event.type === 'SHUTDOWN'
+							? 'closed'
+							: event.type === 'INVALIDATE' ||
+								  event.type === 'IDENTITY' ||
+								  event.type === 'IDENTITY_FAILED'
+								? 'invalidated'
+								: 'cancelled')
+				}
 			})
 		}
 	})
@@ -126,36 +154,50 @@ export function createTestAppRestoreWorkflow(
 	const retainRecord = (context: Context, record: RestoreJournalRecord | undefined) => {
 		data(context).observedJournal = record
 	}
-	const terminal = '#test-app-restore-workflow.reporting'
+
 	const batchWrite = (src: 'attachment' | 'notebook' | 'note') =>
 		model.createStateConfig({
 			on: {
-				CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-				SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-				INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+				CANCEL: (args, enq) => {
+					enq.sendTo('effect', args.event)
+					return args.actions.interrupt(args)
+				},
+				SHUTDOWN: (args, enq) => {
+					enq.sendTo('effect', args.event)
+					return args.actions.interrupt(args)
+				},
+				INVALIDATE: (args, enq) => {
+					if (!args.guards.currentBinding(args)) return
+					enq.sendTo('effect', args.event)
+					return args.actions.interrupt(args)
+				}
 			},
 
 			invoke: {
 				id: 'effect',
 				src,
 				input: writeInput,
-				onDone: [
-					{
-						guard: ({ event }) => event.output.outcome === 'batchWritten',
-						target: 'selecting',
-						actions: [
-							({ context, event }) => {
-								data(context).attachment = undefined
-								data(context).notebook = undefined
-								data(context).notes = undefined
-								retainRecord(context, event.output.record)
-							},
-							assign({ result: ({ event }) => ({ ...event.output, outcome: 'incomplete' }) })
-						]
-					},
-					{ target: terminal, actions: assign({ result: ({ event }) => event.output }) }
-				],
-				onError: terminal
+				onDone: (args, enq) => {
+					const { event } = args
+					if (event.output.outcome === 'batchWritten') {
+						enq(() => {
+							const { context, event } = args
+							data(context).attachment = undefined
+							data(context).notebook = undefined
+							data(context).notes = undefined
+							retainRecord(context, event.output.record)
+						})
+						return {
+							target: 'selecting',
+							context: { result: { ...event.output, outcome: 'incomplete' } }
+						}
+					}
+					return {
+						target: '#test-app-restore-workflow.reporting',
+						context: { result: event.output }
+					}
+				},
+				onError: { target: '#test-app-restore-workflow.reporting' }
 			}
 		})
 	return model.createMachine({
@@ -173,149 +215,190 @@ export function createTestAppRestoreWorkflow(
 			outcome: context.interruption ?? context.result.outcome
 		}),
 		on: {
-			CANCEL: { actions: 'interrupt' },
-			SHUTDOWN: { actions: 'interrupt' },
-			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' },
-			RELEASE: { actions: raise({ type: 'CANCEL' }) },
-			IDENTITY: {
-				guard: ({ context, event }) =>
-					sameBackupBinding(context.binding, event.binding) &&
-					event.identityId !== context.binding.identityId,
-				actions: raise(({ context }) => ({ type: 'INVALIDATE', binding: context.binding }))
+			CANCEL: (args) => {
+				return args.actions.interrupt(args)
 			},
-			IDENTITY_FAILED: {
-				guard: ({ context, event }) => sameBackupBinding(context.binding, event.binding),
-				actions: raise(({ context }) => ({ type: 'INVALIDATE', binding: context.binding }))
+			SHUTDOWN: (args) => {
+				return args.actions.interrupt(args)
+			},
+			INVALIDATE: (args) => {
+				if (!args.guards.currentBinding(args)) return
+				return args.actions.interrupt(args)
+			},
+			RELEASE: (args, enq) => {
+				enq.raise({ type: 'CANCEL' })
+			},
+			IDENTITY: (args, enq) => {
+				const { context, event } = args
+				if (
+					!(
+						sameBackupBinding(context.binding, event.binding) &&
+						event.identityId !== context.binding.identityId
+					)
+				)
+					return
+				enq.raise({ type: 'INVALIDATE', binding: context.binding })
+			},
+			IDENTITY_FAILED: (args, enq) => {
+				const { context } = args
+				if (!sameBackupBinding(context.binding, args.event.binding)) return
+				enq.raise({ type: 'INVALIDATE', binding: context.binding })
 			}
 		},
 		states: {
 			claiming: {
 				entry: ({ context, self }) =>
 					self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' }),
-				on: { CLAIMED: 'working', CLAIM_FAILED: 'reporting' }
+				on: { CLAIMED: { target: 'working' }, CLAIM_FAILED: { target: 'reporting' } }
 			},
 			working: {
 				initial: 'admitting',
 				invoke: [
-					{ src: 'resources', input, onError: terminal },
+					{ src: 'resources', input, onError: { target: '#test-app-restore-workflow.reporting' } },
 					{
 						src: 'identity',
 						input: ({ context }) => context.binding,
-						onError: {
-							actions: raise(({ context }) => ({
+						onError: (args, enq) => {
+							enq.raise({
 								type: 'IDENTITY_FAILED',
-								binding: context.binding
-							}))
+								binding: args.context.binding
+							})
 						}
 					}
 				],
 				states: {
 					admitting: {
-						always: [
-							{ guard: 'interrupted', target: terminal },
-							{
-								guard: ({ context }) => data(context).options?.mode === 'new',
-								target: 'initializing'
-							},
-							{ target: 'planning' }
-						]
+						always: (args) => {
+							const { context } = args
+							if (args.guards.interrupted(args)) {
+								return { target: '#test-app-restore-workflow.reporting' }
+							}
+							if (data(context).options?.mode === 'new') {
+								return { target: 'initializing' }
+							}
+							return { target: 'planning' }
+						}
 					},
 					initializing: {
 						invoke: {
-							id: 'effect',
+							id: 'journal',
 							src: 'journal',
 							input: ({ context }) => ({
 								binding: context.binding,
 								databaseName: context.databaseName,
 								command: { mode: 'initialize' }
 							}),
-							onDone: [
-								{ guard: 'interrupted', target: terminal },
-								{
-									guard: ({ event }) => event.output.outcome === 'initialized',
-									target: 'planning'
-								},
-								{ target: terminal }
-							],
-							onError: terminal
+							onDone: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-restore-workflow.reporting' }
+								}
+								if (args.event.output.outcome === 'initialized') {
+									return { target: 'planning' }
+								}
+								return { target: '#test-app-restore-workflow.reporting' }
+							},
+							onError: { target: '#test-app-restore-workflow.reporting' }
 						}
 					},
 					planning: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
 							id: 'effect',
 							src: 'plan',
 							input,
-							onDone: [
-								{ guard: 'interrupted', target: terminal },
-								{
-									guard: ({ context, event }) =>
-										event.output.outcome === 'planned' &&
-										(data(context).options?.mode === 'new' ||
-											testAppRecoveryIntentMatches(context)),
-									target: 'selecting',
-									actions: assign({
-										result: ({ context }) => ({
-											binding: context.binding,
-											outcome: 'incomplete',
-											record: data(context).observedJournal
-										})
-									})
-								},
-								{ target: terminal }
-							],
-							onError: terminal
+							onDone: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-restore-workflow.reporting' }
+								}
+								if (
+									args.event.output.outcome === 'planned' &&
+									(data(context).options?.mode === 'new' || testAppRecoveryIntentMatches(context))
+								) {
+									return {
+										target: 'selecting',
+										context: {
+											result: {
+												binding: context.binding,
+												outcome: 'incomplete',
+												record: data(context).observedJournal
+											}
+										}
+									}
+								}
+								return { target: '#test-app-restore-workflow.reporting' }
+							},
+							onError: { target: '#test-app-restore-workflow.reporting' }
 						}
 					},
 					selecting: {
-						always: [
-							{ guard: 'interrupted', target: terminal },
-							{
-								guard: ({ context }) => {
+						always: (args) => {
+							const { context } = args
+							if (args.guards.interrupted(args)) {
+								return { target: '#test-app-restore-workflow.reporting' }
+							}
+							if (
+								(({ context }) => {
 									const checkpoint = data(context).observedJournal?.checkpoint
 									return (
 										!checkpoint ||
 										(checkpoint.kind === 'writing' && checkpoint.completed.length === 0)
 									)
-								},
-								target: 'preparing'
-							},
-							{
-								guard: ({ context }) =>
-									data(context).observedJournal?.checkpoint.kind === 'comparing',
-								target: 'comparing'
-							},
-							{
-								guard: ({ context }) =>
-									data(context).observedJournal?.checkpoint.kind === 'activating' ||
-									data(context).observedJournal?.checkpoint.kind === 'complete',
-								target: 'activating'
-							},
-							{
-								guard: ({ context }) => testAppCurrentStepIsAttachment(context),
-								target: 'preparingAttachment'
-							},
-							{
-								guard: ({ context }) => testAppCurrentStepIsRoot(context),
-								target: 'preparingNotebook'
-							},
-							{
-								guard: ({ context }) => testAppCurrentStepIsNote(context),
-								target: 'preparingNote'
-							},
-							{ target: '#test-app-restore-workflow.conflict' }
-						]
+								})(args)
+							) {
+								return { target: 'preparing' }
+							}
+							if (data(context).observedJournal?.checkpoint.kind === 'comparing') {
+								return { target: 'comparing' }
+							}
+							if (
+								data(context).observedJournal?.checkpoint.kind === 'activating' ||
+								data(context).observedJournal?.checkpoint.kind === 'complete'
+							) {
+								return { target: 'activating' }
+							}
+							if (testAppCurrentStepIsAttachment(context)) {
+								return { target: 'preparingAttachment' }
+							}
+							if (testAppCurrentStepIsRoot(context)) {
+								return { target: 'preparingNotebook' }
+							}
+							if (testAppCurrentStepIsNote(context)) {
+								return { target: 'preparingNote' }
+							}
+							return { target: '#test-app-restore-workflow.conflict' }
+						}
 					},
 					preparing: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
@@ -327,18 +410,24 @@ export function createTestAppRestoreWorkflow(
 								intent: required(data(context).intent),
 								writeId: required(data(context).intent).plan.preparation.writeId
 							}),
-							onDone: [
-								{
-									guard: ({ event }) => event.output.outcome === 'prepared',
-									target: 'selecting',
-									actions: [
-										({ context, event }) => retainRecord(context, event.output.record),
-										assign({ result: ({ event }) => ({ ...event.output, outcome: 'incomplete' }) })
-									]
-								},
-								{ target: terminal, actions: assign({ result: ({ event }) => event.output }) }
-							],
-							onError: terminal
+							onDone: (args, enq) => {
+								const { event } = args
+								if (event.output.outcome === 'prepared') {
+									enq(() => {
+										const { context, event } = args
+										return retainRecord(context, event.output.record)
+									})
+									return {
+										target: 'selecting',
+										context: { result: { ...event.output, outcome: 'incomplete' } }
+									}
+								}
+								return {
+									target: '#test-app-restore-workflow.reporting',
+									context: { result: event.output }
+								}
+							},
+							onError: { target: '#test-app-restore-workflow.reporting' }
 						}
 					},
 					preparingAttachment: {
@@ -350,7 +439,10 @@ export function createTestAppRestoreWorkflow(
 								self.send({ type: 'EXPECTED_FAILED' })
 							}
 						},
-						on: { EXPECTED_READY: 'writingAttachment', EXPECTED_FAILED: terminal }
+						on: {
+							EXPECTED_READY: { target: 'writingAttachment' },
+							EXPECTED_FAILED: { target: '#test-app-restore-workflow.reporting' }
+						}
 					},
 					preparingNotebook: {
 						entry: ({ context, self }) => {
@@ -361,7 +453,10 @@ export function createTestAppRestoreWorkflow(
 								self.send({ type: 'EXPECTED_FAILED' })
 							}
 						},
-						on: { EXPECTED_READY: 'writingNotebook', EXPECTED_FAILED: terminal }
+						on: {
+							EXPECTED_READY: { target: 'writingNotebook' },
+							EXPECTED_FAILED: { target: '#test-app-restore-workflow.reporting' }
+						}
 					},
 					preparingNote: {
 						entry: ({ context, self }) => {
@@ -372,7 +467,10 @@ export function createTestAppRestoreWorkflow(
 								self.send({ type: 'EXPECTED_FAILED' })
 							}
 						},
-						on: { EXPECTED_READY: 'writingNote', EXPECTED_FAILED: terminal }
+						on: {
+							EXPECTED_READY: { target: 'writingNote' },
+							EXPECTED_FAILED: { target: '#test-app-restore-workflow.reporting' }
+						}
 					},
 					writingAttachment: batchWrite('attachment'),
 					writingNotebook: batchWrite('notebook'),
@@ -382,25 +480,25 @@ export function createTestAppRestoreWorkflow(
 							id: 'effect',
 							src: 'compare',
 							input,
-							onDone: [
-								{ guard: 'interrupted', target: terminal },
-								{
-									guard: ({ event }) => event.output === 'incompleteMatch',
-									target: 'savingComparison'
-								},
-								{
-									guard: ({ event }) =>
-										event.output === 'conflict' || event.output === 'activeMatch',
-									target: '#test-app-restore-workflow.conflict'
-								},
-								{ target: terminal }
-							],
-							onError: terminal
+							onDone: (args) => {
+								const { event } = args
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-restore-workflow.reporting' }
+								}
+								if (event.output === 'incompleteMatch') {
+									return { target: 'savingComparison' }
+								}
+								if (event.output === 'conflict' || event.output === 'activeMatch') {
+									return { target: '#test-app-restore-workflow.conflict' }
+								}
+								return { target: '#test-app-restore-workflow.reporting' }
+							},
+							onError: { target: '#test-app-restore-workflow.reporting' }
 						}
 					},
 					savingComparison: {
 						invoke: {
-							id: 'effect',
+							id: 'journal',
 							src: 'journal',
 							input: ({ context }) => {
 								const record = required(data(context).observedJournal)
@@ -433,31 +531,43 @@ export function createTestAppRestoreWorkflow(
 									}
 								}
 							},
-							onDone: [
-								{
-									guard: ({ event }) =>
-										event.output.outcome === 'updated' && event.output.record !== undefined,
-									target: 'selecting',
-									actions: [
-										({ context, event }) => retainRecord(context, event.output.record),
-										assign({
-											result: ({ context, event }) => ({
+							onDone: (args, enq) => {
+								const { context, event } = args
+								if (event.output.outcome === 'updated' && event.output.record !== undefined) {
+									enq(() => {
+										const { context, event } = args
+										return retainRecord(context, event.output.record)
+									})
+									return {
+										target: 'selecting',
+										context: {
+											result: {
 												...context.result,
 												record: event.output.record
-											})
-										})
-									]
-								},
-								{ target: terminal }
-							],
-							onError: terminal
+											}
+										}
+									}
+								}
+								return { target: '#test-app-restore-workflow.reporting' }
+							},
+							onError: { target: '#test-app-restore-workflow.reporting' }
 						}
 					},
 					activating: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
@@ -469,37 +579,53 @@ export function createTestAppRestoreWorkflow(
 								intent: required(data(context).intent),
 								writeId: required(data(context).intent).plan.activation.writeId
 							}),
-							onDone: {
-								target: terminal,
-								actions: assign({ result: ({ event }) => event.output })
+							onDone: (args) => {
+								return {
+									target: '#test-app-restore-workflow.reporting',
+									context: { result: args.event.output }
+								}
 							},
-							onError: terminal
+							onError: { target: '#test-app-restore-workflow.reporting' }
 						}
 					}
 				}
 			},
 			conflict: {
 				type: 'final',
-				entry: assign({ result: ({ context }) => ({ ...context.result, outcome: 'conflict' }) })
+				entry: (args) => {
+					return { context: { result: { ...args.context.result, outcome: 'conflict' } } }
+				}
 			},
 			reporting: {
-				always: [
-					{ guard: ({ context }) => context.interruption === 'cancelled', target: 'cancelled' },
-					{ guard: ({ context }) => context.interruption === 'closed', target: 'closed' },
-					{ guard: ({ context }) => context.interruption === 'invalidated', target: 'invalidated' },
-					{ guard: ({ context }) => context.result.outcome === 'complete', target: 'succeeded' },
-					{ guard: ({ context }) => context.result.outcome === 'conflict', target: 'conflict' },
-					{
-						guard: ({ context }) => context.result.outcome === 'unavailable',
-						target: 'unavailable'
-					},
-					{ target: 'incomplete' }
-				]
+				always: (args) => {
+					const { context } = args
+					if (context.interruption === 'cancelled') {
+						return { target: 'cancelled' }
+					}
+					if (context.interruption === 'closed') {
+						return { target: 'closed' }
+					}
+					if (context.interruption === 'invalidated') {
+						return { target: 'invalidated' }
+					}
+					if (context.result.outcome === 'complete') {
+						return { target: 'succeeded' }
+					}
+					if (context.result.outcome === 'conflict') {
+						return { target: 'conflict' }
+					}
+					if (context.result.outcome === 'unavailable') {
+						return { target: 'unavailable' }
+					}
+					return { target: 'incomplete' }
+				}
 			},
 			succeeded: { type: 'final' },
 			incomplete: {
 				type: 'final',
-				entry: assign({ result: ({ context }) => ({ ...context.result, outcome: 'incomplete' }) })
+				entry: (args) => {
+					return { context: { result: { ...args.context.result, outcome: 'incomplete' } } }
+				}
 			},
 			unavailable: { type: 'final' },
 			cancelled: { type: 'final' },

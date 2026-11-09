@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, waitFor, fromPromise } from 'xstate'
+import { createActor, waitFor, createAsyncLogic } from 'xstate'
 import { createInvitationAuthorityMachine } from './invitation-authority.js'
 import type {
 	InvitationAuthorityAdmission,
@@ -134,17 +134,20 @@ const member = { id: 'existing-membership', workspaceId: 'notebook', accountId: 
 function assertCleared(f: Fixture, snapshot: Snapshot) {
 	const context = snapshot.context
 	for (const field of [
-		'credentials',
 		'request',
 		'admission',
-		'transaction',
 		'records',
 		'now',
 		'plan',
-		'decision',
-		'write'
+		'decision'
 	] satisfies (keyof typeof context)[])
 		expect(context[field]).toBeUndefined()
+	for (const field of [
+		'credentials',
+		'transaction',
+		'write'
+	] satisfies (keyof typeof context.resources)[])
+		expect(context.resources[field]).toBeUndefined()
 	expect(Object.keys(snapshot.children)).toHaveLength(0)
 	for (const secret of [f.credentials.bearer, 'synthetic-private-code', 'synthetic-private-digest'])
 		expect(JSON.stringify(context)).not.toContain(secret)
@@ -736,11 +739,13 @@ describe('invitation authority resource owner', () => {
 		const f = fixture()
 		const logic = createInvitationAuthorityMachine(f.capability).provide({
 			actors: {
-				verify: fromPromise<
+				verify: createAsyncLogic<
 					{ outcome: 'succeeded'; value: boolean } | { outcome: 'failed' },
 					{ code: string; digest: string }
-				>(async () => {
-					throw new Error(f.request.code)
+				>({
+					run: async () => {
+						throw new Error(f.request.code)
+					}
 				})
 			}
 		})
@@ -831,7 +836,7 @@ it('retains invitation custody when the owner crashes after acquisition', async 
 	const logic = createInvitationAuthorityMachine(f.capability).provide({
 		guards: {
 			closing: ({ context }) => {
-				if (context.transaction !== undefined) throw new Error('owner failed')
+				if (context.resources.transaction !== undefined) throw new Error('owner failed')
 				return false
 			}
 		}

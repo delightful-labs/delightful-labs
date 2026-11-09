@@ -1,20 +1,11 @@
+import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
 import {
 	PersistedWriteRejectedError,
 	type Db,
 	type Transaction,
 	type WriteHandle
 } from 'jazz-tools'
-import {
-	forwardTo,
-	raise,
-	and,
-	not,
-	assign,
-	fromCallback,
-	fromPromise,
-	setup,
-	stateIn
-} from 'xstate'
+import { createCallbackLogic, setup, matchesState, createAsyncLogic, types } from 'xstate'
 import type { RestoreJournalIntent } from 'delightful-local-first/backup/restore/journal'
 import {
 	restoreTransactionAccess,
@@ -51,7 +42,7 @@ export function createTestAppDestinationWriteMachine(
 	}
 	const actors = {
 		// Native subscription bridge only. All admission and draining decisions live below.
-		observeIdentity: fromCallback<RestoreEvent, DestinationInput>(({ input, sendBack }) => {
+		observeIdentity: createCallbackLogic<RestoreEvent, DestinationInput>(({ input, sendBack }) => {
 			try {
 				return db.onAuthChanged((state) =>
 					sendBack({
@@ -64,37 +55,31 @@ export function createTestAppDestinationWriteMachine(
 				sendBack({ type: 'IDENTITY_FAILED', binding: input.binding } satisfies IdentityReport)
 			}
 		}),
-		insert: fromPromise<'inserted' | 'identityMismatch', DestinationInput>(({ input }) =>
-			restoreTransactionAccess(input).call((transaction) => {
-				// Synchronous invariant at the SDK write boundary, after machine-owned admission.
-				if (db.getAuthState().session?.user.account !== input.intent.operation.identityId)
-					return 'identityMismatch'
-				insert(transaction, input)
-				return 'inserted'
-			})
-		)
+		insert: createAsyncLogic<'inserted' | 'identityMismatch', DestinationInput>({
+			run: ({ input }) =>
+				restoreTransactionAccess(input).call((transaction) => {
+					// Synchronous invariant at the SDK write boundary, after machine-owned admission.
+					if (db.getAuthState().session?.user.account !== input.intent.operation.identityId)
+						return 'identityMismatch'
+					insert(transaction, input)
+					return 'inserted'
+				})
+		})
 	}
-	const model = setup<
-		Context,
-		RestoreEvent | IdentityReport,
-		typeof actors,
-		{},
-		{ interrupt: undefined },
-		{
-			interrupted: undefined
-			currentBinding: undefined
-			currentReport: undefined
-			identityMatches: undefined
-			stageOperation: undefined
-			writeOperation: undefined
-			revoked: undefined
-			observationFailed: undefined
+	const model = setup({
+		schemas: {
+			output: types<DestinationWriteResult>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<RestoreEvent | IdentityReport, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<RestoreEvent | IdentityReport, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<RestoreEvent | IdentityReport, 'INVALIDATE'>>(),
+				IDENTITY_OBSERVED:
+					types<EventPayload<RestoreEvent | IdentityReport, 'IDENTITY_OBSERVED'>>(),
+				IDENTITY_FAILED: types<EventPayload<RestoreEvent | IdentityReport, 'IDENTITY_FAILED'>>()
+			},
+			input: types<DestinationInput>()
 		},
-		never,
-		string,
-		DestinationInput,
-		DestinationWriteResult
-	>({
 		actors,
 		guards: {
 			interrupted: ({ context }) => context.interruption !== undefined,
@@ -109,18 +94,28 @@ export function createTestAppDestinationWriteMachine(
 			stageOperation: ({ context }) => context.input.operation === 'stage',
 			writeOperation: ({ context }) =>
 				context.input.operation === 'authority' || context.input.operation === 'stage',
-			revoked: stateIn('#test-app-write-revoked'),
-			observationFailed: stateIn('#test-app-write-observation-failed')
+			revoked: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ working: { inserting: 'revoked' } }, value),
+			observationFailed: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ working: { inserting: 'observationFailed' } }, value)
 		},
 		actions: {
-			interrupt: assign({
-				interruption: ({ context, event }) =>
-					context.interruption ??
-					(event.type === 'SHUTDOWN'
-						? 'closed'
-						: event.type === 'INVALIDATE'
-							? 'invalidated'
-							: 'cancelled')
+			interrupt: ({
+				context,
+				event
+			}: {
+				context: Context
+				event: RestoreEvent | IdentityReport
+			}) => ({
+				context: {
+					interruption:
+						context.interruption ??
+						(event.type === 'SHUTDOWN'
+							? 'closed'
+							: event.type === 'INVALIDATE'
+								? 'invalidated'
+								: 'cancelled')
+				}
 			})
 		}
 	})
@@ -131,9 +126,16 @@ export function createTestAppDestinationWriteMachine(
 		context: ({ input }) => ({ input, interruption: undefined, result: 'unavailable' }),
 		output: ({ context }) => context.interruption ?? context.result,
 		on: {
-			CANCEL: { actions: 'interrupt' },
-			SHUTDOWN: { actions: 'interrupt' },
-			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
+			CANCEL: (args) => {
+				return args.actions.interrupt(args)
+			},
+			SHUTDOWN: (args) => {
+				return args.actions.interrupt(args)
+			},
+			INVALIDATE: (args) => {
+				if (!args.guards.currentBinding(args)) return
+				return args.actions.interrupt(args)
+			}
 		},
 		states: {
 			working: {
@@ -141,37 +143,42 @@ export function createTestAppDestinationWriteMachine(
 				invoke: {
 					src: 'observeIdentity',
 					input,
-					onError: {
-						actions: raise(({ context }) => ({
+					onError: (args, enq) => {
+						enq.raise({
 							type: 'IDENTITY_FAILED',
-							binding: context.input.binding
-						}))
+							binding: args.context.input.binding
+						})
 					}
 				},
 				states: {
 					observingIdentity: {
-						always: [
-							{ guard: 'interrupted', target: '#test-app-destination-write.complete' },
-							{ guard: not('writeOperation'), target: '#test-app-destination-write.unavailable' }
-						],
+						always: (args) => {
+							if (args.guards.interrupted(args)) {
+								return { target: '#test-app-destination-write.complete' }
+							}
+							if (!args.guards.writeOperation(args)) {
+								return { target: '#test-app-destination-write.unavailable' }
+							}
+						},
 						on: {
-							IDENTITY_OBSERVED: [
-								{
-									guard: and(['currentReport', not('identityMatches')]),
-									target: '#test-app-destination-write.denied'
-								},
-								{
-									guard: and(['currentReport', 'identityMatches', 'stageOperation']),
-									target: 'inserting'
-								},
-								{
-									guard: and(['currentReport', 'identityMatches']),
-									target: '#test-app-destination-write.allowed'
+							IDENTITY_OBSERVED: (args) => {
+								if (args.guards.currentReport(args) && !args.guards.identityMatches(args)) {
+									return { target: '#test-app-destination-write.denied' }
 								}
-							],
-							IDENTITY_FAILED: {
-								guard: 'currentReport',
-								target: '#test-app-destination-write.unavailable'
+								if (
+									args.guards.currentReport(args) &&
+									args.guards.identityMatches(args) &&
+									args.guards.stageOperation(args)
+								) {
+									return { target: 'inserting' }
+								}
+								if (args.guards.currentReport(args) && args.guards.identityMatches(args)) {
+									return { target: '#test-app-destination-write.allowed' }
+								}
+							},
+							IDENTITY_FAILED: (args) => {
+								if (!args.guards.currentReport(args)) return
+								return { target: '#test-app-destination-write.unavailable' }
 							}
 						}
 					},
@@ -180,26 +187,38 @@ export function createTestAppDestinationWriteMachine(
 						invoke: {
 							src: 'insert',
 							input,
-							onDone: [
-								{ guard: 'interrupted', target: '#test-app-destination-write.complete' },
-								{ guard: 'revoked', target: '#test-app-destination-write.denied' },
-								{ guard: 'observationFailed', target: '#test-app-destination-write.unavailable' },
-								{
-									guard: ({ event }) => event.output === 'identityMismatch',
-									target: '#test-app-destination-write.denied'
-								},
-								{ target: '#test-app-destination-write.staged' }
-							],
-							onError: '#test-app-destination-write.unavailable'
+							onDone: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-destination-write.complete' }
+								}
+								if (args.guards.revoked(args)) {
+									return { target: '#test-app-destination-write.denied' }
+								}
+								if (args.guards.observationFailed(args)) {
+									return { target: '#test-app-destination-write.unavailable' }
+								}
+								if (args.event.output === 'identityMismatch') {
+									return { target: '#test-app-destination-write.denied' }
+								}
+								return { target: '#test-app-destination-write.staged' }
+							},
+							onError: { target: '#test-app-destination-write.unavailable' }
 						},
 						states: {
 							pending: {
 								on: {
-									IDENTITY_OBSERVED: [
-										{ guard: and(['currentReport', 'identityMatches']) },
-										{ guard: 'currentReport', target: 'revoked' }
-									],
-									IDENTITY_FAILED: { guard: 'currentReport', target: 'observationFailed' }
+									IDENTITY_OBSERVED: (args) => {
+										if (args.guards.currentReport(args) && args.guards.identityMatches(args)) {
+											return {}
+										}
+										if (args.guards.currentReport(args)) {
+											return { target: 'revoked' }
+										}
+									},
+									IDENTITY_FAILED: (args) => {
+										if (!args.guards.currentReport(args)) return
+										return { target: 'observationFailed' }
+									}
 								}
 							},
 							revoked: { id: 'test-app-write-revoked' },
@@ -208,9 +227,24 @@ export function createTestAppDestinationWriteMachine(
 					}
 				}
 			},
-			allowed: { type: 'final', entry: assign({ result: 'allowed' }) },
-			denied: { type: 'final', entry: assign({ result: 'denied' }) },
-			staged: { type: 'final', entry: assign({ result: 'staged' }) },
+			allowed: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'allowed' } }
+				}
+			},
+			denied: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'denied' } }
+				}
+			},
+			staged: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'staged' } }
+				}
+			},
 			unavailable: { type: 'final' },
 			complete: { type: 'final' }
 		}
@@ -272,28 +306,31 @@ export function createTestAppPreparationWriter(
 		}
 	}
 	const actors = {
-		remote: fromPromise(({ input }: { input: Input }) =>
-			db.one(query(input), { tier: 'remote' }).then((row) => matches(row, input))
-		),
-		read: fromPromise(({ input }: { input: Input }) =>
-			restoreTransactionAccess(input).call((tx) =>
-				tx.one(query(input)).then((row) => matches(row, input))
-			)
-		),
+		remote: createAsyncLogic({
+			run: ({ input }: { input: Input }) =>
+				db.one(query(input), { tier: 'remote' }).then((row) => matches(row, input))
+		}),
+		read: createAsyncLogic({
+			run: ({ input }: { input: Input }) =>
+				restoreTransactionAccess(input).call((tx) =>
+					tx.one(query(input)).then((row) => matches(row, input))
+				)
+		}),
 		write
 	}
-	const model = setup<
-		Context,
-		RestoreEvent,
-		typeof actors,
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		RestoreDestinationResult
-	>({ actors })
+	const model = setup({
+		schemas: {
+			output: types<RestoreDestinationResult>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<RestoreEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<RestoreEvent, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>()
+			},
+			input: types<Input>()
+		},
+		actors
+	})
 
 	const input = ({ context }: { context: Context }) => context.input
 	return model.createMachine({
@@ -302,76 +339,89 @@ export function createTestAppPreparationWriter(
 		context: ({ input }) => ({ input, result: 'unavailable', interruption: undefined }),
 		output: ({ context }) => context.interruption ?? context.result,
 		on: {
-			CANCEL: {
-				actions: assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' })
+			CANCEL: (args) => {
+				return { context: { interruption: args.context.interruption ?? 'cancelled' } }
 			},
-			SHUTDOWN: {
-				actions: assign({ interruption: ({ context }) => context.interruption ?? 'closed' })
+			SHUTDOWN: (args) => {
+				return { context: { interruption: args.context.interruption ?? 'closed' } }
 			},
-			INVALIDATE: {
-				guard: ({ context, event }) => sameBackupBinding(context.input.binding, event.binding),
-				actions: assign({ interruption: ({ context }) => context.interruption ?? 'invalidated' })
+			INVALIDATE: (args) => {
+				const { context } = args
+				if (!sameBackupBinding(context.input.binding, args.event.binding)) return
+				return { context: { interruption: context.interruption ?? 'invalidated' } }
 			}
 		},
 		states: {
 			admitting: {
-				always: [
-					{
-						guard: ({ context }) =>
-							context.input.step.writeId !== context.input.intent.plan.preparation.writeId,
-						target: 'conflict'
-					},
-					{ guard: ({ context }) => context.input.operation === 'remote', target: 'remote' },
-					{ guard: ({ context }) => context.input.operation === 'read', target: 'read' },
-					{ target: 'writing' }
-				]
+				always: (args) => {
+					const { context } = args
+					if (context.input.step.writeId !== context.input.intent.plan.preparation.writeId) {
+						return { target: 'conflict' }
+					}
+					if (context.input.operation === 'remote') {
+						return { target: 'remote' }
+					}
+					if (context.input.operation === 'read') {
+						return { target: 'read' }
+					}
+					return { target: 'writing' }
+				}
 			},
 			remote: {
 				invoke: {
 					src: 'remote',
 					input,
-					onDone: [
-						{ guard: ({ context }) => context.interruption !== undefined, target: 'complete' },
-						{ guard: ({ event }) => !event.output.present, target: 'missing' },
-						{ guard: ({ event }) => event.output.matches, target: 'match' },
-						{ target: 'conflict' }
-					],
-					onError: 'complete'
+					onDone: (args) => {
+						const { event } = args
+						if (args.context.interruption !== undefined) {
+							return { target: 'complete' }
+						}
+						if (!event.output.present) {
+							return { target: 'missing' }
+						}
+						if (event.output.matches) {
+							return { target: 'match' }
+						}
+						return { target: 'conflict' }
+					},
+					onError: { target: 'complete' }
 				}
 			},
 			read: {
 				invoke: {
 					src: 'read',
 					input,
-					onDone: [
-						{ guard: ({ context }) => context.interruption !== undefined, target: 'complete' },
-						{ guard: ({ event }) => !event.output.present, target: 'missing' },
-						{ guard: ({ event }) => event.output.matches, target: 'match' },
-						{ target: 'conflict' }
-					],
-					onError: 'complete'
+					onDone: (args) => {
+						const { event } = args
+						if (args.context.interruption !== undefined) {
+							return { target: 'complete' }
+						}
+						if (!event.output.present) {
+							return { target: 'missing' }
+						}
+						if (event.output.matches) {
+							return { target: 'match' }
+						}
+						return { target: 'conflict' }
+					},
+					onError: { target: 'complete' }
 				}
 			},
 			writing: {
 				on: {
-					CANCEL: {
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' }),
-							forwardTo('write')
-						]
+					CANCEL: (args, enq) => {
+						enq.sendTo('write', args.event)
+						return { context: { interruption: args.context.interruption ?? 'cancelled' } }
 					},
-					SHUTDOWN: {
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'closed' }),
-							forwardTo('write')
-						]
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('write', args.event)
+						return { context: { interruption: args.context.interruption ?? 'closed' } }
 					},
-					INVALIDATE: {
-						guard: ({ context, event }) => sameBackupBinding(context.input.binding, event.binding),
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'invalidated' }),
-							forwardTo('write')
-						]
+					INVALIDATE: (args, enq) => {
+						const { context } = args
+						if (!sameBackupBinding(context.input.binding, args.event.binding)) return
+						enq.sendTo('write', args.event)
+						return { context: { interruption: context.interruption ?? 'invalidated' } }
 					}
 				},
 
@@ -379,16 +429,30 @@ export function createTestAppPreparationWriter(
 					id: 'write',
 					src: 'write',
 					input,
-					onDone: {
-						target: 'complete',
-						actions: assign({ result: ({ event }) => event.output })
+					onDone: (args) => {
+						return { target: 'complete', context: { result: args.event.output } }
 					},
-					onError: 'complete'
+					onError: { target: 'complete' }
 				}
 			},
-			match: { type: 'final', entry: assign({ result: 'match' }) },
-			missing: { type: 'final', entry: assign({ result: 'missingOrHidden' }) },
-			conflict: { type: 'final', entry: assign({ result: 'conflict' }) },
+			match: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'match' } }
+				}
+			},
+			missing: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'missingOrHidden' } }
+				}
+			},
+			conflict: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'conflict' } }
+				}
+			},
 			complete: { type: 'final' }
 		}
 	})

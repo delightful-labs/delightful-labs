@@ -272,7 +272,7 @@ export const sessionRecoveryMachine = model.createMachine({
 			},
 			invoke: {
 				id: 'restoration',
-				src: actors.restoration,
+				src: 'restoration',
 				input: ({ context, self }) => {
 					const request = required(context.request)
 					if (request.kind !== 'restore') throw new Error('Missing recovery input')

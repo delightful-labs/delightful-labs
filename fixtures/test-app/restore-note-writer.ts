@@ -1,5 +1,6 @@
+import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
 import { z } from 'zod'
-import { forwardTo, not, assign, createActor, fromCallback, fromPromise, setup } from 'xstate'
+import { createActor, createCallbackLogic, setup, createAsyncLogic, types } from 'xstate'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { payloadLimits } from 'delightful-local-first/backup/archive'
 import type { RestoreJournalIntent } from 'delightful-local-first/backup/restore/journal'
@@ -199,7 +200,7 @@ export function createTestAppNoteWriter(db: Db, request: TestAppRestoreRequest) 
 		cell.observed = parsed.success ? parsed.data : undefined
 	}
 	const actors = {
-		observations: fromCallback<
+		observations: createCallbackLogic<
 			{ type: string },
 			{
 				handle: Handle
@@ -216,18 +217,21 @@ export function createTestAppNoteWriter(db: Db, request: TestAppRestoreRequest) 
 				clear()
 			}
 		}),
-		remote: fromPromise<void, Context>(({ input }) =>
-			db
-				.one(query(input.input.intent, expected()), { tier: 'remote' })
-				.then((row) => consume(input.handle, row))
-		),
-		read: fromPromise<void, Context>(({ input }) => {
-			const access = restoreTransactionAccess(input.input)
-			return access.call((transaction) =>
-				transaction
-					.one(query(input.input.intent, expected()))
+		remote: createAsyncLogic<void, Context>({
+			run: ({ input }) =>
+				db
+					.one(query(input.input.intent, expected()), { tier: 'remote' })
 					.then((row) => consume(input.handle, row))
-			)
+		}),
+		read: createAsyncLogic<void, Context>({
+			run: ({ input }) => {
+				const access = restoreTransactionAccess(input.input)
+				return access.call((transaction) =>
+					transaction
+						.one(query(input.input.intent, expected()))
+						.then((row) => consume(input.handle, row))
+				)
+			}
 		}),
 		write: createTestAppDestinationWriteMachine(db, (transaction) => {
 			for (const note of expected())
@@ -246,33 +250,17 @@ export function createTestAppNoteWriter(db: Db, request: TestAppRestoreRequest) 
 				)
 		})
 	}
-	const model = setup<
-		Context,
-		RestoreEvent,
-		typeof actors,
-		{},
-		{ interrupt: undefined },
-		{
-			interrupted: undefined
-			currentBinding: undefined
-			scopeMatches: undefined
-			hasExpected: undefined
-			remoteOperation: undefined
-			authorityOperation: undefined
-			readOperation: undefined
-			stageOperation: undefined
-			hasObservation: undefined
-			controlMatches: undefined
-			parentsPresent: undefined
-			parentsMatch: undefined
-			notePresent: undefined
-			contentMatches: undefined
+	const model = setup({
+		schemas: {
+			output: types<RestoreDestinationResult>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<RestoreEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<RestoreEvent, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>()
+			},
+			input: types<Input>()
 		},
-		never,
-		string,
-		Input,
-		RestoreDestinationResult
-	>({
 		actors,
 		guards: {
 			interrupted: ({ context }) => context.interruption !== undefined,
@@ -326,14 +314,16 @@ export function createTestAppNoteWriter(db: Db, request: TestAppRestoreRequest) 
 			}
 		},
 		actions: {
-			interrupt: assign({
-				interruption: ({ context, event }) =>
-					context.interruption ??
-					(event.type === 'SHUTDOWN'
-						? 'closed'
-						: event.type === 'INVALIDATE'
-							? 'invalidated'
-							: 'cancelled')
+			interrupt: ({ context, event }: { context: Context; event: RestoreEvent }) => ({
+				context: {
+					interruption:
+						context.interruption ??
+						(event.type === 'SHUTDOWN'
+							? 'closed'
+							: event.type === 'INVALIDATE'
+								? 'invalidated'
+								: 'cancelled')
+				}
 			})
 		}
 	})
@@ -349,9 +339,16 @@ export function createTestAppNoteWriter(db: Db, request: TestAppRestoreRequest) 
 		},
 		output: ({ context }) => context.interruption ?? context.result,
 		on: {
-			CANCEL: { actions: 'interrupt' },
-			SHUTDOWN: { actions: 'interrupt' },
-			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
+			CANCEL: (args) => {
+				return args.actions.interrupt(args)
+			},
+			SHUTDOWN: (args) => {
+				return args.actions.interrupt(args)
+			},
+			INVALIDATE: (args) => {
+				if (!args.guards.currentBinding(args)) return
+				return args.actions.interrupt(args)
+			}
 		},
 		states: {
 			working: {
@@ -359,85 +356,139 @@ export function createTestAppNoteWriter(db: Db, request: TestAppRestoreRequest) 
 				invoke: {
 					src: 'observations',
 					input: ({ context, self }) => ({ handle: context.handle, owner: self }),
-					onError: 'unavailable'
+					onError: { target: 'unavailable' }
 				},
 				states: {
 					admitting: {
-						always: [
-							{ guard: 'interrupted', target: '#test-app-note-destination.complete' },
-							{ guard: not('hasExpected'), target: '#test-app-note-destination.unavailable' },
-							{ guard: 'scopeMatches', target: 'selectingOperation' },
-							{ target: '#test-app-note-destination.conflict' }
-						]
+						always: (args) => {
+							if (args.guards.interrupted(args)) {
+								return { target: '#test-app-note-destination.complete' }
+							}
+							if (!args.guards.hasExpected()) {
+								return { target: '#test-app-note-destination.unavailable' }
+							}
+							if (args.guards.scopeMatches(args)) {
+								return { target: 'selectingOperation' }
+							}
+							return { target: '#test-app-note-destination.conflict' }
+						}
 					},
 					selectingOperation: {
-						always: [
-							{ guard: 'remoteOperation', target: 'readingRemote' },
-							{ guard: 'authorityOperation', target: 'writing' },
-							{ guard: 'readOperation', target: 'readingTransaction' },
-							{ guard: 'stageOperation', target: 'writing' },
-							{ target: '#test-app-note-destination.unavailable' }
-						]
+						always: (args) => {
+							if (args.guards.remoteOperation(args)) {
+								return { target: 'readingRemote' }
+							}
+							if (args.guards.authorityOperation(args)) {
+								return { target: 'writing' }
+							}
+							if (args.guards.readOperation(args)) {
+								return { target: 'readingTransaction' }
+							}
+							if (args.guards.stageOperation(args)) {
+								return { target: 'writing' }
+							}
+							return { target: '#test-app-note-destination.unavailable' }
+						}
 					},
 					readingRemote: {
 						invoke: {
 							src: 'remote',
 							input,
-							onDone: [
-								{ guard: 'interrupted', target: '#test-app-note-destination.complete' },
-								{ target: 'checkingObservation' }
-							],
-							onError: '#test-app-note-destination.unavailable'
+							onDone: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-note-destination.complete' }
+								}
+								return { target: 'checkingObservation' }
+							},
+							onError: { target: '#test-app-note-destination.unavailable' }
 						}
 					},
 					readingTransaction: {
 						invoke: {
 							src: 'read',
 							input,
-							onDone: [
-								{ guard: 'interrupted', target: '#test-app-note-destination.complete' },
-								{ target: 'checkingObservation' }
-							],
-							onError: '#test-app-note-destination.unavailable'
+							onDone: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-note-destination.complete' }
+								}
+								return { target: 'checkingObservation' }
+							},
+							onError: { target: '#test-app-note-destination.unavailable' }
 						}
 					},
 					checkingObservation: {
-						always: [
-							{
-								guard: not('hasObservation'),
-								target: '#test-app-note-destination.unavailable'
-							},
-							{ guard: not('controlMatches'), target: '#test-app-note-destination.conflict' },
-							{ guard: not('parentsPresent'), target: '#test-app-note-destination.unavailable' },
-							{ guard: not('parentsMatch'), target: '#test-app-note-destination.conflict' },
-							{ guard: not('notePresent'), target: '#test-app-note-destination.missing' },
-							{ guard: 'contentMatches', target: '#test-app-note-destination.match' },
-							{ target: '#test-app-note-destination.conflict' }
-						]
+						always: (args) => {
+							if (!args.guards.hasObservation(args)) {
+								return { target: '#test-app-note-destination.unavailable' }
+							}
+							if (!args.guards.controlMatches(args)) {
+								return { target: '#test-app-note-destination.conflict' }
+							}
+							if (!args.guards.parentsPresent(args)) {
+								return { target: '#test-app-note-destination.unavailable' }
+							}
+							if (!args.guards.parentsMatch(args)) {
+								return { target: '#test-app-note-destination.conflict' }
+							}
+							if (!args.guards.notePresent(args)) {
+								return { target: '#test-app-note-destination.missing' }
+							}
+							if (args.guards.contentMatches(args)) {
+								return { target: '#test-app-note-destination.match' }
+							}
+							return { target: '#test-app-note-destination.conflict' }
+						}
 					},
 					writing: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('write')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('write')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('write')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('write', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('write', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('write', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
 							id: 'write',
 							src: 'write',
 							input: ({ context }) => context.input,
-							onDone: {
-								target: '#test-app-note-destination.complete',
-								actions: assign({ result: ({ event }) => event.output })
+							onDone: (args) => {
+								return {
+									target: '#test-app-note-destination.complete',
+									context: { result: args.event.output }
+								}
 							},
-							onError: '#test-app-note-destination.unavailable'
+							onError: { target: '#test-app-note-destination.unavailable' }
 						}
 					}
 				}
 			},
-			match: { type: 'final', entry: assign({ result: 'match' }) },
-			missing: { type: 'final', entry: assign({ result: 'missingOrHidden' }) },
-			conflict: { type: 'final', entry: assign({ result: 'conflict' }) },
+			match: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'match' } }
+				}
+			},
+			missing: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'missingOrHidden' } }
+				}
+			},
+			conflict: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'conflict' } }
+				}
+			},
 			unavailable: { type: 'final' },
 			complete: { type: 'final' }
 		}

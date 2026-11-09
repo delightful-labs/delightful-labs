@@ -754,7 +754,7 @@ for (const interruption of ['CANCEL', 'SHUTDOWN', 'release', 'stop', 'creationFa
 				const actor = api.createActor(api.createBrowserRestoreJournalMachine(), {
 					input: { request },
 					inspect(event) {
-						if (event.type === '@xstate.event' && event.event.type === 'UPGRADE_REQUESTED') {
+						if (event.type === '@xstate.transition' && event.event.type === 'UPGRADE_REQUESTED') {
 							observed = true
 							if (interruption === 'CANCEL') actor.send({ type: 'CANCEL' })
 							if (interruption === 'SHUTDOWN') actor.send({ type: 'SHUTDOWN' })

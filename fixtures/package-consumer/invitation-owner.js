@@ -98,8 +98,8 @@ try {
 	const context = actor.getSnapshot().context
 	if (
 		context.request !== undefined ||
-		context.credentials !== undefined ||
-		context.transaction !== undefined ||
+		context.resources.credentials !== undefined ||
+		context.resources.transaction !== undefined ||
 		context.admission !== undefined
 	)
 		throw new Error('Packaged authority retained transient resources')

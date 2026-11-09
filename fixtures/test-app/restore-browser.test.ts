@@ -1,3 +1,8 @@
+import type { RestoreEvent, RestoreDestinationInput } from '../../src/lib/backup/restore.js'
+import type { BackupBinding } from '../../src/lib/backup/binding.js'
+import type { Transaction } from 'jazz-tools'
+import type { TestAppRestoreRequest } from './restore-request.js'
+import type { TestAppComparison } from './restore-comparison.js'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -186,7 +191,7 @@ async function run(page: Page, sample: Sample, mode: 'new' | 'resume') {
 				{
 					input: { request },
 					inspect(event) {
-						if (event.type === '@xstate.event' && event.event.type.startsWith('xstate.error'))
+						if (event.type === '@xstate.transition' && event.event.type.startsWith('xstate.error'))
 							trace.push(String(event.event.error))
 					}
 				}
@@ -614,7 +619,10 @@ it('holds one operation owner across tabs and releases ownership after cancellat
 				actors: {
 					write: api.preparationWrite.provide({
 						actors: {
-							observeIdentity: api.fromCallback(({ input, sendBack }) => {
+							observeIdentity: api.createCallbackLogic<
+								RestoreEvent,
+								RestoreDestinationInput<Transaction<'mergeable'>>
+							>(({ input, sendBack }) => {
 								api.pending.releaseAuthority = () =>
 									sendBack({
 										type: 'IDENTITY_OBSERVED',
@@ -964,7 +972,10 @@ it('rejects a second claim without clearing the first restore actor’s resource
 			actors: {
 				write: api.preparationWrite.provide({
 					actors: {
-						observeIdentity: api.fromCallback(({ input, sendBack }) => {
+						observeIdentity: api.createCallbackLogic<
+							RestoreEvent,
+							RestoreDestinationInput<Transaction<'mergeable'>>
+						>(({ input, sendBack }) => {
 							reportEntered()
 							void gate.then(() =>
 								sendBack({
@@ -1030,7 +1041,10 @@ for (const authority of ['denied', 'failed']) {
 				actors: {
 					write: api.preparationWrite.provide({
 						actors: {
-							observeIdentity: api.fromCallback(({ input, sendBack }) => {
+							observeIdentity: api.createCallbackLogic<
+								RestoreEvent,
+								RestoreDestinationInput<Transaction<'mergeable'>>
+							>(({ input, sendBack }) => {
 								if (authority === 'failed') {
 									sendBack({ type: 'IDENTITY_FAILED', binding: input.binding })
 									return
@@ -1095,7 +1109,10 @@ for (const change of ['lost', 'failed', 'stale', 'cancelBeforeObservation']) {
 				let disposed = 0
 				const logic = api.preparationWrite.provide({
 					actors: {
-						observeIdentity: api.fromCallback(({ input, sendBack }) => {
+						observeIdentity: api.createCallbackLogic<
+							RestoreEvent,
+							RestoreDestinationInput<Transaction<'mergeable'>>
+						>(({ input, sendBack }) => {
 							report = (kind) => {
 								if (kind === 'failed') {
 									sendBack({ type: 'IDENTITY_FAILED', binding: input.binding })
@@ -1115,9 +1132,14 @@ for (const change of ['lost', 'failed', 'stale', 'cancelBeforeObservation']) {
 								disposed++
 							}
 						}),
-						insert: api.fromPromise(() => {
-							started()
-							return gate.then((): 'inserted' => 'inserted')
+						insert: api.createAsyncLogic<
+							'inserted' | 'identityMismatch',
+							RestoreDestinationInput<Transaction<'mergeable'>>
+						>({
+							run: () => {
+								started()
+								return gate.then((): 'inserted' => 'inserted')
+							}
 						})
 					}
 				})
@@ -1490,7 +1512,10 @@ for (const interruption of [
 						.createTestAppDestinationWriteMachine(api.db, () => {})
 						.provide({
 							actors: {
-								observeIdentity: api.fromCallback(({ input, sendBack }) => {
+								observeIdentity: api.createCallbackLogic<
+									RestoreEvent,
+									RestoreDestinationInput<Transaction<'mergeable'>>
+								>(({ input, sendBack }) => {
 									const same = () =>
 										sendBack({
 											type: 'IDENTITY_OBSERVED',
@@ -1509,35 +1534,39 @@ for (const interruption of [
 									}
 									same()
 								}),
-								insert: api.fromPromise(({ input }) =>
-									api
-										.restoreTransactionAccess(input)
-										.call(async (transaction): Promise<'inserted'> => {
-											const observed = await transaction.one(
-												api.testAppRestoreApp.restoreDestinations.where({
-													id: input.intent.operation.destinationWorkspaceId
-												})
-											)
-											if (!observed) throw new Error('Missing fixture control')
-											const mapping = input.intent.plan.mappings.find(
-												(row) => row.kind === 'record' && row.type === 'notebook'
-											)
-											if (!mapping) throw new Error('Missing fixture mapping')
-											transaction.insert(
-												api.testAppRestoreApp.restoreNotebooks,
-												{
-													destinationId: observed.id,
-													ownerId: observed.ownerId,
-													operationId: observed.operationId,
-													title: 'Test app fixture'
-												},
-												{ id: mapping.destinationId }
-											)
-											api.rootPending.staged = true
-											await gate
-											return 'inserted'
-										})
-								)
+								insert: api.createAsyncLogic<
+									'inserted' | 'identityMismatch',
+									RestoreDestinationInput<Transaction<'mergeable'>>
+								>({
+									run: ({ input }) =>
+										api
+											.restoreTransactionAccess(input)
+											.call(async (transaction): Promise<'inserted'> => {
+												const observed = await transaction.one(
+													api.testAppRestoreApp.restoreDestinations.where({
+														id: input.intent.operation.destinationWorkspaceId
+													})
+												)
+												if (!observed) throw new Error('Missing fixture control')
+												const mapping = input.intent.plan.mappings.find(
+													(row) => row.kind === 'record' && row.type === 'notebook'
+												)
+												if (!mapping) throw new Error('Missing fixture mapping')
+												transaction.insert(
+													api.testAppRestoreApp.restoreNotebooks,
+													{
+														destinationId: observed.id,
+														ownerId: observed.ownerId,
+														operationId: observed.operationId,
+														title: 'Test app fixture'
+													},
+													{ id: mapping.destinationId }
+												)
+												api.rootPending.staged = true
+												await gate
+												return 'inserted'
+											})
+								})
 							}
 						})
 				}
@@ -2142,7 +2171,10 @@ for (const interruption of [
 						.createTestAppDestinationWriteMachine(api.db, () => {})
 						.provide({
 							actors: {
-								observeIdentity: api.fromCallback(({ input, sendBack }) => {
+								observeIdentity: api.createCallbackLogic<
+									RestoreEvent,
+									RestoreDestinationInput<Transaction<'mergeable'>>
+								>(({ input, sendBack }) => {
 									const same = () =>
 										sendBack({
 											type: 'IDENTITY_OBSERVED',
@@ -2161,31 +2193,35 @@ for (const interruption of [
 									}
 									same()
 								}),
-								insert: api.fromPromise(({ input }) =>
-									api
-										.restoreTransactionAccess(input)
-										.call(async (transaction): Promise<'inserted'> => {
-											const notes = api.testAppRestoreNotes(request)
-											if (!notes) throw new Error('Missing fixture notes')
-											for (const expected of notes)
-												transaction.insert(
-													api.testAppRestoreApp.restoreNotes,
-													{
-														destinationId: expected.destinationId,
-														ownerId: expected.ownerId,
-														operationId: expected.operationId,
-														notebookId: expected.notebookId,
-														attachmentId: expected.attachmentId,
-														body: expected.body,
-														archived: expected.archived
-													},
-													{ id: expected.id }
-												)
-											api.notePending.staged = true
-											await gate
-											return 'inserted'
-										})
-								)
+								insert: api.createAsyncLogic<
+									'inserted' | 'identityMismatch',
+									RestoreDestinationInput<Transaction<'mergeable'>>
+								>({
+									run: ({ input }) =>
+										api
+											.restoreTransactionAccess(input)
+											.call(async (transaction): Promise<'inserted'> => {
+												const notes = api.testAppRestoreNotes(request)
+												if (!notes) throw new Error('Missing fixture notes')
+												for (const expected of notes)
+													transaction.insert(
+														api.testAppRestoreApp.restoreNotes,
+														{
+															destinationId: expected.destinationId,
+															ownerId: expected.ownerId,
+															operationId: expected.operationId,
+															notebookId: expected.notebookId,
+															attachmentId: expected.attachmentId,
+															body: expected.body,
+															archived: expected.archived
+														},
+														{ id: expected.id }
+													)
+												api.notePending.staged = true
+												await gate
+												return 'inserted'
+											})
+								})
 							}
 						})
 				}
@@ -3130,9 +3166,16 @@ for (const fault of ['stageFailure', 'cancelStaging', 'partialPresence']) {
 					fault === 'partialPresence'
 						? destination.provide({
 								actors: {
-									remote: api.fromPromise(async () => {
-										signal()
-										await gate
+									remote: api.createAsyncLogic<
+										void,
+										import('xstate').InputFrom<
+											ReturnType<typeof api.createTestAppNoteWriter>['_actorMap']['remote']
+										>
+									>({
+										run: async () => {
+											signal()
+											await gate
+										}
 									})
 								}
 							})
@@ -3142,34 +3185,38 @@ for (const fault of ['stageFailure', 'cancelStaging', 'partialPresence']) {
 										.createTestAppDestinationWriteMachine(api.db, () => {})
 										.provide({
 											actors: {
-												insert: api.fromPromise(({ input }) =>
-													api
-														.restoreTransactionAccess(input)
-														.call(async (tx): Promise<'inserted'> => {
-															const notes = api.testAppRestoreNotes(request)
-															if (!notes) throw new Error('Expected note batch')
-															for (const note of notes) {
-																tx.insert(
-																	api.testAppRestoreApp.restoreNotes,
-																	{
-																		destinationId: note.destinationId,
-																		ownerId: note.ownerId,
-																		operationId: note.operationId,
-																		notebookId: note.notebookId,
-																		attachmentId: note.attachmentId,
-																		body: note.body,
-																		archived: note.archived
-																	},
-																	{ id: note.id }
-																)
-																if (fault === 'stageFailure')
-																	throw new Error('Injected batch stage failure')
-															}
-															signal()
-															await gate
-															return 'inserted'
-														})
-												)
+												insert: api.createAsyncLogic<
+													'inserted' | 'identityMismatch',
+													RestoreDestinationInput<Transaction<'mergeable'>>
+												>({
+													run: ({ input }) =>
+														api
+															.restoreTransactionAccess(input)
+															.call(async (tx): Promise<'inserted'> => {
+																const notes = api.testAppRestoreNotes(request)
+																if (!notes) throw new Error('Expected note batch')
+																for (const note of notes) {
+																	tx.insert(
+																		api.testAppRestoreApp.restoreNotes,
+																		{
+																			destinationId: note.destinationId,
+																			ownerId: note.ownerId,
+																			operationId: note.operationId,
+																			notebookId: note.notebookId,
+																			attachmentId: note.attachmentId,
+																			body: note.body,
+																			archived: note.archived
+																		},
+																		{ id: note.id }
+																	)
+																	if (fault === 'stageFailure')
+																		throw new Error('Injected batch stage failure')
+																}
+																signal()
+																await gate
+																return 'inserted'
+															})
+												})
 											}
 										})
 								}
@@ -3558,12 +3605,13 @@ for (const workload of measurements) {
 											input: { request: diagnosticRequest },
 											inspect(event) {
 												const ref = event.actorRef
+												if (!ref.sessionId) throw new Error('Missing actor session ID')
 												if (event.type === '@xstate.actor')
 													actorStarts.set(ref.sessionId, {
 														id: 'id' in ref && typeof ref.id === 'string' ? ref.id : 'unnamed',
 														started: performance.now()
 													})
-												if (event.type !== '@xstate.snapshot' || event.snapshot.status !== 'done')
+												if (event.type !== '@xstate.transition' || event.snapshot.status !== 'done')
 													return
 												const started = actorStarts.get(ref.sessionId)
 												if (!started) return
@@ -3709,19 +3757,23 @@ for (const interruption of ['release', 'identity']) {
 					})
 				const machine = api.createTestAppRestoreWorkflow(api.db, api.writer, request).provide({
 					actors: {
-						identity: api.fromCallback(({ input, sendBack }) => {
-							report = (identityId) => sendBack({ type: 'IDENTITY', binding: input, identityId })
-							report(input.identityId)
-						}),
-						compare: api.fromPromise(async ({ input }) => {
-							const row = await api.db.one(
-								api.testAppDestinationGraphQuery(value.binding.workspaceId),
-								{ tier: 'remote' }
-							)
-							const result = api.compareTestAppDestination(row, input.request)
-							ready()
-							await gate
-							return result
+						identity: api.createCallbackLogic<RestoreEvent, BackupBinding>(
+							({ input, sendBack }) => {
+								report = (identityId) => sendBack({ type: 'IDENTITY', binding: input, identityId })
+								report(input.identityId)
+							}
+						),
+						compare: api.createAsyncLogic<TestAppComparison, { request: TestAppRestoreRequest }>({
+							run: async ({ input }) => {
+								const row = await api.db.one(
+									api.testAppDestinationGraphQuery(value.binding.workspaceId),
+									{ tier: 'remote' }
+								)
+								const result = api.compareTestAppDestination(row, input.request)
+								ready()
+								await gate
+								return result
+							}
 						})
 					}
 				})
@@ -3778,7 +3830,11 @@ it('finishes a failed graph read incomplete and resumes without replaying domain
 		if (checked.outcome !== 'integrityChecked') throw new Error('Invalid test file')
 		const request = api.prepareTestAppRestore({ ...value, mode: 'new', archive: checked.archive })
 		const machine = api.createTestAppRestoreWorkflow(api.db, api.writer, request).provide({
-			actors: { compare: api.fromPromise(() => Promise.reject(new Error('Read failed'))) }
+			actors: {
+				compare: api.createAsyncLogic<TestAppComparison, { request: TestAppRestoreRequest }>({
+					run: () => Promise.reject(new Error('Read failed'))
+				})
+			}
 		})
 		const actor = api.createActor(machine, { input: { request } }).start()
 		const result = await api.toPromise(actor)

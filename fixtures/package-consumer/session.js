@@ -1,5 +1,5 @@
 // Resolve actual built entries. Synthetic ownership resources never create or close an SDK client.
-import { createActor, fromTransition, waitFor } from 'xstate'
+import { createActor, createStepLogic, waitFor } from 'xstate'
 import { createJazzSessionAcquisition } from 'delightful-local-first/backend/jazz/session'
 import {
 	createSessionAcquisitionMachine,
@@ -28,7 +28,15 @@ const owner = createActor(createSessionAcquisitionMachine(), {
 	}
 }).start()
 const reporter = createActor(
-	fromTransition((count, event) => (event.type === 'SESSION_ACQUIRED' ? count + 1 : count), 0)
+	createStepLogic({
+		context: 0,
+		run: (
+			/** @type {{context:number;event:import('delightful-local-first/session/contracts').SessionStartupReport<object>}} */ {
+				context,
+				event
+			}
+		) => ({ context: event.type === 'SESSION_ACQUIRED' ? context + 1 : context })
+	})
 ).start()
 const first = createActor(createSessionStartupMachine(), { input: { reportTo: reporter } }).start()
 const second = createActor(createSessionStartupMachine(), { input: { reportTo: reporter } }).start()
@@ -84,13 +92,17 @@ const readinessBinding = createJazzSessionReadinessAdapter({
 	close: unused
 })
 const readinessReporter = createActor(
-	fromTransition(
-		(count, event) =>
-			event.type === 'SESSION_STATUS' && 'afterRetry' in event && event.afterRetry === 1
-				? count + 1
-				: count,
-		0
-	)
+	createStepLogic({
+		context: 0,
+		run: (
+			/** @type {{context:number;event:import('delightful-local-first/session/contracts').SessionReadinessReport}} */ {
+				context,
+				event
+			}
+		) => ({
+			context: event.type === 'SESSION_STATUS' && event.afterRetry === 1 ? context + 1 : context
+		})
+	})
 ).start()
 const readiness = createActor(createSessionReadinessMachine(), {
 	input: { reportTo: readinessReporter }

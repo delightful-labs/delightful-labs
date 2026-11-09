@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { createActor, fromCallback } from 'xstate'
+import { createActor, createCallbackLogic } from 'xstate'
 import type {
 	WorkspaceDirectory,
 	WorkspaceDrainRequest,
@@ -17,7 +17,7 @@ afterEach(() => {
 function fixture(bind = true, autoDrain = false) {
 	const reports: WorkspaceSelectionReport[] = []
 	const recipient = createActor(
-		fromCallback<WorkspaceSelectionReport>(({ receive }) =>
+		createCallbackLogic<WorkspaceSelectionReport>(({ receive }) =>
 			receive((event) => {
 				reports.push(event)
 				if (autoDrain && event.type === 'WORKSPACE_DRAIN_REQUESTED')

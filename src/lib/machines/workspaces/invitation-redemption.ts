@@ -292,7 +292,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 						states: {
 							pending: {
 								invoke: {
-									src: actors.redeem,
+									src: 'redeem',
 									input: ({ context }) => ({
 										request: required(context.request),
 										capability: required(context.capability)

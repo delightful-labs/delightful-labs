@@ -625,13 +625,19 @@ describe('native Jazz archive export', () => {
 			}
 		}
 		const request = prepareJazzArchiveExport(input.value)
-		const machine = createJazzArchiveExportMachine(reader(graph)).provide({
-			actions: {
-				fail: () => {
+		const source = createJazzArchiveExportMachine(reader(graph))
+		const machine = {
+			initialTransition: source.initialTransition.bind(source),
+			getInitialSnapshot: source.getInitialSnapshot.bind(source),
+			getPersistedSnapshot: source.getPersistedSnapshot.bind(source),
+			start: source.start.bind(source),
+			transition: (...args: Parameters<typeof source.transition>) => {
+				if (args[0].matches({ working: 'validating' })) {
 					throw new Error('Synthetic owner crash')
 				}
+				return source.transition(...args)
 			}
-		})
+		}
 		const actor = createActor(machine, { input: { request } })
 		const terminal = toPromise(actor)
 		actor.start()

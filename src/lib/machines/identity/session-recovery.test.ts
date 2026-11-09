@@ -1,5 +1,6 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assign, createActor, sendTo, setup, waitFor } from 'xstate'
+import { createActor, setup, waitFor, types } from 'xstate'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import {
 	sessionRecoveryMachine,
@@ -28,28 +29,39 @@ function fixture(crash: 'before' | 'after' | 'none' = 'none', request?: Recovery
 		restoreIdentity: vi.fn(() => restore.promise),
 		readIdentity: async () => ({ kind: 'ready', identityId: 'restored' })
 	}
-	const child = restorationMachine.provide({
+	const provided = restorationMachine.provide({
 		guards: {
 			currentBinding: () => {
 				if (crash === 'before') throw new Error('private-child-error')
 				return true
 			}
-		},
-		actions: {
-			settled:
-				crash === 'after'
-					? () => {
-							throw new Error('private-child-error')
-						}
-					: assign({ mutation: 'settled' })
 		}
 	})
+	// Fail the actor's transition at settlement, rather than overriding a removed v5 action.
+	const child = {
+		initialTransition: provided.initialTransition.bind(provided),
+		getInitialSnapshot: provided.getInitialSnapshot.bind(provided),
+		getPersistedSnapshot: provided.getPersistedSnapshot.bind(provided),
+		start: provided.start.bind(provided),
+		transition: (...args: Parameters<typeof provided.transition>) => {
+			if (crash === 'after' && args[0].matches('restoring') && 'output' in args[1]) {
+				throw new Error('private-child-error')
+			}
+			return provided.transition(...args)
+		}
+	}
+
 	const recovery = sessionRecoveryMachine.provide({ actors: { restoration: child } })
-	const parent = setup<
-		{ result: RecoveryResult | undefined; error: unknown },
-		RecoveryNotice,
-		{ recovery: typeof recovery }
-	>({ actors: { recovery } }).createMachine({
+	const parent = setup({
+		schemas: {
+			context: types<{ result: RecoveryResult | undefined; error: unknown }>(),
+			events: {
+				RECOVERY_VALIDATED: types<EventPayload<RecoveryNotice, 'RECOVERY_VALIDATED'>>(),
+				RECOVERY_DRAIN_REQUESTED: types<EventPayload<RecoveryNotice, 'RECOVERY_DRAIN_REQUESTED'>>()
+			}
+		},
+		actors: { recovery }
+	}).createMachine({
 		initial: 'active',
 		context: { result: undefined, error: undefined },
 		states: {
@@ -70,28 +82,24 @@ function fixture(crash: 'before' | 'after' | 'none' = 'none', request?: Recovery
 						readHref: () => '/from',
 						navigate
 					},
-					onDone: {
-						target: 'done',
-						actions: [
-							() => {
-								calls.push('parent-done')
-							},
-							assign({ result: ({ event }) => event.output })
-						]
+					onDone: (args, enq) => {
+						enq(() => {
+							calls.push('parent-done')
+						})
+						return { target: 'done', context: { result: args.event.output } }
 					},
-					onError: {
-						target: 'failed',
-						actions: [
-							() => {
-								calls.push('parent-error')
-							},
-							assign({ error: ({ event }) => event.error })
-						]
+					onError: (args, enq) => {
+						enq(() => {
+							calls.push('parent-error')
+						})
+						return { target: 'failed', context: { error: args.event.error } }
 					}
 				},
 				on: {
 					RECOVERY_VALIDATED: {},
-					RECOVERY_DRAIN_REQUESTED: { actions: sendTo('recovery', { type: 'WORKSPACE_DRAINED' }) }
+					RECOVERY_DRAIN_REQUESTED: (args, enq) => {
+						enq.sendTo('recovery', { type: 'WORKSPACE_DRAINED' })
+					}
 				}
 			},
 			done: { type: 'final' },

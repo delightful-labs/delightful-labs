@@ -1,4 +1,5 @@
-import { forwardTo, raise, assign, setup, type Snapshot } from 'xstate'
+import type { EventPayload } from '../../src/lib/contracts/machine-events.js'
+import { setup, type Snapshot, types } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
 	RestoreEvent,
@@ -57,27 +58,27 @@ export function createTestAppRestoreContinuationMachine<
 		plan: createTestAppRestorePlanningMachine(),
 		batch: createRestoreMachine(writer, destination)
 	}
-	const model = setup<
-		Context,
+	type Event =
 		| RestoreEvent
-		| { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' | 'EXPECTED_READY' | 'EXPECTED_FAILED' },
-		typeof actors,
-		{},
-		{ interrupt: undefined },
-		{
-			interrupted: undefined
-			currentBinding: undefined
-			resumeRequest: undefined
-			recoveryConflict: undefined
-			matchingIntent: undefined
-			currentStep: undefined
-			preparationComplete: undefined
+		| {
+				type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' | 'EXPECTED_READY' | 'EXPECTED_FAILED'
+		  }
+	const model = setup({
+		schemas: {
+			output: types<TestAppContinuationResult<NotApplicable>>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				RELEASE: types<EventPayload<Event, 'RELEASE'>>(),
+				CLAIMED: types<EventPayload<Event, 'CLAIMED'>>(),
+				CLAIM_FAILED: types<EventPayload<Event, 'CLAIM_FAILED'>>(),
+				EXPECTED_READY: types<EventPayload<Event, 'EXPECTED_READY'>>(),
+				EXPECTED_FAILED: types<EventPayload<Event, 'EXPECTED_FAILED'>>()
+			},
+			input: types<Input>()
 		},
-		never,
-		string,
-		Input,
-		TestAppContinuationResult<NotApplicable>
-	>({
 		actors,
 		guards: {
 			interrupted: ({ context }) => context.interruption !== undefined,
@@ -90,14 +91,24 @@ export function createTestAppRestoreContinuationMachine<
 			currentStep: ({ context }) => continuation.currentStep(context)
 		},
 		actions: {
-			interrupt: assign({
-				interruption: ({ context, event }) =>
-					context.interruption ??
-					(event.type === 'SHUTDOWN'
-						? 'closed'
-						: event.type === 'INVALIDATE'
-							? 'invalidated'
-							: 'cancelled')
+			interrupt: ({
+				context,
+				event
+			}: {
+				context: Context
+				event:
+					| RestoreEvent
+					| { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' | 'EXPECTED_READY' | 'EXPECTED_FAILED' }
+			}) => ({
+				context: {
+					interruption:
+						context.interruption ??
+						(event.type === 'SHUTDOWN'
+							? 'closed'
+							: event.type === 'INVALIDATE'
+								? 'invalidated'
+								: 'cancelled')
+				}
 			})
 		}
 	})
@@ -121,76 +132,111 @@ export function createTestAppRestoreContinuationMachine<
 			outcome: context.interruption ?? context.result.outcome
 		}),
 		on: {
-			CANCEL: { actions: 'interrupt' },
-			SHUTDOWN: { actions: 'interrupt' },
-			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' },
-			RELEASE: { actions: raise({ type: 'CANCEL' }) }
+			CANCEL: (args) => {
+				return args.actions.interrupt(args)
+			},
+			SHUTDOWN: (args) => {
+				return args.actions.interrupt(args)
+			},
+			INVALIDATE: (args) => {
+				if (!args.guards.currentBinding(args)) return
+				return args.actions.interrupt(args)
+			},
+			RELEASE: (args, enq) => {
+				enq.raise({ type: 'CANCEL' })
+			}
 		},
 		states: {
 			claiming: {
 				entry: ({ context, self }) => {
 					self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' })
 				},
-				on: { CLAIMED: 'working', CLAIM_FAILED: 'complete' }
+				on: { CLAIMED: { target: 'working' }, CLAIM_FAILED: { target: 'complete' } }
 			},
 			working: {
 				initial: 'admittingResume',
-				invoke: { src: 'resources', input, onError: 'complete' },
+				invoke: { src: 'resources', input, onError: { target: 'complete' } },
 				states: {
 					admittingResume: {
-						always: [
-							{ guard: 'interrupted', target: '#test-app-restore-continuation.complete' },
-							{ guard: 'resumeRequest', target: 'planning' },
-							{ target: '#test-app-restore-continuation.complete' }
-						]
+						always: (args) => {
+							if (args.guards.interrupted(args)) {
+								return { target: '#test-app-restore-continuation.complete' }
+							}
+							if (args.guards.resumeRequest(args)) {
+								return { target: 'planning' }
+							}
+							return { target: '#test-app-restore-continuation.complete' }
+						}
 					},
 					planning: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
 							id: 'effect',
 							src: 'plan',
 							input,
-							onDone: [
-								{ guard: 'interrupted', target: '#test-app-restore-continuation.complete' },
-								{
-									guard: ({ event }) => event.output.outcome === 'planned',
-									target: 'checkingRecovery',
-									actions: assign({
-										result: ({ context }) => ({
-											binding: context.binding,
-											outcome: 'incomplete',
-											record: data(context).observedJournal
-										})
-									})
-								},
-								{ target: '#test-app-restore-continuation.complete' }
-							],
-							onError: '#test-app-restore-continuation.complete'
+							onDone: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-restore-continuation.complete' }
+								}
+								if (args.event.output.outcome === 'planned') {
+									return {
+										target: 'checkingRecovery',
+										context: {
+											result: {
+												binding: context.binding,
+												outcome: 'incomplete',
+												record: data(context).observedJournal
+											}
+										}
+									}
+								}
+								return { target: '#test-app-restore-continuation.complete' }
+							},
+							onError: { target: '#test-app-restore-continuation.complete' }
 						}
 					},
 					checkingRecovery: {
-						always: [
-							{ guard: 'recoveryConflict', target: '#test-app-restore-continuation.conflict' },
-							{ guard: 'matchingIntent', target: 'checkingPreparation' },
-							{ target: '#test-app-restore-continuation.conflict' }
-						]
+						always: (args) => {
+							if (args.guards.recoveryConflict(args)) {
+								return { target: '#test-app-restore-continuation.conflict' }
+							}
+							if (args.guards.matchingIntent(args)) {
+								return { target: 'checkingPreparation' }
+							}
+							return { target: '#test-app-restore-continuation.conflict' }
+						}
 					},
 					checkingPreparation: {
-						always: [
-							{ guard: 'preparationComplete', target: 'selectingStep' },
-							{ target: '#test-app-restore-continuation.complete' }
-						]
+						always: (args) => {
+							if (args.guards.preparationComplete(args)) {
+								return { target: 'selectingStep' }
+							}
+							return { target: '#test-app-restore-continuation.complete' }
+						}
 					},
 					selectingStep: {
-						always: [
-							{ guard: 'currentStep', target: 'preparingExpected' },
-							{ target: '#test-app-restore-continuation.notApplicable' }
-						]
+						always: (args) => {
+							if (args.guards.currentStep(args)) {
+								return { target: 'preparingExpected' }
+							}
+							return { target: '#test-app-restore-continuation.notApplicable' }
+						}
 					},
 					preparingExpected: {
 						entry: ({ context, self }) => {
@@ -202,18 +248,30 @@ export function createTestAppRestoreContinuationMachine<
 							}
 						},
 						on: {
-							EXPECTED_READY: [
-								{ guard: 'interrupted', target: '#test-app-restore-continuation.complete' },
-								{ target: 'writingBatch' }
-							],
-							EXPECTED_FAILED: '#test-app-restore-continuation.complete'
+							EXPECTED_READY: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-restore-continuation.complete' }
+								}
+								return { target: 'writingBatch' }
+							},
+							EXPECTED_FAILED: { target: '#test-app-restore-continuation.complete' }
 						}
 					},
 					writingBatch: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
@@ -225,24 +283,30 @@ export function createTestAppRestoreContinuationMachine<
 								intent: required(data(context).intent),
 								writeId: continuation.writeId(context)
 							}),
-							onDone: {
-								target: '#test-app-restore-continuation.complete',
-								actions: assign({ result: ({ event }) => event.output })
+							onDone: (args) => {
+								return {
+									target: '#test-app-restore-continuation.complete',
+									context: { result: args.event.output }
+								}
 							},
-							onError: '#test-app-restore-continuation.complete'
+							onError: { target: '#test-app-restore-continuation.complete' }
 						}
 					}
 				}
 			},
 			conflict: {
 				type: 'final',
-				entry: assign({ result: ({ context }) => ({ ...context.result, outcome: 'conflict' }) })
+				entry: (args) => {
+					return { context: { result: { ...args.context.result, outcome: 'conflict' } } }
+				}
 			},
 			notApplicable: {
 				type: 'final',
-				entry: assign({
-					result: ({ context }) => ({ ...context.result, outcome: continuation.notApplicable })
-				})
+				entry: (args) => {
+					return {
+						context: { result: { ...args.context.result, outcome: continuation.notApplicable } }
+					}
+				}
 			},
 			complete: { type: 'final' }
 		}

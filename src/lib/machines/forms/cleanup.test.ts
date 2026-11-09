@@ -1,6 +1,7 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { createActor, setup, toPromise, type SnapshotFrom } from 'xstate'
+import { createActor, setup, toPromise, type SnapshotFrom, types } from 'xstate'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import { createSingleWriteFormOptions } from './policy.js'
 import {
@@ -108,24 +109,35 @@ describe('profile save guarantees', () => {
 				(_id: string, _user: string, _values: ProfileAvatarValues) => avatarSaved.promise
 			)
 			const imageStarted = vi.fn()
-			const processImage = setup<
-				{},
-				{ type: 'CANCEL' | 'SHUTDOWN' },
-				{},
-				{},
-				{},
-				{},
-				never,
-				string,
-				{
-					file: File
-					options: { maxWidth: number; maxHeight: number; mimeType: 'image/webp'; quality: number }
-				},
-				ProfileImageResult
-			>({}).createMachine({
+			const processImage = setup({
+				schemas: {
+					context: types<{}>(),
+					events: {
+						CANCEL: types<EventPayload<{ type: 'CANCEL' | 'SHUTDOWN' }, 'CANCEL'>>(),
+						SHUTDOWN: types<EventPayload<{ type: 'CANCEL' | 'SHUTDOWN' }, 'SHUTDOWN'>>()
+					},
+					input: types<{
+						file: File
+						options: {
+							maxWidth: number
+							maxHeight: number
+							mimeType: 'image/webp'
+							quality: number
+						}
+					}>()
+				}
+			}).createMachine({
 				initial: 'done',
-				states: { done: { type: 'final', entry: imageStarted } },
-				output: () => ({ outcome: 'failed' })
+				context: {},
+				states: {
+					done: {
+						type: 'final',
+						entry: (_args, enq) => {
+							enq(() => imageStarted())
+						}
+					}
+				},
+				output: (): ProfileImageResult => ({ outcome: 'failed' })
 			})
 			const saveSettlement = guarantee === 'confirmed' ? 'confirmed' : 'locallyPersisted'
 			const options = createProfileFormOptions({

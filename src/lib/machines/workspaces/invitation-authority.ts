@@ -671,7 +671,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 							},
 							verifyingCode: {
 								invoke: {
-									src: actors.verify,
+									src: 'verify',
 									input: ({ context }) => ({
 										code: required(context.request).code,
 										digest: invitation(context).codeDigest

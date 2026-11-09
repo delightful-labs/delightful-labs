@@ -1,6 +1,6 @@
 import { setImmediate } from 'node:timers/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, waitFor, type ActorRefFrom } from 'xstate'
+import { createActor, waitFor, type Actor } from 'xstate'
 import type {
 	AvailableRecoveryScope,
 	RecoveryPhraseCapability,
@@ -9,7 +9,7 @@ import type {
 } from '../../contracts/recovery-phrase.js'
 import { createRecoveryPhraseMachine, selectRecoveryPhraseView } from './recovery-phrase.js'
 
-type RecoveryActor = ActorRefFrom<ReturnType<typeof createRecoveryPhraseMachine>>
+type RecoveryActor = Actor<ReturnType<typeof createRecoveryPhraseMachine>>
 const actors: RecoveryActor[] = []
 
 function availableScope(): AvailableRecoveryScope {

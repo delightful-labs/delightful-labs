@@ -1,5 +1,5 @@
 // An independent test app owns its provenance and opaque database binding.
-import { createActor, setup, toPromise } from 'xstate'
+import { createActor, setup, types, toPromise } from 'xstate'
 import { createWorkspaceInitialization } from 'delightful-local-first/workspace/initialization'
 import { observeRow } from 'delightful-local-first/data/observations'
 import 'delightful-local-first/workspace/startup'
@@ -15,9 +15,18 @@ import 'delightful-local-first/profile/avatar'
 import 'delightful-local-first/recovery/coordination'
 import 'delightful-local-first/backend/jazz/startup'
 
-/** @type {{events?:import('delightful-local-first/workspace/initialization').InitializationEvent;input?:{db:object;attempt:{identityId:string;workspaceId:string};purpose?:'additional'|'bootstrap'};output?:{outcome:'committed'}}} */
-const types = {}
-const transaction = setup({ types }).createMachine({
+/** @typedef {{db:object;attempt:{identityId:string;workspaceId:string};purpose?:'additional'|'bootstrap'}} Input */
+/** @type {import('xstate').TypeSchema<Input>} */
+const inputSchema = types()
+/** @type {import('xstate').TypeSchema<{outcome:'committed'}>} */
+const outputSchema = types()
+const transaction = setup({
+	schemas: {
+		input: inputSchema,
+		output: outputSchema,
+		events: { CANCEL: types(), SHUTDOWN: types() }
+	}
+}).createMachine({
 	initial: 'complete',
 	states: { complete: { type: 'final' } },
 	output: () => ({ outcome: 'committed' })
