@@ -19,7 +19,9 @@
     "prepare": "svelte-kit sync"
   },
   "dependencies": {
-    "delightful-ui": "file:vendor/delightful-ui-0.0.25.tgz"
+    "delightful-ui": "file:vendor/delightful-ui-0.0.25.tgz",
+    "xstate": "6.0.0-beta.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",

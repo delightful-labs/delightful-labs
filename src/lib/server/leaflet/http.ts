@@ -27,7 +27,9 @@ export function publicAddress(ip: string): boolean {
 export async function readJson(
   input: string,
   limit = 6_000_000,
+  signal?: AbortSignal,
 ): Promise<unknown> {
+  signal?.throwIfAborted();
   const url = new URL(input);
   if (
     url.protocol !== "https:" ||
@@ -38,19 +40,36 @@ export async function readJson(
     throw new Error("Invalid upstream URL");
   const host = url.hostname.replace(/^\[|\]$/g, "");
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal?.reason);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
   const addresses = isIP(host)
     ? [{ address: host }]
     : await Promise.race([
         lookup(host, { all: true }),
         new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error("Upstream DNS timeout")), 5_000);
+          timer = setTimeout(
+            () => reject(new Error("Upstream DNS timeout")),
+            5_000,
+          );
         }),
-      ]).finally(() => clearTimeout(timer));
+        aborted,
+      ]).finally(() => {
+        clearTimeout(timer);
+        if (onAbort) signal?.removeEventListener("abort", onAbort);
+      });
+  if (onAbort) signal?.removeEventListener("abort", onAbort);
+  signal?.throwIfAborted();
   if (!addresses.length || addresses.some((a) => !publicAddress(a.address)))
     throw new Error("Non-public upstream");
   const response = await fetch(url, {
     redirect: "error",
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.any([
+      AbortSignal.timeout(12_000),
+      ...(signal ? [signal] : []),
+    ]),
     headers: { accept: "application/json" },
   });
   if (!response.ok || !response.body)

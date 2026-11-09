@@ -51,6 +51,12 @@ annotations link to Leaflet instead of becoming frames or raw HTML. Published
 theme/font settings are not adopted. Missing image alt text remains unchanged
 and is marked in the read model for later content review.
 
+The server reader's cache/refresh lifecycle is an XState v6 machine, pinned to
+`6.0.0-beta.1` as requested. Fetching and Zod validation live in focused modules;
+the machine owns concurrency, freshness, stale fallback, retries and cancellation.
+See [the lifecycle contract](specs/001-homepage-native-blog/contracts/reader-lifecycle.md)
+for the state diagram and tested invariants. This machine remains process-local.
+
 ## Local public-source proof
 
 The verification script accepts only an explicit local article URL. Run a separate
@@ -59,6 +65,9 @@ example, then run `node scripts/verify-native.mjs <local-article-url>`. This che
 initial HTML, browser text/links, a loaded image, no frames, and no page errors.
 Never use a demonstration publication as the committed or production default.
 Evidence from the initial proof is in the feature's `verification.md`.
+Run this proof after other dev/build/browser-test processes have stopped, or
+from a separate checkout: SvelteKit processes in one checkout share generated
+environment files, even when they use different ports.
 
 ## Deployment status and remaining gates
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizePages, textRuns, safeLink } from "../src/lib/leaflet/content";
 import { PublicationReader } from "../src/lib/server/leaflet/reader";
-import { publicAddress } from "../src/lib/server/leaflet/http";
+import { publicAddress, readJson } from "../src/lib/server/leaflet/http";
 
 const did = "did:plc:testowner";
 const publication = `at://${did}/site.standard.publication/test`;
@@ -35,7 +35,7 @@ function harness() {
   let commitCount = 0;
   let records: unknown[] = [
     document("one"),
-    document("unrelated", "at://other/publication/test"),
+    document("unrelated", `at://${did}/site.standard.publication/other`),
   ];
   const calls: string[] = [];
   const reader = new PublicationReader(
@@ -62,6 +62,7 @@ function harness() {
           return {
             uri: publication,
             value: {
+              $type: "site.standard.publication",
               name: "Test publication",
               url: "https://test.leaflet.pub",
             },
@@ -135,6 +136,8 @@ describe("native record reads", () => {
     h.time(301_000);
     h.fail();
     expect((await h.reader.read())?.stale).toBe(true);
+    h.time(86_400_000);
+    expect((await h.reader.read())?.stale).toBe(true);
     h.time(86_400_001);
     await expect(h.reader.read()).rejects.toThrow();
   });
@@ -175,6 +178,49 @@ describe("native record reads", () => {
     expect((await h.reader.read())?.articles.map((a) => a.key)).toEqual([
       "one",
     ]);
+  });
+  it("rejects a missing site before filtering and retains the previous archive", async () => {
+    const h = harness();
+    await h.reader.read();
+    h.time(301_000);
+    h.records([{ ...document("one"), value: { title: "Broken record" } }]);
+    const result = await h.reader.read();
+    expect(result?.stale).toBe(true);
+    expect(result?.articles.map((article) => article.key)).toEqual(["one"]);
+  });
+  it("rejects malformed envelopes instead of publishing an empty first scan", async () => {
+    const h = harness();
+    h.records([null]);
+    await expect(h.reader.read()).rejects.toThrow();
+  });
+  it("rejects invalid publication references instead of inferring deletion", async () => {
+    const h = harness();
+    await h.reader.read();
+    h.time(301_000);
+    h.records([document("one", "not a publication URI")]);
+    expect(
+      (await h.reader.read())?.articles.map((article) => article.key),
+    ).toEqual(["one"]);
+  });
+  it("settles in-flight requests when disposed and rejects later reads", async () => {
+    let signal: AbortSignal | undefined;
+    const reader = new PublicationReader(
+      { ownerDid: did, publicationUri: publication },
+      {
+        json: async (_, value) => {
+          signal = value;
+          return new Promise(() => {});
+        },
+      },
+    );
+    const first = reader.read(),
+      second = reader.read();
+    reader.stop();
+    reader.stop();
+    await expect(first).rejects.toThrow("stopped");
+    await expect(second).rejects.toThrow("stopped");
+    await expect(reader.read()).rejects.toThrow("stopped");
+    expect(signal?.aborted).toBe(true);
   });
   it("loads blob-backed pages instead of the inline stub", async () => {
     const h = harness(),
@@ -319,5 +365,12 @@ describe("native content boundary", () => {
     ])
       expect(publicAddress(ip)).toBe(false);
     expect(publicAddress("8.8.8.8")).toBe(true);
+  });
+  it("honors cancellation before any transport work", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("Cancelled"));
+    await expect(
+      readJson("https://example.com", undefined, controller.signal),
+    ).rejects.toThrow("Cancelled");
   });
 });

@@ -13,11 +13,14 @@ export function publicationReader(): PublicationReader {
   const publicationUri = LEAFLET_PUBLICATION_URI || undefined;
   const key = JSON.stringify([ownerDid, publicationUri]);
   if (!reader || key !== identity) {
+    reader?.stop();
     reader = new PublicationReader({ ownerDid, publicationUri });
     identity = key;
   }
   return reader;
 }
+
+if (import.meta.hot) import.meta.hot.dispose(() => reader?.stop());
 export function canonicalOrigin(): string {
   const url = new URL(SITE_ORIGIN);
   if (

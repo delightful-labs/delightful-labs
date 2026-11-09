@@ -17,6 +17,12 @@ built from clean source commit eaf1b98290944ef3a99c1fa183e227a61a8de2ee.
 Default owner: did:plc:226m7t4kp7d7sg2qsdresypm. Publication stays unset until
 Open Thoughts exists; never default to another author's records.
 
+Reader lifecycle: exact `xstate@6.0.0-beta.1`, selected by the owner. Use the
+installed v6 APIs and separate network/schema validation from the machine.
+Zod 4.6.7 validates upstream envelopes before filtering publication membership.
+The lifecycle contract and state diagram are in
+[contracts/reader-lifecycle.md](contracts/reader-lifecycle.md).
+
 ## Constitution Check
 
 No ratified constitution or extension hooks exist. Follow AGENTS.md: native

@@ -8,11 +8,16 @@ publication migration or hosting cutover.
 
 - `pnpm install --frozen-lockfile`: reproducible installation from the committed
   local UI artifact and lockfile.
-- `pnpm test`: 17 behavior checks covering pagination, exact publication
+- `pnpm test`: 29 behavior checks covering pagination, exact publication
   filtering, owner mismatch, empty config, failed initial fetch, coalesced reads,
   stale age limits, confirmed removal, changed/incomplete scans, malformed records,
   UTF-8/overlapping facets, unsafe links, member boundaries, unknown blocks and
   annotations, reachable/cyclic subpages, blob-page precedence, and private IPs.
+  This includes explicit XState v6 lifecycle checks for shared loads/refreshes,
+  fresh cache hits, stale recovery, expiry during a pending refresh, retry,
+  cancellation, waiter cleanup, and ignored late results. Regression tests first
+  reproduced missing-site/malformed-envelope false removals in the old reader;
+  the new parser rejects those scans before membership filtering.
 - `pnpm check`: no errors or warnings.
 - `pnpm build`: successful Vercel adapter output; generated function config
   identifies Node.js 24 and SvelteKit 3.1.1. This is a local build, not deployment.
@@ -26,6 +31,25 @@ Local execution used the installed Node.js 25.2.1. The repository pins Node.js 2
 for CI and the Vercel runtime; an actual hosted Node.js 24 release is not claimed.
 Browser verification used installed Playwright Chromium because the Chrome
 DevTools connector was unavailable.
+
+## XState v6 follow-up
+
+The owner requested v6 after reviewing the server reader. The exact version is
+`6.0.0-beta.1`; it is a direct dependency, independent of Delightful UI's internal
+v5 dependency. New implementation uses the bundled v6 APIs (`createAsyncLogic`,
+`schemas`/`types`, context patches and queued effects), not v5 compatibility code.
+`reader.ts` is now a small Promise adapter. Fetching, schemas, pagination,
+identity resolution, article conversion and lifecycle are separate modules.
+See [the lifecycle contract](contracts/reader-lifecycle.md).
+
+The native public-source proof and all three Chromium route checks passed again
+after the migration. No homepage content, typography, source publication settings,
+or production hosting configuration changed as part of this refactor.
+During the final proof, a second validation process rewrote the checkout's shared
+SvelteKit development environment files, leaving the proof process unconfigured
+(404). Restarting the explicit-source process after the other checks completed
+restored the expected native result. The final proof was run sequentially; local
+instructions now warn against sharing generated state between concurrent modes.
 
 ## Live native source proof
 
