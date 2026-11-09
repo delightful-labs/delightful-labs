@@ -33,16 +33,20 @@
 
 ## Later stages — not foundation completion claims
 
-- [ ] T014 [US3] Configure an owner-created Leaflet publication and prove external canonical URL persistence; record results in research.md.
+- [ ] T014 [US3] Configure an owner-created Leaflet publication and prove external canonical URL persistence; record results in research.md and canonical-proof.md.
 - [x] T015 [US3] Implement durable cross-instance snapshot/concurrency behavior in src/lib/server/leaflet/ and verify in Preview. Production store enablement remains gated.
 - [ ] T016 [US4] Preserve archive inputs/assets, prove editable quiet import, then finalize feeds and redirects using the exact inventory in research-migration.md.
+  - [x] Preserve six known-public Markdown posts, original image/license, live HTML and generated images/feed/sitemap with hashes and planned URL mappings in migration/open-thoughts/.
+  - [ ] Prove one editable quiet Leaflet import with its public date and image; migrate and compare all six only after that proof.
+  - [ ] Resolve record keys/aliases, fragment compatibility, replacement feeds and staged redirects before activating old-URL redirects.
+  - [ ] Preserve the original export in owner-controlled storage before retiring the old repo; do not republish account fields or eight unclassified entries.
 - [ ] T017 [US5] Verify hosted preview and production cutover using the approved domains; document rollback in README.md.
 
 ## Dependencies and strategy
 
 T001–T005 precede routes. US1 can be demonstrated without a publication. US2 is
 verified using an isolated public source, never a committed production default.
-US3 cache checks can use the injected upstream client. No parallel tasks are
+US3 cache checks replace named I/O actors in tests. No parallel tasks are
 marked because the small foundation shares core types. T014–T017 require the
 actual owner publication and deployment configuration; they do not block the
 local foundation or justify copying sample content into the public site.

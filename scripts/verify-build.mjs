@@ -9,6 +9,8 @@ for (const [path, status] of [
   ["/", 200],
   ["/open-thoughts/", 200],
   ["/open-thoughts/unknown/", 404],
+  ["/migration/open-thoughts/manifest.json", 404],
+  ["/migration/open-thoughts/source/content/blog/thinking-as-you-go.md", 404],
 ]) {
   const response = await server.respond(
     new Request(`https://example.com${path}`),

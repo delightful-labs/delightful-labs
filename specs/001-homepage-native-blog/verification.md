@@ -126,3 +126,29 @@ The Blob adapter now sends data-only operations to registered SDK actors.
 Lifecycle tests mock the actual SDK rather than injecting operational callbacks
 into machine input. An additional check verifies the explicit download → validate
 → complete path; all 104 tests and emitted-server checks pass.
+
+
+## Merged workflow composition and migration preparation
+
+PR #4 merged with all 123 tests, type checks, production/emitted-server checks,
+three Chromium checks, and Node 24 CI passing. The final Preview deployment
+`dpl_6jGMpweRPVJuXtcTXa31zmHDjCKu` logged `saved` followed by `fresh` with the
+same `verifiedAt: 1794241422337`. The application now composes named child
+machines with data-only inputs; Promise runners/store facades are test support.
+
+Archive preparation preserves six public source Markdown files, original chart,
+license/stylesheet, six live HTML pages, three generated image variants, live
+Atom feed, sitemap and stylesheet: 21 original files with SHA-256 and sizes.
+All twelve live captures returned HTTP 200 on November 9, 2026. The manifest
+records legacy/native URL plans, fragments, exact legacy Atom IDs, public dates,
+and export timestamps. `pnpm check:migration` verifies these preserved bytes.
+The full account export and its eight unclassified entries are not copied.
+
+The ecosystem article's public date is November 14, 2022; its export creation date
+is November 12. Both are preserved, with public-date parity required for import.
+No article has been imported, published or edited in Leaflet by this work.
+
+The owner's publication still has URL `https://open-thoughts.leaflet.pub` and zero
+matching documents after complete enumeration. External-subpath persistence is
+not yet proved. See [canonical-proof.md](canonical-proof.md) for source evidence,
+the authenticated workflow still required, and an unsent support request.

@@ -118,3 +118,14 @@ See [the spec](specs/001-homepage-native-blog/spec.md),
 [implementation plan](specs/001-homepage-native-blog/plan.md),
 [tasks](specs/001-homepage-native-blog/tasks.md), and
 [research](specs/001-homepage-native-blog/research.md).
+
+## Archive preparation
+
+The six already-public posts, original image and license, live article captures,
+image variants, feed, sitemap, and their checksum/URL manifest are preserved in
+[migration/open-thoughts](migration/open-thoughts/README.md), outside the public
+application. Run `pnpm check:migration` to verify the archive bytes and references.
+No Leaflet import or redirect is activated by these files.
+
+The next integration gate and an unsent support request are documented in the
+[external canonical URL proof](specs/001-homepage-native-blog/canonical-proof.md).
