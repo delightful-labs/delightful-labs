@@ -27,7 +27,8 @@
 		"measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
 		"check:backup-restore": "tsc --noEmit --project fixtures/test-app/tsconfig.json && vitest run --config fixtures/test-app/restore.vitest.config.ts",
 		"check:native-backup": "tsc --noEmit --project fixtures/native-capture/tsconfig.json && vitest run --config fixtures/native-capture/vitest.config.ts",
-		"check:library": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.library.json --fail-on-warnings && tsc --noEmit --project tsconfig.library.json"
+		"check:library": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.library.json --fail-on-warnings && tsc --noEmit --project tsconfig.library.json",
+		"test:xstate-readiness": "tsc --project tsconfig.xstate-tests.json && vitest run --config vitest.config.ts src/lib/machines/identity/session-readiness.test.ts src/lib/machines/identity/session-readiness.model.test.ts"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "3.1.0",

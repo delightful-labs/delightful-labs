@@ -1,5 +1,6 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assign, createActor, fromCallback, fromTransition, setup, waitFor } from 'xstate'
+import { createActor, createCallbackLogic, createStepLogic, setup, waitFor, types } from 'xstate'
 import { createScopedFormReadinessMachine } from './readiness.js'
 import { formInterruptionResult } from '../../contracts/scoped-form.js'
 import type {
@@ -29,14 +30,16 @@ function fixture() {
 		revision: 1,
 		facts: { scope: { binding: {}, id: 'A' }, allowed: true }
 	}
-	const source = fromTransition(
-		(context: Observation, event: FormChildEvent<Facts>) => {
-			if (event.type !== 'OBSERVE') return context
-			if (event.observation.facts.crash) throw new Error('policy crashed')
-			return event.observation
-		},
-		({ input }: { input: Observation }) => input
-	)
+	const source = createStepLogic({
+		context: ({ input }: { input: Observation }) => input,
+		run: ({ context, event }: { context: Observation; event: FormChildEvent<Facts> }) => ({
+			context: ((context: Observation, event: FormChildEvent<Facts>) => {
+				if (event.type !== 'OBSERVE') return context
+				if (event.observation.facts.crash) throw new Error('policy crashed')
+				return event.observation
+			})(context, event)
+		})
+	})
 	const selectAvailability = vi.fn(
 		(snapshot: ReturnType<typeof source.getInitialSnapshot>): Capability => ({
 			revision: snapshot.context.revision,
@@ -54,7 +57,15 @@ function fixture() {
 	}
 	const reporter = track(
 		createActor(
-			fromTransition((reports: Report[], event: Report) => [...reports, event], [])
+			createStepLogic({
+				context: (): Report[] => [],
+				run: ({ context, event }: { context: Report[]; event: Report }) => ({
+					context:
+						event.type !== 'FORM_CAPABILITY_REPORTED'
+							? context
+							: ((reports: Report[], event: Report) => [...reports, event])(context, event)
+				})
+			})
 		).start()
 	)
 	const token = { requestId: 8, scopeRevision: 4, generation: 12 }
@@ -195,25 +206,25 @@ describe('shared scoped form readiness', () => {
 	})
 	it('does not treat unexpected policy completion as readiness', async () => {
 		const f = fixture()
-		const source = setup<
-			{ observation: Observation },
-			FormChildEvent<Facts>,
-			{},
-			{},
-			{},
-			{},
-			never,
-			string,
-			Observation
-		>({}).createMachine({
+		const source = setup({
+			schemas: {
+				context: types<{ observation: Observation }>(),
+				events: {
+					CANCEL: types<EventPayload<FormChildEvent<Facts>, 'CANCEL'>>(),
+					SHUTDOWN: types<EventPayload<FormChildEvent<Facts>, 'SHUTDOWN'>>(),
+					INVALIDATE: types<EventPayload<FormChildEvent<Facts>, 'INVALIDATE'>>(),
+					OBSERVE: types<EventPayload<FormChildEvent<Facts>, 'OBSERVE'>>()
+				},
+				input: types<Observation>()
+			}
+		}).createMachine({
 			initial: 'watching',
 			context: ({ input }) => ({ observation: input }),
 			states: {
 				watching: {
 					on: {
-						OBSERVE: {
-							target: 'finished',
-							actions: assign({ observation: ({ event }) => event.observation })
+						OBSERVE: (args) => {
+							return { target: 'finished', context: { observation: args.event.observation } }
 						}
 					}
 				},
@@ -258,7 +269,7 @@ describe('shared scoped form readiness', () => {
 	it('tears down its invoked policy source when its owner stops it', () => {
 		const f = fixture()
 		const cleanup = vi.fn()
-		const source = fromCallback<FormChildEvent<Facts>, Observation>(() => cleanup)
+		const source = createCallbackLogic<FormChildEvent<Facts>, Observation>(() => cleanup)
 		const actor = track(
 			createActor(
 				createScopedFormReadinessMachine({

@@ -303,8 +303,10 @@ export function createWorkspaceCreationOwner<
 					id: 'operation',
 					src: operation,
 					input: ({ context }) => {
-						if (!context.bindingState.operation) throw new Error('Missing creation binding')
-						return { binding: context.bindingState.operation, request: context.request }
+						// v6 calculates invoke input before this state's entry patch. Capture the
+						// admitted binding directly; entry records the same binding for later drain.
+						if (!context.bindingState.binding) throw new Error('Missing creation binding')
+						return { binding: context.bindingState.binding, request: context.request }
 					},
 					onDone: (args) => {
 						const { context, event } = args

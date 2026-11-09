@@ -4,7 +4,7 @@ import { RecoveryPhrase } from 'jazz-tools/passphrase'
 import { createJazzRecoveryAdapter } from 'delightful-local-first/backend/jazz/recovery'
 import { createJazzRestorationAdapter } from 'delightful-local-first/backend/jazz/restoration'
 import { restorationMachine } from 'delightful-local-first/restoration/workflow'
-import { createActor, fromCallback, waitFor } from 'xstate'
+import { createActor, createCallbackLogic, waitFor } from 'xstate'
 
 /** @type {string | null} */
 let stored = null
@@ -58,9 +58,9 @@ try {
 	}
 	const restorationAdapter = createJazzRestorationAdapter(session, () => session)
 	const restorationScope = { binding: restorationAdapter.binding, attempt: 1 }
-	/** @type {import('delightful-local-first/restoration/workflow').RestorationInput['reportTo']} */
+	/** @type {import('delightful-local-first/restoration/workflow').RestorationInput['reportTo'] & {stop():void}} */
 	const recipient = createActor(
-		fromCallback(({ receive }) =>
+		createCallbackLogic(({ receive }) =>
 			receive((event) => {
 				if (event.type === 'RESTORATION_PREPARE_REQUESTED') {
 					restoration.send({ type: 'PREPARED', ...restorationScope })

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, fromPromise, waitFor } from 'xstate'
+import { createActor, waitFor, createAsyncLogic } from 'xstate'
 import { createInvitationRedemptionMachine } from './invitation-redemption.js'
 import type {
 	InvitationCapability,
@@ -283,11 +283,13 @@ describe('invitation redemption', () => {
 		const capability: Capability = { assess: () => ({ kind: 'ready' }), redeem: async () => joined }
 		const logic = createInvitationRedemptionMachine<Scope>().provide({
 			actors: {
-				redeem: fromPromise<
+				redeem: createAsyncLogic<
 					Exclude<InvitationSettlement, { kind: 'notStarted' }>,
 					{ request: InvitationRequest<Scope>; capability: Capability }
-				>(async () => {
-					throw new Error(request.code)
+				>({
+					run: async () => {
+						throw new Error(request.code)
+					}
 				})
 			}
 		})

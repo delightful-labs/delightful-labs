@@ -7,9 +7,12 @@ import {
 } from './restore-request.js'
 
 type Input = { request: TestAppRestoreRequest }
-export function testAppCurrentStepIsAttachment(input: Input): boolean {
+export function testAppCurrentStepIsAttachment(
+	input: Input,
+	record = data(input).observedJournal
+): boolean {
 	const value = data(input),
-		batch = currentTestAppBatch(input)
+		batch = currentTestAppBatch(input, record)
 	if (!batch || batch.mappingIndexes.length !== 1) return false
 	const index = batch.mappingIndexes[0]
 	return index !== undefined && value.intent?.plan.mappings[index]?.kind === 'attachment'

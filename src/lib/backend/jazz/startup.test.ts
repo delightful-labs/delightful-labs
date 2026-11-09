@@ -19,7 +19,6 @@ describe('application-owned Jazz startup registry', () => {
 		expect(acquire).toHaveBeenCalledOnce()
 		expect(open).not.toHaveBeenCalled()
 		expect(registry.getCurrentJazzSession()).toBeUndefined()
-		first.owner.stop()
 	})
 	it('requires coordinated cleanup before an environment replacement', () => {
 		const registry = createJazzStartupRegistry(() => ({
@@ -45,6 +44,5 @@ describe('application-owned Jazz startup registry', () => {
 				initial: 'local-first'
 			}).owner
 		).toBe(first.owner)
-		first.owner.stop()
 	})
 })

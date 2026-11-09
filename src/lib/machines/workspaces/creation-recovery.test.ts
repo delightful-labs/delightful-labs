@@ -1,14 +1,15 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-	assign,
 	createActor,
-	fromPromise,
 	setup,
 	toPromise,
 	waitFor,
 	type InspectionEvent,
-	type SnapshotFrom
+	type SnapshotFrom,
+	createAsyncLogic,
+	types
 } from 'xstate'
 import {
 	createWorkspaceCreationOwner,
@@ -44,7 +45,7 @@ function tracked<T extends { stop(): void }>(actor: T): T {
 function observeCommands(events: string[], id: string) {
 	return (inspection: InspectionEvent) => {
 		if (
-			inspection.type === '@xstate.event' &&
+			inspection.type === '@xstate.transition' &&
 			'id' in inspection.actorRef &&
 			inspection.actorRef.id === id &&
 			(inspection.event.type === 'CANCEL' || inspection.event.type === 'SHUTDOWN')
@@ -53,40 +54,126 @@ function observeCommands(events: string[], id: string) {
 	}
 }
 // A controlled child owns its pending leaf until completion; interruption is observed without exiting.
-function child<
-	T extends object,
-	Input extends object,
-	Event extends { type: string } = { type: 'CANCEL' | 'SHUTDOWN' }
->(run: (input: Input) => Promise<T>) {
-	const settle = fromPromise<T, { input: Input }>(({ input }) => run(input.input))
-	return setup<
-		{ input: Input; result: T | undefined },
-		Event,
-		{ settle: typeof settle },
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		T
-	>({ actors: { settle } }).createMachine({
-		context: ({ input }) => ({ input, result: undefined }),
+function child<T extends object, Input extends object>(run: (input: Input) => Promise<T>) {
+	const settle = createAsyncLogic<T, { input: Input }>({ run: ({ input }) => run(input.input) })
+	return setup({
+		schemas: {
+			context: types<{ work: { input: Input; result: { value: T } | undefined } }>(),
+			events: { CANCEL: types<{}>(), SHUTDOWN: types<{}>() },
+			input: types<Input>()
+		},
+		actors: { settle }
+	}).createMachine({
+		context: ({ input }) => ({ work: { input, result: undefined } }),
 		initial: 'pending',
-		output: ({ context }) => {
-			if (context.result === undefined) throw new Error('Missing child result')
-			return context.result
+		output: ({ context }): T => {
+			if (context.work.result === undefined) throw new Error('Missing child result')
+			return context.work.result.value
 		},
 		states: {
 			pending: {
 				invoke: {
 					src: 'settle',
-					input: ({ context }) => ({ input: context.input }),
-					onDone: { target: 'done', actions: assign({ result: ({ event }) => event.output }) },
-					onError: {
-						actions: ({ event }) => {
-							throw event.error
+					input: ({ context }) => ({ input: context.work.input }),
+					onDone: (args) => {
+						return {
+							target: 'done',
+							context: { work: { ...args.context.work, result: { value: args.event.output } } }
 						}
+					},
+					onError: (args, enq) => {
+						enq(() => {
+							throw args.event.error
+						})
+					}
+				}
+			},
+			done: { type: 'final' }
+		}
+	})
+}
+function journalChild<T extends object, Input extends object>(run: (input: Input) => Promise<T>) {
+	const settle = createAsyncLogic<T, { input: Input }>({ run: ({ input }) => run(input.input) })
+	return setup({
+		schemas: {
+			context: types<{ work: { input: Input; result: { value: T } | undefined } }>(),
+			events: {
+				OPENED: types<EventPayload<WorkspaceJournalEvent, 'OPENED'>>(),
+				CLOSED: types<EventPayload<WorkspaceJournalEvent, 'CLOSED'>>(),
+				ACQUIRED: types<EventPayload<WorkspaceJournalEvent, 'ACQUIRED'>>(),
+				OPEN_FAILED: types<EventPayload<WorkspaceJournalEvent, 'OPEN_FAILED'>>(),
+				ACQUIRE_FAILED: types<EventPayload<WorkspaceJournalEvent, 'ACQUIRE_FAILED'>>(),
+				CLOSE_FAILED: types<EventPayload<WorkspaceJournalEvent, 'CLOSE_FAILED'>>(),
+				CANCEL: types<EventPayload<WorkspaceJournalEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<WorkspaceJournalEvent, 'SHUTDOWN'>>(),
+				TX_COMPLETE: types<EventPayload<WorkspaceJournalEvent, 'TX_COMPLETE'>>(),
+				TX_ABORTED: types<EventPayload<WorkspaceJournalEvent, 'TX_ABORTED'>>(),
+				RECORD: types<EventPayload<WorkspaceJournalEvent, 'RECORD'>>(),
+				TX_FAILED: types<EventPayload<WorkspaceJournalEvent, 'TX_FAILED'>>()
+			},
+			input: types<Input>()
+		},
+		actors: { settle }
+	}).createMachine({
+		context: ({ input }) => ({ work: { input, result: undefined } }),
+		initial: 'pending',
+		output: ({ context }): T => {
+			if (context.work.result === undefined) throw new Error('Missing child result')
+			return context.work.result.value
+		},
+		states: {
+			pending: {
+				invoke: {
+					src: 'settle',
+					input: ({ context }) => ({ input: context.work.input }),
+					onDone: (args) => {
+						return {
+							target: 'done',
+							context: { work: { ...args.context.work, result: { value: args.event.output } } }
+						}
+					},
+					onError: (args, enq) => {
+						enq(() => {
+							throw args.event.error
+						})
+					}
+				}
+			},
+			done: { type: 'final' }
+		}
+	})
+}
+function checkChild<T extends object, Input extends object>(run: (input: Input) => Promise<T>) {
+	const settle = createAsyncLogic<T, { input: Input }>({ run: ({ input }) => run(input.input) })
+	return setup({
+		schemas: {
+			context: types<{ work: { input: Input; result: { value: T } | undefined } }>(),
+			events: { CHECK: types<{}>() },
+			input: types<Input>()
+		},
+		actors: { settle }
+	}).createMachine({
+		context: ({ input }) => ({ work: { input, result: undefined } }),
+		initial: 'pending',
+		output: ({ context }): T => {
+			if (context.work.result === undefined) throw new Error('Missing child result')
+			return context.work.result.value
+		},
+		states: {
+			pending: {
+				invoke: {
+					src: 'settle',
+					input: ({ context }) => ({ input: context.work.input }),
+					onDone: (args) => {
+						return {
+							target: 'done',
+							context: { work: { ...args.context.work, result: { value: args.event.output } } }
+						}
+					},
+					onError: (args, enq) => {
+						enq(() => {
+							throw args.event.error
+						})
 					}
 				}
 			},
@@ -105,21 +192,18 @@ function operationFixture(
 	const journalRead = vi.fn<() => Promise<WorkspaceJournalResult<Record>>>(
 		options.read ?? (() => Promise.resolve({ outcome: 'succeeded', record }))
 	)
-	const journal = child<
-		WorkspaceJournalResult<Record>,
-		CreationJournalInput<Record>,
-		WorkspaceJournalEvent
-	>((input) => {
-		if (input.mode === 'read') return journalRead()
-		return Promise.resolve<WorkspaceJournalResult<Record>>({
-			outcome: 'succeeded',
-			record: input.mode === 'write' ? input.record : undefined
-		})
-	})
-	const reconcile = child<
+	const journal = journalChild<WorkspaceJournalResult<Record>, CreationJournalInput<Record>>(
+		(input) => {
+			if (input.mode === 'read') return journalRead()
+			return Promise.resolve<WorkspaceJournalResult<Record>>({
+				outcome: 'succeeded',
+				record: input.mode === 'write' ? input.record : undefined
+			})
+		}
+	)
+	const reconcile = checkChild<
 		CreationReconciliation<Workspace>,
-		{ db: object; attempt: Record['attempt'] },
-		{ type: 'CHECK' }
+		{ db: object; attempt: Record['attempt'] }
 	>(() => options.reconciliation?.() ?? Promise.resolve({ outcome: 'absent' }))
 	const persistCall = vi.fn(
 		(_input: { attempt: Record['attempt'] }) =>
@@ -155,21 +239,36 @@ function operationFixture(
 		matchesBinding: (candidate) => candidate.attempt.member === 'a',
 		attemptId: (candidate) => candidate.attempt.notebookId
 	})
+	const issuances: unknown[] = []
 	const start = (request: CreationRequest<Record>, inspect?: (event: InspectionEvent) => void) =>
 		tracked(
-			createActor(machine, { input: { binding, request }, ...(inspect ? { inspect } : {}) })
+			createActor(machine, {
+				input: { binding, request },
+				inspect(event) {
+					inspect?.(event)
+					if (event.type !== '@xstate.actor' || event.src !== persist) return
+					const snapshot = event.snapshot
+					if (
+						'context' in snapshot &&
+						snapshot.context &&
+						typeof snapshot.context === 'object' &&
+						'issuance' in snapshot.context
+					) {
+						issuances.push(snapshot.context.issuance)
+					}
+				}
+			})
 		).start()
-	return { start, persistCall, journalRead }
+	return { start, persistCall, journalRead, issuances }
 }
 function persistenceFixture(
 	reconcileRead: () => Promise<CreationReconciliation<Workspace>>,
 	commit: () => Promise<Persistence> = () =>
 		Promise.resolve({ outcome: 'succeeded', settlement: 'locallyPersisted', workspace })
 ) {
-	const reconcile = child<
+	const reconcile = checkChild<
 		CreationReconciliation<Workspace>,
-		{ db: object; attempt: Record['attempt'] },
-		{ type: 'CHECK' }
+		{ db: object; attempt: Record['attempt'] }
 	>(reconcileRead)
 	const commitCall = vi.fn(commit),
 		events: string[] = []
@@ -222,8 +321,7 @@ describe('creation owner retains recovery through drain', () => {
 			gate.resolve({ outcome: 'closed', record, settlement: 'unresolved' })
 			await waitFor(owner, (snapshot) => snapshot.matches('unresolved'))
 			expect(owner.getSnapshot().context).toMatchObject({
-				operation: binding,
-				record,
+				bindingState: { operation: binding, record },
 				result: { settlement: 'unresolved' }
 			})
 			owner.send({ type: 'OBSERVED', binding: { key: 'notebook/member-c' } })
@@ -270,7 +368,7 @@ describe('creation owner retains recovery through drain', () => {
 				settlement: 'unresolved',
 				error
 			})
-			expect(owner.getSnapshot().context.operation).toEqual(binding)
+			expect(owner.getSnapshot().context.bindingState.operation).toEqual(binding)
 			owner.send({ type: 'OBSERVED', binding })
 			owner.send({ type: 'RETRY' })
 			await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
@@ -368,8 +466,9 @@ describe('operation settlement is reflected in state, context and output', () =>
 			settlement: 'locallyPersisted'
 		})
 		expect(fixture.persistCall).toHaveBeenCalledWith(
-			expect.objectContaining({ attempt: record.attempt, issuance: 'new' })
+			expect.objectContaining({ attempt: record.attempt })
 		)
+		expect(fixture.issuances).toEqual(['new'])
 	})
 	it('accepts conclusive notStarted recovery without issuing a write', async () => {
 		const fixture = operationFixture({

@@ -32,13 +32,20 @@ test('DUI selection, native dismissal and crop acceptance update the bound form'
 	page
 }) => {
 	await open(page)
+	async function chooseAvatar() {
+		const chooser = page.waitForEvent('filechooser')
+		await page.getByRole('button', { name: 'Avatar', exact: true }).click()
+		await (await chooser).setFiles(image)
+	}
 	const dialog = page.getByRole('dialog', { name: 'Crop avatar' })
-	await page.locator('input[type=file]').setInputFiles(image)
+	await chooseAvatar()
 	await expect(dialog).toBeVisible()
 	await page.keyboard.press('Escape')
 	await expect(dialog).toHaveCount(0)
 	await expect(page.getByRole('status', { name: 'Selected file' })).toHaveText('unchanged')
-	await page.locator('input[type=file]').setInputFiles(image)
+	// Native dismissal must finish clearing the input before reselecting the same file.
+	await expect(page.locator('input[type=file]')).toHaveJSProperty('value', '')
+	await chooseAvatar()
 	await dialog.getByRole('button', { name: 'Accept crop' }).click()
 	await expect(dialog).toHaveCount(0)
 	await expect(page.getByRole('status', { name: 'Selected file' })).toHaveText('picked.png')

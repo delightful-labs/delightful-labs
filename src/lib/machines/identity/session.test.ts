@@ -1,5 +1,6 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, fromCallback, setup, waitFor } from 'xstate'
+import { createActor, createCallbackLogic, setup, waitFor, types } from 'xstate'
 import type { EventObject } from 'xstate'
 import type {
 	SessionOwnerReply,
@@ -33,7 +34,10 @@ function recipient<Event extends EventObject>() {
 	const events: Event[] = []
 	const actor = tracked(
 		createActor(
-			fromCallback<Event>(({ receive }) => receive((event) => events.push(event)))
+			createCallbackLogic<Event, undefined>(({ receive }) =>
+				receive((event) => events.push(event))
+			),
+			{ input: undefined }
 		).start()
 	)
 	return { actor, events }
@@ -80,7 +84,7 @@ async function closed(app: ReturnType<typeof attachment>) {
 		outcome: 'closed'
 	})
 	expect(app.actor.getSnapshot().context.owner).toBeUndefined()
-	expect(app.actor.getSnapshot().context.session).toBeUndefined()
+	expect(app.actor.getSnapshot().context.acquisition.session).toBeUndefined()
 	expect(app.actor.getSnapshot().context.scope).toBeUndefined()
 }
 afterEach(() => {
@@ -383,16 +387,31 @@ describe('startup attachment lifecycle', () => {
 	it('sanitizes an owner actor crash instead of restarting it', async () => {
 		const source = tracked(
 			createActor(
-				setup<{}, SessionOwnerEvent<Session> | { type: 'CRASH' }>({}).createMachine({
+				setup({
+					schemas: {
+						context: types<{}>(),
+						events: {
+							ACQUIRE:
+								types<EventPayload<SessionOwnerEvent<Session> | { type: 'CRASH' }, 'ACQUIRE'>>(),
+							RETRY_ACQUIRE:
+								types<
+									EventPayload<SessionOwnerEvent<Session> | { type: 'CRASH' }, 'RETRY_ACQUIRE'>
+								>(),
+							RELEASE:
+								types<EventPayload<SessionOwnerEvent<Session> | { type: 'CRASH' }, 'RELEASE'>>(),
+							CRASH: types<EventPayload<SessionOwnerEvent<Session> | { type: 'CRASH' }, 'CRASH'>>()
+						}
+					}
+				}).createMachine({
 					context: {},
 					initial: 'active',
 					states: {
 						active: {
 							on: {
-								CRASH: {
-									actions: () => {
+								CRASH: (args, enq) => {
+									enq(() => {
 										throw new Error('private owner crash')
-									}
+									})
 								}
 							}
 						}

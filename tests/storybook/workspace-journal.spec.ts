@@ -135,7 +135,7 @@ test('abort during native commit waits for actual completion and preserves the f
 		const actor = createActor(machine, {
 			input: { mode: 'write', key: record.key, record },
 			inspect: (inspection) => {
-				if (inspection.type === '@xstate.event' && inspection.event.type === 'TX_ABORTED')
+				if (inspection.type === '@xstate.transition' && inspection.event.type === 'TX_ABORTED')
 					fakeAborts++
 			}
 		})
@@ -320,7 +320,7 @@ for (const stage of ['opening', 'acquired', 'first-opening']) {
 				inspect(event) {
 					if (
 						stage === 'acquired' &&
-						event.type === '@xstate.event' &&
+						event.type === '@xstate.transition' &&
 						event.event.type === 'ACQUIRED'
 					) {
 						acquired = true

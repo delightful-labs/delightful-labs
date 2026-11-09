@@ -1,13 +1,14 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, expect, it } from 'vitest'
 import {
-	assign,
 	createActor,
-	fromPromise,
 	setup,
 	toPromise,
 	waitFor,
 	type InputFrom,
-	type Snapshot
+	type Snapshot,
+	createAsyncLogic,
+	types
 } from 'xstate'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import {
@@ -33,32 +34,66 @@ afterEach(() => {
 	for (const actor of actors) actor.stop()
 	actors.clear()
 })
-function controlled<Output, Input, Event extends { type: string }>(promise: Promise<Output>) {
-	const settle = fromPromise<Output>(() => promise)
-	return setup<
-		{ result: Output | undefined },
-		Event,
-		{ settle: typeof settle },
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		Output
-	>({ actors: { settle } }).createMachine({
+function controlled<Output, Input>(promise: Promise<Output>) {
+	const settle = createAsyncLogic<Output>({ run: () => promise })
+	return setup({
+		schemas: {
+			context: types<{ result: { value: Output } | undefined }>(),
+			events: {
+				CANCEL: types<EventPayload<FormChildEvent<ProfileObservation>, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<FormChildEvent<ProfileObservation>, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<FormChildEvent<ProfileObservation>, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<FormChildEvent<ProfileObservation>, 'OBSERVE'>>()
+			},
+			input: types<Input>()
+		},
+		actors: { settle }
+	}).createMachine({
 		initial: 'pending',
 		context: { result: undefined },
-		output: ({ context }) => {
+		output: ({ context }): Output => {
 			if (context.result === undefined) throw new Error('Missing test result')
-			return context.result
+			return context.result.value
 		},
 		states: {
 			pending: {
 				invoke: {
 					src: 'settle',
-					onDone: { target: 'done', actions: assign({ result: ({ event }) => event.output }) },
-					onError: 'failed'
+					onDone: (args) => {
+						return { target: 'done', context: { result: { value: args.event.output } } }
+					},
+					onError: { target: 'failed' }
+				}
+			},
+			done: { type: 'final' },
+			failed: { type: 'final' }
+		}
+	})
+}
+function controlledImage<Output, Input>(promise: Promise<Output>) {
+	const settle = createAsyncLogic<Output>({ run: () => promise })
+	return setup({
+		schemas: {
+			context: types<{ result: { value: Output } | undefined }>(),
+			events: { CANCEL: types<{}>(), SHUTDOWN: types<{}>() },
+			input: types<Input>()
+		},
+		actors: { settle }
+	}).createMachine({
+		initial: 'pending',
+		context: { result: undefined },
+		output: ({ context }): Output => {
+			if (context.result === undefined) throw new Error('Missing test result')
+			return context.result.value
+		},
+		states: {
+			pending: {
+				invoke: {
+					src: 'settle',
+					onDone: (args) => {
+						return { target: 'done', context: { result: { value: args.event.output } } }
+					},
+					onError: { target: 'failed' }
 				}
 			},
 			done: { type: 'final' },
@@ -71,12 +106,8 @@ function fixture(draft: ProfileAvatarDraft) {
 		write = deferred<WriteResult>()
 	const imageCommands: string[] = [],
 		writeCommands: string[] = []
-	const processImage = controlled<ProfileImageResult, ImageInput, { type: 'CANCEL' | 'SHUTDOWN' }>(
-		image.promise
-	)
-	const persistence = controlled<WriteResult, WriteInput, FormChildEvent<ProfileObservation>>(
-		write.promise
-	)
+	const processImage = controlledImage<ProfileImageResult, ImageInput>(image.promise)
+	const persistence = controlled<WriteResult, WriteInput>(write.promise)
 	const facts: ProfileObservation = {
 		identityId: 'member',
 		binding: {},
@@ -96,7 +127,7 @@ function fixture(draft: ProfileAvatarDraft) {
 		{
 			inspect(event) {
 				if (
-					event.type !== '@xstate.event' ||
+					event.type !== '@xstate.transition' ||
 					!('id' in event.actorRef) ||
 					!['CANCEL', 'INVALIDATE', 'SHUTDOWN'].includes(event.event.type)
 				)

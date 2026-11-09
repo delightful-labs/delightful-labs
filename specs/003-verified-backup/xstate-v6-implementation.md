@@ -1,6 +1,6 @@
 # XState v6 implementation review
 
-Status: implementation review candidate, 2026-11-09. Behavioral qualification pending.
+Status: implementation merged in PR #37 on 2026-11-09. Behavioral qualification in progress.
 PR: https://github.com/delightful-labs/delightful-local-first/pull/37
 
 ## Versions and baseline
@@ -79,12 +79,12 @@ Completed checks: `pnpm check:library` (zero Svelte errors/warnings and passing
 production TypeScript), changed-source Oxlint with denied warnings, Oxfmt,
 `git diff --check`, and `pnpm package` including strict Publint.
 
-Implementation tests and legacy fixtures have not been migrated or run. The
-repository requires user review and approval before adding or running them.
-Implementation commits use `[skip ci]` because the PR workflow runs those tests
-automatically; required CI remains pending until the review gate is cleared.
+Before PR #37 merged, implementation tests and legacy fixtures were not migrated
+or run because of the repository review gate. Those implementation commits used
+`[skip ci]` to avoid running tests before approval. The merge clears that gate for
+the merged implementation; post-merge qualification is recorded below.
 
-After approval:
+Qualification checklist:
 
 1. Migrate v5 test harnesses and fixtures, capture v5 traces from the baseline and
    compare v6 branch, cancellation, generation and terminal-output behavior.
@@ -106,4 +106,95 @@ See [the source audit and cross-repository acceptance criteria](xstate-v6-design
 It records the corrected final-state interpretation, pure release-token updates,
 queued native preparation, explicit choice nodes, private event origins, typed
 observer children and the journal request typestate. Behavioral qualification
-remains pending user review; earlier static results do not qualify these changes.
+is in progress after merge; earlier static results do not qualify these changes.
+
+## Post-merge qualification: session readiness
+
+PR #37 merged at `73de2bc`; the user's merge confirmation clears the
+implementation-test review gate for that merged code. The initial readiness slice changed no
+production implementation; CI qualification below expands that scope. The 25 existing readiness tests now use
+`createCallbackLogic` and the v6 `xstate.error.actor` protocol. Two deliberate
+system-event injections remain outside the public command union, with localized
+`@ts-expect-error` annotations. These check error-report handling, not an actual
+child crash; native observer read/setup/cleanup failures are exercised separately.
+
+`pnpm test:xstate-readiness` type-checks the two readiness test files and runs 27
+tests, including two `@xstate/test` campaigns against the production actor. The
+independent bound-observer contract compares status history, lifecycle and release
+count. It generates all five session statuses, foreign attachment and noncurrent
+observation reports, and shutdown. Shutdown also invokes a retained backend
+callback to verify it cannot publish after disposal. The property campaign uses
+seed `20261109`, 250 runs and up to 50 commands; it requires every command type and
+model state. Shortest paths stop after three statuses and use an exploration limit
+of 500, requiring all model states. Terminal shutdown ends a generated sequence.
+The existing suite retains retry, duplicate, failure and drain scenarios.
+
+`tsconfig.xstate-tests.json` is an incremental qualification target, not a
+replacement for the full check. Remaining legacy harnesses, native backup,
+packaged-consumer and browser/worker qualification are still outstanding. Generated
+shrunk failures are ignored locally and uploaded by CI on failure; promote fixed
+regressions to tracked replay fixtures as described in the design review.
+
+Validation of this slice: focused strict TypeScript and all 27 tests pass;
+changed-test Oxlint passes with denied warnings. Full `pnpm check` remains blocked
+by 184 errors in 22 other legacy test/consumer files. CI runs the focused target
+before the full check, and retains the full gate. This is not a green repository
+qualification or release-readiness claim.
+
+## PR #38 CI follow-up
+
+The failing Actions run `42644545685` stopped at the full `pnpm check`, with 184
+v5 harness errors. Remaining TypeScript and JavaScript fixtures now use v6
+schemas, function transitions, async/callback/step logic and transition inspection.
+Step-based report collectors ignore initialization; generic fake children retain
+complete immutable context records and their exact public event contracts.
+Fault-injection wrappers preserve the real machine lifecycle and throw at the
+selected transition, replacing overrides of v5 actions that no longer exist.
+No XState package, declaration, or required CI gate is patched or disabled.
+
+Runtime checks against the already merged implementation exposed six production
+corrections prepared in this follow-up:
+
+- `workspaces/creation-owner.ts`: invoke input captures the admitted binding;
+  the operation binding is recorded by entry, which runs after input selection.
+- `forms/write.ts`: the assessment token uses the next generation; entry increments
+  the owner's counter after invoke input is selected.
+- `identity/session-recovery.ts`, `workspaces/invitation-authority.ts` and
+  `workspaces/invitation-redemption.ts`: registered source names preserve supported
+  `provide({ actors })` replacement behavior at these customization boundaries.
+- `backup/restore-write-step.ts`: successful settlement/rollback enters a native
+  custody-clear state while the custodian is still alive. A synchronous callback
+  reports completion before the machine exits and stops its custodian. This avoids
+  handing an already settled transaction to detached recovery. It adds no Promise
+  or await to the transaction path and keeps uncertain/error custody intact.
+
+Static validation passes: full `pnpm check`, library check, test-app/native-capture/
+private-creation/packaged-consumer TypeScript, strict package validation, lint,
+formatting and whitespace checks. The user instructed restoration of the missing PR checks, authorizing the CI
+implementation tests. A normal follow-up commit restores both Actions checks;
+no skip marker is used for subsequent qualification commits. The full CI workflow
+remains enabled and unchanged in scope. All 949 unit tests now pass, including
+the production corrections above. Native, consumer and browser results are recorded below; require green CI before merging.
+
+### Full CI fixture qualification
+
+The complete gates also compile/run JavaScript and `.mjs` consumers. The bounded
+backup reader now declares v6 schemas and queues native chunk handling. Assembly
+is a synchronous callback leaf that reports completion before stream cleanup;
+all 17 reader tests pass. Fixture event payload types live beside the test app,
+so its emitted build uses public package subpaths and stays within its root.
+
+The full restore fixture now queues claim/preparation entry effects and routes
+from the immutable checkpoint already in chart context. It no longer reads a
+queued native metadata update during immediate eventless routing. All 72 restore
+browser tests pass; seven existing opt-in measurement cases remain skipped.
+Native backup qualification passes all 20 tests, private creation passes all 10,
+and the complete consumer gate passes, including its 12 archive checks.
+
+Upgrade interruption tests now hook the actual IndexedDB upgrade event before
+adapter handling; v6 inspection reports after the transition and cannot reproduce
+the old pre-delivery inspection hook. The avatar dismissal/reselection test uses
+the native file chooser and verifies input clearing before reselecting the same
+file; it passes five concurrent repetitions without retries or time sleeps.
+All 63 Storybook browser tests pass.
+The required full checks remain enabled; no qualification commit skips CI.

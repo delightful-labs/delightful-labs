@@ -1,4 +1,4 @@
-import { types, createAsyncLogic, setup, type Snapshot } from 'xstate'
+import { types, createAsyncLogic, createCallbackLogic, setup, type Snapshot } from 'xstate'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { sameBackupBinding } from '../../backup/binding.js'
@@ -76,6 +76,10 @@ export function createRestoreWriteStepMachine<
 		outcome: RestoreWriteResult['outcome']
 	}
 	const actors = {
+		clearCustody: createCallbackLogic<{ type: string }, Handle>(({ input, sendBack }) => {
+			clearTransactionCustody(native(input).custody)
+			sendBack({ type: 'CUSTODY_CLEARED' })
+		}),
 		journal: createRestoreJournalStepMachine(),
 		custodian: transactionCustodian<Transaction, Write>(),
 		remote: destination,
@@ -137,7 +141,8 @@ export function createRestoreWriteStepMachine<
 			events: {
 				CANCEL: types<EventPayload<RestoreEvent, 'CANCEL'>>(),
 				SHUTDOWN: types<EventPayload<RestoreEvent, 'SHUTDOWN'>>(),
-				INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>()
+				INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>(),
+				CUSTODY_CLEARED: types<{}>()
 			},
 			input: types<RestoreWriteInput>(),
 			output: types<RestoreWriteResult>()
@@ -730,17 +735,14 @@ export function createRestoreWriteStepMachine<
 						invoke: model.createInvoke<typeof actors.journal, Context>({
 							src: actors.journal,
 							input: journalInput,
-							onDone: (args, enq) => {
-								const { context: _context, event } = args
+							onDone: (args) => {
+								const { event } = args
 								if (journalUpdateSucceeded(event.output)) {
-									let context = args.context
 									let patch = {}
 									patch = { ...patch, record: requireRestoreValue(event.output.record) }
-									context = { ...args.context, ...patch }
-									enq(() => clearTransactionCustody(native(context.native).custody))
 
 									return {
-										target: '#restore-write-step.written',
+										target: '#restore-write-step.working.releasingWritten',
 										context: patch satisfies Partial<Context>
 									}
 								}
@@ -774,16 +776,24 @@ export function createRestoreWriteStepMachine<
 							}
 						})
 					},
+					// Keep the custodian alive until the native clear reports completion.
+					releasingWritten: {
+						invoke: { src: actors.clearCustody, input: handle },
+						on: { CUSTODY_CLEARED: { target: '#restore-write-step.written' } }
+					},
+					releasingRollback: {
+						invoke: { src: actors.clearCustody, input: handle },
+						on: { CUSTODY_CLEARED: { target: '#restore-write-step.complete' } }
+					},
+
 					rollingBack: {
 						invoke: model.createInvoke<typeof actors.rollback, Context>({
 							src: actors.rollback,
 							input: handle,
-							onDone: (args, enq) => {
+							onDone: (args) => {
 								if (args.event.output) {
-									enq(() => clearTransactionCustody(native(args.context.native).custody))
-
 									return {
-										target: '#restore-write-step.complete'
+										target: '#restore-write-step.working.releasingRollback'
 									}
 								}
 

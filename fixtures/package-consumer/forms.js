@@ -1,5 +1,5 @@
 // Domain-free readiness and actor-free outcome imports; no SDK, Svelte or browser context.
-import { createActor, fromTransition, toPromise } from 'xstate'
+import { createActor, createStepLogic, toPromise } from 'xstate'
 import { formInterruptionResult } from 'delightful-local-first/forms/contracts'
 import { createScopedFormReadinessMachine } from 'delightful-local-first/forms/readiness'
 
@@ -7,11 +7,12 @@ const scope = { attachment: {}, project: 'consumer' }
 const observation = { revision: 1, facts: { scope, allowed: true } }
 /** @typedef {typeof observation} Observation */
 /** @typedef {import('delightful-local-first/forms/contracts').FormChildEvent<Observation['facts']>} Event */
-const policy = fromTransition(
-	(/** @type {Observation} */ current, /** @type {Event} */ event) =>
-		event.type === 'OBSERVE' ? event.observation : current,
-	(/** @type {{ input: Observation }} */ { input }) => input
-)
+const policy = createStepLogic({
+	context: (/** @type {{input:Observation}} */ { input }) => input,
+	run: (/** @type {{context:Observation;event:Event}} */ { context, event }) => ({
+		context: event.type === 'OBSERVE' ? event.observation : context
+	})
+})
 const token = { requestId: 4, scopeRevision: 2, generation: 3 }
 const actor = createActor(
 	createScopedFormReadinessMachine({

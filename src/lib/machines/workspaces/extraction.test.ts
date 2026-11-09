@@ -1,26 +1,26 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { describe, it, expect, vi } from 'vitest'
-import { createActor, setup, toPromise } from 'xstate'
+import { createActor, setup, toPromise, types } from 'xstate'
 import { createWorkspaceInitialization } from './initialization.js'
 import { observeRow, observeRows } from '../../contracts/observation.js'
 import { profileScope, sameProfileScope } from '../identity/profile.js'
 
-const transaction = setup<
-	{},
-	{ type: 'CANCEL' } | { type: 'SHUTDOWN' },
-	{},
-	{},
-	{},
-	{},
-	never,
-	string,
-	{
-		db: unknown
-		attempt: { identityId: string; workspaceId: string }
-		purpose?: 'additional' | 'bootstrap'
-	},
-	{ outcome: string }
->({}).createMachine({
+const transaction = setup({
+	schemas: {
+		context: types<{}>(),
+		events: {
+			CANCEL: types<EventPayload<{ type: 'CANCEL' } | { type: 'SHUTDOWN' }, 'CANCEL'>>(),
+			SHUTDOWN: types<EventPayload<{ type: 'CANCEL' } | { type: 'SHUTDOWN' }, 'SHUTDOWN'>>()
+		},
+		input: types<{
+			db: unknown
+			attempt: { identityId: string; workspaceId: string }
+			purpose?: 'additional' | 'bootstrap'
+		}>()
+	}
+}).createMachine({
 	initial: 'done',
+	context: {},
 	states: { done: { type: 'final' } },
 	output: () => ({ outcome: 'committed' })
 })

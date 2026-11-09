@@ -1,4 +1,5 @@
-import { assign, fromPromise, raise, setup } from 'xstate'
+import type { EventPayload } from './restore-events.js'
+import { setup, createAsyncLogic, types } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type { RestoreEvent } from 'delightful-local-first/backup/restore'
 import { createRestoreJournalStepMachine } from 'delightful-local-first/backup/restore/workflow'
@@ -42,32 +43,39 @@ export function createTestAppRestorePlanningMachine() {
 	}
 	const actors = {
 		discover: createRestoreJournalStepMachine(),
-		graphHash: fromPromise<string, Input>(({ input }) => hashTestAppProjection(data(input).graph)),
-		preparationHash: fromPromise<string, Input>(({ input }) =>
-			hashTestAppProjection(data(input).preparation)
-		),
-		batchHash: fromPromise<string, Input & { index: number }>(({ input }) =>
-			hashTestAppProjection(required(data(input).batches[input.index]).contents)
-		),
-		activationHash: fromPromise<string, Input>(({ input }) =>
-			hashTestAppProjection(data(input).activation)
-		),
-		planHash: fromPromise<string, Input>(({ input }) =>
-			hashTestAppProjection(testAppCanonical(testAppPlan(data(input))))
-		)
+		graphHash: createAsyncLogic<string, Input>({
+			run: ({ input }) => hashTestAppProjection(data(input).graph)
+		}),
+		preparationHash: createAsyncLogic<string, Input>({
+			run: ({ input }) => hashTestAppProjection(data(input).preparation)
+		}),
+		batchHash: createAsyncLogic<string, Input & { index: number }>({
+			run: ({ input }) => hashTestAppProjection(required(data(input).batches[input.index]).contents)
+		}),
+		activationHash: createAsyncLogic<string, Input>({
+			run: ({ input }) => hashTestAppProjection(data(input).activation)
+		}),
+		planHash: createAsyncLogic<string, Input>({
+			run: ({ input }) => hashTestAppProjection(testAppCanonical(testAppPlan(data(input))))
+		})
 	}
-	const model = setup<
-		Context,
-		RestoreEvent | { type: 'PLANNING_DONE'; success: boolean } | { type: 'PLANNING_APPLIED' },
-		typeof actors,
-		{},
-		{ interrupt: undefined },
-		{ interrupted: undefined; currentBinding: undefined },
-		never,
-		string,
-		Input,
-		Result
-	>({
+	type Event =
+		| RestoreEvent
+		| { type: 'PLANNING_DONE'; success: boolean }
+		| { type: 'PLANNING_APPLIED' }
+	const model = setup({
+		schemas: {
+			output: types<Result>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				PLANNING_DONE: types<EventPayload<Event, 'PLANNING_DONE'>>(),
+				PLANNING_APPLIED: types<EventPayload<Event, 'PLANNING_APPLIED'>>()
+			},
+			input: types<Input>()
+		},
 		actors,
 		guards: {
 			interrupted: ({ context }) => context.interruption !== undefined,
@@ -75,27 +83,40 @@ export function createTestAppRestorePlanningMachine() {
 				event.type === 'INVALIDATE' && sameBackupBinding(context.binding, event.binding)
 		},
 		actions: {
-			interrupt: assign({
-				interruption: ({ context, event }) =>
-					context.interruption ??
-					(event.type === 'SHUTDOWN'
-						? 'closed'
-						: event.type === 'INVALIDATE'
-							? 'invalidated'
-							: 'cancelled')
+			interrupt: ({
+				context,
+				event
+			}: {
+				context: Context
+				event:
+					| RestoreEvent
+					| { type: 'PLANNING_DONE'; success: boolean }
+					| { type: 'PLANNING_APPLIED' }
+			}) => ({
+				context: {
+					interruption:
+						context.interruption ??
+						(event.type === 'SHUTDOWN'
+							? 'closed'
+							: event.type === 'INVALIDATE'
+								? 'invalidated'
+								: 'cancelled')
+				}
 			})
 		}
 	})
-	const synchronous = (operation: (context: Context) => boolean | void) =>
-		model.createAction(({ context, self }) => {
-			self.send({ type: 'PLANNING_DONE', success: planningSucceeded(() => operation(context)) })
-		})
+	type Entry = Extract<
+		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	const synchronous =
+		(operation: (context: Context) => boolean | void): Entry =>
+		({ context, self }, enq) => {
+			enq(() =>
+				self.send({ type: 'PLANNING_DONE', success: planningSucceeded(() => operation(context)) })
+			)
+		}
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
-	const failed = '#test-app-restore-plan.complete'
-	const interrupted = { guard: 'interrupted', target: failed } satisfies {
-		guard: 'interrupted'
-		target: string
-	}
 	return model.createMachine({
 		id: 'test-app-restore-plan',
 		initial: 'validating',
@@ -115,18 +136,26 @@ export function createTestAppRestorePlanningMachine() {
 		},
 		output: ({ context }) => ({ outcome: context.interruption ?? context.outcome }),
 		on: {
-			PLANNING_DONE: {
-				actions: [
-					assign({
-						planningSucceeded: ({ context, event }) =>
-							event.type === 'PLANNING_DONE' ? event.success : context.planningSucceeded
-					}),
-					raise({ type: 'PLANNING_APPLIED' })
-				]
+			PLANNING_DONE: (args, enq) => {
+				const { event } = args
+				enq.raise({ type: 'PLANNING_APPLIED' })
+				return {
+					context: {
+						planningSucceeded:
+							event.type === 'PLANNING_DONE' ? event.success : args.context.planningSucceeded
+					}
+				}
 			},
-			CANCEL: { actions: 'interrupt' },
-			SHUTDOWN: { actions: 'interrupt' },
-			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' }
+			CANCEL: (args) => {
+				return args.actions.interrupt(args)
+			},
+			SHUTDOWN: (args) => {
+				return args.actions.interrupt(args)
+			},
+			INVALIDATE: (args) => {
+				if (!args.guards.currentBinding(args)) return
+				return args.actions.interrupt(args)
+			}
 		},
 		states: {
 			validating: {
@@ -134,15 +163,19 @@ export function createTestAppRestorePlanningMachine() {
 					testAppProfile.validate(data(context).archive.readPayload())
 				),
 				on: {
-					PLANNING_APPLIED: [
-						interrupted,
-						{
-							guard: ({ context }) => context.planningSucceeded && context.mode === 'new',
-							target: 'allocating'
-						},
-						{ guard: ({ context }) => context.planningSucceeded, target: 'discovering' },
-						{ target: failed }
-					]
+					PLANNING_APPLIED: (args) => {
+						const { context } = args
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
+						}
+						if (context.planningSucceeded && context.mode === 'new') {
+							return { target: 'allocating' }
+						}
+						if (context.planningSucceeded) {
+							return { target: 'discovering' }
+						}
+						return { target: '#test-app-restore-plan.complete' }
+					}
 				}
 			},
 			discovering: {
@@ -153,21 +186,23 @@ export function createTestAppRestorePlanningMachine() {
 						databaseName: context.databaseName,
 						command: { mode: 'discover' }
 					}),
-					onDone: [
-						interrupted,
-						{
-							guard: ({ event }) =>
-								event.output.outcome === 'loaded' && event.output.record !== undefined,
-							target: 'projecting',
-							actions: ({ context, event }) => {
+					onDone: (args, enq) => {
+						const { event } = args
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
+						}
+						if (event.output.outcome === 'loaded' && event.output.record !== undefined) {
+							enq(() => {
+								const { context, event } = args
 								const record = required(event.output.record)
 								data(context).mappings = record.intent.plan.mappings
 								data(context).observedJournal = record
-							}
-						},
-						{ target: failed }
-					],
-					onError: failed
+							})
+							return { target: 'projecting' }
+						}
+						return { target: '#test-app-restore-plan.complete' }
+					},
+					onError: { target: '#test-app-restore-plan.complete' }
 				}
 			},
 			allocating: {
@@ -176,11 +211,15 @@ export function createTestAppRestorePlanningMachine() {
 					value.mappings = allocateTestAppMappings(value.archive.readPayload())
 				}),
 				on: {
-					PLANNING_APPLIED: [
-						interrupted,
-						{ guard: ({ context }) => context.planningSucceeded, target: 'projecting' },
-						{ target: failed }
-					]
+					PLANNING_APPLIED: (args) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
+						}
+						if (args.context.planningSucceeded) {
+							return { target: 'projecting' }
+						}
+						return { target: '#test-app-restore-plan.complete' }
+					}
 				}
 			},
 			projecting: {
@@ -188,27 +227,32 @@ export function createTestAppRestorePlanningMachine() {
 					projectTestAppGraph(data(context), data(context).observedJournal?.intent.plan)
 				}),
 				on: {
-					PLANNING_APPLIED: [
-						interrupted,
-						{ guard: ({ context }) => context.planningSucceeded, target: 'hashingGraph' },
-						{ target: failed }
-					]
+					PLANNING_APPLIED: (args) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
+						}
+						if (args.context.planningSucceeded) {
+							return { target: 'hashingGraph' }
+						}
+						return { target: '#test-app-restore-plan.complete' }
+					}
 				}
 			},
 			hashingGraph: {
 				invoke: {
 					src: 'graphHash',
 					input,
-					onDone: [
-						interrupted,
-						{
-							target: 'projectingControl',
-							actions: ({ context, event }) => {
-								data(context).graphSha256 = event.output
-							}
+					onDone: (args, enq) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
 						}
-					],
-					onError: failed
+						enq(() => {
+							const { context, event } = args
+							data(context).graphSha256 = event.output
+						})
+						return { target: 'projectingControl' }
+					},
+					onError: { target: '#test-app-restore-plan.complete' }
 				}
 			},
 			projectingControl: {
@@ -216,84 +260,91 @@ export function createTestAppRestorePlanningMachine() {
 					projectTestAppControl(data(context))
 				}),
 				on: {
-					PLANNING_APPLIED: [
-						interrupted,
-						{ guard: ({ context }) => context.planningSucceeded, target: 'hashingPreparation' },
-						{ target: failed }
-					]
+					PLANNING_APPLIED: (args) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
+						}
+						if (args.context.planningSucceeded) {
+							return { target: 'hashingPreparation' }
+						}
+						return { target: '#test-app-restore-plan.complete' }
+					}
 				}
 			},
 			hashingPreparation: {
 				invoke: {
 					src: 'preparationHash',
 					input,
-					onDone: [
-						interrupted,
-						{
-							target: 'hashingBatch',
-							actions: ({ context, event }) => {
-								data(context).preparationSha256 = event.output
-							}
+					onDone: (args, enq) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
 						}
-					],
-					onError: failed
+						enq(() => {
+							const { context, event } = args
+							data(context).preparationSha256 = event.output
+						})
+						return { target: 'hashingBatch' }
+					},
+					onError: { target: '#test-app-restore-plan.complete' }
 				}
 			},
 			hashingBatch: {
 				invoke: {
 					src: 'batchHash',
 					input: ({ context }) => ({ ...input({ context }), index: context.index }),
-					onDone: [
-						interrupted,
-						{
-							guard: ({ context }) => context.index + 1 < data(context).batches.length,
-							target: 'hashingBatch',
-							reenter: true,
-							actions: [
-								({ context, event }) => {
-									required(data(context).batches[context.index]).sha256 = event.output
-								},
-								assign({ index: ({ context }) => context.index + 1 })
-							]
-						},
-						{
-							target: 'hashingActivation',
-							actions: ({ context, event }) => {
+					onDone: (args, enq) => {
+						const { context } = args
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
+						}
+						if (context.index + 1 < data(context).batches.length) {
+							enq(() => {
+								const { context, event } = args
 								required(data(context).batches[context.index]).sha256 = event.output
+							})
+							return {
+								target: 'hashingBatch',
+								reenter: true,
+								context: { index: context.index + 1 }
 							}
 						}
-					],
-					onError: failed
+						enq(() => {
+							const { context, event } = args
+							required(data(context).batches[context.index]).sha256 = event.output
+						})
+						return { target: 'hashingActivation' }
+					},
+					onError: { target: '#test-app-restore-plan.complete' }
 				}
 			},
 			hashingActivation: {
 				invoke: {
 					src: 'activationHash',
 					input,
-					onDone: [
-						interrupted,
-						{
-							target: 'hashingPlan',
-							actions: ({ context, event }) => {
-								data(context).activationSha256 = event.output
-							}
+					onDone: (args, enq) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
 						}
-					],
-					onError: failed
+						enq(() => {
+							const { context, event } = args
+							data(context).activationSha256 = event.output
+						})
+						return { target: 'hashingPlan' }
+					},
+					onError: { target: '#test-app-restore-plan.complete' }
 				}
 			},
 			hashingPlan: {
 				invoke: {
 					src: 'planHash',
 					input,
-					onDone: [
-						interrupted,
-						{
-							target: 'buildingIntent',
-							actions: assign({ planSha256: ({ event }) => event.output })
+					onDone: (args) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
 						}
-					],
-					onError: failed
+						return { target: 'buildingIntent', context: { planSha256: args.event.output } }
+					},
+					onError: { target: '#test-app-restore-plan.complete' }
 				}
 			},
 			buildingIntent: {
@@ -302,14 +353,23 @@ export function createTestAppRestorePlanningMachine() {
 					value.intent = buildTestAppIntent(value, context.planSha256)
 				}),
 				on: {
-					PLANNING_APPLIED: [
-						interrupted,
-						{ guard: ({ context }) => context.planningSucceeded, target: 'planned' },
-						{ target: failed }
-					]
+					PLANNING_APPLIED: (args) => {
+						if (args.guards.interrupted(args)) {
+							return { target: '#test-app-restore-plan.complete' }
+						}
+						if (args.context.planningSucceeded) {
+							return { target: 'planned' }
+						}
+						return { target: '#test-app-restore-plan.complete' }
+					}
 				}
 			},
-			planned: { type: 'final', entry: assign({ outcome: 'planned' }) },
+			planned: {
+				type: 'final',
+				entry: () => {
+					return { context: { outcome: 'planned' } }
+				}
+			},
 			complete: { type: 'final' }
 		}
 	})

@@ -1,4 +1,5 @@
-import { forwardTo, raise, assign, setup, type Snapshot } from 'xstate'
+import type { EventPayload } from './restore-events.js'
+import { setup, type Snapshot, types } from 'xstate'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
 	RestoreEvent,
@@ -40,18 +41,21 @@ export function createTestAppRestorePreparationMachine<
 		plan: createTestAppRestorePlanningMachine(),
 		prepare: createRestoreMachine(writer, destination)
 	}
-	const model = setup<
-		Context,
-		RestoreEvent | { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' },
-		typeof actors,
-		{},
-		{ interrupt: undefined },
-		{ interrupted: undefined; currentBinding: undefined },
-		never,
-		string,
-		Input,
-		RestoreResult
-	>({
+	type Event = RestoreEvent | { type: 'RELEASE' | 'CLAIMED' | 'CLAIM_FAILED' }
+	const model = setup({
+		schemas: {
+			output: types<RestoreResult>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				RELEASE: types<EventPayload<Event, 'RELEASE'>>(),
+				CLAIMED: types<EventPayload<Event, 'CLAIMED'>>(),
+				CLAIM_FAILED: types<EventPayload<Event, 'CLAIM_FAILED'>>()
+			},
+			input: types<Input>()
+		},
 		actors,
 		guards: {
 			interrupted: ({ context }) => context.interruption !== undefined,
@@ -59,14 +63,16 @@ export function createTestAppRestorePreparationMachine<
 				event.type === 'INVALIDATE' && sameBackupBinding(context.binding, event.binding)
 		},
 		actions: {
-			interrupt: assign({
-				interruption: ({ context, event }) =>
-					context.interruption ??
-					(event.type === 'SHUTDOWN'
-						? 'closed'
-						: event.type === 'INVALIDATE'
-							? 'invalidated'
-							: 'cancelled')
+			interrupt: ({ context, event }: { context: Context; event: Event }) => ({
+				context: {
+					interruption:
+						context.interruption ??
+						(event.type === 'SHUTDOWN'
+							? 'closed'
+							: event.type === 'INVALIDATE'
+								? 'invalidated'
+								: 'cancelled')
+				}
 			})
 		}
 	})
@@ -90,48 +96,81 @@ export function createTestAppRestorePreparationMachine<
 			outcome: context.interruption ?? context.result.outcome
 		}),
 		on: {
-			CANCEL: { actions: 'interrupt' },
-			SHUTDOWN: { actions: 'interrupt' },
-			INVALIDATE: { guard: 'currentBinding', actions: 'interrupt' },
-			RELEASE: { actions: raise({ type: 'CANCEL' }) }
+			CANCEL: (args) => {
+				return args.actions.interrupt(args)
+			},
+			SHUTDOWN: (args) => {
+				return args.actions.interrupt(args)
+			},
+			INVALIDATE: (args) => {
+				if (!args.guards.currentBinding(args)) return
+				return args.actions.interrupt(args)
+			},
+			RELEASE: (args, enq) => {
+				enq.raise({ type: 'CANCEL' })
+			}
 		},
 		states: {
 			claiming: {
-				entry: ({ context, self }) =>
-					self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' }),
-				on: { CLAIMED: 'working', CLAIM_FAILED: 'complete' }
+				entry: ({ context, self }, enq) => {
+					enq(() => {
+						self.send({ type: claimTestAppRestore(context) ? 'CLAIMED' : 'CLAIM_FAILED' })
+					})
+				},
+				on: { CLAIMED: { target: 'working' }, CLAIM_FAILED: { target: 'complete' } }
 			},
 			working: {
 				initial: 'planning',
-				invoke: { src: 'resources', input, onError: 'complete' },
+				invoke: { src: 'resources', input, onError: { target: 'complete' } },
 				states: {
 					planning: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
 							id: 'effect',
 							src: 'plan',
 							input,
-							onDone: [
-								{ guard: 'interrupted', target: '#test-app-restore-preparation.complete' },
-								{
-									guard: ({ event }) => event.output.outcome === 'planned',
-									target: 'preparingDestination'
-								},
-								{ target: '#test-app-restore-preparation.complete' }
-							],
-							onError: '#test-app-restore-preparation.complete'
+							onDone: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#test-app-restore-preparation.complete' }
+								}
+								if (args.event.output.outcome === 'planned') {
+									return { target: 'preparingDestination' }
+								}
+								return { target: '#test-app-restore-preparation.complete' }
+							},
+							onError: { target: '#test-app-restore-preparation.complete' }
 						}
 					},
 					preparingDestination: {
 						on: {
-							CANCEL: { actions: ['interrupt', forwardTo('effect')] },
-							SHUTDOWN: { actions: ['interrupt', forwardTo('effect')] },
-							INVALIDATE: { guard: 'currentBinding', actions: ['interrupt', forwardTo('effect')] }
+							CANCEL: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							},
+							INVALIDATE: (args, enq) => {
+								if (!args.guards.currentBinding(args)) return
+								enq.sendTo('effect', args.event)
+								return args.actions.interrupt(args)
+							}
 						},
 
 						invoke: {
@@ -143,11 +182,13 @@ export function createTestAppRestorePreparationMachine<
 								writeId: required(data(context).intent).plan.preparation.writeId,
 								intent: required(data(context).intent)
 							}),
-							onDone: {
-								target: '#test-app-restore-preparation.complete',
-								actions: assign({ result: ({ event }) => event.output })
+							onDone: (args) => {
+								return {
+									target: '#test-app-restore-preparation.complete',
+									context: { result: args.event.output }
+								}
 							},
-							onError: '#test-app-restore-preparation.complete'
+							onError: { target: '#test-app-restore-preparation.complete' }
 						}
 					}
 				}

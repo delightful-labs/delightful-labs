@@ -730,11 +730,17 @@ for (const interruption of ['CANCEL', 'SHUTDOWN', 'release', 'stop', 'creationFa
 				const nativeOpen = indexedDB.open.bind(indexedDB),
 					nativeCreate = IDBDatabase.prototype.createObjectStore
 				let finishOpen = () => {}
+				let interrupt = () => {}
 				const openSettled = new Promise<void>((resolve) => {
 					finishOpen = resolve
 				})
 				indexedDB.open = (name, version) => {
 					const request = nativeOpen(name, version)
+					// Register before the adapter: interrupt at the native upgrade boundary.
+					request.addEventListener('upgradeneeded', () => {
+						observed = true
+						interrupt()
+					})
 					request.addEventListener('error', () => finishOpen())
 					request.addEventListener('success', () => finishOpen())
 					return request
@@ -752,17 +758,14 @@ for (const interruption of ['CANCEL', 'SHUTDOWN', 'release', 'stop', 'creationFa
 					command: { mode: 'initialize' }
 				})
 				const actor = api.createActor(api.createBrowserRestoreJournalMachine(), {
-					input: { request },
-					inspect(event) {
-						if (event.type === '@xstate.event' && event.event.type === 'UPGRADE_REQUESTED') {
-							observed = true
-							if (interruption === 'CANCEL') actor.send({ type: 'CANCEL' })
-							if (interruption === 'SHUTDOWN') actor.send({ type: 'SHUTDOWN' })
-							if (interruption === 'release') request.release()
-							if (interruption === 'stop') actor.stop()
-						}
-					}
+					input: { request }
 				})
+				interrupt = () => {
+					if (interruption === 'CANCEL') actor.send({ type: 'CANCEL' })
+					if (interruption === 'SHUTDOWN') actor.send({ type: 'SHUTDOWN' })
+					if (interruption === 'release') request.release()
+					if (interruption === 'stop') actor.stop()
+				}
 				try {
 					actor.start()
 					const output = interruption === 'stop' ? undefined : await api.toPromise(actor)

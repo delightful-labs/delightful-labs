@@ -18,9 +18,8 @@ export function testAppPreparationComplete(input: Input): boolean {
 		checkpoint !== undefined && checkpoint.kind !== 'conflict' && checkpoint.completed.length > 0
 	)
 }
-export function currentTestAppBatch(input: Input) {
-	const value = data(input),
-		record = value.observedJournal
+export function currentTestAppBatch(input: Input, record = data(input).observedJournal) {
+	const value = data(input)
 	if (!record || record.checkpoint.kind !== 'writing' || record.checkpoint.completed.length === 0)
 		return undefined
 	const batch = value.intent?.plan.batches[record.checkpoint.completed.length - 1]

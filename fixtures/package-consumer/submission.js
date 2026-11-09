@@ -1,5 +1,5 @@
 // Independent parser and finite operation: no Zod, Finance schema, SDK or browser globals.
-import { assign, createActor, fromPromise, setup, toPromise } from 'xstate'
+import { createActor, setup, types, toPromise, createAsyncLogic } from 'xstate'
 import { createScopedFormSubmissionMachine } from 'delightful-local-first/forms/submission'
 
 /** @typedef {{ name: string }} Values */
@@ -13,9 +13,23 @@ async function save({ input }) {
 }
 /** @typedef {import('delightful-local-first/forms/contracts').FormChildEvent<Facts>} Event */
 /** @typedef {{ input: Input; result: Output | undefined }} Context */
-/** @type {{ context?: Context; events?: Event; input?: Input; output?: Output }} */
-const types = {}
-const operation = setup({ types, actors: { save: fromPromise(save) } }).createMachine({
+/** @type {import('xstate').TypeSchema<Context>} */
+const contextSchema = types()
+/** @type {import('xstate').TypeSchema<Input>} */
+const inputSchema = types()
+/** @type {import('xstate').TypeSchema<Output>} */
+const outputSchema = types()
+/** @type {import('xstate').TypeSchema<Omit<Extract<Event,{type:'OBSERVE'}>,'type'>>} */
+const observeSchema = types()
+const operation = setup({
+	schemas: {
+		context: contextSchema,
+		input: inputSchema,
+		output: outputSchema,
+		events: { OBSERVE: observeSchema, CANCEL: types(), SHUTDOWN: types(), INVALIDATE: types() }
+	},
+	actors: { save: createAsyncLogic({ run: save }) }
+}).createMachine({
 	initial: 'saving',
 	context: ({ input }) => ({ input, result: undefined }),
 	output: ({ context }) => {
@@ -27,12 +41,16 @@ const operation = setup({ types, actors: { save: fromPromise(save) } }).createMa
 			invoke: {
 				src: 'save',
 				input: ({ context }) => context.input,
-				onDone: { target: 'finished', actions: assign({ result: ({ event }) => event.output }) },
-				onError: {
-					target: 'finished',
-					actions: assign({
-						result: { outcome: 'failed', code: 'operationFailed', settlement: 'unknown' }
-					})
+				onDone: (args) => {
+					return { target: 'finished', context: { result: args.event.output } }
+				},
+				onError: () => {
+					return {
+						target: 'finished',
+						context: {
+							result: { outcome: 'failed', code: 'operationFailed', settlement: 'unknown' }
+						}
+					}
 				}
 			}
 		},

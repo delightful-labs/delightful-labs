@@ -1,19 +1,20 @@
 // Exercise the built public protocol without importing a backend, provider, or Finance domain.
-import { createActor, fromTransition } from 'xstate'
+import { createActor, createStepLogic } from 'xstate'
 import {
 	createWorkspaceSelectionMachine,
 	selectWorkspaceLease
 } from 'delightful-local-first/workspace/workflow'
 import 'delightful-local-first/workspace/contracts'
 
-/**
- * @param {import('delightful-local-first/workspace/contracts').WorkspaceSelectionReport[]} reports
- * @param {import('delightful-local-first/workspace/contracts').WorkspaceSelectionReport} event
- */
-function append(reports, event) {
-	return [...reports, event]
-}
-const recipient = createActor(fromTransition(append, [])).start()
+/** @typedef {import('delightful-local-first/workspace/contracts').WorkspaceSelectionReport} Report */
+const recipient = createActor(
+	createStepLogic({
+		context: /** @returns {Report[]} */ () => [],
+		run: (/** @type {{context:Report[];event:Report}} */ { context, event }) => ({
+			context: event.type === 'WORKSPACE_DRAIN_REQUESTED' ? [...context, event] : context
+		})
+	})
+).start()
 const actor = createActor(createWorkspaceSelectionMachine(), {
 	input: { reportTo: recipient }
 }).start()

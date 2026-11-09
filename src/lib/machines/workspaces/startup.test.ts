@@ -1,5 +1,6 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assign, createActor, fromPromise, fromTransition, setup, waitFor } from 'xstate'
+import { createActor, createStepLogic, setup, waitFor, createAsyncLogic, types } from 'xstate'
 import { createWorkspaceStartupMachine } from './startup.js'
 import type {
 	InitializationRequest,
@@ -29,29 +30,42 @@ function fixture(userId: string | undefined) {
 			: undefined
 	)
 	const recipient = createActor(
-		fromTransition(
-			(events: InitializationStatusEvent[], event: InitializationStatusEvent) => [...events, event],
-			[]
-		)
+		createStepLogic({
+			context: (): InitializationStatusEvent[] => [],
+			run: ({
+				context,
+				event
+			}: {
+				context: InitializationStatusEvent[]
+				event: InitializationStatusEvent
+			}) => ({
+				context:
+					event.type !== 'INITIALIZATION_STATUS'
+						? context
+						: ((events: InitializationStatusEvent[], event: InitializationStatusEvent) => [
+								...events,
+								event
+							])(context, event)
+			})
+		})
 	).start()
 	actors.add(recipient)
 	const request: InitializationRequest = { status: 'ready', userId, generation: 1 }
 	type Control = { type: 'CANCEL' } | { type: 'SHUTDOWN' }
-	const initializeLeaf = fromPromise(({ input }: { input: Parameters<typeof initialize>[0] }) =>
-		initialize(input)
-	)
-	const initializeMachine = setup<
-		{ input: Parameters<typeof initialize>[0]; result: Result },
-		Control,
-		{ leaf: typeof initializeLeaf },
-		{},
-		{},
-		{},
-		never,
-		string,
-		Parameters<typeof initialize>[0],
-		Result
-	>({ actors: { leaf: initializeLeaf } }).createMachine({
+	const initializeLeaf = createAsyncLogic({
+		run: ({ input }: { input: Parameters<typeof initialize>[0] }) => initialize(input)
+	})
+	const initializeMachine = setup({
+		schemas: {
+			context: types<{ input: Parameters<typeof initialize>[0]; result: Result }>(),
+			events: {
+				CANCEL: types<EventPayload<Control, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Control, 'SHUTDOWN'>>()
+			},
+			input: types<Parameters<typeof initialize>[0]>()
+		},
+		actors: { leaf: initializeLeaf }
+	}).createMachine({
 		initial: 'pending',
 		context: ({ input }) => ({ input, result: { outcome: 'failed' } }),
 		output: ({ context }) => context.result,
@@ -60,30 +74,35 @@ function fixture(userId: string | undefined) {
 				invoke: {
 					src: 'leaf',
 					input: ({ context }) => context.input,
-					onDone: { target: 'done', actions: assign({ result: ({ event }) => event.output }) }
+					onDone: (args) => {
+						return { target: 'done', context: { result: args.event.output } }
+					}
 				}
 			},
 			done: { type: 'final' }
 		}
 	})
-	const seedLeaf = fromPromise(({ input }: { input: Parameters<typeof seed>[0] }) => seed(input))
-	const seedMachine = setup<
-		{ input: Parameters<typeof seed>[0] },
-		Control,
-		{ leaf: typeof seedLeaf },
-		{},
-		{},
-		{},
-		never,
-		string,
-		Parameters<typeof seed>[0],
-		undefined
-	>({ actors: { leaf: seedLeaf } }).createMachine({
+	const seedLeaf = createAsyncLogic({
+		run: ({ input }: { input: Parameters<typeof seed>[0] }) => seed(input)
+	})
+	const seedMachine = setup({
+		schemas: {
+			context: types<{ input: Parameters<typeof seed>[0] }>(),
+			events: {
+				CANCEL: types<EventPayload<Control, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Control, 'SHUTDOWN'>>()
+			},
+			input: types<Parameters<typeof seed>[0]>()
+		},
+		actors: { leaf: seedLeaf }
+	}).createMachine({
 		initial: 'pending',
 		context: ({ input }) => ({ input }),
 		output: () => undefined,
 		states: {
-			pending: { invoke: { src: 'leaf', input: ({ context }) => context.input, onDone: 'done' } },
+			pending: {
+				invoke: { src: 'leaf', input: ({ context }) => context.input, onDone: { target: 'done' } }
+			},
 			done: { type: 'final' }
 		}
 	})

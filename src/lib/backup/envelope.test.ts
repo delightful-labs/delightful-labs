@@ -478,7 +478,7 @@ describe('operation ownership, interruption and safe snapshots', () => {
 		const actor = createActor(createArchiveEnvelopeMachine(), {
 			input: { request },
 			inspect(event) {
-				if (event.type === '@xstate.event' && event.event.type === 'RELEASE') revocations += 1
+				if (event.type === '@xstate.transition' && event.event.type === 'RELEASE') revocations += 1
 			}
 		})
 		const snapshots: string[] = []

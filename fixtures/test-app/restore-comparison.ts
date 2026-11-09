@@ -1,4 +1,5 @@
-import { forwardTo, assign, fromPromise, setup } from 'xstate'
+import type { EventPayload } from './restore-events.js'
+import { setup, createAsyncLogic, types } from 'xstate'
 import type { Db, Transaction, schema } from 'jazz-tools'
 import {
 	restoreTransactionAccess,
@@ -106,36 +107,39 @@ export function createTestAppActivationDestination(db: Db, request: TestAppResto
 		result: RestoreDestinationResult
 	}
 	const actors = {
-		remote: fromPromise<TestAppComparison, Input>(({ input }) =>
-			db
-				.one(testAppDestinationGraphQuery(input.binding.workspaceId), { tier: 'remote' })
-				.then((row) => compareTestAppDestination(row, request))
-		),
-		read: fromPromise<TestAppComparison, Input>(({ input }) =>
-			restoreTransactionAccess(input).call((transaction) =>
-				transaction
-					.one(testAppDestinationGraphQuery(input.binding.workspaceId))
+		remote: createAsyncLogic<TestAppComparison, Input>({
+			run: ({ input }) =>
+				db
+					.one(testAppDestinationGraphQuery(input.binding.workspaceId), { tier: 'remote' })
 					.then((row) => compareTestAppDestination(row, request))
-			)
-		),
+		}),
+		read: createAsyncLogic<TestAppComparison, Input>({
+			run: ({ input }) =>
+				restoreTransactionAccess(input).call((transaction) =>
+					transaction
+						.one(testAppDestinationGraphQuery(input.binding.workspaceId))
+						.then((row) => compareTestAppDestination(row, request))
+				)
+		}),
 		write: createTestAppDestinationWriteMachine(db, (transaction, input) => {
 			transaction.update(testAppRestoreApp.restoreDestinations, input.binding.workspaceId, {
 				status: 'active'
 			})
 		})
 	}
-	const model = setup<
-		Context,
-		RestoreEvent,
-		typeof actors,
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		RestoreDestinationResult
-	>({ actors })
+	const model = setup({
+		schemas: {
+			output: types<RestoreDestinationResult>(),
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<RestoreEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<RestoreEvent, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>()
+			},
+			input: types<Input>()
+		},
+		actors
+	})
 
 	const input = ({ context }: { context: Context }) => context.input
 	return model.createMachine({
@@ -144,77 +148,92 @@ export function createTestAppActivationDestination(db: Db, request: TestAppResto
 		context: ({ input }) => ({ input, interruption: undefined, result: 'unavailable' }),
 		output: ({ context }) => context.interruption ?? context.result,
 		on: {
-			CANCEL: {
-				actions: assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' })
+			CANCEL: (args) => {
+				return { context: { interruption: args.context.interruption ?? 'cancelled' } }
 			},
-			SHUTDOWN: {
-				actions: assign({ interruption: ({ context }) => context.interruption ?? 'closed' })
+			SHUTDOWN: (args) => {
+				return { context: { interruption: args.context.interruption ?? 'closed' } }
 			},
-			INVALIDATE: {
-				guard: ({ context, event }) => sameBackupBinding(context.input.binding, event.binding),
-				actions: assign({ interruption: ({ context }) => context.interruption ?? 'invalidated' })
+			INVALIDATE: (args) => {
+				const { context } = args
+				if (!sameBackupBinding(context.input.binding, args.event.binding)) return
+				return { context: { interruption: context.interruption ?? 'invalidated' } }
 			}
 		},
 		states: {
 			admitting: {
-				always: [
-					{
-						guard: ({ context }) =>
-							context.input.step.writeId !== context.input.intent.plan.activation.writeId,
-						target: 'conflict'
-					},
-					{ guard: ({ context }) => context.input.operation === 'remote', target: 'remote' },
-					{ guard: ({ context }) => context.input.operation === 'read', target: 'read' },
-					{ target: 'writing' }
-				]
+				always: (args) => {
+					const { context } = args
+					if (context.input.step.writeId !== context.input.intent.plan.activation.writeId) {
+						return { target: 'conflict' }
+					}
+					if (context.input.operation === 'remote') {
+						return { target: 'remote' }
+					}
+					if (context.input.operation === 'read') {
+						return { target: 'read' }
+					}
+					return { target: 'writing' }
+				}
 			},
 			remote: {
 				invoke: {
 					src: 'remote',
 					input,
-					onDone: [
-						{ guard: ({ context }) => context.interruption !== undefined, target: 'complete' },
-						{ guard: ({ event }) => event.output === 'activeMatch', target: 'match' },
-						{ guard: ({ event }) => event.output === 'incompleteMatch', target: 'missing' },
-						{ guard: ({ event }) => event.output === 'conflict', target: 'conflict' },
-						{ target: 'complete' }
-					],
-					onError: 'unavailable'
+					onDone: (args) => {
+						const { event } = args
+						if (args.context.interruption !== undefined) {
+							return { target: 'complete' }
+						}
+						if (event.output === 'activeMatch') {
+							return { target: 'match' }
+						}
+						if (event.output === 'incompleteMatch') {
+							return { target: 'missing' }
+						}
+						if (event.output === 'conflict') {
+							return { target: 'conflict' }
+						}
+						return { target: 'complete' }
+					},
+					onError: { target: 'unavailable' }
 				}
 			},
 			read: {
 				invoke: {
 					src: 'read',
 					input,
-					onDone: [
-						{ guard: ({ context }) => context.interruption !== undefined, target: 'complete' },
-						{ guard: ({ event }) => event.output === 'incompleteMatch', target: 'missing' },
-						{ guard: ({ event }) => event.output === 'conflict', target: 'conflict' },
-						{ target: 'complete' }
-					],
-					onError: 'unavailable'
+					onDone: (args) => {
+						const { event } = args
+						if (args.context.interruption !== undefined) {
+							return { target: 'complete' }
+						}
+						if (event.output === 'incompleteMatch') {
+							return { target: 'missing' }
+						}
+						if (event.output === 'conflict') {
+							return { target: 'conflict' }
+						}
+						return { target: 'complete' }
+					},
+					onError: { target: 'unavailable' }
 				}
 			},
 			writing: {
 				on: {
-					CANCEL: {
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'cancelled' }),
-							forwardTo('write')
-						]
+					CANCEL: (args, enq) => {
+						enq.sendTo('write', args.event)
+						return { context: { interruption: args.context.interruption ?? 'cancelled' } }
 					},
-					SHUTDOWN: {
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'closed' }),
-							forwardTo('write')
-						]
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('write', args.event)
+						return { context: { interruption: args.context.interruption ?? 'closed' } }
 					},
-					INVALIDATE: {
-						guard: ({ context, event }) => sameBackupBinding(context.input.binding, event.binding),
-						actions: [
-							assign({ interruption: ({ context }) => context.interruption ?? 'invalidated' }),
-							forwardTo('write')
-						]
+					INVALIDATE: (args, enq) => {
+						const { context } = args
+						if (!sameBackupBinding(context.input.binding, args.event.binding)) return
+						enq.sendTo('write', args.event)
+						return { context: { interruption: context.interruption ?? 'invalidated' } }
 					}
 				},
 
@@ -222,13 +241,30 @@ export function createTestAppActivationDestination(db: Db, request: TestAppResto
 					id: 'write',
 					src: 'write',
 					input,
-					onDone: { target: 'complete', actions: assign({ result: ({ event }) => event.output }) },
-					onError: 'unavailable'
+					onDone: (args) => {
+						return { target: 'complete', context: { result: args.event.output } }
+					},
+					onError: { target: 'unavailable' }
 				}
 			},
-			match: { type: 'final', entry: assign({ result: 'match' }) },
-			missing: { type: 'final', entry: assign({ result: 'missingOrHidden' }) },
-			conflict: { type: 'final', entry: assign({ result: 'conflict' }) },
+			match: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'match' } }
+				}
+			},
+			missing: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'missingOrHidden' } }
+				}
+			},
+			conflict: {
+				type: 'final',
+				entry: () => {
+					return { context: { result: 'conflict' } }
+				}
+			},
 			unavailable: { type: 'final' },
 			complete: { type: 'final' }
 		}

@@ -396,7 +396,8 @@ export function createScopedFormWriteMachine<
 							token: {
 								requestId: request(context).id,
 								scopeRevision: request(context).scopeRevision,
-								generation: context.assessmentGeneration
+								// Invoke input is selected before entry increments the generation.
+								generation: context.assessmentGeneration + 1
 							}
 						}
 					}),

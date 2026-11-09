@@ -337,7 +337,7 @@ describe('inspection lifecycle', () => {
 		const actor = createActor(createArchiveInspectionMachine(), {
 			input: { request },
 			inspect(event) {
-				if (event.type === '@xstate.event' && event.event.type === 'RELEASE') revocations += 1
+				if (event.type === '@xstate.transition' && event.event.type === 'RELEASE') revocations += 1
 			}
 		})
 		actor.start()

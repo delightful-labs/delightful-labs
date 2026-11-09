@@ -1,5 +1,6 @@
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assign, createActor, fromPromise, fromTransition, setup, waitFor } from 'xstate'
+import { createActor, createStepLogic, setup, waitFor, createAsyncLogic, types } from 'xstate'
 import { createScopedFormSubmissionMachine } from './submission.js'
 import type {
 	FormChildEvent,
@@ -43,18 +44,19 @@ function fixture(report = true) {
 		() => undefined
 	)
 	const schema = { parseAsync: vi.fn((_value: unknown) => validation.promise) }
-	const operation = setup<
-		{ input: Input; result: Output | undefined },
-		FormChildEvent<Facts>,
-		{ complete: ReturnType<typeof fromPromise<Output>> },
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		Output
-	>({ actors: { complete: fromPromise<Output>(() => completion.promise) } }).createMachine({
+	const operation = setup({
+		schemas: {
+			context: types<{ input: Input; result: Output | undefined }>(),
+			events: {
+				CANCEL: types<EventPayload<FormChildEvent<Facts>, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<FormChildEvent<Facts>, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<FormChildEvent<Facts>, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<FormChildEvent<Facts>, 'OBSERVE'>>()
+			},
+			input: types<Input>()
+		},
+		actors: { complete: createAsyncLogic<Output>({ run: () => completion.promise }) }
+	}).createMachine({
 		initial: 'working',
 		context: ({ input }) => {
 			started(input)
@@ -68,14 +70,28 @@ function fixture(report = true) {
 			working: {
 				invoke: {
 					src: 'complete',
-					onDone: { target: 'done', actions: assign({ result: ({ event }) => event.output }) },
-					onError: 'crashed'
+					onDone: (args) => {
+						return { target: 'done', context: { result: args.event.output } }
+					},
+					onError: { target: 'crashed' }
 				},
 				on: {
-					OBSERVE: { actions: ({ event }) => received(event) },
-					CANCEL: { actions: ({ event }) => received(event) },
-					INVALIDATE: { actions: ({ event }) => received(event) },
-					SHUTDOWN: { actions: ({ event }) => received(event) }
+					OBSERVE: (args, enq) => {
+						const { event } = args
+						enq(() => received(event))
+					},
+					CANCEL: (args, enq) => {
+						const { event } = args
+						enq(() => received(event))
+					},
+					INVALIDATE: (args, enq) => {
+						const { event } = args
+						enq(() => received(event))
+					},
+					SHUTDOWN: (args, enq) => {
+						const { event } = args
+						enq(() => received(event))
+					}
 				}
 			},
 			done: { type: 'final' },
@@ -91,13 +107,24 @@ function fixture(report = true) {
 	const request = { id: 11, scope, scopeRevision: 5, values: { name: ' Raw ' }, checkpoint }
 	const observation: FormObservation<Facts> = { revision: 1, facts: { scope, version: 1 } }
 	const reporter = createActor(
-		fromTransition(
-			(events: FormSubmissionProgressEvent[], event: FormSubmissionProgressEvent) => [
-				...events,
+		createStepLogic({
+			context: (): FormSubmissionProgressEvent[] => [],
+			run: ({
+				context,
 				event
-			],
-			[]
-		)
+			}: {
+				context: FormSubmissionProgressEvent[]
+				event: FormSubmissionProgressEvent
+			}) => ({
+				context:
+					event.type !== 'FORM_SUBMISSION_PROGRESS'
+						? context
+						: ((events: FormSubmissionProgressEvent[], event: FormSubmissionProgressEvent) => [
+								...events,
+								event
+							])(context, event)
+			})
+		})
 	).start()
 	actors.add(reporter)
 	const actor = createActor(

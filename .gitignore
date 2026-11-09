@@ -25,3 +25,6 @@ project.inlang/*.sqlite*
 playwright-report/
 test-results/
 .pnpm-store/v10/
+
+# Automatically shrunk XState failures; promote fixed regressions to tracked fixtures.
+.xstate-test/
