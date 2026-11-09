@@ -81,3 +81,42 @@ exhaustive evidence.
 Coordinated adoption remains DUI → DLF → Clipper/Finance by complete connected
 actor graphs. Independent DUI roots do not permit passing v5 refs into v6 actors.
 local-first-ux-patterns remains outside the migration.
+
+## Generated testing with the v6 test beta
+
+Use the published `@xstate/test@2.0.0-beta.0` with its required peer
+`fast-check@4.10.2` for generated machine coverage. These are experimental APIs;
+keep exact versions and review changes on upgrade. Zod and Effect are optional,
+not prerequisites. See the [model-based testing guide](https://stately.ai/docs/xstate/v6/model-based-testing)
+and the README shipped with the installed test package.
+
+Prefer `propertyTest` for varied command sequences and shrinking, and `testPaths`
+for bounded reachable paths. Use an independent product contract with a real actor
+or adapter as `sut`; compare observed behavior through `read` and `projectModel`.
+Do not implement the SUT by copying the expected model snapshot. Declare generators
+explicitly for type-only event schemas. Keep bounds, seeds and coverage thresholds
+visible, and distinguish generated coverage from exhaustive proof. Shortest paths
+omit ignored/self-loop commands; exercise rejection and duplicates in generated
+sequences and targeted regressions.
+
+For asynchronous actors use executed mode with generated outcomes where appropriate.
+Scheduler exploration covers only work instrumented through that scheduler; it does
+not prove all browser, worker, Jazz or native interleavings. Preserve integration
+coverage for actual cleanup, cancellation, persistence and realm boundaries.
+
+Use the library failure store (`failures` with a stable key) to retain shrunk traces,
+ignore `.xstate-test/` in source control, and upload it on CI failure once campaigns
+are enabled. Promote meaningful fixed failures into tracked regression fixtures
+using `replayTest` with `expect: 'pass'`; the automatic store removes fixed failures.
+Do not build another custom sequence runner or patch XState/test declarations.
+
+DUI pilot: `pnpm test:model` runs the independent SwipeActions button contract
+against the production actor. It compares open/closed side and the complete emitted
+choice history, including disabled and wrong-side choices, close and reset. The
+property campaign uses seed `20261109`, 250 runs and at most 60 commands, requiring
+all seven command types. The shortest-path campaign stops at two selections,
+limits exploration to 500, and requires every model state. It covers neither drag
+thresholds nor DOM behavior; retain the existing unit and Playwright suites.
+The production machine's custom emitted schema currently conflicts with the test
+beta's generic source constraint under strict typing; the independent contract
+source avoids that limitation through supported APIs, without casts or overrides.

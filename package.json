@@ -16,7 +16,8 @@
 		"storybook": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
 		"storybook:network": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
 		"build-storybook": "storybook build --disable-telemetry",
-		"test:storybook": "storybook build --config-dir tests/storybook --output-dir storybook-test-static --disable-telemetry && playwright test --config playwright.storybook.config.js"
+		"test:storybook": "storybook build --config-dir tests/storybook --output-dir storybook-test-static --disable-telemetry && playwright test --config playwright.storybook.config.js",
+		"test:model": "vitest run src/swipe-actions.model.test.ts"
 	},
 	"exports": {
 		".": {
@@ -50,9 +51,11 @@
 		"@types/node": "^22.20.5",
 		"@typescript-eslint/eslint-plugin": "^8.71.2",
 		"@typescript-eslint/parser": "^8.71.2",
+		"@xstate/test": "2.0.0-beta.0",
 		"eslint": "^10.12.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.23.1",
+		"fast-check": "4.10.2",
 		"globals": "^17.13.0",
 		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.1.1",

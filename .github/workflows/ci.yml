@@ -48,3 +48,11 @@ jobs:
             test-results/
           retention-days: 14
           if-no-files-found: ignore
+      - name: Upload generated test failures
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: xstate-test-failures
+          path: .xstate-test/
+          retention-days: 14
+          if-no-files-found: ignore
