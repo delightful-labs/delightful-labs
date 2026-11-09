@@ -14,3 +14,5 @@
 - Use the repository Oxlint and Oxfmt configurations and avoid unrelated formatting.
 - When starting a development server, tell the user and provide its URL.
 - Never commit or publish without explicit authorization.
+
+- For v6 machine testing, follow the generated-testing section in `specs/003-verified-backup/xstate-v6-design-review.md`: prefer `@xstate/test` campaigns with independent behavioral oracles; preserve integration tests and existing implementation-review gates.
