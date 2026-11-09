@@ -208,7 +208,9 @@ rather than asking the owner to choose infrastructure without evidence.
 - DNS edit access, isolated preview/production configuration, and any snapshot
   store setup before deployment.
 
-This is the research phase, not a completed Spec Kit implementation plan. The
-data model, interface contracts, executable validation guide, and implementation
-tasks should follow once the target publication is identified and the relevant
-integration proofs are scoped.
+The foundation now has an [implementation plan](plan.md), [data model](data-model.md),
+[reader contracts](contracts/reader.md), [validation guide](quickstart.md), and
+[task tracking](tasks.md). A native Svelte public-source proof is implemented and
+verified; see [verification.md](verification.md). Publication mutation, hosted
+canonical settings, durable caching, archive import and production cutover remain
+separate gates and are not claimed complete by the foundation.
