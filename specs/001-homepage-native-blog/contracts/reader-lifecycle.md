@@ -63,3 +63,33 @@ unconfigured reads, initial loads, concurrent callers, fresh hits, refreshes,
 stale failure/recovery, expiry during a pending refresh, retries, cancellation,
 cleared waiters, and ignored late results. `tests/reader.test.ts` checks the actual
 loader and the missing-site/malformed-envelope regression.
+
+## Snapshot loading stages
+
+`load-snapshot.ts` owns one short-lived `snapshotMachine` actor per refresh and
+bridges the reader's abort signal to that actor. The machine invokes one stage at
+a time; each asynchronous stage owns its transport cancellation signal.
+
+```mermaid
+stateDiagram-v2
+    [*] --> resolvingIdentity
+    resolvingIdentity --> readingInitialCommit
+    readingInitialCommit --> readingPublication
+    readingPublication --> enumeratingRecords
+    enumeratingRecords --> normalizingArticles
+    normalizingArticles --> verifyingCommit
+    verifyingCommit --> complete
+    complete --> [*]
+```
+
+Any stage error terminates the load and propagates the original error to the
+reader's refresh lifecycle. Cancellation aborts the current stage and rejects the
+load without starting later stages. No intermediate result becomes a snapshot.
+The final stage checks the repository commit before assigning `verifiedAt`.
+The original refresh start time is shared by all RPC stages, preserving the
+existing total time budget. Pagination and normalization remain focused functions;
+the machine coordinates their lifetimes rather than modeling each record as a
+state. No automatic stage retries or partial-scan resumption are introduced.
+
+Tests cover ordered completion, failure at every stage, and cancellation at every
+stage (including blob loading during article normalization).

@@ -8,7 +8,7 @@ publication migration or hosting cutover.
 
 - `pnpm install --frozen-lockfile`: reproducible installation from the committed
   local UI artifact and lockfile.
-- `pnpm test`: 29 behavior checks covering pagination, exact publication
+- `pnpm test`: 42 behavior checks covering pagination, exact publication
   filtering, owner mismatch, empty config, failed initial fetch, coalesced reads,
   stale age limits, confirmed removal, changed/incomplete scans, malformed records,
   UTF-8/overlapping facets, unsafe links, member boundaries, unknown blocks and
@@ -87,3 +87,9 @@ third-party article bodies and images are not committed as site content.
 - Vercel project inspection returned HTTP 403 for the connected team. A consent
   link was supplied; no Vercel project or deployment was created and no domains
   or DNS records were changed. The GitHub CI run will be separate hosted evidence.
+
+## Snapshot machine follow-up
+
+Snapshot loading now uses six explicit XState v6 stages. Thirteen additional
+checks verify ordered completion and error/cancellation at every stage. All 42
+tests and Svelte/TypeScript checks pass. The Vercel adapter build succeeds.
