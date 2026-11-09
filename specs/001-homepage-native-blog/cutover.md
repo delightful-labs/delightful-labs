@@ -56,5 +56,5 @@ Do not delete Leaflet posts or rewrite their stable identities during rollback.
 ## Accepted limits
 
 Canonical alignment with Leaflet remains unresolved and nonblocking. Body
-heading fragment IDs are not provided by the accepted renderer. Old title and
-main landmark IDs are preserved; the renderer has not been patched.
+heading fragment IDs are not provided by the accepted renderer. The main landmark ID is preserved; legacy title IDs are not added. The renderer
+has not been patched.

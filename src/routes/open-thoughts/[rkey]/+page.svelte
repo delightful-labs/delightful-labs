@@ -17,7 +17,7 @@
 </svelte:head>
 <article>
   <header>
-    <Heading level="h1" id={data.legacyTitleId}>{data.article.title}</Heading>
+    <Heading level="h1">{data.article.title}</Heading>
     <time datetime={data.article.publishedAt}
       >{formatDate(data.article.publishedAt)}</time
     >

@@ -43,7 +43,7 @@ to the new Atom endpoint. Preserve the original opaque `example.com` entry IDs
 for subscription continuity; destination links use the native site. New posts use
 their complete AT URI as their feed identity. Feeds reuse the article renderer.
 
-The page title and `main` landmark retain their old IDs. Body heading fragments
+The `main` landmark retains its ID. Legacy title IDs are not added. Body heading fragments
 remain limited by the accepted Standard Reader renderer; no custom renderer or
 typography has been added. Canonical alignment is a nonblocking research item.
 

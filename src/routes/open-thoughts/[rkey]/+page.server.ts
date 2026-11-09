@@ -1,7 +1,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import { canonicalOrigin } from "#lib/server/leaflet/service.ts";
 import { readPublication } from "#lib/server/publication/read.ts";
-import { archivePosts, archivedPost } from "#lib/server/publication/archive.ts";
+import { archivePosts } from "#lib/server/publication/archive.ts";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params, url }) => {
@@ -15,6 +15,5 @@ export const load: PageServerLoad = async ({ params, url }) => {
   return {
     article,
     canonical: `${canonicalOrigin()}${article.path}`,
-    legacyTitleId: archivedPost(article.uri)?.slug,
   };
 };
