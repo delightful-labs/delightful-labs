@@ -304,3 +304,14 @@ it also contains account fields and eight unclassified entries.
 Owner publication identity is now verified and enumeration is empty. The hosted
 external canonical URL/edit/settings workflow is still unproved; current source
 findings and the concrete proof checklist are in [canonical-proof.md](canonical-proof.md).
+
+
+## First quiet publication proved
+
+Following explicit owner approval, the ecosystem article was quietly published
+as `site.standard.document/3mzvkf4zddc2n`. The original public date, complete body,
+links/lists/headings, uploaded image and native Preview initial HTML/browser
+rendering were verified; see [verification.md](verification.md). Its public record
+mapping and proof metadata are now in the migration manifest. The other five
+articles remain unimported. Canonical alignment, old slug/fragment compatibility,
+feeds and production cutover remain separate open work.

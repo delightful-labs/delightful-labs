@@ -152,3 +152,48 @@ The owner's publication still has URL `https://open-thoughts.leaflet.pub` and ze
 matching documents after complete enumeration. External-subpath persistence is
 not yet proved. See [canonical-proof.md](canonical-proof.md) for source evidence,
 the authenticated workflow still required, and an unsent support request.
+
+
+## First owner-approved quiet publication
+
+The owner explicitly approved publishing the ecosystem article quietly as the
+first integration proof while external canonical URL support remains unresolved.
+The real Leaflet editor created and saved an editable draft from the preserved
+Markdown. The original chart was uploaded through the editor. Title, complete
+body, links and image survived reload; Leaflet's documented read API also returned
+the eight correct heading levels and one image. Draft/edit capability URLs are
+not committed to this public repository.
+
+The publish wizard was set to November 14, 2022 at midnight America/New_York.
+Date and quiet-sharing choices survived a reload. “Post Quietly” was checked;
+Bluesky sharing and Discover were unchecked. The final publish action reported
+“Published!”. Public PDS retrieval then verified:
+
+- URI: `at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvkf4zddc2n`.
+- CID: `bafyreifncz3hegl25dzfajuzaixqgiyht7cp5qclcmbgrnpljslo47eadi`.
+- Exact publication membership and path `/3mzvkf4zddc2n`.
+- `publishedAt: 2022-11-14T05:00:00.000Z`, preserving the public calendar date;
+  this chosen date-only normalization is not a recovered original timestamp.
+- `preferences.showInDiscover: false`; no Bluesky `postRef`.
+- Public source: https://open-thoughts.leaflet.pub/3mzvkf4zddc2n.
+- Explicit Leaflet source-view fallback also returned the full article without
+  redirecting away from that route.
+
+Native Preview:
+https://delightful-labs-gou5e192e-mjamesderochers-projects.vercel.app/open-thoughts/3mzvkf4zddc2n/
+
+The initial HTML returned 200 with the article body, all eight headings, image,
+canonical tag, and exact `rel="site.standard.document"` reference. In the browser,
+the normalized body matched all 6,448 source characters after removing Markdown
+syntax/image markup. It retained four numbered items, five bullet items, nine
+bold spans, one emphasis span, and all three original external links. The chart
+loaded directly from the public PDS at 1280 × 853; there were zero iframes.
+The only browser resource error was the foundation's absent `/favicon.ico`.
+
+Remaining limits: native heading IDs are empty under the accepted renderer, so
+legacy heading fragments are not yet preserved. The planned human-readable slug
+alias is not implemented. Leaflet's source page still declares its Leaflet URL
+canonical while native Preview declares the intended main-site route; this
+owner-approved proof does not resolve that temporary conflict. Native feeds,
+remaining imports, production configuration, DNS and redirects remain outstanding.
+No publication settings, primary URL or DNS records were changed for this proof.

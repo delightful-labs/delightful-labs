@@ -134,13 +134,46 @@
           "alt": ""
         }
       ],
-      "leafletDocumentUri": null,
-      "migrationStatus": "not-imported",
+      "leafletDocumentUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvkf4zddc2n",
+      "migrationStatus": "published-proof",
       "legacyAtomId": "https://example.com/blog/a-tools-for-thought-ecosystem/",
       "legacyAtomLink": "https://example.com/blog/a-tools-for-thought-ecosystem/",
       "legacyLandmarkIds": [
         "main"
-      ]
+      ],
+      "nativeRecordPath": "/open-thoughts/3mzvkf4zddc2n/",
+      "leafletSourceUrl": "https://open-thoughts.leaflet.pub/3mzvkf4zddc2n",
+      "publicationProof": {
+        "verifiedAt": "2026-11-09T18:29:07.772661+00:00",
+        "recordCid": "bafyreifncz3hegl25dzfajuzaixqgiyht7cp5qclcmbgrnpljslo47eadi",
+        "publishedAt": "2022-11-14T05:00:00.000Z",
+        "datePolicy": "Original public date selected as midnight America/New_York; this retains November 14 in the native UTC date formatter. This is not a recovered original creation timestamp.",
+        "postQuietly": true,
+        "showInDiscover": false,
+        "blueskyPostRef": null,
+        "imageBlobCid": "bafkreibwlt6tmspoja2tyrzdu4ckbg3ama2si2lje3wo525tzkmynv3vae",
+        "imageWidth": 1280,
+        "imageHeight": 853,
+        "bodyTextMatchesSource": true,
+        "normalizedBodyCharacters": 6448,
+        "headings": 8,
+        "numberedItems": 4,
+        "bulletItems": 5,
+        "externalBodyLinks": 3,
+        "nativeInitialHtml": true,
+        "nativeImageLoaded": true,
+        "iframes": 0,
+        "previewUrl": "https://delightful-labs-gou5e192e-mjamesderochers-projects.vercel.app/open-thoughts/3mzvkf4zddc2n/",
+        "sourceCanonicalUrl": "https://open-thoughts.leaflet.pub/3mzvkf4zddc2n",
+        "nativeCanonicalUrl": "https://delightfullabs.com/open-thoughts/3mzvkf4zddc2n/",
+        "remaining": [
+          "external-canonical-alignment",
+          "legacy-slug-alias",
+          "legacy-heading-fragments",
+          "feed-continuity",
+          "production-cutover"
+        ]
+      }
     },
     {
       "slug": "two-steps-forward-one-step-backwards",

@@ -17,9 +17,9 @@ endpoint agree:
 - Desired record URL, after proof: `https://delightfullabs.com/open-thoughts`.
 - Current PDS: `https://morel.us-east.host.bsky.network`; keep resolving it from
   the DID document rather than treating this observation as configuration.
-- Complete document enumeration: zero records belonging to this publication,
-  one response page with no continuation cursor. There is no post to use as a
-  hosted editing proof yet.
+- Initial complete enumeration found zero matching documents. The owner-approved
+  first quiet publication now exists as `site.standard.document/3mzvkf4zddc2n`;
+  its editable draft and public/native rendering proof are recorded below.
 
 Public verification source:
 https://open-thoughts.leaflet.pub/.well-known/site.standard.publication
@@ -104,3 +104,26 @@ Prepared for owner review; this has not been sent:
 > republishing posts and saving publication settings. If this requires staff
 > configuration, can you confirm how both Leaflet's stored publication and the
 > PDS record should stay aligned? We have not changed the record or DNS.
+
+
+## Authenticated UI and first publication update
+
+After the owner signed in, the hosted General Settings page was inspected
+read-only. Its Domains section showed only `open-thoughts.leaflet.pub` as default,
+no available domains, and a profile-settings link for adding domains. No arbitrary
+external canonical URL field was present. Publication settings were not changed.
+
+The owner subsequently approved one quiet publication at the current Leaflet URL
+as an integration proof. The ecosystem article now exists as public document
+`3mzvkf4zddc2n`; the saved editable draft, original date, native body, image and
+public record were verified. This supersedes the initial zero-document observation.
+See [verification.md](verification.md). It does not prove external canonical
+configuration or URL persistence after settings changes. T014 remains open.
+
+Leaflet also documents a per-document AI editing API in its
+[own API guide](https://github.com/hyperlink-academy/leaflet/blob/600c7b5f1f7b31b66fb626c293cc104312a12caf/.claude/skills/leaflet-ai-api/SKILL.md).
+A read of the saved draft through that API succeeded. It supports document reads,
+search and selected block edits, rather than a complete publication/archive
+import workflow. Its URL token is an authentication capability; do not commit
+editor URLs or tokens to the public migration manifest. The editor remains the
+verified import path for this article's lists and uploaded image.

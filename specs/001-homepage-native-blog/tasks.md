@@ -37,7 +37,8 @@
 - [x] T015 [US3] Implement durable cross-instance snapshot/concurrency behavior in src/lib/server/leaflet/ and verify in Preview. Production store enablement remains gated.
 - [ ] T016 [US4] Preserve archive inputs/assets, prove editable quiet import, then finalize feeds and redirects using the exact inventory in research-migration.md.
   - [x] Preserve six known-public Markdown posts, original image/license, live HTML and generated images/feed/sitemap with hashes and planned URL mappings in migration/open-thoughts/.
-  - [ ] Prove one editable quiet Leaflet import with its public date and image; migrate and compare all six only after that proof.
+  - [x] Prove one editable quiet Leaflet import with its public date and image: ecosystem article `3mzvkf4zddc2n`, native Preview verified.
+  - [ ] Import and compare the remaining five articles after the representative proof.
   - [ ] Resolve record keys/aliases, fragment compatibility, replacement feeds and staged redirects before activating old-URL redirects.
   - [ ] Preserve the original export in owner-controlled storage before retiring the old repo; do not republish account fields or eight unclassified entries.
 - [ ] T017 [US5] Verify hosted preview and production cutover using the approved domains; document rollback in README.md.

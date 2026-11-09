@@ -2,8 +2,9 @@
 
 This directory preserves the six already-public articles from the Eleventy blog.
 It is outside `src/routes` and `static`; the application does not import or serve
-it. These are migration/comparison inputs, not published Leaflet posts or new site
-content. No article text has been rewritten.
+it. These are migration/comparison inputs, not an application content source.
+One representative article is now quietly published on Leaflet and verified in
+the native Preview; the other five remain unimported. No article text has been rewritten.
 
 ## Provenance
 
@@ -17,8 +18,9 @@ Pinned source commit: `3017dd1244f874ba0bb9bbdc9ee79e49e30041a3`.
   variants, Atom feed, sitemap, and feed stylesheet on November 9, 2026.
 - `manifest.json`: per-file SHA-256, byte size and origin; each post's public
   date, export timestamps, old URL, proposed native path, heading/landmark IDs,
-  image references, and legacy Atom ID/link. Leaflet record mappings are null
-  until actual editable migration is proved.
+  image references, and legacy Atom ID/link. The ecosystem article now has a
+  verified public Leaflet record mapping and proof metadata; remaining mappings
+  stay null. Editor URLs are capability-bearing and are not stored here.
 
 Run `pnpm check:migration` to verify the preserved bytes and manifest references.
 The files are frozen evidence: don't run formatting tools over archived Markdown,
@@ -49,7 +51,8 @@ original repository path, pinned commit, SHA-256 and classification counts are
 recorded in the manifest. Preserve an owner-controlled copy before retiring the
 old repository; do not treat those entries as public migration candidates.
 
-Editable Leaflet import, quiet publishing, canonical URL alignment, destination
-and fragment checks, feeds, redirect activation, production hosting/DNS, and old
-repository retirement remain outstanding. The first representative migration
-should be the ecosystem article because it exercises the image and headings.
+The ecosystem article passed editable-draft, quiet-publication and native-read
+checks, including the chart. Its record-key route works; its planned legacy-slug
+alias does not exist yet. Canonical alignment, fragment compatibility, the other
+five imports, feeds, redirects, production hosting/DNS and old repository
+retirement remain outstanding. See the [first publication proof](../../specs/001-homepage-native-blog/verification.md).
