@@ -71,9 +71,9 @@ export function createArchiveEnvelopeMachine() {
 				RELEASE: types<EventPayload<Event, 'RELEASE'>>(),
 				CRYPTO_DONE: types<EventPayload<Event, 'CRYPTO_DONE'>>(),
 				CRYPTO_FAILED: types<EventPayload<Event, 'CRYPTO_FAILED'>>(),
-				SYNC_COMPLETED: types<EventPayload<Event, 'SYNC_COMPLETED'>>(),
-				SYNC_APPLIED: types<EventPayload<Event, 'SYNC_APPLIED'>>()
+				SYNC_COMPLETED: types<EventPayload<Event, 'SYNC_COMPLETED'>>()
 			},
+			internalEvents: { SYNC_APPLIED: types<EventPayload<Event, 'SYNC_APPLIED'>>() },
 			input: types<ArchiveEnvelopeInput>(),
 			output: types<ArchiveEnvelopeResult>()
 		},
@@ -422,8 +422,10 @@ export function createArchiveEnvelopeMachine() {
 								return { target: 'decrypting' }
 							}
 						},
-						exit: ({ context }) => {
-							envelopeData(context.request).material = undefined
+						exit: ({ context }, enq) => {
+							enq(() => {
+								envelopeData(context.request).material = undefined
+							})
 						}
 					},
 					encrypting: {
@@ -445,8 +447,10 @@ export function createArchiveEnvelopeMachine() {
 								return { target: 'buildingEnvelope' }
 							}
 						},
-						exit: ({ context }) => {
-							envelopeData(context.request).key = undefined
+						exit: ({ context }, enq) => {
+							enq(() => {
+								envelopeData(context.request).key = undefined
+							})
 						}
 					},
 					decrypting: {
@@ -468,8 +472,10 @@ export function createArchiveEnvelopeMachine() {
 								return { target: 'checkingPlaintextBounds' }
 							}
 						},
-						exit: ({ context }) => {
-							envelopeData(context.request).key = undefined
+						exit: ({ context }, enq) => {
+							enq(() => {
+								envelopeData(context.request).key = undefined
+							})
 						}
 					},
 					checkingPlaintextBounds: {
@@ -617,8 +623,10 @@ export function createArchiveEnvelopeMachine() {
 						}
 					}
 				},
-				// Dispose before the native child stops; successful output is transferred, all other data revoked.
-				exit: ({ context }) => clearEnvelopeData(context.request)
+				// Queue revocation with the owning exit; native teardown shares idempotent cleanup.
+				exit: ({ context }, enq) => {
+					enq(() => clearEnvelopeData(context.request))
+				}
 			},
 			cleaning: {
 				entry: synchronous((context) => {

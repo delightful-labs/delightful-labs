@@ -70,10 +70,10 @@ export const jazzArchiveScopeMachine = setup({
 		context: types<Context>(),
 		events: {
 			RELEASE: types<EventPayload<Event, 'RELEASE'>>(),
-			HANDOFF_SETTLED: types<EventPayload<Event, 'HANDOFF_SETTLED'>>(),
 			CLAIM: types<EventPayload<Event, 'CLAIM'>>(),
 			DISPATCH: types<EventPayload<Event, 'DISPATCH'>>()
 		},
+		internalEvents: { HANDOFF_SETTLED: types<EventPayload<Event, 'HANDOFF_SETTLED'>>() },
 		input: types<Input>(),
 		output: types<Result>()
 	},

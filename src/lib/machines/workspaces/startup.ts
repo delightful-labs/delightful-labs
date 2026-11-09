@@ -7,7 +7,6 @@ import {
 	type ActorLogic,
 	type Snapshot
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import {
@@ -112,7 +111,9 @@ export function createWorkspaceStartupMachine<
 			events: {
 				OBSERVED: types<EventPayload<Event, 'OBSERVED'>>(),
 				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
-				REEVALUATE: types<EventPayload<Event, 'REEVALUATE'>>(),
+				REEVALUATE: types<EventPayload<Event, 'REEVALUATE'>>()
+			},
+			internalEvents: {
 				DRAIN_SEED: types<EventPayload<Event, 'DRAIN_SEED'>>(),
 				REPLACE_SEED: types<EventPayload<Event, 'REPLACE_SEED'>>()
 			},
@@ -132,15 +133,14 @@ export function createWorkspaceStartupMachine<
 				!sameInitializationRequest(context.request, context.operation)
 		}
 	})
-	const report = (status: (context: Context) => InitializationStatus) =>
-		model.createStateConfig({
-			entry: ({ context }, enq) => {
-				enq.sendTo(context.recipient, {
-					type: 'INITIALIZATION_STATUS',
-					report: { request: context.operation ?? context.request, status: status(context) }
-				})
-			}
-		}).entry
+	const report =
+		(status: (context: Context) => InitializationStatus) =>
+		({ context }: { context: Context }, enq: CompletionQueue) => {
+			enq.sendTo(context.recipient, {
+				type: 'INITIALIZATION_STATUS',
+				report: { request: context.operation ?? context.request, status: status(context) }
+			})
+		}
 	type CompletionEntry = Extract<
 		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
 		(...args: never[]) => unknown
@@ -163,12 +163,7 @@ export function createWorkspaceStartupMachine<
 			context?: Partial<Context>
 		}
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
+
 	return model.createMachine({
 		id: 'workspace-startup',
 		context: ({ input }) => ({
@@ -189,13 +184,14 @@ export function createWorkspaceStartupMachine<
 					context: { request: args.event.request } satisfies Partial<Context>
 				}
 			},
-			SHUTDOWN: (args, enq) => {
-				return complete('closed', args, enq, { target: '.closed' })
+			SHUTDOWN: (_args) => {
+				return { target: '.closed' }
 			}
 		},
 		states: {
 			checking: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					const { context } = args
 					if (context.request.status === 'ready' && !!context.request.userId) {
 						return { target: 'initializing' }
@@ -262,12 +258,10 @@ export function createWorkspaceStartupMachine<
 					id: 'initialize',
 					src: workspaceInitialization,
 					input: ({ context }) => ({ db, userId: context.operation?.userId ?? '' }),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (matchesState({ initializing: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, { target: 'closed' })
-							}
+							return { target: 'closed' }
 						}
 						if (matchesState({ initializing: 'replacing' }, args.value)) {
 							return { target: 'checking' }
@@ -283,11 +277,9 @@ export function createWorkspaceStartupMachine<
 							} satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (matchesState({ initializing: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, { target: 'closed' })
-							}
+							return { target: 'closed' }
 						}
 						if (matchesState({ initializing: 'replacing' }, args.value)) {
 							return { target: 'checking' }
@@ -305,7 +297,8 @@ export function createWorkspaceStartupMachine<
 				})
 			},
 			admittingReady: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					const { context } = args
 					if (
 						!!context.operation?.userId &&
@@ -352,9 +345,8 @@ export function createWorkspaceStartupMachine<
 							enq.sendTo('seed', { type: 'SHUTDOWN' })
 							return { target: '.closing' }
 						}
-						{
-							return complete('closed', args, enq, { target: 'closed' })
-						}
+
+						return { target: 'closed' }
 					}
 				},
 				states: {
@@ -374,19 +366,17 @@ export function createWorkspaceStartupMachine<
 						userId: context.operation?.userId ?? '',
 						organizationId: context.provenance?.organizationId ?? ''
 					}),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (matchesState({ ready: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, {
-									target: 'closed',
-									context: {
-										results: {
-											...args.context.results,
-											seedResult: event.output
-										}
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'closed',
+								context: {
+									results: {
+										...args.context.results,
+										seedResult: event.output
+									}
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ ready: 'replacing' }, args.value)) {
@@ -410,11 +400,9 @@ export function createWorkspaceStartupMachine<
 							} satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (matchesState({ ready: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, { target: 'closed' })
-							}
+							return { target: 'closed' }
 						}
 						if (matchesState({ ready: 'replacing' }, args.value)) {
 							return { target: 'checking' }
@@ -443,7 +431,8 @@ export function createWorkspaceStartupMachine<
 			},
 			closed: {
 				type: 'final',
-				on: { OBSERVED: {}, SHUTDOWN: {} }
+				on: { OBSERVED: {}, SHUTDOWN: {} },
+				entry: finalizers.closed
 			}
 		}
 	})

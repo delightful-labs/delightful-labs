@@ -1,5 +1,4 @@
 import { types, createAsyncLogic, setup, type ActorLogic, type Snapshot } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 export type InitializationEvent =
@@ -127,7 +126,7 @@ export function createWorkspaceInitialization<
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		ready: (args, _enq) => {
+		ready: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -148,7 +147,7 @@ export function createWorkspaceInitialization<
 				} satisfies Partial<Context>
 			}
 		},
-		duplicateIdentities: (_args, _enq) => {
+		duplicateIdentities: (_args) => {
 			return {
 				context: {
 					operation: {
@@ -161,7 +160,7 @@ export function createWorkspaceInitialization<
 				} satisfies Partial<Context>
 			}
 		},
-		identityMissing: (_args, _enq) => {
+		identityMissing: (_args) => {
 			return {
 				context: {
 					operation: {
@@ -174,7 +173,7 @@ export function createWorkspaceInitialization<
 				} satisfies Partial<Context>
 			}
 		},
-		authorityUnavailable: (_args, _enq) => {
+		authorityUnavailable: (_args) => {
 			return {
 				context: {
 					operation: {
@@ -187,7 +186,7 @@ export function createWorkspaceInitialization<
 				} satisfies Partial<Context>
 			}
 		},
-		initializationMissing: (_args, _enq) => {
+		initializationMissing: (_args) => {
 			return {
 				context: {
 					operation: {
@@ -200,7 +199,7 @@ export function createWorkspaceInitialization<
 				} satisfies Partial<Context>
 			}
 		},
-		cancelled: (_args, _enq) => {
+		cancelled: (_args) => {
 			return {
 				context: {
 					operation: {
@@ -213,7 +212,7 @@ export function createWorkspaceInitialization<
 				} satisfies Partial<Context>
 			}
 		},
-		closed: (_args, _enq) => {
+		closed: (_args) => {
 			return {
 				context: {
 					operation: {
@@ -235,12 +234,7 @@ export function createWorkspaceInitialization<
 			context?: Partial<Context>
 		}
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
+
 	const machine = completionModel.createMachine({
 		id: 'workspace-initialization',
 		context: ({ input }) => ({
@@ -255,11 +249,11 @@ export function createWorkspaceInitialization<
 		initial: 'readingLocal',
 		output: ({ context }): WorkspaceInitializationResult => required(context.operation.result),
 		on: {
-			CANCEL: (args, enq) => {
-				return complete('cancelled', args, enq, { target: '.cancelled' })
+			CANCEL: (_args) => {
+				return { target: '.cancelled' }
 			},
-			SHUTDOWN: (args, enq) => {
-				return complete('closed', args, enq, { target: '.closed' })
+			SHUTDOWN: (_args) => {
+				return { target: '.closed' }
 			}
 		},
 		states: {
@@ -295,33 +289,30 @@ export function createWorkspaceInitialization<
 				})
 			},
 			checkingIdentities: {
-				always: (args, enq) => {
+				type: 'choice',
+				choice: (args) => {
 					if ((args.context.records?.identities.length ?? 0) > 1) {
-						{
-							return complete('duplicateIdentities', args, enq, { target: 'duplicateIdentities' })
-						}
+						return { target: 'duplicateIdentities' }
 					}
 					return { target: 'checkingInitialization' }
 				}
 			},
 			checkingInitialization: {
-				always: (args, enq) => {
+				type: 'choice',
+				choice: (args) => {
 					if (args.context.records?.identities[0]?.initialWorkspaceId != null) {
-						{
-							return complete('ready', args, enq, { target: 'ready' })
-						}
+						return { target: 'ready' }
 					}
 					return { target: 'checkingAuthority' }
 				}
 			},
 			checkingAuthority: {
-				always: (args, enq) => {
+				always: (args) => {
 					if (args.context.records?.serverConfigured === true) {
 						return { target: 'awaitingAuthority' }
 					}
-					{
-						return complete('authorityUnavailable', args, enq, { target: 'authorityUnavailable' })
-					}
+
+					return { target: 'authorityUnavailable' }
 				}
 			},
 			awaitingAuthority: {
@@ -357,29 +348,22 @@ export function createWorkspaceInitialization<
 				})
 			},
 			checkingAuthoritativeIdentities: {
-				always: (args, enq) => {
+				type: 'choice',
+				choice: (args) => {
 					const { context } = args
 					if ((context.records?.identities.length ?? 0) > 1) {
-						{
-							return complete('duplicateIdentities', args, enq, { target: 'duplicateIdentities' })
-						}
+						return { target: 'duplicateIdentities' }
 					}
 					if (context.records?.identities[0]?.initialWorkspaceId != null) {
-						{
-							return complete('ready', args, enq, { target: 'ready' })
-						}
+						return { target: 'ready' }
 					}
 					if (context.records?.identities.length === 1) {
-						{
-							return complete('initializationMissing', args, enq, {
-								target: 'initializationMissing'
-							})
+						return {
+							target: 'initializationMissing'
 						}
 					}
 					if ((context.records?.workspaces.length ?? 0) > 0) {
-						{
-							return complete('identityMissing', args, enq, { target: 'identityMissing' })
-						}
+						return { target: 'identityMissing' }
 					}
 					return { target: 'preparingInitial' }
 				}
@@ -433,12 +417,10 @@ export function createWorkspaceInitialization<
 						attempt: required(context.operation.attempt),
 						purpose: 'bootstrap'
 					}),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (event.output?.outcome === 'succeeded') {
-							{
-								return complete('ready', args, enq, { target: 'ready' })
-							}
+							return { target: 'ready' }
 						}
 						return {
 							target: 'completed',
@@ -468,25 +450,32 @@ export function createWorkspaceInitialization<
 				})
 			},
 			ready: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.ready
 			},
 			duplicateIdentities: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.duplicateIdentities
 			},
 			identityMissing: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.identityMissing
 			},
 			authorityUnavailable: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.authorityUnavailable
 			},
 			initializationMissing: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.initializationMissing
 			},
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			},
 			failed: { type: 'final' },
 			completed: { type: 'final' }

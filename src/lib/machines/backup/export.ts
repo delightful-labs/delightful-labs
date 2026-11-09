@@ -417,7 +417,9 @@ export function createJazzArchiveExportMachine<
 					},
 					cleaning: {
 						on: { CANCEL: {}, SHUTDOWN: {}, INVALIDATE: {} },
-						entry: ({ context }) => abortJazzExport(context.request),
+						entry: ({ context }, enq) => {
+							enq(() => abortJazzExport(context.request))
+						},
 						invoke: {
 							src: actors.cleanup,
 							input,

@@ -1,5 +1,4 @@
 import { types, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import {
@@ -9,7 +8,6 @@ import {
 	type BrowserJournalResult
 } from '../../backup/restore-journal-browser.js'
 import type { RestoreJournalRecord } from '../../backup/restore-journal.js'
-import { requireRestoreValue } from '../../backup/restore.js'
 import { createBrowserRestoreJournalMachine } from './restore-journal.js'
 type Input = BrowserJournalConfiguration
 type Context = {
@@ -58,7 +56,12 @@ export function createRestoreJournalStepMachine() {
 			input: types<Input>(),
 			output: types<Result>()
 		},
-		actors
+		actors,
+		states: {
+			preparing: {},
+			running: { schemas: { context: types<{ request: BrowserJournalRequest }>() } },
+			complete: { type: 'final' }
+		}
 	})
 	type CompletionEntry = Extract<
 		NonNullable<Parameters<typeof completionModel.createStateConfig>[0]['entry']>,
@@ -74,12 +77,6 @@ export function createRestoreJournalStepMachine() {
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return completionModel.createMachine({
 		id: 'restore-journal-step',
@@ -92,15 +89,17 @@ export function createRestoreJournalStepMachine() {
 		output: ({ context }) => context.result,
 		states: {
 			preparing: {
-				entry: ({ context, self }) => {
-					try {
-						self.send({
-							type: 'PREPARED',
-							request: prepareBrowserRestoreJournal(context.configuration)
-						})
-					} catch {
-						self.send({ type: 'PREPARATION_FAILED' })
-					}
+				entry: ({ context, self }, enq) => {
+					enq(() => {
+						try {
+							self.send({
+								type: 'PREPARED',
+								request: prepareBrowserRestoreJournal(context.configuration)
+							})
+						} catch {
+							self.send({ type: 'PREPARATION_FAILED' })
+						}
+					})
 				},
 				on: {
 					PREPARED: (args) => {
@@ -109,36 +108,36 @@ export function createRestoreJournalStepMachine() {
 							context: { request: args.event.request } satisfies Partial<Context>
 						}
 					},
-					PREPARATION_FAILED: (args, enq) => {
-						return complete('complete', args, enq, { target: 'complete' })
+					PREPARATION_FAILED: (_args) => {
+						return { target: 'complete' }
 					}
 				}
 			},
 			running: {
 				invoke: {
 					src: actors.journal,
-					input: ({ context }) => ({ request: requireRestoreValue(context.request) }),
-					onDone: (args, enq) => {
+					input: ({ context }) => ({ request: context.request }),
+					onDone: (args) => {
 						const { event } = args
-						{
-							return complete('complete', args, enq, {
-								target: 'complete',
-								context: {
-									result: {
-										outcome: event.output.outcome,
-										record: event.output.record?.readRecord()
-									}
-								} satisfies Partial<Context>
-							})
+
+						return {
+							target: 'complete',
+							context: {
+								result: {
+									outcome: event.output.outcome,
+									record: event.output.record?.readRecord()
+								}
+							} satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
-						return complete('complete', args, enq, { target: 'complete' })
+					onError: (_args) => {
+						return { target: 'complete' }
 					}
 				}
 			},
 			complete: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.complete
 			}
 		}
 	})

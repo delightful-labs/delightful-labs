@@ -251,7 +251,8 @@ export function createWorkspacePersistence<
 				}
 			},
 			settling: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					const { context } = args
 					if (context.issuance === 'unknown' && context.result?.settlement === 'notStarted') {
 						return { target: 'unresolvedSettlement' }

@@ -229,12 +229,17 @@ export function createRestoreMachine<
 		},
 		states: {
 			validating: {
-				entry: ({ context, self }) => {
-					try {
-						self.send({ type: 'INPUT_VALIDATED', value: validateRestoreInput(input({ context })) })
-					} catch {
-						self.send({ type: 'INPUT_INVALID' })
-					}
+				entry: ({ context, self }, enq) => {
+					enq(() => {
+						try {
+							self.send({
+								type: 'INPUT_VALIDATED',
+								value: validateRestoreInput(input({ context }))
+							})
+						} catch {
+							self.send({ type: 'INPUT_INVALID' })
+						}
+					})
 				},
 				on: {
 					INPUT_VALIDATED: (args) => {

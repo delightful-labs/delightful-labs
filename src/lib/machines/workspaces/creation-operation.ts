@@ -219,7 +219,8 @@ export function createWorkspaceCreationOperation<
 						initial: 'dispatching',
 						states: {
 							dispatching: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									const { context } = args
 									if (context.request.mode === 'load') {
 										return { target: 'readingJournal' }
@@ -259,7 +260,8 @@ export function createWorkspaceCreationOperation<
 								})
 							},
 							checkingName: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'finishing' }
 									}
@@ -484,7 +486,8 @@ export function createWorkspaceCreationOperation<
 								})
 							},
 							checkingRecordedJournal: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'finishing' }
 									}
@@ -495,7 +498,8 @@ export function createWorkspaceCreationOperation<
 								}
 							},
 							checkingRecordedOutcome: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.context.journal?.outcome === 'succeeded') {
 										return { target: 'persisting' }
 									}
@@ -794,7 +798,8 @@ export function createWorkspaceCreationOperation<
 								}
 							},
 							finishing: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (matchesState({ running: { control: 'closing' } }, args.value)) {
 										return { target: '#workspace-creation-operation.closing' }
 									}
@@ -839,7 +844,8 @@ export function createWorkspaceCreationOperation<
 				always: { target: 'checkingSettlement' }
 			},
 			checkingSettlement: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					if (args.guards.hasSettlementEvidence(args)) {
 						return { target: 'classifyingOutcome' }
 					}
@@ -893,7 +899,8 @@ export function createWorkspaceCreationOperation<
 				}
 			},
 			classifyingOutcome: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					const { context } = args
 					if (context.result.outcome === 'closed') {
 						return { target: 'closed' }

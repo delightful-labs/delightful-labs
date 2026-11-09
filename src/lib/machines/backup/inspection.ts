@@ -78,9 +78,9 @@ export function createArchiveInspectionMachine() {
 				SOURCE_READY: types<EventPayload<Event, 'SOURCE_READY'>>(),
 				PASSWORD_READY: types<EventPayload<Event, 'PASSWORD_READY'>>(),
 				READ_FAILED: types<EventPayload<Event, 'READ_FAILED'>>(),
-				SYNC_COMPLETED: types<EventPayload<Event, 'SYNC_COMPLETED'>>(),
-				SYNC_APPLIED: types<EventPayload<Event, 'SYNC_APPLIED'>>()
+				SYNC_COMPLETED: types<EventPayload<Event, 'SYNC_COMPLETED'>>()
 			},
+			internalEvents: { SYNC_APPLIED: types<EventPayload<Event, 'SYNC_APPLIED'>>() },
 			input: types<ArchiveInspectionInput>(),
 			output: types<ArchiveInspectionResult>()
 		},
@@ -354,11 +354,15 @@ export function createArchiveInspectionMachine() {
 						}
 					},
 					transferringReport: {
-						entry: ({ context }) => clearInspectionData(context.request, true),
+						entry: ({ context }, enq) => {
+							enq(() => clearInspectionData(context.request, true))
+						},
 						always: { target: '#archive-inspection.cleaning' }
 					}
 				},
-				exit: ({ context }) => clearInspectionData(context.request)
+				exit: ({ context }, enq) => {
+					enq(() => clearInspectionData(context.request))
+				}
 			},
 			cleaning: {
 				entry: synchronous((context) => {

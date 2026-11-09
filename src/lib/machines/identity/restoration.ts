@@ -1,5 +1,4 @@
 import { types, createAsyncLogic, matchesState, setup, type ActorRef, type Snapshot } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -72,9 +71,9 @@ function defineRestorationMachine<Input extends RestorationInput>(
 				PREPARED: types<EventPayload<Event, 'PREPARED'>>(),
 				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
 				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
-				BINDING_INVALIDATED: types<EventPayload<Event, 'BINDING_INVALIDATED'>>(),
-				RELEASE_CREDENTIAL: types<EventPayload<Event, 'RELEASE_CREDENTIAL'>>()
+				BINDING_INVALIDATED: types<EventPayload<Event, 'BINDING_INVALIDATED'>>()
 			},
+			internalEvents: { RELEASE_CREDENTIAL: types<EventPayload<Event, 'RELEASE_CREDENTIAL'>>() },
 			input: types<Input>(),
 			output: types<RestorationResult>()
 		},
@@ -98,12 +97,12 @@ function defineRestorationMachine<Input extends RestorationInput>(
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		restored: (_args, _enq) => {
+		restored: (_args) => {
 			return {
 				context: { phrase: undefined, credential: undefined } satisfies Partial<Context>
 			}
 		},
-		invalid: (args, _enq) => {
+		invalid: (args) => {
 			let context = args.context
 			let patch = {}
 			patch = { ...patch, phrase: undefined, credential: undefined }
@@ -115,7 +114,7 @@ function defineRestorationMachine<Input extends RestorationInput>(
 			context = { ...args.context, ...patch }
 			return { context: patch satisfies Partial<Context> }
 		},
-		failed: (args, _enq) => {
+		failed: (args) => {
 			let context = args.context
 			let patch = {}
 			patch = { ...patch, phrase: undefined, credential: undefined }
@@ -127,7 +126,7 @@ function defineRestorationMachine<Input extends RestorationInput>(
 			context = { ...args.context, ...patch }
 			return { context: patch satisfies Partial<Context> }
 		},
-		identityUnavailable: (args, _enq) => {
+		identityUnavailable: (args) => {
 			let context = args.context
 			let patch = {}
 			patch = { ...patch, phrase: undefined, credential: undefined }
@@ -139,7 +138,7 @@ function defineRestorationMachine<Input extends RestorationInput>(
 			context = { ...args.context, ...patch }
 			return { context: patch satisfies Partial<Context> }
 		},
-		cancelled: (args, _enq) => {
+		cancelled: (args) => {
 			let context = args.context
 			let patch = {}
 			patch = { ...patch, phrase: undefined, credential: undefined }
@@ -159,12 +158,6 @@ function defineRestorationMachine<Input extends RestorationInput>(
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'identity-restoration',
@@ -180,25 +173,24 @@ function defineRestorationMachine<Input extends RestorationInput>(
 		}),
 		output: ({ context }) => required(context.result),
 		on: {
-			CANCEL: (args, enq) => {
-				return complete('cancelled', args, enq, { target: '.cancelled' })
+			CANCEL: (_args) => {
+				return { target: '.cancelled' }
 			},
-			SHUTDOWN: (args, enq) => {
-				return complete('cancelled', args, enq, { target: '.cancelled' })
+			SHUTDOWN: (_args) => {
+				return { target: '.cancelled' }
 			},
-			BINDING_INVALIDATED: (args, enq) => {
-				return complete('cancelled', args, enq, { target: '.cancelled' })
+			BINDING_INVALIDATED: (_args) => {
+				return { target: '.cancelled' }
 			}
 		},
 		states: {
 			assessing: {
-				always: (args, enq) => {
+				always: (args) => {
 					if (args.guards.currentBinding(args)) {
 						return { target: 'validating' }
 					}
-					{
-						return complete('cancelled', args, enq, { target: 'cancelled' })
-					}
+
+					return { target: 'cancelled' }
 				}
 			},
 			validating: {
@@ -208,12 +200,10 @@ function defineRestorationMachine<Input extends RestorationInput>(
 						capability: context.capability,
 						phrase: required(context.phrase)
 					}),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (!args.guards.currentBinding(args)) {
-							{
-								return complete('cancelled', args, enq, { target: 'cancelled' })
-							}
+							return { target: 'cancelled' }
 						}
 						if (event.output.trim().length > 0) {
 							return {
@@ -221,19 +211,15 @@ function defineRestorationMachine<Input extends RestorationInput>(
 								context: { phrase: undefined, credential: event.output } satisfies Partial<Context>
 							}
 						}
-						{
-							return complete('invalid', args, enq, { target: 'invalid' })
-						}
+
+						return { target: 'invalid' }
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (args.guards.currentBinding(args)) {
-							{
-								return complete('invalid', args, enq, { target: 'invalid' })
-							}
+							return { target: 'invalid' }
 						}
-						{
-							return complete('cancelled', args, enq, { target: 'cancelled' })
-						}
+
+						return { target: 'cancelled' }
 					}
 				}
 			},
@@ -249,11 +235,10 @@ function defineRestorationMachine<Input extends RestorationInput>(
 						...context.scope
 					})
 				},
-				always: (args, enq) => {
+				always: (args) => {
 					if (args.guards.currentBinding(args)) return
-					{
-						return complete('cancelled', args, enq, { target: 'cancelled' })
-					}
+
+					return { target: 'cancelled' }
 				},
 				on: {
 					PREPARED: (args) => {
@@ -275,21 +260,17 @@ function defineRestorationMachine<Input extends RestorationInput>(
 						scope: context.scope,
 						credential: required(context.credential)
 					}),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						if (matchesState({ restoring: 'settlingCancellation' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: patches.settled(args) satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: patches.settled(args) satisfies Partial<Context>
 							}
 						}
 						if (!args.guards.currentBinding(args)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: patches.settled(args) satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: patches.settled(args) satisfies Partial<Context>
 							}
 						}
 						return {
@@ -297,28 +278,23 @@ function defineRestorationMachine<Input extends RestorationInput>(
 							context: patches.settled(args) satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (matchesState({ restoring: 'settlingCancellation' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: patches.settled(args) satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: patches.settled(args) satisfies Partial<Context>
 							}
 						}
 						if (!args.guards.currentBinding(args)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: patches.settled(args) satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: patches.settled(args) satisfies Partial<Context>
 							}
 						}
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: patches.settled(args) satisfies Partial<Context>
-							})
+
+						return {
+							target: 'failed',
+							context: patches.settled(args) satisfies Partial<Context>
 						}
 					}
 				},
@@ -343,62 +319,59 @@ function defineRestorationMachine<Input extends RestorationInput>(
 				invoke: {
 					src: actors.identity,
 					input: ({ context }) => ({ capability: context.capability, scope: context.scope }),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (!args.guards.currentBinding(args)) {
-							{
-								return complete('cancelled', args, enq, { target: 'cancelled' })
-							}
+							return { target: 'cancelled' }
 						}
 						if (event.output.kind === 'ready' && event.output.identityId.trim().length > 0) {
-							{
-								return complete('restored', args, enq, {
-									target: 'restored',
-									context: {
-										result: (({ context, event }): RestorationResult => {
-											if (event.output.kind !== 'ready')
-												throw new Error('Restoration identity unavailable')
-											return {
-												...context.scope,
-												outcome: 'restored',
-												mutation: 'settled',
-												identityId: event.output.identityId
-											}
-										})(args)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'restored',
+								context: {
+									result: (({ context, event }): RestorationResult => {
+										if (event.output.kind !== 'ready')
+											throw new Error('Restoration identity unavailable')
+										return {
+											...context.scope,
+											outcome: 'restored',
+											mutation: 'settled',
+											identityId: event.output.identityId
+										}
+									})(args)
+								} satisfies Partial<Context>
 							}
 						}
-						{
-							return complete('identityUnavailable', args, enq, { target: 'identityUnavailable' })
-						}
+
+						return { target: 'identityUnavailable' }
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (args.guards.currentBinding(args)) {
-							{
-								return complete('identityUnavailable', args, enq, { target: 'identityUnavailable' })
-							}
+							return { target: 'identityUnavailable' }
 						}
-						{
-							return complete('cancelled', args, enq, { target: 'cancelled' })
-						}
+
+						return { target: 'cancelled' }
 					}
 				}
 			},
 			restored: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.restored
 			},
 			invalid: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.invalid
 			},
 			failed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.failed
 			},
 			identityUnavailable: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.identityUnavailable
 			},
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			}
 		}
 	})

@@ -1,5 +1,4 @@
 import { types, createCallbackLogic, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type { RestoreScope } from '../../backup/restore.js'
@@ -72,7 +71,7 @@ type CompletionEntry = Extract<
 type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 type CompletionQueue = Parameters<CompletionEntry>[1]
 const finalizers = {
-	released: (_args, _enq) => {
+	released: (_args) => {
 		return {
 			context: { outcome: 'released' } satisfies Partial<{
 				name: string
@@ -80,7 +79,7 @@ const finalizers = {
 			}>
 		}
 	},
-	failed: (_args, _enq) => {
+	failed: (_args) => {
 		return {
 			context: { outcome: 'failed' } satisfies Partial<{
 				name: string
@@ -100,15 +99,6 @@ const finalizers = {
 		}>
 	}
 >
-const complete = createFinalTransitions<
-	{
-		name: string
-		outcome: Outcome
-	},
-	CompletionArgs,
-	CompletionQueue,
-	keyof typeof finalizers
->(finalizers)
 
 export const operationLock = completionModel.createMachine({
 	id: 'restore-operation-lock',
@@ -126,7 +116,8 @@ export const operationLock = completionModel.createMachine({
 	output: ({ context }) => context.outcome,
 	states: {
 		checkingSupport: {
-			always: (args) => {
+			type: 'choice',
+			choice: (args) => {
 				if (args.guards.supported()) {
 					return { target: 'active' }
 				}
@@ -139,13 +130,13 @@ export const operationLock = completionModel.createMachine({
 				id: 'native',
 				src: actors.native,
 				input: ({ context }) => ({ name: context.name }),
-				onError: (args, enq) => {
-					return complete('failed', args, enq, { target: 'failed' })
+				onError: (_args) => {
+					return { target: 'failed' }
 				}
 			},
 			on: {
-				NATIVE_FAILED: (args, enq) => {
-					return complete('failed', args, enq, { target: '#restore-operation-lock.failed' })
+				NATIVE_FAILED: (_args) => {
+					return { target: '#restore-operation-lock.failed' }
 				}
 			},
 			states: {
@@ -175,8 +166,8 @@ export const operationLock = completionModel.createMachine({
 						enq.sendTo(args.parent, { type: 'LOCK_FAILED' } satisfies LockEvent)
 					},
 					on: {
-						RELEASE: (args, enq) => {
-							return complete('failed', args, enq, { target: '#restore-operation-lock.failed' })
+						RELEASE: (_args) => {
+							return { target: '#restore-operation-lock.failed' }
 						}
 					}
 				},
@@ -185,8 +176,8 @@ export const operationLock = completionModel.createMachine({
 						enq.sendTo('native', { type: 'RELEASE' })
 					},
 					on: {
-						NATIVE_SETTLED: (args, enq) => {
-							return complete('released', args, enq, { target: '#restore-operation-lock.released' })
+						NATIVE_SETTLED: (_args) => {
+							return { target: '#restore-operation-lock.released' }
 						}
 					}
 				},
@@ -199,11 +190,13 @@ export const operationLock = completionModel.createMachine({
 			}
 		},
 		released: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.released
 		},
 		unavailable: { type: 'final' },
 		failed: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.failed
 		}
 	}
 })

@@ -20,8 +20,9 @@ was executed in this implementation phase. Jazz remains `2.0.0-alpha.59`.
 - Sources use direct logic and `createInvoke` for generic inference. The form
   writer deliberately retains a registered v6 source for its native/consumer
   logic union. Its input cannot be inferred through the direct-source union.
-- Final-state cleanup and outcome selection run on incoming transitions through
-  typed finalizers. Final node names remain stable and nodes are inert.
+- Final-state cleanup and outcome selection use their owning final entries.
+  The deeper review corrected the earlier assumption that these entries were
+  unsupported; the unnecessary incoming-transition wrappers have been removed.
   Parallel region cancellation, sibling reentry and effect order require replay
   qualification; static typing does not prove equivalent scheduling.
 - Startup uses scoped child references. Writer failure uses the reported error
@@ -98,3 +99,11 @@ After approval:
 
 No runtime-equivalence, browser, native, worker or downstream readiness claim is
 made by the production type check or package build.
+
+## Documentation-led design review
+
+See [the source audit and cross-repository acceptance criteria](xstate-v6-design-review.md).
+It records the corrected final-state interpretation, pure release-token updates,
+queued native preparation, explicit choice nodes, private event origins, typed
+observer children and the journal request typestate. Behavioral qualification
+remains pending user review; earlier static results do not qualify these changes.

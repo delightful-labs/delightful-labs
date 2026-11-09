@@ -8,7 +8,6 @@ import {
 	type ActorRef,
 	type Snapshot
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { formInterruptionResult } from '../../contracts/scoped-form.js'
@@ -93,18 +92,17 @@ export function createScopedFormSubmissionMachine<
 				matchesState({ validating: 'cancelling' }, value)
 		}
 	})
-	const publishProgress = (progress: FormSubmissionProgressEvent['progress']) =>
-		workflow.createStateConfig({
-			entry: ({ context }, enq) => {
-				if (context.recipient)
-					enq.sendTo(context.recipient, {
-						type: 'FORM_SUBMISSION_PROGRESS',
-						requestId: context.request.id,
-						scopeRevision: context.request.scopeRevision,
-						progress
-					})
-			}
-		}).entry
+	const publishProgress =
+		(progress: FormSubmissionProgressEvent['progress']) =>
+		({ context }: { context: Context }, enq: CompletionQueue) => {
+			if (context.recipient)
+				enq.sendTo(context.recipient, {
+					type: 'FORM_SUBMISSION_PROGRESS',
+					requestId: context.request.id,
+					scopeRevision: context.request.scopeRevision,
+					progress
+				})
+		}
 
 	type CompletionEntry = Extract<
 		NonNullable<Parameters<typeof workflow.createStateConfig>[0]['entry']>,
@@ -113,7 +111,7 @@ export function createScopedFormSubmissionMachine<
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		succeeded: (args, _enq) => {
+		succeeded: (args) => {
 			return {
 				context: {
 					request: { ...args.context.request, values: undefined, checkpoint: undefined },
@@ -123,7 +121,7 @@ export function createScopedFormSubmissionMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		partial: (args, _enq) => {
+		partial: (args) => {
 			return {
 				context: {
 					request: { ...args.context.request, values: undefined, checkpoint: undefined },
@@ -133,7 +131,7 @@ export function createScopedFormSubmissionMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		denied: (args, _enq) => {
+		denied: (args) => {
 			return {
 				context: {
 					request: { ...args.context.request, values: undefined, checkpoint: undefined },
@@ -143,7 +141,7 @@ export function createScopedFormSubmissionMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		unavailable: (args, _enq) => {
+		unavailable: (args) => {
 			return {
 				context: {
 					request: { ...args.context.request, values: undefined, checkpoint: undefined },
@@ -153,7 +151,7 @@ export function createScopedFormSubmissionMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		invalid: (args, _enq) => {
+		invalid: (args) => {
 			return {
 				context: {
 					request: { ...args.context.request, values: undefined, checkpoint: undefined },
@@ -163,7 +161,7 @@ export function createScopedFormSubmissionMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		failed: (args, _enq) => {
+		failed: (args) => {
 			return {
 				context: {
 					request: { ...args.context.request, values: undefined, checkpoint: undefined },
@@ -173,7 +171,7 @@ export function createScopedFormSubmissionMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		scopeChanged: (args, _enq) => {
+		scopeChanged: (args) => {
 			let context = args.context
 			let patch = {}
 			patch = {
@@ -191,7 +189,7 @@ export function createScopedFormSubmissionMachine<
 			context = { ...args.context, ...patch }
 			return { context: patch satisfies Partial<Context> }
 		},
-		cancelled: (args, _enq) => {
+		cancelled: (args) => {
 			let context = args.context
 			let patch = {}
 			patch = {
@@ -209,7 +207,7 @@ export function createScopedFormSubmissionMachine<
 			context = { ...args.context, ...patch }
 			return { context: patch satisfies Partial<Context> }
 		},
-		closed: (args, _enq) => {
+		closed: (args) => {
 			let context = args.context
 			let patch = {}
 			patch = {
@@ -231,12 +229,6 @@ export function createScopedFormSubmissionMachine<
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return workflow.createMachine({
 		id: 'scoped-form-submission',
@@ -257,42 +249,30 @@ export function createScopedFormSubmissionMachine<
 				invoke: workflow.createInvoke<typeof actors.validate, Context>({
 					src: actors.validate,
 					input: ({ context }: { context: Context }) => context.request.values,
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						if (matchesState({ validating: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, { target: 'closed' })
-							}
+							return { target: 'closed' }
 						}
 						if (matchesState({ validating: 'invalidated' }, args.value)) {
-							{
-								return complete('scopeChanged', args, enq, { target: 'scopeChanged' })
-							}
+							return { target: 'scopeChanged' }
 						}
 						if (matchesState({ validating: 'cancelling' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, { target: 'cancelled' })
-							}
+							return { target: 'cancelled' }
 						}
 						return {
 							target: 'admittingOperation',
 							context: { validated: { value: args.event.output } } satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (matchesState({ validating: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, { target: 'closed' })
-							}
+							return { target: 'closed' }
 						}
 						if (matchesState({ validating: 'invalidated' }, args.value)) {
-							{
-								return complete('scopeChanged', args, enq, { target: 'scopeChanged' })
-							}
+							return { target: 'scopeChanged' }
 						}
 						if (matchesState({ validating: 'cancelling' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, { target: 'cancelled' })
-							}
+							return { target: 'cancelled' }
 						}
 						return {
 							target: 'classifying',
@@ -331,18 +311,17 @@ export function createScopedFormSubmissionMachine<
 				}
 			},
 			admittingOperation: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (context.validated !== undefined && context.observation !== undefined) {
 						return { target: 'operating' }
 					}
-					{
-						return complete('failed', args, enq, {
-							target: 'failed',
-							context: {
-								result: { outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }
-							} satisfies Partial<Context>
-						})
+
+					return {
+						target: 'failed',
+						context: {
+							result: { outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }
+						} satisfies Partial<Context>
 					}
 				}
 			},
@@ -361,36 +340,30 @@ export function createScopedFormSubmissionMachine<
 							observation: context.observation
 						}
 					},
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (matchesState({ operating: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, {
-									target: 'closed',
-									context: {
-										result: formInterruptionResult('closed', event.output)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'closed',
+								context: {
+									result: formInterruptionResult('closed', event.output)
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ operating: 'invalidated' }, args.value)) {
-							{
-								return complete('scopeChanged', args, enq, {
-									target: 'scopeChanged',
-									context: {
-										result: formInterruptionResult('scopeChanged', event.output)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'scopeChanged',
+								context: {
+									result: formInterruptionResult('scopeChanged', event.output)
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ operating: 'cancelling' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: {
-										result: formInterruptionResult('cancelled', event.output)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: {
+									result: formInterruptionResult('cancelled', event.output)
+								} satisfies Partial<Context>
 							}
 						}
 						return {
@@ -404,48 +377,41 @@ export function createScopedFormSubmissionMachine<
 							} satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (matchesState({ operating: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, {
-									target: 'closed',
-									context: {
-										result: { outcome: 'closed', settlement: 'unknown' }
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'closed',
+								context: {
+									result: { outcome: 'closed', settlement: 'unknown' }
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ operating: 'invalidated' }, args.value)) {
-							{
-								return complete('scopeChanged', args, enq, {
-									target: 'scopeChanged',
-									context: {
-										result: { outcome: 'scopeChanged', settlement: 'unknown' }
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'scopeChanged',
+								context: {
+									result: { outcome: 'scopeChanged', settlement: 'unknown' }
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ operating: 'cancelling' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: {
-										result: { outcome: 'cancelled', settlement: 'unknown' }
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: {
+									result: { outcome: 'cancelled', settlement: 'unknown' }
+								} satisfies Partial<Context>
 							}
 						}
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: {
-									result: {
-										outcome: 'failed',
-										code: 'operationFailed',
-										settlement: 'unknown'
-									}
-								} satisfies Partial<Context>
-							})
+
+						return {
+							target: 'failed',
+							context: {
+								result: {
+									outcome: 'failed',
+									code: 'operationFailed',
+									settlement: 'unknown'
+								}
+							} satisfies Partial<Context>
 						}
 					}
 				}),
@@ -483,79 +449,71 @@ export function createScopedFormSubmissionMachine<
 				}
 			},
 			classifying: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (context.result?.outcome === 'invalid') {
-						{
-							return complete('invalid', args, enq, { target: 'invalid' })
-						}
+						return { target: 'invalid' }
 					}
 					if (context.result?.outcome === 'succeeded') {
-						{
-							return complete('succeeded', args, enq, { target: 'succeeded' })
-						}
+						return { target: 'succeeded' }
 					}
 					if (context.result?.outcome === 'partial') {
-						{
-							return complete('partial', args, enq, { target: 'partial' })
-						}
+						return { target: 'partial' }
 					}
 					if (context.result?.outcome === 'denied') {
-						{
-							return complete('denied', args, enq, { target: 'denied' })
-						}
+						return { target: 'denied' }
 					}
 					if (context.result?.outcome === 'unavailable') {
-						{
-							return complete('unavailable', args, enq, { target: 'unavailable' })
-						}
+						return { target: 'unavailable' }
 					}
 					if (context.result?.outcome === 'scopeChanged') {
-						{
-							return complete('scopeChanged', args, enq, { target: 'scopeChanged' })
-						}
+						return { target: 'scopeChanged' }
 					}
 					if (context.result?.outcome === 'cancelled') {
-						{
-							return complete('cancelled', args, enq, { target: 'cancelled' })
-						}
+						return { target: 'cancelled' }
 					}
 					if (context.result?.outcome === 'closed') {
-						{
-							return complete('closed', args, enq, { target: 'closed' })
-						}
+						return { target: 'closed' }
 					}
-					{
-						return complete('failed', args, enq, { target: 'failed' })
-					}
+
+					return { target: 'failed' }
 				}
 			},
 			succeeded: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.succeeded
 			},
 			partial: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.partial
 			},
 			denied: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.denied
 			},
 			unavailable: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.unavailable
 			},
 			invalid: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.invalid
 			},
 			failed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.failed
 			},
 			scopeChanged: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.scopeChanged
 			},
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

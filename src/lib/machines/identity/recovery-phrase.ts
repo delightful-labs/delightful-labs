@@ -1,5 +1,4 @@
 import { types, createAsyncLogic, setup, type SnapshotFrom } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -82,7 +81,7 @@ export function createRecoveryPhraseMachine(capability: RecoveryPhraseCapability
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		closed: (_args, _enq) => {
+		closed: (_args) => {
 			return {
 				context: { scope: { kind: 'unavailable' }, phrase: undefined } satisfies Partial<Context>
 			}
@@ -91,20 +90,14 @@ export function createRecoveryPhraseMachine(capability: RecoveryPhraseCapability
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'recovery-phrase',
 		initial: 'assessing',
 		context: ({ input }) => ({ scope: input, phrase: undefined }),
 		on: {
-			SHUTDOWN: (args, enq) => {
-				return complete('closed', args, enq, { target: '.closed' })
+			SHUTDOWN: (_args) => {
+				return { target: '.closed' }
 			},
 			OBSERVE: (args) => {
 				const { event } = args
@@ -133,7 +126,8 @@ export function createRecoveryPhraseMachine(capability: RecoveryPhraseCapability
 		},
 		states: {
 			assessing: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					if (args.guards.currentScope(args)) {
 						return { target: 'hidden' }
 					}
@@ -243,7 +237,8 @@ export function createRecoveryPhraseMachine(capability: RecoveryPhraseCapability
 				}
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

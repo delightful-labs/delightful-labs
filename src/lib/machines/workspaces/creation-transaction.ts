@@ -1,5 +1,4 @@
 import { matchesState, type StateValue, types, createAsyncLogic, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import {
@@ -160,7 +159,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		cancelled: (args, _enq) => {
+		cancelled: (args) => {
 			return {
 				context: {
 					result: {
@@ -170,7 +169,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 				} satisfies Partial<FullContext>
 			}
 		},
-		closed: (args, _enq) => {
+		closed: (args) => {
 			return {
 				context: {
 					result: {
@@ -189,12 +188,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 			context?: Partial<FullContext>
 		}
 	>
-	const complete = createFinalTransitions<
-		FullContext,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
+
 	return model.createMachine({
 		id: 'workspace-creation-transaction',
 		context: ({ input }) => ({
@@ -258,7 +252,8 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								}
 							},
 							checkingAfterOpen: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'rollingBack' }
 									}
@@ -292,7 +287,8 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								}
 							},
 							checkingAfterRead: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'rollingBack' }
 									}
@@ -368,7 +364,8 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								}
 							},
 							checkingBeforeCommit: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'rollingBack' }
 									}
@@ -473,19 +470,16 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								}
 							},
 							finishing: {
-								always: (args, enq) => {
+								type: 'choice',
+								choice: (args) => {
 									if (matchesState({ running: { control: 'closing' } }, args.value)) {
-										{
-											return complete('closed', args, enq, {
-												target: '#workspace-creation-transaction.closed'
-											})
+										return {
+											target: '#workspace-creation-transaction.closed'
 										}
 									}
 									if (matchesState({ running: { control: 'cancelling' } }, args.value)) {
-										{
-											return complete('cancelled', args, enq, {
-												target: '#workspace-creation-transaction.cancelled'
-											})
+										return {
+											target: '#workspace-creation-transaction.cancelled'
 										}
 									}
 									return { target: '#workspace-creation-transaction.completed' }
@@ -496,7 +490,8 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 				}
 			},
 			completed: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					const { context } = args
 					if (context.result?.outcome === 'succeeded') {
 						return { target: 'succeeded' }
@@ -511,10 +506,12 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 			blocked: { type: 'final' },
 			failed: { type: 'final' },
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

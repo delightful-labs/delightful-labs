@@ -45,7 +45,7 @@ type Context<Session extends object> = {
 	capability: SessionOpenCapability<Session>
 	requests: Request<Session>[]
 	// Terminal attachment tokens are weakly retained to reject late messages without a token leak.
-	released: WeakSet<object>
+	released: readonly WeakRef<object>[]
 	acquisition: {
 		session: Session | undefined
 	}
@@ -91,11 +91,17 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 			context: Context<Session>
 			event: SessionOwnerEvent<Session>
 		}): Partial<Context<Session>> => {
-			context.released.add(event.scope.attachment)
 			return {
 				requests: context.requests.filter(
 					(request) => request.scope.attachment !== event.scope.attachment
-				)
+				),
+				released: [
+					...context.released.filter(
+						(reference) =>
+							reference.deref() !== undefined && reference.deref() !== event.scope.attachment
+					),
+					new WeakRef(event.scope.attachment)
+				]
 			}
 		}
 	}
@@ -122,7 +128,7 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 			}) => {
 				if (
 					!validScope(context.binding, event.scope) ||
-					context.released.has(event.scope.attachment)
+					context.released.some((reference) => reference.deref() === event.scope.attachment)
 				)
 					return false
 				const previous = context.requests.find(
@@ -143,7 +149,7 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 			}) => {
 				if (
 					!validScope(context.binding, event.scope) ||
-					context.released.has(event.scope.attachment)
+					context.released.some((reference) => reference.deref() === event.scope.attachment)
 				)
 					return false
 				const previous = context.requests.find(
@@ -181,7 +187,7 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 			binding: input.binding,
 			capability: input.capability,
 			requests: [],
-			released: new WeakSet(),
+			released: [],
 			acquisition: {
 				session: input.existing
 			}
@@ -201,7 +207,8 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 		},
 		states: {
 			assessing: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					if (args.guards.supplied(args)) {
 						return { target: 'acquired' }
 					}

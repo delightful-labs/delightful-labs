@@ -7,7 +7,6 @@ import {
 	type Snapshot,
 	type SnapshotFrom
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -181,10 +180,12 @@ export function createScopedFormMachine<
 				RESET: types<EventPayload<Event, 'RESET'>>(),
 				OPEN: types<EventPayload<Event, 'OPEN'>>(),
 				RETRY_READINESS: types<EventPayload<Event, 'RETRY_READINESS'>>(),
+				FORM_CAPABILITY_REPORTED: types<EventPayload<Event, 'FORM_CAPABILITY_REPORTED'>>()
+			},
+			internalEvents: {
 				AVAILABILITY_FAILED: types<EventPayload<Event, 'AVAILABILITY_FAILED'>>(),
 				OBSERVATION_CHANGED: types<EventPayload<Event, 'OBSERVATION_CHANGED'>>(),
-				CAPABILITY_ACCEPTED: types<EventPayload<Event, 'CAPABILITY_ACCEPTED'>>(),
-				FORM_CAPABILITY_REPORTED: types<EventPayload<Event, 'FORM_CAPABILITY_REPORTED'>>()
+				CAPABILITY_ACCEPTED: types<EventPayload<Event, 'CAPABILITY_ACCEPTED'>>()
 			},
 			input: types<Observation>(),
 			meta: types<{
@@ -230,7 +231,7 @@ export function createScopedFormMachine<
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		closed: (_args, _enq) => {
+		closed: (_args) => {
 			return {
 				context: {
 					observation: undefined,
@@ -247,12 +248,6 @@ export function createScopedFormMachine<
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return workflow.createMachine({
 		id: 'scoped-form',
@@ -273,8 +268,8 @@ export function createScopedFormMachine<
 		states: {
 			open: {
 				type: 'parallel',
-				onDone: (args, enq) => {
-					return complete('closed', args, enq, { target: 'closed' })
+				onDone: (_args) => {
+					return { target: 'closed' }
 				},
 				on: {
 					OBSERVE: (args, enq) => {
@@ -431,7 +426,8 @@ export function createScopedFormMachine<
 								initial: 'assessing',
 								states: {
 									assessing: {
-										always: (args) => {
+										type: 'choice',
+										choice: (args) => {
 											const { context } = args
 											if (context.result === undefined) {
 												return { target: 'quiet' }
@@ -516,7 +512,8 @@ export function createScopedFormMachine<
 										initial: 'assessing',
 										states: {
 											assessing: {
-												always: (args) => {
+												type: 'choice',
+												choice: (args) => {
 													const { context } = args
 													if (
 														context.result !== undefined &&
@@ -559,7 +556,8 @@ export function createScopedFormMachine<
 										initial: 'assessing',
 										states: {
 											assessing: {
-												always: (args) => {
+												type: 'choice',
+												choice: (args) => {
 													const { context } = args
 													if (
 														context.result !== undefined &&
@@ -929,7 +927,8 @@ export function createScopedFormMachine<
 								},
 								states: {
 									admitting: {
-										always: (args) => {
+										type: 'choice',
+										choice: (args) => {
 											if (args.context.scope !== undefined && options.complete !== undefined) {
 												return { target: 'navigating' }
 											}
@@ -964,7 +963,8 @@ export function createScopedFormMachine<
 				}
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

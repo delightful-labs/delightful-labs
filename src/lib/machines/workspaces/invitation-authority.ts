@@ -1,5 +1,4 @@
 import { matchesState, type StateValue, types, createAsyncLogic, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import {
@@ -332,12 +331,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 			context?: Partial<Context>
 		}
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
+
 	return model.createMachine({
 		id: 'invitation-authority',
 		initial: 'running',
@@ -477,7 +471,8 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							checkingAdmission: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'finishing' }
 									}
@@ -522,7 +517,8 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							checkingAcquisition: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'rollingBack' }
 									}
@@ -572,7 +568,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							correlating: {
-								always: (args, _enq) => {
+								always: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'rollingBack' }
 									}
@@ -680,7 +676,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 										code: required(context.request).code,
 										digest: invitation(context).codeDigest
 									}),
-									onDone: (args, _enq) => {
+									onDone: (args) => {
 										if (
 											(({ event }: typeof args) =>
 												event.output.outcome === 'succeeded' && event.output.value === true)(args)
@@ -764,7 +760,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							checkingEvidence: {
-								always: (args, _enq) => {
+								always: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'rollingBack' }
 									}
@@ -851,7 +847,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							checkingMembership: {
-								always: (args, _enq) => {
+								always: (args) => {
 									if (
 										(({ context }: typeof args) => required(context.records).membership !== null)(
 											args
@@ -893,7 +889,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							checkingRevocation: {
-								always: (args, _enq) => {
+								always: (args) => {
 									if ((({ context }: typeof args) => invitation(context).revoked)(args)) {
 										let context = args.context
 										let patch: Partial<Context> = {}
@@ -957,7 +953,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							checkingExpiry: {
-								always: (args, _enq) => {
+								always: (args) => {
 									if (args.guards.closing(args)) {
 										return { target: 'rollingBack' }
 									}
@@ -1024,7 +1020,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								}
 							},
 							checkingConsumption: {
-								always: (args, _enq) => {
+								always: (args) => {
 									if ((({ context }: typeof args) => invitation(context).consumed !== null)(args)) {
 										let context = args.context
 										let patch: Partial<Context> = {}
@@ -1243,25 +1239,20 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								entry: (args, enq) => {
 									enq(args.actions.releaseCustody, args)
 								},
-								always: (args, enq) => {
+								always: (args) => {
 									if (matchesState({ running: { control: 'closing' } }, args.value)) {
-										{
-											return complete('closed', args, enq, {
-												target: '#invitation-authority.closed'
-											})
+										return {
+											target: '#invitation-authority.closed'
 										}
 									}
 									if (matchesState({ running: { control: 'cancelling' } }, args.value)) {
-										{
-											return complete('cancelled', args, enq, {
-												target: '#invitation-authority.cancelled'
-											})
+										return {
+											target: '#invitation-authority.cancelled'
 										}
 									}
-									{
-										return complete('settled', args, enq, {
-											target: '#invitation-authority.settled'
-										})
+
+									return {
+										target: '#invitation-authority.settled'
 									}
 								}
 							}
@@ -1270,13 +1261,16 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 				}
 			},
 			settled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.settled
 			},
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

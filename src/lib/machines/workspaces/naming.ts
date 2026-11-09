@@ -1,5 +1,4 @@
 import { matchesState, type StateValue, types, createAsyncLogic, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -72,22 +71,16 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		finished: (_args, _enq) => {
+		finished: (_args) => {
 			return { context: { write: undefined } satisfies Partial<Context> }
 		}
 	} satisfies Record<
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	const interruptionFinalizers = {
-		cancelled: (args, _enq) => ({
+		cancelled: (args) => ({
 			context: {
 				result: {
 					outcome: 'cancelled',
@@ -96,7 +89,7 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 				write: undefined
 			} satisfies Partial<Context>
 		}),
-		invalidated: (args, _enq) => ({
+		invalidated: (args) => ({
 			context: {
 				result: {
 					outcome: 'invalidated',
@@ -105,7 +98,7 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 				write: undefined
 			} satisfies Partial<Context>
 		}),
-		closed: (args, _enq) => ({
+		closed: (args) => ({
 			context: {
 				result: {
 					outcome: 'closed',
@@ -118,12 +111,6 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const completeInterruption = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof interruptionFinalizers
-	>(interruptionFinalizers)
 
 	return model.createMachine({
 		id: 'workspace-naming',
@@ -139,15 +126,13 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 		},
 		states: {
 			validating: {
-				always: (args, enq) => {
+				always: (args) => {
 					if (args.context.request.name.length === 0) {
-						{
-							return complete('finished', args, enq, {
-								target: 'finished',
-								context: {
-									result: { outcome: 'invalid', settlement: { kind: 'notStarted' } }
-								} satisfies Partial<Context>
-							})
+						return {
+							target: 'finished',
+							context: {
+								result: { outcome: 'invalid', settlement: { kind: 'notStarted' } }
+							} satisfies Partial<Context>
 						}
 					}
 					return { target: 'assessing' }
@@ -155,53 +140,49 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 			},
 			assessing: {
 				on: {
-					CANCEL: (args, enq) => {
-						return completeInterruption('cancelled', args, enq, { target: 'cancelled' })
+					CANCEL: (_args) => {
+						return { target: 'cancelled' }
 					},
-					INVALIDATE: (args, enq) => {
-						return completeInterruption('invalidated', args, enq, { target: 'invalidated' })
+					INVALIDATE: (_args) => {
+						return { target: 'invalidated' }
 					},
-					SHUTDOWN: (args, enq) => {
-						return completeInterruption('closed', args, enq, { target: 'closed' })
+					SHUTDOWN: (_args) => {
+						return { target: 'closed' }
 					}
 				},
 				invoke: {
 					src: actors.assess,
 					input: ({ context }) => context.request,
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (event.output.kind === 'blocked') {
-							{
-								return complete('finished', args, enq, {
-									target: 'finished',
-									context: {
-										result: (({ event }): Outcome => {
-											if (event.output.kind !== 'blocked')
-												throw new Error('Missing naming restriction')
-											return {
-												outcome: 'blocked',
-												reason: event.output.reason,
-												settlement: { kind: 'notStarted' }
-											}
-										})(args)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'finished',
+								context: {
+									result: (({ event }): Outcome => {
+										if (event.output.kind !== 'blocked')
+											throw new Error('Missing naming restriction')
+										return {
+											outcome: 'blocked',
+											reason: event.output.reason,
+											settlement: { kind: 'notStarted' }
+										}
+									})(args)
+								} satisfies Partial<Context>
 							}
 						}
 						return { target: 'writing' }
 					},
-					onError: (args, enq) => {
-						{
-							return complete('finished', args, enq, {
-								target: 'finished',
-								context: {
-									result: {
-										outcome: 'failed',
-										error: args.event.error,
-										settlement: { kind: 'notStarted' }
-									}
-								} satisfies Partial<Context>
-							})
+					onError: (args) => {
+						return {
+							target: 'finished',
+							context: {
+								result: {
+									outcome: 'failed',
+									error: args.event.error,
+									settlement: { kind: 'notStarted' }
+								}
+							} satisfies Partial<Context>
 						}
 					}
 				}
@@ -287,31 +268,24 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 								}
 							},
 							resolving: {
-								always: (args, enq) => {
+								always: (args) => {
 									if (matchesState({ writing: { control: 'closing' } }, args.value)) {
-										{
-											return completeInterruption('closed', args, enq, {
-												target: '#workspace-naming.closed'
-											})
+										return {
+											target: '#workspace-naming.closed'
 										}
 									}
 									if (matchesState({ writing: { control: 'invalidated' } }, args.value)) {
-										{
-											return completeInterruption('invalidated', args, enq, {
-												target: '#workspace-naming.invalidated'
-											})
+										return {
+											target: '#workspace-naming.invalidated'
 										}
 									}
 									if (matchesState({ writing: { control: 'cancelling' } }, args.value)) {
-										{
-											return completeInterruption('cancelled', args, enq, {
-												target: '#workspace-naming.cancelled'
-											})
+										return {
+											target: '#workspace-naming.cancelled'
 										}
 									}
-									{
-										return complete('finished', args, enq, { target: '#workspace-naming.finished' })
-									}
+
+									return { target: '#workspace-naming.finished' }
 								}
 							}
 						}
@@ -319,11 +293,12 @@ export function createWorkspaceNamingOperation<Scope, Settings, Reason, Write>(
 				}
 			},
 			finished: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.finished
 			},
-			cancelled: { type: 'final' },
-			invalidated: { type: 'final' },
-			closed: { type: 'final' }
+			cancelled: { type: 'final', entry: interruptionFinalizers.cancelled },
+			invalidated: { type: 'final', entry: interruptionFinalizers.invalidated },
+			closed: { type: 'final', entry: interruptionFinalizers.closed }
 		}
 	})
 }

@@ -166,7 +166,9 @@ export function createJazzArchiveReaderMachine<
 			},
 			reading,
 			revoking: {
-				entry: ({ context }) => endJazzReader(context.request),
+				entry: ({ context }, enq) => {
+					enq(() => endJazzReader(context.request))
+				},
 				always: { target: 'complete' }
 			},
 			complete: { type: 'final' }

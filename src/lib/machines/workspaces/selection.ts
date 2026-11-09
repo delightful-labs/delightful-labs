@@ -7,7 +7,6 @@ import {
 	type Snapshot,
 	type SnapshotFrom
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -199,7 +198,7 @@ export function createWorkspaceSelectionMachine() {
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		closed: (_args, _enq) => {
+		closed: (_args) => {
 			return {
 				context: {
 					scope: undefined,
@@ -210,7 +209,7 @@ export function createWorkspaceSelectionMachine() {
 				} satisfies Partial<Context>
 			}
 		},
-		unresolved: (_args, _enq) => {
+		unresolved: (_args) => {
 			return {
 				context: {
 					request: undefined,
@@ -223,12 +222,6 @@ export function createWorkspaceSelectionMachine() {
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'workspace-selection',
@@ -253,8 +246,8 @@ export function createWorkspaceSelectionMachine() {
 							context: { scope: { ...args.event.scope } } satisfies Partial<Context>
 						}
 					},
-					SHUTDOWN: (args, enq) => {
-						return complete('closed', args, enq, { target: 'closed' })
+					SHUTDOWN: (_args) => {
+						return { target: 'closed' }
 					}
 				}
 			},
@@ -263,7 +256,8 @@ export function createWorkspaceSelectionMachine() {
 				initial: 'assessing',
 				states: {
 					assessing: {
-						always: (args) => {
+						type: 'choice',
+						choice: (args) => {
 							const { context } = args
 							if (
 								!context.request ||
@@ -406,16 +400,14 @@ export function createWorkspaceSelectionMachine() {
 						},
 						on: {
 							...retainedFacts.on,
-							DRAINED: (args, enq) => {
+							DRAINED: (args) => {
 								if (
 									args.guards.matchingDrain(args) &&
 									matchesState({ bound: { draining: 'closing' } }, args.value)
 								) {
-									{
-										return complete('closed', args, enq, {
-											target: '#workspace-selection.closed',
-											context: patches.clearReleased(args) satisfies Partial<Context>
-										})
+									return {
+										target: '#workspace-selection.closed',
+										context: patches.clearReleased(args) satisfies Partial<Context>
 									}
 								}
 								if (
@@ -449,10 +441,9 @@ export function createWorkspaceSelectionMachine() {
 											}
 										})(args)
 									)
-									{
-										return complete('unresolved', args, enq, {
-											target: '#workspace-selection.unresolved'
-										})
+
+									return {
+										target: '#workspace-selection.unresolved'
 									}
 								}
 								if (
@@ -471,11 +462,10 @@ export function createWorkspaceSelectionMachine() {
 											}
 										})(args)
 									)
-									{
-										return complete('closed', args, enq, {
-											target: '#workspace-selection.closed',
-											context: patches.clearReleased(args) satisfies Partial<Context>
-										})
+
+									return {
+										target: '#workspace-selection.closed',
+										context: patches.clearReleased(args) satisfies Partial<Context>
 									}
 								}
 								if (args.guards.matchingDrain(args)) {
@@ -512,10 +502,12 @@ export function createWorkspaceSelectionMachine() {
 				}
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			},
 			unresolved: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.unresolved
 			}
 		}
 	})

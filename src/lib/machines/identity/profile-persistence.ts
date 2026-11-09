@@ -1,5 +1,4 @@
 import { matchesState, type StateValue, types, createAsyncLogic, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type { ProfileObservation, ProfileReason, ProfileScope } from '../../contracts/profile.js'
@@ -71,12 +70,12 @@ export function createProfilePersistenceMachine<Values>(options: {
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		unavailable: (_args, _enq) => {
+		unavailable: (_args) => {
 			return {
 				context: { request: undefined, observation: undefined } satisfies Partial<Context>
 			}
 		},
-		complete: (_args, _enq) => {
+		complete: (_args) => {
 			return {
 				context: { request: undefined, observation: undefined } satisfies Partial<Context>
 			}
@@ -85,12 +84,6 @@ export function createProfilePersistenceMachine<Values>(options: {
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'profile-persistence',
@@ -98,86 +91,74 @@ export function createProfilePersistenceMachine<Values>(options: {
 		context: ({ input }) => ({ ...input, result: failure }),
 		output: ({ context }) => context.result,
 		on: {
-			CANCEL: (args, enq) => {
-				{
-					return complete('complete', args, enq, {
-						target: '.complete',
-						context: {
-							result: { outcome: 'cancelled', settlement: 'notStarted' }
-						} satisfies Partial<Context>
-					})
+			CANCEL: (_args) => {
+				return {
+					target: '.complete',
+					context: {
+						result: { outcome: 'cancelled', settlement: 'notStarted' }
+					} satisfies Partial<Context>
 				}
 			},
-			INVALIDATE: (args, enq) => {
-				{
-					return complete('complete', args, enq, {
-						target: '.complete',
-						context: {
-							result: { outcome: 'scopeChanged', settlement: 'notStarted' }
-						} satisfies Partial<Context>
-					})
+			INVALIDATE: (_args) => {
+				return {
+					target: '.complete',
+					context: {
+						result: { outcome: 'scopeChanged', settlement: 'notStarted' }
+					} satisfies Partial<Context>
 				}
 			},
-			SHUTDOWN: (args, enq) => {
-				{
-					return complete('complete', args, enq, {
-						target: '.complete',
-						context: {
-							result: { outcome: 'closed', settlement: 'notStarted' }
-						} satisfies Partial<Context>
-					})
+			SHUTDOWN: (_args) => {
+				return {
+					target: '.complete',
+					context: {
+						result: { outcome: 'closed', settlement: 'notStarted' }
+					} satisfies Partial<Context>
 				}
 			}
 		},
 		states: {
 			admitting: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (context.request?.scope.identityId == null) {
-						{
-							return complete('unavailable', args, enq, {
-								target: 'unavailable',
-								context: {
-									result: {
-										outcome: 'unavailable',
-										reason: 'sessionUnavailable',
-										settlement: 'notStarted'
-									}
-								} satisfies Partial<Context>
-							})
+						return {
+							target: 'unavailable',
+							context: {
+								result: {
+									outcome: 'unavailable',
+									reason: 'sessionUnavailable',
+									settlement: 'notStarted'
+								}
+							} satisfies Partial<Context>
 						}
 					}
 					if (context.request?.scope.profileId == null) {
-						{
-							return complete('unavailable', args, enq, {
-								target: 'unavailable',
-								context: {
-									result: {
-										outcome: 'unavailable',
-										reason: 'profileUnavailable',
-										settlement: 'notStarted'
-									}
-								} satisfies Partial<Context>
-							})
+						return {
+							target: 'unavailable',
+							context: {
+								result: {
+									outcome: 'unavailable',
+									reason: 'profileUnavailable',
+									settlement: 'notStarted'
+								}
+							} satisfies Partial<Context>
 						}
 					}
 					if (
 						context.observation !== undefined &&
 						unavailableReason(context.observation.facts) !== undefined
 					) {
-						{
-							return complete('unavailable', args, enq, {
-								target: 'unavailable',
-								context: {
-									result: {
-										outcome: 'unavailable',
-										reason: context.observation
-											? (unavailableReason(context.observation.facts) ?? 'profileUnavailable')
-											: 'profileUnavailable',
-										settlement: 'notStarted'
-									}
-								} satisfies Partial<Context>
-							})
+						return {
+							target: 'unavailable',
+							context: {
+								result: {
+									outcome: 'unavailable',
+									reason: context.observation
+										? (unavailableReason(context.observation.facts) ?? 'profileUnavailable')
+										: 'profileUnavailable',
+									settlement: 'notStarted'
+								}
+							} satisfies Partial<Context>
 						}
 					}
 					if (
@@ -187,13 +168,12 @@ export function createProfilePersistenceMachine<Values>(options: {
 					) {
 						return { target: 'saving' }
 					}
-					{
-						return complete('complete', args, enq, {
-							target: 'complete',
-							context: {
-								result: { outcome: 'scopeChanged', settlement: 'notStarted' }
-							} satisfies Partial<Context>
-						})
+
+					return {
+						target: 'complete',
+						context: {
+							result: { outcome: 'scopeChanged', settlement: 'notStarted' }
+						} satisfies Partial<Context>
 					}
 				}
 			},
@@ -202,112 +182,96 @@ export function createProfilePersistenceMachine<Values>(options: {
 				invoke: {
 					src: actors.save,
 					input: ({ context }) => context,
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (matchesState({ saving: 'closing' }, args.value)) {
-							{
-								return complete('complete', args, enq, {
-									target: 'complete',
-									context: {
-										result: {
-											outcome: 'closed',
-											settlement: event.output === 'saved' ? options.settlement : 'notStarted'
-										}
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'complete',
+								context: {
+									result: {
+										outcome: 'closed',
+										settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+									}
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ saving: 'invalidated' }, args.value)) {
-							{
-								return complete('complete', args, enq, {
-									target: 'complete',
-									context: {
-										result: {
-											outcome: 'scopeChanged',
-											settlement: event.output === 'saved' ? options.settlement : 'notStarted'
-										}
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'complete',
+								context: {
+									result: {
+										outcome: 'scopeChanged',
+										settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+									}
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ saving: 'cancelling' }, args.value)) {
-							{
-								return complete('complete', args, enq, {
-									target: 'complete',
-									context: {
-										result: {
-											outcome: 'cancelled',
-											settlement: event.output === 'saved' ? options.settlement : 'notStarted'
-										}
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'complete',
+								context: {
+									result: {
+										outcome: 'cancelled',
+										settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+									}
+								} satisfies Partial<Context>
 							}
 						}
 						if (event.output === 'saved') {
-							{
-								return complete('complete', args, enq, {
-									target: 'complete',
-									context: {
-										result: {
-											outcome: 'succeeded',
-											value: undefined,
-											settlement: options.settlement
-										}
-									} satisfies Partial<Context>
-								})
-							}
-						}
-						{
-							return complete('unavailable', args, enq, {
-								target: 'unavailable',
+							return {
+								target: 'complete',
 								context: {
 									result: {
-										outcome: 'unavailable',
-										reason: 'profileUnavailable',
-										settlement: 'notStarted'
+										outcome: 'succeeded',
+										value: undefined,
+										settlement: options.settlement
 									}
 								} satisfies Partial<Context>
-							})
+							}
+						}
+
+						return {
+							target: 'unavailable',
+							context: {
+								result: {
+									outcome: 'unavailable',
+									reason: 'profileUnavailable',
+									settlement: 'notStarted'
+								}
+							} satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (matchesState({ saving: 'closing' }, args.value)) {
-							{
-								return complete('complete', args, enq, {
-									target: 'complete',
-									context: {
-										result: formInterruptionResult('closed', undefined)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'complete',
+								context: {
+									result: formInterruptionResult('closed', undefined)
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ saving: 'invalidated' }, args.value)) {
-							{
-								return complete('complete', args, enq, {
-									target: 'complete',
-									context: {
-										result: formInterruptionResult('scopeChanged', undefined)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'complete',
+								context: {
+									result: formInterruptionResult('scopeChanged', undefined)
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ saving: 'cancelling' }, args.value)) {
-							{
-								return complete('complete', args, enq, {
-									target: 'complete',
-									context: {
-										result: formInterruptionResult('cancelled', undefined)
-									} satisfies Partial<Context>
-								})
-							}
-						}
-						{
-							return complete('complete', args, enq, {
+							return {
 								target: 'complete',
 								context: {
-									result: { outcome: 'failed', code: 'operationFailed', settlement: 'unknown' }
+									result: formInterruptionResult('cancelled', undefined)
 								} satisfies Partial<Context>
-							})
+							}
+						}
+
+						return {
+							target: 'complete',
+							context: {
+								result: { outcome: 'failed', code: 'operationFailed', settlement: 'unknown' }
+							} satisfies Partial<Context>
 						}
 					}
 				},
@@ -336,10 +300,12 @@ export function createProfilePersistenceMachine<Values>(options: {
 				}
 			},
 			unavailable: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.unavailable
 			},
 			complete: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.complete
 			}
 		}
 	})

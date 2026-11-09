@@ -7,7 +7,6 @@ import {
 	type ActorRef,
 	type Snapshot
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -135,7 +134,7 @@ export function createSessionStartupMachine<Session extends object>() {
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		closed: (_args, _enq) => {
+		closed: (_args) => {
 			return {
 				context: {
 					owner: undefined,
@@ -157,12 +156,7 @@ export function createSessionStartupMachine<Session extends object>() {
 			context?: Partial<Context<Session>>
 		}
 	>
-	const complete = createFinalTransitions<
-		Context<Session>,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
+
 	return model.createMachine({
 		id: 'session-startup',
 		initial: 'waiting',
@@ -193,8 +187,8 @@ export function createSessionStartupMachine<Session extends object>() {
 							} satisfies Partial<Context<Session>>
 						}
 					},
-					SHUTDOWN: (args, enq) => {
-						return complete('closed', args, enq, { target: 'closed' })
+					SHUTDOWN: (_args) => {
+						return { target: 'closed' }
 					}
 				}
 			},
@@ -206,9 +200,7 @@ export function createSessionStartupMachine<Session extends object>() {
 					onError: (args, enq) => {
 						const { context, self } = args
 						if (matchesState({ bound: 'releasing' }, args.value)) {
-							{
-								return complete('closed', args, enq, { target: 'closed' })
-							}
+							return { target: 'closed' }
 						}
 						enq.sendTo(required(context.owner), {
 							type: 'RELEASE',
@@ -321,17 +313,16 @@ export function createSessionStartupMachine<Session extends object>() {
 							return { context: patch satisfies Partial<Context<Session>> }
 						},
 						on: {
-							RELEASED: (args, enq) => {
+							RELEASED: (args) => {
 								if (!args.guards.matchingReply(args)) return
-								{
-									return complete('closed', args, enq, { target: '#session-startup.closed' })
-								}
+
+								return { target: '#session-startup.closed' }
 							},
-							OWNER_FAILED: (args, enq) => {
-								return complete('closed', args, enq, { target: '#session-startup.closed' })
+							OWNER_FAILED: (_args) => {
+								return { target: '#session-startup.closed' }
 							},
-							OWNER_OBSERVER_FAILED: (args, enq) => {
-								return complete('closed', args, enq, { target: '#session-startup.closed' })
+							OWNER_OBSERVER_FAILED: (_args) => {
+								return { target: '#session-startup.closed' }
 							},
 							SHUTDOWN: {}
 						}
@@ -359,13 +350,14 @@ export function createSessionStartupMachine<Session extends object>() {
 					return { context: patch satisfies Partial<Context<Session>> }
 				},
 				on: {
-					SHUTDOWN: (args, enq) => {
-						return complete('closed', args, enq, { target: 'closed' })
+					SHUTDOWN: (_args) => {
+						return { target: 'closed' }
 					}
 				}
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

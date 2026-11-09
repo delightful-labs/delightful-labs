@@ -1,5 +1,4 @@
 import { types, createAsyncLogic, matchesState, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { restorationMachine } from './restoration.js'
@@ -153,9 +152,9 @@ const model = setup({
 			RESTORATION_VALIDATED: types<EventPayload<Event, 'RESTORATION_VALIDATED'>>(),
 			RESTORATION_PREPARE_REQUESTED: types<EventPayload<Event, 'RESTORATION_PREPARE_REQUESTED'>>(),
 			WORKSPACE_DRAINED: types<EventPayload<Event, 'WORKSPACE_DRAINED'>>(),
-			SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
-			RELEASE_REQUEST: types<EventPayload<Event, 'RELEASE_REQUEST'>>()
+			SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 		},
+		internalEvents: { RELEASE_REQUEST: types<EventPayload<Event, 'RELEASE_REQUEST'>>() },
 		input: types<Input>(),
 		output: types<RecoveryResult>()
 	},
@@ -179,7 +178,7 @@ type CompletionEntry = Extract<
 type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 type CompletionQueue = Parameters<CompletionEntry>[1]
 const finalizers = {
-	invalid: (args, _enq) => {
+	invalid: (args) => {
 		return {
 			context: {
 				result: { outcome: 'invalid', mutation: args.context.mutation },
@@ -187,7 +186,7 @@ const finalizers = {
 			} satisfies Partial<Context>
 		}
 	},
-	restoreFailed: (args, _enq) => {
+	restoreFailed: (args) => {
 		return {
 			context: {
 				result: { outcome: 'restoreFailed', mutation: args.context.mutation },
@@ -195,7 +194,7 @@ const finalizers = {
 			} satisfies Partial<Context>
 		}
 	},
-	restored: (args, _enq) => {
+	restored: (args) => {
 		return {
 			context: {
 				result: { outcome: 'restored', mutation: args.context.mutation },
@@ -203,7 +202,7 @@ const finalizers = {
 			} satisfies Partial<Context>
 		}
 	},
-	closed: (args, _enq) => {
+	closed: (args) => {
 		return {
 			context: {
 				result: { outcome: 'closed', mutation: args.context.mutation },
@@ -211,25 +210,19 @@ const finalizers = {
 			} satisfies Partial<Context>
 		}
 	},
-	restorationChildFailed: (args, _enq) => {
+	restorationChildFailed: (args) => {
 		const { context } = args
 		return {
 			context: { request: undefined, result: childFailure(context) } satisfies Partial<Context>
 		}
 	},
-	navigationFailed: (_args, _enq) => {
+	navigationFailed: (_args) => {
 		return { context: { request: undefined } satisfies Partial<Context> }
 	}
 } satisfies Record<
 	string,
 	(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 >
-const complete = createFinalTransitions<
-	Context,
-	CompletionArgs,
-	CompletionQueue,
-	keyof typeof finalizers
->(finalizers)
 
 export const sessionRecoveryMachine = model.createMachine({
 	id: 'session-recovery',
@@ -250,8 +243,8 @@ export const sessionRecoveryMachine = model.createMachine({
 	}),
 	output: ({ context }) => context.result ?? childFailure(context),
 	on: {
-		SHUTDOWN: (args, enq) => {
-			return complete('closed', args, enq, { target: '.closed' })
+		SHUTDOWN: (_args) => {
+			return { target: '.closed' }
 		}
 	},
 	states: {
@@ -291,27 +284,21 @@ export const sessionRecoveryMachine = model.createMachine({
 						reportTo: self
 					}
 				},
-				onDone: (args, enq) => {
+				onDone: (args) => {
 					const { event } = args
 					if (matchesState({ restoring: 'closing' }, args.value)) {
-						{
-							return complete('closed', args, enq, {
-								target: 'closed',
-								context: { mutation: event.output.mutation } satisfies Partial<Context>
-							})
+						return {
+							target: 'closed',
+							context: { mutation: event.output.mutation } satisfies Partial<Context>
 						}
 					}
 					if (event.output.outcome === 'invalid') {
-						{
-							return complete('invalid', args, enq, { target: 'invalid' })
-						}
+						return { target: 'invalid' }
 					}
 					if (event.output.outcome === 'cancelled') {
-						{
-							return complete('closed', args, enq, {
-								target: 'closed',
-								context: { mutation: event.output.mutation } satisfies Partial<Context>
-							})
+						return {
+							target: 'closed',
+							context: { mutation: event.output.mutation } satisfies Partial<Context>
 						}
 					}
 					if (event.output.outcome === 'restored') {
@@ -330,23 +317,21 @@ export const sessionRecoveryMachine = model.createMachine({
 						context = { ...args.context, ...patch }
 						patch = { ...patch, ...patches.navigationFailed({ ...args, context }) }
 						context = { ...args.context, ...patch }
-						{
-							return complete('navigationFailed', args, enq, {
-								target: 'navigationFailed',
-								context: patch satisfies Partial<Context>
-							})
+
+						return {
+							target: 'navigationFailed',
+							context: patch satisfies Partial<Context>
 						}
 					}
-					{
-						return complete('restoreFailed', args, enq, {
-							target: 'restoreFailed',
-							context: { mutation: event.output.mutation } satisfies Partial<Context>
-						})
+
+					return {
+						target: 'restoreFailed',
+						context: { mutation: event.output.mutation } satisfies Partial<Context>
 					}
 				},
 				// Exit the owned binding scope before publishing a finite, sanitized failure.
-				onError: (args, enq) => {
-					return complete('restorationChildFailed', args, enq, { target: 'restorationChildFailed' })
+				onError: (_args) => {
+					return { target: 'restorationChildFailed' }
 				}
 			},
 			on: {
@@ -405,7 +390,7 @@ export const sessionRecoveryMachine = model.createMachine({
 			invoke: {
 				src: actors.navigationFacts,
 				input: ({ context }) => ({ session: context.session, readHref: context.readHref }),
-				onDone: (args, enq) => {
+				onDone: (args) => {
 					const { context, event } = args
 					if (
 						event.output.status === 'ready' &&
@@ -414,16 +399,13 @@ export const sessionRecoveryMachine = model.createMachine({
 					) {
 						return { target: 'navigating' }
 					}
-					{
-						return complete('restored', args, enq, { target: 'restored' })
-					}
+
+					return { target: 'restored' }
 				},
-				onError: (args, enq) => {
-					{
-						return complete('navigationFailed', args, enq, {
-							target: 'navigationFailed',
-							context: patches.navigationFailed(args) satisfies Partial<Context>
-						})
+				onError: (args) => {
+					return {
+						target: 'navigationFailed',
+						context: patches.navigationFailed(args) satisfies Partial<Context>
 					}
 				}
 			}
@@ -433,27 +415,21 @@ export const sessionRecoveryMachine = model.createMachine({
 			invoke: {
 				src: actors.navigate,
 				input: ({ context }) => ({ navigate: context.navigate, destination: context.destination }),
-				onDone: (args, enq) => {
+				onDone: (args) => {
 					if (matchesState({ navigating: 'closing' }, args.value)) {
-						{
-							return complete('closed', args, enq, { target: 'closed' })
-						}
+						return { target: 'closed' }
 					}
-					{
-						return complete('restored', args, enq, { target: 'restored' })
-					}
+
+					return { target: 'restored' }
 				},
-				onError: (args, enq) => {
+				onError: (args) => {
 					if (matchesState({ navigating: 'closing' }, args.value)) {
-						{
-							return complete('closed', args, enq, { target: 'closed' })
-						}
+						return { target: 'closed' }
 					}
-					{
-						return complete('navigationFailed', args, enq, {
-							target: 'navigationFailed',
-							context: patches.navigationFailed(args) satisfies Partial<Context>
-						})
+
+					return {
+						target: 'navigationFailed',
+						context: patches.navigationFailed(args) satisfies Partial<Context>
 					}
 				}
 			},
@@ -461,22 +437,28 @@ export const sessionRecoveryMachine = model.createMachine({
 			states: { active: {}, closing: { on: { SHUTDOWN: {} } } }
 		},
 		invalid: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.invalid
 		},
 		restoreFailed: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.restoreFailed
 		},
 		restored: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.restored
 		},
 		closed: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.closed
 		},
 		restorationChildFailed: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.restorationChildFailed
 		},
 		navigationFailed: {
-			type: 'final'
+			type: 'final',
+			entry: finalizers.navigationFailed
 		}
 	}
 })

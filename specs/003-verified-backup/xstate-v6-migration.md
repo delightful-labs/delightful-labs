@@ -75,11 +75,11 @@ manual correction. DLF's generic factories require particular attention.
 
 ## Concrete runtime hazards requiring design review
 
-- **Final-state actions:** `machines/workspaces/creation-transaction.ts` currently
-  assigns cancelled/closed outcomes in final-state entry actions. Audit every
-  final state's actions, invokes, transitions and output. Move required work to
-  a preceding transition or meaningful completion state and preserve result
-  selection before terminal output; v6 final states are inert.
+- **Final-state behavior:** final states still support entry/exit and output.
+  Audit terminal context updates and cleanup ordering; preserve those actions on
+  their owning entries. Final-state transitions, timers and invokes are unsupported.
+  Do not move all entry cleanup onto incoming transitions merely because final
+  states are described as inert. See the [design review](xstate-v6-design-review.md).
 - **Parallel transitions:** forms, workspace journal/creation/invitations,
   naming and profile-avatar use parallel states. Document each region's owner,
   exit set, cancellation precedence and drain join. Review sibling resets and
@@ -88,8 +88,8 @@ manual correction. DLF's generic factories require particular attention.
   output and state-ID targets. Do not depend on completed children remaining in
   the parent's child record or old suffixed lifecycle event names.
 - **Frozen context:** classify context contents as immutable workflow facts or
-  opaque native resources. `transaction-custody.ts` mutates a plain receipt holder;
-  `identity/session-acquisition.ts` retains a WeakSet and request/session facts.
+  opaque native resources. the baseline `transaction-custody.ts` used a mutable plain receipt holder;
+  session acquisition used mutable weak release tokens and request/session facts.
   Trace where these reach context and qualify development freezing. Do not
   disable freezing globally or mutate snapshots to retain the old implementation.
   Private resource bookkeeping may remain in an adapter with explicit ownership;
@@ -138,14 +138,11 @@ session/DB/transaction handles and live actor refs stay in their owning realm;
 cross-realm communication uses validated bounded messages and projected views,
 with request identity, binding generation and stale-result rejection.
 
-Observed Clipper reference: worktree `jazz-cleanup-verify` at
-`9a30b73960dd6a5e5a055cdc00e7ea4e47d96d86`, especially
-`apps/web/src/lib/runtime/worker/{application.worker,host-machine,protocol,account-store,storage-channel,broker-channel}.ts`
-and `apps/web/tests/worker/host.spec.ts`. It contains the application-worker split,
-not just the earlier article-processing worker. This is inspected source and
-existing test intent, not a fresh qualification run or proof that this commit is
-the final accepted deployment reference. Select and record the accepted reference
-before worker adoption.
+Current Clipper reference: main `78d611f8bcf8e7a05d61408515545a711c7598bd`,
+which contains the application-worker host and the earlier `9a30b73` lineage.
+Inspect `apps/web/src/lib/runtime/worker/{application.worker,host-machine,protocol,account-store,storage-channel,broker-channel}.ts`
+and worker acceptance coverage. This is current source evidence, not a fresh
+qualification run. Preserve the exact patch/version pairing during Finance design.
 
 Its configured Jazz alpha.60 patch supplies `browserWorkerHost` broker opening
 and generation storage, worker runtime detection and configuration handling.

@@ -1,3 +1,4 @@
+import type { ActorRefFrom } from 'xstate'
 import {
 	types,
 	createAsyncLogic,
@@ -7,7 +8,6 @@ import {
 	type ActorRef,
 	type Snapshot
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -144,6 +144,10 @@ export function createSessionReadinessMachine() {
 	const model = setup({
 		schemas: {
 			context: types<Context>(),
+			children: {
+				observer: types<ActorRefFrom<typeof actors.observe>>(),
+				retry: types<ActorRefFrom<typeof actors.retry>>()
+			},
 			events: {
 				BIND: types<EventPayload<Event, 'BIND'>>(),
 				RETRY: types<EventPayload<Event, 'RETRY'>>(),
@@ -197,7 +201,7 @@ export function createSessionReadinessMachine() {
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		closed: (_args, _enq) => {
+		closed: (_args) => {
 			return {
 				context: { capability: undefined, scope: undefined } satisfies Partial<Context>
 			}
@@ -206,12 +210,6 @@ export function createSessionReadinessMachine() {
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'session-readiness',
@@ -237,8 +235,8 @@ export function createSessionReadinessMachine() {
 							} satisfies Partial<Context>
 						}
 					},
-					SHUTDOWN: (args, enq) => {
-						return complete('closed', args, enq, { target: 'closed' })
+					SHUTDOWN: (_args) => {
+						return { target: 'closed' }
 					}
 				}
 			},
@@ -293,8 +291,8 @@ export function createSessionReadinessMachine() {
 						})
 						return { target: '.observerFailed' }
 					},
-					SHUTDOWN: (args, enq) => {
-						return complete('closed', args, enq, { target: '#session-readiness.closed' })
+					SHUTDOWN: (_args) => {
+						return { target: '#session-readiness.closed' }
 					}
 				},
 				states: {
@@ -358,6 +356,7 @@ export function createSessionReadinessMachine() {
 							})
 						},
 						invoke: {
+							id: 'retry',
 							src: actors.retry,
 							input: ({ context }) => required(context.capability),
 							onDone: (args, enq) => {
@@ -369,9 +368,8 @@ export function createSessionReadinessMachine() {
 										attempt: context.attempt,
 										outcome: 'resolved'
 									})
-									{
-										return complete('closed', args, enq, { target: '#session-readiness.closed' })
-									}
+
+									return { target: '#session-readiness.closed' }
 								}
 								if (matchesState({ bound: { retrying: 'observerFailed' } }, args.value)) {
 									enq.sendTo(context.reportTo, {
@@ -399,9 +397,8 @@ export function createSessionReadinessMachine() {
 										attempt: context.attempt,
 										outcome: 'rejected'
 									})
-									{
-										return complete('closed', args, enq, { target: '#session-readiness.closed' })
-									}
+
+									return { target: '#session-readiness.closed' }
 								}
 								if (matchesState({ bound: { retrying: 'observerFailed' } }, args.value)) {
 									enq.sendTo(context.reportTo, {
@@ -459,7 +456,7 @@ export function createSessionReadinessMachine() {
 								on: {
 									OBSERVED: {},
 									OBSERVATION_FAILED: {},
-									'xstate.error.actor': (args, _enq) => {
+									'xstate.error.actor': (args) => {
 										if (args.event.actorId !== 'observer') return
 										return {}
 									}
@@ -473,7 +470,7 @@ export function createSessionReadinessMachine() {
 									SHUTDOWN: {},
 									OBSERVED: {},
 									OBSERVATION_FAILED: {},
-									'xstate.error.actor': (args, _enq) => {
+									'xstate.error.actor': (args) => {
 										if (args.event.actorId !== 'observer') return
 										return {}
 									}
@@ -484,7 +481,8 @@ export function createSessionReadinessMachine() {
 				}
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

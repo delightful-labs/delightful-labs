@@ -1,5 +1,4 @@
 import { matchesState, type StateValue, types, createAsyncLogic, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -98,7 +97,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		completed: (args, _enq) => {
+		completed: (args) => {
 			return {
 				context: {
 					request: undefined,
@@ -115,7 +114,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 				} satisfies Partial<Context>
 			}
 		},
-		invalid: (args, _enq) => {
+		invalid: (args) => {
 			return {
 				context: {
 					request: undefined,
@@ -128,7 +127,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 				} satisfies Partial<Context>
 			}
 		},
-		failed: (args, _enq) => {
+		failed: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -144,7 +143,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 				} satisfies Partial<Context>
 			}
 		},
-		cancelled: (args, _enq) => {
+		cancelled: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -158,7 +157,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 				} satisfies Partial<Context>
 			}
 		},
-		scopeChanged: (args, _enq) => {
+		scopeChanged: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -172,7 +171,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 				} satisfies Partial<Context>
 			}
 		},
-		closed: (args, _enq) => {
+		closed: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -190,12 +189,6 @@ export function createInvitationRedemptionMachine<Scope>() {
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'invitation-redemption',
@@ -213,19 +206,19 @@ export function createInvitationRedemptionMachine<Scope>() {
 		}),
 		output: ({ context }) => required(context.result),
 		on: {
-			CANCEL: (args, enq) => {
-				return complete('cancelled', args, enq, { target: '.cancelled' })
+			CANCEL: (_args) => {
+				return { target: '.cancelled' }
 			},
-			INVALIDATE: (args, enq) => {
-				return complete('scopeChanged', args, enq, { target: '.scopeChanged' })
+			INVALIDATE: (_args) => {
+				return { target: '.scopeChanged' }
 			},
-			SHUTDOWN: (args, enq) => {
-				return complete('closed', args, enq, { target: '.closed' })
+			SHUTDOWN: (_args) => {
+				return { target: '.closed' }
 			}
 		},
 		states: {
 			validating: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (
 						context.identity.operationId.trim() &&
@@ -234,9 +227,8 @@ export function createInvitationRedemptionMachine<Scope>() {
 					) {
 						return { target: 'assessing' }
 					}
-					{
-						return complete('invalid', args, enq, { target: 'invalid' })
-					}
+
+					return { target: 'invalid' }
 				}
 			},
 			assessing: {
@@ -246,7 +238,7 @@ export function createInvitationRedemptionMachine<Scope>() {
 						identity: context.identity,
 						capability: required(context.capability)
 					}),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (event.output.kind === 'ready') {
 							return { target: 'redeeming' }
@@ -270,12 +262,11 @@ export function createInvitationRedemptionMachine<Scope>() {
 								} satisfies Partial<Context>
 							}
 						}
-						{
-							return complete('failed', args, enq, { target: 'failed' })
-						}
+
+						return { target: 'failed' }
 					},
-					onError: (args, enq) => {
-						return complete('failed', args, enq, { target: 'failed' })
+					onError: (_args) => {
+						return { target: 'failed' }
 					}
 				}
 			},
@@ -321,39 +312,30 @@ export function createInvitationRedemptionMachine<Scope>() {
 								}
 							},
 							resolving: {
-								always: (args, enq) => {
+								always: (args) => {
 									if (matchesState({ redeeming: { control: 'closing' } }, args.value)) {
-										{
-											return complete('closed', args, enq, {
-												target: '#invitation-redemption.closed'
-											})
+										return {
+											target: '#invitation-redemption.closed'
 										}
 									}
 									if (matchesState({ redeeming: { control: 'invalidated' } }, args.value)) {
-										{
-											return complete('scopeChanged', args, enq, {
-												target: '#invitation-redemption.scopeChanged'
-											})
+										return {
+											target: '#invitation-redemption.scopeChanged'
 										}
 									}
 									if (matchesState({ redeeming: { control: 'cancelling' } }, args.value)) {
-										{
-											return complete('cancelled', args, enq, {
-												target: '#invitation-redemption.cancelled'
-											})
+										return {
+											target: '#invitation-redemption.cancelled'
 										}
 									}
 									if (args.context.settlement.kind === 'confirmed') {
-										{
-											return complete('completed', args, enq, {
-												target: '#invitation-redemption.completed'
-											})
+										return {
+											target: '#invitation-redemption.completed'
 										}
 									}
-									{
-										return complete('failed', args, enq, {
-											target: '#invitation-redemption.failed'
-										})
+
+									return {
+										target: '#invitation-redemption.failed'
 									}
 								}
 							}
@@ -362,23 +344,29 @@ export function createInvitationRedemptionMachine<Scope>() {
 				}
 			},
 			completed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.completed
 			},
 			invalid: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.invalid
 			},
 			blocked: { type: 'final' },
 			failed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.failed
 			},
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			},
 			scopeChanged: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.scopeChanged
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})

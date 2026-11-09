@@ -344,7 +344,8 @@ export function createWorkspaceCreationOwner<
 				})
 			},
 			classifying: {
-				always: (args) => {
+				type: 'choice',
+				choice: (args) => {
 					const { context } = args
 					if (context.result?.outcome === 'complete') {
 						return { target: 'complete' }

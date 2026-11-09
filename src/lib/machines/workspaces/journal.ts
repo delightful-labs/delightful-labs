@@ -1,5 +1,4 @@
 import { matchesState, type StateValue, types, createCallbackLogic, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { journalDatabase, type JournalDatabaseEvent } from './journal-native.js'
@@ -175,12 +174,12 @@ export function createWorkspaceJournal<
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		cancelled: (_args, _enq) => {
+		cancelled: (_args) => {
 			return {
 				context: { result: { outcome: 'cancelled' } } satisfies Partial<Context>
 			}
 		},
-		failed: (args, _enq) => {
+		failed: (args) => {
 			return {
 				context: {
 					result: args.context.result ?? {
@@ -198,12 +197,7 @@ export function createWorkspaceJournal<
 			context?: Partial<Context>
 		}
 	}
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
+
 	const machine = completionModel.createMachine({
 		id: 'workspace-creation-journal',
 		initial: 'running',
@@ -224,14 +218,12 @@ export function createWorkspaceJournal<
 					id: 'database',
 					src: journalDatabase,
 					input: () => ({ databaseName: options.databaseName }),
-					onError: (args, enq) => {
-						{
-							return complete('failed', args, enq, {
-								target: '#workspace-creation-journal.failed',
-								context: {
-									result: { outcome: 'failed', error: args.event.error }
-								} satisfies Partial<Context>
-							})
+					onError: (args) => {
+						return {
+							target: '#workspace-creation-journal.failed',
+							context: {
+								result: { outcome: 'failed', error: args.event.error }
+							} satisfies Partial<Context>
 						}
 					}
 				},
@@ -266,7 +258,8 @@ export function createWorkspaceJournal<
 								}
 							},
 							checkingOpen: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (matchesState({ running: { control: 'closing' } }, args.value)) {
 										return { target: 'closingDatabase' }
 									}
@@ -541,20 +534,16 @@ export function createWorkspaceJournal<
 								}
 							},
 							finishing: {
-								always: (args, enq) => {
+								always: (args) => {
 									const { context } = args
 									if (context.result?.outcome === 'failed') {
-										{
-											return complete('failed', args, enq, {
-												target: '#workspace-creation-journal.failed'
-											})
+										return {
+											target: '#workspace-creation-journal.failed'
 										}
 									}
 									if (matchesState({ running: { control: 'closing' } }, args.value)) {
-										{
-											return complete('cancelled', args, enq, {
-												target: '#workspace-creation-journal.cancelled'
-											})
+										return {
+											target: '#workspace-creation-journal.cancelled'
 										}
 									}
 									if (context.result?.outcome === 'succeeded') {
@@ -563,10 +552,9 @@ export function createWorkspaceJournal<
 									if (context.result?.outcome === 'conflict') {
 										return { target: '#workspace-creation-journal.conflict' }
 									}
-									{
-										return complete('failed', args, enq, {
-											target: '#workspace-creation-journal.failed'
-										})
+
+									return {
+										target: '#workspace-creation-journal.failed'
 									}
 								}
 							}
@@ -577,10 +565,12 @@ export function createWorkspaceJournal<
 			succeeded: { type: 'final' },
 			conflict: { type: 'final' },
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			},
 			failed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.failed
 			}
 		}
 	})

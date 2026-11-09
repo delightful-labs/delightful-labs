@@ -1,5 +1,4 @@
 import { types, createAsyncLogic, setup, type Snapshot } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { sameBackupBinding } from '../../backup/binding.js'
@@ -216,12 +215,6 @@ export function createRestoreWriteStepMachine<
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'restore-write-step',
@@ -260,8 +253,8 @@ export function createRestoreWriteStepMachine<
 				invoke: model.createInvoke<typeof actors.custodian, Context>({
 					src: actors.custodian,
 					input: ({ context, self }) => ({ custody: native(context.native).custody, owner: self }),
-					onError: (args, enq) => {
-						return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+					onError: (_args) => {
+						return { target: '#restore-write-step.complete' }
 					}
 				}),
 				states: {
@@ -291,26 +284,20 @@ export function createRestoreWriteStepMachine<
 							id: 'destination',
 							src: actors.remote,
 							input: ({ context }) => ({ ...input({ context }), operation: 'remote' }),
-							onDone: (args, enq) => {
+							onDone: (args) => {
 								const { context, event } = args
 								if (args.guards.interrupted(args)) {
-									{
-										return complete('complete', args, enq, {
-											target: '#restore-write-step.complete'
-										})
+									return {
+										target: '#restore-write-step.complete'
 									}
 								}
 								if (event.output === 'conflict') {
-									{
-										return complete('conflict', args, enq, {
-											target: '#restore-write-step.conflict'
-										})
+									return {
+										target: '#restore-write-step.conflict'
 									}
 								}
 								if (event.output === 'match' && writeStepCompleted(context.record, context.step)) {
-									{
-										return complete('written', args, enq, { target: '#restore-write-step.written' })
-									}
+									return { target: '#restore-write-step.written' }
 								}
 								if (
 									event.output === 'match' &&
@@ -329,12 +316,11 @@ export function createRestoreWriteStepMachine<
 								) {
 									return { target: 'checkingAuthority' }
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -364,13 +350,11 @@ export function createRestoreWriteStepMachine<
 							id: 'destination',
 							src: actors.authority,
 							input: ({ context }) => ({ ...input({ context }), operation: 'authority' }),
-							onDone: (args, enq) => {
+							onDone: (args) => {
 								const { context } = args
 								if (args.guards.interrupted(args)) {
-									{
-										return complete('complete', args, enq, {
-											target: '#restore-write-step.complete'
-										})
+									return {
+										target: '#restore-write-step.complete'
 									}
 								}
 								if (args.event.output === 'allowed') {
@@ -381,12 +365,11 @@ export function createRestoreWriteStepMachine<
 										} satisfies Partial<Context>
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -394,7 +377,7 @@ export function createRestoreWriteStepMachine<
 						invoke: model.createInvoke<typeof actors.journal, Context>({
 							src: actors.journal,
 							input: journalInput,
-							onDone: (args, enq) => {
+							onDone: (args) => {
 								const { event } = args
 								if (journalUpdateSucceeded(event.output)) {
 									return {
@@ -404,21 +387,19 @@ export function createRestoreWriteStepMachine<
 										} satisfies Partial<Context>
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
 					admittingTransaction: {
-						always: (args, enq) => {
+						type: 'choice',
+						choice: (args) => {
 							if (args.guards.interrupted(args)) {
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+								return { target: '#restore-write-step.complete' }
 							}
 							return { target: 'opening' }
 						}
@@ -439,8 +420,8 @@ export function createRestoreWriteStepMachine<
 								}, args)
 								return { target: 'readingTransaction' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -545,8 +526,8 @@ export function createRestoreWriteStepMachine<
 								}, args)
 								return { target: 'readingTransactionId' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -560,8 +541,8 @@ export function createRestoreWriteStepMachine<
 								}, args)
 								return { target: 'persistingLocal' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -603,7 +584,7 @@ export function createRestoreWriteStepMachine<
 						invoke: model.createInvoke<typeof actors.journal, Context>({
 							src: actors.journal,
 							input: journalInput,
-							onDone: (args, enq) => {
+							onDone: (args) => {
 								const { event } = args
 								if (journalUpdateSucceeded(event.output)) {
 									return {
@@ -613,21 +594,19 @@ export function createRestoreWriteStepMachine<
 										} satisfies Partial<Context>
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
 					admittingObservation: {
-						always: (args, enq) => {
+						type: 'choice',
+						choice: (args) => {
 							if (args.guards.interrupted(args)) {
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+								return { target: '#restore-write-step.complete' }
 							}
 							if (args.context.intent.plan.requirements.remote === 'notRequired') {
 								return { target: 'checkingSettlement' }
@@ -637,29 +616,24 @@ export function createRestoreWriteStepMachine<
 					},
 					observingRemote: {
 						on: {
-							CANCEL: (args, enq) => {
-								{
-									return complete('complete', args, enq, {
-										target: '#restore-write-step.complete',
-										context: patches.interrupt(args) satisfies Partial<Context>
-									})
+							CANCEL: (args) => {
+								return {
+									target: '#restore-write-step.complete',
+									context: patches.interrupt(args) satisfies Partial<Context>
 								}
 							},
-							SHUTDOWN: (args, enq) => {
-								{
-									return complete('complete', args, enq, {
-										target: '#restore-write-step.complete',
-										context: patches.interrupt(args) satisfies Partial<Context>
-									})
+							SHUTDOWN: (args) => {
+								return {
+									target: '#restore-write-step.complete',
+									context: patches.interrupt(args) satisfies Partial<Context>
 								}
 							},
-							INVALIDATE: (args, enq) => {
+							INVALIDATE: (args) => {
 								if (!args.guards.currentBinding(args)) return
-								{
-									return complete('complete', args, enq, {
-										target: '#restore-write-step.complete',
-										context: patches.interrupt(args) satisfies Partial<Context>
-									})
+
+								return {
+									target: '#restore-write-step.complete',
+									context: patches.interrupt(args) satisfies Partial<Context>
 								}
 							}
 						},
@@ -683,7 +657,7 @@ export function createRestoreWriteStepMachine<
 									} satisfies Partial<Context>
 								}
 							},
-							onError: (args, enq) => {
+							onError: (args) => {
 								const { context } = args
 								if (
 									capability.isRemoteRejection(
@@ -706,9 +680,8 @@ export function createRestoreWriteStepMachine<
 										} satisfies Partial<Context>
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -716,7 +689,7 @@ export function createRestoreWriteStepMachine<
 						invoke: model.createInvoke<typeof actors.journal, Context>({
 							src: actors.journal,
 							input: journalInput,
-							onDone: (args, enq) => {
+							onDone: (args) => {
 								const { event } = args
 								if (journalUpdateSucceeded(event.output)) {
 									return {
@@ -726,17 +699,16 @@ export function createRestoreWriteStepMachine<
 										} satisfies Partial<Context>
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
 					checkingSettlement: {
-						always: (args, enq) => {
+						always: (args) => {
 							const { context } = args
 							if (writeStepSettlementSatisfied(context.record, context.step)) {
 								return {
@@ -750,9 +722,8 @@ export function createRestoreWriteStepMachine<
 									} satisfies Partial<Context>
 								}
 							}
-							{
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-							}
+
+							return { target: '#restore-write-step.complete' }
 						}
 					},
 					savingCompletion: {
@@ -767,19 +738,17 @@ export function createRestoreWriteStepMachine<
 									patch = { ...patch, record: requireRestoreValue(event.output.record) }
 									context = { ...args.context, ...patch }
 									enq(() => clearTransactionCustody(native(context.native).custody))
-									{
-										return complete('written', args, enq, {
-											target: '#restore-write-step.written',
-											context: patch satisfies Partial<Context>
-										})
+
+									return {
+										target: '#restore-write-step.written',
+										context: patch satisfies Partial<Context>
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -787,24 +756,21 @@ export function createRestoreWriteStepMachine<
 						invoke: model.createInvoke<typeof actors.journal, Context>({
 							src: actors.journal,
 							input: journalInput,
-							onDone: (args, enq) => {
+							onDone: (args) => {
 								const { event } = args
 								if (journalUpdateSucceeded(event.output)) {
-									{
-										return complete('written', args, enq, {
-											target: '#restore-write-step.written',
-											context: {
-												record: requireRestoreValue(event.output.record)
-											} satisfies Partial<Context>
-										})
+									return {
+										target: '#restore-write-step.written',
+										context: {
+											record: requireRestoreValue(event.output.record)
+										} satisfies Partial<Context>
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					},
@@ -815,31 +781,32 @@ export function createRestoreWriteStepMachine<
 							onDone: (args, enq) => {
 								if (args.event.output) {
 									enq(() => clearTransactionCustody(native(args.context.native).custody))
-									{
-										return complete('complete', args, enq, {
-											target: '#restore-write-step.complete'
-										})
+
+									return {
+										target: '#restore-write-step.complete'
 									}
 								}
-								{
-									return complete('complete', args, enq, { target: '#restore-write-step.complete' })
-								}
+
+								return { target: '#restore-write-step.complete' }
 							},
-							onError: (args, enq) => {
-								return complete('complete', args, enq, { target: '#restore-write-step.complete' })
+							onError: (_args) => {
+								return { target: '#restore-write-step.complete' }
 							}
 						})
 					}
 				}
 			},
 			written: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.written
 			},
 			conflict: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.conflict
 			},
 			complete: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.complete
 			}
 		}
 	})

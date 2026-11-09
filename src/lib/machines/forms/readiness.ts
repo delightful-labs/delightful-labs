@@ -58,9 +58,9 @@ export function createScopedFormReadinessMachine<
 				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
 				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
 				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
-				OBSERVE: types<EventPayload<Event, 'OBSERVE'>>(),
-				PROJECTED: types<EventPayload<Event, 'PROJECTED'>>()
+				OBSERVE: types<EventPayload<Event, 'OBSERVE'>>()
 			},
+			internalEvents: { PROJECTED: types<EventPayload<Event, 'PROJECTED'>>() },
 			input: types<Input>(),
 			output: types<FormReadinessResult<Scope, Reason>>()
 		},
@@ -97,7 +97,8 @@ export function createScopedFormReadinessMachine<
 				},
 				states: {
 					selecting: {
-						always: (args) => {
+						type: 'choice',
+						choice: (args) => {
 							if (args.context.delivery.kind === 'watch') {
 								return { target: 'watching' }
 							}

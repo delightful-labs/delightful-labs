@@ -7,7 +7,6 @@ import {
 	type ActorLogic,
 	type Snapshot
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
@@ -148,7 +147,7 @@ export function createProfileAvatarMachine<
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		succeeded: (args, _enq) => {
+		succeeded: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -162,7 +161,7 @@ export function createProfileAvatarMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		partial: (args, _enq) => {
+		partial: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -176,7 +175,7 @@ export function createProfileAvatarMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		denied: (args, _enq) => {
+		denied: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -190,7 +189,7 @@ export function createProfileAvatarMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		unavailable: (args, _enq) => {
+		unavailable: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -204,7 +203,7 @@ export function createProfileAvatarMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		failed: (args, _enq) => {
+		failed: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -218,7 +217,7 @@ export function createProfileAvatarMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		closed: (args, _enq) => {
+		closed: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -232,7 +231,7 @@ export function createProfileAvatarMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		scopeChanged: (args, _enq) => {
+		scopeChanged: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -249,7 +248,7 @@ export function createProfileAvatarMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		cancelled: (args, _enq) => {
+		cancelled: (args) => {
 			const { context } = args
 			return {
 				context: {
@@ -270,12 +269,6 @@ export function createProfileAvatarMachine<
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'profile-avatar',
@@ -461,7 +454,8 @@ export function createProfileAvatarMachine<
 								})
 							},
 							ready: {
-								always: (args) => {
+								type: 'choice',
+								choice: (args) => {
 									if (matchesState({ running: { control: 'interrupted' } }, args.value)) {
 										return { target: 'finishing' }
 									}
@@ -560,14 +554,12 @@ export function createProfileAvatarMachine<
 								})
 							},
 							finishing: {
-								always: (args, enq) => {
+								always: (args) => {
 									const { context } = args
 									if (
 										matchesState({ running: { control: { interrupted: 'closed' } } }, args.value)
 									) {
-										{
-											return complete('closed', args, enq, { target: '#profile-avatar.closed' })
-										}
+										return { target: '#profile-avatar.closed' }
 									}
 									if (
 										matchesState(
@@ -575,67 +567,48 @@ export function createProfileAvatarMachine<
 											args.value
 										)
 									) {
-										{
-											return complete('scopeChanged', args, enq, {
-												target: '#profile-avatar.scopeChanged'
-											})
+										return {
+											target: '#profile-avatar.scopeChanged'
 										}
 									}
 									if (
 										matchesState({ running: { control: { interrupted: 'cancelled' } } }, args.value)
 									) {
-										{
-											return complete('cancelled', args, enq, {
-												target: '#profile-avatar.cancelled'
-											})
+										return {
+											target: '#profile-avatar.cancelled'
 										}
 									}
 									if (context.result?.outcome === 'succeeded') {
-										{
-											return complete('succeeded', args, enq, {
-												target: '#profile-avatar.succeeded'
-											})
+										return {
+											target: '#profile-avatar.succeeded'
 										}
 									}
 									if (context.result?.outcome === 'partial') {
-										{
-											return complete('partial', args, enq, { target: '#profile-avatar.partial' })
-										}
+										return { target: '#profile-avatar.partial' }
 									}
 									if (context.result?.outcome === 'denied') {
-										{
-											return complete('denied', args, enq, { target: '#profile-avatar.denied' })
-										}
+										return { target: '#profile-avatar.denied' }
 									}
 									if (context.result?.outcome === 'unavailable') {
-										{
-											return complete('unavailable', args, enq, {
-												target: '#profile-avatar.unavailable'
-											})
+										return {
+											target: '#profile-avatar.unavailable'
 										}
 									}
 									if (context.result?.outcome === 'closed') {
-										{
-											return complete('closed', args, enq, { target: '#profile-avatar.closed' })
-										}
+										return { target: '#profile-avatar.closed' }
 									}
 									if (context.result?.outcome === 'scopeChanged') {
-										{
-											return complete('scopeChanged', args, enq, {
-												target: '#profile-avatar.scopeChanged'
-											})
+										return {
+											target: '#profile-avatar.scopeChanged'
 										}
 									}
 									if (context.result?.outcome === 'cancelled') {
-										{
-											return complete('cancelled', args, enq, {
-												target: '#profile-avatar.cancelled'
-											})
+										return {
+											target: '#profile-avatar.cancelled'
 										}
 									}
-									{
-										return complete('failed', args, enq, { target: '#profile-avatar.failed' })
-									}
+
+									return { target: '#profile-avatar.failed' }
 								}
 							}
 						}
@@ -643,28 +616,36 @@ export function createProfileAvatarMachine<
 				}
 			},
 			succeeded: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.succeeded
 			},
 			partial: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.partial
 			},
 			denied: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.denied
 			},
 			unavailable: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.unavailable
 			},
 			failed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.failed
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			},
 			scopeChanged: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.scopeChanged
 			},
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			}
 		}
 	})

@@ -1,5 +1,4 @@
 import { types, setup } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { sameBackupBinding, type BackupBinding } from '../../backup/binding.js'
@@ -23,7 +22,8 @@ import {
 import {
 	createRestoreJournalError,
 	decodeRestoreJournalRecord,
-	encodeRestoreJournalRecord
+	encodeRestoreJournalRecord,
+	type RestoreJournalRecord
 } from '../../backup/restore-journal.js'
 import { isValidatedRestoreJournalSuccessor } from '../../backup/restore-journal-successor.js'
 export type BrowserJournalInput = {
@@ -47,9 +47,16 @@ type Event =
 			type: 'CLAIM_FAILED'
 			code: BrowserJournalErrorCode
 	  }
+	| {
+			type: 'DECODED'
+			record: RestoreJournalRecord | undefined
+			failure: BrowserJournalErrorCode | undefined
+	  }
+	| { type: 'ENCODED'; failure: BrowserJournalErrorCode | undefined }
 type Context = BrowserJournalInput & {
 	binding: BackupBinding
 	claimed: boolean
+	observed: RestoreJournalRecord | undefined
 	interruption: BrowserJournalInterruption | undefined
 	failure: BrowserJournalErrorCode | undefined
 	outcome: BrowserJournalOutcome
@@ -75,20 +82,22 @@ function candidateAdmitted(context: Context): boolean {
 	if (!matchesJournalBinding(command.record, context.binding)) return false
 	if (command.mode === 'create') return !context.exists && command.record.revision === 0
 	return (
-		data.observed?.revision === command.expectedRevision &&
-		isValidatedRestoreJournalSuccessor(data.observed, command.record)
+		context.observed?.revision === command.expectedRevision &&
+		isValidatedRestoreJournalSuccessor(context.observed, command.record)
 	)
 }
-function facts(context: Context): Pick<BrowserJournalResult, 'binding' | 'journal' | 'record'> {
+function selectedRecord(context: Context): RestoreJournalRecord | undefined {
 	const data = browserJournalData(context.request),
 		command = data.configuration?.command
-	const record =
-		context.terminal === 'complete' && data.configuration
-			? committed(context) && command && (command.mode === 'create' || command.mode === 'update')
-				? command.record
-				: data.observed
-			: undefined
-	data.result = record
+	return context.terminal === 'complete' && data.configuration
+		? committed(context) && command && (command.mode === 'create' || command.mode === 'update')
+			? command.record
+			: context.observed
+		: undefined
+}
+function facts(context: Context): Pick<BrowserJournalResult, 'binding' | 'journal' | 'record'> {
+	const data = browserJournalData(context.request)
+	const record = selectedRecord(context)
 	return {
 		binding: context.binding,
 		journal: {
@@ -126,36 +135,32 @@ export function createBrowserRestoreJournalMachine() {
 						? event.code
 						: (context.failure ?? event.code)
 					: context.failure
-		}),
-		decode: (args: { context: Context; event: Event }): Partial<Context> => ({
-			failure: (({ context }: { context: Context }) => {
-				const data = browserJournalData(context.request)
-				try {
-					if (!(data.raw instanceof Uint8Array)) throw createRestoreJournalError('invalidJournal')
-					data.observed = decodeRestoreJournalRecord(data.raw)
-					return context.failure
-				} catch (error) {
-					return context.failure ?? browserJournalFailure(error)
-				} finally {
-					clearBrowserJournalBuffers(context.request)
-				}
-			})(args)
-		}),
-		encode: (args: { context: Context; event: Event }): Partial<Context> => ({
-			failure: (({ context }: { context: Context }) => {
-				const data = browserJournalData(context.request),
-					command = data.configuration?.command
-				try {
-					if (!command || (command.mode !== 'create' && command.mode !== 'update'))
-						return 'invalidJournalRequest'
-					data.encoded = encodeRestoreJournalRecord(command.record)
-					return context.failure
-				} catch (error) {
-					return context.failure ?? browserJournalFailure(error)
-				}
-			})(args)
 		})
 	}
+	function decode(context: Context) {
+		const data = browserJournalData(context.request)
+		try {
+			if (!(data.raw instanceof Uint8Array)) throw createRestoreJournalError('invalidJournal')
+			return { record: decodeRestoreJournalRecord(data.raw), failure: context.failure }
+		} catch (error) {
+			return { record: undefined, failure: context.failure ?? browserJournalFailure(error) }
+		} finally {
+			clearBrowserJournalBuffers(context.request)
+		}
+	}
+	function encode(context: Context): BrowserJournalErrorCode | undefined {
+		const data = browserJournalData(context.request)
+		const command = data.configuration?.command
+		try {
+			if (!command || (command.mode !== 'create' && command.mode !== 'update'))
+				return 'invalidJournalRequest'
+			data.encoded = encodeRestoreJournalRecord(command.record)
+			return context.failure
+		} catch (error) {
+			return context.failure ?? browserJournalFailure(error)
+		}
+	}
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),
@@ -178,7 +183,9 @@ export function createBrowserRestoreJournalMachine() {
 				CLOSED: types<EventPayload<Event, 'CLOSED'>>(),
 				NATIVE_FAILED: types<EventPayload<Event, 'NATIVE_FAILED'>>(),
 				REQUEST_CLAIMED: types<EventPayload<Event, 'REQUEST_CLAIMED'>>(),
-				CLAIM_FAILED: types<EventPayload<Event, 'CLAIM_FAILED'>>()
+				CLAIM_FAILED: types<EventPayload<Event, 'CLAIM_FAILED'>>(),
+				DECODED: types<EventPayload<Event, 'DECODED'>>(),
+				ENCODED: types<EventPayload<Event, 'ENCODED'>>()
 			},
 			input: types<BrowserJournalInput>(),
 			output: types<BrowserJournalResult>()
@@ -198,13 +205,13 @@ export function createBrowserRestoreJournalMachine() {
 			matchingIntent: ({ context }: { context: Context }) => {
 				const data = browserJournalData(context.request),
 					command = data.configuration?.command
-				if (!data.observed || !command || command.mode === 'initialize') return false
+				if (!context.observed || !command || command.mode === 'initialize') return false
 				if (command.mode === 'discover')
-					return matchesJournalBinding(data.observed, context.binding)
+					return matchesJournalBinding(context.observed, context.binding)
 				const expected = command.mode === 'load' ? command.intent : command.record.intent
 				return (
-					matchesJournalBinding(data.observed, context.binding) &&
-					JSON.stringify(data.observed.intent) === JSON.stringify(expected)
+					matchesJournalBinding(context.observed, context.binding) &&
+					JSON.stringify(context.observed.intent) === JSON.stringify(expected)
 				)
 			},
 			alreadyStored: ({ context }: { context: Context }) => {
@@ -212,8 +219,8 @@ export function createBrowserRestoreJournalMachine() {
 					command = data.configuration?.command
 				return (
 					command?.mode === 'update' &&
-					data.observed !== undefined &&
-					JSON.stringify(data.observed) === JSON.stringify(command.record)
+					context.observed !== undefined &&
+					JSON.stringify(context.observed) === JSON.stringify(command.record)
 				)
 			},
 			candidateAdmitted: ({ context }: { context: Context }) => candidateAdmitted(context),
@@ -225,7 +232,11 @@ export function createBrowserRestoreJournalMachine() {
 					context.outcome === 'existing') &&
 				context.terminal !== 'complete'
 		},
-		actions: {}
+		actions: {
+			publishResult: ({ context }: { context: Context }) => {
+				if (context.claimed) browserJournalData(context.request).result = selectedRecord(context)
+			}
+		}
 	})
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
 	type CompletionEntry = Extract<
@@ -235,10 +246,12 @@ export function createBrowserRestoreJournalMachine() {
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		failed: (args, _enq) => {
+		failed: (args, enq) => {
+			enq(args.actions.publishResult, args)
 			const { context } = args
 			return {
 				context: {
+					observed: undefined,
 					result: {
 						...(context.claimed
 							? facts(context)
@@ -252,10 +265,12 @@ export function createBrowserRestoreJournalMachine() {
 				} satisfies Partial<Context>
 			}
 		},
-		interrupted: (args, _enq) => {
+		interrupted: (args, enq) => {
+			enq(args.actions.publishResult, args)
 			const { context } = args
 			return {
 				context: {
+					observed: undefined,
 					result: {
 						...facts(context),
 						outcome: context.interruption ?? 'cancelled'
@@ -263,10 +278,12 @@ export function createBrowserRestoreJournalMachine() {
 				} satisfies Partial<Context>
 			}
 		},
-		succeeded: (args, _enq) => {
+		succeeded: (args, enq) => {
+			enq(args.actions.publishResult, args)
 			const { context } = args
 			return {
 				context: {
+					observed: undefined,
 					result: {
 						...facts(context),
 						outcome: context.outcome
@@ -278,12 +295,6 @@ export function createBrowserRestoreJournalMachine() {
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return model.createMachine({
 		id: 'browser-restore-journal',
@@ -292,6 +303,7 @@ export function createBrowserRestoreJournalMachine() {
 			request: input.request,
 			binding: browserJournalBinding(input.request),
 			claimed: false,
+			observed: undefined,
 			interruption: undefined,
 			failure: undefined,
 			outcome: 'unavailable',
@@ -327,13 +339,15 @@ export function createBrowserRestoreJournalMachine() {
 		},
 		states: {
 			claiming: {
-				entry: ({ context, self }) => {
-					try {
-						claimBrowserJournalRequest(context.request)
-						self.send({ type: 'REQUEST_CLAIMED' })
-					} catch (error) {
-						self.send({ type: 'CLAIM_FAILED', code: browserJournalFailure(error) })
-					}
+				entry: ({ context, self }, enq) => {
+					enq(() => {
+						try {
+							claimBrowserJournalRequest(context.request)
+							self.send({ type: 'REQUEST_CLAIMED' })
+						} catch (error) {
+							self.send({ type: 'CLAIM_FAILED', code: browserJournalFailure(error) })
+						}
+					})
 				},
 				on: {
 					REQUEST_CLAIMED: (args) => {
@@ -581,9 +595,17 @@ export function createBrowserRestoreJournalMachine() {
 								}
 							},
 							validating: {
-								entry: (args) => {
-									return { context: patches.decode(args) satisfies Partial<Context> }
+								entry: ({ context, self }, enq) => {
+									enq(() => self.send({ type: 'DECODED', ...decode(context) }))
 								},
+								on: {
+									DECODED: ({ context, event }) => ({
+										target: 'checkingDecoded',
+										context: { observed: event.record, failure: context.failure ?? event.failure }
+									})
+								}
+							},
+							checkingDecoded: {
 								always: (args) => {
 									if (args.guards.hasFailure(args)) {
 										return { target: 'aborting' }
@@ -636,10 +658,19 @@ export function createBrowserRestoreJournalMachine() {
 								}
 							},
 							encoding: {
-								entry: (args) => {
-									return { context: patches.encode(args) satisfies Partial<Context> }
+								entry: ({ context, self }, enq) => {
+									enq(() => self.send({ type: 'ENCODED', failure: encode(context) }))
 								},
-								always: (args) => {
+								on: {
+									ENCODED: ({ context, event }) => ({
+										target: 'checkingEncoded',
+										context: { failure: context.failure ?? event.failure }
+									})
+								}
+							},
+							checkingEncoded: {
+								type: 'choice',
+								choice: (args) => {
 									if (args.guards.hasFailure(args)) {
 										return { target: 'aborting' }
 									}
@@ -693,52 +724,44 @@ export function createBrowserRestoreJournalMachine() {
 				}
 			},
 			finishing: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (!context.claimed || context.failure === 'journalCleanupFailed') {
-						{
-							return complete('failed', args, enq, { target: 'failed' })
-						}
+						return { target: 'failed' }
 					}
 					if (args.guards.interrupted(args)) {
-						{
-							return complete('interrupted', args, enq, { target: 'interrupted' })
-						}
+						return { target: 'interrupted' }
 					}
 					if (args.guards.hasFailure(args)) {
-						{
-							return complete('failed', args, enq, { target: 'failed' })
-						}
+						return { target: 'failed' }
 					}
 					if (args.guards.successNeedsCommit(args)) {
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: { failure: 'journalStoreFailed' } satisfies Partial<Context>
-							})
+						return {
+							target: 'failed',
+							context: { failure: 'journalStoreFailed' } satisfies Partial<Context>
 						}
 					}
 					if (args.guards.successNeedsTerminal(args)) {
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: { failure: 'journalStoreFailed' } satisfies Partial<Context>
-							})
+						return {
+							target: 'failed',
+							context: { failure: 'journalStoreFailed' } satisfies Partial<Context>
 						}
 					}
-					{
-						return complete('succeeded', args, enq, { target: 'succeeded' })
-					}
+
+					return { target: 'succeeded' }
 				}
 			},
 			failed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.failed
 			},
 			interrupted: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.interrupted
 			},
 			succeeded: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.succeeded
 			}
 		}
 	})

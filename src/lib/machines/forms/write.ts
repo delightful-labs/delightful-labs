@@ -6,7 +6,6 @@ import {
 	setup,
 	type Snapshot
 } from 'xstate'
-import { createFinalTransitions } from '../finalize.js'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { formInterruptionResult } from '../../contracts/scoped-form.js'
@@ -164,7 +163,7 @@ export function createScopedFormWriteMachine<
 	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
 	type CompletionQueue = Parameters<CompletionEntry>[1]
 	const finalizers = {
-		partial: (_args, _enq) => {
+		partial: (_args) => {
 			return {
 				context: {
 					request: undefined,
@@ -174,7 +173,7 @@ export function createScopedFormWriteMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		succeeded: (_args, _enq) => {
+		succeeded: (_args) => {
 			return {
 				context: {
 					request: undefined,
@@ -184,7 +183,7 @@ export function createScopedFormWriteMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		denied: (args, _enq) => {
+		denied: (args) => {
 			return {
 				context: {
 					result: (({ context }): Output => {
@@ -201,7 +200,7 @@ export function createScopedFormWriteMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		unavailable: (args, _enq) => {
+		unavailable: (args) => {
 			return {
 				context: {
 					result: (({ context }): Output => {
@@ -218,7 +217,7 @@ export function createScopedFormWriteMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		failed: (_args, _enq) => {
+		failed: (_args) => {
 			return {
 				context: {
 					request: undefined,
@@ -228,7 +227,7 @@ export function createScopedFormWriteMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		cancelled: (args, _enq) => {
+		cancelled: (args) => {
 			return {
 				context: {
 					result: args.context.result ?? { outcome: 'cancelled', settlement: 'notStarted' },
@@ -239,7 +238,7 @@ export function createScopedFormWriteMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		scopeChanged: (args, _enq) => {
+		scopeChanged: (args) => {
 			return {
 				context: {
 					result: args.context.result ?? { outcome: 'scopeChanged', settlement: 'notStarted' },
@@ -250,7 +249,7 @@ export function createScopedFormWriteMachine<
 				} satisfies Partial<Context>
 			}
 		},
-		closed: (args, _enq) => {
+		closed: (args) => {
 			return {
 				context: {
 					result: args.context.result ?? { outcome: 'closed', settlement: 'notStarted' },
@@ -265,12 +264,6 @@ export function createScopedFormWriteMachine<
 		string,
 		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
 	>
-	const complete = createFinalTransitions<
-		Context,
-		CompletionArgs,
-		CompletionQueue,
-		keyof typeof finalizers
-	>(finalizers)
 
 	return form.createMachine({
 		id: 'scoped-form-write',
@@ -285,28 +278,27 @@ export function createScopedFormWriteMachine<
 		}),
 		output: ({ context }) => context.result ?? failure('failed'),
 		on: {
-			CANCEL: (args, enq) => {
-				return complete('cancelled', args, enq, { target: '.cancelled' })
+			CANCEL: (_args) => {
+				return { target: '.cancelled' }
 			},
-			INVALIDATE: (args, enq) => {
-				return complete('scopeChanged', args, enq, { target: '.scopeChanged' })
+			INVALIDATE: (_args) => {
+				return { target: '.scopeChanged' }
 			},
-			SHUTDOWN: (args, enq) => {
-				return complete('closed', args, enq, { target: '.closed' })
+			SHUTDOWN: (_args) => {
+				return { target: '.closed' }
 			}
 		},
 		states: {
 			admittingInput: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (context.request !== undefined && context.observation !== undefined) {
 						return { target: 'refreshing' }
 					}
-					{
-						return complete('failed', args, enq, {
-							target: 'failed',
-							context: { result: prewriteFailure } satisfies Partial<Context>
-						})
+
+					return {
+						target: 'failed',
+						context: { result: prewriteFailure } satisfies Partial<Context>
 					}
 				}
 			},
@@ -326,12 +318,10 @@ export function createScopedFormWriteMachine<
 							} satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: { result: prewriteFailure } satisfies Partial<Context>
-							})
+					onError: (_args) => {
+						return {
+							target: 'failed',
+							context: { result: prewriteFailure } satisfies Partial<Context>
 						}
 					}
 				}),
@@ -347,22 +337,18 @@ export function createScopedFormWriteMachine<
 				}
 			},
 			checkingScope: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (context.request === undefined || context.observation === undefined) {
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: { result: prewriteFailure } satisfies Partial<Context>
-							})
+						return {
+							target: 'failed',
+							context: { result: prewriteFailure } satisfies Partial<Context>
 						}
 					}
 					if (
 						!options.sameScope(request(context).scope, options.scopeOf(observation(context).facts))
 					) {
-						{
-							return complete('scopeChanged', args, enq, { target: 'scopeChanged' })
-						}
+						return { target: 'scopeChanged' }
 					}
 					return { target: 'authorizing' }
 				}
@@ -372,14 +358,12 @@ export function createScopedFormWriteMachine<
 				states: {
 					pending: {},
 					checkingError: {
-						always: (args, enq) => {
+						always: (args) => {
 							const { context } = args
 							if (context.assessmentError?.generation === context.assessmentGeneration) {
-								{
-									return complete('failed', args, enq, {
-										target: '#scoped-form-write.failed',
-										context: { result: prewriteFailure } satisfies Partial<Context>
-									})
+								return {
+									target: '#scoped-form-write.failed',
+									context: { result: prewriteFailure } satisfies Partial<Context>
 								}
 							}
 							return { target: 'pending' }
@@ -416,7 +400,7 @@ export function createScopedFormWriteMachine<
 							}
 						}
 					}),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { context, event } = args
 						if (
 							event.output.token !== undefined &&
@@ -439,11 +423,10 @@ export function createScopedFormWriteMachine<
 								} satisfies Partial<Context>
 							}
 						}
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: { result: prewriteFailure } satisfies Partial<Context>
-							})
+
+						return {
+							target: 'failed',
+							context: { result: prewriteFailure } satisfies Partial<Context>
 						}
 					},
 					onError: (args) => {
@@ -476,14 +459,12 @@ export function createScopedFormWriteMachine<
 				}
 			},
 			deciding: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (context.request === undefined || context.observation === undefined) {
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: { result: prewriteFailure } satisfies Partial<Context>
-							})
+						return {
+							target: 'failed',
+							context: { result: prewriteFailure } satisfies Partial<Context>
 						}
 					}
 					if (context.capability?.readiness.kind === 'ready') {
@@ -498,20 +479,15 @@ export function createScopedFormWriteMachine<
 							)
 						})(args)
 					) {
-						{
-							return complete('denied', args, enq, { target: 'denied' })
-						}
+						return { target: 'denied' }
 					}
 					if (context.capability?.readiness.kind === 'blocked') {
-						{
-							return complete('unavailable', args, enq, { target: 'unavailable' })
-						}
+						return { target: 'unavailable' }
 					}
-					{
-						return complete('failed', args, enq, {
-							target: 'failed',
-							context: { result: prewriteFailure } satisfies Partial<Context>
-						})
+
+					return {
+						target: 'failed',
+						context: { result: prewriteFailure } satisfies Partial<Context>
 					}
 				}
 			},
@@ -524,36 +500,30 @@ export function createScopedFormWriteMachine<
 						request: request(context),
 						observation: observation(context)
 					}),
-					onDone: (args, enq) => {
+					onDone: (args) => {
 						const { event } = args
 						if (matchesState({ writing: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, {
-									target: 'closed',
-									context: {
-										result: interruptedResult('closed', event.output)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'closed',
+								context: {
+									result: interruptedResult('closed', event.output)
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ writing: 'invalidated' }, args.value)) {
-							{
-								return complete('scopeChanged', args, enq, {
-									target: 'scopeChanged',
-									context: {
-										result: interruptedResult('scopeChanged', event.output)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'scopeChanged',
+								context: {
+									result: interruptedResult('scopeChanged', event.output)
+								} satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ writing: 'cancelling' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: {
-										result: interruptedResult('cancelled', event.output)
-									} satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: {
+									result: interruptedResult('cancelled', event.output)
+								} satisfies Partial<Context>
 							}
 						}
 						return {
@@ -561,36 +531,29 @@ export function createScopedFormWriteMachine<
 							context: { result: event.output ?? failure('failed') } satisfies Partial<Context>
 						}
 					},
-					onError: (args, enq) => {
+					onError: (args) => {
 						if (matchesState({ writing: 'closing' }, args.value)) {
-							{
-								return complete('closed', args, enq, {
-									target: 'closed',
-									context: { result: failure('closed') } satisfies Partial<Context>
-								})
+							return {
+								target: 'closed',
+								context: { result: failure('closed') } satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ writing: 'invalidated' }, args.value)) {
-							{
-								return complete('scopeChanged', args, enq, {
-									target: 'scopeChanged',
-									context: { result: failure('scopeChanged') } satisfies Partial<Context>
-								})
+							return {
+								target: 'scopeChanged',
+								context: { result: failure('scopeChanged') } satisfies Partial<Context>
 							}
 						}
 						if (matchesState({ writing: 'cancelling' }, args.value)) {
-							{
-								return complete('cancelled', args, enq, {
-									target: 'cancelled',
-									context: { result: failure('cancelled') } satisfies Partial<Context>
-								})
+							return {
+								target: 'cancelled',
+								context: { result: failure('cancelled') } satisfies Partial<Context>
 							}
 						}
-						{
-							return complete('failed', args, enq, {
-								target: 'failed',
-								context: { result: failure('failed') } satisfies Partial<Context>
-							})
+
+						return {
+							target: 'failed',
+							context: { result: failure('failed') } satisfies Partial<Context>
 						}
 					}
 				},
@@ -627,71 +590,64 @@ export function createScopedFormWriteMachine<
 				}
 			},
 			settled: {
-				always: (args, enq) => {
+				always: (args) => {
 					const { context } = args
 					if (context.result?.outcome === 'succeeded') {
-						{
-							return complete('succeeded', args, enq, { target: 'succeeded' })
-						}
+						return { target: 'succeeded' }
 					}
 					if (context.result?.outcome === 'denied') {
-						{
-							return complete('denied', args, enq, { target: 'denied' })
-						}
+						return { target: 'denied' }
 					}
 					if (context.result?.outcome === 'unavailable') {
-						{
-							return complete('unavailable', args, enq, { target: 'unavailable' })
-						}
+						return { target: 'unavailable' }
 					}
 					if (context.result?.outcome === 'cancelled') {
-						{
-							return complete('cancelled', args, enq, { target: 'cancelled' })
-						}
+						return { target: 'cancelled' }
 					}
 					if (context.result?.outcome === 'closed') {
-						{
-							return complete('closed', args, enq, { target: 'closed' })
-						}
+						return { target: 'closed' }
 					}
 					if (context.result?.outcome === 'scopeChanged') {
-						{
-							return complete('scopeChanged', args, enq, { target: 'scopeChanged' })
-						}
+						return { target: 'scopeChanged' }
 					}
 					if (context.result?.outcome === 'partial') {
-						{
-							return complete('partial', args, enq, { target: 'partial' })
-						}
+						return { target: 'partial' }
 					}
-					{
-						return complete('failed', args, enq, { target: 'failed' })
-					}
+
+					return { target: 'failed' }
 				}
 			},
 			partial: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.partial
 			},
 			succeeded: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.succeeded
 			},
 			denied: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.denied
 			},
 			unavailable: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.unavailable
 			},
 			failed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.failed
 			},
 			cancelled: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.cancelled
 			},
 			scopeChanged: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.scopeChanged
 			},
 			closed: {
-				type: 'final'
+				type: 'final',
+				entry: finalizers.closed
 			}
 		}
 	})
