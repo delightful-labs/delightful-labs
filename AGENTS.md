@@ -15,7 +15,7 @@ and shell helpers are under `.specify/`. This setup reuses the Spec Kit 1.1.3
 files already installed in the local Delightful Local First project. No project
 constitution has been ratified; do not treat the constitution template as policy.
 
-The current deliverable is the specification and removal of the legacy landing
-page implementation in the same commit. The old files remain available in Git
-history. New application implementation, publishing migrated articles, and
-production hosting/DNS cutover are later work.
+The specification and legacy cleanup were merged in PR #1. Continue with the
+basic application foundation and native-reader proof. Publication creation,
+archive publishing, and production DNS cutover remain gated by the documented
+integration checks. Content and typography remain deferred.
