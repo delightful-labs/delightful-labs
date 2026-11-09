@@ -127,14 +127,18 @@ export function createWorkspaceCreationOperation<
 		reconcile: options.reconcile,
 		persist: options.persist
 	}
-	type Context = Input & {
-		db: Db
+	type Context = {
+		request: CreationRequest
 		name: string
-		record: WorkspaceJournalRecord | undefined
 		journal: JournalResult | undefined
 		reconciliation: ReconciliationResult | undefined
 		persistence: WorkspacePersistenceResult | undefined
 		result: CreationResult
+		operation: {
+			binding: Binding
+			db: Db
+			record: WorkspaceJournalRecord | undefined
+		}
 	}
 	function required<T>(value: T | undefined): T {
 		if (value === undefined) throw new Error('Missing creation operation value')
@@ -161,7 +165,7 @@ export function createWorkspaceCreationOperation<
 				context.reconciliation?.outcome === 'notStarted' ||
 				context.persistence?.settlement === 'notStarted',
 			recoveringUnknownAttempt: ({ context }: { context: Context }) =>
-				context.record !== undefined &&
+				context.operation.record !== undefined &&
 				(context.request.mode === 'load' ||
 					(context.request.mode === 'retry' && context.request.settlement === 'unresolved'))
 		}
@@ -170,14 +174,17 @@ export function createWorkspaceCreationOperation<
 		id: 'workspace-creation-operation',
 		initial: 'running',
 		context: ({ input }) => ({
-			...input,
-			db,
+			request: input.request,
 			name: '',
-			record: 'record' in input.request ? input.request.record : undefined,
 			journal: undefined,
 			reconciliation: undefined,
 			persistence: undefined,
-			result: { outcome: 'editing', record: undefined, settlement: 'notStarted' }
+			result: { outcome: 'editing', record: undefined, settlement: 'notStarted' },
+			operation: {
+				binding: input.binding,
+				db,
+				record: 'record' in input.request ? input.request.record : undefined
+			}
 		}),
 		output: ({ context }) => context.result,
 		states: {
@@ -265,11 +272,19 @@ export function createWorkspaceCreationOperation<
 							preparing: {
 								invoke: model.createInvoke<typeof actors.prepare, Context>({
 									src: actors.prepare,
-									input: ({ context }) => ({ binding: context.binding, name: context.name }),
+									input: ({ context }) => ({
+										binding: context.operation.binding,
+										name: context.name
+									}),
 									onDone: (args) => {
 										return {
 											target: 'checkingBinding',
-											context: { record: args.event.output } satisfies Partial<Context>
+											context: {
+												operation: {
+													...args.context.operation,
+													record: args.event.output
+												}
+											} satisfies Partial<Context>
 										}
 									},
 									onError: (args) => {
@@ -277,7 +292,7 @@ export function createWorkspaceCreationOperation<
 											target: 'finishing',
 											context: {
 												result: {
-													record: args.context.record,
+													record: args.context.operation.record,
 													settlement: 'notStarted',
 													outcome: 'failed',
 													error: args.event.error
@@ -297,8 +312,8 @@ export function createWorkspaceCreationOperation<
 										return { target: 'finishing' }
 									}
 									if (
-										context.record?.key === context.binding.key &&
-										options.matchesBinding(context.record, context.binding)
+										context.operation.record?.key === context.operation.binding.key &&
+										options.matchesBinding(context.operation.record, context.operation.binding)
 									) {
 										return { target: 'recordingJournal' }
 									}
@@ -307,7 +322,7 @@ export function createWorkspaceCreationOperation<
 										context: {
 											result: {
 												outcome: 'conflict',
-												record: context.record,
+												record: context.operation.record,
 												settlement: 'notStarted'
 											}
 										} satisfies Partial<Context>
@@ -334,17 +349,20 @@ export function createWorkspaceCreationOperation<
 								invoke: model.createInvoke<typeof actors.journal, Context>({
 									id: 'effect',
 									src: actors.journal,
-									input: ({ context }) => ({ key: context.binding.key, mode: 'read' }),
+									input: ({ context }) => ({ key: context.operation.binding.key, mode: 'read' }),
 									onDone: (args) => {
 										const { event } = args
 										return {
 											target: 'checkingLoadedJournal',
 											context: {
 												journal: event.output,
-												record:
-													event.output?.outcome === 'succeeded'
-														? event.output.record
-														: args.context.record
+												operation: {
+													...args.context.operation,
+													record:
+														event.output?.outcome === 'succeeded'
+															? event.output.record
+															: args.context.operation.record
+												}
 											} satisfies Partial<Context>
 										}
 									},
@@ -353,7 +371,7 @@ export function createWorkspaceCreationOperation<
 											target: 'finishing',
 											context: {
 												result: {
-													record: args.context.record,
+													record: args.context.operation.record,
 													settlement: 'notStarted',
 													outcome: 'failed',
 													error: args.event.error
@@ -385,10 +403,13 @@ export function createWorkspaceCreationOperation<
 										return {
 											target: 'checkingLoadedBinding',
 											context: {
-												record:
-													context.journal?.outcome === 'succeeded'
-														? context.journal.record
-														: undefined
+												operation: {
+													...args.context.operation,
+													record:
+														context.journal?.outcome === 'succeeded'
+															? context.journal.record
+															: undefined
+												}
 											} satisfies Partial<Context>
 										}
 									}
@@ -399,8 +420,8 @@ export function createWorkspaceCreationOperation<
 								always: (args) => {
 									const { context } = args
 									if (
-										context.record?.key === context.binding.key &&
-										options.matchesBinding(context.record, context.binding)
+										context.operation.record?.key === context.operation.binding.key &&
+										options.matchesBinding(context.operation.record, context.operation.binding)
 									) {
 										return { target: 'reconciling' }
 									}
@@ -409,7 +430,7 @@ export function createWorkspaceCreationOperation<
 										context: {
 											result: {
 												outcome: 'conflict',
-												record: context.record,
+												record: context.operation.record,
 												settlement: 'notStarted'
 											}
 										} satisfies Partial<Context>
@@ -437,9 +458,9 @@ export function createWorkspaceCreationOperation<
 									id: 'effect',
 									src: actors.journal,
 									input: ({ context }) => ({
-										key: context.binding.key,
+										key: context.operation.binding.key,
 										mode: 'write',
-										record: required(context.record)
+										record: required(context.operation.record)
 									}),
 									onDone: (args) => {
 										return {
@@ -452,7 +473,7 @@ export function createWorkspaceCreationOperation<
 											target: 'finishing',
 											context: {
 												result: {
-													record: args.context.record,
+													record: args.context.operation.record,
 													settlement: 'notStarted',
 													outcome: 'failed',
 													error: args.event.error
@@ -502,9 +523,9 @@ export function createWorkspaceCreationOperation<
 									id: 'effect',
 									src: actors.journal,
 									input: ({ context }) => ({
-										key: context.binding.key,
+										key: context.operation.binding.key,
 										mode: 'clear',
-										attemptId: options.attemptId(required(context.record))
+										attemptId: options.attemptId(required(context.operation.record))
 									}),
 									onDone: (args) => {
 										return {
@@ -517,7 +538,7 @@ export function createWorkspaceCreationOperation<
 											target: 'finishing',
 											context: {
 												result: {
-													record: args.context.record,
+													record: args.context.operation.record,
 													settlement: 'notStarted',
 													outcome: 'failed',
 													error: args.event.error
@@ -538,7 +559,12 @@ export function createWorkspaceCreationOperation<
 									if (args.context.journal?.outcome === 'succeeded') {
 										return {
 											target: 'finishing',
-											context: { record: undefined } satisfies Partial<Context>
+											context: {
+												operation: {
+													...args.context.operation,
+													record: undefined
+												}
+											} satisfies Partial<Context>
 										}
 									}
 									return { target: 'journalFailure' }
@@ -553,7 +579,7 @@ export function createWorkspaceCreationOperation<
 											context: {
 												result: {
 													outcome: 'conflict',
-													record: context.record,
+													record: context.operation.record,
 													settlement: 'notStarted'
 												}
 											} satisfies Partial<Context>
@@ -563,7 +589,7 @@ export function createWorkspaceCreationOperation<
 										target: 'finishing',
 										context: {
 											result: {
-												record: context.record,
+												record: context.operation.record,
 												settlement: 'notStarted',
 												outcome: 'failed',
 												error:
@@ -579,8 +605,8 @@ export function createWorkspaceCreationOperation<
 								invoke: model.createInvoke<typeof actors.reconcile, Context>({
 									src: actors.reconcile,
 									input: ({ context }) => ({
-										db: context.db,
-										attempt: required(context.record).attempt
+										db: context.operation.db,
+										attempt: required(context.operation.record).attempt
 									}),
 									onDone: (args) => {
 										return {
@@ -593,7 +619,7 @@ export function createWorkspaceCreationOperation<
 											target: 'finishing',
 											context: {
 												result: {
-													record: args.context.record,
+													record: args.context.operation.record,
 													settlement: 'notStarted',
 													outcome: 'failed',
 													error: args.event.error
@@ -616,7 +642,7 @@ export function createWorkspaceCreationOperation<
 														throw new Error('Expected completed creation')
 													return {
 														outcome: 'complete',
-														record: required(context.record),
+														record: required(context.operation.record),
 														workspace: result.workspace,
 														settlement: 'locallyPersisted'
 													}
@@ -630,7 +656,7 @@ export function createWorkspaceCreationOperation<
 											context: {
 												result: {
 													outcome: 'recovered',
-													record: required(context.record),
+													record: required(context.operation.record),
 													settlement: 'notStarted'
 												}
 											} satisfies Partial<Context>
@@ -641,7 +667,7 @@ export function createWorkspaceCreationOperation<
 										context: {
 											result: {
 												outcome: 'unresolved',
-												record: context.record,
+												record: context.operation.record,
 												settlement: 'unresolved',
 												error: new Error('Prior creation issuance is unknown')
 											}
@@ -670,7 +696,7 @@ export function createWorkspaceCreationOperation<
 									id: 'effect',
 									src: actors.persist,
 									input: ({ context }) => ({
-										attempt: required(context.record).attempt,
+										attempt: required(context.operation.record).attempt,
 										issuance:
 											context.request.mode === 'create' ||
 											(context.request.mode === 'retry' &&
@@ -689,7 +715,7 @@ export function createWorkspaceCreationOperation<
 											target: 'finishing',
 											context: {
 												result: {
-													record: args.context.record,
+													record: args.context.operation.record,
 													outcome: 'unresolved',
 													settlement: 'unresolved',
 													error: args.event.error
@@ -712,7 +738,7 @@ export function createWorkspaceCreationOperation<
 														throw new Error('Expected completed creation')
 													return {
 														outcome: 'complete',
-														record: required(context.record),
+														record: required(context.operation.record),
 														workspace: result.workspace,
 														settlement: 'locallyPersisted'
 													}
@@ -726,7 +752,7 @@ export function createWorkspaceCreationOperation<
 											context: {
 												result: {
 													outcome: 'unresolved',
-													record: context.record,
+													record: context.operation.record,
 													settlement: 'unresolved',
 													error:
 														context.persistence?.outcome === 'failed'
@@ -745,7 +771,7 @@ export function createWorkspaceCreationOperation<
 											context: {
 												result: {
 													outcome: 'conflict',
-													record: context.record,
+													record: context.operation.record,
 													settlement: 'notStarted'
 												}
 											} satisfies Partial<Context>
@@ -755,7 +781,7 @@ export function createWorkspaceCreationOperation<
 										target: 'finishing',
 										context: {
 											result: {
-												record: context.record,
+												record: context.operation.record,
 												settlement: 'notStarted',
 												outcome: 'failed',
 												error:
@@ -789,7 +815,7 @@ export function createWorkspaceCreationOperation<
 						context: {
 							result: {
 								outcome: 'closed',
-								record: context.record,
+								record: context.operation.record,
 								settlement: context.persistence?.settlement ?? context.result.settlement
 							}
 						} satisfies Partial<Context>
@@ -804,7 +830,7 @@ export function createWorkspaceCreationOperation<
 						context: {
 							result: {
 								outcome: 'cancelled',
-								record: context.record,
+								record: context.operation.record,
 								settlement: context.persistence?.settlement ?? context.result.settlement
 							}
 						} satisfies Partial<Context>
@@ -832,7 +858,7 @@ export function createWorkspaceCreationOperation<
 							context: {
 								result: {
 									outcome: 'closed',
-									record: context.record,
+									record: context.operation.record,
 									settlement: 'unresolved'
 								}
 							} satisfies Partial<Context>
@@ -844,7 +870,7 @@ export function createWorkspaceCreationOperation<
 							context: {
 								result: {
 									outcome: 'cancelled',
-									record: context.record,
+									record: context.operation.record,
 									settlement: 'unresolved'
 								}
 							} satisfies Partial<Context>
@@ -855,7 +881,7 @@ export function createWorkspaceCreationOperation<
 						context: {
 							result: {
 								outcome: 'unresolved',
-								record: context.record,
+								record: context.operation.record,
 								settlement: 'unresolved',
 								error:
 									context.result.outcome === 'failed'

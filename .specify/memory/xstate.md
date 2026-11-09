@@ -20,9 +20,12 @@ from their reported events, and use the transition's scoped child references for
 ongoing work. Pure named predicates remain useful; compose them with ordinary JS
 instead of v5 guard combinators. Review parallel-region reentry explicitly.
 
-The checked-in declaration-only XState patch preserves generic type-only schemas
-and source/target context identity. It changes no runtime behavior. Consumer
-migrations must qualify the same patch until upstream supplies these fixes; see
+Use the published XState package without patches or declaration overrides. Group
+related generic lifecycle values in explicit immutable context records and update
+the complete record when any member changes. This keeps ownership visible and
+lets v6 check source/target context compatibility. Where a generic union output
+cannot be expressed through the beta's schema inference, use an explicitly typed
+output mapper and let the machine infer that output contract. See
 `specs/003-verified-backup/xstate-v6-implementation.md`. Historical v5 API references
 below describe the original ownership rules, not supported imports.
 

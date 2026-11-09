@@ -31,18 +31,37 @@ was executed in this implementation phase. Jazz remains `2.0.0-alpha.59`.
   frozen interface. Retention, late acquisition and owner-error observation
   remain in place pending v6 native qualification.
 
-## Declaration patch and consumers
+## Unpatched XState and context ownership
 
-`patches/xstate@6.0.0-beta.1.patch` changes only two upstream declarations:
-`RequiredContextKeys` recognizes assignable current/target context before
-requiring patch keys; `InferOutput` preserves type-only generic schema outputs
-without expanding them through `Compute`. Runtime JavaScript is unchanged.
-These are local beta compatibility fixes, not claimed upstream fixes.
+Use the published `xstate@6.0.0-beta.1` package. There are no XState patches,
+declaration overrides, or consumer patch requirements.
 
-The root pnpm configuration applies the patch with a locked hash. The archive
-includes the patch, but consumers must explicitly register it in their own root
-`patchedDependencies`; pnpm does not inherit dependency patch settings. Reassess
-these fixes on each beta update. No v5/v6 peer compatibility is claimed.
+Related generic lifecycle values now live in explicit immutable records:
+
+| Machine                     | Context record | Owned values                                    |
+| --------------------------- | -------------- | ----------------------------------------------- |
+| Session acquisition/startup | `acquisition`  | Session reference                               |
+| Creation operation          | `operation`    | Binding, database, journal record               |
+| Creation owner              | `bindingState` | Observed/active bindings, journal record        |
+| Creation persistence        | `resources`    | Database, validated attempt                     |
+| Creation transaction        | `resources`    | Transaction, records, workspace, commit receipt |
+| Workspace initialization    | `operation`    | Database, prepared attempt, outcome             |
+| Invitation authority        | `resources`    | Credentials, transaction, write receipt         |
+| Workspace journal           | `observation`  | Parsed journal record                           |
+| Workspace startup           | `results`      | Initialization and seed outcomes                |
+
+Transitions replace a complete record, preserving its other members explicitly.
+This works with the beta's context compatibility checks without weakening types.
+Required secrets/resource clearing targets the same values inside their owning
+record. The session selector retains its public return contract; callers must
+adapt any direct access to these internal snapshot context fields. Persisted
+XState snapshots from the prior shape are not a supported migration format.
+
+Workspace initialization omits the generic union output schema and declares the
+output mapper's `InitializationOutcome<Persistence>` return type instead. XState
+infers the machine output from that mapper using its supported config inference.
+The public input/event/output contracts remain typed; no casts or broad actor
+types are introduced to bypass the published declarations.
 
 The vendored DUI archive is unchanged. Its independent UI actors and consumer
 archives still require coordinated v6 adoption; do not pass v5 actor refs or
@@ -73,7 +92,7 @@ After approval:
    settlement. Retain recovery ownership until each boundary is proven.
 3. Run full checks, packaged consumer declarations/imports, native backup/Jazz
    fixtures and Storybook/browser flows. Verify optional independent subpaths
-   without XState and an actual patched consumer installation.
+   without XState and an actual consumer installation using the published beta.
 4. Build identifiable archives and qualify Clipper/Finance adoption separately,
    including worker storage identity, offline restart, multi-tab and drain.
 

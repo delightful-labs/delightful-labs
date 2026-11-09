@@ -37,9 +37,13 @@ export function createWorkspacePersistence<
 		attempt: Attempt
 		issuance: 'new' | 'unknown'
 	}
-	type Context = Input & {
-		db: Db
+	type Context = {
+		issuance: 'new' | 'unknown'
 		result: WorkspacePersistenceResult | undefined
+		resources: {
+			attempt: Attempt
+			db: Db
+		}
 	}
 	const db = options.db
 	const transaction = options.transaction
@@ -67,7 +71,14 @@ export function createWorkspacePersistence<
 	})
 	return invokeModel.createMachine({
 		id: 'workspace-creation-persistence',
-		context: ({ input }) => ({ ...input, db, result: undefined }),
+		context: ({ input }) => ({
+			issuance: input.issuance,
+			result: undefined,
+			resources: {
+				attempt: input.attempt,
+				db
+			}
+		}),
 		initial: 'validating',
 		output: ({ context }) => {
 			if (!context.result) throw new Error('Missing workspace persistence outcome')
@@ -78,11 +89,16 @@ export function createWorkspacePersistence<
 			validating: {
 				invoke: invokeModel.createInvoke<typeof validate, Context>({
 					src: validate,
-					input: ({ context }) => ({ attempt: context.attempt }),
+					input: ({ context }) => ({ attempt: context.resources.attempt }),
 					onDone: (args) => {
 						return {
 							target: 'reconciling',
-							context: { attempt: args.event.output } satisfies Partial<Context>
+							context: {
+								resources: {
+									...args.context.resources,
+									attempt: args.event.output
+								}
+							} satisfies Partial<Context>
 						}
 					},
 					onError: (args) => {
@@ -102,7 +118,10 @@ export function createWorkspacePersistence<
 			reconciling: {
 				invoke: invokeModel.createInvoke<typeof options.reconcile, Context>({
 					src: options.reconcile,
-					input: ({ context }) => context,
+					input: ({ context }) => ({
+						db: context.resources.db,
+						attempt: context.resources.attempt
+					}),
 					onDone: (args) => {
 						const { event } = args
 						if (
@@ -184,7 +203,7 @@ export function createWorkspacePersistence<
 				invoke: invokeModel.createInvoke<typeof transaction, Context>({
 					id: 'transaction',
 					src: transaction,
-					input: ({ context }) => context,
+					input: ({ context }) => ({ attempt: context.resources.attempt }),
 					onDone: (args) => {
 						return {
 							target: 'settling',

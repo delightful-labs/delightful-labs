@@ -76,16 +76,18 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 	type Context = {
 		custody: Custody
 		identity: InvitationAuthorityIdentity
-		credentials: Credentials | undefined
 		request: InvitationAuthorityRequest | undefined
 		admission: Admission | undefined
-		transaction: Transaction | undefined
 		records: InvitationAuthorityRecords<Role> | undefined
 		now: number | undefined
 		plan: InvitationAuthorityPlan<Role> | undefined
 		decision: InvitationDecision | undefined
-		write: Write | undefined
 		result: Result | undefined
+		resources: {
+			credentials: Credentials | undefined
+			transaction: Transaction | undefined
+			write: Write | undefined
+		}
 	}
 	const records = (context: Context) => required(context.records)
 	const invitation = (context: Context) => required(records(context).invitation ?? undefined)
@@ -210,15 +212,18 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 	}
 	const patches = {
 		clear: (_args: { context: Context }): Partial<Context> => ({
-			credentials: undefined,
 			request: undefined,
 			admission: undefined,
-			transaction: undefined,
 			records: undefined,
 			now: undefined,
 			plan: undefined,
 			decision: undefined,
-			write: undefined
+			resources: {
+				..._args.context.resources,
+				credentials: undefined,
+				transaction: undefined,
+				write: undefined
+			}
 		}),
 		failure: ({ context }: { context: Context }): Partial<Context> => ({
 			result: {
@@ -235,8 +240,8 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 					kind: 'unknown',
 					retained: {
 						accountId: admitted(context).accountId,
-						transaction: required(context.transaction),
-						write: context.write,
+						transaction: required(context.resources.transaction),
+						write: context.resources.write,
 						access: {
 							confirm: admitted(context).transactions.confirm.bind(admitted(context).transactions),
 							rollback: admitted(context).transactions.rollback.bind(admitted(context).transactions)
@@ -271,9 +276,8 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 	const transactionInput = ({ context }: { context: Context }) => ({
 		custody: context.custody,
 		transactions: admitted(context).transactions,
-		transaction: required(context.transaction)
+		transaction: required(context.resources.transaction)
 	})
-
 	type CompletionEntry = Extract<
 		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
 		(...args: never[]) => unknown
@@ -321,7 +325,12 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		}
 	} satisfies Record<
 		string,
-		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+		(
+			args: CompletionArgs,
+			enq: CompletionQueue
+		) => void | {
+			context?: Partial<Context>
+		}
 	>
 	const complete = createFinalTransitions<
 		Context,
@@ -329,7 +338,6 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 		CompletionQueue,
 		keyof typeof finalizers
 	>(finalizers)
-
 	return model.createMachine({
 		id: 'invitation-authority',
 		initial: 'running',
@@ -344,16 +352,18 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 				operationId: input.request.operationId,
 				invitationId: input.request.invitationId
 			},
-			credentials: input.credentials,
 			request: { ...input.request },
 			admission: undefined,
-			transaction: undefined,
 			records: undefined,
 			now: undefined,
 			plan: undefined,
 			decision: undefined,
-			write: undefined,
-			result: undefined
+			result: undefined,
+			resources: {
+				credentials: input.credentials,
+				transaction: undefined,
+				write: undefined
+			}
 		}),
 		output: ({ context }) => required(context.result),
 		states: {
@@ -405,7 +415,9 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 							admitting: {
 								invoke: {
 									src: actors.admit,
-									input: ({ context }) => ({ credentials: required(context.credentials) }),
+									input: ({ context }) => ({
+										credentials: required(context.resources.credentials)
+									}),
 									onDone: (args) => {
 										const { event } = args
 										if (
@@ -415,19 +427,21 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 											return {
 												target: 'checkingAdmission',
 												context: {
-													credentials: undefined,
 													admission:
 														event.output.outcome === 'succeeded' &&
 														event.output.value.outcome === 'admitted'
 															? event.output.value
-															: undefined
+															: undefined,
+													resources: {
+														...args.context.resources,
+														credentials: undefined
+													}
 												} satisfies Partial<Context>
 											}
 										}
 										return {
 											target: 'finishing',
 											context: {
-												credentials: undefined,
 												result: {
 													...args.context.identity,
 													outcome:
@@ -436,6 +450,10 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 															? 'unauthenticated'
 															: 'unavailable',
 													settlement: { kind: 'notStarted' }
+												},
+												resources: {
+													...args.context.resources,
+													credentials: undefined
 												}
 											} satisfies Partial<Context>
 										}
@@ -444,11 +462,14 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 										return {
 											target: 'finishing',
 											context: {
-												credentials: undefined,
 												result: {
 													...args.context.identity,
 													outcome: 'unavailable',
 													settlement: { kind: 'notStarted' }
+												},
+												resources: {
+													...args.context.resources,
+													credentials: undefined
 												}
 											} satisfies Partial<Context>
 										}
@@ -479,8 +500,11 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 											return {
 												target: 'checkingAcquisition',
 												context: {
-													transaction:
-														event.output.outcome === 'succeeded' ? event.output.value : undefined
+													resources: {
+														...args.context.resources,
+														transaction:
+															event.output.outcome === 'succeeded' ? event.output.value : undefined
+													}
 												} satisfies Partial<Context>
 											}
 										}
@@ -512,7 +536,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								invoke: {
 									src: actors.read,
 									input: ({ context }) => ({
-										transaction: required(context.transaction),
+										transaction: required(context.resources.transaction),
 										custody: context.custody,
 										identity: context.identity,
 										accountId: admitted(context).accountId
@@ -1085,7 +1109,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 								invoke: {
 									src: actors.stage,
 									input: ({ context }) => ({
-										transaction: required(context.transaction),
+										transaction: required(context.resources.transaction),
 										custody: context.custody,
 										plan: required(context.plan)
 									}),
@@ -1130,10 +1154,13 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 											return {
 												target: 'confirming',
 												context: {
-													write:
-														event.output.outcome === 'succeeded'
-															? event.output.value.write
-															: undefined
+													resources: {
+														...args.context.resources,
+														write:
+															event.output.outcome === 'succeeded'
+																? event.output.value.write
+																: undefined
+													}
 												} satisfies Partial<Context>
 											}
 										}
@@ -1156,7 +1183,7 @@ export function createInvitationAuthorityMachine<Credentials, Transaction, Write
 									input: ({ context }) => ({
 										custody: context.custody,
 										transactions: admitted(context).transactions,
-										write: required(context.write)
+										write: required(context.resources.write)
 									}),
 									onDone: (args, enq) => {
 										const { context } = args

@@ -139,11 +139,8 @@ before updating a pinned consumer. `forms/zod` optionally supplies `zodFormIssue
 
 ## XState v6 implementation candidate
 
-The library now pins `xstate@6.0.0-beta.1`. Its generic declarations require the
-checked-in `patches/xstate@6.0.0-beta.1.patch`; pnpm patch configuration is not
-transitive. A consuming application's root must copy that patch and register it
-in its own `patchedDependencies` for the exact version, then regenerate its lockfile.
-The patch is included in the package files and changes declarations only. See
+The library now pins the published, unpatched `xstate@6.0.0-beta.1` package.
+Consumers do not need an XState patch. See
 [implementation and qualification notes](../specs/003-verified-backup/xstate-v6-implementation.md).
 
 Adopt a rebuilt artifact across complete connected actor graphs. Consumer fixtures

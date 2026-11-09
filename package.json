@@ -358,8 +358,7 @@
 	"files": [
 		"dist",
 		"!dist/**/*.test.*",
-		"!dist/**/*.spec.*",
-		"patches/xstate@6.0.0-beta.1.patch"
+		"!dist/**/*.spec.*"
 	],
 	"peerDependencies": {
 		"delightful-ui": "0.0.25",

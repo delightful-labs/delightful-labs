@@ -43,10 +43,12 @@ export type SessionOwnerInput<Session extends object> = Readonly<{
 type Context<Session extends object> = {
 	binding: object
 	capability: SessionOpenCapability<Session>
-	session: Session | undefined
 	requests: Request<Session>[]
 	// Terminal attachment tokens are weakly retained to reject late messages without a token leak.
 	released: WeakSet<object>
+	acquisition: {
+		session: Session | undefined
+	}
 }
 function validScope(binding: object, scope: SessionScope): boolean {
 	return (
@@ -109,7 +111,8 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 		},
 		actors,
 		guards: {
-			supplied: ({ context }: { context: Context<Session> }) => context.session !== undefined,
+			supplied: ({ context }: { context: Context<Session> }) =>
+				context.acquisition.session !== undefined,
 			allowedRequest: ({
 				context,
 				event
@@ -177,9 +180,11 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 		context: ({ input }) => ({
 			binding: input.binding,
 			capability: input.capability,
-			session: input.existing,
 			requests: [],
-			released: new WeakSet()
+			released: new WeakSet(),
+			acquisition: {
+				session: input.existing
+			}
 		}),
 		on: {
 			RELEASE: (args, enq) => {
@@ -244,11 +249,17 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 					onDone: (args, enq) => {
 						let context = args.context
 						let patch = {}
-						patch = { ...patch, session: args.event.output }
+						patch = {
+							...patch,
+							acquisition: {
+								...context.acquisition,
+								session: args.event.output
+							}
+						}
 						context = { ...args.context, ...patch }
 						{
 							const contextBefore = context
-							const session = contextBefore.session
+							const session = contextBefore.acquisition.session
 							if (session === undefined) throw new Error('Acquired session unavailable')
 							for (const request of contextBefore.requests) {
 								enq.sendTo(request.replyTo, { type: 'ACQUIRED', scope: request.scope, session })
@@ -357,7 +368,7 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 							context = { ...args.context, ...patch }
 							{
 								const contextBefore = context
-								const session = contextBefore.session
+								const session = contextBefore.acquisition.session
 								if (session === undefined) throw new Error('Acquired session unavailable')
 								for (const request of contextBefore.requests) {
 									enq.sendTo(request.replyTo, { type: 'ACQUIRED', scope: request.scope, session })
@@ -381,7 +392,7 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 							context = { ...args.context, ...patch }
 							{
 								const contextBefore = context
-								const session = contextBefore.session
+								const session = contextBefore.acquisition.session
 								if (session === undefined) throw new Error('Acquired session unavailable')
 								for (const request of contextBefore.requests) {
 									enq.sendTo(request.replyTo, { type: 'ACQUIRED', scope: request.scope, session })
@@ -406,6 +417,6 @@ export function selectAcquiredSession<Session extends object>(
 	snapshot: SnapshotFrom<ReturnType<typeof createSessionAcquisitionMachine<Session>>>
 ): Session | undefined {
 	return snapshot.status === 'active' && snapshot.matches('acquired')
-		? snapshot.context.session
+		? snapshot.context.acquisition.session
 		: undefined
 }

@@ -86,16 +86,20 @@ export function createWorkspaceStartupMachine<
 					  >
 					| undefined
 		  }
-	type Context = Input & {
+	type Context = {
+		request: InitializationRequest
+		recipient: InitializationRecipient
 		operation: InitializationRequest | undefined
-		result: WorkspaceInitializationResult | undefined
-		seedResult: WorkspaceFakeDataResult | undefined
 		provenance:
 			| {
 					profileId: string
 					organizationId: string
 			  }
 			| undefined
+		results: {
+			result: WorkspaceInitializationResult | undefined
+			seedResult: WorkspaceFakeDataResult | undefined
+		}
 	}
 	type WorkspaceInitializationResult = Initialization
 	type WorkspaceFakeDataResult = Seed
@@ -152,7 +156,12 @@ export function createWorkspaceStartupMachine<
 		}
 	} satisfies Record<
 		string,
-		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+		(
+			args: CompletionArgs,
+			enq: CompletionQueue
+		) => void | {
+			context?: Partial<Context>
+		}
 	>
 	const complete = createFinalTransitions<
 		Context,
@@ -160,15 +169,17 @@ export function createWorkspaceStartupMachine<
 		CompletionQueue,
 		keyof typeof finalizers
 	>(finalizers)
-
 	return model.createMachine({
 		id: 'workspace-startup',
 		context: ({ input }) => ({
-			...input,
+			request: input.request,
+			recipient: input.recipient,
 			operation: undefined,
-			result: undefined,
-			seedResult: undefined,
-			provenance: undefined
+			provenance: undefined,
+			results: {
+				result: undefined,
+				seedResult: undefined
+			}
 		}),
 		initial: 'checking',
 		on: {
@@ -217,9 +228,12 @@ export function createWorkspaceStartupMachine<
 							...args,
 							context
 						}),
-						result: undefined,
-						seedResult: undefined,
-						provenance: undefined
+						provenance: undefined,
+						results: {
+							...context.results,
+							result: undefined,
+							seedResult: undefined
+						}
 					}
 					context = { ...args.context, ...patch }
 					report(() => ({ kind: 'checking' }))({ ...args, context }, enq)
@@ -261,8 +275,11 @@ export function createWorkspaceStartupMachine<
 						return {
 							target: 'admittingReady',
 							context: {
-								result: event.output,
-								provenance: options.ready(event.output)
+								provenance: options.ready(event.output),
+								results: {
+									...args.context.results,
+									result: event.output
+								}
 							} satisfies Partial<Context>
 						}
 					},
@@ -278,7 +295,10 @@ export function createWorkspaceStartupMachine<
 						return {
 							target: 'failed',
 							context: {
-								result: options.initializationFailure(args.event.error)
+								results: {
+									...args.context.results,
+									result: options.initializationFailure(args.event.error)
+								}
 							} satisfies Partial<Context>
 						}
 					}
@@ -360,19 +380,34 @@ export function createWorkspaceStartupMachine<
 							{
 								return complete('closed', args, enq, {
 									target: 'closed',
-									context: { seedResult: event.output } satisfies Partial<Context>
+									context: {
+										results: {
+											...args.context.results,
+											seedResult: event.output
+										}
+									} satisfies Partial<Context>
 								})
 							}
 						}
 						if (matchesState({ ready: 'replacing' }, args.value)) {
 							return {
 								target: 'checking',
-								context: { seedResult: event.output } satisfies Partial<Context>
+								context: {
+									results: {
+										...args.context.results,
+										seedResult: event.output
+									}
+								} satisfies Partial<Context>
 							}
 						}
 						return {
 							target: '.settled',
-							context: { seedResult: event.output } satisfies Partial<Context>
+							context: {
+								results: {
+									...args.context.results,
+									seedResult: event.output
+								}
+							} satisfies Partial<Context>
 						}
 					},
 					onError: (args, enq) => {
@@ -387,7 +422,10 @@ export function createWorkspaceStartupMachine<
 						return {
 							target: '.settled',
 							context: {
-								seedResult: options.seedFailure(args.event.error)
+								results: {
+									...args.context.results,
+									seedResult: options.seedFailure(args.event.error)
+								}
 							} satisfies Partial<Context>
 						}
 					}

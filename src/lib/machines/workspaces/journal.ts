@@ -137,8 +137,10 @@ export function createWorkspaceJournal<
 		request: Input
 		tx: IDBTransaction | undefined
 		raw: unknown
-		record: WorkspaceJournalRecord | undefined
 		result: JournalResult | undefined
+		observation: {
+			record: WorkspaceJournalRecord | undefined
+		}
 	}
 	const completionModel = setup({
 		schemas: {
@@ -192,7 +194,9 @@ export function createWorkspaceJournal<
 		[name: string]: (
 			args: CompletionArgs,
 			enq: CompletionQueue
-		) => void | { context?: Partial<Context> }
+		) => void | {
+			context?: Partial<Context>
+		}
 	}
 	const complete = createFinalTransitions<
 		Context,
@@ -200,7 +204,6 @@ export function createWorkspaceJournal<
 		CompletionQueue,
 		keyof typeof finalizers
 	>(finalizers)
-
 	const machine = completionModel.createMachine({
 		id: 'workspace-creation-journal',
 		initial: 'running',
@@ -208,8 +211,10 @@ export function createWorkspaceJournal<
 			request: input,
 			tx: undefined,
 			raw: undefined,
-			record: undefined,
-			result: undefined
+			result: undefined,
+			observation: {
+				record: undefined
+			}
 		}),
 		output: ({ context }) => required(context.result),
 		states: {
@@ -394,7 +399,10 @@ export function createWorkspaceJournal<
 												return {
 													target: 'choosing',
 													context: {
-														record: options.schema.parse(context.raw)
+														observation: {
+															...args.context.observation,
+															record: options.schema.parse(context.raw)
+														}
 													} satisfies Partial<Context>
 												}
 											}
@@ -405,8 +413,8 @@ export function createWorkspaceJournal<
 										always: (args) => {
 											const { context } = args
 											if (
-												context.record !== undefined &&
-												context.record.key !== context.request.key
+												context.observation.record !== undefined &&
+												context.observation.record.key !== context.request.key
 											) {
 												return { target: 'conflicting' }
 											}
@@ -416,33 +424,37 @@ export function createWorkspaceJournal<
 													context: {
 														result: {
 															outcome: 'succeeded',
-															record: context.record
+															record: context.observation.record
 														}
 													} satisfies Partial<Context>
 												}
 											}
 											if (
 												context.request.mode === 'write' &&
-												context.record === undefined &&
+												context.observation.record === undefined &&
 												context.request.record.key === context.request.key
 											) {
 												return { target: 'inserting' }
 											}
 											if (
 												context.request.mode === 'write' &&
-												JSON.stringify(context.record) === JSON.stringify(context.request.record)
+												JSON.stringify(context.observation.record) ===
+													JSON.stringify(context.request.record)
 											) {
 												return {
 													target: 'waiting',
 													context: {
 														result: {
 															outcome: 'succeeded',
-															record: context.record
+															record: context.observation.record
 														}
 													} satisfies Partial<Context>
 												}
 											}
-											if (context.request.mode === 'clear' && context.record === undefined) {
+											if (
+												context.request.mode === 'clear' &&
+												context.observation.record === undefined
+											) {
 												return {
 													target: 'waiting',
 													context: {
@@ -452,8 +464,8 @@ export function createWorkspaceJournal<
 											}
 											if (
 												context.request.mode === 'clear' &&
-												context.record !== undefined &&
-												options.attemptId(context.record) === context.request.attemptId
+												context.observation.record !== undefined &&
+												options.attemptId(context.observation.record) === context.request.attemptId
 											) {
 												return { target: 'removing' }
 											}

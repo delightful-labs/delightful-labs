@@ -91,10 +91,14 @@ export function createWorkspaceInitialization<
 	const prepareInitial = createAsyncLogic({
 		run: async ({ input }: { input: Input }) => options.prepareInitial(input)
 	})
-	type Context = Input & {
+	type Context = {
+		userId: string
 		records: Records | undefined
-		attempt: WorkspaceCreationAttempt | undefined
-		result: WorkspaceInitializationResult | undefined
+		operation: {
+			db: Db
+			attempt: WorkspaceCreationAttempt | undefined
+			result: WorkspaceInitializationResult | undefined
+		}
 	}
 	function required<T>(value: T | undefined): T {
 		if (value === undefined) throw new Error('Missing workspace initialization observation')
@@ -108,8 +112,7 @@ export function createWorkspaceInitialization<
 				CANCEL: types<EventPayload<WorkspacePersistenceEvent, 'CANCEL'>>(),
 				SHUTDOWN: types<EventPayload<WorkspacePersistenceEvent, 'SHUTDOWN'>>()
 			},
-			input: types<Input>(),
-			output: types<WorkspaceInitializationResult>()
+			input: types<Input>()
 		},
 		actors: {
 			discover,
@@ -128,16 +131,19 @@ export function createWorkspaceInitialization<
 			const { context } = args
 			return {
 				context: {
-					result: {
-						outcome: 'ready',
-						...(context.attempt !== undefined
-							? options.selectReady(context.attempt)
-							: {
-									identityId: required(context.records?.identities[0]).id,
-									workspaceId: required(
-										required(context.records?.identities[0]).initialWorkspaceId ?? undefined
-									)
-								})
+					operation: {
+						...args.context.operation,
+						result: {
+							outcome: 'ready',
+							...(context.operation.attempt !== undefined
+								? options.selectReady(context.operation.attempt)
+								: {
+										identityId: required(context.records?.identities[0]).id,
+										workspaceId: required(
+											required(context.records?.identities[0]).initialWorkspaceId ?? undefined
+										)
+									})
+						}
 					}
 				} satisfies Partial<Context>
 			}
@@ -145,9 +151,12 @@ export function createWorkspaceInitialization<
 		duplicateIdentities: (_args, _enq) => {
 			return {
 				context: {
-					result: {
-						outcome: 'unavailable',
-						reason: 'duplicateIdentities'
+					operation: {
+						..._args.context.operation,
+						result: {
+							outcome: 'unavailable',
+							reason: 'duplicateIdentities'
+						}
 					}
 				} satisfies Partial<Context>
 			}
@@ -155,9 +164,12 @@ export function createWorkspaceInitialization<
 		identityMissing: (_args, _enq) => {
 			return {
 				context: {
-					result: {
-						outcome: 'unavailable',
-						reason: 'identityMissing'
+					operation: {
+						..._args.context.operation,
+						result: {
+							outcome: 'unavailable',
+							reason: 'identityMissing'
+						}
 					}
 				} satisfies Partial<Context>
 			}
@@ -165,9 +177,12 @@ export function createWorkspaceInitialization<
 		authorityUnavailable: (_args, _enq) => {
 			return {
 				context: {
-					result: {
-						outcome: 'unavailable',
-						reason: 'authorityUnavailable'
+					operation: {
+						..._args.context.operation,
+						result: {
+							outcome: 'unavailable',
+							reason: 'authorityUnavailable'
+						}
 					}
 				} satisfies Partial<Context>
 			}
@@ -175,9 +190,12 @@ export function createWorkspaceInitialization<
 		initializationMissing: (_args, _enq) => {
 			return {
 				context: {
-					result: {
-						outcome: 'unavailable',
-						reason: 'initializationMissing'
+					operation: {
+						..._args.context.operation,
+						result: {
+							outcome: 'unavailable',
+							reason: 'initializationMissing'
+						}
 					}
 				} satisfies Partial<Context>
 			}
@@ -185,9 +203,12 @@ export function createWorkspaceInitialization<
 		cancelled: (_args, _enq) => {
 			return {
 				context: {
-					result: {
-						outcome: 'cancelled',
-						settlement: 'notStarted'
+					operation: {
+						..._args.context.operation,
+						result: {
+							outcome: 'cancelled',
+							settlement: 'notStarted'
+						}
 					}
 				} satisfies Partial<Context>
 			}
@@ -195,16 +216,24 @@ export function createWorkspaceInitialization<
 		closed: (_args, _enq) => {
 			return {
 				context: {
-					result: {
-						outcome: 'closed',
-						settlement: 'notStarted'
+					operation: {
+						..._args.context.operation,
+						result: {
+							outcome: 'closed',
+							settlement: 'notStarted'
+						}
 					}
 				} satisfies Partial<Context>
 			}
 		}
 	} satisfies Record<
 		string,
-		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+		(
+			args: CompletionArgs,
+			enq: CompletionQueue
+		) => void | {
+			context?: Partial<Context>
+		}
 	>
 	const complete = createFinalTransitions<
 		Context,
@@ -212,17 +241,19 @@ export function createWorkspaceInitialization<
 		CompletionQueue,
 		keyof typeof finalizers
 	>(finalizers)
-
 	const machine = completionModel.createMachine({
 		id: 'workspace-initialization',
 		context: ({ input }) => ({
-			...input,
+			userId: input.userId,
 			records: undefined,
-			attempt: undefined,
-			result: undefined
+			operation: {
+				db: input.db,
+				attempt: undefined,
+				result: undefined
+			}
 		}),
 		initial: 'readingLocal',
-		output: ({ context }) => required(context.result),
+		output: ({ context }): WorkspaceInitializationResult => required(context.operation.result),
 		on: {
 			CANCEL: (args, enq) => {
 				return complete('cancelled', args, enq, { target: '.cancelled' })
@@ -236,7 +267,7 @@ export function createWorkspaceInitialization<
 				invoke: completionModel.createInvoke<typeof discover, Context>({
 					src: discover,
 					input: ({ context }) => ({
-						db: context.db,
+						db: context.operation.db,
 						userId: context.userId,
 						tier: options.tiers.local
 					}),
@@ -250,10 +281,13 @@ export function createWorkspaceInitialization<
 						return {
 							target: 'failed',
 							context: {
-								result: {
-									outcome: 'failed',
-									settlement: 'notStarted',
-									error: args.event.error
+								operation: {
+									...args.context.operation,
+									result: {
+										outcome: 'failed',
+										settlement: 'notStarted',
+										error: args.event.error
+									}
 								}
 							} satisfies Partial<Context>
 						}
@@ -295,7 +329,7 @@ export function createWorkspaceInitialization<
 				invoke: completionModel.createInvoke<typeof discover, Context>({
 					src: discover,
 					input: ({ context }) => ({
-						db: context.db,
+						db: context.operation.db,
 						userId: context.userId,
 						tier: options.tiers.authority
 					}),
@@ -309,10 +343,13 @@ export function createWorkspaceInitialization<
 						return {
 							target: 'failed',
 							context: {
-								result: {
-									outcome: 'failed',
-									settlement: 'notStarted',
-									error: args.event.error
+								operation: {
+									...args.context.operation,
+									result: {
+										outcome: 'failed',
+										settlement: 'notStarted',
+										error: args.event.error
+									}
 								}
 							} satisfies Partial<Context>
 						}
@@ -350,21 +387,29 @@ export function createWorkspaceInitialization<
 			preparingInitial: {
 				invoke: completionModel.createInvoke<typeof prepareInitial, Context>({
 					src: prepareInitial,
-					input: ({ context }) => context,
+					input: ({ context }) => ({ db: context.operation.db, userId: context.userId }),
 					onDone: (args) => {
 						return {
 							target: 'bootstrapping',
-							context: { attempt: args.event.output } satisfies Partial<Context>
+							context: {
+								operation: {
+									...args.context.operation,
+									attempt: args.event.output
+								}
+							} satisfies Partial<Context>
 						}
 					},
 					onError: (args) => {
 						return {
 							target: 'failed',
 							context: {
-								result: {
-									outcome: 'failed',
-									settlement: 'notStarted',
-									error: args.event.error
+								operation: {
+									...args.context.operation,
+									result: {
+										outcome: 'failed',
+										settlement: 'notStarted',
+										error: args.event.error
+									}
 								}
 							} satisfies Partial<Context>
 						}
@@ -384,8 +429,8 @@ export function createWorkspaceInitialization<
 					id: 'bootstrap',
 					src: options.transaction,
 					input: ({ context }) => ({
-						db: context.db,
-						attempt: required(context.attempt),
+						db: context.operation.db,
+						attempt: required(context.operation.attempt),
 						purpose: 'bootstrap'
 					}),
 					onDone: (args, enq) => {
@@ -397,17 +442,25 @@ export function createWorkspaceInitialization<
 						}
 						return {
 							target: 'completed',
-							context: { result: event.output } satisfies Partial<Context>
+							context: {
+								operation: {
+									...args.context.operation,
+									result: event.output
+								}
+							} satisfies Partial<Context>
 						}
 					},
 					onError: (args) => {
 						return {
 							target: 'failed',
 							context: {
-								result: {
-									outcome: 'failed',
-									settlement: 'unresolved',
-									error: args.event.error
+								operation: {
+									...args.context.operation,
+									result: {
+										outcome: 'failed',
+										settlement: 'unresolved',
+										error: args.event.error
+									}
 								}
 							} satisfies Partial<Context>
 						}

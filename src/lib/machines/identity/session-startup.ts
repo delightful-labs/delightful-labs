@@ -40,8 +40,10 @@ type Context<Session extends object> = {
 	reportTo: SessionStartupInput<Session>['reportTo']
 	owner: SessionOwnerRef<Session> | undefined
 	scope: SessionScope | undefined
-	session: Session | undefined
 	reason: SessionFailure | undefined
+	acquisition: {
+		session: Session | undefined
+	}
 }
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Session attachment binding unavailable')
@@ -106,11 +108,14 @@ export function createSessionStartupMachine<Session extends object>() {
 		on: {
 			ACQUIRED: (args, enq) => {
 				if (!args.guards.matchingReply(args)) return
-				const context = { ...args.context, session: args.event.session }
+				const context: Context<Session> = {
+					...args.context,
+					acquisition: { session: args.event.session }
+				}
 				enq.sendTo(context.reportTo, {
 					type: 'SESSION_ACQUIRED',
 					scope: required(context.scope),
-					session: required(context.session)
+					session: required(context.acquisition.session)
 				})
 				return { target: 'attached', context }
 			},
@@ -135,14 +140,22 @@ export function createSessionStartupMachine<Session extends object>() {
 				context: {
 					owner: undefined,
 					scope: undefined,
-					session: undefined,
-					reason: undefined
+					reason: undefined,
+					acquisition: {
+						..._args.context.acquisition,
+						session: undefined
+					}
 				} satisfies Partial<Context<Session>>
 			}
 		}
 	} satisfies Record<
 		string,
-		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context<Session>> }
+		(
+			args: CompletionArgs,
+			enq: CompletionQueue
+		) => void | {
+			context?: Partial<Context<Session>>
+		}
 	>
 	const complete = createFinalTransitions<
 		Context<Session>,
@@ -150,7 +163,6 @@ export function createSessionStartupMachine<Session extends object>() {
 		CompletionQueue,
 		keyof typeof finalizers
 	>(finalizers)
-
 	return model.createMachine({
 		id: 'session-startup',
 		initial: 'waiting',
@@ -158,8 +170,10 @@ export function createSessionStartupMachine<Session extends object>() {
 			reportTo: input.reportTo,
 			owner: undefined,
 			scope: undefined,
-			session: undefined,
-			reason: undefined
+			reason: undefined,
+			acquisition: {
+				session: undefined
+			}
 		}),
 		output: () => ({ outcome: 'closed' }),
 		states: {
@@ -291,7 +305,13 @@ export function createSessionStartupMachine<Session extends object>() {
 							const { self } = args
 							let context = args.context
 							let patch = {}
-							patch = { ...patch, session: undefined }
+							patch = {
+								...patch,
+								acquisition: {
+									...context.acquisition,
+									session: undefined
+								}
+							}
 							context = { ...args.context, ...patch }
 							enq.sendTo(required(context.owner), {
 								type: 'RELEASE',
@@ -322,7 +342,14 @@ export function createSessionStartupMachine<Session extends object>() {
 				entry: (args, enq) => {
 					let context = args.context
 					let patch = {}
-					patch = { ...patch, owner: undefined, session: undefined }
+					patch = {
+						...patch,
+						owner: undefined,
+						acquisition: {
+							...context.acquisition,
+							session: undefined
+						}
+					}
 					context = { ...args.context, ...patch }
 					enq.sendTo(context.reportTo, {
 						type: 'SESSION_STARTUP_FAILED',

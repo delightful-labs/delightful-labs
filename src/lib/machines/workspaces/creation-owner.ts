@@ -90,11 +90,13 @@ export function createWorkspaceCreationOwner<
 	type Result = CreationResult<Record, Workspace>
 	type Context = {
 		draftRevision: number
-		binding: Binding | undefined
-		operation: Binding | undefined
 		request: CreationRequest
-		record: WorkspaceJournalRecord | undefined
 		result: Result | undefined
+		bindingState: {
+			binding: Binding | undefined
+			operation: Binding | undefined
+			record: WorkspaceJournalRecord | undefined
+		}
 	}
 	type Event =
 		| {
@@ -108,14 +110,14 @@ export function createWorkspaceCreationOwner<
 		| {
 				type: 'REEVALUATE' | 'RETRY' | 'NEW' | 'CANCEL' | 'SHUTDOWN'
 		  }
-	function completed(output: Result | undefined, context: Context) {
+	function completed(output: Result | undefined, context: Context): Partial<Context> {
 		const result: Result = output ?? {
 			outcome: 'unresolved',
 			settlement: 'unresolved',
-			record: context.record,
+			record: context.bindingState.record,
 			error: new Error('Creation operation returned no result')
 		}
-		return { result, record: result.record }
+		return { result, bindingState: { ...context.bindingState, record: result.record } }
 	}
 	const invokeModel = setup({
 		schemas: {
@@ -140,7 +142,7 @@ export function createWorkspaceCreationOwner<
 		actors: { operation },
 		guards: {
 			changed: ({ context }: { context: Context }) =>
-				context.binding?.key !== context.operation?.key,
+				context.bindingState.binding?.key !== context.bindingState.operation?.key,
 			replacing: ({ value }: { value: StateValue }) =>
 				matchesState({ operating: 'replacing' }, value),
 			closing: ({ value }: { value: StateValue }) => matchesState({ operating: 'closing' }, value)
@@ -150,19 +152,26 @@ export function createWorkspaceCreationOwner<
 		id: 'workspace-creation',
 		initial: 'checking',
 		context: ({ input }) => ({
-			...input,
 			draftRevision: 0,
-			operation: undefined,
 			request: { mode: 'load' },
-			record: undefined,
-			result: undefined
+			result: undefined,
+			bindingState: {
+				binding: input.binding,
+				operation: undefined,
+				record: undefined
+			}
 		}),
-		output: ({ context }) => ({ binding: context.operation, result: context.result }),
+		output: ({ context }) => ({ binding: context.bindingState.operation, result: context.result }),
 		on: {
 			OBSERVED: (args, enq) => {
 				enq.raise({ type: 'REEVALUATE' })
 				return {
-					context: { binding: args.event.binding } satisfies Partial<Context>
+					context: {
+						bindingState: {
+							...args.context.bindingState,
+							binding: args.event.binding
+						}
+					} satisfies Partial<Context>
 				}
 			},
 			REEVALUATE: (args) => {
@@ -172,15 +181,18 @@ export function createWorkspaceCreationOwner<
 			SHUTDOWN: { target: '.closed' },
 			RETRY: (args) => {
 				const { context } = args
-				if (context.binding !== undefined && context.record !== undefined) {
+				if (
+					context.bindingState.binding !== undefined &&
+					context.bindingState.record !== undefined
+				) {
 					return {
 						target: '.operating',
 						context: {
 							request: (({ context }): CreationRequest => {
-								if (!context.record) throw new Error('Missing retry attempt')
+								if (!context.bindingState.record) throw new Error('Missing retry attempt')
 								return {
 									mode: 'retry',
-									record: context.record,
+									record: context.bindingState.record,
 									settlement:
 										context.result?.settlement === 'notStarted' ? 'notStarted' : 'unresolved'
 								}
@@ -196,14 +208,17 @@ export function createWorkspaceCreationOwner<
 				entry: (_args) => {
 					return {
 						context: {
-							record: undefined,
 							result: undefined,
-							request: { mode: 'load' }
+							request: { mode: 'load' },
+							bindingState: {
+								..._args.context.bindingState,
+								record: undefined
+							}
 						} satisfies Partial<Context>
 					}
 				},
 				always: (args) => {
-					if (args.context.binding !== undefined) {
+					if (args.context.bindingState.binding !== undefined) {
 						return { target: 'operating' }
 					}
 					return { target: 'unavailable' }
@@ -211,7 +226,14 @@ export function createWorkspaceCreationOwner<
 			},
 			unavailable: {
 				entry: (_args) => {
-					return { context: { operation: undefined } satisfies Partial<Context> }
+					return {
+						context: {
+							bindingState: {
+								..._args.context.bindingState,
+								operation: undefined
+							}
+						} satisfies Partial<Context>
+					}
 				}
 			},
 			editing: {
@@ -247,7 +269,12 @@ export function createWorkspaceCreationOwner<
 				initial: 'active',
 				entry: (args) => {
 					return {
-						context: { operation: args.context.binding } satisfies Partial<Context>
+						context: {
+							bindingState: {
+								...args.context.bindingState,
+								operation: args.context.bindingState.binding
+							}
+						} satisfies Partial<Context>
 					}
 				},
 				on: {
@@ -276,8 +303,8 @@ export function createWorkspaceCreationOwner<
 					id: 'operation',
 					src: operation,
 					input: ({ context }) => {
-						if (!context.operation) throw new Error('Missing creation binding')
-						return { binding: context.operation, request: context.request }
+						if (!context.bindingState.operation) throw new Error('Missing creation binding')
+						return { binding: context.bindingState.operation, request: context.request }
 					},
 					onDone: (args) => {
 						const { context, event } = args
@@ -308,7 +335,7 @@ export function createWorkspaceCreationOwner<
 								result: {
 									outcome: 'unresolved',
 									settlement: 'unresolved',
-									record: args.context.record,
+									record: args.context.bindingState.record,
 									error: args.event.error
 								}
 							} satisfies Partial<Context>
@@ -330,7 +357,7 @@ export function createWorkspaceCreationOwner<
 					}
 					if (
 						context.result?.outcome === 'recovered' ||
-						(context.result?.outcome === 'cancelled' && context.record !== undefined)
+						(context.result?.outcome === 'cancelled' && context.bindingState.record !== undefined)
 					) {
 						return { target: 'recovered' }
 					}
@@ -356,8 +383,8 @@ export function createWorkspaceCreationOwner<
 							target: 'operating',
 							context: {
 								request: (({ context }): CreationRequest => {
-									if (!context.record) throw new Error('Missing completed attempt')
-									return { mode: 'clear', record: context.record }
+									if (!context.bindingState.record) throw new Error('Missing completed attempt')
+									return { mode: 'clear', record: context.bindingState.record }
 								})(args)
 							} satisfies Partial<Context>
 						}
@@ -373,13 +400,20 @@ export function createWorkspaceCreationOwner<
 					SHUTDOWN: {},
 					RETRY: (args) => {
 						const { context } = args
-						if (context.binding !== undefined && context.binding.key === context.operation?.key) {
+						if (
+							context.bindingState.binding !== undefined &&
+							context.bindingState.binding.key === context.bindingState.operation?.key
+						) {
 							return {
 								target: 'operating',
 								context: {
 									request: (({ context }): CreationRequest => {
-										return context.record
-											? { mode: 'retry', record: context.record, settlement: 'unresolved' }
+										return context.bindingState.record
+											? {
+													mode: 'retry',
+													record: context.bindingState.record,
+													settlement: 'unresolved'
+												}
 											: { mode: 'load' }
 									})(args)
 								} satisfies Partial<Context>

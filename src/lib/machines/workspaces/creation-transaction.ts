@@ -31,10 +31,13 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 	type Context = {
 		custody: Custody
 		attempt: Attempt
-		transaction: Transaction | undefined
-		workspace: Workspace | undefined
-		write: Write | undefined
 		result: Outcome | undefined
+		resources: {
+			transaction: Transaction | undefined
+			workspace: Workspace | undefined
+			write: Write | undefined
+			records: Records | undefined
+		}
 	}
 	const actors = {
 		custodian: transactionCustodian<Transaction, Write>(),
@@ -119,9 +122,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 			}) => transactionCall(input.custody, () => capability.rollback(input.transaction))
 		})
 	}
-	type FullContext = Context & {
-		records: Records | undefined
-	}
+	type FullContext = Context
 	const model = setup({
 		schemas: {
 			context: types<FullContext>(),
@@ -149,7 +150,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 	})
 	const transactionInput = ({ context }: { context: FullContext }) => ({
 		custody: context.custody,
-		transaction: required(context.transaction),
+		transaction: required(context.resources.transaction),
 		attempt: context.attempt
 	})
 	type CompletionEntry = Extract<
@@ -181,7 +182,12 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 		}
 	} satisfies Record<
 		string,
-		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<FullContext> }
+		(
+			args: CompletionArgs,
+			enq: CompletionQueue
+		) => void | {
+			context?: Partial<FullContext>
+		}
 	>
 	const complete = createFinalTransitions<
 		FullContext,
@@ -189,17 +195,18 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 		CompletionQueue,
 		keyof typeof finalizers
 	>(finalizers)
-
 	return model.createMachine({
 		id: 'workspace-creation-transaction',
 		context: ({ input }) => ({
 			custody: createTransactionCustody(capability.retainDetached),
 			attempt: input.attempt,
-			transaction: undefined,
-			records: undefined,
-			workspace: undefined,
-			write: undefined,
-			result: undefined
+			result: undefined,
+			resources: {
+				transaction: undefined,
+				records: undefined,
+				workspace: undefined,
+				write: undefined
+			}
 		}),
 		initial: 'running',
 		output: ({ context }) => ({ ...required(context.result), attempt: context.attempt }),
@@ -234,7 +241,12 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 									onDone: (args) => {
 										return {
 											target: 'checkingAfterOpen',
-											context: { transaction: args.event.output } satisfies Partial<FullContext>
+											context: {
+												resources: {
+													...args.context.resources,
+													transaction: args.event.output
+												}
+											} satisfies Partial<FullContext>
 										}
 									},
 									onError: (args) => {
@@ -263,7 +275,12 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 									onDone: (args) => {
 										return {
 											target: 'checkingAfterRead',
-											context: { records: args.event.output } satisfies Partial<FullContext>
+											context: {
+												resources: {
+													...args.context.resources,
+													records: args.event.output
+												}
+											} satisfies Partial<FullContext>
 										}
 									},
 									onError: (args) => {
@@ -289,7 +306,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								invoke: {
 									src: actors.assess,
 									input: ({ context }) => ({
-										records: required(context.records),
+										records: required(context.resources.records),
 										attempt: context.attempt
 									}),
 									onDone: (args) => {
@@ -334,7 +351,12 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 									onDone: (args) => {
 										return {
 											target: 'checkingBeforeCommit',
-											context: { workspace: args.event.output } satisfies Partial<FullContext>
+											context: {
+												resources: {
+													...args.context.resources,
+													workspace: args.event.output
+												}
+											} satisfies Partial<FullContext>
 										}
 									},
 									onError: (args) => {
@@ -360,13 +382,18 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								invoke: {
 									src: actors.commit,
 									input: ({ context }) => ({
-										transaction: required(context.transaction),
+										transaction: required(context.resources.transaction),
 										custody: context.custody
 									}),
 									onDone: (args) => {
 										return {
 											target: 'persistingLocal',
-											context: { write: args.event.output } satisfies Partial<FullContext>
+											context: {
+												resources: {
+													...args.context.resources,
+													write: args.event.output
+												}
+											} satisfies Partial<FullContext>
 										}
 									},
 									onError: (args) => {
@@ -383,7 +410,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								invoke: {
 									src: actors.persist,
 									input: ({ context }) => ({
-										write: required(context.write),
+										write: required(context.resources.write),
 										custody: context.custody
 									}),
 									onDone: (args, enq) => {
@@ -396,7 +423,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 													outcome: 'succeeded',
 													settlement: {
 														kind: 'locallyPersisted',
-														workspace: required(context.workspace)
+														workspace: required(context.resources.workspace)
 													}
 												}
 											} satisfies Partial<FullContext>
@@ -416,7 +443,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 								invoke: {
 									src: actors.rollback,
 									input: ({ context }) => ({
-										transaction: required(context.transaction),
+										transaction: required(context.resources.transaction),
 										custody: context.custody
 									}),
 									onDone: (args, enq) => {
