@@ -12,6 +12,8 @@
 
 ### Session 2026-11-09
 
+- Portrait follow-up: Use the four owner-supplied photos in a compact grayscale Paper Image Dithering rotation above the apps. Hold each image, then dissolve the pixel grid out and in. Provide Pause/Play, reduced-motion behavior and a static grayscale fallback. No typography or editorial copy changes.
+
 - Homepage follow-up: The owner authorized live Clipper and Finance iframes, explicitly requesting small mobile-like viewports. Use 375px-wide, 600px-tall frames that shrink on narrow screens and wrap rather than expand on desktop. App names and open-app links are the only added labels. Typography and other editorial content remain owner-controlled. This supersedes the empty-homepage requirement for these two embeds only; Leaflet continues to render natively.
 
 - Renderer decision: The owner accepts `@standard-reader/renderer-svelte@0.4.0` and matching core with their evaluated limitations. Replace the custom renderer; do not patch the package or rebuild its parser. Package support defines native content fidelity for this foundation. Overlapping/malformed facets, checklist state, member delimiters, unsupported blocks, and subpage/heading anchors follow package behavior. Keep no-iframe rendering, safe links, existing DUI defaults, and native AT Protocol loading. No existing Leaflet publication requires compatibility work yet. This decision supersedes the earlier custom-renderer preservation requirements below where they conflict; archive migration must still be verified before cutover.

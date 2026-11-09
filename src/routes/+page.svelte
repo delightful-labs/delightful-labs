@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Portraits from "#lib/components/Portraits.svelte";
   import { Heading } from "delightful-ui";
 
   const apps = [
@@ -14,6 +15,8 @@
     },
   ];
 </script>
+
+<Portraits />
 
 <div class="apps">
   {#each apps as app (app.id)}
