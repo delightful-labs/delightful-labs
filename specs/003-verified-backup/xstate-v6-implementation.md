@@ -141,7 +141,7 @@ by 184 errors in 22 other legacy test/consumer files. CI runs the focused target
 before the full check, and retains the full gate. This is not a green repository
 qualification or release-readiness claim.
 
-## PR #38 CI follow-up: implementation review required
+## PR #38 CI follow-up
 
 The failing Actions run `42644545685` stopped at the full `pnpm check`, with 184
 v5 harness errors. Remaining TypeScript and JavaScript fixtures now use v6
@@ -170,9 +170,9 @@ corrections prepared in this follow-up:
 
 Static validation passes: full `pnpm check`, library check, test-app/native-capture/
 private-creation/packaged-consumer TypeScript, strict package validation, lint,
-formatting and whitespace checks. The post-fix runtime, native and browser suites
-are **not yet qualified**. The repository's explicit implementation-test review
-gate applies to these new production corrections. The follow-up commit uses
-`[skip ci]` until the user approves this concrete implementation; the full CI
-workflow remains enabled and unchanged in scope. After approval, run the full
-suite, address any further behavior differences, and rerun CI before merging.
+formatting and whitespace checks. The user instructed restoration of the missing PR checks, authorizing the CI
+implementation tests. A normal follow-up commit restores both Actions checks;
+no skip marker is used for subsequent qualification commits. The full CI workflow
+remains enabled and unchanged in scope. All 949 unit tests now pass, including
+the production corrections above. Native, consumer and browser qualification
+continues; require green CI before merging.

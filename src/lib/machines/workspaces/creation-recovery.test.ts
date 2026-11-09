@@ -239,11 +239,27 @@ function operationFixture(
 		matchesBinding: (candidate) => candidate.attempt.member === 'a',
 		attemptId: (candidate) => candidate.attempt.notebookId
 	})
+	const issuances: unknown[] = []
 	const start = (request: CreationRequest<Record>, inspect?: (event: InspectionEvent) => void) =>
 		tracked(
-			createActor(machine, { input: { binding, request }, ...(inspect ? { inspect } : {}) })
+			createActor(machine, {
+				input: { binding, request },
+				inspect(event) {
+					inspect?.(event)
+					if (event.type !== '@xstate.actor' || event.src !== persist) return
+					const snapshot = event.snapshot
+					if (
+						'context' in snapshot &&
+						snapshot.context &&
+						typeof snapshot.context === 'object' &&
+						'issuance' in snapshot.context
+					) {
+						issuances.push(snapshot.context.issuance)
+					}
+				}
+			})
 		).start()
-	return { start, persistCall, journalRead }
+	return { start, persistCall, journalRead, issuances }
 }
 function persistenceFixture(
 	reconcileRead: () => Promise<CreationReconciliation<Workspace>>,
@@ -305,8 +321,7 @@ describe('creation owner retains recovery through drain', () => {
 			gate.resolve({ outcome: 'closed', record, settlement: 'unresolved' })
 			await waitFor(owner, (snapshot) => snapshot.matches('unresolved'))
 			expect(owner.getSnapshot().context).toMatchObject({
-				operation: binding,
-				record,
+				bindingState: { operation: binding, record },
 				result: { settlement: 'unresolved' }
 			})
 			owner.send({ type: 'OBSERVED', binding: { key: 'notebook/member-c' } })
@@ -451,8 +466,9 @@ describe('operation settlement is reflected in state, context and output', () =>
 			settlement: 'locallyPersisted'
 		})
 		expect(fixture.persistCall).toHaveBeenCalledWith(
-			expect.objectContaining({ attempt: record.attempt, issuance: 'new' })
+			expect.objectContaining({ attempt: record.attempt })
 		)
+		expect(fixture.issuances).toEqual(['new'])
 	})
 	it('accepts conclusive notStarted recovery without issuing a write', async () => {
 		const fixture = operationFixture({
