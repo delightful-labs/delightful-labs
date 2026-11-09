@@ -94,5 +94,20 @@ Thirty added checks cover restart recovery, cross-instance deletion/CAS races,
 shared reads and storage outage behavior, stale expiry at completion, failed first
 loads/writes, cancellation, exact Blob options, identity/schema/size validation,
 and publication/environment/branch isolation. All 93 tests, type checks, Vercel
-build, and emitted-server checks pass locally. Hosted persistence proof follows
-on this branch.
+build, and emitted-server checks pass locally. Hosted persistence proof is recorded below.
+
+### Hosted restart/redeployment proof
+
+Both deployments ran on Node 24 against the real empty Open Thoughts publication:
+
+- `dpl_5cpMmdgnUpDfEYiNQXEYks1tgBhL`: `/open-thoughts/` returned 200 and logged
+  `outcome: saved, verifiedAt: 1794237877196`.
+- Separate deployment `dpl_GnKBea4N9yfuHscbmHUPwP9AU7tp` returned 200 and logged
+  `outcome: fresh, verifiedAt: 1794237877196`. The original timestamp was retained
+  across deployments rather than resetting age or relying on process memory.
+- Its publication-verification endpoint returned the correct owner publication URI.
+- Node 24 CI passed all 93 tests, emitted-server smoke checks and browser checks.
+
+This proves real private-store persistence and readback across deployments.
+Deletion/conflict/error cases use isolated fixture tests; no test posts were
+published or removed from the owner's publication.

@@ -131,7 +131,8 @@ limit are checked. A complete empty snapshot is an authoritative removal.
 Storage operations have four-second abort limits; the source scan retains its
 40-second total deadline. Publication verification remains configuration-only.
 
-Keys hash schema version, publication identity, and environment/branch scope.
+Keys combine a schema version with a hash of publication identity and
+environment/branch scope.
 Production uses a separate namespace; Preview keys include the branch, not its
 commit SHA, so redeployments retain snapshots. This is application namespace
 isolation; use a separate private Production store at cutover. No CDN/ISR or
