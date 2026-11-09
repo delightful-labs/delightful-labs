@@ -1,3 +1,6 @@
+import { matchesState, type StateValue, types, createAsyncLogic, setup } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import {
 	createTransactionCustody,
 	clearTransactionCustody,
@@ -5,7 +8,6 @@ import {
 	transactionCustodian,
 	type TransactionCustody
 } from './transaction-custody.js'
-import { assign, fromPromise, setup, stateIn } from 'xstate'
 import type {
 	WorkspaceCreationAssessment,
 	WorkspaceCreationAttempt,
@@ -14,12 +16,10 @@ import type {
 	WorkspaceCreationResult,
 	WorkspaceCreationTransactionCapability
 } from '../../contracts/workspace-creation.js'
-
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Missing workspace creation resource')
 	return value
 }
-
 /** One atomic transaction. Callers journal intent before invocation and reconcile unknown outcomes. */
 export function createWorkspaceCreationTransaction<Draft, Transaction, Records, Workspace, Write>(
 	capability: WorkspaceCreationTransactionCapability<Draft, Transaction, Records, Workspace, Write>
@@ -30,66 +30,116 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 	type Context = {
 		custody: Custody
 		attempt: Attempt
-		transaction: Transaction | undefined
-		workspace: Workspace | undefined
-		write: Write | undefined
 		result: Outcome | undefined
+		resources: {
+			transaction: Transaction | undefined
+			workspace: Workspace | undefined
+			write: Write | undefined
+			records: Records | undefined
+		}
 	}
 	const actors = {
 		custodian: transactionCustodian<Transaction, Write>(),
-		open: fromPromise(({ input }: { input: { custody: Custody } }) => {
-			const call = transactionCall(input.custody, () => capability.open())
-			input.custody.acquisition = call
-			return call
-		}),
-		read: fromPromise(
-			async ({
+		open: createAsyncLogic({
+			run: ({
 				input
 			}: {
-				input: { transaction: Transaction; attempt: Attempt; custody: Custody }
+				input: {
+					custody: Custody
+				}
+			}) => {
+				const call = transactionCall(input.custody, () => capability.open())
+				input.custody.recordAcquisition(call)
+				return call
+			}
+		}),
+		read: createAsyncLogic({
+			run: async ({
+				input
+			}: {
+				input: {
+					transaction: Transaction
+					attempt: Attempt
+					custody: Custody
+				}
 			}) =>
 				transactionCall(input.custody, () => capability.readLocal(input.transaction, input.attempt))
-		),
-		assess: fromPromise(async ({ input }: { input: { records: Records; attempt: Attempt } }) =>
-			capability.assess(input.records, input.attempt)
-		),
-		stage: fromPromise(
-			async ({
+		}),
+		assess: createAsyncLogic({
+			run: async ({
 				input
 			}: {
-				input: { transaction: Transaction; attempt: Attempt; custody: Custody }
-			}) => transactionCall(input.custody, () => capability.stage(input.transaction, input.attempt))
-		),
-		commit: fromPromise(({ input }: { input: { transaction: Transaction; custody: Custody } }) => {
-			const call = transactionCall(input.custody, () => capability.commit(input.transaction))
-			input.custody.commit = call
-			return call
+				input: {
+					records: Records
+					attempt: Attempt
+				}
+			}) => capability.assess(input.records, input.attempt)
 		}),
-		persist: fromPromise(async ({ input }: { input: { write: Write; custody: Custody } }) =>
-			transactionCall(input.custody, () => capability.persistLocal(input.write))
-		),
-		rollback: fromPromise(
-			async ({ input }: { input: { transaction: Transaction; custody: Custody } }) =>
-				transactionCall(input.custody, () => capability.rollback(input.transaction))
-		)
+		stage: createAsyncLogic({
+			run: async ({
+				input
+			}: {
+				input: {
+					transaction: Transaction
+					attempt: Attempt
+					custody: Custody
+				}
+			}) => transactionCall(input.custody, () => capability.stage(input.transaction, input.attempt))
+		}),
+		commit: createAsyncLogic({
+			run: ({
+				input
+			}: {
+				input: {
+					transaction: Transaction
+					custody: Custody
+				}
+			}) => {
+				const call = transactionCall(input.custody, () => capability.commit(input.transaction))
+				input.custody.recordCommit(call)
+				return call
+			}
+		}),
+		persist: createAsyncLogic({
+			run: async ({
+				input
+			}: {
+				input: {
+					write: Write
+					custody: Custody
+				}
+			}) => transactionCall(input.custody, () => capability.persistLocal(input.write))
+		}),
+		rollback: createAsyncLogic({
+			run: async ({
+				input
+			}: {
+				input: {
+					transaction: Transaction
+					custody: Custody
+				}
+			}) => transactionCall(input.custody, () => capability.rollback(input.transaction))
+		})
 	}
-	type FullContext = Context & { records: Records | undefined }
-	const model = setup<
-		FullContext,
-		WorkspaceCreationEvent,
-		typeof actors,
-		{},
-		{},
-		{ cancelling: undefined; closing: undefined },
-		never,
-		string,
-		{ attempt: Attempt },
-		WorkspaceCreationResult<Draft, Workspace>
-	>({
+	type FullContext = Context
+	const model = setup({
+		schemas: {
+			context: types<FullContext>(),
+			events: {
+				CANCEL: types<EventPayload<WorkspaceCreationEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<WorkspaceCreationEvent, 'SHUTDOWN'>>()
+			},
+			input: types<{
+				attempt: Attempt
+			}>(),
+			output: types<WorkspaceCreationResult<Draft, Workspace>>()
+		},
 		actors,
 		guards: {
-			cancelling: stateIn({ running: { control: 'cancelling' } }),
-			closing: stateIn({ running: { control: 'closing' } })
+			cancelling: ({ value }: { value: StateValue }) =>
+				matchesState({ running: { control: 'cancelling' } }, value),
+			closing: ({ value }: { value: StateValue }) =>
+				matchesState({ running: { control: 'closing' } }, value)
 		}
 	})
 	const fail = (error: unknown, unresolved = false): Outcome => ({
@@ -99,23 +149,58 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 	})
 	const transactionInput = ({ context }: { context: FullContext }) => ({
 		custody: context.custody,
-		transaction: required(context.transaction),
+		transaction: required(context.resources.transaction),
 		attempt: context.attempt
 	})
-	const interrupt = [
-		{ guard: 'closing', target: 'rollingBack' },
-		{ guard: 'cancelling', target: 'rollingBack' }
-	] satisfies { guard: 'closing' | 'cancelling'; target: string }[]
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		cancelled: (args) => {
+			return {
+				context: {
+					result: {
+						outcome: 'cancelled',
+						settlement: args.context.result?.settlement ?? { kind: 'notStarted' }
+					}
+				} satisfies Partial<FullContext>
+			}
+		},
+		closed: (args) => {
+			return {
+				context: {
+					result: {
+						outcome: 'closed',
+						settlement: args.context.result?.settlement ?? { kind: 'notStarted' }
+					}
+				} satisfies Partial<FullContext>
+			}
+		}
+	} satisfies Record<
+		string,
+		(
+			args: CompletionArgs,
+			enq: CompletionQueue
+		) => void | {
+			context?: Partial<FullContext>
+		}
+	>
+
 	return model.createMachine({
 		id: 'workspace-creation-transaction',
 		context: ({ input }) => ({
 			custody: createTransactionCustody(capability.retainDetached),
 			attempt: input.attempt,
-			transaction: undefined,
-			records: undefined,
-			workspace: undefined,
-			write: undefined,
-			result: undefined
+			result: undefined,
+			resources: {
+				transaction: undefined,
+				records: undefined,
+				workspace: undefined,
+				write: undefined
+			}
 		}),
 		initial: 'running',
 		output: ({ context }) => ({ ...required(context.result), attempt: context.attempt }),
@@ -123,20 +208,20 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 			running: {
 				type: 'parallel',
 				invoke: {
-					src: 'custodian',
+					src: actors.custodian,
 					input: ({ context, self }) => ({ custody: context.custody, owner: self }),
-					onError: {
-						actions: () => {
+					onError: (args, enq) => {
+						enq(() => {
 							throw new Error('Transaction custody failed')
-						}
+						})
 					}
 				},
 				states: {
 					control: {
 						initial: 'active',
 						states: {
-							active: { on: { CANCEL: 'cancelling', SHUTDOWN: 'closing' } },
-							cancelling: { on: { CANCEL: {}, SHUTDOWN: 'closing' } },
+							active: { on: { CANCEL: { target: 'cancelling' }, SHUTDOWN: { target: 'closing' } } },
+							cancelling: { on: { CANCEL: {}, SHUTDOWN: { target: 'closing' } } },
 							closing: { on: { CANCEL: {}, SHUTDOWN: {} } }
 						}
 					},
@@ -145,51 +230,96 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 						states: {
 							opening: {
 								invoke: {
-									src: 'open',
+									src: actors.open,
 									input: ({ context }) => ({ custody: context.custody }),
-									onDone: {
-										target: 'checkingAfterOpen',
-										actions: assign({ transaction: ({ event }) => event.output })
+									onDone: (args) => {
+										return {
+											target: 'checkingAfterOpen',
+											context: {
+												resources: {
+													...args.context.resources,
+													transaction: args.event.output
+												}
+											} satisfies Partial<FullContext>
+										}
 									},
-									onError: {
-										target: 'finishing',
-										actions: assign({ result: ({ event }) => fail(event.error) })
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: { result: fail(args.event.error) } satisfies Partial<FullContext>
+										}
 									}
 								}
 							},
-							checkingAfterOpen: { always: [...interrupt, { target: 'readingLocal' }] },
+							checkingAfterOpen: {
+								type: 'choice',
+								choice: (args) => {
+									if (args.guards.closing(args)) {
+										return { target: 'rollingBack' }
+									}
+									if (args.guards.cancelling(args)) {
+										return { target: 'rollingBack' }
+									}
+									return { target: 'readingLocal' }
+								}
+							},
 							readingLocal: {
 								invoke: {
-									src: 'read',
+									src: actors.read,
 									input: transactionInput,
-									onDone: {
-										target: 'checkingAfterRead',
-										actions: assign({ records: ({ event }) => event.output })
+									onDone: (args) => {
+										return {
+											target: 'checkingAfterRead',
+											context: {
+												resources: {
+													...args.context.resources,
+													records: args.event.output
+												}
+											} satisfies Partial<FullContext>
+										}
 									},
-									onError: {
-										target: 'rollingBack',
-										actions: assign({ result: ({ event }) => fail(event.error) })
+									onError: (args) => {
+										return {
+											target: 'rollingBack',
+											context: { result: fail(args.event.error) } satisfies Partial<FullContext>
+										}
 									}
 								}
 							},
-							checkingAfterRead: { always: [...interrupt, { target: 'assessing' }] },
+							checkingAfterRead: {
+								type: 'choice',
+								choice: (args) => {
+									if (args.guards.closing(args)) {
+										return { target: 'rollingBack' }
+									}
+									if (args.guards.cancelling(args)) {
+										return { target: 'rollingBack' }
+									}
+									return { target: 'assessing' }
+								}
+							},
 							assessing: {
 								invoke: {
-									src: 'assess',
+									src: actors.assess,
 									input: ({ context }) => ({
-										records: required(context.records),
+										records: required(context.resources.records),
 										attempt: context.attempt
 									}),
-									onDone: [
-										...interrupt,
-										{
-											guard: ({ event }) => event.output.outcome === 'eligible',
-											target: 'staging'
-										},
-										{
+									onDone: (args) => {
+										const { event } = args
+										if (args.guards.closing(args)) {
+											return { target: 'rollingBack' }
+										}
+										if (args.guards.cancelling(args)) {
+											return { target: 'rollingBack' }
+										}
+										if (event.output.outcome === 'eligible') {
+											return { target: 'staging' }
+										}
+										return {
 											target: 'rollingBack',
-											actions: assign({
-												result: ({ event }): Outcome => {
+											context: {
+												result: (({ event }): Outcome => {
 													const assessment: WorkspaceCreationAssessment = event.output
 													if (assessment.outcome !== 'blocked')
 														throw new Error('Expected blocked creation')
@@ -198,142 +328,190 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 														reason: assessment.reason,
 														settlement: { kind: 'notStarted' }
 													}
-												}
-											})
+												})(args)
+											} satisfies Partial<FullContext>
 										}
-									],
-									onError: {
-										target: 'rollingBack',
-										actions: assign({ result: ({ event }) => fail(event.error) })
+									},
+									onError: (args) => {
+										return {
+											target: 'rollingBack',
+											context: { result: fail(args.event.error) } satisfies Partial<FullContext>
+										}
 									}
 								}
 							},
 							staging: {
 								invoke: {
-									src: 'stage',
+									src: actors.stage,
 									input: transactionInput,
-									onDone: {
-										target: 'checkingBeforeCommit',
-										actions: assign({ workspace: ({ event }) => event.output })
+									onDone: (args) => {
+										return {
+											target: 'checkingBeforeCommit',
+											context: {
+												resources: {
+													...args.context.resources,
+													workspace: args.event.output
+												}
+											} satisfies Partial<FullContext>
+										}
 									},
-									onError: {
-										target: 'rollingBack',
-										actions: assign({ result: ({ event }) => fail(event.error) })
+									onError: (args) => {
+										return {
+											target: 'rollingBack',
+											context: { result: fail(args.event.error) } satisfies Partial<FullContext>
+										}
 									}
 								}
 							},
-							checkingBeforeCommit: { always: [...interrupt, { target: 'committing' }] },
+							checkingBeforeCommit: {
+								type: 'choice',
+								choice: (args) => {
+									if (args.guards.closing(args)) {
+										return { target: 'rollingBack' }
+									}
+									if (args.guards.cancelling(args)) {
+										return { target: 'rollingBack' }
+									}
+									return { target: 'committing' }
+								}
+							},
 							committing: {
 								invoke: {
-									src: 'commit',
+									src: actors.commit,
 									input: ({ context }) => ({
-										transaction: required(context.transaction),
+										transaction: required(context.resources.transaction),
 										custody: context.custody
 									}),
-									onDone: {
-										target: 'persistingLocal',
-										actions: assign({ write: ({ event }) => event.output })
+									onDone: (args) => {
+										return {
+											target: 'persistingLocal',
+											context: {
+												resources: {
+													...args.context.resources,
+													write: args.event.output
+												}
+											} satisfies Partial<FullContext>
+										}
 									},
-									onError: {
-										target: 'rollingBack',
-										actions: assign({ result: ({ event }) => fail(event.error, true) })
+									onError: (args) => {
+										return {
+											target: 'rollingBack',
+											context: {
+												result: fail(args.event.error, true)
+											} satisfies Partial<FullContext>
+										}
 									}
 								}
 							},
 							persistingLocal: {
 								invoke: {
-									src: 'persist',
+									src: actors.persist,
 									input: ({ context }) => ({
-										write: required(context.write),
+										write: required(context.resources.write),
 										custody: context.custody
 									}),
-									onDone: {
-										target: 'finishing',
-										actions: [
-											({ context }) => clearTransactionCustody(context.custody),
-											assign({
-												result: ({ context }): Outcome => ({
+									onDone: (args, enq) => {
+										const { context } = args
+										enq(({ context }) => clearTransactionCustody(context.custody), args)
+										return {
+											target: 'finishing',
+											context: {
+												result: {
 													outcome: 'succeeded',
 													settlement: {
 														kind: 'locallyPersisted',
-														workspace: required(context.workspace)
+														workspace: required(context.resources.workspace)
 													}
-												})
-											})
-										]
+												}
+											} satisfies Partial<FullContext>
+										}
 									},
-									onError: {
-										target: 'rollingBack',
-										actions: assign({ result: ({ event }) => fail(event.error, true) })
+									onError: (args) => {
+										return {
+											target: 'rollingBack',
+											context: {
+												result: fail(args.event.error, true)
+											} satisfies Partial<FullContext>
+										}
 									}
 								}
 							},
 							rollingBack: {
 								invoke: {
-									src: 'rollback',
+									src: actors.rollback,
 									input: ({ context }) => ({
-										transaction: required(context.transaction),
+										transaction: required(context.resources.transaction),
 										custody: context.custody
 									}),
-									onDone: [
-										{
-											guard: ({ context, event }) =>
-												event.output && context.result?.settlement.kind !== 'unresolved',
-											target: 'finishing',
-											actions: ({ context }) => clearTransactionCustody(context.custody)
-										},
-										{ guard: ({ event }) => event.output, target: 'finishing' },
-										{
-											target: 'finishing',
-											actions: assign({
-												result: () => fail(new Error('Workspace rollback not confirmed'), true)
-											})
+									onDone: (args, enq) => {
+										const { context, event } = args
+										if (event.output && context.result?.settlement.kind !== 'unresolved') {
+											enq(() => clearTransactionCustody(context.custody))
+											return { target: 'finishing' }
 										}
-									],
-									onError: {
-										target: 'finishing',
-										actions: assign({ result: ({ event }) => fail(event.error, true) })
+										if (event.output) {
+											return { target: 'finishing' }
+										}
+										return {
+											target: 'finishing',
+											context: {
+												result: fail(new Error('Workspace rollback not confirmed'), true)
+											} satisfies Partial<FullContext>
+										}
+									},
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: fail(args.event.error, true)
+											} satisfies Partial<FullContext>
+										}
 									}
 								}
 							},
 							finishing: {
-								always: [
-									{ guard: 'closing', target: '#workspace-creation-transaction.closed' },
-									{ guard: 'cancelling', target: '#workspace-creation-transaction.cancelled' },
-									{ target: '#workspace-creation-transaction.completed' }
-								]
+								type: 'choice',
+								choice: (args) => {
+									if (matchesState({ running: { control: 'closing' } }, args.value)) {
+										return {
+											target: '#workspace-creation-transaction.closed'
+										}
+									}
+									if (matchesState({ running: { control: 'cancelling' } }, args.value)) {
+										return {
+											target: '#workspace-creation-transaction.cancelled'
+										}
+									}
+									return { target: '#workspace-creation-transaction.completed' }
+								}
 							}
 						}
 					}
 				}
 			},
 			completed: {
-				always: [
-					{ guard: ({ context }) => context.result?.outcome === 'succeeded', target: 'succeeded' },
-					{ guard: ({ context }) => context.result?.outcome === 'blocked', target: 'blocked' },
-					{ target: 'failed' }
-				]
+				type: 'choice',
+				choice: (args) => {
+					const { context } = args
+					if (context.result?.outcome === 'succeeded') {
+						return { target: 'succeeded' }
+					}
+					if (context.result?.outcome === 'blocked') {
+						return { target: 'blocked' }
+					}
+					return { target: 'failed' }
+				}
 			},
 			succeeded: { type: 'final' },
 			blocked: { type: 'final' },
 			failed: { type: 'final' },
 			cancelled: {
 				type: 'final',
-				entry: assign({
-					result: ({ context }): Outcome => ({
-						outcome: 'cancelled',
-						settlement: context.result?.settlement ?? { kind: 'notStarted' }
-					})
-				})
+				entry: finalizers.cancelled
 			},
 			closed: {
 				type: 'final',
-				entry: assign({
-					result: ({ context }): Outcome => ({
-						outcome: 'closed',
-						settlement: context.result?.settlement ?? { kind: 'notStarted' }
-					})
-				})
+				entry: finalizers.closed
 			}
 		}
 	})

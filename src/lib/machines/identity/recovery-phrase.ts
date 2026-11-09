@@ -1,4 +1,6 @@
-import { assign, fromPromise, not, setup, type SnapshotFrom } from 'xstate'
+import { types, createAsyncLogic, setup, type SnapshotFrom } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
 	AvailableRecoveryScope,
 	RecoveryPhraseCapability,
@@ -6,15 +8,19 @@ import type {
 	RecoveryPhraseView,
 	RecoveryScope
 } from '../../contracts/recovery-phrase.js'
-
-type Context = { scope: RecoveryScope; phrase: string | undefined }
-type RevealedPhrase = { scope: AvailableRecoveryScope; phrase: string }
-type Guards = {
+type Context = {
+	scope: RecoveryScope
+	phrase: string | undefined
+}
+type RevealedPhrase = {
+	scope: AvailableRecoveryScope
+	phrase: string
+}
+type _Guards = {
 	currentScope: undefined
 	unchangedObservation: undefined
 	availableObservation: undefined
 }
-
 function sameScope(left: RecoveryScope, right: RecoveryScope): boolean {
 	if (left.kind === 'unavailable' || right.kind === 'unavailable') return left.kind === right.kind
 	return (
@@ -23,98 +29,160 @@ function sameScope(left: RecoveryScope, right: RecoveryScope): boolean {
 		left.generation === right.generation
 	)
 }
-
 /** Sensitive actor: its context and invoke output must not enter inspection or snapshot history. */
 export function createRecoveryPhraseMachine(capability: RecoveryPhraseCapability) {
 	const actors = {
 		// One leaf plus result correlation. Availability and lifecycle decisions stay in guards.
-		reveal: fromPromise<RevealedPhrase, AvailableRecoveryScope>(async ({ input }) => ({
-			scope: input,
-			phrase: await capability.readPhrase(input)
-		}))
+		reveal: createAsyncLogic<RevealedPhrase, AvailableRecoveryScope>({
+			run: async ({ input }) => ({
+				scope: input,
+				phrase: await capability.readPhrase(input)
+			})
+		})
 	}
-	const model = setup<
-		Context,
-		RecoveryPhraseEvent,
-		typeof actors,
-		{},
-		{},
-		Guards,
-		never,
-		string,
-		RecoveryScope
-	>({
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				SHUTDOWN: types<EventPayload<RecoveryPhraseEvent, 'SHUTDOWN'>>(),
+				RETRY: types<EventPayload<RecoveryPhraseEvent, 'RETRY'>>(),
+				REVEAL: types<EventPayload<RecoveryPhraseEvent, 'REVEAL'>>(),
+				HIDE: types<EventPayload<RecoveryPhraseEvent, 'HIDE'>>(),
+				COMPLETE: types<EventPayload<RecoveryPhraseEvent, 'COMPLETE'>>(),
+				CONFIRM: types<EventPayload<RecoveryPhraseEvent, 'CONFIRM'>>(),
+				OBSERVE: types<EventPayload<RecoveryPhraseEvent, 'OBSERVE'>>()
+			},
+			input: types<RecoveryScope>()
+		},
 		actors,
 		guards: {
-			currentScope: ({ context }) =>
+			currentScope: ({ context }: { context: Context }) =>
 				context.scope.kind === 'available' && capability.isCurrentScope(context.scope),
-			unchangedObservation: ({ context, event }) =>
+			unchangedObservation: ({
+				context,
+				event
+			}: {
+				context: Context
+				event: RecoveryPhraseEvent
+			}) =>
 				event.type === 'OBSERVE' &&
 				sameScope(context.scope, event.scope) &&
 				(event.scope.kind === 'unavailable' || capability.isCurrentScope(event.scope)),
-			availableObservation: ({ event }) =>
+			availableObservation: ({ event }: { event: RecoveryPhraseEvent }) =>
 				event.type === 'OBSERVE' &&
 				event.scope.kind === 'available' &&
 				capability.isCurrentScope(event.scope)
 		}
 	})
-	const clearPhrase = model.assign({ phrase: undefined })
-	const clearScope = model.assign({
-		scope: (): RecoveryScope => ({ kind: 'unavailable' }),
-		phrase: undefined
-	})
-	const observeScope = model.assign(({ event }) =>
-		event.type === 'OBSERVE' ? { scope: event.scope, phrase: undefined } : {}
-	)
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		closed: (_args) => {
+			return {
+				context: { scope: { kind: 'unavailable' }, phrase: undefined } satisfies Partial<Context>
+			}
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
 
 	return model.createMachine({
 		id: 'recovery-phrase',
 		initial: 'assessing',
 		context: ({ input }) => ({ scope: input, phrase: undefined }),
 		on: {
-			SHUTDOWN: '.closed',
-			OBSERVE: [
-				{ guard: 'unchangedObservation' },
-				{ guard: 'availableObservation', target: '.hidden', actions: observeScope },
-				{ target: '.unavailable' }
-			],
-			HIDE: [
-				{ guard: 'currentScope', target: '.hidden', actions: clearPhrase },
-				{ target: '.unavailable' }
-			]
+			SHUTDOWN: (_args) => {
+				return { target: '.closed' }
+			},
+			OBSERVE: (args) => {
+				const { event } = args
+				if (args.guards.unchangedObservation(args)) {
+					return {}
+				}
+				if (args.guards.availableObservation(args)) {
+					return {
+						target: '.hidden',
+						context: (event.type === 'OBSERVE'
+							? { scope: event.scope, phrase: undefined }
+							: {}) satisfies Partial<Context>
+					}
+				}
+				return { target: '.unavailable' }
+			},
+			HIDE: (args) => {
+				if (args.guards.currentScope(args)) {
+					return {
+						target: '.hidden',
+						context: { phrase: undefined } satisfies Partial<Context>
+					}
+				}
+				return { target: '.unavailable' }
+			}
 		},
 		states: {
 			assessing: {
-				always: [{ guard: 'currentScope', target: 'hidden' }, { target: 'unavailable' }]
+				type: 'choice',
+				choice: (args) => {
+					if (args.guards.currentScope(args)) {
+						return { target: 'hidden' }
+					}
+					return { target: 'unavailable' }
+				}
 			},
-			unavailable: { entry: clearScope },
+			unavailable: {
+				entry: (_args) => {
+					return {
+						context: {
+							scope: { kind: 'unavailable' },
+							phrase: undefined
+						} satisfies Partial<Context>
+					}
+				}
+			},
 			hidden: {
 				on: {
-					REVEAL: [{ guard: 'currentScope', target: 'revealing' }, { target: 'unavailable' }]
+					REVEAL: (args) => {
+						if (args.guards.currentScope(args)) {
+							return { target: 'revealing' }
+						}
+						return { target: 'unavailable' }
+					}
 				}
 			},
 			revealing: {
 				invoke: {
-					src: 'reveal',
+					src: actors.reveal,
 					input: ({ context }) => {
 						if (context.scope.kind !== 'available') throw new Error('Recovery scope unavailable')
 						return context.scope
 					},
-					onDone: [
-						{
-							guard: ({ context, event }) =>
-								!sameScope(context.scope, event.output.scope) ||
-								!capability.isCurrentScope(event.output.scope),
-							target: 'unavailable'
-						},
-						{
-							guard: ({ event }) => event.output.phrase.trim().length > 0,
-							target: 'revealed',
-							actions: assign({ phrase: ({ event }) => event.output.phrase })
-						},
-						{ target: 'failed' }
-					],
-					onError: [{ guard: 'currentScope', target: 'failed' }, { target: 'unavailable' }]
+					onDone: (args) => {
+						const { event } = args
+						if (
+							!sameScope(args.context.scope, event.output.scope) ||
+							!capability.isCurrentScope(event.output.scope)
+						) {
+							return { target: 'unavailable' }
+						}
+						if (event.output.phrase.trim().length > 0) {
+							return {
+								target: 'revealed',
+								context: { phrase: event.output.phrase } satisfies Partial<Context>
+							}
+						}
+						return { target: 'failed' }
+					},
+					onError: (args) => {
+						if (args.guards.currentScope(args)) {
+							return { target: 'failed' }
+						}
+						return { target: 'unavailable' }
+					}
 				}
 			},
 			revealed: {
@@ -122,43 +190,59 @@ export function createRecoveryPhraseMachine(capability: RecoveryPhraseCapability
 				states: {
 					unconfirmed: {
 						on: {
-							CONFIRM: [
-								{
-									guard: not('currentScope'),
-									target: '#recovery-phrase.unavailable'
-								},
-								{ guard: ({ event }) => event.value, target: 'confirmed' }
-							]
+							CONFIRM: (args) => {
+								if (!args.guards.currentScope(args)) {
+									return { target: '#recovery-phrase.unavailable' }
+								}
+								if (args.event.value) {
+									return { target: 'confirmed' }
+								}
+							}
 						}
 					},
 					confirmed: {
 						on: {
-							CONFIRM: [
-								{
-									guard: not('currentScope'),
-									target: '#recovery-phrase.unavailable'
-								},
-								{ guard: ({ event }) => !event.value, target: 'unconfirmed' }
-							],
-							COMPLETE: [
-								{ guard: 'currentScope', target: '#recovery-phrase.hidden', actions: clearPhrase },
-								{ target: '#recovery-phrase.unavailable' }
-							]
+							CONFIRM: (args) => {
+								if (!args.guards.currentScope(args)) {
+									return { target: '#recovery-phrase.unavailable' }
+								}
+								if (!args.event.value) {
+									return { target: 'unconfirmed' }
+								}
+							},
+							COMPLETE: (args) => {
+								if (args.guards.currentScope(args)) {
+									return {
+										target: '#recovery-phrase.hidden',
+										context: { phrase: undefined } satisfies Partial<Context>
+									}
+								}
+								return { target: '#recovery-phrase.unavailable' }
+							}
 						}
 					}
 				}
 			},
 			failed: {
-				entry: clearPhrase,
+				entry: (_args) => {
+					return { context: { phrase: undefined } satisfies Partial<Context> }
+				},
 				on: {
-					RETRY: [{ guard: 'currentScope', target: 'revealing' }, { target: 'unavailable' }]
+					RETRY: (args) => {
+						if (args.guards.currentScope(args)) {
+							return { target: 'revealing' }
+						}
+						return { target: 'unavailable' }
+					}
 				}
 			},
-			closed: { type: 'final', entry: clearScope }
+			closed: {
+				type: 'final',
+				entry: finalizers.closed
+			}
 		}
 	})
 }
-
 export function selectRecoveryPhraseView(
 	snapshot: SnapshotFrom<ReturnType<typeof createRecoveryPhraseMachine>>
 ): RecoveryPhraseView {

@@ -136,3 +136,13 @@ shapes, and single-write/profile form factories require explicit persistence gua
 [the source migration guide](../specs/001-local-first-foundation/cleanup-review.md#compatibility-and-consumer-migration)
 before updating a pinned consumer. `forms/zod` optionally supplies `zodFormIssues` to the existing
 `validationIssues` callback; core form contracts remain validator-neutral.
+
+## XState v6 implementation candidate
+
+The library now pins the published, unpatched `xstate@6.0.0-beta.1` package.
+Consumers do not need an XState patch. See
+[implementation and qualification notes](../specs/003-verified-backup/xstate-v6-implementation.md).
+
+Adopt a rebuilt artifact across complete connected actor graphs. Consumer fixtures
+and native/browser behavior have not yet been qualified on v6. The vendored DUI
+archive still needs alignment with the reviewed v6 DUI build before app rollout.

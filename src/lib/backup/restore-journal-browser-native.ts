@@ -1,4 +1,4 @@
-import { fromCallback } from 'xstate'
+import { createCallbackLogic } from 'xstate'
 import {
 	browserJournalData,
 	browserJournalFailure,
@@ -35,7 +35,7 @@ export type BrowserJournalNativeEvent =
 	  }
 const storeName = 'restoreOperations'
 /** Native calls and event translation only; admission, sequencing, settlement and cleanup policy are states. */
-export const browserJournalNativeActor = fromCallback<
+export const browserJournalNativeActor = createCallbackLogic<
 	BrowserJournalNativeCommand,
 	{ request: BrowserJournalRequest }
 >(({ input, receive, sendBack }) => {

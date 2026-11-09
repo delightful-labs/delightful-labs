@@ -1,44 +1,65 @@
 import {
-	forwardTo,
-	sendTo,
-	and,
-	not,
-	assign,
-	fromPromise,
+	matchesState,
+	type StateValue,
+	types,
+	createAsyncLogic,
 	setup,
-	stateIn,
 	type ActorLogic,
 	type Snapshot
 } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
 	FormChildEvent,
-	FormInterruption,
+	FormInterruption as _FormInterruption,
 	FormObservation,
 	FormOperationInput,
 	FormOperationResult
 } from '../../contracts/scoped-form.js'
 import type { ProfileObservation, ProfileReason, ProfileScope } from '../../contracts/profile.js'
-export type ProfileAvatarDraft = { action: 'upload'; file: File } | { action: 'remove' }
+export type ProfileAvatarDraft =
+	| {
+			action: 'upload'
+			file: File
+	  }
+	| {
+			action: 'remove'
+	  }
 export type ProfileAvatarValues =
 	| {
 			avatarData: Uint8Array<ArrayBuffer>
 			avatarMimeType: 'image/png' | 'image/jpeg' | 'image/webp'
 	  }
-	| { avatarData: null; avatarMimeType: null }
+	| {
+			avatarData: null
+			avatarMimeType: null
+	  }
 export type ProfileImageResult =
 	| {
 			outcome: 'processed'
 			blob: Blob
 			bytes: Uint8Array
-			dimensions: { width: number; height: number }
+			dimensions: {
+				width: number
+				height: number
+			}
 	  }
-	| { outcome: 'failed' }
+	| {
+			outcome: 'failed'
+	  }
 export type ProfileImageLogic<S extends Snapshot<ProfileImageResult>> = ActorLogic<
 	S,
-	{ type: 'CANCEL' | 'SHUTDOWN' },
+	{
+		type: 'CANCEL' | 'SHUTDOWN'
+	},
 	{
 		file: File
-		options: { maxWidth: number; maxHeight: number; mimeType: 'image/webp'; quality: number }
+		options: {
+			maxWidth: number
+			maxHeight: number
+			mimeType: 'image/webp'
+			quality: number
+		}
 	}
 >
 export type ProfileAvatarWriteLogic<S extends Snapshot<FormOperationResult<void, ProfileReason>>> =
@@ -66,79 +87,189 @@ function required<T>(value: T | undefined): T {
 	return value
 }
 const failed: Result = { outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }
-
 /** Owns image resources through cleanup, then delegates readiness and settlement to the write child. */
 export function createProfileAvatarMachine<
 	ProcessSnapshot extends Snapshot<ProfileImageResult>,
 	WriteSnapshot extends Snapshot<Result>
 >(options: {
 	processImage: ProfileImageLogic<ProcessSnapshot>
-	validateBytes: (input: {
-		bytes: Uint8Array
-		mimeType: string
-	}) => { success: true; data: Values } | { success: false }
+	validateBytes: (input: { bytes: Uint8Array; mimeType: string }) =>
+		| {
+				success: true
+				data: Values
+		  }
+		| {
+				success: false
+		  }
 	write: ProfileAvatarWriteLogic<WriteSnapshot>
 	scopeOf: (facts: ProfileObservation) => ProfileScope
 	sameScope: (left: ProfileScope, right: ProfileScope) => boolean
 }) {
 	const actors = {
 		processImage: options.processImage,
-		validate: fromPromise(async ({ input }: { input: { bytes: Uint8Array; mimeType: string } }) =>
-			options.validateBytes(input)
-		),
+		validate: createAsyncLogic({
+			run: async ({
+				input
+			}: {
+				input: {
+					bytes: Uint8Array
+					mimeType: string
+				}
+			}) => options.validateBytes(input)
+		}),
 		write: options.write
 	}
-	const model = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{ fail: undefined },
-		{
-			interrupted: undefined
-			closing: undefined
-			invalidated: undefined
-			cancelling: undefined
+	const patches = { fail: (_args: { context: Context }): Partial<Context> => ({ result: failed }) }
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<Event, 'OBSERVE'>>()
+			},
+			input: types<Input>(),
+			output: types<Result>()
 		},
-		never,
-		string,
-		Input,
-		Result
-	>({
 		actors,
-		actions: { fail: assign({ result: (): Result => failed }) },
+		actions: {},
 		guards: {
-			interrupted: stateIn({ running: { control: 'interrupted' } }),
-			closing: stateIn({ running: { control: { interrupted: 'closed' } } }),
-			invalidated: stateIn({ running: { control: { interrupted: 'scopeChanged' } } }),
-			cancelling: stateIn({ running: { control: { interrupted: 'cancelled' } } })
+			interrupted: ({ value }: { value: StateValue }) =>
+				matchesState({ running: { control: 'interrupted' } }, value)
 		}
 	})
-	const observe = model.assign({
-		observation: ({ context, event }) =>
-			event.type === 'OBSERVE' ? event.observation : context.observation
-	})
-	const clear = model.assign({
-		request: undefined,
-		draft: undefined,
-		observation: undefined,
-		blob: undefined,
-		bytes: undefined,
-		prepared: undefined
-	})
-	const terminal = (outcome?: FormInterruption) =>
-		model.createStateConfig({
-			type: 'final',
-			entry: [
-				model.assign({
-					result: ({ context }): Result =>
-						outcome
-							? { outcome, settlement: context.result?.settlement ?? 'notStarted' }
-							: (context.result ?? failed)
-				}),
-				clear
-			]
-		})
+
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		succeeded: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: context.result ?? failed,
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		partial: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: context.result ?? failed,
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		denied: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: context.result ?? failed,
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		unavailable: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: context.result ?? failed,
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		failed: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: context.result ?? failed,
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		closed: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: { outcome: 'closed', settlement: context.result?.settlement ?? 'notStarted' },
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		scopeChanged: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: {
+						outcome: 'scopeChanged',
+						settlement: context.result?.settlement ?? 'notStarted'
+					},
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		cancelled: (args) => {
+			const { context } = args
+			return {
+				context: {
+					result: {
+						outcome: 'cancelled',
+						settlement: context.result?.settlement ?? 'notStarted'
+					},
+					request: undefined,
+					draft: undefined,
+					observation: undefined,
+					blob: undefined,
+					bytes: undefined,
+					prepared: undefined
+				} satisfies Partial<Context>
+			}
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
+
 	return model.createMachine({
 		id: 'profile-avatar',
 		initial: 'running',
@@ -166,18 +297,28 @@ export function createProfileAvatarMachine<
 							CANCEL: { target: '.interrupted.cancelled' },
 							INVALIDATE: { target: '.interrupted.scopeChanged' },
 							SHUTDOWN: { target: '.interrupted.closed' },
-							OBSERVE: [
-								{
-									guard: ({ context, event }) =>
-										!options.sameScope(
-											required(context.request).scope,
-											options.scopeOf(event.observation.facts)
-										),
-									target: '.interrupted.scopeChanged',
-									actions: observe
-								},
-								{ actions: observe }
-							]
+							OBSERVE: (args) => {
+								const { context, event } = args
+								if (
+									!options.sameScope(
+										required(context.request).scope,
+										options.scopeOf(event.observation.facts)
+									)
+								) {
+									return {
+										target: '.interrupted.scopeChanged',
+										context: {
+											observation:
+												event.type === 'OBSERVE' ? event.observation : context.observation
+										} satisfies Partial<Context>
+									}
+								}
+								return {
+									context: {
+										observation: event.type === 'OBSERVE' ? event.observation : context.observation
+									} satisfies Partial<Context>
+								}
+							}
 						},
 						states: {
 							active: {},
@@ -195,37 +336,54 @@ export function createProfileAvatarMachine<
 						initial: 'choosing',
 						states: {
 							choosing: {
-								always: [
-									{ guard: 'interrupted', target: 'ready' },
-									{
-										guard: ({ context }) => context.draft?.action === 'remove',
-										target: 'ready',
-										actions: assign({
-											prepared: () => ({ avatarData: null, avatarMimeType: null })
-										})
-									},
-									{ target: 'processingImage' }
-								]
+								always: (args) => {
+									if (matchesState({ running: { control: 'interrupted' } }, args.value)) {
+										return { target: 'ready' }
+									}
+									if (args.context.draft?.action === 'remove') {
+										return {
+											target: 'ready',
+											context: {
+												prepared: { avatarData: null, avatarMimeType: null }
+											} satisfies Partial<Context>
+										}
+									}
+									return { target: 'processingImage' }
+								}
 							},
 							processingImage: {
 								on: {
-									CANCEL: {
-										guard: not('interrupted'),
-										actions: sendTo('processImage', { type: 'CANCEL' })
+									CANCEL: (args, enq) => {
+										if (matchesState({ running: { control: 'interrupted' } }, args.value)) return
+										enq.sendTo('processImage', { type: 'CANCEL' })
 									},
-									INVALIDATE: {
-										guard: and([not('closing'), not('invalidated')]),
-										actions: sendTo('processImage', { type: 'CANCEL' })
+									INVALIDATE: (args, enq) => {
+										if (
+											!(
+												!matchesState(
+													{ running: { control: { interrupted: 'closed' } } },
+													args.value
+												) &&
+												!matchesState(
+													{ running: { control: { interrupted: 'scopeChanged' } } },
+													args.value
+												)
+											)
+										)
+											return
+										enq.sendTo('processImage', { type: 'CANCEL' })
 									},
-									SHUTDOWN: {
-										guard: not('closing'),
-										actions: sendTo('processImage', { type: 'SHUTDOWN' })
+									SHUTDOWN: (args, enq) => {
+										if (
+											matchesState({ running: { control: { interrupted: 'closed' } } }, args.value)
+										)
+											return
+										enq.sendTo('processImage', { type: 'SHUTDOWN' })
 									}
 								},
-
-								invoke: {
+								invoke: model.createInvoke<typeof actors.processImage, Context>({
 									id: 'processImage',
-									src: 'processImage',
+									src: actors.processImage,
 									input: ({ context }) => {
 										const draft = required(context.draft)
 										if (draft.action !== 'upload') throw new Error('Missing avatar upload')
@@ -239,63 +397,122 @@ export function createProfileAvatarMachine<
 											}
 										}
 									},
-									onDone: [
-										{
-											guard: ({ event }) => event.output?.outcome === 'processed',
-											target: 'validatingBytes',
-											actions: assign({
-												blob: ({ event }) =>
-													event.output?.outcome === 'processed' ? event.output.blob : undefined,
-												bytes: ({ event }) =>
-													event.output?.outcome === 'processed' ? event.output.bytes : undefined
-											})
-										},
-										{ target: 'ready', actions: 'fail' }
-									],
-									onError: { target: 'ready', actions: 'fail' }
-								}
+									onDone: (args) => {
+										const { event } = args
+										if (event.output?.outcome === 'processed') {
+											return {
+												target: 'validatingBytes',
+												context: {
+													blob:
+														event.output?.outcome === 'processed' ? event.output.blob : undefined,
+													bytes:
+														event.output?.outcome === 'processed' ? event.output.bytes : undefined
+												} satisfies Partial<Context>
+											}
+										}
+										return {
+											target: 'ready',
+											context: patches.fail(args) satisfies Partial<Context>
+										}
+									},
+									onError: (args) => {
+										return {
+											target: 'ready',
+											context: patches.fail(args) satisfies Partial<Context>
+										}
+									}
+								})
 							},
 							validatingBytes: {
-								invoke: {
-									src: 'validate',
+								invoke: model.createInvoke<typeof actors.validate, Context>({
+									src: actors.validate,
 									input: ({ context }) => ({
 										bytes: required(context.bytes),
 										mimeType: required(context.blob).type
 									}),
-									onDone: [
-										{
-											guard: ({ event }) => event.output.success,
+									onDone: (args) => {
+										const { event } = args
+										if (event.output.success) {
+											return {
+												target: 'ready',
+												context: {
+													prepared: event.output.success ? event.output.data : undefined
+												} satisfies Partial<Context>
+											}
+										}
+										return {
 											target: 'ready',
-											actions: assign({
-												prepared: ({ event }) =>
-													event.output.success ? event.output.data : undefined
-											})
-										},
-										{ target: 'ready', actions: 'fail' }
-									],
-									onError: { target: 'ready', actions: 'fail' }
-								}
+											context: patches.fail(args) satisfies Partial<Context>
+										}
+									},
+									onError: (args) => {
+										return {
+											target: 'ready',
+											context: patches.fail(args) satisfies Partial<Context>
+										}
+									}
+								})
 							},
 							ready: {
-								always: [
-									{ guard: 'interrupted', target: 'finishing' },
-									{ guard: ({ context }) => context.result !== undefined, target: 'finishing' },
-									{ target: 'saving' }
-								]
+								type: 'choice',
+								choice: (args) => {
+									if (matchesState({ running: { control: 'interrupted' } }, args.value)) {
+										return { target: 'finishing' }
+									}
+									if (args.context.result !== undefined) {
+										return { target: 'finishing' }
+									}
+									return { target: 'saving' }
+								}
 							},
 							saving: {
 								on: {
-									CANCEL: { guard: not('interrupted'), actions: forwardTo('write') },
-									INVALIDATE: {
-										guard: and([not('closing'), not('invalidated')]),
-										actions: forwardTo('write')
+									CANCEL: (args, enq) => {
+										if (matchesState({ running: { control: 'interrupted' } }, args.value)) return
+										enq.sendTo('write', args.event)
 									},
-									SHUTDOWN: { guard: not('closing'), actions: forwardTo('write') },
-									OBSERVE: {
-										guard: and([not('closing'), not('invalidated')]),
-										actions: sendTo('write', ({ context, event }) =>
+									INVALIDATE: (args, enq) => {
+										if (
+											!(
+												!matchesState(
+													{ running: { control: { interrupted: 'closed' } } },
+													args.value
+												) &&
+												!matchesState(
+													{ running: { control: { interrupted: 'scopeChanged' } } },
+													args.value
+												)
+											)
+										)
+											return
+										enq.sendTo('write', args.event)
+									},
+									SHUTDOWN: (args, enq) => {
+										if (
+											matchesState({ running: { control: { interrupted: 'closed' } } }, args.value)
+										)
+											return
+										enq.sendTo('write', args.event)
+									},
+									OBSERVE: (args, enq) => {
+										if (
+											!(
+												!matchesState(
+													{ running: { control: { interrupted: 'closed' } } },
+													args.value
+												) &&
+												!matchesState(
+													{ running: { control: { interrupted: 'scopeChanged' } } },
+													args.value
+												)
+											)
+										)
+											return
+										const { event } = args
+										enq.sendTo(
+											'write',
 											!options.sameScope(
-												required(context.request).scope,
+												required(args.context.request).scope,
 												options.scopeOf(event.observation.facts)
 											)
 												? { type: 'INVALIDATE' }
@@ -303,85 +520,133 @@ export function createProfileAvatarMachine<
 										)
 									}
 								},
-
-								invoke: {
+								invoke: model.createInvoke<typeof actors.write, Context>({
 									id: 'write',
-									src: 'write',
+									src: actors.write,
 									input: ({ context }) => ({
 										request: { ...required(context.request), values: required(context.prepared) },
 										observation: required(context.observation)
 									}),
-									onDone: {
-										target: 'finishing',
-										actions: assign({
-											result: ({ event }) =>
-												event.output ?? {
+									onDone: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: args.event.output ?? {
 													outcome: 'failed',
 													code: 'unexpected',
 													settlement: 'unknown'
 												}
-										})
+											} satisfies Partial<Context>
+										}
 									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: () => ({
-												outcome: 'failed',
-												code: 'operationFailed',
-												settlement: 'unknown'
-											})
-										})
+									onError: (_args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													outcome: 'failed',
+													code: 'operationFailed',
+													settlement: 'unknown'
+												}
+											} satisfies Partial<Context>
+										}
 									}
-								}
+								})
 							},
 							finishing: {
-								always: [
-									{ guard: 'closing', target: '#profile-avatar.closed' },
-									{ guard: 'invalidated', target: '#profile-avatar.scopeChanged' },
-									{ guard: 'cancelling', target: '#profile-avatar.cancelled' },
-									{
-										guard: ({ context }) => context.result?.outcome === 'succeeded',
-										target: '#profile-avatar.succeeded'
-									},
-									{
-										guard: ({ context }) => context.result?.outcome === 'partial',
-										target: '#profile-avatar.partial'
-									},
-									{
-										guard: ({ context }) => context.result?.outcome === 'denied',
-										target: '#profile-avatar.denied'
-									},
-									{
-										guard: ({ context }) => context.result?.outcome === 'unavailable',
-										target: '#profile-avatar.unavailable'
-									},
-									{
-										guard: ({ context }) => context.result?.outcome === 'closed',
-										target: '#profile-avatar.closed'
-									},
-									{
-										guard: ({ context }) => context.result?.outcome === 'scopeChanged',
-										target: '#profile-avatar.scopeChanged'
-									},
-									{
-										guard: ({ context }) => context.result?.outcome === 'cancelled',
-										target: '#profile-avatar.cancelled'
-									},
-									{ target: '#profile-avatar.failed' }
-								]
+								always: (args) => {
+									const { context } = args
+									if (
+										matchesState({ running: { control: { interrupted: 'closed' } } }, args.value)
+									) {
+										return { target: '#profile-avatar.closed' }
+									}
+									if (
+										matchesState(
+											{ running: { control: { interrupted: 'scopeChanged' } } },
+											args.value
+										)
+									) {
+										return {
+											target: '#profile-avatar.scopeChanged'
+										}
+									}
+									if (
+										matchesState({ running: { control: { interrupted: 'cancelled' } } }, args.value)
+									) {
+										return {
+											target: '#profile-avatar.cancelled'
+										}
+									}
+									if (context.result?.outcome === 'succeeded') {
+										return {
+											target: '#profile-avatar.succeeded'
+										}
+									}
+									if (context.result?.outcome === 'partial') {
+										return { target: '#profile-avatar.partial' }
+									}
+									if (context.result?.outcome === 'denied') {
+										return { target: '#profile-avatar.denied' }
+									}
+									if (context.result?.outcome === 'unavailable') {
+										return {
+											target: '#profile-avatar.unavailable'
+										}
+									}
+									if (context.result?.outcome === 'closed') {
+										return { target: '#profile-avatar.closed' }
+									}
+									if (context.result?.outcome === 'scopeChanged') {
+										return {
+											target: '#profile-avatar.scopeChanged'
+										}
+									}
+									if (context.result?.outcome === 'cancelled') {
+										return {
+											target: '#profile-avatar.cancelled'
+										}
+									}
+
+									return { target: '#profile-avatar.failed' }
+								}
 							}
 						}
 					}
 				}
 			},
-			succeeded: terminal(),
-			partial: terminal(),
-			denied: terminal(),
-			unavailable: terminal(),
-			failed: terminal(),
-			closed: terminal('closed'),
-			scopeChanged: terminal('scopeChanged'),
-			cancelled: terminal('cancelled')
+			succeeded: {
+				type: 'final',
+				entry: finalizers.succeeded
+			},
+			partial: {
+				type: 'final',
+				entry: finalizers.partial
+			},
+			denied: {
+				type: 'final',
+				entry: finalizers.denied
+			},
+			unavailable: {
+				type: 'final',
+				entry: finalizers.unavailable
+			},
+			failed: {
+				type: 'final',
+				entry: finalizers.failed
+			},
+			closed: {
+				type: 'final',
+				entry: finalizers.closed
+			},
+			scopeChanged: {
+				type: 'final',
+				entry: finalizers.scopeChanged
+			},
+			cancelled: {
+				type: 'final',
+				entry: finalizers.cancelled
+			}
 		}
 	})
 }

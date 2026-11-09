@@ -1,16 +1,30 @@
-import { assign, fromCallback, sendParent, sendTo, setup } from 'xstate'
-import type { RestoreScope } from '../../backup/restore.js'
+import { types, createCallbackLogic, setup } from 'xstate'
 
-export type LockEvent = { type: 'LOCK_ACQUIRED' | 'LOCK_FAILED' }
+import type { EventPayload } from '../../contracts/machine-events.js'
+import type { RestoreScope } from '../../backup/restore.js'
+export type LockEvent = {
+	type: 'LOCK_ACQUIRED' | 'LOCK_FAILED'
+}
 type Input = Pick<RestoreScope, 'binding'>
 type NativeEvent =
-	| { type: 'NATIVE_OFFERED'; available: boolean }
-	| { type: 'NATIVE_SETTLED' | 'NATIVE_FAILED' }
-type Release = { type: 'RELEASE' }
+	| {
+			type: 'NATIVE_OFFERED'
+			available: boolean
+	  }
+	| {
+			type: 'NATIVE_SETTLED' | 'NATIVE_FAILED'
+	  }
+type Release = {
+	type: 'RELEASE'
+}
 type Outcome = 'released' | 'unavailable' | 'failed'
-
 /** One browser protocol call. The owner decides admission and when to release. */
-const nativeLock = fromCallback<Release, { name: string }>(({ input, sendBack, receive }) => {
+const nativeLock = createCallbackLogic<
+	Release,
+	{
+		name: string
+	}
+>(({ input, sendBack, receive }) => {
 	let release: (() => void) | undefined
 	const held = new Promise<void>((resolve) => {
 		release = resolve
@@ -30,24 +44,63 @@ const nativeLock = fromCallback<Release, { name: string }>(({ input, sendBack, r
 	// Disposing before a late callback also leaves its returned promise resolved.
 	return () => release?.()
 })
-
 /** Native observations feed this lifecycle; no acquisition policy lives in callbacks. */
 const actors = { native: nativeLock }
-export const operationLock = setup<
-	{ name: string; outcome: Outcome },
-	Release | NativeEvent,
-	typeof actors,
-	{},
-	never,
-	{ supported: undefined },
-	never,
-	string,
-	Input,
-	Outcome
->({
+const completionModel = setup({
+	schemas: {
+		context: types<{
+			name: string
+			outcome: Outcome
+		}>(),
+		events: {
+			RELEASE: types<EventPayload<Release | NativeEvent, 'RELEASE'>>(),
+			NATIVE_OFFERED: types<EventPayload<Release | NativeEvent, 'NATIVE_OFFERED'>>(),
+			NATIVE_SETTLED: types<EventPayload<Release | NativeEvent, 'NATIVE_SETTLED'>>(),
+			NATIVE_FAILED: types<EventPayload<Release | NativeEvent, 'NATIVE_FAILED'>>()
+		},
+		input: types<Input>(),
+		output: types<Outcome>()
+	},
 	actors,
 	guards: { supported: () => Boolean(globalThis.navigator?.locks) }
-}).createMachine({
+})
+type CompletionEntry = Extract<
+	NonNullable<Parameters<typeof completionModel.createStateConfig>[0]['entry']>,
+	(...args: never[]) => unknown
+>
+type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+type CompletionQueue = Parameters<CompletionEntry>[1]
+const finalizers = {
+	released: (_args) => {
+		return {
+			context: { outcome: 'released' } satisfies Partial<{
+				name: string
+				outcome: Outcome
+			}>
+		}
+	},
+	failed: (_args) => {
+		return {
+			context: { outcome: 'failed' } satisfies Partial<{
+				name: string
+				outcome: Outcome
+			}>
+		}
+	}
+} satisfies Record<
+	string,
+	(
+		args: CompletionArgs,
+		enq: CompletionQueue
+	) => void | {
+		context?: Partial<{
+			name: string
+			outcome: Outcome
+		}>
+	}
+>
+
+export const operationLock = completionModel.createMachine({
 	id: 'restore-operation-lock',
 	initial: 'checkingSupport',
 	context: ({ input }) => ({
@@ -63,47 +116,87 @@ export const operationLock = setup<
 	output: ({ context }) => context.outcome,
 	states: {
 		checkingSupport: {
-			always: [{ guard: 'supported', target: 'active' }, { target: 'unavailable' }]
+			type: 'choice',
+			choice: (args) => {
+				if (args.guards.supported()) {
+					return { target: 'active' }
+				}
+				return { target: 'unavailable' }
+			}
 		},
 		active: {
 			initial: 'acquiring',
 			invoke: {
 				id: 'native',
-				src: 'native',
+				src: actors.native,
 				input: ({ context }) => ({ name: context.name }),
-				onError: 'failed'
+				onError: (_args) => {
+					return { target: 'failed' }
+				}
 			},
-			on: { NATIVE_FAILED: '#restore-operation-lock.failed' },
+			on: {
+				NATIVE_FAILED: (_args) => {
+					return { target: '#restore-operation-lock.failed' }
+				}
+			},
 			states: {
 				acquiring: {
 					on: {
-						NATIVE_OFFERED: [
-							{ guard: ({ event }) => event.available, target: 'held' },
-							{ target: 'releasingUnavailable' }
-						],
-						RELEASE: 'releasing'
+						NATIVE_OFFERED: (args) => {
+							if (args.event.available) {
+								return { target: 'held' }
+							}
+							return { target: 'releasingUnavailable' }
+						},
+						RELEASE: { target: 'releasing' }
 					}
 				},
 				held: {
-					entry: sendParent({ type: 'LOCK_ACQUIRED' } satisfies LockEvent),
-					on: { RELEASE: 'releasing', NATIVE_FAILED: 'lost', NATIVE_SETTLED: 'lost' }
+					entry: (args, enq) => {
+						enq.sendTo(args.parent, { type: 'LOCK_ACQUIRED' } satisfies LockEvent)
+					},
+					on: {
+						RELEASE: { target: 'releasing' },
+						NATIVE_FAILED: { target: 'lost' },
+						NATIVE_SETTLED: { target: 'lost' }
+					}
 				},
 				lost: {
-					entry: sendParent({ type: 'LOCK_FAILED' } satisfies LockEvent),
-					on: { RELEASE: '#restore-operation-lock.failed' }
+					entry: (args, enq) => {
+						enq.sendTo(args.parent, { type: 'LOCK_FAILED' } satisfies LockEvent)
+					},
+					on: {
+						RELEASE: (_args) => {
+							return { target: '#restore-operation-lock.failed' }
+						}
+					}
 				},
 				releasing: {
-					entry: sendTo('native', { type: 'RELEASE' }),
-					on: { NATIVE_SETTLED: '#restore-operation-lock.released' }
+					entry: (args, enq) => {
+						enq.sendTo('native', { type: 'RELEASE' })
+					},
+					on: {
+						NATIVE_SETTLED: (_args) => {
+							return { target: '#restore-operation-lock.released' }
+						}
+					}
 				},
 				releasingUnavailable: {
-					entry: sendTo('native', { type: 'RELEASE' }),
-					on: { NATIVE_SETTLED: '#restore-operation-lock.unavailable' }
+					entry: (args, enq) => {
+						enq.sendTo('native', { type: 'RELEASE' })
+					},
+					on: { NATIVE_SETTLED: { target: '#restore-operation-lock.unavailable' } }
 				}
 			}
 		},
-		released: { type: 'final', entry: assign({ outcome: 'released' }) },
+		released: {
+			type: 'final',
+			entry: finalizers.released
+		},
 		unavailable: { type: 'final' },
-		failed: { type: 'final', entry: assign({ outcome: 'failed' }) }
+		failed: {
+			type: 'final',
+			entry: finalizers.failed
+		}
 	}
 })

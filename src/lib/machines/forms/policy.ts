@@ -1,5 +1,6 @@
+import { type Snapshot, type SnapshotFrom } from 'xstate'
+
 import type { ScopedFormAvailabilityLogic } from './readiness.js'
-import type { Snapshot, SnapshotFrom } from 'xstate'
 import type {
 	FormCapability,
 	FormSchema,
@@ -9,7 +10,6 @@ import type {
 } from '../../contracts/scoped-form.js'
 import { createScopedFormWriteMachine, type FormPersistence } from './write.js'
 import type { ScopedFormOptions } from './scoped-form.js'
-
 /** Composition only: policy states and effects are supplied by the domain. */
 export function createSingleWriteFormOptions<
 	Values,
@@ -57,5 +57,7 @@ export function createSingleWriteFormOptions<
 		Observation,
 		AvailabilitySnapshot,
 		SnapshotFrom<typeof operation>
-	> & { observe: () => Observation }
+	> & {
+		observe: () => Observation
+	}
 }

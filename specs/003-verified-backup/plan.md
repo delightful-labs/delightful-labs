@@ -50,6 +50,11 @@ data; platform performance and actual deployed recovery still require their own 
 
 ## Technical Context
 
+The proposed [XState v6 compatibility and ownership specification](xstate-v6-migration.md)
+defines a coordinated library/consumer migration and worker compatibility boundaries.
+The [v6 implementation](xstate-v6-implementation.md) now awaits review and behavioral
+qualification. The historical implementation baseline below used XState 5.33.2.
+
 - **Language**: strict TypeScript 6.0.3; no casts, `any`, or `switch`.
 - **Dependencies**: Zod 4.1.11 for internal strict schemas/type inference, native Web Crypto, UTF-8 encoding and file APIs for pure archive handling; XState 5.33.2 for lifecycle. Svelte 5/DUI/Paraglide only at later presentation boundaries. Existing Jazz alpha.59 stays in Finance integration.
 - **Storage**: portable bounded JSON envelope; consumer-owned domain database; durable consumer-owned restore journal. Do not persist decrypted records or passwords in machine snapshots.

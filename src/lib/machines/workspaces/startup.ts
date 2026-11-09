@@ -1,34 +1,51 @@
 import {
-	assign,
-	raise,
-	sendTo,
+	matchesState,
+	type StateValue,
+	types,
 	setup,
-	stateIn,
 	type ActorRef,
 	type ActorLogic,
 	type Snapshot
 } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import {
 	sameInitializationRequest,
 	type InitializationRequest,
 	type InitializationRecipient,
 	type InitializationStatus,
-	type InitializationStatusEvent
+	type InitializationStatusEvent as _InitializationStatusEvent
 } from '../../contracts/workspace-startup.js'
 export type StartupInitializationLogic<Db, S extends Snapshot<unknown>> = ActorLogic<
 	S,
-	{ type: 'CANCEL' } | { type: 'SHUTDOWN' },
-	{ db: Db; userId: string }
+	| {
+			type: 'CANCEL'
+	  }
+	| {
+			type: 'SHUTDOWN'
+	  },
+	{
+		db: Db
+		userId: string
+	}
 >
 export type StartupSeedLogic<Db, S extends Snapshot<unknown>> = ActorLogic<
 	S,
-	{ type: 'CANCEL' | 'SHUTDOWN' },
-	{ db: Db; userId: string; organizationId: string }
+	{
+		type: 'CANCEL' | 'SHUTDOWN'
+	},
+	{
+		db: Db
+		userId: string
+		organizationId: string
+	}
 >
 // Own initialization and optional application seeding independently of foreground readiness.
 export function createWorkspaceStartupMachine<
 	Db,
-	Initialization extends { outcome: string },
+	Initialization extends {
+		outcome: string
+	},
 	Seed,
 	IS extends Snapshot<Initialization>,
 	SS extends Snapshot<Seed>
@@ -36,120 +53,197 @@ export function createWorkspaceStartupMachine<
 	db: Db
 	initialize: StartupInitializationLogic<Db, IS>
 	seed: StartupSeedLogic<Db, SS>
-	ready: (
-		result: Initialization | undefined
-	) => { profileId: string; organizationId: string } | undefined
+	ready: (result: Initialization | undefined) =>
+		| {
+				profileId: string
+				organizationId: string
+		  }
+		| undefined
 	initializationFailure: (error: unknown) => Initialization
 	seedFailure: (error: unknown) => Seed
 }) {
-	type Input = { request: InitializationRequest; recipient: InitializationRecipient }
+	type Input = {
+		request: InitializationRequest
+		recipient: InitializationRecipient
+	}
 	type Event =
-		| { type: 'OBSERVED'; request: InitializationRequest }
-		| { type: 'REEVALUATE' | 'SHUTDOWN' }
+		| {
+				type: 'OBSERVED'
+				request: InitializationRequest
+		  }
+		| {
+				type: 'REEVALUATE' | 'SHUTDOWN'
+		  }
 		| {
 				type: 'DRAIN_SEED' | 'REPLACE_SEED'
-				actor: ActorRef<SS, { type: 'CANCEL' | 'SHUTDOWN' }> | undefined
+				actor:
+					| ActorRef<
+							SS,
+							{
+								type: 'CANCEL' | 'SHUTDOWN'
+							}
+					  >
+					| undefined
 		  }
-	type Context = Input & {
+	type Context = {
+		request: InitializationRequest
+		recipient: InitializationRecipient
 		operation: InitializationRequest | undefined
-		result: WorkspaceInitializationResult | undefined
-		seedResult: WorkspaceFakeDataResult | undefined
-		provenance: { profileId: string; organizationId: string } | undefined
+		provenance:
+			| {
+					profileId: string
+					organizationId: string
+			  }
+			| undefined
+		results: {
+			result: WorkspaceInitializationResult | undefined
+			seedResult: WorkspaceFakeDataResult | undefined
+		}
 	}
-
 	type WorkspaceInitializationResult = Initialization
 	type WorkspaceFakeDataResult = Seed
 	const db = options.db
 	const workspaceInitialization = options.initialize
 	const workspaceFakeData = options.seed
-
-	const model = setup<
-		Context,
-		Event,
-		{ initialize: typeof workspaceInitialization; seed: typeof workspaceFakeData },
-		{},
-		{},
-		{
-			closing: undefined
-			replacing: undefined
-			identityChanged: undefined
-			seedAlive: undefined
-			seedClosing: undefined
-			seedReplacing: undefined
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				OBSERVED: types<EventPayload<Event, 'OBSERVED'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				REEVALUATE: types<EventPayload<Event, 'REEVALUATE'>>()
+			},
+			internalEvents: {
+				DRAIN_SEED: types<EventPayload<Event, 'DRAIN_SEED'>>(),
+				REPLACE_SEED: types<EventPayload<Event, 'REPLACE_SEED'>>()
+			},
+			input: types<Input>()
 		},
-		never,
-		string,
-		Input
-	>({
 		actors: { initialize: workspaceInitialization, seed: workspaceFakeData },
 		guards: {
-			closing: stateIn({ initializing: 'closing' }),
-			seedClosing: stateIn({ ready: 'closing' }),
-			seedReplacing: stateIn({ ready: 'replacing' }),
-			seedAlive: ({ event }) =>
+			closing: ({ value }: { value: StateValue }) =>
+				matchesState({ initializing: 'closing' }, value),
+			seedAlive: ({ event }: { event: Event }) =>
 				(event.type === 'DRAIN_SEED' || event.type === 'REPLACE_SEED') &&
 				event.actor?.getSnapshot().status === 'active',
-			replacing: stateIn({ initializing: 'replacing' }),
-			identityChanged: ({ context }) =>
+			replacing: ({ value }: { value: StateValue }) =>
+				matchesState({ initializing: 'replacing' }, value),
+			identityChanged: ({ context }: { context: Context }) =>
 				context.operation === undefined ||
 				!sameInitializationRequest(context.request, context.operation)
 		}
 	})
-	const report = (status: (context: Context) => InitializationStatus) =>
-		model.sendTo(
-			({ context }) => context.recipient,
-			({ context }): InitializationStatusEvent => ({
+	const report =
+		(status: (context: Context) => InitializationStatus) =>
+		({ context }: { context: Context }, enq: CompletionQueue) => {
+			enq.sendTo(context.recipient, {
 				type: 'INITIALIZATION_STATUS',
 				report: { request: context.operation ?? context.request, status: status(context) }
 			})
-		)
+		}
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		closed: ({ context }, enq) => {
+			enq.sendTo(context.recipient, {
+				type: 'INITIALIZATION_STATUS',
+				report: { request: context.operation ?? context.request, status: { kind: 'closed' } }
+			})
+		}
+	} satisfies Record<
+		string,
+		(
+			args: CompletionArgs,
+			enq: CompletionQueue
+		) => void | {
+			context?: Partial<Context>
+		}
+	>
+
 	return model.createMachine({
 		id: 'workspace-startup',
 		context: ({ input }) => ({
-			...input,
+			request: input.request,
+			recipient: input.recipient,
 			operation: undefined,
-			result: undefined,
-			seedResult: undefined,
-			provenance: undefined
+			provenance: undefined,
+			results: {
+				result: undefined,
+				seedResult: undefined
+			}
 		}),
 		initial: 'checking',
 		on: {
-			OBSERVED: {
-				actions: [assign({ request: ({ event }) => event.request }), raise({ type: 'REEVALUATE' })]
+			OBSERVED: (args, enq) => {
+				enq.raise({ type: 'REEVALUATE' })
+				return {
+					context: { request: args.event.request } satisfies Partial<Context>
+				}
 			},
-			SHUTDOWN: '.closed'
+			SHUTDOWN: (_args) => {
+				return { target: '.closed' }
+			}
 		},
 		states: {
 			checking: {
-				always: [
-					{
-						guard: ({ context }) => context.request.status === 'ready' && !!context.request.userId,
-						target: 'initializing'
-					},
-					{ target: 'waitingForSession' }
-				]
+				type: 'choice',
+				choice: (args) => {
+					const { context } = args
+					if (context.request.status === 'ready' && !!context.request.userId) {
+						return { target: 'initializing' }
+					}
+					return { target: 'waitingForSession' }
+				}
 			},
 			waitingForSession: {
-				entry: [assign({ operation: undefined }), report(() => ({ kind: 'waiting' }))],
-				on: { REEVALUATE: 'checking' }
+				entry: (args, enq) => {
+					let context = args.context
+					let patch: Partial<Context> = {}
+					patch = {
+						...patch,
+						operation: undefined
+					}
+					context = { ...args.context, ...patch }
+					report(() => ({ kind: 'waiting' }))({ ...args, context }, enq)
+					return { context: patch satisfies Partial<Context> }
+				},
+				on: { REEVALUATE: { target: 'checking' } }
 			},
 			initializing: {
 				initial: 'active',
-				entry: [
-					assign({
-						operation: ({ context }) => context.request,
-						result: undefined,
-						seedResult: undefined,
-						provenance: undefined
-					}),
-					report(() => ({ kind: 'checking' }))
-				],
+				entry: (args, enq) => {
+					let context = args.context
+					let patch: Partial<Context> = {}
+					patch = {
+						...patch,
+						operation: (({ context }: typeof args) => context.request)({
+							...args,
+							context
+						}),
+						provenance: undefined,
+						results: {
+							...context.results,
+							result: undefined,
+							seedResult: undefined
+						}
+					}
+					context = { ...args.context, ...patch }
+					report(() => ({ kind: 'checking' }))({ ...args, context }, enq)
+					return { context: patch satisfies Partial<Context> }
+				},
 				on: {
-					SHUTDOWN: { target: '.closing', actions: sendTo('initialize', { type: 'SHUTDOWN' }) },
-					REEVALUATE: {
-						guard: 'identityChanged',
-						target: '.replacing',
-						actions: sendTo('initialize', { type: 'SHUTDOWN' })
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('initialize', { type: 'SHUTDOWN' })
+						return { target: '.closing' }
+					},
+					REEVALUATE: (args, enq) => {
+						if (!args.guards.identityChanged(args)) return
+						enq.sendTo('initialize', { type: 'SHUTDOWN' })
+						return { target: '.replacing' }
 					}
 				},
 				states: {
@@ -160,45 +254,61 @@ export function createWorkspaceStartupMachine<
 						on: { REEVALUATE: {}, SHUTDOWN: {} }
 					}
 				},
-				invoke: {
+				invoke: model.createInvoke<typeof workspaceInitialization, Context>({
 					id: 'initialize',
-					src: 'initialize',
+					src: workspaceInitialization,
 					input: ({ context }) => ({ db, userId: context.operation?.userId ?? '' }),
-					onDone: [
-						{ guard: 'closing', target: 'closed' },
-						{ guard: 'replacing', target: 'checking' },
-						{
+					onDone: (args) => {
+						const { event } = args
+						if (matchesState({ initializing: 'closing' }, args.value)) {
+							return { target: 'closed' }
+						}
+						if (matchesState({ initializing: 'replacing' }, args.value)) {
+							return { target: 'checking' }
+						}
+						return {
 							target: 'admittingReady',
-							actions: assign({
-								result: ({ event }) => event.output,
-								provenance: ({ event }) => options.ready(event.output)
-							})
+							context: {
+								provenance: options.ready(event.output),
+								results: {
+									...args.context.results,
+									result: event.output
+								}
+							} satisfies Partial<Context>
 						}
-					],
-					onError: [
-						{ guard: 'closing', target: 'closed' },
-						{ guard: 'replacing', target: 'checking' },
-						{
+					},
+					onError: (args) => {
+						if (matchesState({ initializing: 'closing' }, args.value)) {
+							return { target: 'closed' }
+						}
+						if (matchesState({ initializing: 'replacing' }, args.value)) {
+							return { target: 'checking' }
+						}
+						return {
 							target: 'failed',
-							actions: assign({
-								result: ({ event }): WorkspaceInitializationResult =>
-									options.initializationFailure(event.error)
-							})
+							context: {
+								results: {
+									...args.context.results,
+									result: options.initializationFailure(args.event.error)
+								}
+							} satisfies Partial<Context>
 						}
-					]
-				}
+					}
+				})
 			},
 			admittingReady: {
-				always: [
-					{
-						guard: ({ context }) =>
-							!!context.operation?.userId &&
-							!!context.provenance?.profileId &&
-							!!context.provenance.organizationId,
-						target: 'ready'
-					},
-					{ target: 'failed' }
-				]
+				type: 'choice',
+				choice: (args) => {
+					const { context } = args
+					if (
+						!!context.operation?.userId &&
+						!!context.provenance?.profileId &&
+						!!context.provenance.organizationId
+					) {
+						return { target: 'ready' }
+					}
+					return { target: 'failed' }
+				}
 			},
 			ready: {
 				initial: 'seeding',
@@ -208,90 +318,121 @@ export function createWorkspaceStartupMachine<
 						: { kind: 'failed' }
 				),
 				on: {
-					REEVALUATE: {
-						guard: 'identityChanged',
-						actions: raise(({ self }) => ({
+					REEVALUATE: (args, enq) => {
+						if (!args.guards.identityChanged(args)) return
+						enq.raise({
 							type: 'REPLACE_SEED',
-							actor: self.getSnapshot().children.seed
-						}))
+							actor: args.children.seed
+						})
 					},
-					SHUTDOWN: {
-						actions: raise(({ self }) => ({
+					SHUTDOWN: (args, enq) => {
+						enq.raise({
 							type: 'DRAIN_SEED',
-							actor: self.getSnapshot().children.seed
-						}))
+							actor: args.children.seed
+						})
 					},
-					REPLACE_SEED: [
-						{
-							guard: 'seedAlive',
-							target: '.replacing',
-							actions: sendTo('seed', { type: 'SHUTDOWN' })
-						},
-						{ guard: 'identityChanged', target: 'checking' }
-					],
-					DRAIN_SEED: [
-						{
-							guard: 'seedAlive',
-							target: '.closing',
-							actions: sendTo('seed', { type: 'SHUTDOWN' })
-						},
-						{ target: 'closed' }
-					]
+					REPLACE_SEED: (args, enq) => {
+						if (args.guards.seedAlive(args)) {
+							enq.sendTo('seed', { type: 'SHUTDOWN' })
+							return { target: '.replacing' }
+						}
+						if (args.guards.identityChanged(args)) {
+							return { target: 'checking' }
+						}
+					},
+					DRAIN_SEED: (args, enq) => {
+						if (args.guards.seedAlive(args)) {
+							enq.sendTo('seed', { type: 'SHUTDOWN' })
+							return { target: '.closing' }
+						}
+
+						return { target: 'closed' }
+					}
 				},
 				states: {
-					seeding: { tags: 'workspace-ready' },
-					settled: { tags: 'workspace-ready' },
+					seeding: { tags: ['workspace-ready'] },
+					settled: { tags: ['workspace-ready'] },
 					replacing: { entry: report(() => ({ kind: 'waiting' })), on: { REEVALUATE: {} } },
 					closing: {
 						entry: report(() => ({ kind: 'waiting' })),
 						on: { REEVALUATE: {}, SHUTDOWN: {} }
 					}
 				},
-				invoke: {
+				invoke: model.createInvoke<typeof workspaceFakeData, Context>({
 					id: 'seed',
-					src: 'seed',
+					src: workspaceFakeData,
 					input: ({ context }) => ({
 						db,
 						userId: context.operation?.userId ?? '',
 						organizationId: context.provenance?.organizationId ?? ''
 					}),
-					onDone: [
-						{
-							guard: 'seedClosing',
-							target: 'closed',
-							actions: assign({ seedResult: ({ event }) => event.output })
-						},
-						{
-							guard: 'seedReplacing',
-							target: 'checking',
-							actions: assign({ seedResult: ({ event }) => event.output })
-						},
-						{
-							target: '.settled',
-							actions: assign({ seedResult: ({ event }) => event.output })
+					onDone: (args) => {
+						const { event } = args
+						if (matchesState({ ready: 'closing' }, args.value)) {
+							return {
+								target: 'closed',
+								context: {
+									results: {
+										...args.context.results,
+										seedResult: event.output
+									}
+								} satisfies Partial<Context>
+							}
 						}
-					],
-					onError: [
-						{ guard: 'seedClosing', target: 'closed' },
-						{ guard: 'seedReplacing', target: 'checking' },
-						{
-							target: '.settled',
-							actions: assign({
-								seedResult: ({ event }): WorkspaceFakeDataResult => options.seedFailure(event.error)
-							})
+						if (matchesState({ ready: 'replacing' }, args.value)) {
+							return {
+								target: 'checking',
+								context: {
+									results: {
+										...args.context.results,
+										seedResult: event.output
+									}
+								} satisfies Partial<Context>
+							}
 						}
-					]
-				}
+						return {
+							target: '.settled',
+							context: {
+								results: {
+									...args.context.results,
+									seedResult: event.output
+								}
+							} satisfies Partial<Context>
+						}
+					},
+					onError: (args) => {
+						if (matchesState({ ready: 'closing' }, args.value)) {
+							return { target: 'closed' }
+						}
+						if (matchesState({ ready: 'replacing' }, args.value)) {
+							return { target: 'checking' }
+						}
+						return {
+							target: '.settled',
+							context: {
+								results: {
+									...args.context.results,
+									seedResult: options.seedFailure(args.event.error)
+								}
+							} satisfies Partial<Context>
+						}
+					}
+				})
 			},
 			failed: {
-				tags: 'workspace-error',
+				tags: ['workspace-error'],
 				entry: report(() => ({ kind: 'failed' })),
-				on: { REEVALUATE: { guard: 'identityChanged', target: 'checking' } }
+				on: {
+					REEVALUATE: (args) => {
+						if (!args.guards.identityChanged(args)) return
+						return { target: 'checking' }
+					}
+				}
 			},
 			closed: {
 				type: 'final',
-				entry: report(() => ({ kind: 'closed' })),
-				on: { OBSERVED: {}, SHUTDOWN: {} }
+				on: { OBSERVED: {}, SHUTDOWN: {} },
+				entry: finalizers.closed
 			}
 		}
 	})

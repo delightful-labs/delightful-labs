@@ -1,15 +1,15 @@
-import type { WorkspaceJournalEvent } from './journal.js'
 import {
-	forwardTo,
-	and,
-	not,
-	assign,
-	fromPromise,
+	matchesState,
+	type StateValue,
+	types,
+	createAsyncLogic,
 	setup,
-	stateIn,
 	type ActorLogic,
 	type Snapshot
 } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
+import type { WorkspaceJournalEvent } from './journal.js'
 import type {
 	CreationBinding,
 	CreationRequest as Request,
@@ -18,9 +18,20 @@ import type {
 } from './creation-owner.js'
 import type { WorkspaceJournalResult, WorkspaceJournalInput } from './journal.js'
 export type CreationPersistenceResult<Workspace> =
-	| { outcome: 'succeeded'; settlement: 'locallyPersisted'; workspace: Workspace }
-	| { outcome: 'profileUnavailable' | 'conflict'; settlement: 'notStarted' }
-	| { outcome: 'failed'; settlement: 'notStarted' | 'unresolved'; error: unknown }
+	| {
+			outcome: 'succeeded'
+			settlement: 'locallyPersisted'
+			workspace: Workspace
+	  }
+	| {
+			outcome: 'profileUnavailable' | 'conflict'
+			settlement: 'notStarted'
+	  }
+	| {
+			outcome: 'failed'
+			settlement: 'notStarted' | 'unresolved'
+			error: unknown
+	  }
 	| {
 			outcome: 'cancelled' | 'closed'
 			settlement: 'notStarted' | 'locallyPersisted' | 'unresolved'
@@ -30,13 +41,22 @@ export type CreationPersistenceResult<Workspace> =
  * exact content validation and local durability, not merely a query returning a row.
  */
 export type CreationReconciliation<Workspace> =
-	| { outcome: 'absent' | 'notStarted' | 'conflict' | 'profileUnavailable' }
-	| { outcome: 'matching'; workspace: Workspace }
-export type CreationEvent = { type: 'CANCEL' | 'SHUTDOWN' }
+	| {
+			outcome: 'absent' | 'notStarted' | 'conflict' | 'profileUnavailable'
+	  }
+	| {
+			outcome: 'matching'
+			workspace: Workspace
+	  }
+export type CreationEvent = {
+	type: 'CANCEL' | 'SHUTDOWN'
+}
 export type CreationChild<S extends Snapshot<unknown>, Input> = ActorLogic<S, CreationEvent, Input>
 export type ReconciliationLogic<S extends Snapshot<unknown>, Input> = ActorLogic<
 	S,
-	{ type: 'CHECK' },
+	{
+		type: 'CHECK'
+	},
 	Input
 >
 export type JournalLogic<S extends Snapshot<unknown>, Input> = ActorLogic<
@@ -45,7 +65,6 @@ export type JournalLogic<S extends Snapshot<unknown>, Input> = ActorLogic<
 	Input
 >
 export type CreationJournalInput<Record> = WorkspaceJournalInput<Record>
-
 export function createWorkspaceCreationOperation<
 	Db,
 	Workspace,
@@ -59,10 +78,19 @@ export function createWorkspaceCreationOperation<
 	validate: (name: string) => Promise<string>
 	prepare: (input: { binding: Binding; name: string }) => Promise<Record>
 	journal: JournalLogic<JournalSnapshot, CreationJournalInput<Record>>
-	reconcile: ReconciliationLogic<ReconcileSnapshot, { db: Db; attempt: Record['attempt'] }>
+	reconcile: ReconciliationLogic<
+		ReconcileSnapshot,
+		{
+			db: Db
+			attempt: Record['attempt']
+		}
+	>
 	persist: CreationChild<
 		PersistSnapshot,
-		{ attempt: Record['attempt']; issuance: 'new' | 'unknown' }
+		{
+			attempt: Record['attempt']
+			issuance: 'new' | 'unknown'
+		}
 	>
 	matchesBinding: (record: Record, binding: Binding) => boolean
 	attemptId: (record: Record) => string
@@ -73,13 +101,25 @@ export function createWorkspaceCreationOperation<
 	type JournalResult = WorkspaceJournalResult<Record>
 	type ReconciliationResult = CreationReconciliation<Workspace>
 	type WorkspacePersistenceResult = CreationPersistenceResult<Workspace>
-	type Input = { binding: Binding; request: CreationRequest }
+	type Input = {
+		binding: Binding
+		request: CreationRequest
+	}
 	type Event = CreationEvent
 	const db = options.db
-	const validate = fromPromise(async ({ input }: { input: string }) => options.validate(input))
-	const prepare = fromPromise(async ({ input }: { input: { binding: Binding; name: string } }) =>
-		options.prepare(input)
-	)
+	const validate = createAsyncLogic({
+		run: async ({ input }: { input: string }) => options.validate(input)
+	})
+	const prepare = createAsyncLogic({
+		run: async ({
+			input
+		}: {
+			input: {
+				binding: Binding
+				name: string
+			}
+		}) => options.prepare(input)
+	})
 	const actors = {
 		validate,
 		prepare,
@@ -87,70 +127,64 @@ export function createWorkspaceCreationOperation<
 		reconcile: options.reconcile,
 		persist: options.persist
 	}
-	type Context = Input & {
-		db: Db
+	type Context = {
+		request: CreationRequest
 		name: string
-		record: WorkspaceJournalRecord | undefined
 		journal: JournalResult | undefined
 		reconciliation: ReconciliationResult | undefined
 		persistence: WorkspacePersistenceResult | undefined
 		result: CreationResult
+		operation: {
+			binding: Binding
+			db: Db
+			record: WorkspaceJournalRecord | undefined
+		}
 	}
 	function required<T>(value: T | undefined): T {
 		if (value === undefined) throw new Error('Missing creation operation value')
 		return value
 	}
-	const model = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{},
-		{
-			closing: undefined
-			cancelling: undefined
-			hasSettlementEvidence: undefined
-			recoveringUnknownAttempt: undefined
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
+			},
+			input: types<Input>(),
+			output: types<CreationResult>()
 		},
-		never,
-		string,
-		Input,
-		CreationResult
-	>({
 		actors,
 		guards: {
-			closing: stateIn({ running: { control: 'closing' } }),
-			cancelling: stateIn({ running: { control: 'cancelling' } }),
-			hasSettlementEvidence: ({ context }) =>
+			closing: ({ value }: { value: StateValue }) =>
+				matchesState({ running: { control: 'closing' } }, value),
+			cancelling: ({ value }: { value: StateValue }) =>
+				matchesState({ running: { control: 'cancelling' } }, value),
+			hasSettlementEvidence: ({ context }: { context: Context }) =>
 				context.result.settlement !== 'notStarted' ||
 				context.reconciliation?.outcome === 'notStarted' ||
 				context.persistence?.settlement === 'notStarted',
-			recoveringUnknownAttempt: ({ context }) =>
-				context.record !== undefined &&
+			recoveringUnknownAttempt: ({ context }: { context: Context }) =>
+				context.operation.record !== undefined &&
 				(context.request.mode === 'load' ||
 					(context.request.mode === 'retry' && context.request.settlement === 'unresolved'))
 		}
 	})
-
-	const checkpoint = (
-		target: string
-	): ({ guard: 'closing' | 'cancelling'; target: string } | { target: string })[] => [
-		{ guard: 'closing', target: 'finishing' },
-		{ guard: 'cancelling', target: 'finishing' },
-		{ target }
-	]
 	return model.createMachine({
 		id: 'workspace-creation-operation',
 		initial: 'running',
 		context: ({ input }) => ({
-			...input,
-			db,
+			request: input.request,
 			name: '',
-			record: 'record' in input.request ? input.request.record : undefined,
 			journal: undefined,
 			reconciliation: undefined,
 			persistence: undefined,
-			result: { outcome: 'editing', record: undefined, settlement: 'notStarted' }
+			result: { outcome: 'editing', record: undefined, settlement: 'notStarted' },
+			operation: {
+				binding: input.binding,
+				db,
+				record: 'record' in input.request ? input.request.record : undefined
+			}
 		}),
 		output: ({ context }) => context.result,
 		states: {
@@ -185,364 +219,488 @@ export function createWorkspaceCreationOperation<
 						initial: 'dispatching',
 						states: {
 							dispatching: {
-								always: [
-									{
-										guard: ({ context }) => context.request.mode === 'load',
-										target: 'readingJournal'
-									},
-									{
-										guard: ({ context }) => context.request.mode === 'clear',
-										target: 'clearingJournal'
-									},
-									{
-										guard: ({ context }) => context.request.mode === 'retry',
-										target: 'checkingBinding'
-									},
-									{ target: 'validating' }
-								]
+								type: 'choice',
+								choice: (args) => {
+									const { context } = args
+									if (context.request.mode === 'load') {
+										return { target: 'readingJournal' }
+									}
+									if (context.request.mode === 'clear') {
+										return { target: 'clearingJournal' }
+									}
+									if (context.request.mode === 'retry') {
+										return { target: 'checkingBinding' }
+									}
+									return { target: 'validating' }
+								}
 							},
 							validating: {
-								invoke: {
-									src: 'validate',
+								invoke: model.createInvoke<typeof actors.validate, Context>({
+									src: actors.validate,
 									input: ({ context }) =>
 										context.request.mode === 'create' ? context.request.name : '',
-									onDone: {
-										target: 'checkingName',
-										actions: assign({ name: ({ event }) => event.output })
+									onDone: (args) => {
+										return {
+											target: 'checkingName',
+											context: { name: args.event.output } satisfies Partial<Context>
+										}
 									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: { outcome: 'invalid', record: undefined, settlement: 'notStarted' }
-										})
+									onError: (_args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													outcome: 'invalid',
+													record: undefined,
+													settlement: 'notStarted'
+												}
+											} satisfies Partial<Context>
+										}
 									}
+								})
+							},
+							checkingName: {
+								type: 'choice',
+								choice: (args) => {
+									if (args.guards.closing(args)) {
+										return { target: 'finishing' }
+									}
+									if (args.guards.cancelling(args)) {
+										return { target: 'finishing' }
+									}
+									return { target: 'preparing' }
 								}
 							},
-							checkingName: { always: checkpoint('preparing') },
 							preparing: {
-								invoke: {
-									src: 'prepare',
-									input: ({ context }) => ({ binding: context.binding, name: context.name }),
-									onDone: {
-										target: 'checkingBinding',
-										actions: assign({ record: ({ event }) => event.output })
+								invoke: model.createInvoke<typeof actors.prepare, Context>({
+									src: actors.prepare,
+									input: ({ context }) => ({
+										binding: context.operation.binding,
+										name: context.name
+									}),
+									onDone: (args) => {
+										return {
+											target: 'checkingBinding',
+											context: {
+												operation: {
+													...args.context.operation,
+													record: args.event.output
+												}
+											} satisfies Partial<Context>
+										}
 									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: ({ context, event }): CreationResult => ({
-												record: context.record,
-												settlement: 'notStarted',
-												outcome: 'failed',
-												error: event.error
-											})
-										})
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													record: args.context.operation.record,
+													settlement: 'notStarted',
+													outcome: 'failed',
+													error: args.event.error
+												}
+											} satisfies Partial<Context>
+										}
 									}
-								}
+								})
 							},
 							checkingBinding: {
-								always: [
-									{ guard: 'closing', target: 'finishing' },
-									{ guard: 'cancelling', target: 'finishing' },
-									{
-										guard: ({ context }) =>
-											context.record?.key === context.binding.key &&
-											options.matchesBinding(context.record, context.binding),
-										target: 'recordingJournal'
-									},
-									{
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												outcome: 'conflict',
-												record: context.record,
-												settlement: 'notStarted'
-											})
-										})
+								always: (args) => {
+									const { context } = args
+									if (matchesState({ running: { control: 'closing' } }, args.value)) {
+										return { target: 'finishing' }
 									}
-								]
+									if (matchesState({ running: { control: 'cancelling' } }, args.value)) {
+										return { target: 'finishing' }
+									}
+									if (
+										context.operation.record?.key === context.operation.binding.key &&
+										options.matchesBinding(context.operation.record, context.operation.binding)
+									) {
+										return { target: 'recordingJournal' }
+									}
+									return {
+										target: 'finishing',
+										context: {
+											result: {
+												outcome: 'conflict',
+												record: context.operation.record,
+												settlement: 'notStarted'
+											}
+										} satisfies Partial<Context>
+									}
+								}
 							},
 							readingJournal: {
 								on: {
-									CANCEL: {
-										guard: and([not('closing'), not('cancelling')]),
-										actions: forwardTo('effect')
+									CANCEL: (args, enq) => {
+										if (
+											!(
+												!matchesState({ running: { control: 'closing' } }, args.value) &&
+												!matchesState({ running: { control: 'cancelling' } }, args.value)
+											)
+										)
+											return
+										enq.sendTo('effect', args.event)
 									},
-									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
-								},
-
-								invoke: {
-									id: 'effect',
-									src: 'journal',
-									input: ({ context }) => ({ key: context.binding.key, mode: 'read' }),
-									onDone: {
-										target: 'checkingLoadedJournal',
-										actions: assign({
-											journal: ({ event }) => event.output,
-											record: ({ context, event }) =>
-												event.output?.outcome === 'succeeded' ? event.output.record : context.record
-										})
-									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: ({ context, event }): CreationResult => ({
-												record: context.record,
-												settlement: 'notStarted',
-												outcome: 'failed',
-												error: event.error
-											})
-										})
+									SHUTDOWN: (args, enq) => {
+										if (matchesState({ running: { control: 'closing' } }, args.value)) return
+										enq.sendTo('effect', args.event)
 									}
-								}
+								},
+								invoke: model.createInvoke<typeof actors.journal, Context>({
+									id: 'effect',
+									src: actors.journal,
+									input: ({ context }) => ({ key: context.operation.binding.key, mode: 'read' }),
+									onDone: (args) => {
+										const { event } = args
+										return {
+											target: 'checkingLoadedJournal',
+											context: {
+												journal: event.output,
+												operation: {
+													...args.context.operation,
+													record:
+														event.output?.outcome === 'succeeded'
+															? event.output.record
+															: args.context.operation.record
+												}
+											} satisfies Partial<Context>
+										}
+									},
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													record: args.context.operation.record,
+													settlement: 'notStarted',
+													outcome: 'failed',
+													error: args.event.error
+												}
+											} satisfies Partial<Context>
+										}
+									}
+								})
 							},
 							checkingLoadedJournal: {
-								always: [
-									{ guard: 'closing', target: 'finishing' },
-									{ guard: 'cancelling', target: 'finishing' },
-									{
-										guard: ({ context }) =>
-											context.journal?.outcome === 'succeeded' &&
-											context.journal.record === undefined,
-										target: 'finishing'
-									},
-									{
-										guard: ({ context }) =>
-											context.journal?.outcome === 'succeeded' &&
-											context.journal.record !== undefined,
-										target: 'checkingLoadedBinding',
-										actions: assign({
-											record: ({ context }) =>
-												context.journal?.outcome === 'succeeded'
-													? context.journal.record
-													: undefined
-										})
-									},
-									{ target: 'journalFailure' }
-								]
+								always: (args) => {
+									const { context } = args
+									if (matchesState({ running: { control: 'closing' } }, args.value)) {
+										return { target: 'finishing' }
+									}
+									if (matchesState({ running: { control: 'cancelling' } }, args.value)) {
+										return { target: 'finishing' }
+									}
+									if (
+										context.journal?.outcome === 'succeeded' &&
+										context.journal.record === undefined
+									) {
+										return { target: 'finishing' }
+									}
+									if (
+										context.journal?.outcome === 'succeeded' &&
+										context.journal.record !== undefined
+									) {
+										return {
+											target: 'checkingLoadedBinding',
+											context: {
+												operation: {
+													...args.context.operation,
+													record:
+														context.journal?.outcome === 'succeeded'
+															? context.journal.record
+															: undefined
+												}
+											} satisfies Partial<Context>
+										}
+									}
+									return { target: 'journalFailure' }
+								}
 							},
 							checkingLoadedBinding: {
-								always: [
-									{
-										guard: ({ context }) =>
-											context.record?.key === context.binding.key &&
-											options.matchesBinding(context.record, context.binding),
-										target: 'reconciling'
-									},
-									{
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												outcome: 'conflict',
-												record: context.record,
-												settlement: 'notStarted'
-											})
-										})
+								always: (args) => {
+									const { context } = args
+									if (
+										context.operation.record?.key === context.operation.binding.key &&
+										options.matchesBinding(context.operation.record, context.operation.binding)
+									) {
+										return { target: 'reconciling' }
 									}
-								]
+									return {
+										target: 'finishing',
+										context: {
+											result: {
+												outcome: 'conflict',
+												record: context.operation.record,
+												settlement: 'notStarted'
+											}
+										} satisfies Partial<Context>
+									}
+								}
 							},
 							recordingJournal: {
 								on: {
-									CANCEL: {
-										guard: and([not('closing'), not('cancelling')]),
-										actions: forwardTo('effect')
+									CANCEL: (args, enq) => {
+										if (
+											!(
+												!matchesState({ running: { control: 'closing' } }, args.value) &&
+												!matchesState({ running: { control: 'cancelling' } }, args.value)
+											)
+										)
+											return
+										enq.sendTo('effect', args.event)
 									},
-									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
-								},
-
-								invoke: {
-									id: 'effect',
-									src: 'journal',
-									input: ({ context }) => ({
-										key: context.binding.key,
-										mode: 'write',
-										record: required(context.record)
-									}),
-									onDone: {
-										target: 'checkingRecordedJournal',
-										actions: assign({ journal: ({ event }) => event.output })
-									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: ({ context, event }): CreationResult => ({
-												record: context.record,
-												settlement: 'notStarted',
-												outcome: 'failed',
-												error: event.error
-											})
-										})
+									SHUTDOWN: (args, enq) => {
+										if (matchesState({ running: { control: 'closing' } }, args.value)) return
+										enq.sendTo('effect', args.event)
 									}
-								}
+								},
+								invoke: model.createInvoke<typeof actors.journal, Context>({
+									id: 'effect',
+									src: actors.journal,
+									input: ({ context }) => ({
+										key: context.operation.binding.key,
+										mode: 'write',
+										record: required(context.operation.record)
+									}),
+									onDone: (args) => {
+										return {
+											target: 'checkingRecordedJournal',
+											context: { journal: args.event.output } satisfies Partial<Context>
+										}
+									},
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													record: args.context.operation.record,
+													settlement: 'notStarted',
+													outcome: 'failed',
+													error: args.event.error
+												}
+											} satisfies Partial<Context>
+										}
+									}
+								})
 							},
 							checkingRecordedJournal: {
-								always: checkpoint('checkingRecordedOutcome')
+								type: 'choice',
+								choice: (args) => {
+									if (args.guards.closing(args)) {
+										return { target: 'finishing' }
+									}
+									if (args.guards.cancelling(args)) {
+										return { target: 'finishing' }
+									}
+									return { target: 'checkingRecordedOutcome' }
+								}
 							},
 							checkingRecordedOutcome: {
-								always: [
-									{
-										guard: ({ context }) => context.journal?.outcome === 'succeeded',
-										target: 'persisting'
-									},
-									{ target: 'journalFailure' }
-								]
+								type: 'choice',
+								choice: (args) => {
+									if (args.context.journal?.outcome === 'succeeded') {
+										return { target: 'persisting' }
+									}
+									return { target: 'journalFailure' }
+								}
 							},
 							clearingJournal: {
 								on: {
-									CANCEL: {
-										guard: and([not('closing'), not('cancelling')]),
-										actions: forwardTo('effect')
+									CANCEL: (args, enq) => {
+										if (
+											!(
+												!matchesState({ running: { control: 'closing' } }, args.value) &&
+												!matchesState({ running: { control: 'cancelling' } }, args.value)
+											)
+										)
+											return
+										enq.sendTo('effect', args.event)
 									},
-									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
-								},
-
-								invoke: {
-									id: 'effect',
-									src: 'journal',
-									input: ({ context }) => ({
-										key: context.binding.key,
-										mode: 'clear',
-										attemptId: options.attemptId(required(context.record))
-									}),
-									onDone: {
-										target: 'checkingClearedJournal',
-										actions: assign({ journal: ({ event }) => event.output })
-									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: ({ context, event }): CreationResult => ({
-												record: context.record,
-												settlement: 'notStarted',
-												outcome: 'failed',
-												error: event.error
-											})
-										})
+									SHUTDOWN: (args, enq) => {
+										if (matchesState({ running: { control: 'closing' } }, args.value)) return
+										enq.sendTo('effect', args.event)
 									}
-								}
+								},
+								invoke: model.createInvoke<typeof actors.journal, Context>({
+									id: 'effect',
+									src: actors.journal,
+									input: ({ context }) => ({
+										key: context.operation.binding.key,
+										mode: 'clear',
+										attemptId: options.attemptId(required(context.operation.record))
+									}),
+									onDone: (args) => {
+										return {
+											target: 'checkingClearedJournal',
+											context: { journal: args.event.output } satisfies Partial<Context>
+										}
+									},
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													record: args.context.operation.record,
+													settlement: 'notStarted',
+													outcome: 'failed',
+													error: args.event.error
+												}
+											} satisfies Partial<Context>
+										}
+									}
+								})
 							},
 							checkingClearedJournal: {
-								always: [
-									{ guard: 'closing', target: 'finishing' },
-									{ guard: 'cancelling', target: 'finishing' },
-									{
-										guard: ({ context }) => context.journal?.outcome === 'succeeded',
-										target: 'finishing',
-										actions: assign({ record: undefined })
-									},
-									{ target: 'journalFailure' }
-								]
+								always: (args) => {
+									if (matchesState({ running: { control: 'closing' } }, args.value)) {
+										return { target: 'finishing' }
+									}
+									if (matchesState({ running: { control: 'cancelling' } }, args.value)) {
+										return { target: 'finishing' }
+									}
+									if (args.context.journal?.outcome === 'succeeded') {
+										return {
+											target: 'finishing',
+											context: {
+												operation: {
+													...args.context.operation,
+													record: undefined
+												}
+											} satisfies Partial<Context>
+										}
+									}
+									return { target: 'journalFailure' }
+								}
 							},
 							journalFailure: {
-								always: [
-									{
-										guard: ({ context }) => context.journal?.outcome === 'conflict',
+								always: (args) => {
+									const { context } = args
+									if (context.journal?.outcome === 'conflict') {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													outcome: 'conflict',
+													record: context.operation.record,
+													settlement: 'notStarted'
+												}
+											} satisfies Partial<Context>
+										}
+									}
+									return {
 										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												outcome: 'conflict',
-												record: context.record,
-												settlement: 'notStarted'
-											})
-										})
-									},
-									{
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												record: context.record,
+										context: {
+											result: {
+												record: context.operation.record,
 												settlement: 'notStarted',
 												outcome: 'failed',
 												error:
 													context.journal?.outcome === 'failed'
 														? context.journal.error
 														: new Error('Journal was interrupted')
-											})
-										})
-									}
-								]
-							},
-							reconciling: {
-								invoke: {
-									src: 'reconcile',
-									input: ({ context }) => ({
-										db: context.db,
-										attempt: required(context.record).attempt
-									}),
-									onDone: {
-										target: 'checkingReconciliation',
-										actions: assign({ reconciliation: ({ event }) => event.output })
-									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: ({ context, event }): CreationResult => ({
-												record: context.record,
-												settlement: 'notStarted',
-												outcome: 'failed',
-												error: event.error
-											})
-										})
+											}
+										} satisfies Partial<Context>
 									}
 								}
 							},
-							checkingReconciliation: {
-								always: [
-									{
-										guard: ({ context }) => context.reconciliation?.outcome === 'matching',
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => {
-												const result = required(context.reconciliation)
-												if (result.outcome !== 'matching')
-													throw new Error('Expected completed creation')
-												return {
-													outcome: 'complete',
-													record: required(context.record),
-													workspace: result.workspace,
-													settlement: 'locallyPersisted'
+							reconciling: {
+								invoke: model.createInvoke<typeof actors.reconcile, Context>({
+									src: actors.reconcile,
+									input: ({ context }) => ({
+										db: context.operation.db,
+										attempt: required(context.operation.record).attempt
+									}),
+									onDone: (args) => {
+										return {
+											target: 'checkingReconciliation',
+											context: { reconciliation: args.event.output } satisfies Partial<Context>
+										}
+									},
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													record: args.context.operation.record,
+													settlement: 'notStarted',
+													outcome: 'failed',
+													error: args.event.error
 												}
-											}
-										})
-									},
-									{
-										guard: ({ context }) => context.reconciliation?.outcome === 'notStarted',
+											} satisfies Partial<Context>
+										}
+									}
+								})
+							},
+							checkingReconciliation: {
+								always: (args) => {
+									const { context } = args
+									if (context.reconciliation?.outcome === 'matching') {
+										return {
+											target: 'finishing',
+											context: {
+												result: (({ context }): CreationResult => {
+													const result = required(context.reconciliation)
+													if (result.outcome !== 'matching')
+														throw new Error('Expected completed creation')
+													return {
+														outcome: 'complete',
+														record: required(context.operation.record),
+														workspace: result.workspace,
+														settlement: 'locallyPersisted'
+													}
+												})(args)
+											} satisfies Partial<Context>
+										}
+									}
+									if (context.reconciliation?.outcome === 'notStarted') {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													outcome: 'recovered',
+													record: required(context.operation.record),
+													settlement: 'notStarted'
+												}
+											} satisfies Partial<Context>
+										}
+									}
+									return {
 										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												outcome: 'recovered',
-												record: required(context.record),
-												settlement: 'notStarted'
-											})
-										})
-									},
-									{
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
+										context: {
+											result: {
 												outcome: 'unresolved',
-												record: context.record,
+												record: context.operation.record,
 												settlement: 'unresolved',
 												error: new Error('Prior creation issuance is unknown')
-											})
-										})
+											}
+										} satisfies Partial<Context>
 									}
-								]
+								}
 							},
 							persisting: {
 								on: {
-									CANCEL: {
-										guard: and([not('closing'), not('cancelling')]),
-										actions: forwardTo('effect')
+									CANCEL: (args, enq) => {
+										if (
+											!(
+												!matchesState({ running: { control: 'closing' } }, args.value) &&
+												!matchesState({ running: { control: 'cancelling' } }, args.value)
+											)
+										)
+											return
+										enq.sendTo('effect', args.event)
 									},
-									SHUTDOWN: { guard: not('closing'), actions: forwardTo('effect') }
+									SHUTDOWN: (args, enq) => {
+										if (matchesState({ running: { control: 'closing' } }, args.value)) return
+										enq.sendTo('effect', args.event)
+									}
 								},
-
-								invoke: {
+								invoke: model.createInvoke<typeof actors.persist, Context>({
 									id: 'effect',
-									src: 'persist',
+									src: actors.persist,
 									input: ({ context }) => ({
-										attempt: required(context.record).attempt,
+										attempt: required(context.operation.record).attempt,
 										issuance:
 											context.request.mode === 'create' ||
 											(context.request.mode === 'retry' &&
@@ -550,176 +708,226 @@ export function createWorkspaceCreationOperation<
 												? 'new'
 												: 'unknown'
 									}),
-									onDone: {
-										target: 'checkingPersistence',
-										actions: assign({ persistence: ({ event }) => event.output })
+									onDone: (args) => {
+										return {
+											target: 'checkingPersistence',
+											context: { persistence: args.event.output } satisfies Partial<Context>
+										}
 									},
-									onError: {
-										target: 'finishing',
-										actions: assign({
-											result: ({ context, event }): CreationResult => ({
-												record: context.record,
-												outcome: 'unresolved',
-												settlement: 'unresolved',
-												error: event.error
-											})
-										})
+									onError: (args) => {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													record: args.context.operation.record,
+													outcome: 'unresolved',
+													settlement: 'unresolved',
+													error: args.event.error
+												}
+											} satisfies Partial<Context>
+										}
 									}
-								}
+								})
 							},
 							checkingPersistence: {
-								always: [
-									{
-										guard: ({ context }) => context.persistence?.outcome === 'succeeded',
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => {
-												const result = required(context.persistence)
-												if (result.outcome !== 'succeeded')
-													throw new Error('Expected completed creation')
-												return {
-													outcome: 'complete',
-													record: required(context.record),
-													workspace: result.workspace,
-													settlement: 'locallyPersisted'
+								always: (args) => {
+									const { context } = args
+									if (context.persistence?.outcome === 'succeeded') {
+										return {
+											target: 'finishing',
+											context: {
+												result: (({ context }): CreationResult => {
+													const result = required(context.persistence)
+													if (result.outcome !== 'succeeded')
+														throw new Error('Expected completed creation')
+													return {
+														outcome: 'complete',
+														record: required(context.operation.record),
+														workspace: result.workspace,
+														settlement: 'locallyPersisted'
+													}
+												})(args)
+											} satisfies Partial<Context>
+										}
+									}
+									if (context.persistence?.settlement === 'unresolved') {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													outcome: 'unresolved',
+													record: context.operation.record,
+													settlement: 'unresolved',
+													error:
+														context.persistence?.outcome === 'failed'
+															? context.persistence.error
+															: new Error('Workspace persistence settlement is unresolved')
 												}
-											}
-										})
-									},
-									{
-										guard: ({ context }) => context.persistence?.settlement === 'unresolved',
+											} satisfies Partial<Context>
+										}
+									}
+									if (
+										context.persistence?.outcome === 'conflict' ||
+										context.persistence?.outcome === 'profileUnavailable'
+									) {
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													outcome: 'conflict',
+													record: context.operation.record,
+													settlement: 'notStarted'
+												}
+											} satisfies Partial<Context>
+										}
+									}
+									return {
 										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												outcome: 'unresolved',
-												record: context.record,
-												settlement: 'unresolved',
-												error:
-													context.persistence?.outcome === 'failed'
-														? context.persistence.error
-														: new Error('Workspace persistence settlement is unresolved')
-											})
-										})
-									},
-									{
-										guard: ({ context }) =>
-											context.persistence?.outcome === 'conflict' ||
-											context.persistence?.outcome === 'profileUnavailable',
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												outcome: 'conflict',
-												record: context.record,
-												settlement: 'notStarted'
-											})
-										})
-									},
-									{
-										target: 'finishing',
-										actions: assign({
-											result: ({ context }): CreationResult => ({
-												record: context.record,
+										context: {
+											result: {
+												record: context.operation.record,
 												settlement: 'notStarted',
 												outcome: 'failed',
 												error:
 													context.persistence?.outcome === 'failed'
 														? context.persistence.error
 														: new Error('Workspace persistence was interrupted')
-											})
-										})
+											}
+										} satisfies Partial<Context>
 									}
-								]
+								}
 							},
 							finishing: {
-								always: [
-									{ guard: 'closing', target: '#workspace-creation-operation.closing' },
-									{ guard: 'cancelling', target: '#workspace-creation-operation.cancelling' },
-									{ target: '#workspace-creation-operation.checkingSettlement' }
-								]
+								type: 'choice',
+								choice: (args) => {
+									if (matchesState({ running: { control: 'closing' } }, args.value)) {
+										return { target: '#workspace-creation-operation.closing' }
+									}
+									if (matchesState({ running: { control: 'cancelling' } }, args.value)) {
+										return { target: '#workspace-creation-operation.cancelling' }
+									}
+									return { target: '#workspace-creation-operation.checkingSettlement' }
+								}
 							}
 						}
 					}
 				}
 			},
 			closing: {
-				entry: assign({
-					result: ({ context }): CreationResult => ({
-						outcome: 'closed',
-						record: context.record,
-						settlement: context.persistence?.settlement ?? context.result.settlement
-					})
-				}),
-				always: 'checkingSettlement'
+				entry: (args) => {
+					const { context } = args
+					return {
+						context: {
+							result: {
+								outcome: 'closed',
+								record: context.operation.record,
+								settlement: context.persistence?.settlement ?? context.result.settlement
+							}
+						} satisfies Partial<Context>
+					}
+				},
+				always: { target: 'checkingSettlement' }
 			},
 			cancelling: {
-				entry: assign({
-					result: ({ context }): CreationResult => ({
-						outcome: 'cancelled',
-						record: context.record,
-						settlement: context.persistence?.settlement ?? context.result.settlement
-					})
-				}),
-				always: 'checkingSettlement'
+				entry: (args) => {
+					const { context } = args
+					return {
+						context: {
+							result: {
+								outcome: 'cancelled',
+								record: context.operation.record,
+								settlement: context.persistence?.settlement ?? context.result.settlement
+							}
+						} satisfies Partial<Context>
+					}
+				},
+				always: { target: 'checkingSettlement' }
 			},
 			checkingSettlement: {
-				always: [
-					{ guard: 'hasSettlementEvidence', target: 'classifyingOutcome' },
-					{ guard: 'recoveringUnknownAttempt', target: 'unresolvedSettlement' },
-					{ target: 'classifyingOutcome' }
-				]
+				type: 'choice',
+				choice: (args) => {
+					if (args.guards.hasSettlementEvidence(args)) {
+						return { target: 'classifyingOutcome' }
+					}
+					if (args.guards.recoveringUnknownAttempt(args)) {
+						return { target: 'unresolvedSettlement' }
+					}
+					return { target: 'classifyingOutcome' }
+				}
 			},
 			unresolvedSettlement: {
-				always: [
-					{
-						guard: ({ context }) => context.result.outcome === 'closed',
-						target: 'closed',
-						actions: assign({
-							result: ({ context }): CreationResult => ({
-								outcome: 'closed',
-								record: context.record,
-								settlement: 'unresolved'
-							})
-						})
-					},
-					{
-						guard: ({ context }) => context.result.outcome === 'cancelled',
-						target: 'cancelled',
-						actions: assign({
-							result: ({ context }): CreationResult => ({
-								outcome: 'cancelled',
-								record: context.record,
-								settlement: 'unresolved'
-							})
-						})
-					},
-					{
+				always: (args) => {
+					const { context } = args
+					if (context.result.outcome === 'closed') {
+						return {
+							target: 'closed',
+							context: {
+								result: {
+									outcome: 'closed',
+									record: context.operation.record,
+									settlement: 'unresolved'
+								}
+							} satisfies Partial<Context>
+						}
+					}
+					if (context.result.outcome === 'cancelled') {
+						return {
+							target: 'cancelled',
+							context: {
+								result: {
+									outcome: 'cancelled',
+									record: context.operation.record,
+									settlement: 'unresolved'
+								}
+							} satisfies Partial<Context>
+						}
+					}
+					return {
 						target: 'unresolved',
-						actions: assign({
-							result: ({ context }): CreationResult => ({
+						context: {
+							result: {
 								outcome: 'unresolved',
-								record: context.record,
+								record: context.operation.record,
 								settlement: 'unresolved',
 								error:
 									context.result.outcome === 'failed'
 										? context.result.error
 										: new Error('Prior creation issuance is unknown')
-							})
-						})
+							}
+						} satisfies Partial<Context>
 					}
-				]
+				}
 			},
 			classifyingOutcome: {
-				always: [
-					{ guard: ({ context }) => context.result.outcome === 'closed', target: 'closed' },
-					{ guard: ({ context }) => context.result.outcome === 'cancelled', target: 'cancelled' },
-					{ guard: ({ context }) => context.result.outcome === 'complete', target: 'complete' },
-					{ guard: ({ context }) => context.result.outcome === 'editing', target: 'editing' },
-					{ guard: ({ context }) => context.result.outcome === 'invalid', target: 'invalid' },
-					{ guard: ({ context }) => context.result.outcome === 'recovered', target: 'recovered' },
-					{ guard: ({ context }) => context.result.outcome === 'conflict', target: 'conflict' },
-					{ guard: ({ context }) => context.result.outcome === 'unresolved', target: 'unresolved' },
-					{ target: 'failed' }
-				]
+				type: 'choice',
+				choice: (args) => {
+					const { context } = args
+					if (context.result.outcome === 'closed') {
+						return { target: 'closed' }
+					}
+					if (context.result.outcome === 'cancelled') {
+						return { target: 'cancelled' }
+					}
+					if (context.result.outcome === 'complete') {
+						return { target: 'complete' }
+					}
+					if (context.result.outcome === 'editing') {
+						return { target: 'editing' }
+					}
+					if (context.result.outcome === 'invalid') {
+						return { target: 'invalid' }
+					}
+					if (context.result.outcome === 'recovered') {
+						return { target: 'recovered' }
+					}
+					if (context.result.outcome === 'conflict') {
+						return { target: 'conflict' }
+					}
+					if (context.result.outcome === 'unresolved') {
+						return { target: 'unresolved' }
+					}
+					return { target: 'failed' }
+				}
 			},
 			complete: { type: 'final' },
 			editing: { type: 'final' },

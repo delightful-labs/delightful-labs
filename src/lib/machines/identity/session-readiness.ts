@@ -1,5 +1,15 @@
-import { assign, fromCallback, fromPromise, sendTo, setup, stateIn, stopChild } from 'xstate'
-import type { ActorRef, Snapshot } from 'xstate'
+import type { ActorRefFrom } from 'xstate'
+import {
+	types,
+	createAsyncLogic,
+	matchesState,
+	createCallbackLogic,
+	setup,
+	type ActorRef,
+	type Snapshot
+} from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
 	SessionObservationFailure,
 	SessionReadinessCapability,
@@ -7,7 +17,6 @@ import type {
 	SessionReadinessScope,
 	SessionStatus
 } from '../../contracts/session.js'
-
 export type SessionReadinessInput = Readonly<{
 	reportTo: ActorRef<Snapshot<unknown>, SessionReadinessReport>
 }>
@@ -17,9 +26,19 @@ export type SessionReadinessEvent =
 			scope: SessionReadinessScope
 			capability: SessionReadinessCapability
 	  }>
-	| Readonly<{ type: 'RETRY'; scope: SessionReadinessScope; attempt: number }>
-	| Readonly<{ type: 'REOBSERVE'; scope: SessionReadinessScope; observation: number }>
-	| Readonly<{ type: 'SHUTDOWN' }>
+	| Readonly<{
+			type: 'RETRY'
+			scope: SessionReadinessScope
+			attempt: number
+	  }>
+	| Readonly<{
+			type: 'REOBSERVE'
+			scope: SessionReadinessScope
+			observation: number
+	  }>
+	| Readonly<{
+			type: 'SHUTDOWN'
+	  }>
 type ObservationEvent =
 	| {
 			type: 'OBSERVED'
@@ -34,10 +53,7 @@ type ObservationEvent =
 			observation: number
 			reason: SessionObservationFailure
 	  }
-type Event =
-	| SessionReadinessEvent
-	| ObservationEvent
-	| { type: 'xstate.error.actor.observer'; actorId: string; error: unknown }
+type Event = SessionReadinessEvent | ObservationEvent
 type Context = {
 	reportTo: SessionReadinessInput['reportTo']
 	scope: SessionReadinessScope | undefined
@@ -61,183 +77,140 @@ function sameScope(left: SessionReadinessScope, right: SessionReadinessScope | u
 function fresh(value: number, previous: number) {
 	return Number.isSafeInteger(value) && value > previous
 }
-
 const actors = {
-	observe: fromCallback<{ type: 'REFRESH'; attempt: number }, ObserverInput>(
-		({ input, sendBack, receive }) => {
-			// Resource-boundary guards only; workflow phases remain in the machine below.
-			let active = true
-			const publish = (afterRetry: number | undefined) => {
-				if (!active) return
-				try {
-					const status = input.capability.readStatus()
-					sendBack({
-						type: 'OBSERVED',
-						scope: input.scope,
-						observation: input.observation,
-						status,
-						afterRetry
-					})
-				} catch {
-					active = false
-					sendBack({
-						type: 'OBSERVATION_FAILED',
-						scope: input.scope,
-						observation: input.observation,
-						reason: 'readFailed'
-					})
-				}
-			}
-			receive((event) => publish(event.attempt))
-			let unsubscribe: (() => void) | undefined
+	observe: createCallbackLogic<
+		{
+			type: 'REFRESH'
+			attempt: number
+		},
+		ObserverInput
+	>(({ input, sendBack, receive }) => {
+		// Resource-boundary guards only; workflow phases remain in the machine below.
+		let active = true
+		const publish = (afterRetry: number | undefined) => {
+			if (!active) return
 			try {
-				unsubscribe = input.capability.subscribe(() => publish(undefined))
+				const status = input.capability.readStatus()
+				sendBack({
+					type: 'OBSERVED',
+					scope: input.scope,
+					observation: input.observation,
+					status,
+					afterRetry
+				})
 			} catch {
 				active = false
 				sendBack({
 					type: 'OBSERVATION_FAILED',
 					scope: input.scope,
 					observation: input.observation,
-					reason: 'subscribeFailed'
+					reason: 'readFailed'
 				})
 			}
-			publish(undefined)
-			return () => {
-				active = false
-				try {
-					unsubscribe?.()
-				} catch {
-					input.reportTo.send({
-						type: 'SESSION_OBSERVATION_CLEANUP_FAILED',
-						scope: input.scope,
-						observation: input.observation
-					})
-				}
+		}
+		receive((event) => publish(event.attempt))
+		let unsubscribe: (() => void) | undefined
+		try {
+			unsubscribe = input.capability.subscribe(() => publish(undefined))
+		} catch {
+			active = false
+			sendBack({
+				type: 'OBSERVATION_FAILED',
+				scope: input.scope,
+				observation: input.observation,
+				reason: 'subscribeFailed'
+			})
+		}
+		publish(undefined)
+		return () => {
+			active = false
+			try {
+				unsubscribe?.()
+			} catch {
+				input.reportTo.send({
+					type: 'SESSION_OBSERVATION_CLEANUP_FAILED',
+					scope: input.scope,
+					observation: input.observation
+				})
 			}
 		}
-	),
-	retry: fromPromise(({ input }: { input: SessionReadinessCapability }) => input.retry())
+	}),
+	retry: createAsyncLogic({
+		run: ({ input }: { input: SessionReadinessCapability }) => input.retry()
+	})
 }
-
 /** Host authorizes RETRY only after its workspace drain and mutual exclusion with restoration. */
 export function createSessionReadinessMachine() {
-	const model = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{
-			publishStatus: undefined
-			publishObservationFailure: undefined
-			publishObserverCrash: undefined
-			retryStarted: undefined
-			retryResolved: undefined
-			retryRejected: undefined
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			children: {
+				observer: types<ActorRefFrom<typeof actors.observe>>(),
+				retry: types<ActorRefFrom<typeof actors.retry>>()
+			},
+			events: {
+				BIND: types<EventPayload<Event, 'BIND'>>(),
+				RETRY: types<EventPayload<Event, 'RETRY'>>(),
+				REOBSERVE: types<EventPayload<Event, 'REOBSERVE'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				OBSERVED: types<EventPayload<Event, 'OBSERVED'>>(),
+				OBSERVATION_FAILED: types<EventPayload<Event, 'OBSERVATION_FAILED'>>()
+			},
+			input: types<SessionReadinessInput>(),
+			output: types<{
+				outcome: 'closed'
+			}>()
 		},
-		{
-			currentObservation: undefined
-			freshRetry: undefined
-			freshObservation: undefined
-			closingRetry: undefined
-			failedRetryObserver: undefined
-			refreshed: undefined
-		},
-		never,
-		string,
-		SessionReadinessInput,
-		{ outcome: 'closed' }
-	>({
 		actors,
 		guards: {
-			currentObservation: ({ context, event }) =>
+			currentObservation: ({ context, event }: { context: Context; event: Event }) =>
 				(event.type === 'OBSERVED' || event.type === 'OBSERVATION_FAILED') &&
 				sameScope(event.scope, context.scope) &&
 				event.observation === context.observation,
-			freshRetry: ({ context, event }) =>
+			freshRetry: ({ context, event }: { context: Context; event: Event }) =>
 				event.type === 'RETRY' &&
 				sameScope(event.scope, context.scope) &&
 				fresh(event.attempt, context.attempt),
-			freshObservation: ({ context, event }) =>
+			freshObservation: ({ context, event }: { context: Context; event: Event }) =>
 				event.type === 'REOBSERVE' &&
 				sameScope(event.scope, context.scope) &&
 				fresh(event.observation, context.observation),
-			closingRetry: stateIn({ bound: { retrying: 'closing' } }),
-			failedRetryObserver: stateIn({ bound: { retrying: 'observerFailed' } }),
-			refreshed: ({ context, event }) =>
+			refreshed: ({ context, event }: { context: Context; event: Event }) =>
 				event.type === 'OBSERVED' &&
 				sameScope(event.scope, context.scope) &&
 				event.observation === context.observation &&
 				event.afterRetry === context.attempt
 		},
-		actions: {
-			publishStatus: sendTo(
-				({ context }) => context.reportTo,
-				({ context, event }): SessionReadinessReport => {
-					if (event.type !== 'OBSERVED') throw new Error('Missing observation')
-					return {
-						type: 'SESSION_STATUS',
-						scope: required(context.scope),
-						observation: event.observation,
-						status: event.status,
-						afterRetry: event.afterRetry
-					}
-				}
-			),
-			publishObservationFailure: sendTo(
-				({ context }) => context.reportTo,
-				({ context, event }): SessionReadinessReport => ({
-					type: 'SESSION_OBSERVATION_FAILED',
-					scope: required(context.scope),
-					observation: context.observation,
-					reason: event.type === 'OBSERVATION_FAILED' ? event.reason : 'observerFailed'
-				})
-			),
-			publishObserverCrash: sendTo(
-				({ context }) => context.reportTo,
-				({ context }): SessionReadinessReport => ({
-					type: 'SESSION_OBSERVATION_FAILED',
-					scope: required(context.scope),
-					observation: context.observation,
-					reason: 'observerFailed'
-				})
-			),
-			retryStarted: sendTo(
-				({ context }) => context.reportTo,
-				({ context }): SessionReadinessReport => ({
-					type: 'SESSION_RETRY_STARTED',
-					scope: required(context.scope),
-					attempt: context.attempt
-				})
-			),
-			retryResolved: sendTo(
-				({ context }) => context.reportTo,
-				({ context }): SessionReadinessReport => ({
-					type: 'SESSION_RETRY_SETTLED',
-					scope: required(context.scope),
-					attempt: context.attempt,
-					outcome: 'resolved'
-				})
-			),
-			retryRejected: sendTo(
-				({ context }) => context.reportTo,
-				({ context }): SessionReadinessReport => ({
-					type: 'SESSION_RETRY_SETTLED',
-					scope: required(context.scope),
-					attempt: context.attempt,
-					outcome: 'rejected'
-				})
-			)
-		}
+		actions: {}
 	})
 	const retryCommands = model.createStateConfig({
 		on: {
-			RETRY: {
-				guard: 'freshRetry',
-				target: 'retrying',
-				actions: assign(({ event }) => ({ attempt: event.attempt }))
+			RETRY: (args) => {
+				if (!args.guards.freshRetry(args)) return
+				return {
+					target: 'retrying',
+					context: { attempt: args.event.attempt } satisfies Partial<Context>
+				}
 			}
 		}
 	})
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		closed: (_args) => {
+			return {
+				context: { capability: undefined, scope: undefined } satisfies Partial<Context>
+			}
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
+
 	return model.createMachine({
 		id: 'session-readiness',
 		initial: 'waiting',
@@ -252,130 +225,265 @@ export function createSessionReadinessMachine() {
 		states: {
 			waiting: {
 				on: {
-					BIND: {
-						target: 'bound',
-						actions: assign(({ event }) => ({
-							scope: { ...event.scope },
-							capability: event.capability
-						}))
+					BIND: (args) => {
+						const { event } = args
+						return {
+							target: 'bound',
+							context: {
+								scope: { ...event.scope },
+								capability: event.capability
+							} satisfies Partial<Context>
+						}
 					},
-					SHUTDOWN: 'closed'
+					SHUTDOWN: (_args) => {
+						return { target: 'closed' }
+					}
 				}
 			},
 			bound: {
 				initial: 'observing',
 				invoke: {
 					id: 'observer',
-					src: 'observe',
+					src: actors.observe,
 					input: ({ context }) => ({
 						scope: required(context.scope),
 						capability: required(context.capability),
 						observation: context.observation,
 						reportTo: context.reportTo
 					}),
-					onError: { target: '.observerFailed', actions: 'publishObserverCrash' }
+					onError: (args, enq) => {
+						const { context } = args
+						enq.sendTo(context.reportTo, {
+							type: 'SESSION_OBSERVATION_FAILED',
+							scope: required(context.scope),
+							observation: context.observation,
+							reason: 'observerFailed'
+						})
+						return { target: '.observerFailed' }
+					}
 				},
 				on: {
-					OBSERVED: { guard: 'currentObservation', actions: 'publishStatus' },
-					OBSERVATION_FAILED: {
-						guard: 'currentObservation',
-						target: '.observerFailed',
-						actions: 'publishObservationFailure'
+					OBSERVED: (args, enq) => {
+						if (!args.guards.currentObservation(args)) return
+						const { context } = args
+						enq.sendTo(
+							context.reportTo,
+							(({ context, event }): SessionReadinessReport => {
+								if (event.type !== 'OBSERVED') throw new Error('Missing observation')
+								return {
+									type: 'SESSION_STATUS',
+									scope: required(context.scope),
+									observation: event.observation,
+									status: event.status,
+									afterRetry: event.afterRetry
+								}
+							})(args)
+						)
 					},
-					SHUTDOWN: '#session-readiness.closed'
+					OBSERVATION_FAILED: (args, enq) => {
+						if (!args.guards.currentObservation(args)) return
+						const { context, event } = args
+						enq.sendTo(context.reportTo, {
+							type: 'SESSION_OBSERVATION_FAILED',
+							scope: required(context.scope),
+							observation: context.observation,
+							reason: event.type === 'OBSERVATION_FAILED' ? event.reason : 'observerFailed'
+						})
+						return { target: '.observerFailed' }
+					},
+					SHUTDOWN: (_args) => {
+						return { target: '#session-readiness.closed' }
+					}
 				},
 				states: {
 					observing: retryCommands,
 					retryFailed: retryCommands,
 					observerFailed: {
-						entry: stopChild('observer'),
+						entry: (args, enq) => {
+							enq.stop(args.children['observer'])
+						},
 						on: {
 							OBSERVED: {},
 							OBSERVATION_FAILED: {},
-							REOBSERVE: {
-								guard: 'freshObservation',
-								target: '#session-readiness.bound',
-								reenter: true,
-								actions: assign(({ event }) => ({ observation: event.observation }))
+							REOBSERVE: (args) => {
+								if (!args.guards.freshObservation(args)) return
+								return {
+									target: '#session-readiness.bound',
+									reenter: true,
+									context: { observation: args.event.observation } satisfies Partial<Context>
+								}
 							}
 						}
 					},
 					refreshing: {
-						entry: sendTo('observer', ({ context }) => ({
-							type: 'REFRESH',
-							attempt: context.attempt
-						})),
+						entry: (args, enq) => {
+							enq.sendTo('observer', {
+								type: 'REFRESH',
+								attempt: args.context.attempt
+							})
+						},
 						on: {
-							OBSERVED: [{ guard: 'refreshed', target: 'observing', actions: 'publishStatus' }, {}]
+							OBSERVED: (args, enq) => {
+								const { context } = args
+								if (args.guards.refreshed(args)) {
+									enq.sendTo(
+										context.reportTo,
+										(({ context, event }): SessionReadinessReport => {
+											if (event.type !== 'OBSERVED') throw new Error('Missing observation')
+											return {
+												type: 'SESSION_STATUS',
+												scope: required(context.scope),
+												observation: event.observation,
+												status: event.status,
+												afterRetry: event.afterRetry
+											}
+										})(args)
+									)
+									return { target: 'observing' }
+								}
+								return {}
+							}
 						}
 					},
 					retrying: {
 						initial: 'active',
-						entry: 'retryStarted',
+						entry: (args, enq) => {
+							const { context } = args
+							enq.sendTo(context.reportTo, {
+								type: 'SESSION_RETRY_STARTED',
+								scope: required(context.scope),
+								attempt: context.attempt
+							})
+						},
 						invoke: {
-							src: 'retry',
+							id: 'retry',
+							src: actors.retry,
 							input: ({ context }) => required(context.capability),
-							onDone: [
-								{
-									guard: 'closingRetry',
-									target: '#session-readiness.closed',
-									actions: 'retryResolved'
-								},
-								{
-									guard: 'failedRetryObserver',
-									target: '#session-readiness.bound.observerFailed',
-									actions: 'retryResolved'
-								},
-								{ target: '#session-readiness.bound.refreshing', actions: 'retryResolved' }
-							],
-							onError: [
-								{
-									guard: 'closingRetry',
-									target: '#session-readiness.closed',
-									actions: 'retryRejected'
-								},
-								{
-									guard: 'failedRetryObserver',
-									target: '#session-readiness.bound.observerFailed',
-									actions: 'retryRejected'
-								},
-								{ target: '#session-readiness.bound.retryFailed', actions: 'retryRejected' }
-							]
+							onDone: (args, enq) => {
+								const { context } = args
+								if (matchesState({ bound: { retrying: 'closing' } }, args.value)) {
+									enq.sendTo(context.reportTo, {
+										type: 'SESSION_RETRY_SETTLED',
+										scope: required(context.scope),
+										attempt: context.attempt,
+										outcome: 'resolved'
+									})
+
+									return { target: '#session-readiness.closed' }
+								}
+								if (matchesState({ bound: { retrying: 'observerFailed' } }, args.value)) {
+									enq.sendTo(context.reportTo, {
+										type: 'SESSION_RETRY_SETTLED',
+										scope: required(context.scope),
+										attempt: context.attempt,
+										outcome: 'resolved'
+									})
+									return { target: '#session-readiness.bound.observerFailed' }
+								}
+								enq.sendTo(context.reportTo, {
+									type: 'SESSION_RETRY_SETTLED',
+									scope: required(context.scope),
+									attempt: context.attempt,
+									outcome: 'resolved'
+								})
+								return { target: '#session-readiness.bound.refreshing' }
+							},
+							onError: (args, enq) => {
+								const { context } = args
+								if (matchesState({ bound: { retrying: 'closing' } }, args.value)) {
+									enq.sendTo(context.reportTo, {
+										type: 'SESSION_RETRY_SETTLED',
+										scope: required(context.scope),
+										attempt: context.attempt,
+										outcome: 'rejected'
+									})
+
+									return { target: '#session-readiness.closed' }
+								}
+								if (matchesState({ bound: { retrying: 'observerFailed' } }, args.value)) {
+									enq.sendTo(context.reportTo, {
+										type: 'SESSION_RETRY_SETTLED',
+										scope: required(context.scope),
+										attempt: context.attempt,
+										outcome: 'rejected'
+									})
+									return { target: '#session-readiness.bound.observerFailed' }
+								}
+								enq.sendTo(context.reportTo, {
+									type: 'SESSION_RETRY_SETTLED',
+									scope: required(context.scope),
+									attempt: context.attempt,
+									outcome: 'rejected'
+								})
+								return { target: '#session-readiness.bound.retryFailed' }
+							}
 						},
 						on: {
 							RETRY: {},
 							REOBSERVE: {},
-							OBSERVATION_FAILED: {
-								guard: 'currentObservation',
-								target: '.observerFailed',
-								actions: 'publishObservationFailure'
+							OBSERVATION_FAILED: (args, enq) => {
+								if (!args.guards.currentObservation(args)) return
+								const { context, event } = args
+								enq.sendTo(context.reportTo, {
+									type: 'SESSION_OBSERVATION_FAILED',
+									scope: required(context.scope),
+									observation: context.observation,
+									reason: event.type === 'OBSERVATION_FAILED' ? event.reason : 'observerFailed'
+								})
+								return { target: '.observerFailed' }
 							},
-							'xstate.error.actor.observer': {
-								target: '.observerFailed',
-								actions: 'publishObserverCrash'
+							'xstate.error.actor': (args, enq) => {
+								if (args.event.actorId !== 'observer') return
+								return ((args, enq) => {
+									const { context } = args
+									enq.sendTo(context.reportTo, {
+										type: 'SESSION_OBSERVATION_FAILED',
+										scope: required(context.scope),
+										observation: context.observation,
+										reason: 'observerFailed'
+									})
+									return { target: '.observerFailed' }
+								})(args, enq)
 							},
-							SHUTDOWN: '.closing'
+							SHUTDOWN: { target: '.closing' }
 						},
 						states: {
 							active: {},
 							observerFailed: {
-								entry: stopChild('observer'),
-								on: { OBSERVED: {}, OBSERVATION_FAILED: {}, 'xstate.error.actor.observer': {} }
+								entry: (args, enq) => {
+									enq.stop(args.children['observer'])
+								},
+								on: {
+									OBSERVED: {},
+									OBSERVATION_FAILED: {},
+									'xstate.error.actor': (args) => {
+										if (args.event.actorId !== 'observer') return
+										return {}
+									}
+								}
 							},
 							closing: {
-								entry: stopChild('observer'),
+								entry: (args, enq) => {
+									enq.stop(args.children['observer'])
+								},
 								on: {
 									SHUTDOWN: {},
 									OBSERVED: {},
 									OBSERVATION_FAILED: {},
-									'xstate.error.actor.observer': {}
+									'xstate.error.actor': (args) => {
+										if (args.event.actorId !== 'observer') return
+										return {}
+									}
 								}
 							}
 						}
 					}
 				}
 			},
-			closed: { type: 'final', entry: assign({ capability: undefined, scope: undefined }) }
+			closed: {
+				type: 'final',
+				entry: finalizers.closed
+			}
 		}
 	})
 }

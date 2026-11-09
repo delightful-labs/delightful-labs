@@ -88,7 +88,6 @@ export type BrowserJournalConfiguration = {
 type JournalData = {
 	configuration: BrowserJournalConfiguration | undefined
 	raw: unknown
-	observed: RestoreJournalRecord | undefined
 	encoded: Uint8Array<ArrayBuffer> | undefined
 	result: RestoreJournalRecord | undefined
 	releaseControl: (() => void) | undefined
@@ -177,7 +176,6 @@ export function prepareBrowserRestoreJournal(
 	const data: JournalData = {
 		configuration: { databaseName: name.data, binding: binding.data, command },
 		raw: undefined,
-		observed: undefined,
 		encoded: undefined,
 		result: undefined,
 		releaseControl: undefined,
@@ -196,7 +194,6 @@ export function prepareBrowserRestoreJournal(
 			data.releaseControl?.()
 			data.configuration = undefined
 			data.result = undefined
-			data.observed = undefined
 			clearBrowserJournalBuffers(request)
 		},
 		toJSON: (): { kind: 'browserJournalRequest' } => ({ kind: 'browserJournalRequest' })

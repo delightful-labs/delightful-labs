@@ -4,9 +4,43 @@ Read before designing stateful workflows, readiness, authorization, or async ope
 Adapted on 2026-10-31 from Finance's `.specify/memory/xstate.md` at `8ff72f6`.
 The constitution and active spec define scope; these rules do not authorize implementation.
 
+## XState v6 authoring
+
+The library now targets the exact v6 beta in `package.json`. Use schemas, function
+transitions, immutable context patches, `createAsyncLogic` for async leaves and
+`createCallbackLogic` for native event adapters. Queue selected effects with `enq`.
+Prefer direct actor sources; use `createInvoke` to retain generic input/output
+inference. The form writer retains a registered source name for its union of a
+native leaf and consumer-supplied persistence logic; it remains a v6 source.
+
+Final states support entry/exit actions and output. They do not handle transitions
+or start invokes/timers. Keep terminal context patches and queued cleanup on their
+owning final entries; preserve resource drain before completion.
+Do not depend on a completed child remaining in `children`. Handle native failures
+from their reported events, and use the transition's scoped child references for
+ongoing work. Pure named predicates remain useful; compose them with ordinary JS
+instead of v5 guard combinators. Review parallel-region reentry explicitly. A total, effect-free routing node uses
+`type: 'choice'`; a conditional wait or a context/effect-producing eventless step
+uses `always`. Classify each event by sender before using `internalEvents`: child
+and native callback reports are not self-originated events.
+
+Use the published XState package without patches or declaration overrides. Group
+related generic lifecycle values in explicit immutable context records and update
+the complete record when any member changes. This keeps ownership visible and
+lets v6 check source/target context compatibility. Where a generic union output
+cannot be expressed through the beta's schema inference, use an explicitly typed
+output mapper and let the machine infer that output contract. See
+`specs/003-verified-backup/xstate-v6-implementation.md`. Historical v5 API references
+below describe the original ownership rules, not supported imports.
+
+Read `node_modules/xstate/docs/index.md`, `agents.md` and `api-stability.json` for
+the exact installed beta before migration reviews. Apply the evidence and
+per-repository requirements in `specs/003-verified-backup/xstate-v6-design-review.md`.
+Source inspection, type checking and runtime qualification are separate gates.
+
 ## Mandatory machine-first gate
 
-Before writing an async function or `fromPromise` body, list meaningful steps, decisions,
+Before writing an async function or `createAsyncLogic` body, list meaningful steps, decisions,
 resources, and terminal outcomes in a design note. Start with a statechart when there are
 read/check/write decisions, independently meaningful stages, distinct retry/cancellation paths,
 or an acquired resource spanning commit/rollback/cleanup. Apply this recursively to helpers,
@@ -31,7 +65,7 @@ the write boundary after the modeled decision. Inspect actor helpers recursively
 - Use typed events/reports for continuing observations and invocation output for finite results.
   Actor input initializes; subsequent facts arrive through events. Child context/state paths remain
   private. Do not introduce a global registry, bus, or supervisor without a demonstrated need.
-- Use native `forwardTo`/`sendTo` actions in the state that owns the recipient invocation.
+- Use `enq.sendTo` in the state that owns the recipient invocation.
   Do not rediscover a fixed child's lifetime through `self.getSnapshot().children` for routing.
   Nested handlers must include the parent's interruption/binding actions explicitly. Send only
   commands the child can receive; promise leaves settle under the owner's drain protocol. In

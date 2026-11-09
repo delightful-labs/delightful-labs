@@ -1,19 +1,21 @@
 import {
-	forwardTo,
-	assign,
-	fromPromise,
+	matchesState,
+	type StateValue,
+	types,
+	createAsyncLogic,
 	setup,
-	stateIn,
 	type ActorLogic,
 	type ActorRef,
 	type Snapshot
 } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { formInterruptionResult } from '../../contracts/scoped-form.js'
 import type {
 	FormChildEvent,
 	FormIssue,
 	FormSchema,
-	FormInterruption,
+	FormInterruption as _FormInterruption,
 	FormObservation,
 	FormOperationInput,
 	FormOperationResult,
@@ -21,13 +23,11 @@ import type {
 	FormResult,
 	FormSubmissionProgressEvent
 } from '../../contracts/scoped-form.js'
-
 export type ScopedFormSubmissionInput<Scope, Observation> = {
 	request: FormRequest<Scope>
 	observation: FormObservation<Observation>
 	recipient?: ActorRef<Snapshot<unknown>, FormSubmissionProgressEvent>
 }
-
 export type ScopedFormOperationLogic<
 	Values,
 	Scope,
@@ -38,7 +38,6 @@ export type ScopedFormOperationLogic<
 	FormChildEvent<Observation>,
 	FormOperationInput<Values, Scope, Observation>
 >
-
 export function createScopedFormSubmissionMachine<
 	Values,
 	Result,
@@ -58,74 +57,179 @@ export function createScopedFormSubmissionMachine<
 	> & {
 		recipient: ActorRef<Snapshot<unknown>, FormSubmissionProgressEvent> | undefined
 		observation: FormObservation<Observation> | undefined
-		validated: { value: Values } | undefined
+		validated:
+			| {
+					value: Values
+			  }
+			| undefined
 		result: FormResult<Result, Reason> | undefined
 	}
 	type Event = FormChildEvent<Observation>
 	const actors = {
-		validate: fromPromise<Values, unknown>(async ({ input }) => options.schema.parseAsync(input)),
+		validate: createAsyncLogic<Values, unknown>({
+			run: async ({ input }) => options.schema.parseAsync(input)
+		}),
 		operation: options.operation
 	}
-	const workflow = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{},
-		{
-			closing: undefined
-			invalidated: undefined
-			cancelling: undefined
-			operationClosing: undefined
-			operationInvalidated: undefined
-			operationCancelling: undefined
+	const workflow = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<Event, 'OBSERVE'>>()
+			},
+			input: types<ScopedFormSubmissionInput<Scope, Observation>>(),
+			output: types<FormResult<Result, Reason>>()
 		},
-		never,
-		string,
-		ScopedFormSubmissionInput<Scope, Observation>,
-		FormResult<Result, Reason>
-	>({
 		actors,
 		guards: {
-			closing: stateIn({ validating: 'closing' }),
-			invalidated: stateIn({ validating: 'invalidated' }),
-			cancelling: stateIn({ validating: 'cancelling' }),
-			operationClosing: stateIn({ operating: 'closing' }),
-			operationInvalidated: stateIn({ operating: 'invalidated' }),
-			operationCancelling: stateIn({ operating: 'cancelling' })
+			closing: ({ value }: { value: StateValue }) => matchesState({ validating: 'closing' }, value),
+			invalidated: ({ value }: { value: StateValue }) =>
+				matchesState({ validating: 'invalidated' }, value),
+			cancelling: ({ value }: { value: StateValue }) =>
+				matchesState({ validating: 'cancelling' }, value)
 		}
 	})
-	const publishProgress = (progress: FormSubmissionProgressEvent['progress']) =>
-		workflow.enqueueActions(({ context, enqueue }) => {
-			if (!context.recipient) return
-			enqueue.sendTo(context.recipient, {
-				type: 'FORM_SUBMISSION_PROGRESS',
-				requestId: context.request.id,
-				scopeRevision: context.request.scopeRevision,
-				progress
-			})
-		})
-	const observe = workflow.assign({
-		observation: ({ context, event }) =>
-			event.type === 'OBSERVE' ? event.observation : context.observation
-	})
+	const publishProgress =
+		(progress: FormSubmissionProgressEvent['progress']) =>
+		({ context }: { context: Context }, enq: CompletionQueue) => {
+			if (context.recipient)
+				enq.sendTo(context.recipient, {
+					type: 'FORM_SUBMISSION_PROGRESS',
+					requestId: context.request.id,
+					scopeRevision: context.request.scopeRevision,
+					progress
+				})
+		}
 
-	const clearPayloads = workflow.assign({
-		request: ({ context }) => ({ ...context.request, values: undefined, checkpoint: undefined }),
-		validated: undefined,
-		recipient: undefined,
-		observation: undefined
-	})
-	const finishInterrupted = (outcome: FormInterruption) =>
-		workflow.createStateConfig({
-			type: 'final',
-			entry: [
-				workflow.assign({
-					result: ({ context }) => context.result ?? { outcome, settlement: 'notStarted' }
-				}),
-				clearPayloads
-			]
-		})
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof workflow.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		succeeded: (args) => {
+			return {
+				context: {
+					request: { ...args.context.request, values: undefined, checkpoint: undefined },
+					validated: undefined,
+					recipient: undefined,
+					observation: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		partial: (args) => {
+			return {
+				context: {
+					request: { ...args.context.request, values: undefined, checkpoint: undefined },
+					validated: undefined,
+					recipient: undefined,
+					observation: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		denied: (args) => {
+			return {
+				context: {
+					request: { ...args.context.request, values: undefined, checkpoint: undefined },
+					validated: undefined,
+					recipient: undefined,
+					observation: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		unavailable: (args) => {
+			return {
+				context: {
+					request: { ...args.context.request, values: undefined, checkpoint: undefined },
+					validated: undefined,
+					recipient: undefined,
+					observation: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		invalid: (args) => {
+			return {
+				context: {
+					request: { ...args.context.request, values: undefined, checkpoint: undefined },
+					validated: undefined,
+					recipient: undefined,
+					observation: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		failed: (args) => {
+			return {
+				context: {
+					request: { ...args.context.request, values: undefined, checkpoint: undefined },
+					validated: undefined,
+					recipient: undefined,
+					observation: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		scopeChanged: (args) => {
+			let context = args.context
+			let patch = {}
+			patch = {
+				...patch,
+				result: context.result ?? { outcome: 'scopeChanged', settlement: 'notStarted' }
+			}
+			context = { ...args.context, ...patch }
+			patch = {
+				...patch,
+				request: { ...context.request, values: undefined, checkpoint: undefined },
+				validated: undefined,
+				recipient: undefined,
+				observation: undefined
+			}
+			context = { ...args.context, ...patch }
+			return { context: patch satisfies Partial<Context> }
+		},
+		cancelled: (args) => {
+			let context = args.context
+			let patch = {}
+			patch = {
+				...patch,
+				result: context.result ?? { outcome: 'cancelled', settlement: 'notStarted' }
+			}
+			context = { ...args.context, ...patch }
+			patch = {
+				...patch,
+				request: { ...context.request, values: undefined, checkpoint: undefined },
+				validated: undefined,
+				recipient: undefined,
+				observation: undefined
+			}
+			context = { ...args.context, ...patch }
+			return { context: patch satisfies Partial<Context> }
+		},
+		closed: (args) => {
+			let context = args.context
+			let patch = {}
+			patch = {
+				...patch,
+				result: context.result ?? { outcome: 'closed', settlement: 'notStarted' }
+			}
+			context = { ...args.context, ...patch }
+			patch = {
+				...patch,
+				request: { ...context.request, values: undefined, checkpoint: undefined },
+				validated: undefined,
+				recipient: undefined,
+				observation: undefined
+			}
+			context = { ...args.context, ...patch }
+			return { context: patch satisfies Partial<Context> }
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
+
 	return workflow.createMachine({
 		id: 'scoped-form-submission',
 		initial: 'validating',
@@ -141,74 +245,93 @@ export function createScopedFormSubmissionMachine<
 			validating: {
 				entry: publishProgress('validating'),
 				initial: 'pending',
-				tags: 'validating',
-				invoke: {
-					src: 'validate',
+				tags: ['validating'],
+				invoke: workflow.createInvoke<typeof actors.validate, Context>({
+					src: actors.validate,
 					input: ({ context }: { context: Context }) => context.request.values,
-					onDone: [
-						{ guard: 'closing', target: 'closed' },
-						{ guard: 'invalidated', target: 'scopeChanged' },
-						{ guard: 'cancelling', target: 'cancelled' },
-						{
-							target: 'admittingOperation',
-							actions: assign({ validated: ({ event }) => ({ value: event.output }) })
+					onDone: (args) => {
+						if (matchesState({ validating: 'closing' }, args.value)) {
+							return { target: 'closed' }
 						}
-					],
-					onError: [
-						{ guard: 'closing', target: 'closed' },
-						{ guard: 'invalidated', target: 'scopeChanged' },
-						{ guard: 'cancelling', target: 'cancelled' },
-						{
+						if (matchesState({ validating: 'invalidated' }, args.value)) {
+							return { target: 'scopeChanged' }
+						}
+						if (matchesState({ validating: 'cancelling' }, args.value)) {
+							return { target: 'cancelled' }
+						}
+						return {
+							target: 'admittingOperation',
+							context: { validated: { value: args.event.output } } satisfies Partial<Context>
+						}
+					},
+					onError: (args) => {
+						if (matchesState({ validating: 'closing' }, args.value)) {
+							return { target: 'closed' }
+						}
+						if (matchesState({ validating: 'invalidated' }, args.value)) {
+							return { target: 'scopeChanged' }
+						}
+						if (matchesState({ validating: 'cancelling' }, args.value)) {
+							return { target: 'cancelled' }
+						}
+						return {
 							target: 'classifying',
-							actions: assign({
-								result: ({ event }): FormResult<Result, Reason> => {
+							context: {
+								result: (({ event }): FormResult<Result, Reason> => {
 									const issues = options.validationIssues(event.error)
 									return issues === undefined
 										? { outcome: 'failed', code: 'validationFailed', settlement: 'notStarted' }
 										: { outcome: 'invalid', issues, settlement: 'notStarted' }
-								}
-							})
+								})(args)
+							} satisfies Partial<Context>
 						}
-					]
-				},
+					}
+				}),
 				on: {
-					OBSERVE: { actions: observe },
-					INVALIDATE: '.invalidated',
-					CANCEL: '.cancelling',
-					SHUTDOWN: '.closing'
+					OBSERVE: (args) => {
+						const { event } = args
+						return {
+							context: {
+								observation: event.type === 'OBSERVE' ? event.observation : args.context.observation
+							} satisfies Partial<Context>
+						}
+					},
+					INVALIDATE: { target: '.invalidated' },
+					CANCEL: { target: '.cancelling' },
+					SHUTDOWN: { target: '.closing' }
 				},
 				states: {
 					pending: {},
-					cancelling: { tags: 'cancelling', on: { CANCEL: {} } },
-					invalidated: { tags: 'scopeChanged', on: { CANCEL: {}, INVALIDATE: {} } },
+					cancelling: { tags: ['cancelling'], on: { CANCEL: {} } },
+					invalidated: { tags: ['scopeChanged'], on: { CANCEL: {}, INVALIDATE: {} } },
 					closing: {
-						tags: 'closing',
+						tags: ['closing'],
 						on: { CANCEL: {}, INVALIDATE: {}, SHUTDOWN: {}, OBSERVE: {} }
 					}
 				}
 			},
 			admittingOperation: {
-				always: [
-					{
-						guard: ({ context }) =>
-							context.validated !== undefined && context.observation !== undefined,
-						target: 'operating'
-					},
-					{
-						target: 'failed',
-						actions: assign({
-							result: { outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }
-						})
+				always: (args) => {
+					const { context } = args
+					if (context.validated !== undefined && context.observation !== undefined) {
+						return { target: 'operating' }
 					}
-				]
+
+					return {
+						target: 'failed',
+						context: {
+							result: { outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }
+						} satisfies Partial<Context>
+					}
+				}
 			},
 			operating: {
 				entry: publishProgress('operating'),
-				tags: 'operating',
+				tags: ['operating'],
 				initial: 'pending',
-				invoke: {
+				invoke: workflow.createInvoke<typeof actors.operation, Context>({
 					id: 'operation',
-					src: 'operation',
+					src: actors.operation,
 					input: ({ context }) => {
 						if (!context.validated || !context.observation)
 							throw new Error('Missing validated form input')
@@ -217,110 +340,181 @@ export function createScopedFormSubmissionMachine<
 							observation: context.observation
 						}
 					},
-					onDone: [
-						{
-							guard: 'operationClosing',
-							target: 'closed',
-							actions: assign({
-								result: ({ event }) => formInterruptionResult('closed', event.output)
-							})
-						},
-						{
-							guard: 'operationInvalidated',
-							target: 'scopeChanged',
-							actions: assign({
-								result: ({ event }) => formInterruptionResult('scopeChanged', event.output)
-							})
-						},
-						{
-							guard: 'operationCancelling',
-							target: 'cancelled',
-							actions: assign({
-								result: ({ event }) => formInterruptionResult('cancelled', event.output)
-							})
-						},
-						{
-							target: 'classifying',
-							actions: assign({
-								result: ({ event }) =>
-									event.output ?? { outcome: 'failed', code: 'unexpected', settlement: 'unknown' }
-							})
+					onDone: (args) => {
+						const { event } = args
+						if (matchesState({ operating: 'closing' }, args.value)) {
+							return {
+								target: 'closed',
+								context: {
+									result: formInterruptionResult('closed', event.output)
+								} satisfies Partial<Context>
+							}
 						}
-					],
-					onError: [
-						{
-							guard: 'operationClosing',
-							target: 'closed',
-							actions: assign({ result: () => ({ outcome: 'closed', settlement: 'unknown' }) })
-						},
-						{
-							guard: 'operationInvalidated',
-							target: 'scopeChanged',
-							actions: assign({
-								result: () => ({ outcome: 'scopeChanged', settlement: 'unknown' })
-							})
-						},
-						{
-							guard: 'operationCancelling',
-							target: 'cancelled',
-							actions: assign({ result: () => ({ outcome: 'cancelled', settlement: 'unknown' }) })
-						},
-						{
+						if (matchesState({ operating: 'invalidated' }, args.value)) {
+							return {
+								target: 'scopeChanged',
+								context: {
+									result: formInterruptionResult('scopeChanged', event.output)
+								} satisfies Partial<Context>
+							}
+						}
+						if (matchesState({ operating: 'cancelling' }, args.value)) {
+							return {
+								target: 'cancelled',
+								context: {
+									result: formInterruptionResult('cancelled', event.output)
+								} satisfies Partial<Context>
+							}
+						}
+						return {
+							target: 'classifying',
+							context: {
+								result: event.output ?? {
+									outcome: 'failed',
+									code: 'unexpected',
+									settlement: 'unknown'
+								}
+							} satisfies Partial<Context>
+						}
+					},
+					onError: (args) => {
+						if (matchesState({ operating: 'closing' }, args.value)) {
+							return {
+								target: 'closed',
+								context: {
+									result: { outcome: 'closed', settlement: 'unknown' }
+								} satisfies Partial<Context>
+							}
+						}
+						if (matchesState({ operating: 'invalidated' }, args.value)) {
+							return {
+								target: 'scopeChanged',
+								context: {
+									result: { outcome: 'scopeChanged', settlement: 'unknown' }
+								} satisfies Partial<Context>
+							}
+						}
+						if (matchesState({ operating: 'cancelling' }, args.value)) {
+							return {
+								target: 'cancelled',
+								context: {
+									result: { outcome: 'cancelled', settlement: 'unknown' }
+								} satisfies Partial<Context>
+							}
+						}
+
+						return {
 							target: 'failed',
-							actions: assign({
-								result: () => ({
+							context: {
+								result: {
 									outcome: 'failed',
 									code: 'operationFailed',
 									settlement: 'unknown'
-								})
-							})
+								}
+							} satisfies Partial<Context>
 						}
-					]
-				},
+					}
+				}),
 				on: {
-					OBSERVE: { actions: [observe, forwardTo('operation')] },
-					INVALIDATE: { target: '.invalidated', actions: forwardTo('operation') },
-					CANCEL: { target: '.cancelling', actions: forwardTo('operation') },
-					SHUTDOWN: { target: '.closing', actions: forwardTo('operation') }
+					OBSERVE: (args, enq) => {
+						const { event } = args
+						enq.sendTo('operation', args.event)
+						return {
+							context: {
+								observation: event.type === 'OBSERVE' ? event.observation : args.context.observation
+							} satisfies Partial<Context>
+						}
+					},
+					INVALIDATE: (args, enq) => {
+						enq.sendTo('operation', args.event)
+						return { target: '.invalidated' }
+					},
+					CANCEL: (args, enq) => {
+						enq.sendTo('operation', args.event)
+						return { target: '.cancelling' }
+					},
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('operation', args.event)
+						return { target: '.closing' }
+					}
 				},
 				states: {
 					pending: {},
-					cancelling: { tags: 'cancelling', on: { CANCEL: {} } },
-					invalidated: { tags: 'scopeChanged', on: { CANCEL: {}, INVALIDATE: {} } },
+					cancelling: { tags: ['cancelling'], on: { CANCEL: {} } },
+					invalidated: { tags: ['scopeChanged'], on: { CANCEL: {}, INVALIDATE: {} } },
 					closing: {
-						tags: 'closing',
+						tags: ['closing'],
 						on: { CANCEL: {}, INVALIDATE: {}, SHUTDOWN: {}, OBSERVE: {} }
 					}
 				}
 			},
 			classifying: {
-				always: [
-					{ guard: ({ context }) => context.result?.outcome === 'invalid', target: 'invalid' },
-					{ guard: ({ context }) => context.result?.outcome === 'succeeded', target: 'succeeded' },
-					{ guard: ({ context }) => context.result?.outcome === 'partial', target: 'partial' },
-					{ guard: ({ context }) => context.result?.outcome === 'denied', target: 'denied' },
-					{
-						guard: ({ context }) => context.result?.outcome === 'unavailable',
-						target: 'unavailable'
-					},
-					{
-						guard: ({ context }) => context.result?.outcome === 'scopeChanged',
-						target: 'scopeChanged'
-					},
-					{ guard: ({ context }) => context.result?.outcome === 'cancelled', target: 'cancelled' },
-					{ guard: ({ context }) => context.result?.outcome === 'closed', target: 'closed' },
-					{ target: 'failed' }
-				]
+				always: (args) => {
+					const { context } = args
+					if (context.result?.outcome === 'invalid') {
+						return { target: 'invalid' }
+					}
+					if (context.result?.outcome === 'succeeded') {
+						return { target: 'succeeded' }
+					}
+					if (context.result?.outcome === 'partial') {
+						return { target: 'partial' }
+					}
+					if (context.result?.outcome === 'denied') {
+						return { target: 'denied' }
+					}
+					if (context.result?.outcome === 'unavailable') {
+						return { target: 'unavailable' }
+					}
+					if (context.result?.outcome === 'scopeChanged') {
+						return { target: 'scopeChanged' }
+					}
+					if (context.result?.outcome === 'cancelled') {
+						return { target: 'cancelled' }
+					}
+					if (context.result?.outcome === 'closed') {
+						return { target: 'closed' }
+					}
+
+					return { target: 'failed' }
+				}
 			},
-			succeeded: { type: 'final', entry: clearPayloads },
-			partial: { type: 'final', entry: clearPayloads },
-			denied: { type: 'final', entry: clearPayloads },
-			unavailable: { type: 'final', entry: clearPayloads },
-			invalid: { type: 'final', entry: clearPayloads },
-			failed: { type: 'final', entry: clearPayloads },
-			scopeChanged: finishInterrupted('scopeChanged'),
-			cancelled: finishInterrupted('cancelled'),
-			closed: finishInterrupted('closed')
+			succeeded: {
+				type: 'final',
+				entry: finalizers.succeeded
+			},
+			partial: {
+				type: 'final',
+				entry: finalizers.partial
+			},
+			denied: {
+				type: 'final',
+				entry: finalizers.denied
+			},
+			unavailable: {
+				type: 'final',
+				entry: finalizers.unavailable
+			},
+			invalid: {
+				type: 'final',
+				entry: finalizers.invalid
+			},
+			failed: {
+				type: 'final',
+				entry: finalizers.failed
+			},
+			scopeChanged: {
+				type: 'final',
+				entry: finalizers.scopeChanged
+			},
+			cancelled: {
+				type: 'final',
+				entry: finalizers.cancelled
+			},
+			closed: {
+				type: 'final',
+				entry: finalizers.closed
+			}
 		}
 	})
 }

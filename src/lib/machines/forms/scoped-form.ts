@@ -1,14 +1,14 @@
 import {
-	sendTo,
-	raise,
-	and,
-	assign,
-	fromPromise,
+	matchesState,
+	type StateValue,
+	types,
+	createAsyncLogic,
 	setup,
-	stateIn,
 	type Snapshot,
 	type SnapshotFrom
 } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
 	FormFeedbackInput,
 	FeedbackMessage,
@@ -29,7 +29,6 @@ import type { ScopedFormOperationLogic } from './submission.js'
 import type { ScopedFormAvailabilityLogic } from './readiness.js'
 import { createScopedFormSubmissionMachine } from './submission.js'
 import { createScopedFormReadinessMachine } from './readiness.js'
-
 export type ScopedFormDependencies = {
 	validationIssues: (error: unknown) => readonly FormIssue[] | undefined
 	messages: {
@@ -44,7 +43,6 @@ export type ScopedFormDependencies = {
 		settling: () => string
 	}
 }
-
 export type ScopedFormOptions<
 	Values,
 	Result,
@@ -66,7 +64,6 @@ export type ScopedFormOptions<
 	/** Release file drafts and rebuild controls after successful inline saves. */
 	resetOnSuccess?: boolean
 } & FormMode<Values, Observation>
-
 export function createScopedFormMachine<
 	Values,
 	Result,
@@ -97,7 +94,11 @@ export function createScopedFormMachine<
 	>({ ...options, validationIssues: dependencies.validationIssues })
 	type Context = {
 		observation: FormObservation<Observation> | undefined
-		scope: { value: Scope } | undefined
+		scope:
+			| {
+					value: Scope
+			  }
+			| undefined
 		scopeRevision: number
 		watchGeneration: number
 		capability: FormCapability<Scope, Reason> | undefined
@@ -110,9 +111,18 @@ export function createScopedFormMachine<
 	}
 	type Event =
 		| FormSubmissionProgressEvent
-		| { type: 'OBSERVE'; observation: Observation }
-		| { type: 'SUBMIT'; values: unknown }
-		| { type: 'CHANGE'; values: unknown }
+		| {
+				type: 'OBSERVE'
+				observation: Observation
+		  }
+		| {
+				type: 'SUBMIT'
+				values: unknown
+		  }
+		| {
+				type: 'CHANGE'
+				values: unknown
+		  }
 		| {
 				type:
 					| 'RESET'
@@ -132,8 +142,15 @@ export function createScopedFormMachine<
 		Observation,
 		AvailabilitySnapshot
 	>(options)
-	const completion = fromPromise<void, { scope: Scope }>(async ({ input, signal }) => {
-		await options.complete?.(input.scope, signal)
+	const completion = createAsyncLogic<
+		void,
+		{
+			scope: Scope
+		}
+	>({
+		run: async ({ input, signal }) => {
+			await options.complete?.(input.scope, signal)
+		}
 	})
 	const actors = { availability, submission, completion }
 	const ready = (context: Context) =>
@@ -149,45 +166,51 @@ export function createScopedFormMachine<
 		(values !== undefined &&
 			context.observation !== undefined &&
 			!options.valuesEqual(values, options.initialValues(context.observation.facts)))
-	const workflow = setup<
-		Context,
-		Event,
-		typeof actors,
-		{ availability: 'availability'; submission: 'submission'; completion: 'completion' },
-		{},
-		{
-			closing: undefined
-			invalidated: undefined
-			cancelling: undefined
-			availabilityWatching: undefined
-			idle: undefined
+	const workflow = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				FORM_SUBMISSION_PROGRESS: types<EventPayload<Event, 'FORM_SUBMISSION_PROGRESS'>>(),
+				OBSERVE: types<EventPayload<Event, 'OBSERVE'>>(),
+				SUBMIT: types<EventPayload<Event, 'SUBMIT'>>(),
+				CHANGE: types<EventPayload<Event, 'CHANGE'>>(),
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				RESET: types<EventPayload<Event, 'RESET'>>(),
+				OPEN: types<EventPayload<Event, 'OPEN'>>(),
+				RETRY_READINESS: types<EventPayload<Event, 'RETRY_READINESS'>>(),
+				FORM_CAPABILITY_REPORTED: types<EventPayload<Event, 'FORM_CAPABILITY_REPORTED'>>()
+			},
+			internalEvents: {
+				AVAILABILITY_FAILED: types<EventPayload<Event, 'AVAILABILITY_FAILED'>>(),
+				OBSERVATION_CHANGED: types<EventPayload<Event, 'OBSERVATION_CHANGED'>>(),
+				CAPABILITY_ACCEPTED: types<EventPayload<Event, 'CAPABILITY_ACCEPTED'>>()
+			},
+			input: types<Observation>(),
+			meta: types<{
+				section: string
+				label: (input: FormFeedbackInput<Result, Reason>) => readonly FeedbackMessage[]
+			}>()
 		},
-		never,
-		string,
-		Observation
-	>({
 		actors,
 		guards: {
-			closing: stateIn({ open: { workflow: { active: 'closing' } } }),
-			invalidated: stateIn({ open: { workflow: { active: 'invalidated' } } }),
-			cancelling: stateIn({ open: { workflow: { active: 'cancelling' } } }),
-			availabilityWatching: stateIn({ open: { availability: 'watching' } }),
-			idle: stateIn({ open: { workflow: 'idle' } })
+			closing: ({ value }: { value: StateValue }) =>
+				matchesState({ open: { workflow: { active: 'closing' } } }, value),
+			invalidated: ({ value }: { value: StateValue }) =>
+				matchesState({ open: { workflow: { active: 'invalidated' } } }, value),
+			cancelling: ({ value }: { value: StateValue }) =>
+				matchesState({ open: { workflow: { active: 'cancelling' } } }, value),
+			idle: ({ value }: { value: StateValue }) =>
+				matchesState({ open: { workflow: 'idle' } }, value)
 		}
 	})
-
 	// Recovery belongs to the current scope lifetime, independently of feedback.
 	const acceptCheckpoint = (context: Context, result: FormResult<Result, Reason>) => {
 		if (context.request?.scopeRevision !== context.scopeRevision) return undefined
 		if (result.outcome === 'succeeded') return undefined
 		return result.checkpoint === undefined ? context.checkpoint : result.checkpoint
 	}
-	const clearDraft = workflow.assign({
-		draft: undefined,
-		checkpoint: undefined,
-		result: undefined,
-		draftRevision: ({ context }) => context.draftRevision + 1
-	})
 	const requireObservation = (context: Context) => {
 		if (!context.observation) throw new Error('Missing form observation')
 		return context.observation
@@ -201,6 +224,30 @@ export function createScopedFormMachine<
 		(label: (input: Input) => string): Label =>
 		(input) => [{ text: label(input), role: 'alert' }]
 	const unknown: Label = alert((input) => input.messages.unknown ?? dependencies.messages.unknown())
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof workflow.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		closed: (_args) => {
+			return {
+				context: {
+					observation: undefined,
+					scope: undefined,
+					capability: undefined,
+					request: undefined,
+					result: undefined,
+					checkpoint: undefined,
+					draft: undefined
+				} satisfies Partial<Context>
+			}
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
 
 	return workflow.createMachine({
 		id: 'scoped-form',
@@ -221,79 +268,85 @@ export function createScopedFormMachine<
 		states: {
 			open: {
 				type: 'parallel',
-				onDone: 'closed',
+				onDone: (_args) => {
+					return { target: 'closed' }
+				},
 				on: {
-					OBSERVE: [
-						{ guard: 'closing' },
-						{
-							guard: ({ context, event }) =>
-								context.scope !== undefined &&
-								!options.sameScope(context.scope.value, options.scopeOf(event.observation)),
-							actions: [
-								assign({
+					OBSERVE: (args, enq) => {
+						const { context, event } = args
+						if (matchesState({ open: { workflow: { active: 'closing' } } }, args.value)) {
+							return {}
+						}
+						if (
+							context.scope !== undefined &&
+							!options.sameScope(context.scope.value, options.scopeOf(event.observation))
+						) {
+							enq.raise({ type: 'INVALIDATE' })
+							enq.raise({ type: 'OBSERVATION_CHANGED' })
+							return {
+								context: {
 									capability: undefined,
-									observation: ({ context, event }) => ({
+									observation: {
 										revision: requireObservation(context).revision + 1,
 										facts: event.observation
-									}),
-									scope: ({ event }) => ({ value: options.scopeOf(event.observation) }),
-									scopeRevision: ({ context }) => context.scopeRevision + 1,
-									draftRevision: ({ context }) => context.draftRevision + 1,
+									},
+									scope: { value: options.scopeOf(event.observation) },
+									scopeRevision: context.scopeRevision + 1,
+									draftRevision: context.draftRevision + 1,
 									draft: undefined,
 									checkpoint: undefined,
 									result: undefined
-								}),
-								raise({ type: 'INVALIDATE' }),
-								raise({ type: 'OBSERVATION_CHANGED' })
-							]
-						},
-						{
-							actions: [
-								assign({
-									capability: undefined,
-									observation: ({ context, event }) => ({
-										revision: requireObservation(context).revision + 1,
-										facts: event.observation
-									})
-								}),
-								raise({ type: 'OBSERVATION_CHANGED' })
-							]
+								} satisfies Partial<Context>
+							}
 						}
-					],
-					FORM_CAPABILITY_REPORTED: [
-						{ guard: 'closing' },
-						{
-							guard: and([
-								'availabilityWatching',
-								({ context, event }) =>
-									event.generation === context.watchGeneration &&
-									event.capability.revision === context.observation?.revision &&
-									context.scope !== undefined &&
-									options.sameScope(event.capability.scope, context.scope.value)
-							]),
-							actions: [
-								assign({ capability: ({ event }) => event.capability }),
-								raise({ type: 'CAPABILITY_ACCEPTED' }),
-								workflow.enqueueActions(({ event, enqueue }) => {
-									if (
-										event.type === 'FORM_CAPABILITY_REPORTED' &&
-										event.capability.readiness.kind === 'blocked'
-									)
-										enqueue.raise({ type: 'INVALIDATE' })
-								})
-							]
+						enq.raise({ type: 'OBSERVATION_CHANGED' })
+						return {
+							context: {
+								capability: undefined,
+								observation: {
+									revision: requireObservation(context).revision + 1,
+									facts: event.observation
+								}
+							} satisfies Partial<Context>
 						}
-					]
+					},
+					FORM_CAPABILITY_REPORTED: (args, enq) => {
+						const { context, event } = args
+						if (matchesState({ open: { workflow: { active: 'closing' } } }, args.value)) {
+							return {}
+						}
+						if (
+							matchesState({ open: { availability: 'watching' } }, args.value) &&
+							event.generation === context.watchGeneration &&
+							event.capability.revision === context.observation?.revision &&
+							context.scope !== undefined &&
+							options.sameScope(event.capability.scope, context.scope.value)
+						) {
+							enq.raise({ type: 'CAPABILITY_ACCEPTED' })
+							if (
+								event.type === 'FORM_CAPABILITY_REPORTED' &&
+								event.capability.readiness.kind === 'blocked'
+							)
+								enq.raise({ type: 'INVALIDATE' })
+							return {
+								context: { capability: event.capability } satisfies Partial<Context>
+							}
+						}
+					}
 				},
 				states: {
 					availability: {
 						initial: 'watching',
 						states: {
 							watching: {
-								entry: assign({
-									watchGeneration: ({ context }) => context.watchGeneration + 1,
-									capability: undefined
-								}),
+								entry: (args) => {
+									return {
+										context: {
+											watchGeneration: args.context.watchGeneration + 1,
+											capability: undefined
+										} satisfies Partial<Context>
+									}
+								},
 								initial: 'awaiting',
 								states: {
 									awaiting: {
@@ -319,7 +372,7 @@ export function createScopedFormMachine<
 								},
 								invoke: {
 									id: 'availability',
-									src: 'availability',
+									src: actors.availability,
 									input: ({ context, self }) => ({
 										observation: requireObservation(context),
 										delivery: {
@@ -328,19 +381,20 @@ export function createScopedFormMachine<
 											recipient: self
 										}
 									}),
-									onError: 'failed',
-									onDone: 'failed'
+									onError: { target: 'failed' },
+									onDone: { target: 'failed' }
 								},
 								on: {
-									SHUTDOWN: 'closed',
-									OBSERVATION_CHANGED: {
-										target: '.awaiting',
-										actions: sendTo('availability', ({ context }) => ({
+									SHUTDOWN: { target: 'closed' },
+									OBSERVATION_CHANGED: (args, enq) => {
+										const { context } = args
+										enq.sendTo('availability', {
 											type: 'OBSERVE',
 											observation: requireObservation(context)
-										}))
+										})
+										return { target: '.awaiting' }
 									},
-									CAPABILITY_ACCEPTED: '.current'
+									CAPABILITY_ACCEPTED: { target: '.current' }
 								}
 							},
 							failed: {
@@ -348,13 +402,18 @@ export function createScopedFormMachine<
 									section: 'readiness',
 									label: alert(({ subject }) => dependencies.messages.loadFailed({ subject }))
 								},
-								entry: [assign({ capability: undefined }), raise({ type: 'AVAILABILITY_FAILED' })],
+								entry: (args, enq) => {
+									enq.raise({ type: 'AVAILABILITY_FAILED' })
+									return {
+										context: { capability: undefined } satisfies Partial<Context>
+									}
+								},
 								on: {
-									RETRY_READINESS: {
-										guard: 'idle',
-										target: 'watching'
+									RETRY_READINESS: (args) => {
+										if (!matchesState({ open: { workflow: 'idle' } }, args.value)) return
+										return { target: 'watching' }
 									},
-									SHUTDOWN: 'closed'
+									SHUTDOWN: { target: 'closed' }
 								}
 							},
 							closed: { type: 'final' }
@@ -367,43 +426,45 @@ export function createScopedFormMachine<
 								initial: 'assessing',
 								states: {
 									assessing: {
-										always: [
-											{ guard: ({ context }) => context.result === undefined, target: 'quiet' },
-											{
-												guard: ({ context }) =>
-													context.result !== undefined && context.result.outcome === 'succeeded',
-												target: 'saved'
-											},
-											{
-												guard: ({ context }) =>
-													context.result !== undefined &&
-													context.result.outcome === 'failed' &&
-													context.result.code === 'completionFailed',
-												target: 'completionFailed'
-											},
-											{
-												guard: ({ context }) =>
-													context.result !== undefined &&
-													(context.result.outcome === 'invalid' ||
-														(context.result.outcome === 'failed' &&
-															context.result.code === 'validationFailed')),
-												target: 'invalid'
-											},
-											{
-												guard: ({ context }) =>
-													context.result !== undefined &&
-													(context.result.outcome === 'denied' ||
-														context.result.outcome === 'unavailable'),
-												target: 'blocked'
-											},
-											{
-												guard: ({ context }) =>
-													context.result !== undefined &&
-													['scopeChanged', 'cancelled', 'closed'].includes(context.result.outcome),
-												target: 'interrupted'
-											},
-											{ target: 'failed' }
-										]
+										type: 'choice',
+										choice: (args) => {
+											const { context } = args
+											if (context.result === undefined) {
+												return { target: 'quiet' }
+											}
+											if (context.result !== undefined && context.result.outcome === 'succeeded') {
+												return { target: 'saved' }
+											}
+											if (
+												context.result !== undefined &&
+												context.result.outcome === 'failed' &&
+												context.result.code === 'completionFailed'
+											) {
+												return { target: 'completionFailed' }
+											}
+											if (
+												context.result !== undefined &&
+												(context.result.outcome === 'invalid' ||
+													(context.result.outcome === 'failed' &&
+														context.result.code === 'validationFailed'))
+											) {
+												return { target: 'invalid' }
+											}
+											if (
+												context.result !== undefined &&
+												(context.result.outcome === 'denied' ||
+													context.result.outcome === 'unavailable')
+											) {
+												return { target: 'blocked' }
+											}
+											if (
+												context.result !== undefined &&
+												['scopeChanged', 'cancelled', 'closed'].includes(context.result.outcome)
+											) {
+												return { target: 'interrupted' }
+											}
+											return { target: 'failed' }
+										}
 									},
 									quiet: {},
 									saved: {
@@ -451,21 +512,23 @@ export function createScopedFormMachine<
 										initial: 'assessing',
 										states: {
 											assessing: {
-												always: [
-													{
-														guard: ({ context }) =>
-															context.result !== undefined &&
-															context.result.settlement === 'locallyPersisted',
-														target: 'saved'
-													},
-													{
-														guard: ({ context }) =>
-															context.result !== undefined &&
-															context.result.settlement === 'unknown',
-														target: 'unknown'
-													},
-													{ target: 'quiet' }
-												]
+												type: 'choice',
+												choice: (args) => {
+													const { context } = args
+													if (
+														context.result !== undefined &&
+														context.result.settlement === 'locallyPersisted'
+													) {
+														return { target: 'saved' }
+													}
+													if (
+														context.result !== undefined &&
+														context.result.settlement === 'unknown'
+													) {
+														return { target: 'unknown' }
+													}
+													return { target: 'quiet' }
+												}
 											},
 											saved: {
 												meta: {
@@ -493,90 +556,124 @@ export function createScopedFormMachine<
 										initial: 'assessing',
 										states: {
 											assessing: {
-												always: [
-													{
-														guard: ({ context }) =>
-															context.result !== undefined &&
-															context.result.settlement === 'unknown',
-														target: 'unknown'
-													},
-													{ target: 'quiet' }
-												]
+												type: 'choice',
+												choice: (args) => {
+													const { context } = args
+													if (
+														context.result !== undefined &&
+														context.result.settlement === 'unknown'
+													) {
+														return { target: 'unknown' }
+													}
+													return { target: 'quiet' }
+												}
 											},
 											unknown: { meta: { section: 'result', label: unknown } },
 											quiet: {}
 										}
 									}
 								},
-								tags: 'can-open',
+								tags: ['can-open'],
 								on: {
-									OBSERVATION_CHANGED: '.assessing',
-									SUBMIT: {
-										guard: and([
-											'availabilityWatching',
-											({ context, event }) => editable(context) && hasChanges(context, event.values)
-										]),
-										target: 'admittingSubmission',
-										actions: assign({
-											request: ({ context, event }) => {
-												if (!context.scope) return undefined
-												return {
-													id: context.sequence + 1,
-													scope: context.scope.value,
-													scopeRevision: context.scopeRevision,
-													...(context.checkpoint === undefined
-														? {}
-														: { checkpoint: context.checkpoint }),
-													values: event.values
-												}
-											},
-											sequence: ({ context }) => context.sequence + 1,
-											draft: ({ event }) => (options.mode === 'edit' ? event.values : undefined),
-											result: undefined
-										})
+									OBSERVATION_CHANGED: { target: '.assessing' },
+									SUBMIT: (args) => {
+										const { context, event } = args
+										if (
+											!(
+												matchesState({ open: { availability: 'watching' } }, args.value) &&
+												editable(context) &&
+												hasChanges(context, event.values)
+											)
+										)
+											return
+										return {
+											target: 'admittingSubmission',
+											context: {
+												request: (({ context, event }) => {
+													if (!context.scope) return undefined
+													return {
+														id: context.sequence + 1,
+														scope: context.scope.value,
+														scopeRevision: context.scopeRevision,
+														...(context.checkpoint === undefined
+															? {}
+															: { checkpoint: context.checkpoint }),
+														values: event.values
+													}
+												})(args),
+												sequence: context.sequence + 1,
+												draft: options.mode === 'edit' ? event.values : undefined,
+												result: undefined
+											} satisfies Partial<Context>
+										}
 									},
-									CHANGE: {
-										target: '.assessing',
-										guard: and(['availabilityWatching', ({ context }) => editable(context)]),
-										actions: assign({
-											draft: ({ event }) => (options.mode === 'edit' ? event.values : undefined),
-											result: ({ context }) =>
-												context.result?.outcome === 'succeeded' ? undefined : context.result
-										})
+									CHANGE: (args) => {
+										const { context } = args
+										if (
+											!(
+												matchesState({ open: { availability: 'watching' } }, args.value) &&
+												editable(context)
+											)
+										)
+											return
+										return {
+											target: '.assessing',
+											context: {
+												draft: options.mode === 'edit' ? args.event.values : undefined,
+												result: context.result?.outcome === 'succeeded' ? undefined : context.result
+											} satisfies Partial<Context>
+										}
 									},
-									RESET: { target: '.assessing', actions: clearDraft },
-									OPEN: {
-										target: '.assessing',
-										guard: ({ context }) => context.result?.outcome === 'succeeded',
-										actions: clearDraft
+									RESET: (args) => {
+										return {
+											target: '.assessing',
+											context: {
+												draft: undefined,
+												checkpoint: undefined,
+												result: undefined,
+												draftRevision: args.context.draftRevision + 1
+											} satisfies Partial<Context>
+										}
 									},
-									SHUTDOWN: 'closed'
+									OPEN: (args) => {
+										const { context } = args
+										if (!(context.result?.outcome === 'succeeded')) return
+										return {
+											target: '.assessing',
+											context: {
+												draft: undefined,
+												checkpoint: undefined,
+												result: undefined,
+												draftRevision: context.draftRevision + 1
+											} satisfies Partial<Context>
+										}
+									},
+									SHUTDOWN: { target: 'closed' }
 								}
 							},
 							admittingSubmission: {
-								always: [
-									{
-										guard: ({ context }) =>
-											context.request !== undefined && context.observation !== undefined,
-										target: 'active'
-									},
-									{
+								always: (args) => {
+									const { context } = args
+									if (context.request !== undefined && context.observation !== undefined) {
+										return { target: 'active' }
+									}
+									return {
 										target: 'idle',
-										actions: assign({
+										context: {
 											result: {
 												outcome: 'failed',
 												code: 'operationFailed',
 												settlement: 'notStarted'
 											}
-										})
+										} satisfies Partial<Context>
 									}
-								]
+								}
 							},
 							active: {
 								initial: 'pending',
 								invoke: {
 									id: 'submission',
-									src: 'submission',
+									src: actors.submission,
 									input: ({ context, self }) => {
 										if (!context.request) throw new Error('Missing form request')
 										return {
@@ -585,92 +682,112 @@ export function createScopedFormMachine<
 											recipient: self
 										}
 									},
-									onDone: [
-										{ guard: 'closing', target: 'closed' },
-										{
-											guard: 'invalidated',
+									onDone: (args) => {
+										const { context, event } = args
+										if (matchesState({ open: { workflow: { active: 'closing' } } }, args.value)) {
+											return { target: 'closed' }
+										}
+										if (
+											matchesState({ open: { workflow: { active: 'invalidated' } } }, args.value)
+										) {
+											return {
+												target: 'idle',
+												context: {
+													checkpoint: acceptCheckpoint(context, event.output),
+													result:
+														context.request?.scopeRevision === context.scopeRevision
+															? formInterruptionResult('scopeChanged', event.output)
+															: undefined,
+													request: undefined
+												} satisfies Partial<Context>
+											}
+										}
+										if (
+											matchesState({ open: { workflow: { active: 'cancelling' } } }, args.value)
+										) {
+											return {
+												target: 'idle',
+												context: {
+													checkpoint: acceptCheckpoint(context, event.output),
+													result:
+														context.request?.scopeRevision === context.scopeRevision
+															? formInterruptionResult('cancelled', event.output)
+															: undefined,
+													request: undefined
+												} satisfies Partial<Context>
+											}
+										}
+										if (
+											options.complete !== undefined &&
+											event.output.outcome === 'succeeded' &&
+											context.request?.scopeRevision === context.scopeRevision
+										) {
+											return {
+												target: 'completion',
+												context: {
+													checkpoint: acceptCheckpoint(context, event.output),
+													result: event.output,
+													request: undefined
+												} satisfies Partial<Context>
+											}
+										}
+										return {
 											target: 'idle',
-											actions: assign({
-												checkpoint: ({ context, event }) => acceptCheckpoint(context, event.output),
-												result: ({ context, event }) =>
-													context.request?.scopeRevision === context.scopeRevision
-														? formInterruptionResult('scopeChanged', event.output)
-														: undefined,
-												request: undefined
-											})
-										},
-										{
-											guard: 'cancelling',
-											target: 'idle',
-											actions: assign({
-												checkpoint: ({ context, event }) => acceptCheckpoint(context, event.output),
-												result: ({ context, event }) =>
-													context.request?.scopeRevision === context.scopeRevision
-														? formInterruptionResult('cancelled', event.output)
-														: undefined,
-												request: undefined
-											})
-										},
-										{
-											guard: ({ context, event }) =>
-												options.complete !== undefined &&
-												event.output.outcome === 'succeeded' &&
-												context.request?.scopeRevision === context.scopeRevision,
-											target: 'completion',
-											actions: assign({
-												checkpoint: ({ context, event }) => acceptCheckpoint(context, event.output),
-												result: ({ event }) => event.output,
-												request: undefined
-											})
-										},
-										{
-											target: 'idle',
-											actions: assign({
-												checkpoint: ({ context, event }) => acceptCheckpoint(context, event.output),
-												result: ({ context, event }) =>
+											context: {
+												checkpoint: acceptCheckpoint(context, event.output),
+												result:
 													context.request?.scopeRevision === context.scopeRevision
 														? event.output
 														: undefined,
-												draft: ({ context, event }) =>
+												draft:
 													options.resetOnSuccess && event.output.outcome === 'succeeded'
 														? undefined
 														: context.draft,
-												draftRevision: ({ context, event }) =>
+												draftRevision:
 													options.resetOnSuccess && event.output.outcome === 'succeeded'
 														? context.draftRevision + 1
 														: context.draftRevision,
 												request: undefined
-											})
+											} satisfies Partial<Context>
 										}
-									],
-									onError: [
-										{ guard: 'closing', target: 'closed' },
-										{
-											guard: 'invalidated',
+									},
+									onError: (args) => {
+										const { context } = args
+										if (matchesState({ open: { workflow: { active: 'closing' } } }, args.value)) {
+											return { target: 'closed' }
+										}
+										if (
+											matchesState({ open: { workflow: { active: 'invalidated' } } }, args.value)
+										) {
+											return {
+												target: 'idle',
+												context: {
+													result:
+														context.request?.scopeRevision === context.scopeRevision
+															? { outcome: 'scopeChanged', settlement: 'unknown' }
+															: undefined,
+													request: undefined
+												} satisfies Partial<Context>
+											}
+										}
+										if (
+											matchesState({ open: { workflow: { active: 'cancelling' } } }, args.value)
+										) {
+											return {
+												target: 'idle',
+												context: {
+													result:
+														context.request?.scopeRevision === context.scopeRevision
+															? { outcome: 'cancelled', settlement: 'unknown' }
+															: undefined,
+													request: undefined
+												} satisfies Partial<Context>
+											}
+										}
+										return {
 											target: 'idle',
-											actions: assign({
-												result: ({ context }) =>
-													context.request?.scopeRevision === context.scopeRevision
-														? { outcome: 'scopeChanged', settlement: 'unknown' }
-														: undefined,
-												request: undefined
-											})
-										},
-										{
-											guard: 'cancelling',
-											target: 'idle',
-											actions: assign({
-												result: ({ context }) =>
-													context.request?.scopeRevision === context.scopeRevision
-														? { outcome: 'cancelled', settlement: 'unknown' }
-														: undefined,
-												request: undefined
-											})
-										},
-										{
-											target: 'idle',
-											actions: assign({
-												result: ({ context }) =>
+											context: {
+												result:
 													context.request?.scopeRevision === context.scopeRevision
 														? {
 																outcome: 'failed',
@@ -679,62 +796,64 @@ export function createScopedFormMachine<
 															}
 														: undefined,
 												request: undefined
-											})
+											} satisfies Partial<Context>
 										}
-									]
+									}
 								},
 								on: {
-									INVALIDATE: {
-										target: '.invalidated',
-										actions: sendTo('submission', { type: 'INVALIDATE' })
+									INVALIDATE: (args, enq) => {
+										enq.sendTo('submission', { type: 'INVALIDATE' })
+										return { target: '.invalidated' }
 									},
-									AVAILABILITY_FAILED: {
-										target: '.invalidated',
-										actions: sendTo('submission', { type: 'INVALIDATE' })
+									AVAILABILITY_FAILED: (args, enq) => {
+										enq.sendTo('submission', { type: 'INVALIDATE' })
+										return { target: '.invalidated' }
 									},
-									CANCEL: {
-										target: '.cancelling',
-										actions: sendTo('submission', { type: 'CANCEL' })
+									CANCEL: (args, enq) => {
+										enq.sendTo('submission', { type: 'CANCEL' })
+										return { target: '.cancelling' }
 									},
-									SHUTDOWN: {
-										target: '.closing',
-										actions: sendTo('submission', { type: 'SHUTDOWN' })
+									SHUTDOWN: (args, enq) => {
+										enq.sendTo('submission', { type: 'SHUTDOWN' })
+										return { target: '.closing' }
 									},
-									OBSERVATION_CHANGED: {
-										actions: sendTo('submission', ({ context }) => ({
+									OBSERVATION_CHANGED: (args, enq) => {
+										const { context } = args
+										enq.sendTo('submission', {
 											type: 'OBSERVE',
 											observation: requireObservation(context)
-										}))
+										})
 									}
 								},
 								states: {
 									pending: {
-										tags: 'can-open',
+										tags: ['can-open'],
 										initial: 'awaitingProgress',
 										states: {
 											awaitingProgress: {},
-											validating: { tags: 'validating' },
+											validating: { tags: ['validating'] },
 											operating: {}
 										},
 										on: {
-											FORM_SUBMISSION_PROGRESS: [
-												{
-													guard: ({ context, event }) =>
-														context.request?.id === event.requestId &&
-														context.request.scopeRevision === event.scopeRevision &&
-														context.scopeRevision === event.scopeRevision &&
-														event.progress === 'validating',
-													target: '.validating'
-												},
-												{
-													guard: ({ context, event }) =>
-														context.request?.id === event.requestId &&
-														context.request.scopeRevision === event.scopeRevision &&
-														context.scopeRevision === event.scopeRevision &&
-														event.progress === 'operating',
-													target: '.operating'
+											FORM_SUBMISSION_PROGRESS: (args) => {
+												const { context, event } = args
+												if (
+													context.request?.id === event.requestId &&
+													context.request.scopeRevision === event.scopeRevision &&
+													context.scopeRevision === event.scopeRevision &&
+													event.progress === 'validating'
+												) {
+													return { target: '.validating' }
 												}
-											]
+												if (
+													context.request?.id === event.requestId &&
+													context.request.scopeRevision === event.scopeRevision &&
+													context.scopeRevision === event.scopeRevision &&
+													event.progress === 'operating'
+												) {
+													return { target: '.operating' }
+												}
+											}
 										}
 									},
 									cancelling: {
@@ -744,7 +863,7 @@ export function createScopedFormMachine<
 												(input) => input.messages.settling ?? dependencies.messages.settling()
 											)
 										},
-										tags: 'can-open',
+										tags: ['can-open'],
 										on: { CANCEL: {} }
 									},
 									invalidated: {
@@ -754,7 +873,7 @@ export function createScopedFormMachine<
 												(input) => input.messages.settling ?? dependencies.messages.settling()
 											)
 										},
-										tags: 'can-open',
+										tags: ['can-open'],
 										on: { CANCEL: {}, INVALIDATE: {}, AVAILABILITY_FAILED: {} }
 									},
 									closing: {
@@ -778,37 +897,54 @@ export function createScopedFormMachine<
 							completion: {
 								initial: 'admitting',
 								on: {
-									SHUTDOWN: 'closed',
-									INVALIDATE: {
+									SHUTDOWN: { target: 'closed' },
+									INVALIDATE: (args) => {
 										// Scope changes clear the result before raising INVALIDATE.
 										// Capability refreshes cannot undo an already persisted success.
-										guard: ({ context }) => context.result === undefined,
-										target: 'idle',
-										actions: clearDraft
+										const { context } = args
+										if (!(context.result === undefined)) return
+										return {
+											target: 'idle',
+											context: {
+												draft: undefined,
+												checkpoint: undefined,
+												result: undefined,
+												draftRevision: context.draftRevision + 1
+											} satisfies Partial<Context>
+										}
 									},
-									CANCEL: { target: 'idle', actions: clearDraft }
+									CANCEL: (args) => {
+										return {
+											target: 'idle',
+											context: {
+												draft: undefined,
+												checkpoint: undefined,
+												result: undefined,
+												draftRevision: args.context.draftRevision + 1
+											} satisfies Partial<Context>
+										}
+									}
 								},
 								states: {
 									admitting: {
-										always: [
-											{
-												guard: ({ context }) =>
-													context.scope !== undefined && options.complete !== undefined,
-												target: 'navigating'
-											},
-											{ target: 'failed' }
-										]
+										type: 'choice',
+										choice: (args) => {
+											if (args.context.scope !== undefined && options.complete !== undefined) {
+												return { target: 'navigating' }
+											}
+											return { target: 'failed' }
+										}
 									},
 									navigating: {
 										invoke: {
 											id: 'completion',
-											src: 'completion',
+											src: actors.completion,
 											input: ({ context }) => {
 												if (!context.scope) throw new Error('Missing saved form scope')
 												return { scope: context.scope.value }
 											},
-											onDone: 'completed',
-											onError: 'failed'
+											onDone: { target: 'completed' },
+											onError: { target: 'failed' }
 										}
 									},
 									failed: {
@@ -816,7 +952,7 @@ export function createScopedFormMachine<
 											section: 'result',
 											label: alert(() => dependencies.messages.completionFailed())
 										},
-										on: { SUBMIT: 'admitting' }
+										on: { SUBMIT: { target: 'admitting' } }
 									},
 									completed: {}
 								}
@@ -828,20 +964,11 @@ export function createScopedFormMachine<
 			},
 			closed: {
 				type: 'final',
-				entry: workflow.assign({
-					observation: undefined,
-					scope: undefined,
-					capability: undefined,
-					request: undefined,
-					result: undefined,
-					checkpoint: undefined,
-					draft: undefined
-				})
+				entry: finalizers.closed
 			}
 		}
 	})
 }
-
 export function selectScopedFormView<
 	Values,
 	Result,
@@ -868,7 +995,14 @@ export function selectScopedFormView<
 		'context' | 'status' | 'matches' | 'getMeta' | 'hasTag'
 	> & {
 		can: (
-			event: { type: 'SUBMIT' | 'CHANGE'; values: unknown } | { type: 'RESET' | 'RETRY_READINESS' }
+			event:
+				| {
+						type: 'SUBMIT' | 'CHANGE'
+						values: unknown
+				  }
+				| {
+						type: 'RESET' | 'RETRY_READINESS'
+				  }
 		) => boolean
 	},
 	options: Pick<

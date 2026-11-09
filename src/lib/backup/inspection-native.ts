@@ -1,4 +1,4 @@
-import { fromCallback } from 'xstate'
+import { createCallbackLogic } from 'xstate'
 import { envelopeBytesLimit } from './envelope.js'
 import {
 	clearInspectionData,
@@ -15,7 +15,7 @@ export type InspectionReadEvent =
 	| { type: 'READ_FAILED'; failure: Extract<ArchiveInspectionResult, { outcome: 'failed' }> }
 
 /** A single read per command. The chart owns parsing, password routing and graceful drain. */
-export const inspectionReads = fromCallback<
+export const inspectionReads = createCallbackLogic<
 	InspectionReadCommand,
 	{ request: ArchiveInspectionRequest }
 >(({ input, receive, sendBack }) => {
