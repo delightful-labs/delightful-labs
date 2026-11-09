@@ -85,6 +85,14 @@
     max-inline-size: 100%;
     aspect-ratio: 4 / 5;
   }
+  :global(:root[data-dui-theme="dark"]) .portrait {
+    filter: invert(1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-dui-theme])) .portrait {
+      filter: invert(1);
+    }
+  }
   img,
   .shader {
     position: absolute;
