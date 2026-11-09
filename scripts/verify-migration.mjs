@@ -69,10 +69,19 @@ for (const post of manifest.posts) {
   );
   assert.equal(
     redirect?.to,
-    `${manifest.intendedNativeOrigin}${post.nativePath}`,
+    `${manifest.intendedNativeOrigin}${post.nativeRecordPath ?? post.nativePath}`,
   );
 }
 assert.equal(manifest.routePlan.articleRedirects.length, manifest.posts.length);
 console.log(
-  `Verified ${manifest.posts.length} public posts and ${files.size} preserved files; redirect mappings are plans only.`,
+  `Verified ${manifest.posts.length} public posts and ${files.size} preserved files; redirect mappings are staged for cutover.`,
 );
+
+for (const asset of manifest.routePlan.assetFiles) {
+  const body = await readFile(new URL(`../../${asset.publicFile}`, root));
+  assert.equal(
+    createHash("sha256").update(body).digest("hex"),
+    asset.sha256,
+    `Legacy asset changed: ${asset.publicFile}`,
+  );
+}

@@ -33,13 +33,13 @@
 
 ## Later stages — not foundation completion claims
 
-- [ ] T014 [US3] Configure an owner-created Leaflet publication and prove external canonical URL persistence; record results in research.md and canonical-proof.md.
-- [x] T015 [US3] Implement durable cross-instance snapshot/concurrency behavior in src/lib/server/leaflet/ and verify in Preview. Production store enablement remains gated.
+- [x] T014 [US3] Configure and verify the owner publication. External canonical URL persistence is deferred by explicit owner decision; research is in canonical-proof.md.
+- [x] T015 [US3] Implement durable cross-instance snapshot/concurrency behavior in src/lib/server/leaflet/ and verify in Preview. Production configuration uses the existing private store with an isolated namespace.
 - [ ] T016 [US4] Preserve archive inputs/assets, prove editable quiet import, then finalize feeds and redirects using the exact inventory in research-migration.md.
   - [x] Preserve six known-public Markdown posts, original image/license, live HTML and generated images/feed/sitemap with hashes and planned URL mappings in migration/open-thoughts/.
   - [x] Prove one editable quiet Leaflet import with its public date and image: ecosystem article `3mzvkf4zddc2n`, native Preview verified.
-  - [ ] Import and compare the remaining five articles after the representative proof.
-  - [ ] Resolve record keys/aliases, fragment compatibility, replacement feeds and staged redirects before activating old-URL redirects.
+  - [x] Import and compare the remaining five articles after the representative proof.
+  - [x] Implement record-key mappings, aliases, native feeds and staged redirects; document the accepted body-heading fragment limitation.
   - [ ] Preserve the original export in owner-controlled storage before retiring the old repo; do not republish account fields or eight unclassified entries.
 - [ ] T017 [US5] Verify hosted preview and production cutover using the approved domains; document rollback in README.md.
 

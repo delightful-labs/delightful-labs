@@ -83,7 +83,7 @@ environment files, even when they use different ports.
 
 `pnpm build` generates `.vercel/output` with the explicit Node.js 24 adapter.
 The build is deployable output, not evidence of a hosted release. The repository is linked to the `delightful-labs` Vercel project for preview
-verification. No custom domains or publishing credentials are configured.
+verification. Both custom domains are attached, but DNS still points to Netlify. No Leaflet publishing credentials are stored in the app.
 
 The Vercel connection is authorized for the selected team/project. If using
 the CLI, link before `vercel env pull .env.local` and keep preview configuration
@@ -94,8 +94,8 @@ Durable snapshots use private Vercel Blob (`@vercel/blob@2.8.2`). Set
 `BLOB_STORE_ID` to enable them; Preview uses the connected
 `delightful-labs-snapshots` store. The SDK uses platform OIDC or the project's
 connected storage credentials; none are exposed to the browser. Local use without
-a store still works with the process cache. At production cutover, configure a
-separate private store and the publication URI for Production.
+a store still works with the process cache. Production is configured with the same private store and a distinct Production
+namespace, plus the publication URI. No additional paid store was provisioned.
 
 Snapshots stay fresh for five minutes. Failed refreshes can use the latest
 stored snapshot for at most 24 hours from its original verification time. Every
@@ -107,12 +107,11 @@ branches, Production, and publications have distinct versioned keys. Each snapsh
 is bounded to 10 MB. See [the lifecycle contract](specs/001-homepage-native-blog/contracts/reader-lifecycle.md)
 for concurrency, availability, and validation details.
 
-The owner created the Leaflet publication; its URI and ownership are verified. Before cutover,
-prove its external canonical `/open-thoughts/` URL and edit workflow, import one
-editable archive post quietly, preserve all six posts/assets and old URL mappings,
-generate correct feeds, and verify redirects. No redirects to absent articles are
-enabled in this foundation. No DNS records or upstream publication settings have
-been changed. Keep the existing Netlify blog available through migration.
+All six original public posts are quietly published in the owner’s Leaflet
+publication. Native feeds, aliases, legacy redirects and preserved assets are
+implemented. Canonical alignment is deferred; no publication URL was changed.
+See the [cutover runbook](specs/001-homepage-native-blog/cutover.md) for the pending
+PR merge, production checks, DNS change and rollback. Keep Netlify available.
 
 See [the spec](specs/001-homepage-native-blog/spec.md),
 [implementation plan](specs/001-homepage-native-blog/plan.md),
@@ -125,7 +124,7 @@ The six already-public posts, original image and license, live article captures,
 image variants, feed, sitemap, and their checksum/URL manifest are preserved in
 [migration/open-thoughts](migration/open-thoughts/README.md), outside the public
 application. Run `pnpm check:migration` to verify the archive bytes and references.
-No Leaflet import or redirect is activated by these files.
+The manifest supplies URL mappings; application bodies are loaded from AT Protocol.
 
-The next integration gate and an unsent support request are documented in the
+Nonblocking canonical research and an unsent support request are documented in the
 [external canonical URL proof](specs/001-homepage-native-blog/canonical-proof.md).

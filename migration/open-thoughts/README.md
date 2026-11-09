@@ -1,10 +1,8 @@
 # Open Thoughts migration inputs
 
 This directory preserves the six already-public articles from the Eleventy blog.
-It is outside `src/routes` and `static`; the application does not import or serve
-it. These are migration/comparison inputs, not an application content source.
-One representative article is now quietly published on Leaflet and verified in
-the native Preview; the other five remain unimported. No article text has been rewritten.
+It is outside `src/routes` and `static`; only its URL/identity manifest metadata is imported by the application. These are migration/comparison inputs, not an application content source.
+All six articles are now quietly published on Leaflet. No article text has been rewritten.
 
 ## Provenance
 
@@ -18,41 +16,37 @@ Pinned source commit: `3017dd1244f874ba0bb9bbdc9ee79e49e30041a3`.
   variants, Atom feed, sitemap, and feed stylesheet on November 9, 2026.
 - `manifest.json`: per-file SHA-256, byte size and origin; each post's public
   date, export timestamps, old URL, proposed native path, heading/landmark IDs,
-  image references, and legacy Atom ID/link. The ecosystem article now has a
-  verified public Leaflet record mapping and proof metadata; remaining mappings
-  stay null. Editor URLs are capability-bearing and are not stored here.
+  image references, and legacy Atom ID/link. All six articles have public Leaflet record mappings and proof metadata. Editor URLs are capability-bearing and are not stored here.
 
 Run `pnpm check:migration` to verify the preserved bytes and manifest references.
 The files are frozen evidence: don't run formatting tools over archived Markdown,
 HTML, XML, or images. Make migration-specific transformations in a separate
 working copy, retaining the original inputs.
 
-## Decisions still gated
+## Routing and feeds
 
-The six article redirects are a plan only. Their target slugs do not exist yet.
-The native reader currently routes by record key; migrated record keys or explicit
-aliases must match this manifest before redirects can be activated. Preserve the
-listed title/body heading fragments and `main` landmark where package support
-allows; fragment compatibility remains a separate migration check.
+All six public posts are quietly published on Leaflet, preserving their original
+public dates and body text. The manifest records their public AT URIs, CIDs and
+native record-key routes. The application imports mapping metadata from this
+manifest; article bodies always come from AT Protocol. Archived source files are
+never served as application content.
 
-The live Atom feed uses `example.com` IDs and links. Retain the IDs as opaque
-legacy identities if needed for subscription continuity; fix the destination
-links in the replacement feed. No native feed route has been chosen or created
-by this archive preparation.
+Legacy article URLs redirect directly to native record-key routes. Readable slug
+aliases redirect to those routes only when the source article still exists.
+Original generated images and the feed stylesheet are copied byte-for-byte to
+`static/` at their original paths; checksums cover those copies too.
 
-The ecosystem post is publicly dated `2022-11-14`, while its export creation time
-is `2022-11-12T15:55:33Z`. Preserve the public date; don't substitute export
-creation time automatically. A few raw export update timestamps precede creation
-by one second; they are retained as provenance, not normalized into new dates.
+Native Atom, RSS and JSON feeds are `/open-thoughts/atom.xml`,
+`/open-thoughts/rss.xml` and `/open-thoughts/feed.json`. The old Atom URL redirects
+to the new Atom endpoint. Preserve the original opaque `example.com` entry IDs
+for subscription continuity; destination links use the native site. New posts use
+their complete AT URI as their feed identity. Feeds reuse the article renderer.
 
-The full Write.as export contains account fields and eight uncollected entries
-whose publication status has not been established. It is not copied here. Its
-original repository path, pinned commit, SHA-256 and classification counts are
-recorded in the manifest. Preserve an owner-controlled copy before retiring the
-old repository; do not treat those entries as public migration candidates.
+The page title and `main` landmark retain their old IDs. Body heading fragments
+remain limited by the accepted Standard Reader renderer; no custom renderer or
+typography has been added. Canonical alignment is a nonblocking research item.
 
-The ecosystem article passed editable-draft, quiet-publication and native-read
-checks, including the chart. Its record-key route works; its planned legacy-slug
-alias does not exist yet. Canonical alignment, fragment compatibility, the other
-five imports, feeds, redirects, production hosting/DNS and old repository
-retirement remain outstanding. See the [first publication proof](../../specs/001-homepage-native-blog/verification.md).
+The full Write.as export includes account fields and eight unclassified entries.
+Keep an owner-controlled copy before retiring the old repository; none of those
+entries have been published here. Keep Netlify available until DNS cutover and
+verification complete. See the [cutover runbook](../../specs/001-homepage-native-blog/cutover.md).

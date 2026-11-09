@@ -197,3 +197,36 @@ canonical while native Preview declares the intended main-site route; this
 owner-approved proof does not resolve that temporary conflict. Native feeds,
 remaining imports, production configuration, DNS and redirects remain outstanding.
 No publication settings, primary URL or DNS records were changed for this proof.
+
+## PR #6 complete archive, routing and feeds — November 9
+
+All six known-public posts now have editable Leaflet drafts and public Standard
+Site records, mapped in `migration/open-thoughts/manifest.json`. Initial paste
+verification checked editor text too early: four newly published records lacked
+their opening text. Those existing drafts were repaired, reloaded to confirm
+persistence, and updated under the same record identities. Public/native output,
+not editor DOM alone, is the final comparison authority. Two Steps and the
+previously proved ecosystem post were intact. Original public dates remain.
+
+The five newly imported bodies were compared from the actual native JSON feed
+HTML against normalized original plaintext: 2,089 / 4,454 / 3,697 / 3,323 / 5,594
+characters respectively, exact matches. The ecosystem body's prior text, list,
+image and link proof remains applicable. All six native record-key routes returned
+200 with their document references and no iframe; all six readable aliases
+returned 308 with preserved query strings. All three feeds returned 200, contained
+six full bodies and retained all six legacy Atom IDs with native destinations.
+Feed output contains no Svelte hydration comments. Live checks used emitted SSR
+modules with the real publication, network access and no Blob configuration;
+hosted durable-cache evidence must be checked independently in Preview.
+
+Local verification: zero type errors/warnings, 147 passing tests, production
+Vercel adapter build, emitted SSR route checks, archive/static-copy hashes, and
+three passing Chromium tests. Emitted SSR checks cover the six one-hop legacy
+article redirects, feed filename matching, aliases, sitemap, unconfigured feeds
+and private archive-file 404s. No typography or new editorial copy was added.
+
+Production environment configuration and domain attachment are prepared; DNS
+still points to Netlify. Canonical alignment is explicitly nonblocking and has
+not been changed. Body-heading fragments remain an accepted package limitation.
+See `cutover.md` for release checks and rollback rather than treating these
+Preview/local checks as evidence of completed production cutover.

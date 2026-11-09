@@ -1,6 +1,6 @@
 # Leaflet external canonical URL proof
 
-Rechecked November 9, 2026. Status: source research and public identity checks
+Historical investigation, updated November 9, 2026. Status: source research and public identity checks
 complete; authenticated hosted workflow remains unproved. No publication,
 article, domain, DNS, or email changes were made.
 
@@ -86,9 +86,9 @@ just to make this checklist pass.
   as part of approved hosting cutover. Do not claim final-origin verification from
   a Preview URL.
 
-T014 remains open until the authenticated publication/edit/settings checks pass.
-T016's archive preservation can proceed independently, but import/publication,
-redirect activation, and T017 production cutover remain gated.
+Canonical configuration is deferred by owner decision. It does not gate imports,
+redirects, feeds or production cutover. The checklist above records a possible
+future proof, not current release requirements.
 
 ## Unsent support request
 
@@ -127,3 +127,23 @@ search and selected block edits, rather than a complete publication/archive
 import workflow. Its URL token is an authentication capability; do not commit
 editor URLs or tokens to the public migration manifest. The editor remains the
 verified import path for this article's lists and uploaded image.
+
+## Current decision — PR #6
+
+The owner explicitly deferred a canonical URL change. All six archived articles
+are now quietly published. Native record-key URLs and existing canonical tags
+remain unchanged; Leaflet keeps its own publication/source URLs. Do not confuse
+the stable AT URI identity with the separate HTTPS canonical URL used by search
+engines. The native document link tags still identify the same AT records.
+
+Rechecked the [Leaflet manual](https://about.leaflet.pub/) and
+[Standard.site verification](https://standard.site/docs/verification) on November 9.
+The manual documents custom domains, but no supported externally hosted subpath
+configuration. Standard.site supports subpath verification; that establishes
+protocol support, not a Leaflet authoring feature. The authenticated settings
+inspection found no arbitrary external URL field. No safe supported solution has
+been established. Do not change PDS records independently of Leaflet's stored
+settings or assign our Vercel hostname to Leaflet. No support message was sent.
+
+The existing source investigation remains useful, but its older statements about
+one post, absent browser authentication and release gates are superseded here.

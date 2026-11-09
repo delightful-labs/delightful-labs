@@ -29,13 +29,23 @@
         "thinking-as-you-go"
       ],
       "legacyImages": [],
-      "leafletDocumentUri": null,
-      "migrationStatus": "not-imported",
+      "leafletDocumentUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvl4r7rw22i",
+      "migrationStatus": "published",
       "legacyAtomId": "https://example.com/blog/thinking-as-you-go/",
       "legacyAtomLink": "https://example.com/blog/thinking-as-you-go/",
       "legacyLandmarkIds": [
         "main"
-      ]
+      ],
+      "nativeRecordPath": "/open-thoughts/3mzvl4r7rw22i/",
+      "leafletSourceUrl": "https://open-thoughts.leaflet.pub/3mzvl4r7rw22i",
+      "publicationProof": {
+        "recordCid": "bafyreiaim4kozxdah2vpczpra7s53pffrn7ewet6mbegklpgwd54xk6jti",
+        "publishedAt": "2023-07-17T04:00:00.000Z",
+        "postQuietly": true,
+        "showInDiscover": false,
+        "blueskyPostRef": null,
+        "bodyTextMatchesSource": true
+      }
     },
     {
       "slug": "thoughts-on-files-over-apps",
@@ -52,13 +62,23 @@
         "thoughts-on-files-over-apps"
       ],
       "legacyImages": [],
-      "leafletDocumentUri": null,
-      "migrationStatus": "not-imported",
+      "leafletDocumentUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvl6eg3p222",
+      "migrationStatus": "published",
       "legacyAtomId": "https://example.com/blog/thoughts-on-files-over-apps/",
       "legacyAtomLink": "https://example.com/blog/thoughts-on-files-over-apps/",
       "legacyLandmarkIds": [
         "main"
-      ]
+      ],
+      "nativeRecordPath": "/open-thoughts/3mzvl6eg3p222/",
+      "leafletSourceUrl": "https://open-thoughts.leaflet.pub/3mzvl6eg3p222",
+      "publicationProof": {
+        "recordCid": "bafyreiaboc5yrzpv6lvxvej25rmpukaiekwf375xcys57ys2ro52klwtni",
+        "publishedAt": "2023-07-09T04:00:00.000Z",
+        "postQuietly": true,
+        "showInDiscover": false,
+        "blueskyPostRef": null,
+        "bodyTextMatchesSource": true
+      }
     },
     {
       "slug": "filtering-feeds",
@@ -75,13 +95,23 @@
         "filtering-feeds"
       ],
       "legacyImages": [],
-      "leafletDocumentUri": null,
-      "migrationStatus": "not-imported",
+      "leafletDocumentUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvl6laa622n",
+      "migrationStatus": "published",
       "legacyAtomId": "https://example.com/blog/filtering-feeds/",
       "legacyAtomLink": "https://example.com/blog/filtering-feeds/",
       "legacyLandmarkIds": [
         "main"
-      ]
+      ],
+      "nativeRecordPath": "/open-thoughts/3mzvl6laa622n/",
+      "leafletSourceUrl": "https://open-thoughts.leaflet.pub/3mzvl6laa622n",
+      "publicationProof": {
+        "recordCid": "bafyreie44lhwiv2bhkiiylhx65fs454zaufezwf7lx2gyhugmpe5hyzxg4",
+        "publishedAt": "2023-02-01T05:00:00.000Z",
+        "postQuietly": true,
+        "showInDiscover": false,
+        "blueskyPostRef": null,
+        "bodyTextMatchesSource": true
+      }
     },
     {
       "slug": "ifttt-for-the-semantic-web",
@@ -98,13 +128,23 @@
         "ifttt-for-the-semantic-web"
       ],
       "legacyImages": [],
-      "leafletDocumentUri": null,
-      "migrationStatus": "not-imported",
+      "leafletDocumentUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvla5oam22r",
+      "migrationStatus": "published",
       "legacyAtomId": "https://example.com/blog/ifttt-for-the-semantic-web/",
       "legacyAtomLink": "https://example.com/blog/ifttt-for-the-semantic-web/",
       "legacyLandmarkIds": [
         "main"
-      ]
+      ],
+      "nativeRecordPath": "/open-thoughts/3mzvla5oam22r/",
+      "leafletSourceUrl": "https://open-thoughts.leaflet.pub/3mzvla5oam22r",
+      "publicationProof": {
+        "recordCid": "bafyreielnhc4xbolxuh36xngpuyhbsfmvxiaaa3ifl7lcq52nzpq64ru34",
+        "publishedAt": "2023-01-31T05:00:00.000Z",
+        "postQuietly": true,
+        "showInDiscover": false,
+        "blueskyPostRef": null,
+        "bodyTextMatchesSource": true
+      }
     },
     {
       "slug": "a-tools-for-thought-ecosystem",
@@ -135,7 +175,7 @@
         }
       ],
       "leafletDocumentUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvkf4zddc2n",
-      "migrationStatus": "published-proof",
+      "migrationStatus": "published",
       "legacyAtomId": "https://example.com/blog/a-tools-for-thought-ecosystem/",
       "legacyAtomLink": "https://example.com/blog/a-tools-for-thought-ecosystem/",
       "legacyLandmarkIds": [
@@ -195,13 +235,23 @@
         "making-new-promises"
       ],
       "legacyImages": [],
-      "leafletDocumentUri": null,
-      "migrationStatus": "not-imported",
+      "leafletDocumentUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.document/3mzvlaufg522k",
+      "migrationStatus": "published",
       "legacyAtomId": "https://example.com/blog/two-steps-forward-one-step-backwards/",
       "legacyAtomLink": "https://example.com/blog/two-steps-forward-one-step-backwards/",
       "legacyLandmarkIds": [
         "main"
-      ]
+      ],
+      "nativeRecordPath": "/open-thoughts/3mzvlaufg522k/",
+      "leafletSourceUrl": "https://open-thoughts.leaflet.pub/3mzvlaufg522k",
+      "publicationProof": {
+        "recordCid": "bafyreid6h3vldlcpnym6xxjef5a332j5flmtxjlkq3cocsngylaulpxc5e",
+        "publishedAt": "2022-04-07T04:00:00.000Z",
+        "postQuietly": true,
+        "showInDiscover": false,
+        "blueskyPostRef": null,
+        "bodyTextMatchesSource": true
+      }
     }
   ],
   "files": [
@@ -345,31 +395,31 @@
     }
   ],
   "routePlan": {
-    "status": "planned-not-active",
+    "status": "implemented-awaiting-cutover",
     "articleRedirects": [
       {
         "from": "https://thoughts.delightfullabs.com/blog/thinking-as-you-go/",
-        "to": "https://delightfullabs.com/open-thoughts/thinking-as-you-go/"
+        "to": "https://delightfullabs.com/open-thoughts/3mzvl4r7rw22i/"
       },
       {
         "from": "https://thoughts.delightfullabs.com/blog/thoughts-on-files-over-apps/",
-        "to": "https://delightfullabs.com/open-thoughts/thoughts-on-files-over-apps/"
+        "to": "https://delightfullabs.com/open-thoughts/3mzvl6eg3p222/"
       },
       {
         "from": "https://thoughts.delightfullabs.com/blog/filtering-feeds/",
-        "to": "https://delightfullabs.com/open-thoughts/filtering-feeds/"
+        "to": "https://delightfullabs.com/open-thoughts/3mzvl6laa622n/"
       },
       {
         "from": "https://thoughts.delightfullabs.com/blog/ifttt-for-the-semantic-web/",
-        "to": "https://delightfullabs.com/open-thoughts/ifttt-for-the-semantic-web/"
+        "to": "https://delightfullabs.com/open-thoughts/3mzvla5oam22r/"
       },
       {
         "from": "https://thoughts.delightfullabs.com/blog/a-tools-for-thought-ecosystem/",
-        "to": "https://delightfullabs.com/open-thoughts/a-tools-for-thought-ecosystem/"
+        "to": "https://delightfullabs.com/open-thoughts/3mzvkf4zddc2n/"
       },
       {
         "from": "https://thoughts.delightfullabs.com/blog/two-steps-forward-one-step-backwards/",
-        "to": "https://delightfullabs.com/open-thoughts/two-steps-forward-one-step-backwards/"
+        "to": "https://delightfullabs.com/open-thoughts/3mzvlaufg522k/"
       }
     ],
     "indexPaths": [
@@ -379,10 +429,37 @@
     ],
     "indexDestination": "/open-thoughts/",
     "feedPath": "/feed/feed.xml",
-    "nativeFeedPath": null,
+    "nativeFeedPath": "/open-thoughts/atom.xml",
     "sitemapPath": "/sitemap.xml",
     "generatedImagePolicy": "Serve the three archived generated image URLs with their original bytes before switching the legacy hostname.",
     "stylesheetPolicy": "Retain the old stylesheet only if an archived feed still references it.",
-    "activationGate": "Actual Leaflet record mapping, editable import, native destinations, feeds, fragment compatibility and staged redirect checks must pass first."
-  }
+    "activationGate": "Actual Leaflet record mapping, editable import, native destinations, feeds, fragment compatibility and staged redirect checks must pass first.",
+    "assetFiles": [
+      {
+        "path": "/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.avif",
+        "sourceFile": "live/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.avif",
+        "publicFile": "static/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.avif",
+        "sha256": "825f1b5a956d0f0982e110c0237aa6fdf0c23af2f0e0b723a321a6ab957f599d"
+      },
+      {
+        "path": "/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.png",
+        "sourceFile": "live/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.png",
+        "publicFile": "static/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.png",
+        "sha256": "cba96817550e34939e56148f338bb877ef0c306aeca01d77897190ff8fc15191"
+      },
+      {
+        "path": "/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.webp",
+        "sourceFile": "live/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.webp",
+        "publicFile": "static/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.webp",
+        "sha256": "476cfc653b9b0e643c0f73937bf9beec114e564a94a49d83c26430fd62520068"
+      },
+      {
+        "path": "/feed/pretty-atom-feed.xsl",
+        "sourceFile": "live/feed/pretty-atom-feed.xsl",
+        "publicFile": "static/feed/pretty-atom-feed.xsl",
+        "sha256": "bd79d048bf8f421da0daa7a45cf05e37f5f3d445516ee2964f902269eece88b4"
+      }
+    ]
+  },
+  "publicationUri": "at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.publication/3mzv6a2yk522y"
 }
