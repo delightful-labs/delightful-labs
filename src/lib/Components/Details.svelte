@@ -237,7 +237,12 @@
 		);
 		font-family: var(
 			--dui-details-summary-font-family,
-			var(--dui-font-family, inherit)
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
 		);
 		font-size: var(--dui-details-summary-font-size, inherit);
 		display: flex;

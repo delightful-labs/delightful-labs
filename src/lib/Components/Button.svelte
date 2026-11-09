@@ -242,7 +242,12 @@
 		box-sizing: border-box;
 		font-family: var(
 			--dui-button-font-family,
-			var(--dui-font-family, 'Source Code Pro', monospace)
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
 		);
 		font-size: var(--dui-button-font-size, inherit);
 		line-height: 1.25;

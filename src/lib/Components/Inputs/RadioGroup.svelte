@@ -100,7 +100,15 @@
 		margin: 0;
 		padding: 0;
 		border: 0;
-		font-family: var(--dui-field-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-field-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 		color: var(--dui-field-color, var(--dui-color-foreground, #000));
 	}
 

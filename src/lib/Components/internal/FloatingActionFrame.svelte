@@ -33,6 +33,12 @@
 		background-color: var(--dui-color-accent, #94ff47);
 		color: var(--dui-color-on-accent, #262626);
 		font: inherit;
+		font-family: var(
+			--dui-font-family-interactive,
+			'Cascadia Code',
+			ui-monospace,
+			monospace
+		);
 		font-size: var(
 			--dui-floating-action-icon-size,
 			var(--dui-font-size-xxl, 1.5rem)

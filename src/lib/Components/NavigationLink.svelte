@@ -31,7 +31,12 @@
 		gap: var(--dui-navigation-item-gap, 0.5rem);
 		min-block-size: var(--dui-navigation-link-min-height, 44px);
 		padding: var(--dui-navigation-item-padding, 0.5rem 1rem);
-		font-family: var(--dui-font-family, inherit);
+		font-family: var(
+			--dui-font-family-interactive,
+			'Cascadia Code',
+			ui-monospace,
+			monospace
+		);
 		overflow-wrap: anywhere;
 	}
 	.label {

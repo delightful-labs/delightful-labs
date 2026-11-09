@@ -1,4 +1,6 @@
 /* Import explicitly with `import 'delightful-ui/theme.css'`. */
+@import './fonts.css';
+
 /* Shared theme registrations live here; component registrations live in their owners. */
 @property --dui-color-foreground {
 	syntax: '<color>';
@@ -43,6 +45,16 @@
 }
 
 @property --dui-font-family {
+	syntax: '*';
+	inherits: true;
+}
+
+@property --dui-font-family-interactive {
+	syntax: '*';
+	inherits: true;
+}
+
+@property --dui-font-family-mono {
 	syntax: '*';
 	inherits: true;
 }
@@ -185,8 +197,10 @@
 		--dui-color-focus: var(--dui-color-foreground);
 		--dui-color-error: #b91c1c;
 		--dui-color-on-error: var(--dui-color-background);
-		--dui-font-family: 'Source Code Pro', monospace;
-		--dui-font-family-body: system-ui, sans-serif;
+		--dui-font-family: 'Jost', system-ui, sans-serif;
+		--dui-font-family-mono: 'Cascadia Code', ui-monospace, monospace;
+		--dui-font-family-interactive: var(--dui-font-family-mono);
+		--dui-font-family-body: var(--dui-font-family);
 		--dui-font-size-xs: 0.75rem;
 		--dui-font-size-sm: 0.875rem;
 		--dui-font-size-md: 1rem;
@@ -256,9 +270,9 @@
 		background-color: var(--dui-color-background);
 	}
 
-	:where(button, input, select, textarea) {
+	:where(button, input, select, textarea, summary, [role='menuitem']) {
 		font: inherit;
-		font-family: var(--dui-font-family);
+		font-family: var(--dui-font-family-interactive);
 	}
 
 	a {
@@ -281,6 +295,10 @@
 	:where(img, picture, video) {
 		max-width: 100%;
 		height: auto;
+	}
+
+	:where(code, pre, kbd, samp) {
+		font-family: var(--dui-font-family-mono);
 	}
 
 	pre {

@@ -439,7 +439,15 @@
 	.error,
 	.feedback {
 		margin: 0;
-		font-family: var(--dui-field-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-field-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 	}
 
 	.error {
@@ -472,7 +480,12 @@
 		color: var(--dui-color-foreground, #262626);
 		font-family: var(
 			--dui-input-font-family,
-			var(--dui-font-family, monospace)
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
 		);
 	}
 
@@ -507,7 +520,12 @@
 		min-height: var(--dui-tag-min-height, 48px);
 		font-family: var(
 			--dui-input-font-family,
-			var(--dui-font-family, monospace)
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
 		);
 		color: var(--dui-tag-color, var(--dui-color-on-accent, #262626));
 		background: var(

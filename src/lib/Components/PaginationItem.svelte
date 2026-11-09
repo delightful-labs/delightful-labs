@@ -92,6 +92,12 @@
 		border-radius: 0;
 		color: inherit;
 		font: inherit;
+		font-family: var(
+			--dui-font-family-interactive,
+			'Cascadia Code',
+			ui-monospace,
+			monospace
+		);
 		text-decoration: none;
 	}
 

@@ -46,7 +46,15 @@
 			var(--dui-color-background, transparent)
 		);
 		color: var(--dui-input-color, var(--dui-color-foreground, inherit));
-		font-family: var(--dui-input-font-family, var(--dui-font-family, inherit));
+		font-family: var(
+			--dui-input-font-family,
+			var(
+				--dui-font-family-interactive,
+				'Cascadia Code',
+				ui-monospace,
+				monospace
+			)
+		);
 		font-size: var(--dui-input-font-size, var(--dui-font-size-md, 1rem));
 	}
 
