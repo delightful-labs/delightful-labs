@@ -15,3 +15,5 @@ vite.config.ts.timestamp-*
 /storybook-static
 /storybook-test-static
 debug-storybook.log
+
+/.vercel
