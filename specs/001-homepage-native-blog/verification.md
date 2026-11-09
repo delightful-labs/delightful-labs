@@ -55,7 +55,7 @@ Ongoing SSR tests exercise the actual application integration.
 
 ## Remaining gates
 
-- Owner-created Leaflet publication and external canonical/edit workflow proof.
+- External canonical/edit workflow proof for the owner-created Leaflet publication.
 - Durable snapshots and reconciliation across Vercel instances; the current
   five-minute-fresh/24-hour-stale cache remains process-local.
 - Editable archive import, preserved assets/anchors, feeds, and final redirects.
@@ -72,3 +72,12 @@ Vercel. Vite now bundles each resolved XState version. `pnpm test:build` execute
 the emitted server through Node and checks homepage/index 200 and unknown-post
 404 responses. CI runs this after the production build. Development-server tests
 alone do not cover this module-resolution boundary.
+
+## Owner publication
+
+Verified `https://open-thoughts.leaflet.pub/.well-known/site.standard.publication`
+and the public PDS record both identify
+`at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.publication/3mzv6a2yk522y`,
+owned by Matt's confirmed DID. The record's URL remains the Leaflet subdomain.
+The Vercel Preview environment is configured with this URI; production settings,
+DNS, publication content, and canonical records have not been changed.
