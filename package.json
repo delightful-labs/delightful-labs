@@ -14,7 +14,7 @@
 		"build-storybook": "pnpm paraglide && storybook build --disable-telemetry",
 		"check": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc --noEmit --project tsconfig.json",
 		"check:watch": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --watch",
-		"package": "pnpm paraglide && svelte-package --input src/lib --output dist && publint --strict",
+		"package": "pnpm paraglide && svelte-package --tsconfig tsconfig.library.json --input src/lib --output dist && publint --strict",
 		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/test-app.vite.config.ts && vite build --config tests/fixtures/avatar-selection/vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:test-app",
 		"verify": "pnpm format:check && pnpm lint && pnpm check && pnpm test:unit --run && pnpm package && pnpm check:consumer && pnpm build-storybook",
 		"test:unit": "pnpm paraglide && vitest --config vitest.config.ts",
@@ -26,7 +26,8 @@
 		"measure:backup": "DLF_BACKUP_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures encrypted'",
 		"measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
 		"check:backup-restore": "tsc --noEmit --project fixtures/test-app/tsconfig.json && vitest run --config fixtures/test-app/restore.vitest.config.ts",
-		"check:native-backup": "tsc --noEmit --project fixtures/native-capture/tsconfig.json && vitest run --config fixtures/native-capture/vitest.config.ts"
+		"check:native-backup": "tsc --noEmit --project fixtures/native-capture/tsconfig.json && vitest run --config fixtures/native-capture/vitest.config.ts",
+		"check:library": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.library.json --fail-on-warnings && tsc --noEmit --project tsconfig.library.json"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "3.1.0",
@@ -50,7 +51,7 @@
 		"typescript": "6.0.3",
 		"vite": "8.3.6",
 		"vitest": "4.1.8",
-		"xstate": "5.33.2"
+		"xstate": "6.0.0-beta.1"
 	},
 	"version": "0.0.0",
 	"description": "Reusable local-first identity and workspace foundations for Delightful apps.",
@@ -357,13 +358,14 @@
 	"files": [
 		"dist",
 		"!dist/**/*.test.*",
-		"!dist/**/*.spec.*"
+		"!dist/**/*.spec.*",
+		"patches/xstate@6.0.0-beta.1.patch"
 	],
 	"peerDependencies": {
 		"delightful-ui": "0.0.25",
 		"jazz-tools": "2.0.0-alpha.59",
 		"svelte": "^5.57.2",
-		"xstate": "5.33.2"
+		"xstate": "6.0.0-beta.1"
 	},
 	"peerDependenciesMeta": {
 		"xstate": {

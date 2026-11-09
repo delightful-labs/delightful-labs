@@ -1,12 +1,6 @@
-import {
-	forwardTo,
-	raise,
-	assign,
-	setup,
-	type ActorLogic,
-	type ActorRef,
-	type Snapshot
-} from 'xstate'
+import { types, setup, type ActorLogic, type ActorRef, type Snapshot } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
 	FormAssessmentToken,
 	FormCapability,
@@ -15,7 +9,6 @@ import type {
 	FormObservation,
 	FormReadinessResult
 } from '../../contracts/scoped-form.js'
-
 /** Delivery and correlation belong to the invoking form; policy state paths stay private. */
 export type ScopedFormReadinessDelivery<Scope, Reason> =
 	| {
@@ -23,17 +16,18 @@ export type ScopedFormReadinessDelivery<Scope, Reason> =
 			generation: number
 			recipient: ActorRef<Snapshot<unknown>, FormCapabilityReportEvent<Scope, Reason>>
 	  }
-	| { kind: 'assessment'; token: FormAssessmentToken }
+	| {
+			kind: 'assessment'
+			token: FormAssessmentToken
+	  }
 export type ScopedFormReadinessInput<Scope, Reason, Observation> = {
 	observation: FormObservation<Observation>
 	delivery: ScopedFormReadinessDelivery<Scope, Reason>
 }
-
 export type ScopedFormAvailabilityLogic<
 	AvailabilitySnapshot extends Snapshot<unknown>,
 	Observation
 > = ActorLogic<AvailabilitySnapshot, FormChildEvent<Observation>, FormObservation<Observation>>
-
 /** Adapts the domain's public projection; domain policy and write resources remain elsewhere. */
 export function createScopedFormReadinessMachine<
 	Scope,
@@ -47,30 +41,30 @@ export function createScopedFormReadinessMachine<
 	sameScope: (left: Scope, right: Scope) => boolean
 }) {
 	type Input = ScopedFormReadinessInput<Scope, Reason, Observation>
-	type Context = Input & { capability: FormCapability<Scope, Reason> | undefined }
+	type Context = Input & {
+		capability: FormCapability<Scope, Reason> | undefined
+	}
 	type Event =
 		| FormChildEvent<Observation>
-		| { type: 'PROJECTED'; capability: FormCapability<Scope, Reason> }
+		| {
+				type: 'PROJECTED'
+				capability: FormCapability<Scope, Reason>
+		  }
 	const actors = { source: options.availability }
-	const workflow = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		FormReadinessResult<Scope, Reason>
-	>({ actors })
-	const publish = workflow.enqueueActions(({ context, event, enqueue }) => {
-		if (context.delivery.kind !== 'watch' || event.type !== 'PROJECTED') return
-		enqueue.sendTo(context.delivery.recipient, {
-			type: 'FORM_CAPABILITY_REPORTED',
-			generation: context.delivery.generation,
-			capability: event.capability
-		})
+	const workflow = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<Event, 'OBSERVE'>>(),
+				PROJECTED: types<EventPayload<Event, 'PROJECTED'>>()
+			},
+			input: types<Input>(),
+			output: types<FormReadinessResult<Scope, Reason>>()
+		},
+		actors
 	})
 	return workflow.createMachine({
 		id: 'scoped-form-readiness',
@@ -88,55 +82,72 @@ export function createScopedFormReadinessMachine<
 				initial: 'selecting',
 				invoke: {
 					id: 'source',
-					src: 'source',
+					src: actors.source,
 					input: ({ context }) => context.observation,
-					onSnapshot: {
-						guard: ({ event }) => event.snapshot.status === 'active',
-						actions: raise(({ event }) => ({
+					onSnapshot: (args, enq) => {
+						const { event } = args
+						if (!(event.snapshot.status === 'active')) return
+						enq.raise({
 							type: 'PROJECTED',
 							capability: options.selectAvailability(event.snapshot)
-						}))
+						})
 					},
-					onError: '#scoped-form-readiness.failed',
-					onDone: '#scoped-form-readiness.failed'
+					onError: { target: '#scoped-form-readiness.failed' },
+					onDone: { target: '#scoped-form-readiness.failed' }
 				},
 				states: {
 					selecting: {
-						always: [
-							{ guard: ({ context }) => context.delivery.kind === 'watch', target: 'watching' },
-							{ target: 'assessing' }
-						]
+						always: (args) => {
+							if (args.context.delivery.kind === 'watch') {
+								return { target: 'watching' }
+							}
+							return { target: 'assessing' }
+						}
 					},
 					watching: {
 						on: {
-							OBSERVE: {
-								actions: [
-									assign({ observation: ({ event }) => event.observation }),
-									forwardTo('source')
-								]
+							OBSERVE: (args, enq) => {
+								enq.sendTo('source', args.event)
+								return {
+									context: { observation: args.event.observation } satisfies Partial<Context>
+								}
 							},
-							PROJECTED: {
-								guard: ({ context, event }) =>
-									event.capability.revision === context.observation.revision &&
-									options.sameScope(
+							PROJECTED: ({ context, event }, enq) => {
+								if (
+									event.capability.revision !== context.observation.revision ||
+									!options.sameScope(
 										event.capability.scope,
 										options.scopeOf(context.observation.facts)
-									),
-								actions: publish
+									)
+								)
+									return
+								if (context.delivery.kind === 'watch')
+									enq.sendTo(context.delivery.recipient, {
+										type: 'FORM_CAPABILITY_REPORTED',
+										generation: context.delivery.generation,
+										capability: event.capability
+									})
 							}
 						}
 					},
 					assessing: {
 						on: {
-							PROJECTED: {
-								guard: ({ context, event }) =>
-									event.capability.revision === context.observation.revision &&
-									options.sameScope(
-										event.capability.scope,
-										options.scopeOf(context.observation.facts)
-									),
-								target: '#scoped-form-readiness.assessed',
-								actions: assign({ capability: ({ event }) => event.capability })
+							PROJECTED: (args) => {
+								const { context, event } = args
+								if (
+									!(
+										event.capability.revision === context.observation.revision &&
+										options.sameScope(
+											event.capability.scope,
+											options.scopeOf(context.observation.facts)
+										)
+									)
+								)
+									return
+								return {
+									target: '#scoped-form-readiness.assessed',
+									context: { capability: event.capability } satisfies Partial<Context>
+								}
 							}
 						}
 					}

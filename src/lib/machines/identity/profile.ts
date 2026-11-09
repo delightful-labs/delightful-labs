@@ -1,4 +1,6 @@
-import { assign, setup, type SnapshotFrom, type Snapshot } from 'xstate'
+import { types, setup, type SnapshotFrom, type Snapshot } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type { ProfileObservation, ProfileReason, ProfileScope } from '../../contracts/profile.js'
 import type {
 	FormCapability,
@@ -19,62 +21,73 @@ import { createSingleWriteFormOptions } from '../forms/policy.js'
 export { profileScope, sameProfileScope } from '../../contracts/profile.js'
 import { profileScope, sameProfileScope } from '../../contracts/profile.js'
 export function createProfileAvailability(binding: object) {
-	return setup<
-		{ observation: FormObservation<ProfileObservation> },
-		FormChildEvent<ProfileObservation>,
-		{},
-		{},
-		{},
-		{},
-		never,
-		string,
-		FormObservation<ProfileObservation>
-	>({}).createMachine({
+	return setup({
+		schemas: {
+			context: types<{
+				observation: FormObservation<ProfileObservation>
+			}>(),
+			events: {
+				CANCEL: types<EventPayload<FormChildEvent<ProfileObservation>, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<FormChildEvent<ProfileObservation>, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<FormChildEvent<ProfileObservation>, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<FormChildEvent<ProfileObservation>, 'OBSERVE'>>()
+			},
+			input: types<FormObservation<ProfileObservation>>()
+		}
+	}).createMachine({
 		initial: 'checking',
 		context: ({ input }) => ({ observation: input }),
 		on: {
-			OBSERVE: {
-				target: '.checking',
-				actions: assign({ observation: ({ event }) => event.observation })
+			OBSERVE: (args) => {
+				return {
+					target: '.checking',
+					context: { observation: args.event.observation } satisfies Partial<{
+						observation: FormObservation<ProfileObservation>
+					}>
+				}
 			}
 		},
 		states: {
 			checking: {
-				always: [
-					{
-						guard: ({
+				always: (args) => {
+					if (
+						(({
 							context: {
 								observation: { facts: f }
 							}
-						}) => !f.sessionReady || !f.identityId || f.binding !== binding,
-						target: 'sessionUnavailable'
-					},
-					{
-						guard: ({
+						}) => !f.sessionReady || !f.identityId || f.binding !== binding)(args)
+					) {
+						return { target: 'sessionUnavailable' }
+					}
+					if (
+						(({
 							context: {
 								observation: { facts: f }
 							}
-						}) => f.failed,
-						target: 'loadFailed'
-					},
-					{
-						guard: ({
+						}) => f.failed)(args)
+					) {
+						return { target: 'loadFailed' }
+					}
+					if (
+						(({
 							context: {
 								observation: { facts: f }
 							}
-						}) => f.loading,
-						target: 'loading'
-					},
-					{
-						guard: ({
+						}) => f.loading)(args)
+					) {
+						return { target: 'loading' }
+					}
+					if (
+						(({
 							context: {
 								observation: { facts: f }
 							}
-						}) => !f.profile || f.profile.userId !== f.identityId,
-						target: 'profileUnavailable'
-					},
-					{ target: 'ready' }
-				]
+						}) => !f.profile || f.profile.userId !== f.identityId)(args)
+					) {
+						return { target: 'profileUnavailable' }
+					}
+					return { target: 'ready' }
+				}
 			},
 			sessionUnavailable: {},
 			loadFailed: {},
@@ -98,7 +111,9 @@ export function selectProfileAvailability(
 				: { kind: 'blocked', reason: state === 'checking' ? 'loading' : state }
 	}
 }
-type NameValues = { displayName: string | null }
+type NameValues = {
+	displayName: string | null
+}
 export function createProfileFormOptions<
 	ProcessSnapshot extends Snapshot<ProfileImageResult>,
 	NameSchema extends FormSchema<NameValues>,
@@ -112,10 +127,14 @@ export function createProfileFormOptions<
 	avatarValuesSchema: ValueSchema
 	mimeType: (value: unknown) => 'image/png' | 'image/jpeg' | 'image/webp'
 	processImage: ProfileImageLogic<ProcessSnapshot>
-	validateBytes: (input: {
-		bytes: Uint8Array
-		mimeType: string
-	}) => { success: true; data: ProfileAvatarValues } | { success: false }
+	validateBytes: (input: { bytes: Uint8Array; mimeType: string }) =>
+		| {
+				success: true
+				data: ProfileAvatarValues
+		  }
+		| {
+				success: false
+		  }
 	/** Applies to both save callbacks; hosts await the backend's persistence receipt before resolving. */
 	saveSettlement: 'locallyPersisted' | 'confirmed'
 	saveName: (id: string, user: string, name: string | null) => Promise<unknown>
@@ -219,6 +238,5 @@ export function createProfileFormOptions<
 		SnapshotFrom<typeof availability>,
 		SnapshotFrom<typeof avatarOperation>
 	>
-
 	return { name, avatar }
 }

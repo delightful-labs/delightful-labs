@@ -1,6 +1,16 @@
+import {
+	matchesState,
+	type StateValue,
+	types,
+	createAsyncLogic,
+	setup,
+	type Snapshot
+} from 'xstate'
+import { createFinalTransitions } from '../finalize.js'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { formInterruptionResult } from '../../contracts/scoped-form.js'
 import { createScopedFormReadinessMachine } from './readiness.js'
-import { enqueueActions, assign, fromPromise, setup, stateIn, type Snapshot } from 'xstate'
 import type { ScopedFormAvailabilityLogic } from './readiness.js'
 import type { ScopedFormOperationLogic } from './submission.js'
 import type {
@@ -11,7 +21,6 @@ import type {
 	FormOperationInput,
 	FormOperationResult
 } from '../../contracts/scoped-form.js'
-
 /** Exactly one persistence implementation: a leaf effect or a resource-owning actor. */
 export type FormPersistence<
 	Values,
@@ -29,7 +38,6 @@ export type FormPersistence<
 			write?: never
 			persistence: ScopedFormOperationLogic<Values, Scope, Observation, PersistenceSnapshot>
 	  }
-
 /** Owns prewrite readiness and settlement; supplied effects retain their domain resource obligations. */
 export function createScopedFormWriteMachine<
 	Values,
@@ -58,7 +66,11 @@ export function createScopedFormWriteMachine<
 	type Context = {
 		request: Input['request'] | undefined
 		observation: FormObservation<Observation> | undefined
-		assessmentError: { generation: number } | undefined
+		assessmentError:
+			| {
+					generation: number
+			  }
+			| undefined
 		assessmentGeneration: number
 		capability: FormCapability<Scope, Reason> | undefined
 		result: Output | undefined
@@ -69,56 +81,58 @@ export function createScopedFormWriteMachine<
 	)
 	const effect = options.write
 	const nativeWrite = effect
-		? fromPromise<Output, Input>(async ({ input }) => ({
-				outcome: 'succeeded',
-				value: await effect(input),
-				settlement: options.settlement
-			}))
-		: setup<{}, FormChildEvent<Observation>, {}, {}, {}, {}, never, string, Input, Output>(
-				{}
-			).createMachine({
+		? createAsyncLogic<Output, Input>({
+				run: async ({ input }) => ({
+					outcome: 'succeeded',
+					value: await effect(input),
+					settlement: options.settlement
+				})
+			})
+		: setup({
+				schemas: {
+					context: types<{}>(),
+					events: {
+						CANCEL: types<EventPayload<FormChildEvent<Observation>, 'CANCEL'>>(),
+						SHUTDOWN: types<EventPayload<FormChildEvent<Observation>, 'SHUTDOWN'>>(),
+						INVALIDATE: types<EventPayload<FormChildEvent<Observation>, 'INVALIDATE'>>(),
+						OBSERVE: types<EventPayload<FormChildEvent<Observation>, 'OBSERVE'>>()
+					},
+					input: types<Input>(),
+					output: types<Output>()
+				}
+			}).createMachine({
+				context: {},
 				initial: 'failed',
 				output: () => ({ outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }),
 				states: { failed: { type: 'final' } }
 			})
 	const actors = {
-		refresh: fromPromise<FormObservation<Observation>, FormObservation<Observation>>(({ input }) =>
-			Promise.resolve({ revision: input.revision, facts: options.observe() })
-		),
+		refresh: createAsyncLogic<FormObservation<Observation>, FormObservation<Observation>>({
+			run: ({ input }) => Promise.resolve({ revision: input.revision, facts: options.observe() })
+		}),
 		review,
 		write: options.persistence ?? nativeWrite
 	}
-	const form = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{ observeAssessmentError: undefined },
-		{
-			closing: undefined
-			invalidated: undefined
-			cancelling: undefined
+	const form = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<Event, 'OBSERVE'>>()
+			},
+			input: types<Input>(),
+			output: types<Output>()
 		},
-		never,
-		string,
-		Input,
-		Output
-	>({
 		actors,
-		actions: {
-			observeAssessmentError: enqueueActions(({ self, context, enqueue }) => {
-				enqueue.assign({
-					assessmentError:
-						self.getSnapshot().children.review?.getSnapshot().status === 'error'
-							? { generation: context.assessmentGeneration }
-							: undefined
-				})
-			})
-		},
+		actions: {},
 		guards: {
-			closing: stateIn({ writing: 'closing' }),
-			invalidated: stateIn({ writing: 'invalidated' }),
-			cancelling: stateIn({ writing: 'cancelling' })
+			closing: ({ value }: { value: StateValue }) => matchesState({ writing: 'closing' }, value),
+			invalidated: ({ value }: { value: StateValue }) =>
+				matchesState({ writing: 'invalidated' }, value),
+			cancelling: ({ value }: { value: StateValue }) =>
+				matchesState({ writing: 'cancelling' }, value)
 		}
 	})
 	function observation(context: Context) {
@@ -129,42 +143,7 @@ export function createScopedFormWriteMachine<
 		if (!context.request) throw new Error('Missing write request')
 		return context.request
 	}
-	const observe = form.assign({
-		observation: ({ context, event }) =>
-			event.type === 'OBSERVE' ? event.observation : context.observation
-	})
-	const clear = form.assign({
-		request: undefined,
-		observation: undefined,
-		capability: undefined,
-		assessmentError: undefined
-	})
-	const interrupted = (outcome: FormInterruption) =>
-		form.createStateConfig({
-			type: 'final',
-			entry: [
-				form.assign({
-					result: ({ context }) => context.result ?? { outcome, settlement: 'notStarted' }
-				}),
-				clear
-			]
-		})
-	const blocked = (outcome: 'denied' | 'unavailable') =>
-		form.createStateConfig({
-			type: 'final',
-			entry: [
-				form.assign({
-					result: ({ context }): Output => {
-						if (context.result) return context.result
-						const readiness = context.capability?.readiness
-						if (readiness?.kind !== 'blocked')
-							return { outcome: 'failed', code: 'availabilityFailed', settlement: 'notStarted' }
-						return { outcome, reason: readiness.reason, settlement: 'notStarted' }
-					}
-				}),
-				clear
-			]
-		})
+
 	function interruptedResult(outcome: FormInterruption, result: Output | undefined): Output {
 		return formInterruptionResult(outcome, result)
 	}
@@ -178,6 +157,121 @@ export function createScopedFormWriteMachine<
 		code: 'operationFailed',
 		settlement: 'notStarted'
 	}
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof form.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		partial: (_args, _enq) => {
+			return {
+				context: {
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		succeeded: (_args, _enq) => {
+			return {
+				context: {
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		denied: (args, _enq) => {
+			return {
+				context: {
+					result: (({ context }): Output => {
+						if (context.result) return context.result
+						const readiness = context.capability?.readiness
+						if (readiness?.kind !== 'blocked')
+							return { outcome: 'failed', code: 'availabilityFailed', settlement: 'notStarted' }
+						return { outcome: 'denied', reason: readiness.reason, settlement: 'notStarted' }
+					})(args),
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		unavailable: (args, _enq) => {
+			return {
+				context: {
+					result: (({ context }): Output => {
+						if (context.result) return context.result
+						const readiness = context.capability?.readiness
+						if (readiness?.kind !== 'blocked')
+							return { outcome: 'failed', code: 'availabilityFailed', settlement: 'notStarted' }
+						return { outcome: 'unavailable', reason: readiness.reason, settlement: 'notStarted' }
+					})(args),
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		failed: (_args, _enq) => {
+			return {
+				context: {
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		cancelled: (args, _enq) => {
+			return {
+				context: {
+					result: args.context.result ?? { outcome: 'cancelled', settlement: 'notStarted' },
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		scopeChanged: (args, _enq) => {
+			return {
+				context: {
+					result: args.context.result ?? { outcome: 'scopeChanged', settlement: 'notStarted' },
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		},
+		closed: (args, _enq) => {
+			return {
+				context: {
+					result: args.context.result ?? { outcome: 'closed', settlement: 'notStarted' },
+					request: undefined,
+					observation: undefined,
+					capability: undefined,
+					assessmentError: undefined
+				} satisfies Partial<Context>
+			}
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
+	const complete = createFinalTransitions<
+		Context,
+		CompletionArgs,
+		CompletionQueue,
+		keyof typeof finalizers
+	>(finalizers)
+
 	return form.createMachine({
 		id: 'scoped-form-write',
 		initial: 'admittingInput',
@@ -190,78 +284,120 @@ export function createScopedFormWriteMachine<
 			result: undefined
 		}),
 		output: ({ context }) => context.result ?? failure('failed'),
-		on: { CANCEL: '.cancelled', INVALIDATE: '.scopeChanged', SHUTDOWN: '.closed' },
+		on: {
+			CANCEL: (args, enq) => {
+				return complete('cancelled', args, enq, { target: '.cancelled' })
+			},
+			INVALIDATE: (args, enq) => {
+				return complete('scopeChanged', args, enq, { target: '.scopeChanged' })
+			},
+			SHUTDOWN: (args, enq) => {
+				return complete('closed', args, enq, { target: '.closed' })
+			}
+		},
 		states: {
 			admittingInput: {
-				always: [
+				always: (args, enq) => {
+					const { context } = args
+					if (context.request !== undefined && context.observation !== undefined) {
+						return { target: 'refreshing' }
+					}
 					{
-						guard: ({ context }) =>
-							context.request !== undefined && context.observation !== undefined,
-						target: 'refreshing'
-					},
-					{ target: 'failed', actions: assign({ result: () => prewriteFailure }) }
-				]
+						return complete('failed', args, enq, {
+							target: 'failed',
+							context: { result: prewriteFailure } satisfies Partial<Context>
+						})
+					}
+				}
 			},
 			refreshing: {
-				invoke: {
-					src: 'refresh',
+				invoke: form.createInvoke<typeof actors.refresh, Context>({
+					src: actors.refresh,
 					input: ({ context }) => observation(context),
-					onDone: {
-						target: 'checkingScope',
-						actions: assign({
-							observation: ({ context, event }) =>
-								event.output.revision === context.observation?.revision
-									? event.output
-									: context.observation
-						})
+					onDone: (args) => {
+						const { context, event } = args
+						return {
+							target: 'checkingScope',
+							context: {
+								observation:
+									event.output.revision === context.observation?.revision
+										? event.output
+										: context.observation
+							} satisfies Partial<Context>
+						}
 					},
-					onError: { target: 'failed', actions: assign({ result: () => prewriteFailure }) }
-				},
-				on: { OBSERVE: { actions: observe } }
+					onError: (args, enq) => {
+						{
+							return complete('failed', args, enq, {
+								target: 'failed',
+								context: { result: prewriteFailure } satisfies Partial<Context>
+							})
+						}
+					}
+				}),
+				on: {
+					OBSERVE: (args) => {
+						const { event } = args
+						return {
+							context: {
+								observation: event.type === 'OBSERVE' ? event.observation : args.context.observation
+							} satisfies Partial<Context>
+						}
+					}
+				}
 			},
 			checkingScope: {
-				always: [
-					{
-						guard: ({ context }) =>
-							context.request === undefined || context.observation === undefined,
-						target: 'failed',
-						actions: assign({ result: () => prewriteFailure })
-					},
-					{
-						guard: ({ context }) =>
-							!options.sameScope(
-								request(context).scope,
-								options.scopeOf(observation(context).facts)
-							),
-						target: 'scopeChanged'
-					},
-					{ target: 'authorizing' }
-				]
+				always: (args, enq) => {
+					const { context } = args
+					if (context.request === undefined || context.observation === undefined) {
+						{
+							return complete('failed', args, enq, {
+								target: 'failed',
+								context: { result: prewriteFailure } satisfies Partial<Context>
+							})
+						}
+					}
+					if (
+						!options.sameScope(request(context).scope, options.scopeOf(observation(context).facts))
+					) {
+						{
+							return complete('scopeChanged', args, enq, { target: 'scopeChanged' })
+						}
+					}
+					return { target: 'authorizing' }
+				}
 			},
 			authorizing: {
 				initial: 'pending',
 				states: {
 					pending: {},
 					checkingError: {
-						always: [
-							{
-								guard: ({ context }) =>
-									context.assessmentError?.generation === context.assessmentGeneration,
-								target: '#scoped-form-write.failed',
-								actions: assign({ result: () => prewriteFailure })
-							},
-							{ target: 'pending' }
-						]
+						always: (args, enq) => {
+							const { context } = args
+							if (context.assessmentError?.generation === context.assessmentGeneration) {
+								{
+									return complete('failed', args, enq, {
+										target: '#scoped-form-write.failed',
+										context: { result: prewriteFailure } satisfies Partial<Context>
+									})
+								}
+							}
+							return { target: 'pending' }
+						}
 					}
 				},
-				entry: assign({
-					assessmentGeneration: ({ context }) => context.assessmentGeneration + 1,
-					assessmentError: undefined,
-					capability: undefined
-				}),
-				invoke: {
+				entry: (args) => {
+					return {
+						context: {
+							assessmentGeneration: args.context.assessmentGeneration + 1,
+							assessmentError: undefined,
+							capability: undefined
+						} satisfies Partial<Context>
+					}
+				},
+				invoke: form.createInvoke<typeof actors.review, Context>({
 					id: 'review',
-					src: 'review',
+					src: actors.review,
 					input: ({ context }) => ({
 						observation: {
 							...observation(context),
@@ -280,60 +416,104 @@ export function createScopedFormWriteMachine<
 							}
 						}
 					}),
-					onDone: [
+					onDone: (args, enq) => {
+						const { context, event } = args
+						if (
+							event.output.token !== undefined &&
+							event.output.token.generation < context.assessmentGeneration
+						) {
+							return {}
+						}
+						if (
+							event.output.kind === 'assessed' &&
+							event.output.token.requestId === request(context).id &&
+							event.output.token.scopeRevision === request(context).scopeRevision &&
+							event.output.token.generation === context.assessmentGeneration &&
+							event.output.capability.revision === observation(context).revision &&
+							options.sameScope(event.output.capability.scope, request(context).scope)
+						) {
+							return {
+								target: 'deciding',
+								context: {
+									capability: event.output.kind === 'assessed' ? event.output.capability : undefined
+								} satisfies Partial<Context>
+							}
+						}
 						{
-							guard: ({ context, event }) =>
-								event.output.token !== undefined &&
-								event.output.token.generation < context.assessmentGeneration
-						},
-						{
-							guard: ({ context, event }) =>
-								event.output.kind === 'assessed' &&
-								event.output.token.requestId === request(context).id &&
-								event.output.token.scopeRevision === request(context).scopeRevision &&
-								event.output.token.generation === context.assessmentGeneration &&
-								event.output.capability.revision === observation(context).revision &&
-								options.sameScope(event.output.capability.scope, request(context).scope),
-							target: 'deciding',
-							actions: assign({
-								capability: ({ event }) =>
-									event.output.kind === 'assessed' ? event.output.capability : undefined
+							return complete('failed', args, enq, {
+								target: 'failed',
+								context: { result: prewriteFailure } satisfies Partial<Context>
 							})
-						},
-						{ target: 'failed', actions: assign({ result: () => prewriteFailure }) }
-					],
-					onError: { target: '.checkingError', actions: 'observeAssessmentError' }
-				},
-				on: { OBSERVE: { target: 'checkingScope', actions: observe } }
+						}
+					},
+					onError: (args) => {
+						let _context = args.context
+						let patch = {}
+						{
+							const contextBefore = args.context
+							patch = {
+								...patch,
+								assessmentError: { generation: contextBefore.assessmentGeneration }
+							}
+							_context = { ...args.context, ...patch }
+						}
+						return {
+							target: '.checkingError',
+							context: patch satisfies Partial<Context>
+						}
+					}
+				}),
+				on: {
+					OBSERVE: (args) => {
+						const { event } = args
+						return {
+							target: 'checkingScope',
+							context: {
+								observation: event.type === 'OBSERVE' ? event.observation : args.context.observation
+							} satisfies Partial<Context>
+						}
+					}
+				}
 			},
 			deciding: {
-				always: [
-					{
-						guard: ({ context }) =>
-							context.request === undefined || context.observation === undefined,
-						target: 'failed',
-						actions: assign({ result: () => prewriteFailure })
-					},
-					{
-						guard: ({ context }) => context.capability?.readiness.kind === 'ready',
-						target: 'writing'
-					},
-					{
-						guard: ({ context }) => {
+				always: (args, enq) => {
+					const { context } = args
+					if (context.request === undefined || context.observation === undefined) {
+						{
+							return complete('failed', args, enq, {
+								target: 'failed',
+								context: { result: prewriteFailure } satisfies Partial<Context>
+							})
+						}
+					}
+					if (context.capability?.readiness.kind === 'ready') {
+						return { target: 'writing' }
+					}
+					if (
+						(({ context }) => {
 							const readiness = context.capability?.readiness
 							return (
 								readiness?.kind === 'blocked' &&
 								options.classifyBlocked(readiness.reason) === 'denied'
 							)
-						},
-						target: 'denied'
-					},
+						})(args)
+					) {
+						{
+							return complete('denied', args, enq, { target: 'denied' })
+						}
+					}
+					if (context.capability?.readiness.kind === 'blocked') {
+						{
+							return complete('unavailable', args, enq, { target: 'unavailable' })
+						}
+					}
 					{
-						guard: ({ context }) => context.capability?.readiness.kind === 'blocked',
-						target: 'unavailable'
-					},
-					{ target: 'failed', actions: assign({ result: () => prewriteFailure }) }
-				]
+						return complete('failed', args, enq, {
+							target: 'failed',
+							context: { result: prewriteFailure } satisfies Partial<Context>
+						})
+					}
+				}
 			},
 			writing: {
 				initial: 'pending',
@@ -344,83 +524,100 @@ export function createScopedFormWriteMachine<
 						request: request(context),
 						observation: observation(context)
 					}),
-					onDone: [
-						{
-							guard: 'closing',
-							target: 'closed',
-							actions: assign({ result: ({ event }) => interruptedResult('closed', event.output) })
-						},
-						{
-							guard: 'invalidated',
-							target: 'scopeChanged',
-							actions: assign({
-								result: ({ event }) => interruptedResult('scopeChanged', event.output)
-							})
-						},
-						{
-							guard: 'cancelling',
-							target: 'cancelled',
-							actions: assign({
-								result: ({ event }) => interruptedResult('cancelled', event.output)
-							})
-						},
-						{
-							target: 'settled',
-							actions: assign({ result: ({ event }) => event.output ?? failure('failed') })
+					onDone: (args, enq) => {
+						const { event } = args
+						if (matchesState({ writing: 'closing' }, args.value)) {
+							{
+								return complete('closed', args, enq, {
+									target: 'closed',
+									context: {
+										result: interruptedResult('closed', event.output)
+									} satisfies Partial<Context>
+								})
+							}
 						}
-					],
-					onError: [
+						if (matchesState({ writing: 'invalidated' }, args.value)) {
+							{
+								return complete('scopeChanged', args, enq, {
+									target: 'scopeChanged',
+									context: {
+										result: interruptedResult('scopeChanged', event.output)
+									} satisfies Partial<Context>
+								})
+							}
+						}
+						if (matchesState({ writing: 'cancelling' }, args.value)) {
+							{
+								return complete('cancelled', args, enq, {
+									target: 'cancelled',
+									context: {
+										result: interruptedResult('cancelled', event.output)
+									} satisfies Partial<Context>
+								})
+							}
+						}
+						return {
+							target: 'settled',
+							context: { result: event.output ?? failure('failed') } satisfies Partial<Context>
+						}
+					},
+					onError: (args, enq) => {
+						if (matchesState({ writing: 'closing' }, args.value)) {
+							{
+								return complete('closed', args, enq, {
+									target: 'closed',
+									context: { result: failure('closed') } satisfies Partial<Context>
+								})
+							}
+						}
+						if (matchesState({ writing: 'invalidated' }, args.value)) {
+							{
+								return complete('scopeChanged', args, enq, {
+									target: 'scopeChanged',
+									context: { result: failure('scopeChanged') } satisfies Partial<Context>
+								})
+							}
+						}
+						if (matchesState({ writing: 'cancelling' }, args.value)) {
+							{
+								return complete('cancelled', args, enq, {
+									target: 'cancelled',
+									context: { result: failure('cancelled') } satisfies Partial<Context>
+								})
+							}
+						}
 						{
-							guard: 'closing',
-							target: 'closed',
-							actions: assign({ result: () => failure('closed') })
-						},
-						{
-							guard: 'invalidated',
-							target: 'scopeChanged',
-							actions: assign({ result: () => failure('scopeChanged') })
-						},
-						{
-							guard: 'cancelling',
-							target: 'cancelled',
-							actions: assign({ result: () => failure('cancelled') })
-						},
-						{ target: 'failed', actions: assign({ result: () => failure('failed') }) }
-					]
+							return complete('failed', args, enq, {
+								target: 'failed',
+								context: { result: failure('failed') } satisfies Partial<Context>
+							})
+						}
+					}
 				},
 				on: {
-					CANCEL: {
-						target: '.cancelling',
-						actions: options.persistence ? form.sendTo('write', ({ event }) => event) : []
+					CANCEL: ({ event }, enq) => {
+						if (options.persistence) enq.sendTo('write', event)
+						return { target: '.cancelling' }
 					},
-					INVALIDATE: {
-						target: '.invalidated',
-						actions: options.persistence ? form.sendTo('write', ({ event }) => event) : []
+					INVALIDATE: ({ event }, enq) => {
+						if (options.persistence) enq.sendTo('write', event)
+						return { target: '.invalidated' }
 					},
-					SHUTDOWN: {
-						target: '.closing',
-						actions: options.persistence ? form.sendTo('write', ({ event }) => event) : []
+					SHUTDOWN: ({ event }, enq) => {
+						if (options.persistence) enq.sendTo('write', event)
+						return { target: '.closing' }
 					},
-					OBSERVE: [
-						{
-							guard: ({ context, event }) =>
-								!options.sameScope(
-									request(context).scope,
-									options.scopeOf(event.observation.facts)
-								),
-							target: '.invalidated',
-							actions: [
-								observe,
-								...(options.persistence ? [form.sendTo('write', { type: 'INVALIDATE' })] : [])
-							]
-						},
-						{
-							actions: [
-								observe,
-								...(options.persistence ? [form.sendTo('write', ({ event }) => event)] : [])
-							]
+					OBSERVE: ({ context, event }, enq) => {
+						const changed = !options.sameScope(
+							request(context).scope,
+							options.scopeOf(event.observation.facts)
+						)
+						if (options.persistence) enq.sendTo('write', changed ? { type: 'INVALIDATE' } : event)
+						return {
+							...(changed ? { target: '.invalidated' } : {}),
+							context: { ...context, observation: event.observation } satisfies Context
 						}
-					]
+					}
 				},
 				states: {
 					pending: {},
@@ -430,31 +627,72 @@ export function createScopedFormWriteMachine<
 				}
 			},
 			settled: {
-				always: [
-					{ guard: ({ context }) => context.result?.outcome === 'succeeded', target: 'succeeded' },
-					{ guard: ({ context }) => context.result?.outcome === 'denied', target: 'denied' },
+				always: (args, enq) => {
+					const { context } = args
+					if (context.result?.outcome === 'succeeded') {
+						{
+							return complete('succeeded', args, enq, { target: 'succeeded' })
+						}
+					}
+					if (context.result?.outcome === 'denied') {
+						{
+							return complete('denied', args, enq, { target: 'denied' })
+						}
+					}
+					if (context.result?.outcome === 'unavailable') {
+						{
+							return complete('unavailable', args, enq, { target: 'unavailable' })
+						}
+					}
+					if (context.result?.outcome === 'cancelled') {
+						{
+							return complete('cancelled', args, enq, { target: 'cancelled' })
+						}
+					}
+					if (context.result?.outcome === 'closed') {
+						{
+							return complete('closed', args, enq, { target: 'closed' })
+						}
+					}
+					if (context.result?.outcome === 'scopeChanged') {
+						{
+							return complete('scopeChanged', args, enq, { target: 'scopeChanged' })
+						}
+					}
+					if (context.result?.outcome === 'partial') {
+						{
+							return complete('partial', args, enq, { target: 'partial' })
+						}
+					}
 					{
-						guard: ({ context }) => context.result?.outcome === 'unavailable',
-						target: 'unavailable'
-					},
-					{ guard: ({ context }) => context.result?.outcome === 'cancelled', target: 'cancelled' },
-					{ guard: ({ context }) => context.result?.outcome === 'closed', target: 'closed' },
-					{
-						guard: ({ context }) => context.result?.outcome === 'scopeChanged',
-						target: 'scopeChanged'
-					},
-					{ guard: ({ context }) => context.result?.outcome === 'partial', target: 'partial' },
-					{ target: 'failed' }
-				]
+						return complete('failed', args, enq, { target: 'failed' })
+					}
+				}
 			},
-			partial: { type: 'final', entry: clear },
-			succeeded: { type: 'final', entry: clear },
-			denied: blocked('denied'),
-			unavailable: blocked('unavailable'),
-			failed: { type: 'final', entry: clear },
-			cancelled: interrupted('cancelled'),
-			scopeChanged: interrupted('scopeChanged'),
-			closed: interrupted('closed')
+			partial: {
+				type: 'final'
+			},
+			succeeded: {
+				type: 'final'
+			},
+			denied: {
+				type: 'final'
+			},
+			unavailable: {
+				type: 'final'
+			},
+			failed: {
+				type: 'final'
+			},
+			cancelled: {
+				type: 'final'
+			},
+			scopeChanged: {
+				type: 'final'
+			},
+			closed: {
+				type: 'final'
+			}
 		}
 	})
 }

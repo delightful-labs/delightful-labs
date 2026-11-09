@@ -1,6 +1,7 @@
 # XState v6 compatibility and ownership specification
 
-Status: proposed for review, 2026-11-09. Specification only.
+Status: implementation awaiting review and behavioral qualification, 2026-11-09.
+See [implementation notes](xstate-v6-implementation.md) for changes and remaining gates.
 Inventory baseline: DLF main `be40b8fd1e7e417ac447b45cd81437a407634675`.
 This is a cross-cutting prerequisite for existing foundation and backup workflows;
 it does not change the active feature or authorize backup adoption in Finance.
@@ -25,7 +26,7 @@ specified and qualified in the consuming app.
 
 ## Current surface and migration units
 
-DLF pins XState 5.33.2 in development dependencies and its optional peer contract.
+At the inventory baseline, DLF pinned XState 5.33.2 in development dependencies and its optional peer contract.
 It has no direct `@xstate/svelte` dependency. Jazz is pinned to alpha.59; DUI is a
 vendored 0.0.25 archive. That archive version alone does not identify a v6 build.
 
@@ -205,5 +206,5 @@ to make rollback easier.
 - DLF public exports, machine sources, [next-app integration](../../docs/next-app.md),
   [transaction custody](../../docs/transaction-custody.md), and active backup contracts.
 
-This review changes documentation only. No runtime packages, generated files,
-consumer archives, active-feature selection or unrelated sign-in drafts are changed.
+The implementation now accompanies this specification. Consumer archives, active-feature
+selection and unrelated sign-in drafts remain unchanged; qualification is pending.

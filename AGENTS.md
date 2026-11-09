@@ -2,6 +2,7 @@
 
 - Follow the active feature in `.specify/feature.json` and its artifacts under `specs/`. Follow `.specify/memory/constitution.md` if one is adopted.
 - Before designing workflows or async actors, read `.specify/memory/xstate.md`. Before changing localized text, read `.specify/memory/localization.md`. Before styling or composing components, read `.specify/memory/css.md` and `.specify/memory/components.md`. These adapt shared lessons from Finance and DUI; domain-specific reference behavior is not an implicit library requirement.
+- Machine changes use the pinned XState v6 beta and checked-in declaration patch. Follow the migration notes in `specs/003-verified-backup/xstate-v6-implementation.md`; retain generic contracts and the existing implementation-test review gate.
 - This phase is specification-only. Do not implement the foundation, backend plugins, demonstration apps, or consumer migrations without a new instruction.
 - Follow the Jazz-first MVP decisions in the active spec. Earlier Q1/Q2 decisions are resolved; the 2026-10-31 scope revision defers portable schemas and multi-backend qualification.
 - Jazz is the only required v1 backend. Keep SDK access behind documented integration boundaries for later replacement; independent plugins and a second backend are deferred. Do not silently weaken app-required capabilities, permissions, or durability.

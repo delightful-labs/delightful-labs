@@ -1,13 +1,22 @@
-import { assign, fromPromise, raise, sendParent, sendTo, setup, stateIn } from 'xstate'
+import { types, createAsyncLogic, matchesState, setup } from 'xstate'
+import { createFinalTransitions } from '../finalize.js'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import { restorationMachine } from './restoration.js'
 import type { RestorationCapability, RestorationReport } from '../../contracts/restoration.js'
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Missing recovery resource')
 	return value
 }
-
 export type RecoverySession = {
-	getSnapshot: () => { status: string; account?: { id: string } | undefined }
+	getSnapshot: () => {
+		status: string
+		account?:
+			| {
+					id: string
+			  }
+			| undefined
+	}
 }
 type Session = RecoverySession
 export type RecoveryRestorationBinding = Readonly<{
@@ -16,10 +25,21 @@ export type RecoveryRestorationBinding = Readonly<{
 	/** Total, synchronous, idempotent release of this binding's references; never SDK I/O. */
 	invalidate: () => void
 }>
-export type RecoveryNavigation = { origin: string; destination: string; identity: string }
+export type RecoveryNavigation = {
+	origin: string
+	destination: string
+	identity: string
+}
 export type RecoveryRequest =
-	| { kind: 'restore'; phrase: string; origin: string; destination: string }
-	| ({ kind: 'navigate' } & RecoveryNavigation)
+	| {
+			kind: 'restore'
+			phrase: string
+			origin: string
+			destination: string
+	  }
+	| ({
+			kind: 'navigate'
+	  } & RecoveryNavigation)
 export type RecoveryResult =
 	| {
 			outcome: 'invalid' | 'restoreFailed' | 'restored' | 'closed'
@@ -36,8 +56,14 @@ export type RecoveryResult =
 			mutation: 'notStarted' | 'unknown'
 	  }
 export type RecoveryNotice =
-	| { type: 'RECOVERY_VALIDATED'; attempt: number }
-	| { type: 'RECOVERY_DRAIN_REQUESTED'; attempt: number }
+	| {
+			type: 'RECOVERY_VALIDATED'
+			attempt: number
+	  }
+	| {
+			type: 'RECOVERY_DRAIN_REQUESTED'
+			attempt: number
+	  }
 type Input = {
 	attempt: number
 	request: RecoveryRequest
@@ -63,76 +89,148 @@ type Context = {
 }
 type Event =
 	| RestorationReport
-	| { type: 'WORKSPACE_DRAINED' }
-	| { type: 'SHUTDOWN' }
-	| { type: 'RELEASE_REQUEST' }
-
-function childFailure(
-	context: Context
-): Extract<RecoveryResult, { outcome: 'restorationChildFailed' }> {
+	| {
+			type: 'WORKSPACE_DRAINED'
+	  }
+	| {
+			type: 'SHUTDOWN'
+	  }
+	| {
+			type: 'RELEASE_REQUEST'
+	  }
+function childFailure(context: Context): Extract<
+	RecoveryResult,
+	{
+		outcome: 'restorationChildFailed'
+	}
+> {
 	return {
 		outcome: 'restorationChildFailed',
 		mutation: context.permitIssued ? 'unknown' : 'notStarted'
 	}
 }
-
 const actors = {
 	restoration: restorationMachine,
-	navigationFacts: fromPromise(
-		async ({ input }: { input: { session: Session; readHref: () => string } }) => {
+	navigationFacts: createAsyncLogic({
+		run: async ({
+			input
+		}: {
+			input: {
+				session: Session
+				readHref: () => string
+			}
+		}) => {
 			const snapshot = input.session.getSnapshot()
 			return { status: snapshot.status, identity: snapshot.account?.id, href: input.readHref() }
 		}
-	),
-	navigate: fromPromise(
-		({ input }: { input: { navigate: Input['navigate']; destination: string } }) =>
-			input.navigate(input.destination)
-	)
+	}),
+	navigate: createAsyncLogic({
+		run: ({
+			input
+		}: {
+			input: {
+				navigate: Input['navigate']
+				destination: string
+			}
+		}) => input.navigate(input.destination)
+	})
 }
-const model = setup<
-	Context,
-	Event,
-	typeof actors,
-	{},
-	{ releaseBinding: undefined; navigationFailed: undefined },
-	{ closingRestore: undefined; closingNavigation: undefined; currentReport: undefined },
-	never,
-	string,
-	Input,
-	RecoveryResult
->({
+const patches = {
+	navigationFailed: ({ context }: { context: Context }): Partial<Context> => ({
+		result: {
+			outcome: 'navigationFailed',
+			mutation: context.mutation,
+			navigation: context.identity
+				? { identity: context.identity, origin: context.origin, destination: context.destination }
+				: undefined
+		}
+	})
+}
+const model = setup({
+	schemas: {
+		context: types<Context>(),
+		events: {
+			RESTORATION_VALIDATED: types<EventPayload<Event, 'RESTORATION_VALIDATED'>>(),
+			RESTORATION_PREPARE_REQUESTED: types<EventPayload<Event, 'RESTORATION_PREPARE_REQUESTED'>>(),
+			WORKSPACE_DRAINED: types<EventPayload<Event, 'WORKSPACE_DRAINED'>>(),
+			SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+			RELEASE_REQUEST: types<EventPayload<Event, 'RELEASE_REQUEST'>>()
+		},
+		input: types<Input>(),
+		output: types<RecoveryResult>()
+	},
 	actors,
 	guards: {
-		closingRestore: stateIn({ restoring: 'closing' }),
-		closingNavigation: stateIn({ navigating: 'closing' }),
-		currentReport: ({ context, event }) =>
+		currentReport: ({ context, event }: { context: Context; event: Event }) =>
 			(event.type === 'RESTORATION_VALIDATED' || event.type === 'RESTORATION_PREPARE_REQUESTED') &&
 			event.binding === context.restorationBinding?.binding &&
 			event.attempt === context.attempt
 	},
 	actions: {
-		releaseBinding: ({ context }) => context.restorationBinding?.invalidate(),
-		navigationFailed: assign({
-			result: ({ context }): RecoveryResult => ({
-				outcome: 'navigationFailed',
-				mutation: context.mutation,
-				navigation: context.identity
-					? { identity: context.identity, origin: context.origin, destination: context.destination }
-					: undefined
-			})
-		})
+		releaseBinding: ({ context }: { context: Context }) => context.restorationBinding?.invalidate()
 	}
 })
-const finish = (outcome: 'invalid' | 'restoreFailed' | 'restored' | 'closed') =>
-	model.createStateConfig({
-		type: 'final',
-		entry: assign({
-			result: ({ context }): RecoveryResult => ({ outcome, mutation: context.mutation }),
-			request: undefined
-		})
-	})
 
 /** Restoration lifetime coordinated with host-owned drain and navigation capabilities. */
+type CompletionEntry = Extract<
+	NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+	(...args: never[]) => unknown
+>
+type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+type CompletionQueue = Parameters<CompletionEntry>[1]
+const finalizers = {
+	invalid: (args, _enq) => {
+		return {
+			context: {
+				result: { outcome: 'invalid', mutation: args.context.mutation },
+				request: undefined
+			} satisfies Partial<Context>
+		}
+	},
+	restoreFailed: (args, _enq) => {
+		return {
+			context: {
+				result: { outcome: 'restoreFailed', mutation: args.context.mutation },
+				request: undefined
+			} satisfies Partial<Context>
+		}
+	},
+	restored: (args, _enq) => {
+		return {
+			context: {
+				result: { outcome: 'restored', mutation: args.context.mutation },
+				request: undefined
+			} satisfies Partial<Context>
+		}
+	},
+	closed: (args, _enq) => {
+		return {
+			context: {
+				result: { outcome: 'closed', mutation: args.context.mutation },
+				request: undefined
+			} satisfies Partial<Context>
+		}
+	},
+	restorationChildFailed: (args, _enq) => {
+		const { context } = args
+		return {
+			context: { request: undefined, result: childFailure(context) } satisfies Partial<Context>
+		}
+	},
+	navigationFailed: (_args, _enq) => {
+		return { context: { request: undefined } satisfies Partial<Context> }
+	}
+} satisfies Record<
+	string,
+	(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+>
+const complete = createFinalTransitions<
+	Context,
+	CompletionArgs,
+	CompletionQueue,
+	keyof typeof finalizers
+>(finalizers)
+
 export const sessionRecoveryMachine = model.createMachine({
 	id: 'session-recovery',
 	initial: 'choosing',
@@ -151,25 +249,37 @@ export const sessionRecoveryMachine = model.createMachine({
 		result: undefined
 	}),
 	output: ({ context }) => context.result ?? childFailure(context),
-	on: { SHUTDOWN: '.closed' },
+	on: {
+		SHUTDOWN: (args, enq) => {
+			return complete('closed', args, enq, { target: '.closed' })
+		}
+	},
 	states: {
 		choosing: {
-			always: [
-				{
-					guard: ({ context }) => context.request?.kind === 'navigate',
-					target: 'checkingNavigation',
-					actions: assign({ request: undefined })
-				},
-				{ target: 'restoring' }
-			]
+			always: (args) => {
+				if (args.context.request?.kind === 'navigate') {
+					return {
+						target: 'checkingNavigation',
+						context: { request: undefined } satisfies Partial<Context>
+					}
+				}
+				return { target: 'restoring' }
+			}
 		},
 		restoring: {
 			initial: 'validating',
-			entry: raise({ type: 'RELEASE_REQUEST' }),
-			exit: ['releaseBinding', assign({ restorationBinding: undefined })],
+			entry: (args, enq) => {
+				enq.raise({ type: 'RELEASE_REQUEST' })
+			},
+			exit: (args, enq) => {
+				enq(args.actions.releaseBinding, args)
+				return {
+					context: { restorationBinding: undefined } satisfies Partial<Context>
+				}
+			},
 			invoke: {
 				id: 'restoration',
-				src: 'restoration',
+				src: actors.restoration,
 				input: ({ context, self }) => {
 					const request = required(context.request)
 					if (request.kind !== 'restore') throw new Error('Missing recovery input')
@@ -181,79 +291,109 @@ export const sessionRecoveryMachine = model.createMachine({
 						reportTo: self
 					}
 				},
-				onDone: [
-					{
-						guard: 'closingRestore',
-						target: 'closed',
-						actions: assign({ mutation: ({ event }) => event.output.mutation })
-					},
-					{ guard: ({ event }) => event.output.outcome === 'invalid', target: 'invalid' },
-					{
-						guard: ({ event }) => event.output.outcome === 'cancelled',
-						target: 'closed',
-						actions: assign({ mutation: ({ event }) => event.output.mutation })
-					},
-					{
-						guard: ({ event }) => event.output.outcome === 'restored',
-						target: 'checkingNavigation',
-						actions: assign({
-							mutation: ({ event }) => event.output.mutation,
-							identity: ({ event }) =>
-								event.output.outcome === 'restored' ? event.output.identityId : undefined
-						})
-					},
-					{
-						guard: ({ event }) => event.output.outcome === 'identityUnavailable',
-						target: 'navigationFailed',
-						actions: [
-							assign({ mutation: ({ event }) => event.output.mutation }),
-							'navigationFailed'
-						]
-					},
-					{
-						target: 'restoreFailed',
-						actions: assign({ mutation: ({ event }) => event.output.mutation })
+				onDone: (args, enq) => {
+					const { event } = args
+					if (matchesState({ restoring: 'closing' }, args.value)) {
+						{
+							return complete('closed', args, enq, {
+								target: 'closed',
+								context: { mutation: event.output.mutation } satisfies Partial<Context>
+							})
+						}
 					}
-				],
+					if (event.output.outcome === 'invalid') {
+						{
+							return complete('invalid', args, enq, { target: 'invalid' })
+						}
+					}
+					if (event.output.outcome === 'cancelled') {
+						{
+							return complete('closed', args, enq, {
+								target: 'closed',
+								context: { mutation: event.output.mutation } satisfies Partial<Context>
+							})
+						}
+					}
+					if (event.output.outcome === 'restored') {
+						return {
+							target: 'checkingNavigation',
+							context: {
+								mutation: event.output.mutation,
+								identity: event.output.outcome === 'restored' ? event.output.identityId : undefined
+							} satisfies Partial<Context>
+						}
+					}
+					if (event.output.outcome === 'identityUnavailable') {
+						let context = args.context
+						let patch = {}
+						patch = { ...patch, mutation: event.output.mutation }
+						context = { ...args.context, ...patch }
+						patch = { ...patch, ...patches.navigationFailed({ ...args, context }) }
+						context = { ...args.context, ...patch }
+						{
+							return complete('navigationFailed', args, enq, {
+								target: 'navigationFailed',
+								context: patch satisfies Partial<Context>
+							})
+						}
+					}
+					{
+						return complete('restoreFailed', args, enq, {
+							target: 'restoreFailed',
+							context: { mutation: event.output.mutation } satisfies Partial<Context>
+						})
+					}
+				},
 				// Exit the owned binding scope before publishing a finite, sanitized failure.
-				onError: 'restorationChildFailed'
+				onError: (args, enq) => {
+					return complete('restorationChildFailed', args, enq, { target: 'restorationChildFailed' })
+				}
 			},
 			on: {
-				RELEASE_REQUEST: { actions: assign({ request: undefined }) },
-				SHUTDOWN: { target: '.closing', actions: sendTo('restoration', { type: 'SHUTDOWN' }) }
+				RELEASE_REQUEST: (_args) => {
+					return { context: { request: undefined } satisfies Partial<Context> }
+				},
+				SHUTDOWN: (args, enq) => {
+					enq.sendTo('restoration', { type: 'SHUTDOWN' })
+					return { target: '.closing' }
+				}
 			},
 			states: {
 				validating: {
 					on: {
-						RESTORATION_VALIDATED: {
-							guard: 'currentReport',
-							actions: sendParent(({ context }): RecoveryNotice => ({
+						RESTORATION_VALIDATED: (args, enq) => {
+							if (!args.guards.currentReport(args)) return
+							enq.sendTo(args.parent, {
 								type: 'RECOVERY_VALIDATED',
-								attempt: context.attempt
-							}))
+								attempt: args.context.attempt
+							})
 						},
-						RESTORATION_PREPARE_REQUESTED: {
-							guard: 'currentReport',
-							target: 'awaitingDrain',
-							actions: sendParent(({ context }): RecoveryNotice => ({
+						RESTORATION_PREPARE_REQUESTED: (args, enq) => {
+							if (!args.guards.currentReport(args)) return
+							enq.sendTo(args.parent, {
 								type: 'RECOVERY_DRAIN_REQUESTED',
-								attempt: context.attempt
-							}))
+								attempt: args.context.attempt
+							})
+							return { target: 'awaitingDrain' }
 						}
 					}
 				},
 				awaitingDrain: {
 					on: {
-						WORKSPACE_DRAINED: {
-							target: 'operating',
-							actions: [
-								assign({ permitIssued: true }),
-								sendTo('restoration', ({ context }) => ({
-									type: 'PREPARED',
-									binding: required(context.restorationBinding).binding,
-									attempt: context.attempt
-								}))
-							]
+						WORKSPACE_DRAINED: (args, enq) => {
+							let context = args.context
+							let patch = {}
+							patch = { ...patch, permitIssued: true }
+							context = { ...args.context, ...patch }
+							enq.sendTo('restoration', {
+								type: 'PREPARED',
+								binding: required(context.restorationBinding).binding,
+								attempt: context.attempt
+							})
+							return {
+								target: 'operating',
+								context: patch satisfies Partial<Context>
+							}
 						}
 					}
 				},
@@ -263,43 +403,80 @@ export const sessionRecoveryMachine = model.createMachine({
 		},
 		checkingNavigation: {
 			invoke: {
-				src: 'navigationFacts',
+				src: actors.navigationFacts,
 				input: ({ context }) => ({ session: context.session, readHref: context.readHref }),
-				onDone: [
+				onDone: (args, enq) => {
+					const { context, event } = args
+					if (
+						event.output.status === 'ready' &&
+						event.output.identity === context.identity &&
+						event.output.href === context.origin
+					) {
+						return { target: 'navigating' }
+					}
 					{
-						guard: ({ context, event }) =>
-							event.output.status === 'ready' &&
-							event.output.identity === context.identity &&
-							event.output.href === context.origin,
-						target: 'navigating'
-					},
-					{ target: 'restored' }
-				],
-				onError: { target: 'navigationFailed', actions: 'navigationFailed' }
+						return complete('restored', args, enq, { target: 'restored' })
+					}
+				},
+				onError: (args, enq) => {
+					{
+						return complete('navigationFailed', args, enq, {
+							target: 'navigationFailed',
+							context: patches.navigationFailed(args) satisfies Partial<Context>
+						})
+					}
+				}
 			}
 		},
 		navigating: {
 			initial: 'active',
 			invoke: {
-				src: 'navigate',
+				src: actors.navigate,
 				input: ({ context }) => ({ navigate: context.navigate, destination: context.destination }),
-				onDone: [{ guard: 'closingNavigation', target: 'closed' }, { target: 'restored' }],
-				onError: [
-					{ guard: 'closingNavigation', target: 'closed' },
-					{ target: 'navigationFailed', actions: 'navigationFailed' }
-				]
+				onDone: (args, enq) => {
+					if (matchesState({ navigating: 'closing' }, args.value)) {
+						{
+							return complete('closed', args, enq, { target: 'closed' })
+						}
+					}
+					{
+						return complete('restored', args, enq, { target: 'restored' })
+					}
+				},
+				onError: (args, enq) => {
+					if (matchesState({ navigating: 'closing' }, args.value)) {
+						{
+							return complete('closed', args, enq, { target: 'closed' })
+						}
+					}
+					{
+						return complete('navigationFailed', args, enq, {
+							target: 'navigationFailed',
+							context: patches.navigationFailed(args) satisfies Partial<Context>
+						})
+					}
+				}
 			},
-			on: { SHUTDOWN: '.closing' },
+			on: { SHUTDOWN: { target: '.closing' } },
 			states: { active: {}, closing: { on: { SHUTDOWN: {} } } }
 		},
-		invalid: finish('invalid'),
-		restoreFailed: finish('restoreFailed'),
-		restored: finish('restored'),
-		closed: finish('closed'),
-		restorationChildFailed: {
-			type: 'final',
-			entry: assign({ request: undefined, result: ({ context }) => childFailure(context) })
+		invalid: {
+			type: 'final'
 		},
-		navigationFailed: { type: 'final', entry: assign({ request: undefined }) }
+		restoreFailed: {
+			type: 'final'
+		},
+		restored: {
+			type: 'final'
+		},
+		closed: {
+			type: 'final'
+		},
+		restorationChildFailed: {
+			type: 'final'
+		},
+		navigationFailed: {
+			type: 'final'
+		}
 	}
 })

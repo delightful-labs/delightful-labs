@@ -1,0 +1,34 @@
+diff --git a/dist/declarations/src/setup.d.ts b/dist/declarations/src/setup.d.ts
+index 017b76bc4f80a69d2cdf9c656d893a90b69d1937..39f8cacc9ec0aaf6b6a29372fea6b095a6554c04 100644
+--- a/dist/declarations/src/setup.d.ts
++++ b/dist/declarations/src/setup.d.ts
+@@ -1143,7 +1143,7 @@ type ContextPatch<TCurrentContext, TTargetContext, TResolvedTargetContext extend
+     apply?: never;
+     bind?: never;
+ }>;
+-type RequiredContextKeys<TCurrentContext, TTargetContext> = {
++type RequiredContextKeys<TCurrentContext, TTargetContext> = [TCurrentContext] extends [TTargetContext] ? never : {
+     [K in keyof TTargetContext]-?: K extends keyof TCurrentContext ? [TCurrentContext[K]] extends [TTargetContext[K]] ? never : K : K;
+ }[keyof TTargetContext];
+ /** Initial transition with typed input based on target state */
+diff --git a/dist/declarations/src/types.v6.d.ts b/dist/declarations/src/types.v6.d.ts
+index ef8ff3fe8823102df4bb00e477dc7814e8d76f3d..cc71baaca4ae8fb11d282f714f607040468b0742 100644
+--- a/dist/declarations/src/types.v6.d.ts
++++ b/dist/declarations/src/types.v6.d.ts
+@@ -1,6 +1,6 @@
+ /** Type-only metadata for validating setup-created invoke transitions. */
+ export declare const createdInvokeConfig: unique symbol;
+-import { SetupStateSchemas, StandardSchemaV1 } from "./schema.types.js";
++import { SetupStateSchemas, StandardSchemaV1, TypeSchema } from "./schema.types.js";
+ import type { ActionSchemas, GuardSchemas, InferEvents, InferInternalEvents } from "./base.types.js";
+ export type { ActionSchemas, GuardSchemas, InferEvents, InferInternalEvents };
+ import { MachineSnapshot } from "./State.js";
+@@ -9,7 +9,7 @@ import type { Compute, DoNotInfer, IsNever, NonReducibleUnknown, SingleOrArray }
+ import { MachineContext, Mapper } from "./types.js";
+ import type { LowInfer } from "./typeUtils.js";
+ import { DoneStateEvent } from "./types.js";
+-export type InferOutput<T extends StandardSchemaV1, U> = Compute<StandardSchemaV1.InferOutput<T> extends U ? StandardSchemaV1.InferOutput<T> : never>;
++export type InferOutput<T extends StandardSchemaV1, U> = T extends TypeSchema<infer Output> ? Output extends U ? Output : never : Compute<StandardSchemaV1.InferOutput<T> extends U ? StandardSchemaV1.InferOutput<T> : never>;
+ /**
+  * The machine input type declared by an input schema, or `unknown` when no
+  * input schema is declared (the unresolved schema parameter infers `unknown`).

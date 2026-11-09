@@ -1,20 +1,36 @@
-import { sendTo, enqueueActions, assign, fromPromise, setup } from 'xstate'
-import type { ActorRef, Snapshot, SnapshotFrom } from 'xstate'
+import {
+	types,
+	createAsyncLogic,
+	setup,
+	type ActorRef,
+	type Snapshot,
+	type SnapshotFrom
+} from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
 	SessionOpenCapability,
 	SessionOwnerReply,
 	SessionScope
 } from '../../contracts/session.js'
-
 type Recipient<Session extends object> = ActorRef<Snapshot<unknown>, SessionOwnerReply<Session>>
 type Request<Session extends object> = Readonly<{
 	scope: SessionScope
 	replyTo: Recipient<Session>
 }>
 export type SessionOwnerEvent<Session extends object> =
-	| (Request<Session> & Readonly<{ type: 'ACQUIRE' }>)
-	| (Request<Session> & Readonly<{ type: 'RETRY_ACQUIRE' }>)
-	| (Request<Session> & Readonly<{ type: 'RELEASE' }>)
+	| (Request<Session> &
+			Readonly<{
+				type: 'ACQUIRE'
+			}>)
+	| (Request<Session> &
+			Readonly<{
+				type: 'RETRY_ACQUIRE'
+			}>)
+	| (Request<Session> &
+			Readonly<{
+				type: 'RELEASE'
+			}>)
 export type SessionOwnerRef<Session extends object> = ActorRef<
 	Snapshot<unknown>,
 	SessionOwnerEvent<Session>
@@ -32,45 +48,75 @@ type Context<Session extends object> = {
 	// Terminal attachment tokens are weakly retained to reject late messages without a token leak.
 	released: WeakSet<object>
 }
-
 function validScope(binding: object, scope: SessionScope): boolean {
 	return (
 		scope.binding === binding && Number.isSafeInteger(scope.generation) && scope.generation >= 0
 	)
 }
-
 /** Browser host owns this actor beyond its applications. Never stop it to cancel SDK creation. */
 export function createSessionAcquisitionMachine<Session extends object>() {
 	const actors = {
-		open: fromPromise<Session, SessionOpenCapability<Session>>(({ input }) => input.open())
+		open: createAsyncLogic<Session, SessionOpenCapability<Session>>({
+			run: ({ input }) => input.open()
+		})
 	}
-	const model = setup<
-		Context<Session>,
-		SessionOwnerEvent<Session>,
-		typeof actors,
-		{},
-		{
-			remember: undefined
-			publishAcquired: undefined
-			publishFailure: undefined
-			rejectRequest: undefined
-			release: undefined
-			acknowledgeRelease: undefined
+	const patches = {
+		remember: ({
+			context,
+			event
+		}: {
+			context: Context<Session>
+			event: SessionOwnerEvent<Session>
+		}): Partial<Context<Session>> => ({
+			requests: [
+				...context.requests.filter(
+					(request) => request.scope.attachment !== event.scope.attachment
+				),
+				{
+					scope: {
+						binding: event.scope.binding,
+						attachment: event.scope.attachment,
+						generation: event.scope.generation
+					},
+					replyTo: event.replyTo
+				}
+			]
+		}),
+		release: ({
+			context,
+			event
+		}: {
+			context: Context<Session>
+			event: SessionOwnerEvent<Session>
+		}): Partial<Context<Session>> => {
+			context.released.add(event.scope.attachment)
+			return {
+				requests: context.requests.filter(
+					(request) => request.scope.attachment !== event.scope.attachment
+				)
+			}
+		}
+	}
+	const model = setup({
+		schemas: {
+			context: types<Context<Session>>(),
+			events: {
+				ACQUIRE: types<EventPayload<SessionOwnerEvent<Session>, 'ACQUIRE'>>(),
+				RETRY_ACQUIRE: types<EventPayload<SessionOwnerEvent<Session>, 'RETRY_ACQUIRE'>>(),
+				RELEASE: types<EventPayload<SessionOwnerEvent<Session>, 'RELEASE'>>()
+			},
+			input: types<SessionOwnerInput<Session>>()
 		},
-		{
-			allowedRequest: undefined
-			allowedRelease: undefined
-			newRetry: undefined
-			supplied: undefined
-		},
-		never,
-		string,
-		SessionOwnerInput<Session>
-	>({
 		actors,
 		guards: {
-			supplied: ({ context }) => context.session !== undefined,
-			allowedRequest: ({ context, event }) => {
+			supplied: ({ context }: { context: Context<Session> }) => context.session !== undefined,
+			allowedRequest: ({
+				context,
+				event
+			}: {
+				context: Context<Session>
+				event: SessionOwnerEvent<Session>
+			}) => {
 				if (
 					!validScope(context.binding, event.scope) ||
 					context.released.has(event.scope.attachment)
@@ -85,7 +131,13 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 						event.scope.generation >= previous.scope.generation)
 				)
 			},
-			newRetry: ({ context, event }) => {
+			newRetry: ({
+				context,
+				event
+			}: {
+				context: Context<Session>
+				event: SessionOwnerEvent<Session>
+			}) => {
 				if (
 					!validScope(context.binding, event.scope) ||
 					context.released.has(event.scope.attachment)
@@ -99,7 +151,13 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 					(previous.replyTo === event.replyTo && event.scope.generation > previous.scope.generation)
 				)
 			},
-			allowedRelease: ({ context, event }) => {
+			allowedRelease: ({
+				context,
+				event
+			}: {
+				context: Context<Session>
+				event: SessionOwnerEvent<Session>
+			}) => {
 				if (!validScope(context.binding, event.scope)) return false
 				const previous = context.requests.find(
 					(request) => request.scope.attachment === event.scope.attachment
@@ -111,61 +169,8 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 				)
 			}
 		},
-		actions: {
-			remember: assign(({ context, event }) => ({
-				requests: [
-					...context.requests.filter(
-						(request) => request.scope.attachment !== event.scope.attachment
-					),
-					{
-						scope: {
-							binding: event.scope.binding,
-							attachment: event.scope.attachment,
-							generation: event.scope.generation
-						},
-						replyTo: event.replyTo
-					}
-				]
-			})),
-			publishAcquired: enqueueActions(({ context, enqueue }) => {
-				const session = context.session
-				if (session === undefined) throw new Error('Acquired session unavailable')
-				for (const request of context.requests) {
-					enqueue.sendTo(request.replyTo, { type: 'ACQUIRED', scope: request.scope, session })
-				}
-			}),
-			publishFailure: enqueueActions(({ context, enqueue }) => {
-				for (const request of context.requests) {
-					enqueue.sendTo(request.replyTo, {
-						type: 'ACQUISITION_FAILED',
-						scope: request.scope,
-						reason: 'openFailed'
-					})
-				}
-			}),
-			rejectRequest: sendTo(
-				({ event }) => event.replyTo,
-				({ event }): SessionOwnerReply<Session> => ({
-					type: 'ACQUISITION_FAILED',
-					scope: event.scope,
-					reason: 'invalidRequest'
-				})
-			),
-			release: assign(({ context, event }) => {
-				context.released.add(event.scope.attachment)
-				return {
-					requests: context.requests.filter(
-						(request) => request.scope.attachment !== event.scope.attachment
-					)
-				}
-			}),
-			acknowledgeRelease: sendTo(
-				({ event }) => event.replyTo,
-				({ event }) => ({ type: 'RELEASED', scope: event.scope })
-			)
-		}
+		actions: {}
 	})
-
 	return model.createMachine({
 		id: 'session-acquisition',
 		initial: 'assessing',
@@ -177,71 +182,225 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 			released: new WeakSet()
 		}),
 		on: {
-			RELEASE: [
-				{ guard: 'allowedRelease', actions: ['release', 'acknowledgeRelease'] },
-				{ actions: 'acknowledgeRelease' }
-			]
+			RELEASE: (args, enq) => {
+				const { event } = args
+				if (args.guards.allowedRelease(args)) {
+					enq.sendTo(event.replyTo, { type: 'RELEASED', scope: event.scope })
+					return {
+						context: patches.release(args) satisfies Partial<Context<Session>>
+					}
+				}
+				enq.sendTo(event.replyTo, { type: 'RELEASED', scope: event.scope })
+				return {}
+			}
 		},
 		states: {
-			assessing: { always: [{ guard: 'supplied', target: 'acquired' }, { target: 'idle' }] },
+			assessing: {
+				always: (args) => {
+					if (args.guards.supplied(args)) {
+						return { target: 'acquired' }
+					}
+					return { target: 'idle' }
+				}
+			},
 			idle: {
 				on: {
-					ACQUIRE: [
-						{ guard: 'allowedRequest', target: 'opening', actions: 'remember' },
-						{ actions: 'rejectRequest' }
-					],
-					RETRY_ACQUIRE: [
-						{ guard: 'allowedRequest', target: 'opening', actions: 'remember' },
-						{ actions: 'rejectRequest' }
-					]
+					ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							return {
+								target: 'opening',
+								context: patches.remember(args) satisfies Partial<Context<Session>>
+							}
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					},
+					RETRY_ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							return {
+								target: 'opening',
+								context: patches.remember(args) satisfies Partial<Context<Session>>
+							}
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					}
 				}
 			},
 			opening: {
 				invoke: {
-					src: 'open',
+					src: actors.open,
 					input: ({ context }) => context.capability,
-					onDone: {
-						target: 'acquired',
-						actions: [assign({ session: ({ event }) => event.output }), 'publishAcquired']
+					onDone: (args, enq) => {
+						let context = args.context
+						let patch = {}
+						patch = { ...patch, session: args.event.output }
+						context = { ...args.context, ...patch }
+						{
+							const contextBefore = context
+							const session = contextBefore.session
+							if (session === undefined) throw new Error('Acquired session unavailable')
+							for (const request of contextBefore.requests) {
+								enq.sendTo(request.replyTo, { type: 'ACQUIRED', scope: request.scope, session })
+							}
+						}
+						return {
+							target: 'acquired',
+							context: patch satisfies Partial<Context<Session>>
+						}
 					},
-					onError: { target: 'failed', actions: 'publishFailure' }
+					onError: (args, enq) => {
+						for (const request of args.context.requests) {
+							enq.sendTo(request.replyTo, {
+								type: 'ACQUISITION_FAILED',
+								scope: request.scope,
+								reason: 'openFailed'
+							})
+						}
+						return { target: 'failed' }
+					}
 				},
 				on: {
-					ACQUIRE: [{ guard: 'allowedRequest', actions: 'remember' }, { actions: 'rejectRequest' }],
-					RETRY_ACQUIRE: [
-						{ guard: 'allowedRequest', actions: 'remember' },
-						{ actions: 'rejectRequest' }
-					]
+					ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							return {
+								context: patches.remember(args) satisfies Partial<Context<Session>>
+							}
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					},
+					RETRY_ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							return {
+								context: patches.remember(args) satisfies Partial<Context<Session>>
+							}
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					}
 				}
 			},
 			failed: {
 				on: {
-					ACQUIRE: [
-						{ guard: 'allowedRequest', actions: ['remember', 'publishFailure'] },
-						{ actions: 'rejectRequest' }
-					],
-					RETRY_ACQUIRE: [
-						{ guard: 'newRetry', target: 'opening', actions: 'remember' },
-						{ actions: 'rejectRequest' }
-					]
+					ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							let context = args.context
+							let patch = {}
+							patch = { ...patch, ...patches.remember(args) }
+							context = { ...args.context, ...patch }
+							{
+								const contextBefore = context
+								for (const request of contextBefore.requests) {
+									enq.sendTo(request.replyTo, {
+										type: 'ACQUISITION_FAILED',
+										scope: request.scope,
+										reason: 'openFailed'
+									})
+								}
+							}
+							return { context: patch satisfies Partial<Context<Session>> }
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					},
+					RETRY_ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.newRetry(args)) {
+							return {
+								target: 'opening',
+								context: patches.remember(args) satisfies Partial<Context<Session>>
+							}
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					}
 				}
 			},
 			acquired: {
 				on: {
-					ACQUIRE: [
-						{ guard: 'allowedRequest', actions: ['remember', 'publishAcquired'] },
-						{ actions: 'rejectRequest' }
-					],
-					RETRY_ACQUIRE: [
-						{ guard: 'allowedRequest', actions: ['remember', 'publishAcquired'] },
-						{ actions: 'rejectRequest' }
-					]
+					ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							let context = args.context
+							let patch = {}
+							patch = { ...patch, ...patches.remember(args) }
+							context = { ...args.context, ...patch }
+							{
+								const contextBefore = context
+								const session = contextBefore.session
+								if (session === undefined) throw new Error('Acquired session unavailable')
+								for (const request of contextBefore.requests) {
+									enq.sendTo(request.replyTo, { type: 'ACQUIRED', scope: request.scope, session })
+								}
+							}
+							return { context: patch satisfies Partial<Context<Session>> }
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					},
+					RETRY_ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							let context = args.context
+							let patch = {}
+							patch = { ...patch, ...patches.remember(args) }
+							context = { ...args.context, ...patch }
+							{
+								const contextBefore = context
+								const session = contextBefore.session
+								if (session === undefined) throw new Error('Acquired session unavailable')
+								for (const request of contextBefore.requests) {
+									enq.sendTo(request.replyTo, { type: 'ACQUIRED', scope: request.scope, session })
+								}
+							}
+							return { context: patch satisfies Partial<Context<Session>> }
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					}
 				}
 			}
 		}
 	})
 }
-
 /** Public host integration selector. Acquired means a reference, not SDK identity/readiness. */
 export function selectAcquiredSession<Session extends object>(
 	snapshot: SnapshotFrom<ReturnType<typeof createSessionAcquisitionMachine<Session>>>

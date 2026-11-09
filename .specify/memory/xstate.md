@@ -4,9 +4,31 @@ Read before designing stateful workflows, readiness, authorization, or async ope
 Adapted on 2026-10-31 from Finance's `.specify/memory/xstate.md` at `8ff72f6`.
 The constitution and active spec define scope; these rules do not authorize implementation.
 
+## XState v6 authoring
+
+The library now targets the exact v6 beta in `package.json`. Use schemas, function
+transitions, immutable context patches, `createAsyncLogic` for async leaves and
+`createCallbackLogic` for native event adapters. Queue selected effects with `enq`.
+Prefer direct actor sources; use `createInvoke` to retain generic input/output
+inference. The form writer retains a registered source name for its union of a
+native leaf and consumer-supplied persistence logic; it remains a v6 source.
+
+Final states are inert. Apply outcome selection and cleanup before entering them,
+using the owning chart's finalizers; preserve resource drain before that boundary.
+Do not depend on a completed child remaining in `children`. Handle native failures
+from their reported events, and use the transition's scoped child references for
+ongoing work. Pure named predicates remain useful; compose them with ordinary JS
+instead of v5 guard combinators. Review parallel-region reentry explicitly.
+
+The checked-in declaration-only XState patch preserves generic type-only schemas
+and source/target context identity. It changes no runtime behavior. Consumer
+migrations must qualify the same patch until upstream supplies these fixes; see
+`specs/003-verified-backup/xstate-v6-implementation.md`. Historical v5 API references
+below describe the original ownership rules, not supported imports.
+
 ## Mandatory machine-first gate
 
-Before writing an async function or `fromPromise` body, list meaningful steps, decisions,
+Before writing an async function or `createAsyncLogic` body, list meaningful steps, decisions,
 resources, and terminal outcomes in a design note. Start with a statechart when there are
 read/check/write decisions, independently meaningful stages, distinct retry/cancellation paths,
 or an acquired resource spanning commit/rollback/cleanup. Apply this recursively to helpers,
@@ -31,7 +53,7 @@ the write boundary after the modeled decision. Inspect actor helpers recursively
 - Use typed events/reports for continuing observations and invocation output for finite results.
   Actor input initializes; subsequent facts arrive through events. Child context/state paths remain
   private. Do not introduce a global registry, bus, or supervisor without a demonstrated need.
-- Use native `forwardTo`/`sendTo` actions in the state that owns the recipient invocation.
+- Use `enq.sendTo` in the state that owns the recipient invocation.
   Do not rediscover a fixed child's lifetime through `self.getSnapshot().children` for routing.
   Nested handlers must include the parent's interruption/binding actions explicitly. Send only
   commands the child can receive; promise leaves settle under the owner's drain protocol. In

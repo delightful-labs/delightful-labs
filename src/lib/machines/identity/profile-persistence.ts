@@ -1,4 +1,7 @@
-import { assign, fromPromise, setup, stateIn } from 'xstate'
+import { matchesState, type StateValue, types, createAsyncLogic, setup } from 'xstate'
+import { createFinalTransitions } from '../finalize.js'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type { ProfileObservation, ProfileReason, ProfileScope } from '../../contracts/profile.js'
 import {
 	formInterruptionResult,
@@ -7,7 +10,6 @@ import {
 	type FormOperationResult
 } from '../../contracts/scoped-form.js'
 import { profileScope, sameProfileScope } from '../../contracts/profile.js'
-
 function unavailableReason(facts: ProfileObservation): ProfileReason | undefined {
 	if (!facts.sessionReady || !facts.identityId) return 'sessionUnavailable'
 	if (facts.failed) return 'loadFailed'
@@ -15,7 +17,6 @@ function unavailableReason(facts: ProfileObservation): ProfileReason | undefined
 	if (!facts.profile || facts.profile.userId !== facts.identityId) return 'profileUnavailable'
 	return undefined
 }
-
 /** Domain admission and draining around exactly one host-owned persistence operation. */
 export function createProfilePersistenceMachine<Values>(options: {
 	save: (profileId: string, identityId: string, values: Values) => Promise<unknown>
@@ -31,203 +32,300 @@ export function createProfilePersistenceMachine<Values>(options: {
 	const failure: Output = { outcome: 'failed', code: 'operationFailed', settlement: 'notStarted' }
 	const actors = {
 		// The machine admits scope first; this final argument check cannot issue an invalid save.
-		save: fromPromise<'saved' | 'notIssued', Context>(({ input }) => {
-			const request = input.request
-			if (!request || request.scope.identityId === null || request.scope.profileId === null)
-				return Promise.resolve('notIssued')
-			return options
-				.save(request.scope.profileId, request.scope.identityId, request.values)
-				.then(() => 'saved')
+		save: createAsyncLogic<'saved' | 'notIssued', Context>({
+			run: ({ input }) => {
+				const request = input.request
+				if (!request || request.scope.identityId === null || request.scope.profileId === null)
+					return Promise.resolve('notIssued')
+				return options
+					.save(request.scope.profileId, request.scope.identityId, request.values)
+					.then(() => 'saved')
+			}
 		})
 	}
-	const model = setup<
-		Context,
-		FormChildEvent<ProfileObservation>,
-		typeof actors,
-		{},
-		{},
-		{
-			closing: undefined
-			invalidated: undefined
-			cancelling: undefined
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<FormChildEvent<ProfileObservation>, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<FormChildEvent<ProfileObservation>, 'SHUTDOWN'>>(),
+				INVALIDATE: types<EventPayload<FormChildEvent<ProfileObservation>, 'INVALIDATE'>>(),
+				OBSERVE: types<EventPayload<FormChildEvent<ProfileObservation>, 'OBSERVE'>>()
+			},
+			input: types<Input>(),
+			output: types<Output>()
 		},
-		never,
-		string,
-		Input,
-		Output
-	>({
 		actors,
 		guards: {
-			closing: stateIn({ saving: 'closing' }),
-			invalidated: stateIn({ saving: 'invalidated' }),
-			cancelling: stateIn({ saving: 'cancelling' })
+			closing: ({ value }: { value: StateValue }) => matchesState({ saving: 'closing' }, value),
+			invalidated: ({ value }: { value: StateValue }) =>
+				matchesState({ saving: 'invalidated' }, value),
+			cancelling: ({ value }: { value: StateValue }) =>
+				matchesState({ saving: 'cancelling' }, value)
 		}
 	})
-	const clear = model.assign({ request: undefined, observation: undefined })
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof model.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		unavailable: (_args, _enq) => {
+			return {
+				context: { request: undefined, observation: undefined } satisfies Partial<Context>
+			}
+		},
+		complete: (_args, _enq) => {
+			return {
+				context: { request: undefined, observation: undefined } satisfies Partial<Context>
+			}
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
+	const complete = createFinalTransitions<
+		Context,
+		CompletionArgs,
+		CompletionQueue,
+		keyof typeof finalizers
+	>(finalizers)
+
 	return model.createMachine({
 		id: 'profile-persistence',
 		initial: 'admitting',
 		context: ({ input }) => ({ ...input, result: failure }),
 		output: ({ context }) => context.result,
 		on: {
-			CANCEL: {
-				target: '.complete',
-				actions: assign({ result: { outcome: 'cancelled', settlement: 'notStarted' } })
+			CANCEL: (args, enq) => {
+				{
+					return complete('complete', args, enq, {
+						target: '.complete',
+						context: {
+							result: { outcome: 'cancelled', settlement: 'notStarted' }
+						} satisfies Partial<Context>
+					})
+				}
 			},
-			INVALIDATE: {
-				target: '.complete',
-				actions: assign({ result: { outcome: 'scopeChanged', settlement: 'notStarted' } })
+			INVALIDATE: (args, enq) => {
+				{
+					return complete('complete', args, enq, {
+						target: '.complete',
+						context: {
+							result: { outcome: 'scopeChanged', settlement: 'notStarted' }
+						} satisfies Partial<Context>
+					})
+				}
 			},
-			SHUTDOWN: {
-				target: '.complete',
-				actions: assign({ result: { outcome: 'closed', settlement: 'notStarted' } })
+			SHUTDOWN: (args, enq) => {
+				{
+					return complete('complete', args, enq, {
+						target: '.complete',
+						context: {
+							result: { outcome: 'closed', settlement: 'notStarted' }
+						} satisfies Partial<Context>
+					})
+				}
 			}
 		},
 		states: {
 			admitting: {
-				always: [
-					{
-						guard: ({ context }) => context.request?.scope.identityId == null,
-						target: 'unavailable',
-						actions: assign({
-							result: {
-								outcome: 'unavailable',
-								reason: 'sessionUnavailable',
-								settlement: 'notStarted'
-							}
-						})
-					},
-					{
-						guard: ({ context }) => context.request?.scope.profileId == null,
-						target: 'unavailable',
-						actions: assign({
-							result: {
-								outcome: 'unavailable',
-								reason: 'profileUnavailable',
-								settlement: 'notStarted'
-							}
-						})
-					},
-					{
-						guard: ({ context }) =>
-							context.observation !== undefined &&
-							unavailableReason(context.observation.facts) !== undefined,
-						target: 'unavailable',
-						actions: assign({
-							result: ({ context }): Output => ({
-								outcome: 'unavailable',
-								reason: context.observation
-									? (unavailableReason(context.observation.facts) ?? 'profileUnavailable')
-									: 'profileUnavailable',
-								settlement: 'notStarted'
+				always: (args, enq) => {
+					const { context } = args
+					if (context.request?.scope.identityId == null) {
+						{
+							return complete('unavailable', args, enq, {
+								target: 'unavailable',
+								context: {
+									result: {
+										outcome: 'unavailable',
+										reason: 'sessionUnavailable',
+										settlement: 'notStarted'
+									}
+								} satisfies Partial<Context>
 							})
-						})
-					},
-					{
-						guard: ({ context }) =>
-							context.request !== undefined &&
-							context.observation !== undefined &&
-							sameProfileScope(context.request.scope, profileScope(context.observation.facts)),
-						target: 'saving'
-					},
-					{
-						target: 'complete',
-						actions: assign({ result: { outcome: 'scopeChanged', settlement: 'notStarted' } })
+						}
 					}
-				]
+					if (context.request?.scope.profileId == null) {
+						{
+							return complete('unavailable', args, enq, {
+								target: 'unavailable',
+								context: {
+									result: {
+										outcome: 'unavailable',
+										reason: 'profileUnavailable',
+										settlement: 'notStarted'
+									}
+								} satisfies Partial<Context>
+							})
+						}
+					}
+					if (
+						context.observation !== undefined &&
+						unavailableReason(context.observation.facts) !== undefined
+					) {
+						{
+							return complete('unavailable', args, enq, {
+								target: 'unavailable',
+								context: {
+									result: {
+										outcome: 'unavailable',
+										reason: context.observation
+											? (unavailableReason(context.observation.facts) ?? 'profileUnavailable')
+											: 'profileUnavailable',
+										settlement: 'notStarted'
+									}
+								} satisfies Partial<Context>
+							})
+						}
+					}
+					if (
+						context.request !== undefined &&
+						context.observation !== undefined &&
+						sameProfileScope(context.request.scope, profileScope(context.observation.facts))
+					) {
+						return { target: 'saving' }
+					}
+					{
+						return complete('complete', args, enq, {
+							target: 'complete',
+							context: {
+								result: { outcome: 'scopeChanged', settlement: 'notStarted' }
+							} satisfies Partial<Context>
+						})
+					}
+				}
 			},
 			saving: {
 				initial: 'pending',
 				invoke: {
-					src: 'save',
+					src: actors.save,
 					input: ({ context }) => context,
-					onDone: [
-						{
-							guard: 'closing',
-							target: 'complete',
-							actions: assign({
-								result: ({ event }): Output => ({
-									outcome: 'closed',
-									settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+					onDone: (args, enq) => {
+						const { event } = args
+						if (matchesState({ saving: 'closing' }, args.value)) {
+							{
+								return complete('complete', args, enq, {
+									target: 'complete',
+									context: {
+										result: {
+											outcome: 'closed',
+											settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+										}
+									} satisfies Partial<Context>
 								})
-							})
-						},
-						{
-							guard: 'invalidated',
-							target: 'complete',
-							actions: assign({
-								result: ({ event }): Output => ({
-									outcome: 'scopeChanged',
-									settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+							}
+						}
+						if (matchesState({ saving: 'invalidated' }, args.value)) {
+							{
+								return complete('complete', args, enq, {
+									target: 'complete',
+									context: {
+										result: {
+											outcome: 'scopeChanged',
+											settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+										}
+									} satisfies Partial<Context>
 								})
-							})
-						},
-						{
-							guard: 'cancelling',
-							target: 'complete',
-							actions: assign({
-								result: ({ event }): Output => ({
-									outcome: 'cancelled',
-									settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+							}
+						}
+						if (matchesState({ saving: 'cancelling' }, args.value)) {
+							{
+								return complete('complete', args, enq, {
+									target: 'complete',
+									context: {
+										result: {
+											outcome: 'cancelled',
+											settlement: event.output === 'saved' ? options.settlement : 'notStarted'
+										}
+									} satisfies Partial<Context>
 								})
-							})
-						},
-						{
-							guard: ({ event }) => event.output === 'saved',
-							target: 'complete',
-							actions: assign({
-								result: (): Output => ({
-									outcome: 'succeeded',
-									value: undefined,
-									settlement: options.settlement
+							}
+						}
+						if (event.output === 'saved') {
+							{
+								return complete('complete', args, enq, {
+									target: 'complete',
+									context: {
+										result: {
+											outcome: 'succeeded',
+											value: undefined,
+											settlement: options.settlement
+										}
+									} satisfies Partial<Context>
 								})
-							})
-						},
+							}
+						}
 						{
-							target: 'unavailable',
-							actions: assign({
-								result: {
-									outcome: 'unavailable',
-									reason: 'profileUnavailable',
-									settlement: 'notStarted'
-								}
+							return complete('unavailable', args, enq, {
+								target: 'unavailable',
+								context: {
+									result: {
+										outcome: 'unavailable',
+										reason: 'profileUnavailable',
+										settlement: 'notStarted'
+									}
+								} satisfies Partial<Context>
 							})
 						}
-					],
-					onError: [
+					},
+					onError: (args, enq) => {
+						if (matchesState({ saving: 'closing' }, args.value)) {
+							{
+								return complete('complete', args, enq, {
+									target: 'complete',
+									context: {
+										result: formInterruptionResult('closed', undefined)
+									} satisfies Partial<Context>
+								})
+							}
+						}
+						if (matchesState({ saving: 'invalidated' }, args.value)) {
+							{
+								return complete('complete', args, enq, {
+									target: 'complete',
+									context: {
+										result: formInterruptionResult('scopeChanged', undefined)
+									} satisfies Partial<Context>
+								})
+							}
+						}
+						if (matchesState({ saving: 'cancelling' }, args.value)) {
+							{
+								return complete('complete', args, enq, {
+									target: 'complete',
+									context: {
+										result: formInterruptionResult('cancelled', undefined)
+									} satisfies Partial<Context>
+								})
+							}
+						}
 						{
-							guard: 'closing',
-							target: 'complete',
-							actions: assign({ result: () => formInterruptionResult('closed', undefined) })
-						},
-						{
-							guard: 'invalidated',
-							target: 'complete',
-							actions: assign({ result: () => formInterruptionResult('scopeChanged', undefined) })
-						},
-						{
-							guard: 'cancelling',
-							target: 'complete',
-							actions: assign({ result: () => formInterruptionResult('cancelled', undefined) })
-						},
-						{
-							target: 'complete',
-							actions: assign({
-								result: { outcome: 'failed', code: 'operationFailed', settlement: 'unknown' }
+							return complete('complete', args, enq, {
+								target: 'complete',
+								context: {
+									result: { outcome: 'failed', code: 'operationFailed', settlement: 'unknown' }
+								} satisfies Partial<Context>
 							})
 						}
-					]
+					}
 				},
 				on: {
-					CANCEL: '.cancelling',
-					INVALIDATE: '.invalidated',
-					SHUTDOWN: '.closing',
-					OBSERVE: {
-						guard: ({ context, event }) =>
-							context.request !== undefined &&
-							(!sameProfileScope(context.request.scope, profileScope(event.observation.facts)) ||
-								unavailableReason(event.observation.facts) !== undefined),
-						target: '.invalidated'
+					CANCEL: { target: '.cancelling' },
+					INVALIDATE: { target: '.invalidated' },
+					SHUTDOWN: { target: '.closing' },
+					OBSERVE: (args) => {
+						const { context, event } = args
+						if (
+							!(
+								context.request !== undefined &&
+								(!sameProfileScope(context.request.scope, profileScope(event.observation.facts)) ||
+									unavailableReason(event.observation.facts) !== undefined)
+							)
+						)
+							return
+						return { target: '.invalidated' }
 					}
 				},
 				states: {
@@ -237,8 +335,12 @@ export function createProfilePersistenceMachine<Values>(options: {
 					closing: { on: { CANCEL: {}, INVALIDATE: {}, SHUTDOWN: {}, OBSERVE: {} } }
 				}
 			},
-			unavailable: { type: 'final', entry: clear },
-			complete: { type: 'final', entry: clear }
+			unavailable: {
+				type: 'final'
+			},
+			complete: {
+				type: 'final'
+			}
 		}
 	})
 }

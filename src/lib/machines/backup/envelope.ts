@@ -1,4 +1,6 @@
-import { raise, assign, sendTo, setup } from 'xstate'
+import { types, setup } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import {
 	buildCheckedArchive,
 	buildSealedArchive,
@@ -14,9 +16,12 @@ import { envelopeCrypto, type EnvelopeCryptoEvent } from '../../backup/envelope-
 import { decodeBase64 } from '../../backup/binary.js'
 import { newPasswordHeader, parseEnvelope, type EnvelopeMode } from '../../backup/envelope.js'
 import { parseArchivePayload } from '../../backup/payload.js'
-
-export type ArchiveEnvelopeInput = { request: ArchiveEnvelopeRequest }
-export type ArchiveEnvelopeEvent = { type: 'CANCEL' | 'SHUTDOWN' }
+export type ArchiveEnvelopeInput = {
+	request: ArchiveEnvelopeRequest
+}
+export type ArchiveEnvelopeEvent = {
+	type: 'CANCEL' | 'SHUTDOWN'
+}
 type Event = ArchiveEnvelopeEvent | EnvelopeCryptoEvent | SynchronousEvent
 type Context = ArchiveEnvelopeInput & {
 	mode: EnvelopeMode | undefined
@@ -27,65 +32,74 @@ type Context = ArchiveEnvelopeInput & {
 	result: ArchiveEnvelopeResult | undefined
 }
 type SynchronousEvent =
-	| { type: 'SYNC_COMPLETED'; patch: Partial<Context> }
-	| { type: 'SYNC_APPLIED' }
+	| {
+			type: 'SYNC_COMPLETED'
+			patch: Partial<Context>
+	  }
+	| {
+			type: 'SYNC_APPLIED'
+	  }
 /** Single-use envelope owner. Native crypto drains on cancellation; actor stop only detaches it. */
 export function createArchiveEnvelopeMachine() {
 	const actors = { crypto: envelopeCrypto }
-	const model = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{ fail: undefined },
-		{ interrupted: undefined },
-		never,
-		string,
-		ArchiveEnvelopeInput,
-		ArchiveEnvelopeResult
-	>({
+	const patches = {
+		fail: ({
+			event
+		}: {
+			context: Context
+			event:
+				| Event
+				| {
+						type: 'xstate.error.actor'
+						error: unknown
+				  }
+		}): Partial<Context> => ({
+			result:
+				'error' in event
+					? envelopeFailure(event.error)
+					: event.type === 'CRYPTO_FAILED'
+						? event.failure
+						: envelopeFailure(undefined)
+		})
+	}
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				RELEASE: types<EventPayload<Event, 'RELEASE'>>(),
+				CRYPTO_DONE: types<EventPayload<Event, 'CRYPTO_DONE'>>(),
+				CRYPTO_FAILED: types<EventPayload<Event, 'CRYPTO_FAILED'>>(),
+				SYNC_COMPLETED: types<EventPayload<Event, 'SYNC_COMPLETED'>>(),
+				SYNC_APPLIED: types<EventPayload<Event, 'SYNC_APPLIED'>>()
+			},
+			input: types<ArchiveEnvelopeInput>(),
+			output: types<ArchiveEnvelopeResult>()
+		},
 		actors,
 		guards: {
-			interrupted: ({ context }) =>
+			interrupted: ({ context }: { context: Context }) =>
 				context.interruption !== undefined ||
 				context.result?.outcome === 'failed' ||
 				(context.acquired && envelopeData(context.request).initialMode === undefined)
 		},
-		actions: {
-			fail: assign({
-				result: ({ event }) =>
-					'error' in event
-						? envelopeFailure(event.error)
-						: event.type === 'CRYPTO_FAILED'
-							? event.failure
-							: envelopeFailure(undefined)
-			})
-		}
+		actions: {}
 	})
 	// Admit bounded synchronous transform failures; the chart selects cleanup and outcomes.
 	const synchronous = (run: (context: Context) => Partial<Context>) =>
-		model.createAction(({ context, self }) => {
-			try {
-				self.send({ type: 'SYNC_COMPLETED', patch: run(context) })
-			} catch (error) {
-				self.send({ type: 'SYNC_COMPLETED', patch: { result: envelopeFailure(error) } })
+		model.createStateConfig({
+			entry: ({ context, self }, enq) => {
+				enq(() => {
+					try {
+						self.send({ type: 'SYNC_COMPLETED', patch: run(context) })
+					} catch (error) {
+						self.send({ type: 'SYNC_COMPLETED', patch: { result: envelopeFailure(error) } })
+					}
+				})
 			}
-		})
+		}).entry
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
-	const failed = { target: '#archive-envelope.cleaning', actions: 'fail' } satisfies {
-		target: string
-		actions: 'fail'
-	}
-	const interrupted = {
-		guard: 'interrupted',
-		target: '#archive-envelope.cleaning',
-		actions: model.assign(({ context }) =>
-			context.interruption === undefined && context.result?.outcome !== 'failed'
-				? { result: { outcome: 'failed', code: 'resourceReleased' } }
-				: {}
-		)
-	} satisfies { guard: 'interrupted'; target: string; actions: unknown }
-	const advance = (target: string) => [interrupted, { target }]
 	return model.createMachine({
 		id: 'archive-envelope',
 		initial: 'claiming',
@@ -103,15 +117,26 @@ export function createArchiveEnvelopeMachine() {
 				? { outcome: context.interruption }
 				: (context.result ?? { outcome: 'failed', code: 'cryptoFailed' }),
 		on: {
-			SYNC_COMPLETED: {
-				actions: [
-					model.assign(({ event }) => (event.type === 'SYNC_COMPLETED' ? event.patch : {})),
-					raise({ type: 'SYNC_APPLIED' })
-				]
+			SYNC_COMPLETED: (args, enq) => {
+				const { event } = args
+				enq.raise({ type: 'SYNC_APPLIED' })
+				return {
+					context: (event.type === 'SYNC_COMPLETED' ? event.patch : {}) satisfies Partial<Context>
+				}
 			},
-			CANCEL: { actions: assign({ interruption: 'cancelled' }) },
-			SHUTDOWN: { actions: assign({ interruption: 'closed' }) },
-			RELEASE: { actions: assign({ result: { outcome: 'failed', code: 'resourceReleased' } }) }
+			CANCEL: (_args) => {
+				return { context: { interruption: 'cancelled' } satisfies Partial<Context> }
+			},
+			SHUTDOWN: (_args) => {
+				return { context: { interruption: 'closed' } satisfies Partial<Context> }
+			},
+			RELEASE: (_args) => {
+				return {
+					context: {
+						result: { outcome: 'failed', code: 'resourceReleased' }
+					} satisfies Partial<Context>
+				}
+			}
 		},
 		states: {
 			claiming: {
@@ -124,25 +149,45 @@ export function createArchiveEnvelopeMachine() {
 					}
 				}),
 				on: {
-					SYNC_APPLIED: [
-						{ guard: ({ context }) => !context.acquired, target: 'complete' },
-						{ guard: 'interrupted', target: 'cleaning' },
-						{
-							guard: ({ context }) => context.mode === 'sealPassword',
-							target: 'working.creatingPasswordHeader'
-						},
-						{
-							guard: ({ context }) => context.mode === 'sealPlain',
-							target: 'working.checkingAttachments'
-						},
-						{ target: 'working.parsingEnvelope' }
-					]
+					SYNC_APPLIED: (args) => {
+						const { context } = args
+						if (!context.acquired) {
+							return { target: 'complete' }
+						}
+						if (args.guards.interrupted(args)) {
+							return { target: 'cleaning' }
+						}
+						if (context.mode === 'sealPassword') {
+							return { target: 'working.creatingPasswordHeader' }
+						}
+						if (context.mode === 'sealPlain') {
+							return { target: 'working.checkingAttachments' }
+						}
+						return { target: 'working.parsingEnvelope' }
+					}
 				}
 			},
 			working: {
-				invoke: { id: 'crypto', src: 'crypto', input, onError: failed },
+				invoke: {
+					id: 'crypto',
+					src: actors.crypto,
+					input,
+					onError: (args) => {
+						return {
+							target: '#archive-envelope.cleaning',
+							context: ((args) => patches.fail(args))(args) satisfies Partial<Context>
+						}
+					}
+				},
 				initial: 'parsingEnvelope',
-				on: { CRYPTO_FAILED: failed },
+				on: {
+					CRYPTO_FAILED: (args) => {
+						return {
+							target: '#archive-envelope.cleaning',
+							context: ((args) => patches.fail(args))(args) satisfies Partial<Context>
+						}
+					}
+				},
 				states: {
 					parsingEnvelope: {
 						entry: synchronous(({ request }) => {
@@ -154,14 +199,22 @@ export function createArchiveEnvelopeMachine() {
 							return { mode: envelope.protection === 'none' ? 'openPlain' : 'openPassword' }
 						}),
 						on: {
-							SYNC_APPLIED: [
-								interrupted,
-								{
-									guard: ({ context }) => context.mode === 'openPlain',
-									target: 'decodingPlainEnvelope'
-								},
-								{ target: 'decodingPasswordEnvelope' }
-							]
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								if (context.mode === 'openPlain') {
+									return { target: 'decodingPlainEnvelope' }
+								}
+								return { target: 'decodingPasswordEnvelope' }
+							}
 						}
 					},
 					decodingPlainEnvelope: {
@@ -175,7 +228,21 @@ export function createArchiveEnvelopeMachine() {
 							data.parsedEnvelope = undefined
 							return {}
 						}),
-						on: { SYNC_APPLIED: advance('hashingPayload') }
+						on: {
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'hashingPayload' }
+							}
+						}
 					},
 					decodingPasswordEnvelope: {
 						entry: synchronous(({ request }) => {
@@ -189,125 +256,298 @@ export function createArchiveEnvelopeMachine() {
 							data.parsedEnvelope = undefined
 							return {}
 						}),
-						on: { SYNC_APPLIED: advance('importingPassword') }
+						on: {
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'importingPassword' }
+							}
+						}
 					},
 					creatingPasswordHeader: {
 						entry: synchronous(({ request }) => {
 							envelopeData(request).header = newPasswordHeader()
 							return {}
 						}),
-						on: { SYNC_APPLIED: advance('checkingAttachments') }
+						on: {
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'checkingAttachments' }
+							}
+						}
 					},
 					checkingAttachments: {
-						always: [
-							interrupted,
-							{
-								guard: ({ context }) => context.attachmentIndex < context.attachmentCount,
-								target: 'hashingAttachment'
-							},
-							{
-								guard: ({ context }) => context.mode === 'sealPassword',
-								target: 'importingPassword'
-							},
-							{ guard: ({ context }) => context.mode === 'sealPlain', target: 'hashingPayload' },
-							{ target: 'buildingChecked' }
-						]
+						always: (args) => {
+							const { context } = args
+							if (args.guards.interrupted(args)) {
+								return {
+									target: '#archive-envelope.cleaning',
+									context: (context.interruption === undefined &&
+									context.result?.outcome !== 'failed'
+										? { result: { outcome: 'failed', code: 'resourceReleased' } }
+										: {}) satisfies Partial<Context>
+								}
+							}
+							if (context.attachmentIndex < context.attachmentCount) {
+								return { target: 'hashingAttachment' }
+							}
+							if (context.mode === 'sealPassword') {
+								return { target: 'importingPassword' }
+							}
+							if (context.mode === 'sealPlain') {
+								return { target: 'hashingPayload' }
+							}
+							return { target: 'buildingChecked' }
+						}
 					},
 					hashingAttachment: {
-						entry: sendTo('crypto', ({ context }) => ({
-							type: 'HASH_ATTACHMENT',
-							index: context.attachmentIndex
-						})),
-						on: { CRYPTO_DONE: advance('checkingAttachmentDigest') }
+						entry: (args, enq) => {
+							enq.sendTo('crypto', {
+								type: 'HASH_ATTACHMENT',
+								index: args.context.attachmentIndex
+							})
+						},
+						on: {
+							CRYPTO_DONE: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'checkingAttachmentDigest' }
+							}
+						}
 					},
 					checkingAttachmentDigest: {
-						always: [
-							interrupted,
-							{
-								guard: ({ context }) => {
+						always: (args) => {
+							const { context } = args
+							if (args.guards.interrupted(args)) {
+								return {
+									target: '#archive-envelope.cleaning',
+									context: (context.interruption === undefined &&
+									context.result?.outcome !== 'failed'
+										? { result: { outcome: 'failed', code: 'resourceReleased' } }
+										: {}) satisfies Partial<Context>
+								}
+							}
+							if (
+								(({ context }) => {
 									const data = envelopeData(context.request)
 									return (
 										data.attachmentDigest !== undefined &&
 										data.attachmentDigest ===
 											data.payload?.attachments[context.attachmentIndex]?.sha256
 									)
-								},
-								target: 'checkingAttachments',
-								actions: assign({ attachmentIndex: ({ context }) => context.attachmentIndex + 1 })
-							},
-							{
-								target: '#archive-envelope.cleaning',
-								actions: assign({ result: { outcome: 'failed', code: 'integrityMismatch' } })
+								})(args)
+							) {
+								return {
+									target: 'checkingAttachments',
+									context: {
+										attachmentIndex: context.attachmentIndex + 1
+									} satisfies Partial<Context>
+								}
 							}
-						]
+							return {
+								target: '#archive-envelope.cleaning',
+								context: {
+									result: { outcome: 'failed', code: 'integrityMismatch' }
+								} satisfies Partial<Context>
+							}
+						}
 					},
 					importingPassword: {
-						entry: sendTo('crypto', { type: 'IMPORT_PASSWORD' }),
-						on: { CRYPTO_DONE: advance('derivingKey') }
+						entry: (args, enq) => {
+							enq.sendTo('crypto', { type: 'IMPORT_PASSWORD' })
+						},
+						on: {
+							CRYPTO_DONE: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'derivingKey' }
+							}
+						}
 					},
 					derivingKey: {
-						entry: sendTo('crypto', ({ context }) => ({
-							type: 'DERIVE_KEY',
-							usage: context.mode === 'sealPassword' ? 'encrypt' : 'decrypt'
-						})),
+						entry: (args, enq) => {
+							enq.sendTo('crypto', {
+								type: 'DERIVE_KEY',
+								usage: args.context.mode === 'sealPassword' ? 'encrypt' : 'decrypt'
+							})
+						},
 						on: {
-							CRYPTO_DONE: [
-								interrupted,
-								{ guard: ({ context }) => context.mode === 'sealPassword', target: 'encrypting' },
-								{ target: 'decrypting' }
-							]
+							CRYPTO_DONE: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								if (context.mode === 'sealPassword') {
+									return { target: 'encrypting' }
+								}
+								return { target: 'decrypting' }
+							}
 						},
 						exit: ({ context }) => {
 							envelopeData(context.request).material = undefined
 						}
 					},
 					encrypting: {
-						entry: sendTo('crypto', { type: 'ENCRYPT' }),
-						on: { CRYPTO_DONE: advance('buildingEnvelope') },
+						entry: (args, enq) => {
+							enq.sendTo('crypto', { type: 'ENCRYPT' })
+						},
+						on: {
+							CRYPTO_DONE: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'buildingEnvelope' }
+							}
+						},
 						exit: ({ context }) => {
 							envelopeData(context.request).key = undefined
 						}
 					},
 					decrypting: {
-						entry: sendTo('crypto', { type: 'DECRYPT' }),
-						on: { CRYPTO_DONE: advance('checkingPlaintextBounds') },
+						entry: (args, enq) => {
+							enq.sendTo('crypto', { type: 'DECRYPT' })
+						},
+						on: {
+							CRYPTO_DONE: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'checkingPlaintextBounds' }
+							}
+						},
 						exit: ({ context }) => {
 							envelopeData(context.request).key = undefined
 						}
 					},
 					checkingPlaintextBounds: {
-						always: [
-							interrupted,
-							{
-								guard: ({ context }) =>
-									(envelopeData(context.request).bytes?.length ?? Infinity) <=
-									envelopeData(context.request).limits.payloadBytes,
-								target: 'hashingPayload'
-							},
-							{
-								target: '#archive-envelope.cleaning',
-								actions: assign({ result: { outcome: 'failed', code: 'limitExceeded' } })
+						always: (args) => {
+							const { context } = args
+							if (args.guards.interrupted(args)) {
+								return {
+									target: '#archive-envelope.cleaning',
+									context: (context.interruption === undefined &&
+									context.result?.outcome !== 'failed'
+										? { result: { outcome: 'failed', code: 'resourceReleased' } }
+										: {}) satisfies Partial<Context>
+								}
 							}
-						]
+							if (
+								(envelopeData(context.request).bytes?.length ?? Infinity) <=
+								envelopeData(context.request).limits.payloadBytes
+							) {
+								return { target: 'hashingPayload' }
+							}
+							return {
+								target: '#archive-envelope.cleaning',
+								context: {
+									result: { outcome: 'failed', code: 'limitExceeded' }
+								} satisfies Partial<Context>
+							}
+						}
 					},
 					hashingPayload: {
-						entry: sendTo('crypto', { type: 'HASH_PAYLOAD' }),
-						on: { CRYPTO_DONE: advance('checkingPayloadDigest') }
+						entry: (args, enq) => {
+							enq.sendTo('crypto', { type: 'HASH_PAYLOAD' })
+						},
+						on: {
+							CRYPTO_DONE: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'checkingPayloadDigest' }
+							}
+						}
 					},
 					checkingPayloadDigest: {
-						always: [
-							interrupted,
-							{
-								guard: ({ context }) => {
+						always: (args) => {
+							const { context } = args
+							if (args.guards.interrupted(args)) {
+								return {
+									target: '#archive-envelope.cleaning',
+									context: (context.interruption === undefined &&
+									context.result?.outcome !== 'failed'
+										? { result: { outcome: 'failed', code: 'resourceReleased' } }
+										: {}) satisfies Partial<Context>
+								}
+							}
+							if (
+								(({ context }) => {
 									const data = envelopeData(context.request)
 									return data.expectedDigest !== undefined && data.expectedDigest !== data.digest
-								},
-								target: '#archive-envelope.cleaning',
-								actions: assign({ result: { outcome: 'failed', code: 'integrityMismatch' } })
-							},
-							{ guard: ({ context }) => context.mode === 'sealPlain', target: 'buildingEnvelope' },
-							{ target: 'parsingPayload' }
-						]
+								})(args)
+							) {
+								return {
+									target: '#archive-envelope.cleaning',
+									context: {
+										result: { outcome: 'failed', code: 'integrityMismatch' }
+									} satisfies Partial<Context>
+								}
+							}
+							if (context.mode === 'sealPlain') {
+								return { target: 'buildingEnvelope' }
+							}
+							return { target: 'parsingPayload' }
+						}
 					},
 					parsingPayload: {
 						entry: synchronous(({ request }) => {
@@ -315,24 +555,66 @@ export function createArchiveEnvelopeMachine() {
 							data.payload = parseArchivePayload(requireEnvelopeValue(data.bytes), data.limits)
 							return { attachmentCount: data.payload.attachments.length }
 						}),
-						on: { SYNC_APPLIED: advance('checkingAttachments') }
+						on: {
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'checkingAttachments' }
+							}
+						}
 					},
 					transferring: {
 						entry: synchronous(({ request }) => {
 							clearEnvelopeData(request, true)
 							return {}
 						}),
-						on: { SYNC_APPLIED: '#archive-envelope.cleaning' }
+						on: { SYNC_APPLIED: { target: '#archive-envelope.cleaning' } }
 					},
 					buildingEnvelope: {
 						entry: synchronous(({ request, mode }) => ({
 							result: buildSealedArchive(request, requireEnvelopeValue(mode))
 						})),
-						on: { SYNC_APPLIED: [interrupted, { target: 'transferring' }] }
+						on: {
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'transferring' }
+							}
+						}
 					},
 					buildingChecked: {
 						entry: synchronous(({ request }) => ({ result: buildCheckedArchive(request) })),
-						on: { SYNC_APPLIED: [interrupted, { target: 'transferring' }] }
+						on: {
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return {
+										target: '#archive-envelope.cleaning',
+										context: (context.interruption === undefined &&
+										context.result?.outcome !== 'failed'
+											? { result: { outcome: 'failed', code: 'resourceReleased' } }
+											: {}) satisfies Partial<Context>
+									}
+								}
+								return { target: 'transferring' }
+							}
+						}
 					}
 				},
 				// Dispose before the native child stops; successful output is transferred, all other data revoked.
@@ -348,7 +630,7 @@ export function createArchiveEnvelopeMachine() {
 						context.result.archive.release()
 					return {}
 				}),
-				on: { SYNC_APPLIED: 'complete' }
+				on: { SYNC_APPLIED: { target: 'complete' } }
 			},
 			complete: { type: 'final' }
 		}

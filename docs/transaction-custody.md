@@ -66,9 +66,15 @@ need normal supervision of root actor errors.
 
 ## Qualification
 
-Real XState tests cover stop during acquisition/read/stage/commit, owner transition crashes,
+Historical v5 XState tests cover stop during acquisition/read/stage/commit, owner transition crashes,
 confirmed graceful completion without detachment, uncertain rollback custody, and the invitation
 output handoff without a second owner. The Jazz adapter fixture additionally opens a real exclusive
 transaction, stops its workflow, awaits the handed-off pending read, and rolls it back from the
 host. This qualifies that bounded SDK boundary, not arbitrary host recovery policies or process
 termination. See the active feature implementation notes for final run results.
+
+The v6 candidate retains the owner-error observation workaround until it is
+requalified. Receipt state now lives in a closure behind a frozen interface with
+readonly getters and explicit recording/clearing methods, so development context
+freezing does not freeze a mutable receipt holder. The workflow still owns all
+settlement decisions. The historical checks above are not v6 qualification.

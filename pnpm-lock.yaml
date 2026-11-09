@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  xstate@6.0.0-beta.1:
+    hash: 3d8d5bc554296bd095fb22da6853d91097a8aa418b5035f33ded03813f86278e
+    path: patches/xstate@6.0.0-beta.1.patch
+
 importers:
 
   .:
@@ -76,8 +81,8 @@ importers:
         specifier: 4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0))
       xstate:
-        specifier: 5.33.2
-        version: 5.33.2
+        specifier: 6.0.0-beta.1
+        version: 6.0.0-beta.1(patch_hash=3d8d5bc554296bd095fb22da6853d91097a8aa418b5035f33ded03813f86278e)
 
 packages:
 
@@ -2506,8 +2511,9 @@ packages:
     resolution: {integrity: sha512-h3Fbisa2nKGPxCpm89Hk33lBLsnaGBvctQopaBSOW/uIs6FTe1ATyAnKFJrzVs9vpGdsTe73WF3V4lIsk4Gacw==}
     engines: {node: '>=18'}
 
-  xstate@5.33.2:
-    resolution: {integrity: sha512-8tC7yXgeCvpT8gKEeEje6ikJJG1wpnoLiXe+HfECW8m10ubMd3QxKOwWA8KxPJVBcLwfdRoMKYxIBGYKmo37/A==}
+  xstate@6.0.0-beta.1:
+    resolution: {integrity: sha512-HzG+CdBxkxcqBv91aUfbscjKhREhnu949en+Ype3kIZ0cUVmK7LsPWU06GMyu+O7z9bIq52eDPQfzlUM7AtJ9g==}
+    hasBin: true
 
   zimmerframe@1.1.2:
     resolution: {integrity: sha512-rAbqEGa8ovJy4pyBxZM70hg4pE6gDgaQ0Sl9M3enG3I0d6H4XSAM3GeNGLKnsBpuijUow064sf7ww1nutC5/3w==}
@@ -4511,7 +4517,7 @@ snapshots:
     dependencies:
       is-wsl: 3.1.1
 
-  xstate@5.33.2: {}
+  xstate@6.0.0-beta.1(patch_hash=3d8d5bc554296bd095fb22da6853d91097a8aa418b5035f33ded03813f86278e): {}
 
   zimmerframe@1.1.2: {}
 

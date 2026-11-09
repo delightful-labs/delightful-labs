@@ -1,4 +1,4 @@
-import { fromCallback } from 'xstate'
+import { createCallbackLogic } from 'xstate'
 import {
 	PersistedWriteRejectedError,
 	type Db,
@@ -371,7 +371,7 @@ export function clearJazzExport(request: JazzArchiveExportRequest) {
 	scope.verdict = undefined
 }
 /** Direct native custody survives a failed reader and XState's unexpected-error stop ordering. */
-export const jazzExportResources = fromCallback<
+export const jazzExportResources = createCallbackLogic<
 	{ type: string },
 	{
 		request: JazzArchiveExportRequest

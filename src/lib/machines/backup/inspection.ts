@@ -1,4 +1,6 @@
-import { raise, assign, sendTo, setup } from 'xstate'
+import { types, setup } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type { ArchiveEnvelopeRequest } from '../../backup/envelope-operation.js'
 import { createArchiveEnvelopeMachine } from './envelope.js'
 import {
@@ -16,9 +18,12 @@ import {
 	type InspectionValidation
 } from '../../backup/inspection.js'
 import { inspectionReads, type InspectionReadEvent } from '../../backup/inspection-native.js'
-
-export type ArchiveInspectionInput = { request: ArchiveInspectionRequest }
-export type ArchiveInspectionEvent = { type: 'CANCEL' | 'SHUTDOWN' }
+export type ArchiveInspectionInput = {
+	request: ArchiveInspectionRequest
+}
+export type ArchiveInspectionEvent = {
+	type: 'CANCEL' | 'SHUTDOWN'
+}
 type Event = ArchiveInspectionEvent | InspectionReadEvent | SynchronousEvent
 type Context = ArchiveInspectionInput & {
 	envelope: ArchiveEnvelopeRequest | undefined
@@ -31,57 +36,74 @@ type Context = ArchiveInspectionInput & {
 	result: ArchiveInspectionResult | undefined
 }
 type SynchronousEvent =
-	| { type: 'SYNC_COMPLETED'; patch: Partial<Context> }
-	| { type: 'SYNC_APPLIED' }
+	| {
+			type: 'SYNC_COMPLETED'
+			patch: Partial<Context>
+	  }
+	| {
+			type: 'SYNC_APPLIED'
+	  }
 export function createArchiveInspectionMachine() {
 	const actors = { reads: inspectionReads, open: createArchiveEnvelopeMachine() }
-	const model = setup<
-		Context,
-		Event,
-		typeof actors,
-		{},
-		{ fail: undefined; revoke: undefined },
-		{ interrupted: undefined },
-		never,
-		string,
-		ArchiveInspectionInput,
-		ArchiveInspectionResult
-	>({
+	const patches = {
+		fail: ({
+			event
+		}: {
+			context: Context
+			event:
+				| Event
+				| {
+						type: 'xstate.error.actor'
+						error: unknown
+				  }
+		}): Partial<Context> => ({
+			result:
+				'error' in event
+					? inspectionFailure(event.error)
+					: event.type === 'READ_FAILED'
+						? event.failure
+						: inspectionFailure(undefined)
+		}),
+		revoke: (_args: { context: Context }): Partial<Context> => ({
+			result: { outcome: 'failed', code: 'inspectionFailed' }
+		})
+	}
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				RELEASE: types<EventPayload<Event, 'RELEASE'>>(),
+				SOURCE_READY: types<EventPayload<Event, 'SOURCE_READY'>>(),
+				PASSWORD_READY: types<EventPayload<Event, 'PASSWORD_READY'>>(),
+				READ_FAILED: types<EventPayload<Event, 'READ_FAILED'>>(),
+				SYNC_COMPLETED: types<EventPayload<Event, 'SYNC_COMPLETED'>>(),
+				SYNC_APPLIED: types<EventPayload<Event, 'SYNC_APPLIED'>>()
+			},
+			input: types<ArchiveInspectionInput>(),
+			output: types<ArchiveInspectionResult>()
+		},
 		actors,
 		guards: {
-			interrupted: ({ context }) =>
+			interrupted: ({ context }: { context: Context }) =>
 				context.interruption !== undefined || context.result?.outcome === 'failed'
 		},
-		actions: {
-			fail: assign({
-				result: ({ event }) =>
-					'error' in event
-						? inspectionFailure(event.error)
-						: event.type === 'READ_FAILED'
-							? event.failure
-							: inspectionFailure(undefined)
-			}),
-			revoke: assign({ result: { outcome: 'failed', code: 'inspectionFailed' } })
-		}
+		actions: {}
 	})
 	const synchronous = (run: (context: Context) => Partial<Context>) =>
-		model.createAction(({ context, self }) => {
-			try {
-				self.send({ type: 'SYNC_COMPLETED', patch: run(context) })
-			} catch (error) {
-				self.send({ type: 'SYNC_COMPLETED', patch: { result: inspectionFailure(error) } })
+		model.createStateConfig({
+			entry: ({ context, self }, enq) => {
+				enq(() => {
+					try {
+						self.send({ type: 'SYNC_COMPLETED', patch: run(context) })
+					} catch (error) {
+						self.send({ type: 'SYNC_COMPLETED', patch: { result: inspectionFailure(error) } })
+					}
+				})
 			}
-		})
+		}).entry
 	const input = ({ context }: { context: Context }) => ({ request: context.request })
-	const fail = { target: '#archive-inspection.cleaning', actions: 'fail' } satisfies {
-		target: string
-		actions: 'fail'
-	}
-	const interrupted = { guard: 'interrupted', target: '#archive-inspection.cleaning' } satisfies {
-		guard: 'interrupted'
-		target: string
-	}
-	const advance = (target: string) => [interrupted, { target }]
 	return model.createMachine({
 		id: 'archive-inspection',
 		initial: 'claiming',
@@ -101,14 +123,19 @@ export function createArchiveInspectionMachine() {
 				? { outcome: context.interruption }
 				: (context.result ?? { outcome: 'failed', code: 'inspectionFailed' }),
 		on: {
-			SYNC_COMPLETED: {
-				actions: [
-					model.assign(({ event }) => (event.type === 'SYNC_COMPLETED' ? event.patch : {})),
-					raise({ type: 'SYNC_APPLIED' })
-				]
+			SYNC_COMPLETED: (args, enq) => {
+				const { event } = args
+				enq.raise({ type: 'SYNC_APPLIED' })
+				return {
+					context: (event.type === 'SYNC_COMPLETED' ? event.patch : {}) satisfies Partial<Context>
+				}
 			},
-			CANCEL: { actions: assign({ interruption: 'cancelled' }) },
-			SHUTDOWN: { actions: assign({ interruption: 'closed' }) }
+			CANCEL: (_args) => {
+				return { context: { interruption: 'cancelled' } satisfies Partial<Context> }
+			},
+			SHUTDOWN: (_args) => {
+				return { context: { interruption: 'closed' } satisfies Partial<Context> }
+			}
 		},
 		states: {
 			claiming: {
@@ -117,99 +144,160 @@ export function createArchiveInspectionMachine() {
 					hasPassword: claimInspectionRequest(request)
 				})),
 				on: {
-					SYNC_APPLIED: [
-						{ guard: ({ context }) => !context.acquired, target: 'complete' },
-						{ guard: 'interrupted', target: 'cleaning' },
-						{ target: 'working' }
-					]
+					SYNC_APPLIED: (args) => {
+						if (!args.context.acquired) {
+							return { target: 'complete' }
+						}
+						if (args.guards.interrupted(args)) {
+							return { target: 'cleaning' }
+						}
+						return { target: 'working' }
+					}
 				}
 			},
 			working: {
-				invoke: { id: 'reads', src: 'reads', input, onError: fail },
+				invoke: {
+					id: 'reads',
+					src: actors.reads,
+					input,
+					onError: (args) => {
+						return {
+							target: '#archive-inspection.cleaning',
+							context: ((args) => patches.fail(args))(args) satisfies Partial<Context>
+						}
+					}
+				},
 				initial: 'reading',
 				on: {
-					CANCEL: {
-						actions: [
-							assign({ interruption: 'cancelled' }),
-							sendTo('reads', { type: 'ABORT_READ' })
-						]
+					CANCEL: (args, enq) => {
+						enq.sendTo('reads', { type: 'ABORT_READ' })
+						return {
+							context: { interruption: 'cancelled' } satisfies Partial<Context>
+						}
 					},
-					SHUTDOWN: {
-						actions: [assign({ interruption: 'closed' }), sendTo('reads', { type: 'ABORT_READ' })]
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('reads', { type: 'ABORT_READ' })
+						return { context: { interruption: 'closed' } satisfies Partial<Context> }
 					},
-					RELEASE: { actions: ['revoke', sendTo('reads', { type: 'ABORT_READ' })] },
-					READ_FAILED: fail
+					RELEASE: (args, enq) => {
+						enq.sendTo('reads', { type: 'ABORT_READ' })
+						return { context: patches.revoke(args) satisfies Partial<Context> }
+					},
+					READ_FAILED: (args) => {
+						return {
+							target: '#archive-inspection.cleaning',
+							context: ((args) => patches.fail(args))(args) satisfies Partial<Context>
+						}
+					}
 				},
 				states: {
 					reading: {
-						entry: sendTo('reads', { type: 'READ_SOURCE' }),
-						on: { SOURCE_READY: advance('checkingSource') }
+						entry: (args, enq) => {
+							enq.sendTo('reads', { type: 'READ_SOURCE' })
+						},
+						on: {
+							SOURCE_READY: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								return { target: 'checkingSource' }
+							}
+						}
 					},
 					checkingSource: {
 						entry: synchronous(({ request }) => ({ protection: inspectSourceHeader(request) })),
 						on: {
-							SYNC_APPLIED: [
-								interrupted,
-								{
-									guard: ({ context }) => context.protection === 'password' && !context.hasPassword,
-									target: '#archive-inspection.cleaning',
-									actions: assign({ result: { outcome: 'passwordRequired' } })
-								},
-								{
-									guard: ({ context }) => context.protection === 'password',
-									target: 'readingPassword'
-								},
-								{ target: 'preparingEnvelope' }
-							]
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								if (context.protection === 'password' && !context.hasPassword) {
+									return {
+										target: '#archive-inspection.cleaning',
+										context: { result: { outcome: 'passwordRequired' } } satisfies Partial<Context>
+									}
+								}
+								if (context.protection === 'password') {
+									return { target: 'readingPassword' }
+								}
+								return { target: 'preparingEnvelope' }
+							}
 						}
 					},
 					readingPassword: {
-						entry: sendTo('reads', { type: 'READ_PASSWORD' }),
-						on: { PASSWORD_READY: advance('preparingEnvelope') }
+						entry: (args, enq) => {
+							enq.sendTo('reads', { type: 'READ_PASSWORD' })
+						},
+						on: {
+							PASSWORD_READY: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								return { target: 'preparingEnvelope' }
+							}
+						}
 					},
 					preparingEnvelope: {
 						entry: synchronous(({ request }) => ({ envelope: prepareInspectionEnvelope(request) })),
-						on: { SYNC_APPLIED: advance('opening') }
+						on: {
+							SYNC_APPLIED: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								return { target: 'opening' }
+							}
+						}
 					},
 					opening: {
 						on: {
-							CANCEL: {
-								actions: [
-									assign({ interruption: 'cancelled' }),
-									sendTo('envelope', { type: 'CANCEL' })
-								]
+							CANCEL: (args, enq) => {
+								enq.sendTo('envelope', { type: 'CANCEL' })
+								return {
+									context: { interruption: 'cancelled' } satisfies Partial<Context>
+								}
 							},
-							SHUTDOWN: {
-								actions: [
-									assign({ interruption: 'closed' }),
-									sendTo('envelope', { type: 'SHUTDOWN' })
-								]
+							SHUTDOWN: (args, enq) => {
+								enq.sendTo('envelope', { type: 'SHUTDOWN' })
+								return {
+									context: { interruption: 'closed' } satisfies Partial<Context>
+								}
 							},
-							RELEASE: { actions: ['revoke', sendTo('envelope', { type: 'SHUTDOWN' })] }
+							RELEASE: (args, enq) => {
+								enq.sendTo('envelope', { type: 'SHUTDOWN' })
+								return { context: patches.revoke(args) satisfies Partial<Context> }
+							}
 						},
 						invoke: {
 							id: 'envelope',
-							src: 'open',
+							src: actors.open,
 							input: ({ context }) => ({ request: requireInspectionValue(context.envelope) }),
-							onError: fail,
-							onDone: [
-								interrupted,
-								{
-									guard: ({ event }) => event.output.outcome === 'integrityChecked',
-									target: 'matchingProfile'
-								},
-								{
+							onError: (args) => {
+								return {
 									target: '#archive-inspection.cleaning',
-									actions: assign({
-										result: ({ event }): ArchiveInspectionResult =>
+									context: ((args) => patches.fail(args))(args) satisfies Partial<Context>
+								}
+							},
+							onDone: (args) => {
+								const { event } = args
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								if (event.output.outcome === 'integrityChecked') {
+									return { target: 'matchingProfile' }
+								}
+								return {
+									target: '#archive-inspection.cleaning',
+									context: {
+										result:
 											event.output.outcome === 'failed' ||
 											event.output.outcome === 'cancelled' ||
 											event.output.outcome === 'closed'
 												? event.output
 												: { outcome: 'failed', code: 'inspectionFailed' }
-									})
+									} satisfies Partial<Context>
 								}
-							]
+							}
 						}
 					},
 					matchingProfile: {
@@ -217,16 +305,21 @@ export function createArchiveInspectionMachine() {
 							profileIndex: matchInspectionProfile(request)
 						})),
 						on: {
-							SYNC_APPLIED: [
-								interrupted,
-								{
-									guard: ({ context }) =>
-										context.profileIndex !== undefined && context.profileIndex < 0,
-									target: 'buildingReport',
-									actions: assign({ validation: 'integrityValidProfileUnsupported' })
-								},
-								{ target: 'inspectingProfile' }
-							]
+							SYNC_APPLIED: (args) => {
+								const { context } = args
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								if (context.profileIndex !== undefined && context.profileIndex < 0) {
+									return {
+										target: 'buildingReport',
+										context: {
+											validation: 'integrityValidProfileUnsupported'
+										} satisfies Partial<Context>
+									}
+								}
+								return { target: 'inspectingProfile' }
+							}
 						}
 					},
 					inspectingProfile: {
@@ -235,7 +328,14 @@ export function createArchiveInspectionMachine() {
 								? 'profileValid'
 								: 'profileInvalid'
 						})),
-						on: { SYNC_APPLIED: advance('buildingReport') }
+						on: {
+							SYNC_APPLIED: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								return { target: 'buildingReport' }
+							}
+						}
 					},
 					buildingReport: {
 						entry: synchronous(({ request, protection, validation }) => ({
@@ -244,11 +344,18 @@ export function createArchiveInspectionMachine() {
 								report: buildInspectionReport(request, requireInspectionValue(protection))
 							}
 						})),
-						on: { SYNC_APPLIED: advance('transferringReport') }
+						on: {
+							SYNC_APPLIED: (args) => {
+								if (args.guards.interrupted(args)) {
+									return { target: '#archive-inspection.cleaning' }
+								}
+								return { target: 'transferringReport' }
+							}
+						}
 					},
 					transferringReport: {
 						entry: ({ context }) => clearInspectionData(context.request, true),
-						always: '#archive-inspection.cleaning'
+						always: { target: '#archive-inspection.cleaning' }
 					}
 				},
 				exit: ({ context }) => clearInspectionData(context.request)
@@ -260,7 +367,7 @@ export function createArchiveInspectionMachine() {
 						context.result.report.release()
 					return {}
 				}),
-				on: { SYNC_APPLIED: 'complete' }
+				on: { SYNC_APPLIED: { target: 'complete' } }
 			},
 			complete: { type: 'final' }
 		}

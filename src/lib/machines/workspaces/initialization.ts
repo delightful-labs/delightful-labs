@@ -1,13 +1,29 @@
-import { assign, fromPromise, sendTo, setup, type ActorLogic, type Snapshot } from 'xstate'
-export type InitializationEvent = { type: 'CANCEL' } | { type: 'SHUTDOWN' }
+import { types, createAsyncLogic, setup, type ActorLogic, type Snapshot } from 'xstate'
+import { createFinalTransitions } from '../finalize.js'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
+export type InitializationEvent =
+	| {
+			type: 'CANCEL'
+	  }
+	| {
+			type: 'SHUTDOWN'
+	  }
 export type InitializationRecords = {
-	identities: readonly { id: string; initialWorkspaceId?: string | null | undefined }[]
+	identities: readonly {
+		id: string
+		initialWorkspaceId?: string | null | undefined
+	}[]
 	workspaces: readonly unknown[]
 	serverConfigured: boolean
 }
 export type InitializationOutcome<Persistence> =
 	| Persistence
-	| { outcome: 'ready'; identityId: string; workspaceId: string }
+	| {
+			outcome: 'ready'
+			identityId: string
+			workspaceId: string
+	  }
 	| {
 			outcome: 'unavailable'
 			reason:
@@ -16,37 +32,65 @@ export type InitializationOutcome<Persistence> =
 				| 'identityMissing'
 				| 'duplicateIdentities'
 	  }
-	| { outcome: 'failed'; settlement: 'notStarted' | 'unresolved'; error: unknown }
-	| { outcome: 'closed' | 'cancelled'; settlement: 'notStarted' }
+	| {
+			outcome: 'failed'
+			settlement: 'notStarted' | 'unresolved'
+			error: unknown
+	  }
+	| {
+			outcome: 'closed' | 'cancelled'
+			settlement: 'notStarted'
+	  }
 export type BootstrapLogic<Db, Attempt, S extends Snapshot<unknown>> = ActorLogic<
 	S,
 	InitializationEvent,
-	{ db: Db; attempt: Attempt; purpose?: 'additional' | 'bootstrap' }
+	{
+		db: Db
+		attempt: Attempt
+		purpose?: 'additional' | 'bootstrap'
+	}
 >
 export function createWorkspaceInitialization<
 	Db,
 	Tier,
 	Attempt,
-	Persistence extends { outcome: string },
+	Persistence extends {
+		outcome: string
+	},
 	S extends Snapshot<Persistence>
 >(options: {
-	tiers: { local: Tier; authority: Tier }
+	tiers: {
+		local: Tier
+		authority: Tier
+	}
 	discover: (input: { db: Db; userId: string; tier: Tier }) => Promise<InitializationRecords>
 	prepareInitial: (input: { db: Db; userId: string }) => Promise<Attempt>
-	selectReady: (attempt: Attempt) => { identityId: string; workspaceId: string }
+	selectReady: (attempt: Attempt) => {
+		identityId: string
+		workspaceId: string
+	}
 	transaction: BootstrapLogic<Db, Attempt, S>
 }) {
-	type Input = { db: Db; userId: string }
+	type Input = {
+		db: Db
+		userId: string
+	}
 	type Records = InitializationRecords
 	type WorkspaceCreationAttempt = Attempt
 	type WorkspacePersistenceEvent = InitializationEvent
 	type WorkspaceInitializationResult = InitializationOutcome<Persistence>
-	const discover = fromPromise(async ({ input }: { input: Input & { tier: Tier } }) =>
-		options.discover(input)
-	)
-	const prepareInitial = fromPromise(async ({ input }: { input: Input }) =>
-		options.prepareInitial(input)
-	)
+	const discover = createAsyncLogic({
+		run: async ({
+			input
+		}: {
+			input: Input & {
+				tier: Tier
+			}
+		}) => options.discover(input)
+	})
+	const prepareInitial = createAsyncLogic({
+		run: async ({ input }: { input: Input }) => options.prepareInitial(input)
+	})
 	type Context = Input & {
 		records: Records | undefined
 		attempt: WorkspaceCreationAttempt | undefined
@@ -56,30 +100,120 @@ export function createWorkspaceInitialization<
 		if (value === undefined) throw new Error('Missing workspace initialization observation')
 		return value
 	}
-
 	/** Initialization provenance is independent of the active workspace/route. No writes on empty cache alone. */
-	const machine = setup<
-		Context,
-		WorkspacePersistenceEvent,
-		{
-			discover: typeof discover
-			prepareInitial: typeof prepareInitial
-			transaction: typeof options.transaction
+	const completionModel = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<WorkspacePersistenceEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<WorkspacePersistenceEvent, 'SHUTDOWN'>>()
+			},
+			input: types<Input>(),
+			output: types<WorkspaceInitializationResult>()
 		},
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		WorkspaceInitializationResult
-	>({
 		actors: {
 			discover,
 			prepareInitial,
 			transaction: options.transaction
 		}
-	}).createMachine({
+	})
+	type CompletionEntry = Extract<
+		NonNullable<Parameters<typeof completionModel.createStateConfig>[0]['entry']>,
+		(...args: never[]) => unknown
+	>
+	type CompletionArgs = Pick<Parameters<CompletionEntry>[0], 'context' | 'actions'>
+	type CompletionQueue = Parameters<CompletionEntry>[1]
+	const finalizers = {
+		ready: (args, _enq) => {
+			const { context } = args
+			return {
+				context: {
+					result: {
+						outcome: 'ready',
+						...(context.attempt !== undefined
+							? options.selectReady(context.attempt)
+							: {
+									identityId: required(context.records?.identities[0]).id,
+									workspaceId: required(
+										required(context.records?.identities[0]).initialWorkspaceId ?? undefined
+									)
+								})
+					}
+				} satisfies Partial<Context>
+			}
+		},
+		duplicateIdentities: (_args, _enq) => {
+			return {
+				context: {
+					result: {
+						outcome: 'unavailable',
+						reason: 'duplicateIdentities'
+					}
+				} satisfies Partial<Context>
+			}
+		},
+		identityMissing: (_args, _enq) => {
+			return {
+				context: {
+					result: {
+						outcome: 'unavailable',
+						reason: 'identityMissing'
+					}
+				} satisfies Partial<Context>
+			}
+		},
+		authorityUnavailable: (_args, _enq) => {
+			return {
+				context: {
+					result: {
+						outcome: 'unavailable',
+						reason: 'authorityUnavailable'
+					}
+				} satisfies Partial<Context>
+			}
+		},
+		initializationMissing: (_args, _enq) => {
+			return {
+				context: {
+					result: {
+						outcome: 'unavailable',
+						reason: 'initializationMissing'
+					}
+				} satisfies Partial<Context>
+			}
+		},
+		cancelled: (_args, _enq) => {
+			return {
+				context: {
+					result: {
+						outcome: 'cancelled',
+						settlement: 'notStarted'
+					}
+				} satisfies Partial<Context>
+			}
+		},
+		closed: (_args, _enq) => {
+			return {
+				context: {
+					result: {
+						outcome: 'closed',
+						settlement: 'notStarted'
+					}
+				} satisfies Partial<Context>
+			}
+		}
+	} satisfies Record<
+		string,
+		(args: CompletionArgs, enq: CompletionQueue) => void | { context?: Partial<Context> }
+	>
+	const complete = createFinalTransitions<
+		Context,
+		CompletionArgs,
+		CompletionQueue,
+		keyof typeof finalizers
+	>(finalizers)
+
+	const machine = completionModel.createMachine({
 		id: 'workspace-initialization',
 		context: ({ input }) => ({
 			...input,
@@ -90,233 +224,220 @@ export function createWorkspaceInitialization<
 		initial: 'readingLocal',
 		output: ({ context }) => required(context.result),
 		on: {
-			CANCEL: { target: '.cancelled' },
-			SHUTDOWN: { target: '.closed' }
+			CANCEL: (args, enq) => {
+				return complete('cancelled', args, enq, { target: '.cancelled' })
+			},
+			SHUTDOWN: (args, enq) => {
+				return complete('closed', args, enq, { target: '.closed' })
+			}
 		},
 		states: {
 			readingLocal: {
-				invoke: {
-					src: 'discover',
+				invoke: completionModel.createInvoke<typeof discover, Context>({
+					src: discover,
 					input: ({ context }) => ({
 						db: context.db,
 						userId: context.userId,
 						tier: options.tiers.local
 					}),
-					onDone: {
-						target: 'checkingIdentities',
-						actions: assign({ records: ({ event }) => event.output })
+					onDone: (args) => {
+						return {
+							target: 'checkingIdentities',
+							context: { records: args.event.output } satisfies Partial<Context>
+						}
 					},
-					onError: {
-						target: 'failed',
-						actions: assign({
-							result: ({ event }): WorkspaceInitializationResult => ({
-								outcome: 'failed',
-								settlement: 'notStarted',
-								error: event.error
-							})
-						})
+					onError: (args) => {
+						return {
+							target: 'failed',
+							context: {
+								result: {
+									outcome: 'failed',
+									settlement: 'notStarted',
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
+					}
+				})
+			},
+			checkingIdentities: {
+				always: (args, enq) => {
+					if ((args.context.records?.identities.length ?? 0) > 1) {
+						{
+							return complete('duplicateIdentities', args, enq, { target: 'duplicateIdentities' })
+						}
+					}
+					return { target: 'checkingInitialization' }
+				}
+			},
+			checkingInitialization: {
+				always: (args, enq) => {
+					if (args.context.records?.identities[0]?.initialWorkspaceId != null) {
+						{
+							return complete('ready', args, enq, { target: 'ready' })
+						}
+					}
+					return { target: 'checkingAuthority' }
+				}
+			},
+			checkingAuthority: {
+				always: (args, enq) => {
+					if (args.context.records?.serverConfigured === true) {
+						return { target: 'awaitingAuthority' }
+					}
+					{
+						return complete('authorityUnavailable', args, enq, { target: 'authorityUnavailable' })
 					}
 				}
 			},
-			checkingIdentities: {
-				always: [
-					{
-						guard: ({ context }) => (context.records?.identities.length ?? 0) > 1,
-						target: 'duplicateIdentities'
-					},
-					{ target: 'checkingInitialization' }
-				]
-			},
-			checkingInitialization: {
-				always: [
-					{
-						guard: ({ context }) => context.records?.identities[0]?.initialWorkspaceId != null,
-						target: 'ready'
-					},
-					{ target: 'checkingAuthority' }
-				]
-			},
-			checkingAuthority: {
-				always: [
-					{
-						guard: ({ context }) => context.records?.serverConfigured === true,
-						target: 'awaitingAuthority'
-					},
-					{ target: 'authorityUnavailable' }
-				]
-			},
 			awaitingAuthority: {
 				// Remote waits offline; no timeout or empty local result authorizes bootstrap.
-				invoke: {
-					src: 'discover',
+				invoke: completionModel.createInvoke<typeof discover, Context>({
+					src: discover,
 					input: ({ context }) => ({
 						db: context.db,
 						userId: context.userId,
 						tier: options.tiers.authority
 					}),
-					onDone: {
-						target: 'checkingAuthoritativeIdentities',
-						actions: assign({ records: ({ event }) => event.output })
+					onDone: (args) => {
+						return {
+							target: 'checkingAuthoritativeIdentities',
+							context: { records: args.event.output } satisfies Partial<Context>
+						}
 					},
-					onError: {
-						target: 'failed',
-						actions: assign({
-							result: ({ event }): WorkspaceInitializationResult => ({
-								outcome: 'failed',
-								settlement: 'notStarted',
-								error: event.error
-							})
-						})
+					onError: (args) => {
+						return {
+							target: 'failed',
+							context: {
+								result: {
+									outcome: 'failed',
+									settlement: 'notStarted',
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
 					}
-				}
+				})
 			},
 			checkingAuthoritativeIdentities: {
-				always: [
-					{
-						guard: ({ context }) => (context.records?.identities.length ?? 0) > 1,
-						target: 'duplicateIdentities'
-					},
-					{
-						guard: ({ context }) => context.records?.identities[0]?.initialWorkspaceId != null,
-						target: 'ready'
-					},
-					{
-						guard: ({ context }) => context.records?.identities.length === 1,
-						target: 'initializationMissing'
-					},
-					{
-						guard: ({ context }) => (context.records?.workspaces.length ?? 0) > 0,
-						target: 'identityMissing'
-					},
-					{ target: 'preparingInitial' }
-				]
+				always: (args, enq) => {
+					const { context } = args
+					if ((context.records?.identities.length ?? 0) > 1) {
+						{
+							return complete('duplicateIdentities', args, enq, { target: 'duplicateIdentities' })
+						}
+					}
+					if (context.records?.identities[0]?.initialWorkspaceId != null) {
+						{
+							return complete('ready', args, enq, { target: 'ready' })
+						}
+					}
+					if (context.records?.identities.length === 1) {
+						{
+							return complete('initializationMissing', args, enq, {
+								target: 'initializationMissing'
+							})
+						}
+					}
+					if ((context.records?.workspaces.length ?? 0) > 0) {
+						{
+							return complete('identityMissing', args, enq, { target: 'identityMissing' })
+						}
+					}
+					return { target: 'preparingInitial' }
+				}
 			},
 			preparingInitial: {
-				invoke: {
-					src: 'prepareInitial',
+				invoke: completionModel.createInvoke<typeof prepareInitial, Context>({
+					src: prepareInitial,
 					input: ({ context }) => context,
-					onDone: {
-						target: 'bootstrapping',
-						actions: assign({ attempt: ({ event }) => event.output })
+					onDone: (args) => {
+						return {
+							target: 'bootstrapping',
+							context: { attempt: args.event.output } satisfies Partial<Context>
+						}
 					},
-					onError: {
-						target: 'failed',
-						actions: assign({
-							result: ({ event }): WorkspaceInitializationResult => ({
-								outcome: 'failed',
-								settlement: 'notStarted',
-								error: event.error
-							})
-						})
+					onError: (args) => {
+						return {
+							target: 'failed',
+							context: {
+								result: {
+									outcome: 'failed',
+									settlement: 'notStarted',
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
 					}
-				}
+				})
 			},
 			bootstrapping: {
 				on: {
-					CANCEL: { actions: sendTo('bootstrap', { type: 'CANCEL' }) },
-					SHUTDOWN: { actions: sendTo('bootstrap', { type: 'SHUTDOWN' }) }
+					CANCEL: (args, enq) => {
+						enq.sendTo('bootstrap', { type: 'CANCEL' })
+					},
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('bootstrap', { type: 'SHUTDOWN' })
+					}
 				},
-				invoke: {
+				invoke: completionModel.createInvoke<typeof options.transaction, Context>({
 					id: 'bootstrap',
-					src: 'transaction',
+					src: options.transaction,
 					input: ({ context }) => ({
 						db: context.db,
 						attempt: required(context.attempt),
 						purpose: 'bootstrap'
 					}),
-					onDone: [
-						{
-							guard: ({ event }) => event.output?.outcome === 'succeeded',
-							target: 'ready'
-						},
-						{ target: 'completed', actions: assign({ result: ({ event }) => event.output }) }
-					],
-					onError: {
-						target: 'failed',
-						actions: assign({
-							result: ({ event }): WorkspaceInitializationResult => ({
-								outcome: 'failed',
-								settlement: 'unresolved',
-								error: event.error
-							})
-						})
+					onDone: (args, enq) => {
+						const { event } = args
+						if (event.output?.outcome === 'succeeded') {
+							{
+								return complete('ready', args, enq, { target: 'ready' })
+							}
+						}
+						return {
+							target: 'completed',
+							context: { result: event.output } satisfies Partial<Context>
+						}
+					},
+					onError: (args) => {
+						return {
+							target: 'failed',
+							context: {
+								result: {
+									outcome: 'failed',
+									settlement: 'unresolved',
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
 					}
-				}
+				})
 			},
 			ready: {
-				type: 'final',
-				entry: assign({
-					result: ({ context }): WorkspaceInitializationResult => ({
-						outcome: 'ready',
-						...(context.attempt !== undefined
-							? options.selectReady(context.attempt)
-							: {
-									identityId: required(context.records?.identities[0]).id,
-									workspaceId: required(
-										required(context.records?.identities[0]).initialWorkspaceId ?? undefined
-									)
-								})
-					})
-				})
+				type: 'final'
 			},
 			duplicateIdentities: {
-				type: 'final',
-				entry: assign({
-					result: (): WorkspaceInitializationResult => ({
-						outcome: 'unavailable',
-						reason: 'duplicateIdentities'
-					})
-				})
+				type: 'final'
 			},
 			identityMissing: {
-				type: 'final',
-				entry: assign({
-					result: (): WorkspaceInitializationResult => ({
-						outcome: 'unavailable',
-						reason: 'identityMissing'
-					})
-				})
+				type: 'final'
 			},
 			authorityUnavailable: {
-				type: 'final',
-				entry: assign({
-					result: (): WorkspaceInitializationResult => ({
-						outcome: 'unavailable',
-						reason: 'authorityUnavailable'
-					})
-				})
+				type: 'final'
 			},
 			initializationMissing: {
-				type: 'final',
-				entry: assign({
-					result: (): WorkspaceInitializationResult => ({
-						outcome: 'unavailable',
-						reason: 'initializationMissing'
-					})
-				})
+				type: 'final'
 			},
 			cancelled: {
-				type: 'final',
-				entry: assign({
-					result: (): WorkspaceInitializationResult => ({
-						outcome: 'cancelled',
-						settlement: 'notStarted'
-					})
-				})
+				type: 'final'
 			},
 			closed: {
-				type: 'final',
-				entry: assign({
-					result: (): WorkspaceInitializationResult => ({
-						outcome: 'closed',
-						settlement: 'notStarted'
-					})
-				})
+				type: 'final'
 			},
 			failed: { type: 'final' },
 			completed: { type: 'final' }
 		}
 	})
-
 	return machine
 }

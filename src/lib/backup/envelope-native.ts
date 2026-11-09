@@ -1,4 +1,4 @@
-import { fromCallback } from 'xstate'
+import { createCallbackLogic } from 'xstate'
 import { z } from 'zod'
 import { wellFormed } from './schemas.js'
 import { decodeBase64, hex } from './binary.js'
@@ -22,7 +22,7 @@ export type EnvelopeCryptoEvent =
 	| { type: 'CRYPTO_FAILED'; failure: Extract<ArchiveEnvelopeResult, { outcome: 'failed' }> }
 
 /** Native calls own their input copies until settlement. Disposal detaches reports, not WebCrypto. */
-export const envelopeCrypto = fromCallback<
+export const envelopeCrypto = createCallbackLogic<
 	EnvelopeCryptoCommand,
 	{ request: ArchiveEnvelopeRequest }
 >(({ input, receive, sendBack }) => {

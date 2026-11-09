@@ -1,4 +1,6 @@
-import { assign, fromPromise, sendTo, setup, type Snapshot } from 'xstate'
+import { types, createAsyncLogic, setup, type Snapshot } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
 	CreationChild,
 	ReconciliationLogic,
@@ -15,40 +17,55 @@ export function createWorkspacePersistence<
 >(options: {
 	db: Db
 	validate: (attempt: Attempt) => Promise<Attempt>
-	reconcile: ReconciliationLogic<RS, { db: Db; attempt: Attempt }>
-	transaction: CreationChild<TS, { attempt: Attempt }>
+	reconcile: ReconciliationLogic<
+		RS,
+		{
+			db: Db
+			attempt: Attempt
+		}
+	>
+	transaction: CreationChild<
+		TS,
+		{
+			attempt: Attempt
+		}
+	>
 }) {
 	type WorkspacePersistenceEvent = CreationEvent
 	type WorkspacePersistenceResult = CreationPersistenceResult<Workspace>
-	type Input = { attempt: Attempt; issuance: 'new' | 'unknown' }
-	type Context = Input & { db: Db; result: WorkspacePersistenceResult | undefined }
+	type Input = {
+		attempt: Attempt
+		issuance: 'new' | 'unknown'
+	}
+	type Context = Input & {
+		db: Db
+		result: WorkspacePersistenceResult | undefined
+	}
 	const db = options.db
 	const transaction = options.transaction
-	const validate = fromPromise<Attempt, { attempt: Attempt }>(({ input }) =>
-		options.validate(input.attempt)
-	)
-	return setup<
-		Context,
-		WorkspacePersistenceEvent,
+	const validate = createAsyncLogic<
+		Attempt,
 		{
-			validate: typeof validate
-			reconcile: typeof options.reconcile
-			transaction: typeof transaction
+			attempt: Attempt
+		}
+	>({ run: ({ input }) => options.validate(input.attempt) })
+	const invokeModel = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				CANCEL: types<EventPayload<WorkspacePersistenceEvent, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<WorkspacePersistenceEvent, 'SHUTDOWN'>>()
+			},
+			input: types<Input>(),
+			output: types<WorkspacePersistenceResult>()
 		},
-		{},
-		{},
-		{},
-		never,
-		string,
-		Input,
-		WorkspacePersistenceResult
-	>({
 		actors: {
 			validate,
 			reconcile: options.reconcile,
 			transaction
 		}
-	}).createMachine({
+	})
+	return invokeModel.createMachine({
 		id: 'workspace-creation-persistence',
 		context: ({ input }) => ({ ...input, db, result: undefined }),
 		initial: 'validating',
@@ -56,177 +73,218 @@ export function createWorkspacePersistence<
 			if (!context.result) throw new Error('Missing workspace persistence outcome')
 			return context.result
 		},
-		on: { CANCEL: '.cancelling', SHUTDOWN: '.closing' },
+		on: { CANCEL: { target: '.cancelling' }, SHUTDOWN: { target: '.closing' } },
 		states: {
 			validating: {
-				invoke: {
-					src: 'validate',
+				invoke: invokeModel.createInvoke<typeof validate, Context>({
+					src: validate,
 					input: ({ context }) => ({ attempt: context.attempt }),
-					onDone: {
-						target: 'reconciling',
-						actions: assign({ attempt: ({ event }) => event.output })
+					onDone: (args) => {
+						return {
+							target: 'reconciling',
+							context: { attempt: args.event.output } satisfies Partial<Context>
+						}
 					},
-					onError: {
-						target: 'settling',
-						actions: assign({
-							result: ({ event }): WorkspacePersistenceResult => ({
-								outcome: 'failed',
-								settlement: 'notStarted',
-								error: event.error
-							})
-						})
+					onError: (args) => {
+						return {
+							target: 'settling',
+							context: {
+								result: {
+									outcome: 'failed',
+									settlement: 'notStarted',
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
 					}
-				}
+				})
 			},
 			reconciling: {
-				invoke: {
-					src: 'reconcile',
+				invoke: invokeModel.createInvoke<typeof options.reconcile, Context>({
+					src: options.reconcile,
 					input: ({ context }) => context,
-					onDone: [
-						{
-							guard: ({ context, event }) =>
-								event.output?.outcome === 'notStarted' ||
-								(event.output?.outcome === 'absent' && context.issuance === 'new'),
-							target: 'transacting',
-							actions: assign({ issuance: 'new' })
-						},
-						{
-							guard: ({ event }) => event.output?.outcome === 'absent',
-							target: 'settling',
-							actions: assign({
-								result: (): WorkspacePersistenceResult => ({
-									outcome: 'failed',
-									settlement: 'unresolved',
-									error: new Error('Prior creation issuance is unknown')
-								})
-							})
-						},
-						{
-							guard: ({ event }) => event.output?.outcome === 'matching',
-							target: 'settling',
-							actions: assign({
-								result: ({ event }): WorkspacePersistenceResult => {
-									if (event.output?.outcome !== 'matching')
-										throw new Error('Expected matched workspace')
-									return {
-										outcome: 'succeeded',
-										settlement: 'locallyPersisted',
-										workspace: event.output?.workspace
-									}
-								}
-							})
-						},
-						{
-							guard: ({ event }) => event.output?.outcome === 'profileUnavailable',
-							target: 'settling',
-							actions: assign({
-								result: { outcome: 'profileUnavailable', settlement: 'notStarted' }
-							})
-						},
-						{
-							target: 'settling',
-							actions: assign({ result: { outcome: 'conflict', settlement: 'notStarted' } })
+					onDone: (args) => {
+						const { event } = args
+						if (
+							event.output?.outcome === 'notStarted' ||
+							(event.output?.outcome === 'absent' && args.context.issuance === 'new')
+						) {
+							return {
+								target: 'transacting',
+								context: { issuance: 'new' } satisfies Partial<Context>
+							}
 						}
-					],
-					onError: {
-						target: 'settling',
-						actions: assign({
-							result: ({ event }): WorkspacePersistenceResult => ({
-								outcome: 'failed',
-								settlement: 'notStarted',
-								error: event.error
-							})
-						})
+						if (event.output?.outcome === 'absent') {
+							return {
+								target: 'settling',
+								context: {
+									result: {
+										outcome: 'failed',
+										settlement: 'unresolved',
+										error: new Error('Prior creation issuance is unknown')
+									}
+								} satisfies Partial<Context>
+							}
+						}
+						if (event.output?.outcome === 'matching') {
+							return {
+								target: 'settling',
+								context: {
+									result: (({ event }): WorkspacePersistenceResult => {
+										if (event.output?.outcome !== 'matching')
+											throw new Error('Expected matched workspace')
+										return {
+											outcome: 'succeeded',
+											settlement: 'locallyPersisted',
+											workspace: event.output?.workspace
+										}
+									})(args)
+								} satisfies Partial<Context>
+							}
+						}
+						if (event.output?.outcome === 'profileUnavailable') {
+							return {
+								target: 'settling',
+								context: {
+									result: { outcome: 'profileUnavailable', settlement: 'notStarted' }
+								} satisfies Partial<Context>
+							}
+						}
+						return {
+							target: 'settling',
+							context: {
+								result: { outcome: 'conflict', settlement: 'notStarted' }
+							} satisfies Partial<Context>
+						}
+					},
+					onError: (args) => {
+						return {
+							target: 'settling',
+							context: {
+								result: {
+									outcome: 'failed',
+									settlement: 'notStarted',
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
 					}
-				}
+				})
 			},
 			transacting: {
 				// Forward interruption without exiting: the resource owner rolls back or drains its commit.
 				on: {
-					CANCEL: { actions: sendTo('transaction', { type: 'CANCEL' }) },
-					SHUTDOWN: { actions: sendTo('transaction', { type: 'SHUTDOWN' }) }
+					CANCEL: (args, enq) => {
+						enq.sendTo('transaction', { type: 'CANCEL' })
+					},
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('transaction', { type: 'SHUTDOWN' })
+					}
 				},
-				invoke: {
+				invoke: invokeModel.createInvoke<typeof transaction, Context>({
 					id: 'transaction',
-					src: 'transaction',
+					src: transaction,
 					input: ({ context }) => context,
-					onDone: { target: 'settling', actions: assign({ result: ({ event }) => event.output }) },
-					onError: {
-						target: 'settling',
-						actions: assign({
-							result: ({ event }): WorkspacePersistenceResult => ({
-								outcome: 'failed',
-								settlement: 'unresolved',
-								error: event.error
-							})
-						})
+					onDone: (args) => {
+						return {
+							target: 'settling',
+							context: { result: args.event.output } satisfies Partial<Context>
+						}
+					},
+					onError: (args) => {
+						return {
+							target: 'settling',
+							context: {
+								result: {
+									outcome: 'failed',
+									settlement: 'unresolved',
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
+					}
+				})
+			},
+			cancelling: {
+				always: { target: 'settling' },
+				entry: (_args) => {
+					return {
+						context: {
+							result: {
+								outcome: 'cancelled',
+								settlement: 'notStarted'
+							}
+						} satisfies Partial<Context>
 					}
 				}
 			},
-			cancelling: {
-				always: 'settling',
-				entry: assign({
-					result: (): WorkspacePersistenceResult => ({
-						outcome: 'cancelled',
-						settlement: 'notStarted'
-					})
-				})
-			},
 			closing: {
-				always: 'settling',
-				entry: assign({
-					result: (): WorkspacePersistenceResult => ({
-						outcome: 'closed',
-						settlement: 'notStarted'
-					})
-				})
+				always: { target: 'settling' },
+				entry: (_args) => {
+					return {
+						context: {
+							result: {
+								outcome: 'closed',
+								settlement: 'notStarted'
+							}
+						} satisfies Partial<Context>
+					}
+				}
 			},
 			settling: {
-				always: [
-					{
-						guard: ({ context }) =>
-							context.issuance === 'unknown' && context.result?.settlement === 'notStarted',
-						target: 'unresolvedSettlement'
-					},
-					{ guard: ({ context }) => context.result?.outcome === 'closed', target: 'closed' },
-					{ guard: ({ context }) => context.result?.outcome === 'cancelled', target: 'cancelled' },
-					{ guard: ({ context }) => context.result?.outcome === 'failed', target: 'failed' },
-					{ target: 'completed' }
-				]
+				always: (args) => {
+					const { context } = args
+					if (context.issuance === 'unknown' && context.result?.settlement === 'notStarted') {
+						return { target: 'unresolvedSettlement' }
+					}
+					if (context.result?.outcome === 'closed') {
+						return { target: 'closed' }
+					}
+					if (context.result?.outcome === 'cancelled') {
+						return { target: 'cancelled' }
+					}
+					if (context.result?.outcome === 'failed') {
+						return { target: 'failed' }
+					}
+					return { target: 'completed' }
+				}
 			},
 			unresolvedSettlement: {
-				always: [
-					{
-						guard: ({ context }) => context.result?.outcome === 'closed',
-						target: 'closed',
-						actions: assign({
-							result: (): WorkspacePersistenceResult => ({
-								outcome: 'closed',
-								settlement: 'unresolved'
-							})
-						})
-					},
-					{
-						guard: ({ context }) => context.result?.outcome === 'cancelled',
-						target: 'cancelled',
-						actions: assign({
-							result: (): WorkspacePersistenceResult => ({
-								outcome: 'cancelled',
-								settlement: 'unresolved'
-							})
-						})
-					},
-					{
+				always: (args) => {
+					const { context } = args
+					if (context.result?.outcome === 'closed') {
+						return {
+							target: 'closed',
+							context: {
+								result: {
+									outcome: 'closed',
+									settlement: 'unresolved'
+								}
+							} satisfies Partial<Context>
+						}
+					}
+					if (context.result?.outcome === 'cancelled') {
+						return {
+							target: 'cancelled',
+							context: {
+								result: {
+									outcome: 'cancelled',
+									settlement: 'unresolved'
+								}
+							} satisfies Partial<Context>
+						}
+					}
+					return {
 						target: 'failed',
-						actions: assign({
-							result: (): WorkspacePersistenceResult => ({
+						context: {
+							result: {
 								outcome: 'failed',
 								settlement: 'unresolved',
 								error: new Error('Prior creation issuance is unknown')
-							})
-						})
+							}
+						} satisfies Partial<Context>
 					}
-				]
+				}
 			},
 			closed: { type: 'final' },
 			cancelled: { type: 'final' },

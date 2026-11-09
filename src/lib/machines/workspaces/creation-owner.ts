@@ -1,25 +1,53 @@
-import { assign, raise, sendTo, setup, stateIn, type ActorLogic, type Snapshot } from 'xstate'
+import { matchesState, type StateValue, types, setup, type ActorLogic, type Snapshot } from 'xstate'
+
+import type { EventPayload } from '../../contracts/machine-events.js'
 /** Host key includes every identity/profile/backend dimension that invalidates this operation. */
-export type CreationBinding = { key: string }
+export type CreationBinding = {
+	key: string
+}
 export type CreationRecord = {
 	key: string
 	attempt: unknown
 }
 export type CreationRequest<Record> =
-	| { mode: 'load' }
-	| { mode: 'create'; name: string }
-	| { mode: 'clear'; record: Record }
-	| { mode: 'retry'; record: Record; settlement: 'notStarted' | 'unresolved' }
+	| {
+			mode: 'load'
+	  }
+	| {
+			mode: 'create'
+			name: string
+	  }
+	| {
+			mode: 'clear'
+			record: Record
+	  }
+	| {
+			mode: 'retry'
+			record: Record
+			settlement: 'notStarted' | 'unresolved'
+	  }
 export type CreationResult<Record, Workspace> =
-	| { outcome: 'editing' | 'invalid'; record: undefined; settlement: 'notStarted' }
-	| { outcome: 'recovered'; record: Record; settlement: 'notStarted' }
+	| {
+			outcome: 'editing' | 'invalid'
+			record: undefined
+			settlement: 'notStarted'
+	  }
+	| {
+			outcome: 'recovered'
+			record: Record
+			settlement: 'notStarted'
+	  }
 	| {
 			outcome: 'complete'
 			record: Record
 			workspace: Workspace
 			settlement: 'locallyPersisted'
 	  }
-	| { outcome: 'conflict'; record: Record | undefined; settlement: 'notStarted' }
+	| {
+			outcome: 'conflict'
+			record: Record | undefined
+			settlement: 'notStarted'
+	  }
 	| {
 			outcome: 'failed'
 			record: Record | undefined
@@ -37,15 +65,19 @@ export type CreationResult<Record, Workspace> =
 			record: Record | undefined
 			settlement: 'notStarted' | 'locallyPersisted' | 'unresolved'
 	  }
-
 export type CreationOperationLogic<
 	Record,
 	S extends Snapshot<unknown>,
 	Binding extends CreationBinding = CreationBinding
 > = ActorLogic<
 	S,
-	{ type: 'CANCEL' | 'SHUTDOWN' },
-	{ binding: Binding; request: CreationRequest<Record> }
+	{
+		type: 'CANCEL' | 'SHUTDOWN'
+	},
+	{
+		binding: Binding
+		request: CreationRequest<Record>
+	}
 >
 export function createWorkspaceCreationOwner<
 	Record extends CreationRecord,
@@ -65,9 +97,17 @@ export function createWorkspaceCreationOwner<
 		result: Result | undefined
 	}
 	type Event =
-		| { type: 'OBSERVED'; binding: Binding | undefined }
-		| { type: 'SUBMIT'; name: string }
-		| { type: 'REEVALUATE' | 'RETRY' | 'NEW' | 'CANCEL' | 'SHUTDOWN' }
+		| {
+				type: 'OBSERVED'
+				binding: Binding | undefined
+		  }
+		| {
+				type: 'SUBMIT'
+				name: string
+		  }
+		| {
+				type: 'REEVALUATE' | 'RETRY' | 'NEW' | 'CANCEL' | 'SHUTDOWN'
+		  }
 	function completed(output: Result | undefined, context: Context) {
 		const result: Result = output ?? {
 			outcome: 'unresolved',
@@ -77,25 +117,36 @@ export function createWorkspaceCreationOwner<
 		}
 		return { result, record: result.record }
 	}
-	return setup<
-		Context,
-		Event,
-		{ operation: typeof operation },
-		{},
-		{},
-		{ changed: undefined; replacing: undefined; closing: undefined },
-		never,
-		string,
-		{ binding: Binding | undefined },
-		{ binding: Binding | undefined; result: Result | undefined }
-	>({
+	const invokeModel = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				OBSERVED: types<EventPayload<Event, 'OBSERVED'>>(),
+				SUBMIT: types<EventPayload<Event, 'SUBMIT'>>(),
+				CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				REEVALUATE: types<EventPayload<Event, 'REEVALUATE'>>(),
+				RETRY: types<EventPayload<Event, 'RETRY'>>(),
+				NEW: types<EventPayload<Event, 'NEW'>>()
+			},
+			input: types<{
+				binding: Binding | undefined
+			}>(),
+			output: types<{
+				binding: Binding | undefined
+				result: Result | undefined
+			}>()
+		},
 		actors: { operation },
 		guards: {
-			changed: ({ context }) => context.binding?.key !== context.operation?.key,
-			replacing: stateIn({ operating: 'replacing' }),
-			closing: stateIn({ operating: 'closing' })
+			changed: ({ context }: { context: Context }) =>
+				context.binding?.key !== context.operation?.key,
+			replacing: ({ value }: { value: StateValue }) =>
+				matchesState({ operating: 'replacing' }, value),
+			closing: ({ value }: { value: StateValue }) => matchesState({ operating: 'closing' }, value)
 		}
-	}).createMachine({
+	})
+	return invokeModel.createMachine({
 		id: 'workspace-creation',
 		initial: 'checking',
 		context: ({ input }) => ({
@@ -108,67 +159,110 @@ export function createWorkspaceCreationOwner<
 		}),
 		output: ({ context }) => ({ binding: context.operation, result: context.result }),
 		on: {
-			OBSERVED: {
-				actions: [assign({ binding: ({ event }) => event.binding }), raise({ type: 'REEVALUATE' })]
+			OBSERVED: (args, enq) => {
+				enq.raise({ type: 'REEVALUATE' })
+				return {
+					context: { binding: args.event.binding } satisfies Partial<Context>
+				}
 			},
-			REEVALUATE: { guard: 'changed', target: '.checking' },
-			SHUTDOWN: '.closed',
-			RETRY: [
-				{
-					guard: ({ context }) => context.binding !== undefined && context.record !== undefined,
-					target: '.operating',
-					actions: assign({
-						request: ({ context }): CreationRequest => {
-							if (!context.record) throw new Error('Missing retry attempt')
-							return {
-								mode: 'retry',
-								record: context.record,
-								settlement:
-									context.result?.settlement === 'notStarted' ? 'notStarted' : 'unresolved'
-							}
-						}
-					})
-				},
-				{ target: '.checking' }
-			]
+			REEVALUATE: (args) => {
+				if (!args.guards.changed(args)) return
+				return { target: '.checking' }
+			},
+			SHUTDOWN: { target: '.closed' },
+			RETRY: (args) => {
+				const { context } = args
+				if (context.binding !== undefined && context.record !== undefined) {
+					return {
+						target: '.operating',
+						context: {
+							request: (({ context }): CreationRequest => {
+								if (!context.record) throw new Error('Missing retry attempt')
+								return {
+									mode: 'retry',
+									record: context.record,
+									settlement:
+										context.result?.settlement === 'notStarted' ? 'notStarted' : 'unresolved'
+								}
+							})(args)
+						} satisfies Partial<Context>
+					}
+				}
+				return { target: '.checking' }
+			}
 		},
 		states: {
 			checking: {
-				entry: assign({ record: undefined, result: undefined, request: { mode: 'load' } }),
-				always: [
-					{ guard: ({ context }) => context.binding !== undefined, target: 'operating' },
-					{ target: 'unavailable' }
-				]
+				entry: (_args) => {
+					return {
+						context: {
+							record: undefined,
+							result: undefined,
+							request: { mode: 'load' }
+						} satisfies Partial<Context>
+					}
+				},
+				always: (args) => {
+					if (args.context.binding !== undefined) {
+						return { target: 'operating' }
+					}
+					return { target: 'unavailable' }
+				}
 			},
-			unavailable: { entry: assign({ operation: undefined }) },
+			unavailable: {
+				entry: (_args) => {
+					return { context: { operation: undefined } satisfies Partial<Context> }
+				}
+			},
 			editing: {
-				entry: assign({ draftRevision: ({ context }) => context.draftRevision + 1 }),
+				entry: (args) => {
+					return {
+						context: { draftRevision: args.context.draftRevision + 1 } satisfies Partial<Context>
+					}
+				},
 				on: {
-					SUBMIT: {
-						target: 'operating',
-						actions: assign({ request: ({ event }) => ({ mode: 'create', name: event.name }) })
+					SUBMIT: (args) => {
+						return {
+							target: 'operating',
+							context: {
+								request: { mode: 'create', name: args.event.name }
+							} satisfies Partial<Context>
+						}
 					}
 				}
 			},
 			invalid: {
 				on: {
-					SUBMIT: {
-						target: 'operating',
-						actions: assign({ request: ({ event }) => ({ mode: 'create', name: event.name }) })
+					SUBMIT: (args) => {
+						return {
+							target: 'operating',
+							context: {
+								request: { mode: 'create', name: args.event.name }
+							} satisfies Partial<Context>
+						}
 					}
 				}
 			},
 			operating: {
 				initial: 'active',
-				entry: assign({ operation: ({ context }) => context.binding }),
+				entry: (args) => {
+					return {
+						context: { operation: args.context.binding } satisfies Partial<Context>
+					}
+				},
 				on: {
-					REEVALUATE: {
-						guard: 'changed',
-						target: '.replacing',
-						actions: sendTo('operation', { type: 'SHUTDOWN' })
+					REEVALUATE: (args, enq) => {
+						if (!args.guards.changed(args)) return
+						enq.sendTo('operation', { type: 'SHUTDOWN' })
+						return { target: '.replacing' }
 					},
-					SHUTDOWN: { target: '.closing', actions: sendTo('operation', { type: 'SHUTDOWN' }) },
-					CANCEL: { actions: sendTo('operation', { type: 'CANCEL' }) },
+					SHUTDOWN: (args, enq) => {
+						enq.sendTo('operation', { type: 'SHUTDOWN' })
+						return { target: '.closing' }
+					},
+					CANCEL: (args, enq) => {
+						enq.sendTo('operation', { type: 'CANCEL' })
+					},
 					RETRY: {},
 					SUBMIT: {},
 					NEW: {}
@@ -178,104 +272,121 @@ export function createWorkspaceCreationOwner<
 					replacing: { on: { REEVALUATE: {}, RETRY: {}, CANCEL: {} } },
 					closing: { on: { REEVALUATE: {}, RETRY: {}, CANCEL: {}, SHUTDOWN: {} } }
 				},
-				invoke: {
+				invoke: invokeModel.createInvoke<typeof operation, Context>({
 					id: 'operation',
-					src: 'operation',
+					src: operation,
 					input: ({ context }) => {
 						if (!context.operation) throw new Error('Missing creation binding')
 						return { binding: context.operation, request: context.request }
 					},
-					onDone: [
-						{
-							guard: ({ event }) =>
-								event.output === undefined || event.output.settlement === 'unresolved',
-							target: 'unresolved',
-							actions: assign(({ context, event }) => completed(event.output, context))
-						},
-						{
-							guard: 'closing',
-							target: 'closed',
-							actions: assign(({ context, event }) => completed(event.output, context))
-						},
-						{ guard: 'replacing', target: 'checking' },
-						{
-							target: 'classifying',
-							actions: assign(({ context, event }) => completed(event.output, context))
+					onDone: (args) => {
+						const { context, event } = args
+						if (event.output === undefined || event.output.settlement === 'unresolved') {
+							return {
+								target: 'unresolved',
+								context: completed(event.output, context) satisfies Partial<Context>
+							}
 						}
-					],
-					onError: {
-						target: 'unresolved',
-						actions: assign({
-							result: ({ context, event }): Result => ({
-								outcome: 'unresolved',
-								settlement: 'unresolved',
-								record: context.record,
-								error: event.error
-							})
-						})
+						if (matchesState({ operating: 'closing' }, args.value)) {
+							return {
+								target: 'closed',
+								context: completed(event.output, context) satisfies Partial<Context>
+							}
+						}
+						if (matchesState({ operating: 'replacing' }, args.value)) {
+							return { target: 'checking' }
+						}
+						return {
+							target: 'classifying',
+							context: completed(event.output, context) satisfies Partial<Context>
+						}
+					},
+					onError: (args) => {
+						return {
+							target: 'unresolved',
+							context: {
+								result: {
+									outcome: 'unresolved',
+									settlement: 'unresolved',
+									record: args.context.record,
+									error: args.event.error
+								}
+							} satisfies Partial<Context>
+						}
 					}
-				}
+				})
 			},
 			classifying: {
-				always: [
-					{ guard: ({ context }) => context.result?.outcome === 'complete', target: 'complete' },
-					{ guard: ({ context }) => context.result?.outcome === 'editing', target: 'editing' },
-					{ guard: ({ context }) => context.result?.outcome === 'invalid', target: 'invalid' },
-					{
-						guard: ({ context }) =>
-							context.result?.outcome === 'recovered' ||
-							(context.result?.outcome === 'cancelled' && context.record !== undefined),
-						target: 'recovered'
-					},
-					{
-						guard: ({ context }) =>
-							context.result?.outcome === 'cancelled' && context.request.mode === 'load',
-						target: 'checking'
-					},
-					{ guard: ({ context }) => context.result?.outcome === 'cancelled', target: 'editing' },
-					{ guard: ({ context }) => context.result?.outcome === 'conflict', target: 'conflict' },
-					{
-						guard: ({ context }) => context.result?.outcome === 'unresolved',
-						target: 'unresolved'
-					},
-					{ target: 'failed' }
-				]
+				always: (args) => {
+					const { context } = args
+					if (context.result?.outcome === 'complete') {
+						return { target: 'complete' }
+					}
+					if (context.result?.outcome === 'editing') {
+						return { target: 'editing' }
+					}
+					if (context.result?.outcome === 'invalid') {
+						return { target: 'invalid' }
+					}
+					if (
+						context.result?.outcome === 'recovered' ||
+						(context.result?.outcome === 'cancelled' && context.record !== undefined)
+					) {
+						return { target: 'recovered' }
+					}
+					if (context.result?.outcome === 'cancelled' && context.request.mode === 'load') {
+						return { target: 'checking' }
+					}
+					if (context.result?.outcome === 'cancelled') {
+						return { target: 'editing' }
+					}
+					if (context.result?.outcome === 'conflict') {
+						return { target: 'conflict' }
+					}
+					if (context.result?.outcome === 'unresolved') {
+						return { target: 'unresolved' }
+					}
+					return { target: 'failed' }
+				}
 			},
 			complete: {
 				on: {
-					NEW: {
-						target: 'operating',
-						actions: assign({
-							request: ({ context }): CreationRequest => {
-								if (!context.record) throw new Error('Missing completed attempt')
-								return { mode: 'clear', record: context.record }
-							}
-						})
+					NEW: (args) => {
+						return {
+							target: 'operating',
+							context: {
+								request: (({ context }): CreationRequest => {
+									if (!context.record) throw new Error('Missing completed attempt')
+									return { mode: 'clear', record: context.record }
+								})(args)
+							} satisfies Partial<Context>
+						}
 					}
 				}
 			},
 			recovered: {},
-			conflict: { on: { RETRY: 'checking' } },
+			conflict: { on: { RETRY: { target: 'checking' } } },
 			failed: {},
 			unresolved: {
 				on: {
 					REEVALUATE: {},
 					SHUTDOWN: {},
-					RETRY: [
-						{
-							guard: ({ context }) =>
-								context.binding !== undefined && context.binding.key === context.operation?.key,
-							target: 'operating',
-							actions: assign({
-								request: ({ context }): CreationRequest => {
-									return context.record
-										? { mode: 'retry', record: context.record, settlement: 'unresolved' }
-										: { mode: 'load' }
-								}
-							})
-						},
-						{}
-					]
+					RETRY: (args) => {
+						const { context } = args
+						if (context.binding !== undefined && context.binding.key === context.operation?.key) {
+							return {
+								target: 'operating',
+								context: {
+									request: (({ context }): CreationRequest => {
+										return context.record
+											? { mode: 'retry', record: context.record, settlement: 'unresolved' }
+											: { mode: 'load' }
+									})(args)
+								} satisfies Partial<Context>
+							}
+						}
+						return {}
+					}
 				}
 			},
 			closed: { type: 'final', on: { OBSERVED: {}, REEVALUATE: {}, RETRY: {}, SHUTDOWN: {} } }
