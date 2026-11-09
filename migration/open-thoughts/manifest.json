@@ -432,7 +432,7 @@
     "nativeFeedPath": "/open-thoughts/atom.xml",
     "sitemapPath": "/sitemap.xml",
     "generatedImagePolicy": "Serve the three archived generated image URLs with their original bytes before switching the legacy hostname.",
-    "stylesheetPolicy": "Retain the old stylesheet only if an archived feed still references it.",
+    "stylesheetPolicy": "Archive the original stylesheet as migration evidence only; replacement feeds do not reference or serve it.",
     "activationGate": "Actual Leaflet record mapping, editable import, native destinations, feeds, fragment compatibility and staged redirect checks must pass first.",
     "assetFiles": [
       {
@@ -452,12 +452,6 @@
         "sourceFile": "live/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.webp",
         "publicFile": "static/blog/a-tools-for-thought-ecosystem/m-R-Dmd_ly-1280.webp",
         "sha256": "476cfc653b9b0e643c0f73937bf9beec114e564a94a49d83c26430fd62520068"
-      },
-      {
-        "path": "/feed/pretty-atom-feed.xsl",
-        "sourceFile": "live/feed/pretty-atom-feed.xsl",
-        "publicFile": "static/feed/pretty-atom-feed.xsl",
-        "sha256": "bd79d048bf8f421da0daa7a45cf05e37f5f3d445516ee2964f902269eece88b4"
       }
     ]
   },

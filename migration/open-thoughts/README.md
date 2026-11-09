@@ -33,8 +33,9 @@ never served as application content.
 
 Legacy article URLs redirect directly to native record-key routes. Readable slug
 aliases redirect to those routes only when the source article still exists.
-Original generated images and the feed stylesheet are copied byte-for-byte to
-`static/` at their original paths; checksums cover those copies too.
+Original generated images are copied byte-for-byte to `static/` at their original
+paths; checksums cover those copies too. The old feed stylesheet remains only in
+the archive because the replacement feeds do not reference it.
 
 Native Atom, RSS and JSON feeds are `/open-thoughts/atom.xml`,
 `/open-thoughts/rss.xml` and `/open-thoughts/feed.json`. The old Atom URL redirects
