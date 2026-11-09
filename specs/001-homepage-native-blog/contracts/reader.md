@@ -10,7 +10,8 @@ read-only proofs. SITE_ORIGIN defaults to https://delightfullabs.com.
 
 - /: empty main landmark and functional Home/Open Thoughts navigation.
 - /open-thoughts/: published source metadata and native links, or a minimal empty
-  state. Upstream failure is 503 unless a bounded stale snapshot exists.
+  state. Upstream failure is 503 unless a bounded stale snapshot exists. With a store
+  configured, each request checks the authoritative durable snapshot.
 - /open-thoughts/[rkey]/: server-render body, source link, canonical URL and
   standard document link. Unknown records are 404; unavailable upstream is 503.
 - /.well-known/site.standard.publication/open-thoughts: configured validated

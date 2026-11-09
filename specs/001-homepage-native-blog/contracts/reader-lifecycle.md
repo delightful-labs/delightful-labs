@@ -33,7 +33,7 @@ aborts the invoked async actor. Late completions cannot replace the cache.
 - `reader.ts` is the Promise API adapter. It validates configuration, starts the
   actor, sends read events, and disposes it. It holds no separate pending promise
   or snapshot cache.
-- `reader-machine.ts` owns the cache, waiting callers, and refresh lifecycle.
+- `reader-machine.ts` owns the local snapshot, waiting callers, and refresh lifecycle.
   Concurrent reads share one invocation. Success/failure replies are queued
   effects, executed after the transition commits; waiting callers are cleared.
 - Transition calculations do not read the clock. Read requests carry their time,
@@ -49,8 +49,8 @@ aborts the invoked async actor. Late completions cannot replace the cache.
   A stale response retains the last successful verification timestamp. Failure
   after 24 hours rejects instead of returning the expired body.
 - Runtime upstream validation is separate from the machine's type-only schemas.
-  The actor contains callback/function references and is not persisted; durable
-  snapshots and coordination across Vercel instances remain a later integration.
+  The actor contains callback/function references and is not persisted. Durable
+  storage contains validated plain snapshot data, not actor checkpoints.
 
 `PublicationReader.stop()` is idempotent and must be used for production disposal
 so queued callers are settled before the actor ends. Development hot reload disposes the previous reader; deployment environment
@@ -101,3 +101,44 @@ block and inline normalization when rendering. The lifecycle is unchanged.
 Each snapshot stage declares its required context using v6 state schemas.
 Transitions must provide missing results before entering the next stage; actor
 inputs need no non-null assertions for prior-stage output.
+
+## Durable mode
+
+When a store is supplied, every READ invokes the durable loader even if the
+process copy is fresh. Successful stale fallback enters the explicit stale state.
+The machine disables local error fallback in this mode; the durable loader alone
+chooses a current stored snapshot. Concurrent callers in one process still share
+one invocation. Independent instances may scan concurrently; no distributed lock
+or background job is needed.
+
+1. Read the current private Blob with `useCache: false`. If its original
+   `verifiedAt` is less than five minutes old, return it.
+2. Otherwise perform a complete AT Protocol scan with the existing 40-second
+   deadline. A successful scan replaces exactly the ETag read before it started.
+   Initial creation forbids overwrite. Each write includes a unique revision to
+   avoid reusing an old ETag for an identical body (ABA).
+3. A failed write/scan or losing CAS re-reads current storage. Discard the losing
+   scan. Return the stored winner only while its original verification age is at
+   most 24 hours. Never advance verification time during fallback.
+4. If storage is unreadable, missing after failure, invalid, from another scope,
+   or outside the allowed age, return unavailable. Do not resurrect the process's
+   old copy. Cancellation never becomes a stale success.
+
+One versioned JSON object holds the complete inventory, so deletion and body
+changes commit together. Stored schema version, publication/owner/namespace,
+article identities, paths, dates, URLs, duplicate keys, and a 10 MB read/write
+limit are checked. A complete empty snapshot is an authoritative removal.
+Storage operations have four-second abort limits; the source scan retains its
+40-second total deadline. Publication verification remains configuration-only.
+
+Keys hash schema version, publication identity, and environment/branch scope.
+Production uses a separate namespace; Preview keys include the branch, not its
+commit SHA, so redeployments retain snapshots. This is application namespace
+isolation; use a separate private Production store at cutover. No CDN/ISR or
+Runtime Cache layer extends freshness.
+
+Tests in `durable-loader.test.ts` and `blob-store.test.ts` exercise cold readers,
+shared reads, concurrent first creation, deletion races, storage errors, CAS
+preconditions, bounded stale/future times, cancellation, validation, and isolation.
+Blob consistency/conditional-write behavior follows the
+[SDK contracts](https://vercel.com/docs/vercel-blob/using-blob-sdk).

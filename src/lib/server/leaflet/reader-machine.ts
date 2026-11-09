@@ -1,5 +1,10 @@
 import { createAsyncLogic, setup, types, type ActorRefFrom } from "xstate";
-import type { Snapshot, SnapshotLoader } from "./model";
+import {
+  CACHE_FRESH_MS,
+  CACHE_STALE_MS,
+  type Snapshot,
+  type SnapshotLoader,
+} from "./model";
 
 type Reply = {
   resolve: (snapshot: Snapshot | null) => void;
@@ -7,13 +12,12 @@ type Reply = {
 };
 type ReaderInput = {
   configured: boolean;
+  shared?: boolean;
   load: SnapshotLoader;
   now: () => number;
 };
 type ReaderContext = ReaderInput & { cache: Snapshot | null; waiters: Reply[] };
 type LoadFailure = { reason: unknown; at: number };
-const FRESH_FOR = 300_000;
-const STALE_FOR = 86_400_000;
 
 const refresh = createAsyncLogic({
   schemas: {
@@ -42,12 +46,16 @@ const refreshInvocation = readerSetup.createInvoke({
   input: ({ context }) => ({ load: context.load, now: context.now }),
   onDone: ({ context, event }, enq) => {
     for (const waiter of context.waiters) enq(waiter.resolve, event.output);
-    return { target: "ready", context: { cache: event.output, waiters: [] } };
+    return {
+      target: event.output.stale ? "stale" : "ready",
+      context: { cache: event.output, waiters: [] },
+    };
   },
   onError: ({ context, event }, enq) => {
     if (
+      !context.shared &&
       context.cache &&
-      event.error.at - context.cache.verifiedAt <= STALE_FOR
+      event.error.at - context.cache.verifiedAt <= CACHE_STALE_MS
     ) {
       const stale = { ...context.cache, stale: true };
       for (const waiter of context.waiters) enq(waiter.resolve, stale);
@@ -103,8 +111,9 @@ export const readerMachine = readerSetup.createMachine({
       on: {
         READ: ({ context, event }, enq) => {
           if (
+            !context.shared &&
             context.cache &&
-            event.at - context.cache.verifiedAt < FRESH_FOR
+            event.at - context.cache.verifiedAt < CACHE_FRESH_MS
           ) {
             enq(event.reply.resolve, context.cache);
             return;

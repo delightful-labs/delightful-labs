@@ -22,6 +22,7 @@
   "dependencies": {
     "@standard-reader/renderer-core": "0.4.0",
     "@standard-reader/renderer-svelte": "0.4.0",
+    "@vercel/blob": "2.8.2",
     "delightful-ui": "file:vendor/delightful-ui-0.0.25.tgz",
     "ipaddr.js": "2.5.0",
     "undici": "8.12.4",

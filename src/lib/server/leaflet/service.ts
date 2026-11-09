@@ -2,7 +2,11 @@ import {
   LEAFLET_AUTHOR_DID,
   LEAFLET_PUBLICATION_URI,
   SITE_ORIGIN,
+  BLOB_STORE_ID,
+  VERCEL_ENV,
+  VERCEL_GIT_COMMIT_REF,
 } from "$app/env/private";
+import { blobSnapshotStore } from "./blob-store";
 import { parseReaderConfig } from "./config";
 import { PublicationReader } from "./reader";
 
@@ -12,7 +16,19 @@ const config = {
 };
 let reader: PublicationReader | undefined;
 export function publicationReader(): PublicationReader {
-  return (reader ??= new PublicationReader(config));
+  if (!reader) {
+    const parsed = parseReaderConfig(config);
+    const namespace =
+      VERCEL_ENV === "production"
+        ? "production"
+        : `${VERCEL_ENV}/${VERCEL_GIT_COMMIT_REF}`;
+    const store =
+      parsed && BLOB_STORE_ID
+        ? blobSnapshotStore(parsed, BLOB_STORE_ID, namespace)
+        : undefined;
+    reader = new PublicationReader(config, { store });
+  }
+  return reader;
 }
 export function configuredPublicationUri(): string | undefined {
   return parseReaderConfig(config)?.publicationUri;

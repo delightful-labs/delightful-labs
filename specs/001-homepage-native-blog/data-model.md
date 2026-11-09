@@ -12,4 +12,10 @@
   renderer. The owner accepts the package's published behavior and limitations.
 - Snapshot: verified timestamp, publication and articles. Only
   complete successful scans replace it. Five minutes fresh, bounded stale on
-  upstream failure for 24h. Process-local foundation store is not durable.
+  upstream failure for 24h. Optional private Blob storage persists the complete inventory and original
+  verification time. The local actor alone is not durable.
+
+- StoredSnapshot: validated snapshot plus its Blob ETag, used as a compare-and-
+  swap precondition. The serialized envelope adds schema version, owner DID,
+  publication URI, namespace, and a unique revision. Local/actor functions and
+  callbacks are never serialized.

@@ -1,5 +1,6 @@
 import { createActor } from "xstate";
 import { parseReaderConfig } from "./config";
+import { durableLoader } from "./durable-loader";
 import { readJson } from "./http";
 import { loadSnapshot } from "./load-snapshot";
 import type { ReaderConfig, ReaderDependencies, Snapshot } from "./model";
@@ -15,14 +16,18 @@ export class PublicationReader {
     const parsed = parseReaderConfig(config);
     const json = dependencies.json ?? readJson;
     this.now = dependencies.now ?? Date.now;
+    const load = async (signal: AbortSignal) => {
+      if (!parsed) throw new Error("Unconfigured reader cannot load");
+      return loadSnapshot(parsed, json, this.now, signal);
+    };
     this.actor = createActor(readerMachine, {
       input: {
         configured: parsed !== null,
+        shared: dependencies.store !== undefined,
         now: this.now,
-        load: async (signal) => {
-          if (!parsed) throw new Error("Unconfigured reader cannot load");
-          return loadSnapshot(parsed, json, this.now, signal);
-        },
+        load: dependencies.store
+          ? durableLoader(dependencies.store, load, this.now)
+          : load,
       },
     }).start();
   }
