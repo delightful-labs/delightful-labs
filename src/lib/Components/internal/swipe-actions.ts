@@ -1,4 +1,4 @@
-import { and, assign, enqueueActions, setup } from 'xstate'
+import { setup, types } from 'xstate'
 
 export type SwipeSide = 'left' | 'right'
 export type SwipeAction = {
@@ -93,12 +93,98 @@ function drawerOffset(context: Context, side: SwipeSide) {
 	return side === 'left' ? distance : -distance
 }
 
+type MachineArgs = { context: Context; event: Event }
+
+// Pure context patches; transition functions own when each patch is applied.
+const patches = {
+	configure: ({ event }: MachineArgs) =>
+		event.type === 'CONFIGURE' ? event.configuration : {},
+	measure: ({ event }: MachineArgs) =>
+		event.type === 'MEASURE'
+			? {
+					width: event.width,
+					leftWidth: event.leftWidth,
+					rightWidth: event.rightWidth
+				}
+			: {},
+	begin: ({ context, event }: MachineArgs) =>
+		event.type === 'DOWN'
+			? {
+					pointerId: event.pointerId,
+					startX: event.x,
+					startY: event.y,
+					originOffset: context.offset,
+					blockClick: false
+				}
+			: {},
+	move: ({ context, event }: MachineArgs) =>
+		event.type === 'MOVE' ? { offset: dragOffset(context, event) } : {},
+	claim: (_args: MachineArgs) => ({ blockClick: true }),
+	consumeClick: (_args: MachineArgs) => ({ blockClick: false }),
+	openSide: ({ context, event }: MachineArgs) => ({
+		offset:
+			event.type === 'REVEAL'
+				? drawerOffset(context, event.side)
+				: context.offset,
+		pointerId: null,
+		originOffset: 0,
+		blockClick: false
+	}),
+	close: (_args: MachineArgs) => ({ offset: 0, pointerId: null }),
+	clearChoice: (_args: MachineArgs) => ({ choice: null }),
+	exit: ({ context }: MachineArgs) => ({
+		offset: context.choice?.side === 'left' ? context.width : -context.width,
+		pointerId: null
+	}),
+	restore: ({ context }: MachineArgs) => ({
+		offset: context.originOffset,
+		pointerId: null
+	}),
+	reveal: ({ context }: MachineArgs) => ({
+		offset: revealOffset(context),
+		pointerId: null
+	}),
+	chooseSwipe: ({ context }: MachineArgs) => {
+		const action = armedSwipeAction(context)
+		const side = swipeSide(context.offset)
+		return {
+			choice:
+				action && side
+					? { id: action.id, side, source: 'swipe' as const }
+					: null
+		}
+	},
+	chooseButton: ({ event }: MachineArgs) => ({
+		choice:
+			event.type === 'CHOOSE'
+				? { id: event.id, side: event.side, source: 'button' as const }
+				: null
+	})
+}
+
 const machine = setup({
-	types: {} as {
-		context: Context
-		input: Configuration
-		events: Event
-		emitted: { type: 'action.chosen'; detail: SwipeActionChosen }
+	schemas: {
+		context: types<Context>(),
+		input: types<Configuration>(),
+		events: {
+			CONFIGURE: types<{ configuration: Configuration }>(),
+			MEASURE: types<{
+				width: number
+				leftWidth: number
+				rightWidth: number
+			}>(),
+			DOWN: types<{ pointerId: number; x: number; y: number }>(),
+			MOVE: types<{ pointerId: number; x: number; y: number }>(),
+			UP: types<{ pointerId: number }>(),
+			CANCEL: types<{}>(),
+			CLOSE: types<{}>(),
+			REVEAL: types<{ side: SwipeSide }>(),
+			CONSUME_CLICK: types<{}>(),
+			CHOOSE: types<{ side: SwipeSide; id: string }>(),
+			DISMISS_COMPLETE: types<{}>(),
+			RESET: types<{}>()
+		},
+		emitted: { 'action.chosen': types<{ detail: SwipeActionChosen }>() }
 	},
 	guards: {
 		canInteract: ({ context }) =>
@@ -143,80 +229,6 @@ const machine = setup({
 			event.type === 'CHOOSE' &&
 			event.side === swipeSide(context.offset) &&
 			enabled(context, event.side).some((action) => action.id === event.id)
-	},
-	actions: {
-		configure: assign(({ event }) =>
-			event.type === 'CONFIGURE' ? event.configuration : {}
-		),
-		measure: assign(({ event }) =>
-			event.type === 'MEASURE'
-				? {
-						width: event.width,
-						leftWidth: event.leftWidth,
-						rightWidth: event.rightWidth
-					}
-				: {}
-		),
-		begin: assign(({ context, event }) =>
-			event.type === 'DOWN'
-				? {
-						pointerId: event.pointerId,
-						startX: event.x,
-						startY: event.y,
-						originOffset: context.offset,
-						blockClick: false
-					}
-				: {}
-		),
-		move: assign(({ context, event }) =>
-			event.type === 'MOVE' ? { offset: dragOffset(context, event) } : {}
-		),
-		claim: assign({ blockClick: true }),
-		consumeClick: assign({ blockClick: false }),
-		openSide: assign(({ context, event }) => ({
-			offset:
-				event.type === 'REVEAL'
-					? drawerOffset(context, event.side)
-					: context.offset,
-			pointerId: null,
-			originOffset: 0,
-			blockClick: false
-		})),
-		close: assign({ offset: 0, pointerId: null }),
-		clearChoice: assign({ choice: null }),
-		exit: assign(({ context }) => ({
-			offset: context.choice?.side === 'left' ? context.width : -context.width,
-			pointerId: null
-		})),
-		restore: assign({
-			offset: ({ context }) => context.originOffset,
-			pointerId: null
-		}),
-		reveal: assign({
-			offset: ({ context }) => revealOffset(context),
-			pointerId: null
-		}),
-		chooseSwipe: assign(({ context }) => {
-			const action = armedSwipeAction(context)
-			const side = swipeSide(context.offset)
-			return {
-				choice:
-					action && side
-						? { id: action.id, side, source: 'swipe' as const }
-						: null
-			}
-		}),
-		chooseButton: assign(({ event }) => ({
-			choice:
-				event.type === 'CHOOSE'
-					? { id: event.id, side: event.side, source: 'button' as const }
-					: null
-		})),
-		notify: enqueueActions(({ context, enqueue }) => {
-			if (context.choice) {
-				enqueue.emit({ type: 'action.chosen', detail: context.choice })
-			}
-		})
 	}
 })
 
@@ -237,27 +249,44 @@ export const swipeActionsMachine = machine.createMachine({
 	}),
 	initial: 'resting',
 	on: {
-		CONFIGURE: {
-			target: '.resting.closed',
-			actions: ['configure', 'close']
+		CONFIGURE: (args) => {
+			const patch = {
+				...patches.configure(args),
+				...patches.close(args)
+			}
+			return { target: '.resting.closed', context: patch }
 		},
-		MEASURE: [
-			{
-				guard: 'widthChanged',
-				target: '.resting.closed',
-				actions: ['measure', 'close']
-			},
-			{ actions: 'measure' }
-		],
-		DOWN: { guard: 'canInteract', target: '.tracking', actions: 'begin' },
-		REVEAL: {
-			guard: 'canReveal',
-			target: '.resting.open',
-			actions: 'openSide'
+		MEASURE: (args) => {
+			if (args.guards.widthChanged(args)) {
+				const patch = {
+					...patches.measure(args),
+					...patches.close(args)
+				}
+				return { target: '.resting.closed', context: patch }
+			}
+			return { context: patches.measure(args) }
 		},
-		CLOSE: { target: '.resting.closed', actions: 'close' },
-		CONSUME_CLICK: { actions: 'consumeClick' },
-		RESET: { target: '.resting.closed', actions: ['close', 'clearChoice'] }
+		DOWN: (args) => {
+			if (!args.guards.canInteract(args)) return
+			return { target: '.tracking', context: patches.begin(args) }
+		},
+		REVEAL: (args) => {
+			if (!args.guards.canReveal(args)) return
+			return { target: '.resting.open', context: patches.openSide(args) }
+		},
+		CLOSE: (args) => {
+			return { target: '.resting.closed', context: patches.close(args) }
+		},
+		CONSUME_CLICK: (args) => {
+			return { context: patches.consumeClick(args) }
+		},
+		RESET: (args) => {
+			const patch = {
+				...patches.close(args),
+				...patches.clearChoice(args)
+			}
+			return { target: '.resting.closed', context: patch }
+		}
 	},
 	states: {
 		resting: {
@@ -266,10 +295,12 @@ export const swipeActionsMachine = machine.createMachine({
 				closed: {},
 				open: {
 					on: {
-						CHOOSE: {
-							guard: 'validChoice',
-							target: '#swipe-actions.chosen',
-							actions: 'chooseButton'
+						CHOOSE: (args) => {
+							if (!args.guards.validChoice(args)) return
+							return {
+								target: '#swipe-actions.chosen',
+								context: patches.chooseButton(args)
+							}
 						}
 					}
 				}
@@ -277,62 +308,107 @@ export const swipeActionsMachine = machine.createMachine({
 		},
 		tracking: {
 			on: {
-				MOVE: [
-					{ guard: 'verticalIntent', target: 'yielding' },
-					{
-						guard: 'horizontalIntent',
-						target: 'dragging',
-						actions: ['move', 'claim']
+				MOVE: (args) => {
+					if (args.guards.verticalIntent(args)) {
+						return { target: 'yielding' }
 					}
-				],
-				UP: { guard: 'samePointer', target: 'restoring' },
-				CANCEL: 'restoring'
+					if (args.guards.horizontalIntent(args)) {
+						const patch = {
+							...patches.move(args),
+							...patches.claim(args)
+						}
+						return { target: 'dragging', context: patch }
+					}
+				},
+				UP: (args) => {
+					if (!args.guards.samePointer(args)) return
+					return { target: 'restoring' }
+				},
+				CANCEL: { target: 'restoring' }
 			}
 		},
 		yielding: {
 			on: {
-				UP: { guard: 'samePointer', target: 'restoring' },
-				CANCEL: 'restoring'
+				UP: (args) => {
+					if (!args.guards.samePointer(args)) return
+					return { target: 'restoring' }
+				},
+				CANCEL: { target: 'restoring' }
 			}
 		},
 		dragging: {
 			initial: 'revealing',
 			on: {
-				MOVE: { guard: 'samePointer', actions: 'move' },
-				UP: [
-					{
-						guard: and(['samePointer', 'dismissOnSwipe']),
-						target: 'dismissal',
-						actions: ['chooseSwipe', 'exit']
-					},
-					{
-						guard: and(['samePointer', 'armed']),
-						target: 'chosen',
-						actions: 'chooseSwipe'
-					},
-					{
-						guard: and(['samePointer', 'reveal']),
-						target: 'resting.open',
-						actions: 'reveal'
-					},
-					{ guard: 'samePointer', target: 'resting.closed', actions: 'close' }
-				],
-				CANCEL: 'restoring'
+				MOVE: (args) => {
+					if (!args.guards.samePointer(args)) return
+					return { context: patches.move(args) }
+				},
+				UP: (args) => {
+					if (
+						args.guards.samePointer(args) &&
+						args.guards.dismissOnSwipe(args)
+					) {
+						const choice = patches.chooseSwipe(args)
+						const patch = {
+							...choice,
+							...patches.exit({
+								...args,
+								context: { ...args.context, ...choice }
+							})
+						}
+						return { target: 'dismissal', context: patch }
+					}
+					if (args.guards.samePointer(args) && args.guards.armed(args)) {
+						return { target: 'chosen', context: patches.chooseSwipe(args) }
+					}
+					if (args.guards.samePointer(args) && args.guards.reveal(args)) {
+						return {
+							target: 'resting.open',
+							context: patches.reveal(args)
+						}
+					}
+					if (args.guards.samePointer(args)) {
+						return {
+							target: 'resting.closed',
+							context: patches.close(args)
+						}
+					}
+				},
+				CANCEL: { target: 'restoring' }
 			},
 			states: {
-				revealing: { always: { guard: 'armed', target: 'armed' } },
-				armed: { always: { guard: 'unarmed', target: 'revealing' } }
+				revealing: {
+					always: (args) => {
+						if (!args.guards.armed(args)) return
+						return { target: 'armed' }
+					}
+				},
+				armed: {
+					always: (args) => {
+						if (!args.guards.unarmed(args)) return
+						return { target: 'revealing' }
+					}
+				}
 			}
 		},
 		restoring: {
-			always: [
-				{ guard: 'restoreOpen', target: 'resting.open', actions: 'restore' },
-				{ target: 'resting.closed', actions: 'close' }
-			]
+			always: (args) => {
+				if (args.guards.restoreOpen(args)) {
+					return { target: 'resting.open', context: patches.restore(args) }
+				}
+				return { target: 'resting.closed', context: patches.close(args) }
+			}
 		},
 		chosen: {
-			entry: 'notify',
-			always: { target: 'resting.closed', actions: 'close' }
+			entry: (args, enq) => {
+				const { context } = args
+				if (context.choice) {
+					enq.emit({ type: 'action.chosen', detail: context.choice })
+				}
+			},
+			always: (args) => {
+				return { target: 'resting.closed', context: patches.close(args) }
+			}
 		},
 		dismissal: {
 			initial: 'animating',
@@ -342,12 +418,24 @@ export const swipeActionsMachine = machine.createMachine({
 				REVEAL: {},
 				CLOSE: {},
 				CANCEL: {},
-				CONFIGURE: { actions: 'configure' },
-				MEASURE: { actions: 'measure' }
+				CONFIGURE: (args) => {
+					return { context: patches.configure(args) }
+				},
+				MEASURE: (args) => {
+					return { context: patches.measure(args) }
+				}
 			},
 			states: {
 				animating: {
-					on: { DISMISS_COMPLETE: { target: 'complete', actions: 'notify' } }
+					on: {
+						DISMISS_COMPLETE: (args, enq) => {
+							const { context } = args
+							if (context.choice) {
+								enq.emit({ type: 'action.chosen', detail: context.choice })
+							}
+							return { target: 'complete' }
+						}
+					}
 				},
 				complete: {}
 			}
