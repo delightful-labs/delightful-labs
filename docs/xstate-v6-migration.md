@@ -1,6 +1,7 @@
 # XState v6 migration specification
 
-Status: implementation ready for review in PR #20, 2026-11-09.
+Status: PR #20 merged. The follow-up [v6 design review](xstate-v6-design-review.md)
+records source-level applicability and future review requirements.
 Inventory baseline: DUI `eaf1b98`; pre-migration specification commit: `b8a52c2`.
 
 ## Purpose and scope
@@ -14,7 +15,7 @@ The coordinated scope is delightful-ui, delightful-local-first (DLF),
 delightful-clipper, and delightful-finances. local-first-ux-patterns is excluded.
 Each repository gets its own reviewed specification before implementation.
 
-## Current implementation
+## Pre-migration inventory
 
 - `package.json` declares `xstate: ^5.33.3` as a runtime dependency, without an
   `@xstate/svelte` dependency.
