@@ -53,7 +53,14 @@
     aria-label="Portrait of Matt Derocher"
     data-portrait={current}
   >
-    <img src={photos[0]} alt="" width="720" height="960" fetchpriority="high" />
+    <img
+      class:covered={rendered}
+      src={photos[0]}
+      alt=""
+      width="720"
+      height="960"
+      fetchpriority="high"
+    />
     <div
       class="shader"
       class:rendered
@@ -95,6 +102,9 @@
   img {
     object-fit: cover;
     filter: grayscale(1);
+  }
+  img.covered {
+    visibility: hidden;
   }
   .shader {
     opacity: 0;

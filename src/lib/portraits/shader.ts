@@ -14,7 +14,8 @@ void main() {
   vec2 cell = floor(gl_FragCoord.xy / (u_pixelRatio * u_pxSize));
   float threshold = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
   float visible = step(0.001 + 0.998 * threshold, u_reveal);
-  fragColor = mix(vec4(1.0), fragColor, visible);
+  // Premultiplied transparency fades each dot into the actual page background.
+  fragColor *= visible * u_reveal;
 }
 `;
 
