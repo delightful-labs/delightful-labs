@@ -1,9 +1,73 @@
 # Single-user implementation and data-preserving adoption
 
+**Current status (2026-11-10):** [Merged Clipper implementation and remaining work](spec.md#current-implementation-checkpoint--2026-11-10) supersede historical source-build, JWT/Neon, Netlify-only and snapshot-publication instructions below. Jazz alpha.60/Vercel and native Jazz-backed identity are implemented in merged Clipper PR #20; shared DLF/Finance adoption, hosted live-provider qualification and public publication remain open. No existing research edits were discarded.
+
 Direction updated: 2026-11-03, following the user's instruction that Finance and Clipper currently
 serve only them and that implementation should proceed without waiting for a published Jazz release.
 This replaces the research recommendation to require publication before consumer adoption. Preserving
 the user's data remains a delivery requirement. No live data has been changed by this document.
+
+## Clipper-first specification continuation — 2026-11-06
+
+The user selected Clipper as the first integration consumer, with Finance following later. Begin
+with specification of first use and returning access from scratch. The user selected starting
+locally: clipping and writing require no AT Protocol sign-in, with optional connection later.
+Clipper opens directly into local use on every device, without a startup choice or sign-in gate.
+Optional connection and returning sign-in are available in settings without proactive prompts. The user selected
+connection for access to the same library across devices first, with
+Jazz retaining storage and synchronization responsibility. Local work created before signing in must join the existing library through standardized DLF
+behavior shared across apps. Assess existing backup capabilities for reuse; current backup restore
+targets new workspaces and does not already provide this existing-library behavior. The connection
+and transfer processes and data shapes remain undecided. Initially keep both local and existing
+content copies; real merging is deferred future shared DLF work. This does not authorize duplicate
+transfer effects on retry. Bringing local work into an existing library requires confirmation;
+declining discards the local work and continues into the existing library. The choice must make
+that consequence clear. Exact presentation, deletion mechanics and timing remain undecided. A separate Clipper recovery option is deferred beyond this first slice; do not
+promise independent new-device recovery if the connected AT Protocol account is inaccessible.
+This does not authorize removing existing recovery behavior or changing Finance recovery. Public publication remains
+a subsequent Clipper slice. Consult the user before new decisions, and do not select data shapes
+or exact processes. See the [Clipper-first scope and open decisions](spec.md#clipper-first-continuation--2026-11-06).
+
+This supersedes the Finance-first adoption order below. Finance backup work remains required before
+changing deployed Finance identity/storage; it is not a prerequisite for Clipper specification work.
+The user confirms Clipper has no real data to migrate. Its initial identity model and recovery
+experience require user decisions; no existing-account migration is a prerequisite for this design.
+The historical backup/build sequence below does not select that sequence for Clipper. No implementation, migration or deployment is authorized by this
+specification continuation, and the active backup feature pointer is unchanged.
+
+The user approved shared ownership: DLF handles the bring-or-discard decision, transfer lifecycle,
+progress, interruption handling and prevention of repeated transfer effects. Consumers supply domain
+content, relationships, validation, permissions and record access. Reuse suitable backup pieces;
+exact extraction boundaries, interfaces, data shapes and transfer processes still require user decisions.
+
+### Revised connection direction — Jazz-native first
+
+The user approved using Jazz's built-in automatic linking and backend-session following to reduce
+custom orchestration. This supersedes the fresh-settings-intent restriction below and the proposed
+explicit DLF linking controller. Connecting may occur from discovery of an authenticated app session
+without another settings action or confirmation. Local work plus a different existing library is
+accepted as outside the supported first version; Jazz's account switch is not data transfer. Keep
+the reusable SDK integration in DLF. Exact public contracts, backend OAuth/session data and hosting
+remain unselected; local-first behavior still requires qualification.
+
+### Earlier connection intent decision — superseded by Jazz-native direction
+
+The user selected connecting the current local library after the settings Connect action and
+successful AT Protocol sign-in, without a second confirmation, when the identity has no existing
+Clipper library. This is not permission to connect from incidental backend session discovery or
+to transfer local work into an existing library. SDK configuration and exact process remain open.
+
+### Approved first-release reduction
+
+First deliver local use, optional AT Protocol connection to the locally started Clipper library,
+and returning access on another device with no local work, in the web app only. Extension AT
+Protocol sign-in is deferred; preserve existing extension admission behavior. Bringing local work into a different
+existing library is deferred, including bring-or-discard, transfer retry/interruption design and
+real merging. The shared DLF responsibility boundary and user decisions above are future work,
+not first-release gates. Future failed transfers retain local work for retry; only explicit discard
+authorizes discard. Do not implement transfer machinery in this first slice. Handling a device with
+local work attempting to enter another existing library remains a user decision before implementation.
+Publication and separate Clipper recovery remain deferred.
 
 ## Target
 
@@ -132,11 +196,13 @@ user dataset. This is preparation for real adoption, not a substitute deliverabl
 
 ### 5. Adopt in the user's apps
 
-Finance adoption first proves identity-only sign-in, existing records, recovery, explicit local-first
-startup and offline cold restart on the new build. Use the preserved instance until the migrated
-copy and account linking work. Cutover remains explicit; no deployment or user-storage mutation is
-implied by building a branch. Then apply reusable identity behavior to Clipper, keeping its domain
-schemas/private root app-owned. Public publishing follows separately.
+Clipper adoption first must demonstrate its user-approved initial identity experience, returning
+access, permissions and recovery, explicit local-first startup and offline cold restart on the
+selected build. Work created after onboarding must remain preserved.
+Its detailed adoption and preservation process requires user decisions before selection. Clipper
+keeps its domain schemas/private root app-owned; public publishing follows separately. Finance later
+reuses the qualified shared behavior, with its existing backup and data-preservation requirements.
+Cutover remains explicit; no deployment or user-storage mutation is implied by building a branch.
 
 ## Outcomes to demonstrate
 
