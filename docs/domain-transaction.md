@@ -82,7 +82,7 @@ outside the public actor protocol. Formatting, lint and whitespace checks pass.
 
 The reviewed merged DLF uses Jazz alpha.59; Clipper pins an adapted alpha.60
 artifact. This generic source extraction does not upgrade either backend adapter.
-Clipper's compatible archive overlays only the two new bridge modules and exports
+Clipper's initial compatible archive overlaid only the two new bridge modules and exports
 onto its existing alpha.60 package, preserving all native adapter bytes. Its
 existing recovery-view patch applies separately at installation. Clipper's full
 663-test unit/native integration suite, web
@@ -94,4 +94,7 @@ production offline tests also pass. The offline suite includes linked, existing
 and expired-credential accounts across complete browser restarts, persisted
 offline edits and reconnection. This qualifies the extraction's current consumer
 paths; it does not complete the broader workflow-hardening specification or
-establish remote durability for arbitrary consumers.
+establish remote durability for arbitrary consumers. The subsequent compatible
+artifact also includes the qualified owned-operation supervisor; see
+[consumer adoption](owned-operation.md#consumer-adoption) for its source pin,
+ten caller migrations and final 673-test consumer qualification.

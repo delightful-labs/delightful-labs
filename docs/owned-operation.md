@@ -143,8 +143,17 @@ Strict test TypeScript, formatting, lint and whitespace checks pass too.
 
 ## Consumer adoption
 
-No Clipper consumer or pinned artifact uses the supervisor yet; the previously
-qualified transaction bridge remains unchanged. Next migrate the ten blocks,
-rebuild the compatible alpha.60 artifact with provenance, and run the actual
-domain/native/worker/offline/extension gates. SHARE-1/2 and DLF-1/2/4/5 remain
-open pending those consumer checks.
+Clipper adopted the supervisor at `71cdd08` on `feat/workflow-hardening`, replacing
+all ten blocks across saves, articles, organization, image writes, reader writes
+and sample seeding. Its alpha.60 archive is built from DLF source `9b3f094` and
+preserves all baseline native module bytes. The archive SHA-256 is
+`aaf16fe628393537aed32ba487d141d8cb7bc47b3000eff35556ff04a8b11fb7`.
+
+The actual migrated graph passes 673 unit/native tests, six worker browser tests,
+12 packaged-extension tests, eight production offline tests, web/extension type
+checks, formatting, lint, vendor verification and Vercel/Netlify builds. New caller
+tests observe exact native child input at all ten sites and forced save-parent
+custody through the installed owner. Reader queue preparation precedes invocation
+so issued changes, observed rows and operation IDs remain correct under v6.
+SHARE-1/2 and the A consumer evidence are complete; the broader hardening plan
+and subsequent shared-module cutovers retain their own acceptance gates.
