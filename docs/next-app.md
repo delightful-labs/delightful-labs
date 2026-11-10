@@ -171,3 +171,8 @@ native request with a finite deadline and explicit unknown-effect outcomes.
 See [scoped worker request lifecycle](worker-request.md) for the pinned consumer
 comparison and required independent host-close handshake. This source review
 unit has not been behaviorally qualified or adopted by a consumer.
+
+The [bounded worker channel](worker-channel.md) composes those request actors under
+one scoped owner. Import `createWorkerChannel` from `worker/channel/workflow` and
+its contracts from `worker/channel/contracts`. Inject separately owned data and
+control listeners; timeout never substitutes for the real host-close receipt.
