@@ -81,6 +81,28 @@ fix is established. A proposed wait-only change was removed. Do not mark all
 reader/release qualification complete. The native test profile remains local for
 continuation; no profile or credentials are included in repository evidence.
 
+### Known consumer issue: Clipper Linux extension recovery sign-in — 2026-11-10
+
+[Clipper PR #32 Linux CI run 42845035130](https://github.com/delightful-labs/delightful-clipper/actions/runs/42845035130/job/129930124826),
+commit `77cf813`, passed tooling/types/build, web browser, schema migration,
+dedicated-worker and full offline restart checks. The packaged extension suite
+passed nine cases and failed three. Valid recovery-phrase sign-in left the popup
+open past its existing 15-second wait. The stale-account and repeated-settings
+cases failed setup while waiting five seconds for confirmed `clipper.connection`;
+both showed “Updating your account…”, no alerts and no Chrome local-storage keys.
+
+All 12 packaged extension cases pass locally on macOS/Chromium. The cause remains
+unresolved; restoration, connection confirmation and shutdown settlement have not
+been isolated. Diagnostic follow-up is not a verified repair. This concerns
+Clipper's trusted-page Jazz recovery-phrase path, not an established AT Protocol
+OAuth failure or a demonstrated defect across DLF consumers. Direct extension
+AT Protocol provider login remains deferred.
+
+Linux extension qualification and a complete Clipper release-readiness claim
+remain blocked. Existing passing web/native offline results retain their bounded
+scope. Further debugging requires a separate scope discussion; this known-issue
+entry authorizes no runtime, interface or process change.
+
 ### Accepted publication direction; implementation remains open
 
 Initial public publication is deliberate. For already-published items, accepted
