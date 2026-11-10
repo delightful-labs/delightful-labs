@@ -19,8 +19,8 @@ this later instruction. Publication of Clipper content remains a separate consum
 
 ## Current implementation checkpoint — 2026-11-10
 
-Clipper [PR #20](https://github.com/delightful-labs/delightful-clipper/pull/20) is
-merged at `168cd0b`, including extension fix `152d679`. This checkpoint supersedes
+Clipper [PR #32](https://github.com/delightful-labs/delightful-clipper/pull/32) is
+merged at `a5f7773`, following PR #20's native identity and extension integration. This checkpoint supersedes
 historical Netlify/JWT/Neon/source-build preparation below. It records implemented
 consumer behavior, not completion of shared DLF adoption or public publication.
 
@@ -33,7 +33,8 @@ consumer behavior, not completion of shared DLF adoption or public publication.
 | Provider lifecycle | Worker-owned authorization and attempt-bound callback completion; application drain/acquisition settlement/native close before navigation. Sign-out clears this app's provider cookie before native logout. Broader cross-app logout is not implemented.                                                                                                                          |
 | Extension          | Worker-owned settings/recovery sign-in, existing SDK account key/Web Lock and trusted Chrome confirmation. Direct AT Protocol provider login remains deferred. The hidden offscreen capture owner is retained.                                                                                                                                                                    |
 | Local evidence     | 663 unit/native tests, six worker cases, 12 macOS/Chromium extension cases including offline restart and 24 settings teardown/capture cycles. Eight production offline cases cover linked/existing/expired credentials, two full browser restarts with app/auth/Jazz unreachable, preserved edits and reconciliation. Provider identities in browser qualification are synthetic. |
-| Still unqualified  | Further hosted lifecycle checks (returning-device provider sign-in and the direct-reader failure described below), deployed persistence/refresh/revocation cases, Linux extension qualification, Finance/cross-app adoption and complete shared DLF provider/server interfaces. Jazz's published pending-write/account-switch limits remain explicit.                             |
+| Hosted follow-up   | Real returning-device provider sign-in, same-identity direct reader/reloads, actual preview backend restarts and app/provider-session removal pass. Five native lifecycle cases cover renewal/expiry/revocation and simulated provider-token refresh persistence. PR #34 fixes an attached-reader sign-out hang found during qualification.                                       |
+| Still unqualified  | Live access-token rotation, independent authorization-server revocation confirmation, coordinated multi-instance refresh, Linux extension qualification, Finance/cross-app adoption and complete shared DLF provider/server interfaces. Jazz's published pending-write/account-switch limits remain explicit.                                                                     |
 
 Implementation and bounded evidence: [native auth review](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/reviews/atproto-native-alpha60.md),
 [extension investigation](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/reviews/extension-startup-2026-11-09.md)
@@ -53,8 +54,8 @@ No password, token, cookie or recovery material was recorded; the browser was
 closed after verification.
 
 This passes the real-provider callback/reload check, not all hosted lifecycle
-qualification. The live-identity restart follow-up below now supplies offline evidence. Refresh,
-revocation, backend restart and returning-device provider sign-in remain open. The eight
+qualification. The follow-ups below supply offline, returning-device and backend-restart
+evidence. Live token rotation and coordinated multi-instance refresh remain open. The eight
 synthetic-provider offline cases remain separate evidence.
 
 ### Live-identity offline restart — passed with a separate reader gap, 2026-11-10
@@ -84,10 +85,50 @@ This is a consumer reader repair, not a shared DLF interface or SDK change.
 The implementation passed 683 unit/native tests and full verification, plus eight
 offline, six worker and seven reader browser cases. Its actual built worker also
 passed the original failure scenario and three reloads in each of two isolated
-fresh contexts against production using local asset substitution. Normal merge
-and deployed-artifact verification remain open; these isolated checks did not
-deploy the repair. See the [reader qualification](https://github.com/delightful-labs/delightful-clipper/blob/test/atproto-cold-reader/docs/reviews/reader-direct-open-2026-11-10.md).
+fresh contexts against production using local asset substitution. PR #32 has since
+merged, and its normally deployed preview passed real returning-device sign-in
+with direct reader navigation and three reloads. Production is ready on merge
+`a5f7773`; a fresh production reader smoke test is not claimed. See the
+[reader qualification](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/reviews/reader-direct-open-2026-11-10.md).
 The native test profile stays local; repository evidence contains no credentials.
+
+### Hosted lifecycle and consumer shutdown follow-up — 2026-11-10
+
+On an isolated Clipper preview, a saved public documentation article was parsed
+through the real capture service before provider sign-in. The user completed
+Bluesky consent; the article and identity survived three reloads and an actual
+preview backend stop/wake. A fresh isolated browser then completed its own provider
+sign-in and received the same identity/article without copied credentials or
+browser storage. Direct reader navigation and three reloads were readable.
+The first fresh-browser authorization request failed with upstream PAR
+`unknown_error`; one explicit retry succeeded. Its cause remains unresolved.
+
+Native app-session revocation returned no user and denied authenticated provider
+restoration. In the separate browser, the native provider sign-out request made
+provider restoration inactive while retaining the app session and reader; this
+remained true after another backend stop/wake. The plugin suppresses upstream
+revocation errors, so HTTP 200 and durable local session removal are not independent
+proof that the authorization server invalidated the grant. No public PDS writes
+were made.
+
+Five native lifecycle tests cover app-session renewal, expiry and revocation,
+plus provider-token rotation and `invalid_grant` cleanup across real Jazz SQLite
+backend reopen. The last two use the installed plugin/atcute SDK with simulated
+provider discovery/token responses. They do not qualify observed live token
+rotation, cross-instance refresh coordination, DID/PDS migration or Finance.
+
+Qualification found an attached-reader sign-out hang before the auth request:
+private surface cleanup used the UI-ready selector and disposed the message port
+before the viewport closure acknowledgment. [Clipper PR #34](https://github.com/delightful-labs/delightful-clipper/pull/34)
+retains custody through the actual invoked library's lifetime. The real worker
+shutdown regression and deployed preview sign-out pass. All 12 worker and eight
+built-app offline cases pass on the merged baseline with this fix. This is a
+consumer repair, not a new DLF interface or a Jazz patch; review/merge remain open.
+
+The temporary preview-domain protection exception was revoked and its debug
+variable removed, with a clean redeployment ready. Approved branch-only auth
+settings and isolated preview store remain. Production configuration/data were
+unchanged. See [Clipper's dated evidence](https://github.com/delightful-labs/delightful-clipper/blob/test/atproto-cold-reader/docs/reviews/atproto-native-alpha60.md#attached-reader-shutdown-follow-up--pr-34).
 
 ### Known consumer issue: Clipper Linux extension recovery sign-in — 2026-11-10
 
@@ -108,7 +149,10 @@ AT Protocol provider login remains deferred.
 At the user's request, Clipper commit `07acf39` temporarily skips the three failing
 cases on Linux. They remain enabled on macOS; the other nine remain enabled on
 Linux. Skipping the cases does not establish a repair or Linux qualification.
-Latest-head CI still needs confirmation.
+Full CI on `b934415` passed all enabled cases. The first PR #34 run passed web
+and tooling checks, then found an ambiguous schema-test status locator after
+main's layout changes; the assertion is now scoped to main content and all eight
+schema cases pass locally. The latest follow-up CI remains required.
 
 Linux extension qualification and a complete Clipper release-readiness claim
 remain blocked. Existing passing web/native offline results retain their bounded
@@ -141,7 +185,8 @@ and [technical proposal](https://github.com/delightful-labs/delightful-clipper/b
 Shared DLF work must not adopt Clipper's domain schema or turn the backup journal
 into a publication queue without separately evidenced reuse.
 
-Remaining sequence: finish the remaining hosted lifecycle checks; review/extract only
+Remaining sequence: review/merge the consumer shutdown follow-up and track the
+explicit remaining hosted limits; review/extract only
 reusable DLF boundaries and qualify Finance separately; finish Clipper's local
 annotation model/editor; resolve the remaining publication choices with the user;
 then implement and qualify PDS synchronization. Existing backend availability is

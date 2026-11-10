@@ -3,7 +3,8 @@
 ## Evidence checkpoint — 2026-11-10
 
 The [current implementation checkpoint](spec.md#current-implementation-checkpoint--2026-11-10)
-records merged Clipper PR #20 and its local/native/browser evidence. This matrix
+records merged Clipper PR #32 and its local/native/browser evidence, with the
+consumer shutdown follow-up in PR #34. This matrix
 is a continuing acceptance contract, not an assertion that every row is unrun or
 complete. No implementation tests were run as part of this documentation update.
 CI on Clipper `152d679` passed tooling/types/build, but its browser job failed
@@ -14,16 +15,21 @@ suite: nine passed, three failed. Linux extension qualification is blocked by th
 [known recovery sign-in issue](spec.md#known-consumer-issue-clipper-linux-extension-recovery-sign-in--2026-11-10);
 its cause remains unresolved and diagnostic follow-up is not a verified repair.
 User-approved commit `07acf39` temporarily skips those three cases on Linux;
-macOS retains all 12 and Linux retains the other nine. Current-head CI remains
-to be confirmed. Green checks with exclusions do not qualify the skipped paths.
+macOS retains all 12 and Linux retains the other nine. Full CI on `b934415`
+passes all enabled cases. The first PR #34 run passed tooling/web checks, then
+failed four schema cases on a duplicated status-text locator; a main-content
+locator correction passes all eight locally. Final follow-up CI remains required.
+Green checks with exclusions do not qualify the skipped paths. An earlier
+independent-profile offline-read failure passed rerun without an established
+root-cause repair.
 
-| Coverage                         | Evidence / remaining gap                                                                                                                                                                                                                                                                                                                                               |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q-02, Q-06–09, Q-21–22 (partial) | Clipper native callback/storage and ownership regressions plus eight production offline cases; synthetic provider identities with real Better Auth/Jazz persistence. The hosted round trip now passes separately; revocation and all upstream account-switch edge cases are not thereby qualified.                                                                     |
-| Extension                        | All 12 macOS/Chromium cases pass, including recovery sign-in, account switching, offline restart and 24 settings-close/capture cycles. Linux CI passes nine and fails three recovery sign-in/confirmation cases; qualification is blocked pending an established repair. SDK/worker storage-key round trips pass. Direct extension AT provider login remains deferred. |
-| Q-01, Q-05, Q-12–13              | Two-app Finance/Clipper adoption and reusable DLF provider/server contract qualification remain open.                                                                                                                                                                                                                                                                  |
-| Q-14–18                          | Public record creation, updates/deletion, companion synchronization, unknown-outcome reconciliation and live interoperability remain unimplemented/unqualified.                                                                                                                                                                                                        |
-| Q-19–20, Q-23 (partial)          | Native plugin/adapter callback tests and source evidence exist; real-provider callback and three same-account reloads now pass on production merge `168cd0b`; durable deployed refresh and full DID/PDS lifecycle evidence remain open.                                                                                                                                |
+| Coverage                         | Evidence / remaining gap                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q-02, Q-06–09, Q-21–22 (partial) | Clipper native callback/storage and ownership regressions plus eight production offline cases; synthetic provider identities with real Better Auth/Jazz persistence. The hosted round trip now passes separately; revocation and all upstream account-switch edge cases are not thereby qualified.                                                                                                                          |
+| Extension                        | All 12 macOS/Chromium cases pass, including recovery sign-in, account switching, offline restart and 24 settings-close/capture cycles. Linux CI passes nine and fails three recovery sign-in/confirmation cases; qualification is blocked pending an established repair. SDK/worker storage-key round trips pass. Direct extension AT provider login remains deferred.                                                      |
+| Q-01, Q-05, Q-12–13              | Two-app Finance/Clipper adoption and reusable DLF provider/server contract qualification remain open.                                                                                                                                                                                                                                                                                                                       |
+| Q-14–18                          | Public record creation, updates/deletion, companion synchronization, unknown-outcome reconciliation and live interoperability remain unimplemented/unqualified.                                                                                                                                                                                                                                                             |
+| Q-19–20, Q-23 (partial)          | Real-provider callback/reloads on production; returning-device sign-in, direct reader/reloads, backend stop/wake and app/provider-session removal on isolated preview. Five real-adapter lifecycle tests include SDK token rotation/invalid-grant handling with simulated provider responses. Live rotation, independent upstream revocation confirmation, multi-instance refresh and DID/PDS migration remain unqualified. |
 
 Hosted live-provider follow-up: the user completed actual Bluesky sign-in in an
 isolated visible Chromium context on deployment `dpl_5qUpzSiG7Y8APNfgrW1rSQgQ9XD9`
@@ -39,8 +45,30 @@ from production and read the text by library navigation. Extraction was a synthe
 fixture; actual AT authentication and Jazz storage/sync were used. The separate
 fresh-replica direct-reader failure now has an approved, implemented consumer fix
 in PR #32, with local state-machine/offline/worker/reader coverage and isolated
-built-worker checks against production. Normal merge and deployed-artifact
-verification remain open. See the [bounded evidence](spec.md#live-identity-offline-restart--passed-with-a-separate-reader-gap-2026-11-10).
+built-worker checks against production. PR #32 has since merged at `a5f7773`;
+its normally deployed preview passes fresh returning-device reader/reloads.
+Production is ready on that commit; a fresh production reader smoke test is not
+claimed. See the [bounded evidence](spec.md#live-identity-offline-restart--passed-with-a-separate-reader-gap-2026-11-10).
+
+Hosted lifecycle follow-up: a fresh isolated browser completed real provider
+sign-in to the same app identity and article, without copied credentials. Actual
+preview backend stop/wake preserved app/provider sessions; app-session revocation
+denied access, and native provider-session removal stayed inactive across another
+backend restart without deleting the reader. HTTP 200 at the provider sign-out
+endpoint does not independently confirm authorization-server revocation. Five
+native lifecycle cases cover app-session renewal/expiry/revocation and simulated
+provider-token rotation/`invalid_grant` persistence through the actual Jazz
+adapter. Neither live access-token rotation nor multi-instance coordination was
+observed. One initial PAR request failed with upstream `unknown_error` and
+succeeded on explicit retry; its cause is unresolved.
+
+The attached-reader sign-out hang discovered during this work has a consumer
+ownership fix in PR #34. Actual worker closure and deployed preview sign-out
+pass; all 12 worker and eight built-app offline cases pass. Review/merge remain
+open. Temporary preview access/debug configuration has been removed, with a
+clean redeployment ready. This adds no shared DLF contract, new provider policy,
+publication capability or Finance qualification. See the
+[current follow-up](spec.md#hosted-lifecycle-and-consumer-shutdown-follow-up--2026-11-10).
 
 Status: **Partial Clipper evidence; shared adoption and publication remain unqualified.** The checkpoint above records completed consumer tests. Rows below define the remaining/full acceptance contract and do not authorize new implementation or tests. Historical source inspection is recorded in [research](research.md).
 
