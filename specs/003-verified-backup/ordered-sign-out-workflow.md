@@ -4,13 +4,19 @@ Consumer authorization: Clipper workflow-hardening change set D. This is a gener
 provider-injected identity composition; Clipper retains HTTP/cookie policy and UI
 feedback. No backend, provider, account-selection or domain policy is introduced.
 
-Input supplies an optional provider operation, the native session logout operation,
-stage deadlines, optional synchronous native identity observation and bounded overdue reporting. States select the provider stage
-when supplied, then observes native facts before mutation. An already signed-out native identity completes without another logout; replacement/unavailable facts refuse mutation. The session stage requires the original identity, and its capability must enforce atomic admission too. Each stage owns
-one original invocation through waiting and overdue. Failure completes with typed
-stage facts; no raw exception crosses the public result. Success means both calls
-settled successfully, with the consumer responsible for observing native identity
-before admitting a later attempt. Shutdown never replays or interrupts issued calls.
+Input supplies an optional provider operation, native logout, stage deadlines,
+optional synchronous native identity observation and bounded overdue reporting.
+The chart selects provider sign-out first when supplied, then observes native
+facts before mutation. Already signed-out completes without another logout;
+replacement/unavailable facts refuse mutation. Native logout requires the original
+identity, with atomic admission also enforced by its injected capability.
+
+Each effect stage owns one original invocation through waiting and overdue.
+Failure completes with typed stage facts; no raw exception crosses the public
+result. Success requires confirmed provider completion when supplied, followed by
+either observed native sign-out or acknowledged native logout. The consumer
+refreshes native identity after settlement before admitting a later attempt.
+Shutdown never replays or interrupts issued calls.
 
 The parent retains this child until settlement, including during shutdown. Forced
 actor disposal is disruptive and cannot be interpreted as successful sign-out or
@@ -21,3 +27,11 @@ expiry, late completion after expiry, repeated shutdown, forced stop, independen
 generated schedules and the actual Clipper application/Worker shutdown composition.
 Use the existing public package-consumer fixture and compatible alpha.60 archive
 qualification gates before changing a consumer pin.
+
+Qualification at source `5bb6605`: 191 selected sign-out/session/lifecycle/
+transaction tests in 11 files; strict sign-out test types; zero-error/warning
+library checks; strict package publint; all public consumer declarations, fixtures
+and builds. The independent sign-out receipt campaign runs 120 schedules, at most
+12 commands, seed `20261117`, with complete contract-model coverage. Clipper's
+compatible alpha.60 archive and native/browser/offline evidence are recorded in
+its companion PR #33 and `docs/reviews/auth-request-lifecycle.md`.
