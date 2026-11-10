@@ -34,7 +34,8 @@
 		"./owned-operation.ts",
 		"./worker-request.ts",
 		"./worker-channel.ts",
-		"./worker-effect-drain.ts"
+		"./worker-effect-drain.ts",
+		"./ordered-sign-out.ts"
 	],
 	"exclude": []
 }
