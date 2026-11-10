@@ -15,7 +15,7 @@
 		"check": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc --noEmit --project tsconfig.json",
 		"check:watch": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --watch",
 		"package": "pnpm paraglide && svelte-package --tsconfig tsconfig.library.json --input src/lib --output dist && publint --strict",
-		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/test-app.vite.config.ts && vite build --config tests/fixtures/avatar-selection/vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:test-app",
+		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/test-app.vite.config.ts && vite build --config tests/fixtures/avatar-selection/vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:test-app && node --experimental-strip-types fixtures/package-consumer/domain-transaction.ts && node --experimental-strip-types fixtures/package-consumer/owned-operation.ts",
 		"verify": "pnpm format:check && pnpm lint && pnpm check && pnpm test:unit --run && pnpm package && pnpm check:consumer && pnpm build-storybook",
 		"test:unit": "pnpm paraglide && vitest --config vitest.config.ts",
 		"paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --emit-ts-declarations --no-emit-readme --no-emit-prettier-ignore --no-emit-git-ignore",
@@ -354,6 +354,22 @@
 			"types": "./dist/machines/backup/restore.d.ts",
 			"svelte": "./dist/machines/backup/restore.js",
 			"default": "./dist/machines/backup/restore.js"
+		},
+		"./lifecycle/operation/contracts": {
+			"types": "./dist/contracts/owned-operation.d.ts",
+			"default": "./dist/contracts/owned-operation.js"
+		},
+		"./lifecycle/operation/workflow": {
+			"types": "./dist/machines/lifecycle/owned-operation.d.ts",
+			"default": "./dist/machines/lifecycle/owned-operation.js"
+		},
+		"./transactions/contracts": {
+			"types": "./dist/contracts/domain-transaction.d.ts",
+			"default": "./dist/contracts/domain-transaction.js"
+		},
+		"./transactions/workflow": {
+			"types": "./dist/machines/workspaces/domain-transaction.d.ts",
+			"default": "./dist/machines/workspaces/domain-transaction.js"
 		}
 	},
 	"svelte": "./dist/index.js",

@@ -146,3 +146,20 @@ Consumers do not need an XState patch. See
 Adopt a rebuilt artifact across complete connected actor graphs. Consumer fixtures
 and native/browser behavior have not yet been qualified on v6. The vendored DUI
 archive still needs alignment with the reviewed v6 DUI build before app rollout.
+
+## Domain transaction composition
+
+`transactions/workflow` composes a consumer's typed domain chart with the existing
+DLF atomic transaction owner. Use `transactions/contracts` for generic attempt,
+resource, child-spawn and receipt contracts. See [domain transaction composition](domain-transaction.md)
+for the preparation/staging protocol, cancellation custody and extraction review
+gate. The existing workspace-creation API remains available.
+
+## Owned operation lifecycle
+
+`lifecycle/operation/workflow` supplies a state-owned supervisor for concrete
+capability-spawned children. `lifecycle/operation/contracts` preserves typed
+input, output and supported child commands. See [owned operation lifecycle](owned-operation.md)
+for distinct interruption/drain paths, native custody boundaries and the
+consumer migration map and library qualification results. Qualify each consumer
+against its actual compatible artifact before adoption.
