@@ -33,7 +33,7 @@ consumer behavior, not completion of shared DLF adoption or public publication.
 | Provider lifecycle | Worker-owned authorization and attempt-bound callback completion; application drain/acquisition settlement/native close before navigation. Sign-out clears this app's provider cookie before native logout. Broader cross-app logout is not implemented.                                                                                                                          |
 | Extension          | Worker-owned settings/recovery sign-in, existing SDK account key/Web Lock and trusted Chrome confirmation. Direct AT Protocol provider login remains deferred. The hidden offscreen capture owner is retained.                                                                                                                                                                    |
 | Local evidence     | 663 unit/native tests, six worker cases, 12 macOS/Chromium extension cases including offline restart and 24 settings teardown/capture cycles. Eight production offline cases cover linked/existing/expired credentials, two full browser restarts with app/auth/Jazz unreachable, preserved edits and reconciliation. Provider identities in browser qualification are synthetic. |
-| Still unqualified  | Further hosted lifecycle checks (live-identity browser-process/offline restart and returning-device access), deployed persistence/refresh/revocation cases, Linux extension qualification, Finance/cross-app adoption and complete shared DLF provider/server interfaces. Jazz's published pending-write/account-switch limits remain explicit.                                   |
+| Still unqualified  | Further hosted lifecycle checks (returning-device provider sign-in and the direct-reader failure described below), deployed persistence/refresh/revocation cases, Linux extension qualification, Finance/cross-app adoption and complete shared DLF provider/server interfaces. Jazz's published pending-write/account-switch limits remain explicit.                             |
 
 Implementation and bounded evidence: [native auth review](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/reviews/atproto-native-alpha60.md),
 [extension investigation](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/reviews/extension-startup-2026-11-09.md)
@@ -53,9 +53,33 @@ No password, token, cookie or recovery material was recorded; the browser was
 closed after verification.
 
 This passes the real-provider callback/reload check, not all hosted lifecycle
-qualification. Live-identity full browser-process/offline restart, refresh and
-revocation, backend restart and returning-device access remain open. The eight
+qualification. The live-identity restart follow-up below now supplies offline evidence. Refresh,
+revocation, backend restart and returning-device provider sign-in remain open. The eight
 synthetic-provider offline cases remain separate evidence.
+
+### Live-identity offline restart — passed with a separate reader gap, 2026-11-10
+
+Using the same production deployment, a dedicated browser profile signed in at
+Bluesky through the real user flow. One marked synthetic article was saved through
+the existing application; extraction responses were supplied by the test, while
+authentication and Jazz persistence/sync used production services.
+
+After closing the entire browser, two new browser processes reopened the same
+profile with network access disabled, DNS blocked and HTTP cache cleared. Both
+reopened the same account and readable saved article. A favorite added offline
+survived the second process restart. On reconnect, a fresh local replica using
+the same app session received the article and favorite; opening from its library
+also rendered the saved text. The session was reused only within this app and was
+not printed/exported. This does not qualify a new-device OAuth flow, expired live
+credentials, backend restart, or revocation.
+
+A separate production failure remains: direct URL navigation in a fresh replica
+reported the article unavailable while online, whereas opening from the library
+worked. It reproduced twice with a 30-second reader assertion. Corrected local
+cold-reader coverage passes without an application change, so no app/SDK cause or
+fix is established. A proposed wait-only change was removed. Do not mark all
+reader/release qualification complete. The native test profile remains local for
+continuation; no profile or credentials are included in repository evidence.
 
 ### Accepted publication direction; implementation remains open
 

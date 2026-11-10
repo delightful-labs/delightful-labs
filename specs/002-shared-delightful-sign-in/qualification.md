@@ -25,6 +25,14 @@ account/library through three reloads. This is not a live-identity full-process
 offline restart, refresh/revocation or returning-device test. No credentials were
 recorded and the browser was closed. See the [dated checkpoint](spec.md#hosted-clipper-round-trip--passed-2026-11-10).
 
+Live-identity offline follow-up: two complete process restarts passed with network
+and DNS blocked and HTTP cache cleared, retaining the same account, saved reader
+and an offline favorite. A fresh local replica then received the article/favorite
+from production and read the text by library navigation. Extraction was a synthetic
+fixture; actual AT authentication and Jazz storage/sync were used. A separate live
+fresh-replica direct-reader URL failure remains unresolved and did not reproduce
+in the corrected local cold-reader case. See the [bounded evidence](spec.md#live-identity-offline-restart--passed-with-a-separate-reader-gap-2026-11-10).
+
 Status: **Partial Clipper evidence; shared adoption and publication remain unqualified.** The checkpoint above records completed consumer tests. Rows below define the remaining/full acceptance contract and do not authorize new implementation or tests. Historical source inspection is recorded in [research](research.md).
 
 Use two consumers representing Finance and Clipper, independent browser origins/storage and different Jazz app IDs. Use private sentinel records and an unauthorized control identity. Record SDK/provider/registry versions, configuration, environment and real persistence/acceptance evidence for each result; redact credentials. No production user data is required.
