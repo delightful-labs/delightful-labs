@@ -53,7 +53,14 @@
     aria-label="Portrait of Matt Derocher"
     data-portrait={current}
   >
-    <img src={photos[0]} alt="" width="720" height="960" fetchpriority="high" />
+    <img
+      class:covered={rendered}
+      src={photos[0]}
+      alt=""
+      width="720"
+      height="960"
+      fetchpriority="high"
+    />
     <div
       class="shader"
       class:rendered
@@ -85,14 +92,6 @@
     max-inline-size: 100%;
     aspect-ratio: 4 / 5;
   }
-  :global(:root[data-dui-theme="dark"]) .portrait {
-    filter: invert(1);
-  }
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-dui-theme])) .portrait {
-      filter: invert(1);
-    }
-  }
   img,
   .shader {
     position: absolute;
@@ -103,6 +102,9 @@
   img {
     object-fit: cover;
     filter: grayscale(1);
+  }
+  img.covered {
+    visibility: hidden;
   }
   .shader {
     opacity: 0;
