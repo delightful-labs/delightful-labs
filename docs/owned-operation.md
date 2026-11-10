@@ -85,18 +85,18 @@ first settlement ends the controller; later reports cannot restart work.
 Rechecked against implementation branch baseline `168cd0b`. Keep each parent's
 domain decisions, scope checks and result handling local.
 
-| Parent state | Child output | Shutdown policy | Behavior retained in parent |
-| --- | --- | --- | --- |
-| Save record: intent | `StageResult` | Interrupt with `SHUTDOWN` | Publication admission, scope/refusal/uncertainty and receipts. |
-| Save record: publication | `StageResult` | Interrupt with `SHUTDOWN` | Final save outcome and receipts. |
-| Save article: ensure | `ArticleStageResult` | Interrupt with `SHUTDOWN` | URL/duplicate admission and subsequent content work. |
-| Save article: attachment | `ArticleStageResult` | Interrupt with `SHUTDOWN` | Refusal-driven reread and attachment selection. |
-| Save article: content | `SaveResult` | Interrupt with `SHUTDOWN` only | Content interpretation; child has no cancel command. |
-| Organization: writing | `OrganizationStageResult` | Interrupt with `SHUTDOWN` | History, scope checks and local settlement. |
-| Images: saving ready | `ImageStageResult` | Drain without interruption | Ready/uncertain bookkeeping and receipt watch. |
-| Images: saving failure | `ImageStageResult` | Drain without interruption | Failure/uncertain bookkeeping and receipt watch. |
-| Reader: writing | `ReaderStageResult` | Drain without interruption | Issued change, queue, drafts and receipt watch. |
-| Samples: writing | `WorkspaceCreationResult<FakeDataPlan, number>` | Interrupt with `SHUTDOWN` | Sample gating and seeded/skipped/unknown/closed selection. |
+| Parent state             | Child output                                    | Shutdown policy                | Behavior retained in parent                                    |
+| ------------------------ | ----------------------------------------------- | ------------------------------ | -------------------------------------------------------------- |
+| Save record: intent      | `StageResult`                                   | Interrupt with `SHUTDOWN`      | Publication admission, scope/refusal/uncertainty and receipts. |
+| Save record: publication | `StageResult`                                   | Interrupt with `SHUTDOWN`      | Final save outcome and receipts.                               |
+| Save article: ensure     | `ArticleStageResult`                            | Interrupt with `SHUTDOWN`      | URL/duplicate admission and subsequent content work.           |
+| Save article: attachment | `ArticleStageResult`                            | Interrupt with `SHUTDOWN`      | Refusal-driven reread and attachment selection.                |
+| Save article: content    | `SaveResult`                                    | Interrupt with `SHUTDOWN` only | Content interpretation; child has no cancel command.           |
+| Organization: writing    | `OrganizationStageResult`                       | Interrupt with `SHUTDOWN`      | History, scope checks and local settlement.                    |
+| Images: saving ready     | `ImageStageResult`                              | Drain without interruption     | Ready/uncertain bookkeeping and receipt watch.                 |
+| Images: saving failure   | `ImageStageResult`                              | Drain without interruption     | Failure/uncertain bookkeeping and receipt watch.               |
+| Reader: writing          | `ReaderStageResult`                             | Drain without interruption     | Issued change, queue, drafts and receipt watch.                |
+| Samples: writing         | `WorkspaceCreationResult<FakeDataPlan, number>` | Interrupt with `SHUTDOWN`      | Sample gating and seeded/skipped/unknown/closed selection.     |
 
 Reader `issued` and queue updates currently occur in writing entry. Prepare them
 on the preceding transition or a distinct preparation boundary before invocation:
