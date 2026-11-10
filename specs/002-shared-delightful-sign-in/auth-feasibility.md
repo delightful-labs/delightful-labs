@@ -1,5 +1,9 @@
 # AT Protocol identity to Jazz: version and authentication feasibility
 
+**Current status (2026-11-10):** [Merged Clipper implementation and remaining work](spec.md#current-implementation-checkpoint--2026-11-10) supersede historical source-build, JWT/Neon, Netlify-only and snapshot-publication instructions below. Jazz alpha.60/Vercel and native Jazz-backed identity are implemented in merged Clipper PR #20; shared DLF/Finance adoption, hosted live-provider qualification and public publication remain open. No existing research edits were discarded.
+
+## Historical investigation and decisions
+
 Investigated: 2026-11-03. Branch: `research/atproto-jazz-auth`.
 Baseline: merged shared-sign-in spec at DLF `04e7659` (PR #14).
 Status: **source/package investigation complete; integration not runtime-qualified**.
@@ -17,6 +21,136 @@ code. See [upstream delivery status](#upstream-delivery-status). Target that arc
 next spec decision, retaining publication, migration and local-first qualification gates. A JWT
 provider bridge is now a fallback for a separately demonstrated delivery constraint, not an equally
 preferred new architecture. This recommendation does not itself approve an SDK upgrade.
+
+## Published-alpha.59 JWT bridge reconsideration — 2026-11-06
+
+The user requested renewed research into handling more authentication in an app-owned backend,
+followed by a temporary Clipper branch using the simplest viable solution. This authorizes research
+and preparation of a concrete experiment proposal; it does not select dependencies, identity data
+shapes, callback processes or a new production architecture. The earlier unreleased build remains
+available. Do not treat `latest` as a verified current npm dist-tag: this investigation directly
+inspected Clipper's installed `jazz-tools@2.0.0-alpha.59`.
+
+### Dashboard evidence supplied by the user — 2026-11-06
+
+The user supplied a screenshot of the app's **App auth details** dashboard. It explicitly says
+these settings map to the app's `jazz-tools server` process and displays JWT verification source,
+JWT issuer, JWT audience, and `allowLocalFirstAuth` (shown enabled). This resolves the earlier
+uncertainty about whether the dashboard exposes app-level JWT trust configuration. JWT verification
+is shown disabled; no settings were changed during this review. The verification-source dropdown
+was not expanded, so its exact supported choices and source-input fields remain uninspected.
+
+The JWT-bridge experiment can now treat managed Cloud as a concrete deployment candidate with an
+exposed configuration surface. Actual saving/application of settings, public verifier-key access,
+token acceptance, linking and offline restart still require runtime evidence. Do not claim this
+screenshot proves end-to-end compatibility or ask the user to change existing app settings before
+an isolated experiment is prepared. Earlier 'not established' statements below record the prior
+research limit and are superseded by this user-supplied UI evidence for configuration availability.
+
+### Result
+
+**A published-version online authentication/linking proof is supported by the SDK's existing
+boundaries. An all-Netlify + managed Jazz Cloud deployment and offline cold restart are not yet
+qualified.** A local experiment can answer SDK/bridge feasibility without waiting for a managed
+Cloud configuration path or adopting the unreleased build.
+
+| Question                                                                              | Evidence / conclusion                                                                                                                                                             |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Can the installed SDK connect a local account to another verified identity?           | Yes: its public session exposes `linkJWT`; installed enrollment code performs local founding and the registry link request/accept protocol                                        |
+| Can a second device sign into that account?                                           | The public `loginJWT` path exists; same-account result still needs end-to-end demonstration with actual bridge tokens                                                             |
+| Can browsers sync directly to Jazz without a custom persistent gateway?               | Yes under this JWT architecture: the core verifies the app's JWT. A separately operated OAuth/JWT backend need not relay sync                                                     |
+| Can the self-hosted alpha.59 server verify those JWTs?                                | Yes: configured JWKS/public key, issuer and audience are present in tagged verifier and installed dev-server options                                                              |
+| Can managed Jazz Cloud be configured that way through a supported operator interface? | Not established: public docs describe the architecture and reachable JWKS, but demonstrate CLI flags for an owned server. No public Cloud trust-setting API/UI contract was found |
+| Does this fix local-first post-link restart automatically?                            | No evidence of that: installed account persistence explicitly clears `selected` for external selection. Automatic local-first startup may then initialize another account         |
+
+The installed package was read in Clipper's `apps/web/node_modules/jazz-tools/dist/`; no package
+installation or code execution was required. Release-tag evidence is pinned to
+[`f0ada4c`](https://github.com/garden-co/jazz/tree/f0ada4cefcf52a4ebe478413419440da13b06508).
+
+### Managed Cloud findings and limits
+
+The live [auth-provider recipe](https://jazz.tools/docs/recipes/auth/auth-provider-integration)
+describes Better Auth JWT integration and says Cloud must reach the provider's JWKS. That is
+supporting evidence of intended Cloud use, not an operator procedure for setting trust. Its actual
+configuration examples are `jazz-tools server --jwks-url ... --jwt-issuer ... --jwt-audience ...`.
+[Server setup](https://jazz.tools/docs/getting-started/server-setup) likewise distinguishes Cloud
+provisioning from owned-server flags. Publishing schema/policies does not configure token trust.
+
+Searches of public documentation, dashboard URLs, public GitHub issues and public repository
+metadata did not establish a Cloud trust-update contract. `garden-co/infra` was unavailable through
+the connection (404); that is not proof that no private operator interface exists. The clean-browser
+dashboard inspection did not complete. No authenticated dashboard was inspected, no credentials
+read and no Cloud tenant was created or changed. Therefore do not say Cloud lacks JWT support,
+and do not promise we can configure it from these findings.
+
+Backend impersonation is not a workaround: the tagged account-control routes explicitly require
+user bearer authentication and reject impersonated-session headers. Forwarding AT Protocol access
+tokens is also incompatible with this ordinary-JWT boundary. Use the OAuth SDK to verify identity
+and an established auth framework for the app's signed JWT; do not write a DLF token issuer.
+
+### Bridge candidates inspected
+
+The established [Better Auth JWT plugin](https://better-auth.com/docs/plugins/jwt) supplies app JWT
+and verifier JWKS endpoints separately from its primary session cookie. Installed Jazz supplies a
+Better Auth connector, but its `connectAuthProvider` documentation explicitly says to use manual
+`session.linkJWT` when preserving a local-first account. Mounting that connector unchanged can
+register/select another account before local work has linked. New Jazz's automatic linking behavior
+must not be assumed to exist in alpha.59.
+
+Two distinct public-key endpoints have different jobs: the AT Protocol OAuth client's authentication
+keys and the app JWT issuer's keys trusted by Jazz. Do not treat a community plugin's OAuth JWKS
+endpoint as the Better Auth JWT plugin's verifier JWKS endpoint.
+
+| Candidate                                                 | Inspection                                                                                                               | Suitability for a disposable proof                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `vineyardbovines/better-auth-atproto`                     | Main still `a2a6d1d291b7fe792366c4118b5fd23d3b9c9515` from 2026-04-07; historical scope/callback/session concerns remain | Not the first candidate                                                                            |
+| `nperez0111/better-auth-bsky`                             | Main `a053f8c3be3abd849970b28828dd284939f39b13`; source package 0.3.0; atcute OAuth SDK, Better Auth >=1.5.0             | Off-the-shelf alternative, still community maintained                                              |
+| `@kingironman2011/better-auth-bsky`                       | Main `e33d11a0806ed6e23380516fe401c9ae874d3f82`; source package 0.3.2; Node >=20, Better Auth >=1.5.0, atcute OAuth SDK  | Best convenience candidate from inspected plugins for a short experiment; not production-qualified |
+| Official AT Protocol Node SDK + app/framework integration | Maintained protocol implementation; requires our glue into the auth framework                                            | More integration work; fallback if the plugin's behavior cannot fit                                |
+
+The newer fork's [README](https://github.com/KingIronMan2011/better-auth-bsky/blob/e33d11a0806ed6e23380516fe401c9ae874d3f82/README.md),
+`src/server.ts` and `src/stores.ts` were inspected. It defaults to identity-only `atproto` scope,
+uses database-backed state/session stores, establishes a Better Auth session, and restricts callback
+return destinations to local paths. Source dependency declarations are not a verified published
+package graph; no npm package was installed in this review.
+
+Remaining limits include internal Better Auth adapter calls, a single stored OAuth session per DID,
+read-before-create session writes, callback/profile side effects and diagnostic logging of provider
+errors/state fragments. Distributed locking and safe concurrent refresh were not established by
+this source review. Do not add publication, multi-instance execution, account merging or a new
+recovery process to the first proof. These observations are not a full security audit, proof of
+an exploitable issue, or approval to ship the plugin.
+
+### Smallest proposed Clipper experiment — review before dependencies/process selection
+
+Recommend a task-owned temporary Clipper worktree/feature branch, retaining installed alpha.59,
+with a disposable local Jazz server whose JWT trust can be explicitly configured. Use the current
+DLF startup/session boundary and synthetic clips. Evaluate Better Auth JWT plus the newer AT Protocol
+plugin as the first off-the-shelf candidate. Use library-owned test storage rather than designing
+shared DLF persistence formats in an experiment. New dependencies require explicit approval under
+Clipper's AGENTS.md; no library/domain schema or exact process is selected here.
+
+Evidence the experiment should produce:
+
+- Local Clipper use still works without AT Protocol sign-in.
+- A real OAuth login yields an app JWT the configured Jazz core accepts.
+- Linking retains the original account and synthetic clip.
+- A separate clean browser can sign in and see that same account/clip.
+- Restart and offline reopen report the actual retained identity/data behavior. Treat the known
+  external-selection issue as a possible failed acceptance outcome, not permission to create a
+  new account or silently weaken offline requirements.
+- Record which effects depended on the auth server versus Jazz, and any mismatch/unknown outcome.
+
+These are evidence goals, not a selected callback/linking statechart. No automatic login-or-register
+before linking, account-transfer design, live Cloud mutation, deployment or production migration
+is implied. Local success can establish whether the bridge is worth pursuing; it cannot establish
+Cloud custom-JWT configurability or Netlify production behavior.
+
+Netlify remains plausible for the authentication-only backend if the core's trust can be configured
+and auth state is durable across function instances. SQLite on a developer machine is not durable
+Netlify storage. A published-version bridge therefore reduces sync-hosting requirements but adds
+an auth framework/JWT bridge and has an independent offline-resumption gap. Do not call it proven
+simpler overall before the experiment.
 
 ## Conclusion and recommendation
 

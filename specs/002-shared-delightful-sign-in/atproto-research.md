@@ -1,5 +1,9 @@
 # Jazz-native storage with AT Protocol identity and public publication
 
+**Current status (2026-11-10):** [Merged Clipper implementation and remaining work](spec.md#current-implementation-checkpoint--2026-11-10) supersede historical source-build, JWT/Neon, Netlify-only and snapshot-publication instructions below. Jazz alpha.60/Vercel and native Jazz-backed identity are implemented in merged Clipper PR #20; shared DLF/Finance adoption, hosted live-provider qualification and public publication remain open. No existing research edits were discarded.
+
+## Historical investigation and decisions
+
 Research date: 2026-11-03. Status: source/specification inspection, **not runtime qualification**.
 This continues PR #14. No SDK upgrade, authentication service, publication implementation or
 consumer migration is authorized. Product requirements are in [spec.md](spec.md); exercises remain
@@ -105,3 +109,12 @@ This is a design handoff, not a new DLF publication engine or settled statechart
 The first implementation planning task is identity feasibility/version selection. Public export
 design and consumer adoption follow separately, so Finance and shared sign-in are not blocked on
 Clipper schemas, feeds, Spaces or a general-purpose sharing platform.
+
+## Hosting feasibility follow-up — 2026-11-06
+
+See the [deployment feasibility research](hosting.md#deployment-feasibility-research--2026-11-06)
+for the approved source build, Jazz Cloud versus app-backend distinction, Netlify transport limits,
+Vercel socket support, Railway/Render alternatives, split-origin credential behavior, Linux artifact
+requirements, and remaining managed-service qualification. This is research, not provider selection
+or deployed evidence. It supersedes any implication that using unreleased Jazz necessarily requires
+self-hosting its database, or that every supported backend must be a conventional persistent process.
