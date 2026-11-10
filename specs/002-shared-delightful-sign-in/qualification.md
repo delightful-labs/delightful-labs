@@ -13,6 +13,9 @@ on `77cf813` passed web/schema/worker/offline checks and reached the extension
 suite: nine passed, three failed. Linux extension qualification is blocked by the
 [known recovery sign-in issue](spec.md#known-consumer-issue-clipper-linux-extension-recovery-sign-in--2026-11-10);
 its cause remains unresolved and diagnostic follow-up is not a verified repair.
+User-approved commit `07acf39` temporarily skips those three cases on Linux;
+macOS retains all 12 and Linux retains the other nine. Current-head CI remains
+to be confirmed. Green checks with exclusions do not qualify the skipped paths.
 
 | Coverage                         | Evidence / remaining gap                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -33,9 +36,11 @@ Live-identity offline follow-up: two complete process restarts passed with netwo
 and DNS blocked and HTTP cache cleared, retaining the same account, saved reader
 and an offline favorite. A fresh local replica then received the article/favorite
 from production and read the text by library navigation. Extraction was a synthetic
-fixture; actual AT authentication and Jazz storage/sync were used. A separate live
-fresh-replica direct-reader URL failure remains unresolved and did not reproduce
-in the corrected local cold-reader case. See the [bounded evidence](spec.md#live-identity-offline-restart--passed-with-a-separate-reader-gap-2026-11-10).
+fixture; actual AT authentication and Jazz storage/sync were used. The separate
+fresh-replica direct-reader failure now has an approved, implemented consumer fix
+in PR #32, with local state-machine/offline/worker/reader coverage and isolated
+built-worker checks against production. Normal merge and deployed-artifact
+verification remain open. See the [bounded evidence](spec.md#live-identity-offline-restart--passed-with-a-separate-reader-gap-2026-11-10).
 
 Status: **Partial Clipper evidence; shared adoption and publication remain unqualified.** The checkpoint above records completed consumer tests. Rows below define the remaining/full acceptance contract and do not authorize new implementation or tests. Historical source inspection is recorded in [research](research.md).
 

@@ -73,13 +73,21 @@ also rendered the saved text. The session was reused only within this app and wa
 not printed/exported. This does not qualify a new-device OAuth flow, expired live
 credentials, backend restart, or revocation.
 
-A separate production failure remains: direct URL navigation in a fresh replica
-reported the article unavailable while online, whereas opening from the library
-worked. It reproduced twice with a 30-second reader assertion. Corrected local
-cold-reader coverage passes without an application change, so no app/SDK cause or
-fix is established. A proposed wait-only change was removed. Do not mark all
-reader/release qualification complete. The native test profile remains local for
-continuation; no profile or credentials are included in repository evidence.
+A separate production failure was reproduced: direct URL navigation in a fresh
+replica reported unavailable while library navigation worked. Investigation
+confirmed that Clipper treated a temporary snapshot miss during Jazz connection
+startup as terminal absence. [Clipper PR #32](https://github.com/delightful-labs/delightful-clipper/pull/32)
+implements the approved reader-owned native connection wait and one further
+local-first read, retaining immediate cached reads, cancellation and account scope.
+This is a consumer reader repair, not a shared DLF interface or SDK change.
+
+The implementation passed 683 unit/native tests and full verification, plus eight
+offline, six worker and seven reader browser cases. Its actual built worker also
+passed the original failure scenario and three reloads in each of two isolated
+fresh contexts against production using local asset substitution. Normal merge
+and deployed-artifact verification remain open; these isolated checks did not
+deploy the repair. See the [reader qualification](https://github.com/delightful-labs/delightful-clipper/blob/test/atproto-cold-reader/docs/reviews/reader-direct-open-2026-11-10.md).
+The native test profile stays local; repository evidence contains no credentials.
 
 ### Known consumer issue: Clipper Linux extension recovery sign-in — 2026-11-10
 
@@ -97,6 +105,10 @@ been isolated. Diagnostic follow-up is not a verified repair. This concerns
 Clipper's trusted-page Jazz recovery-phrase path, not an established AT Protocol
 OAuth failure or a demonstrated defect across DLF consumers. Direct extension
 AT Protocol provider login remains deferred.
+At the user's request, Clipper commit `07acf39` temporarily skips the three failing
+cases on Linux. They remain enabled on macOS; the other nine remain enabled on
+Linux. Skipping the cases does not establish a repair or Linux qualification.
+Latest-head CI still needs confirmation.
 
 Linux extension qualification and a complete Clipper release-readiness claim
 remain blocked. Existing passing web/native offline results retain their bounded
