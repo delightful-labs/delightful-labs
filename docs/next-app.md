@@ -163,3 +163,11 @@ input, output and supported child commands. See [owned operation lifecycle](owne
 for distinct interruption/drain paths, native custody boundaries and the
 consumer migration map and library qualification results. Qualify each consumer
 against its actual compatible artifact before adoption.
+
+## Scoped worker requests
+
+`worker/request/workflow` and `worker/request/contracts` define one correlated
+native request with a finite deadline and explicit unknown-effect outcomes.
+See [scoped worker request lifecycle](worker-request.md) for the pinned consumer
+comparison and required independent host-close handshake. This source review
+unit has not been behaviorally qualified or adopted by a consumer.

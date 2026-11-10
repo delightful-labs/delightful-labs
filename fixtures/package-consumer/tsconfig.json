@@ -31,7 +31,8 @@
 		"./vite.config.ts",
 		"./envelope.vite.config.ts",
 		"./domain-transaction.ts",
-		"./owned-operation.ts"
+		"./owned-operation.ts",
+		"./worker-request.ts"
 	],
 	"exclude": []
 }
