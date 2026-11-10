@@ -132,6 +132,7 @@ describe('startup admission and captured provenance', () => {
 	it('captures the ready projection once for reporting and seeding', async () => {
 		const f = fixture('member')
 		f.actor.start()
+		expect(f.initialize).toHaveBeenCalledWith(expect.objectContaining({ userId: 'member' }))
 		f.initialized.resolve({ outcome: 'ready', profileId: 'profile', organizationId: 'workspace' })
 		await vi.waitFor(() => expect(f.seed).toHaveBeenCalledOnce())
 		expect(f.ready).toHaveBeenCalledOnce()
@@ -149,6 +150,7 @@ describe('startup admission and captured provenance', () => {
 	it('reports failed instead of seeding missing initialization provenance', async () => {
 		const f = fixture('member')
 		f.actor.start()
+		expect(f.initialize).toHaveBeenCalledWith(expect.objectContaining({ userId: 'member' }))
 		f.initialized.resolve({ outcome: 'ready', profileId: 'profile', organizationId: '' })
 		await waitFor(f.actor, (s) => s.matches('failed'))
 		expect(f.actor.getSnapshot().status).toBe('active')
@@ -158,6 +160,7 @@ describe('startup admission and captured provenance', () => {
 	it('drains optional seeding before shutdown completes', async () => {
 		const f = fixture('member')
 		f.actor.start()
+		expect(f.initialize).toHaveBeenCalledWith(expect.objectContaining({ userId: 'member' }))
 		f.initialized.resolve({ outcome: 'ready', profileId: 'profile', organizationId: 'workspace' })
 		await vi.waitFor(() => expect(f.seed).toHaveBeenCalledOnce())
 		f.actor.send({ type: 'SHUTDOWN' })

@@ -257,7 +257,7 @@ export function createWorkspaceStartupMachine<
 				invoke: model.createInvoke<typeof workspaceInitialization, Context>({
 					id: 'initialize',
 					src: workspaceInitialization,
-					input: ({ context }) => ({ db, userId: context.operation?.userId ?? '' }),
+					input: ({ context }) => ({ db, userId: context.request.userId ?? '' }),
 					onDone: (args) => {
 						const { event } = args
 						if (matchesState({ initializing: 'closing' }, args.value)) {
@@ -431,7 +431,6 @@ export function createWorkspaceStartupMachine<
 			},
 			closed: {
 				type: 'final',
-				on: { OBSERVED: {}, SHUTDOWN: {} },
 				entry: finalizers.closed
 			}
 		}

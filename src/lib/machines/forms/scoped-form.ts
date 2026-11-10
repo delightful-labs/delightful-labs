@@ -256,7 +256,7 @@ export function createScopedFormMachine<
 			observation: { revision: 0, facts: input },
 			scope: { value: options.scopeOf(input) },
 			scopeRevision: 0,
-			watchGeneration: 0,
+			watchGeneration: 1,
 			capability: undefined,
 			request: undefined,
 			sequence: 0,
@@ -339,14 +339,6 @@ export function createScopedFormMachine<
 						initial: 'watching',
 						states: {
 							watching: {
-								entry: (args) => {
-									return {
-										context: {
-											watchGeneration: args.context.watchGeneration + 1,
-											capability: undefined
-										} satisfies Partial<Context>
-									}
-								},
 								initial: 'awaiting',
 								states: {
 									awaiting: {
@@ -411,7 +403,13 @@ export function createScopedFormMachine<
 								on: {
 									RETRY_READINESS: (args) => {
 										if (!matchesState({ open: { workflow: 'idle' } }, args.value)) return
-										return { target: 'watching' }
+										return {
+											target: 'watching',
+											context: {
+												watchGeneration: args.context.watchGeneration + 1,
+												capability: undefined
+											}
+										}
 									},
 									SHUTDOWN: { target: 'closed' }
 								}
