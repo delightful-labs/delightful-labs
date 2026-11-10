@@ -33,13 +33,29 @@ consumer behavior, not completion of shared DLF adoption or public publication.
 | Provider lifecycle | Worker-owned authorization and attempt-bound callback completion; application drain/acquisition settlement/native close before navigation. Sign-out clears this app's provider cookie before native logout. Broader cross-app logout is not implemented.                                                                                                                          |
 | Extension          | Worker-owned settings/recovery sign-in, existing SDK account key/Web Lock and trusted Chrome confirmation. Direct AT Protocol provider login remains deferred. The hidden offscreen capture owner is retained.                                                                                                                                                                    |
 | Local evidence     | 663 unit/native tests, six worker cases, 12 macOS/Chromium extension cases including offline restart and 24 settings teardown/capture cycles. Eight production offline cases cover linked/existing/expired credentials, two full browser restarts with app/auth/Jazz unreachable, preserved edits and reconciliation. Provider identities in browser qualification are synthetic. |
-| Still unqualified  | Hosted real-provider consent on the merged deployment, deployed persistence/refresh/revocation cases, Linux extension qualification, Finance/cross-app adoption and complete shared DLF provider/server interfaces. Jazz's published pending-write/account-switch limits remain explicit.                                                                                         |
+| Still unqualified  | Further hosted lifecycle checks (live-identity browser-process/offline restart and returning-device access), deployed persistence/refresh/revocation cases, Linux extension qualification, Finance/cross-app adoption and complete shared DLF provider/server interfaces. Jazz's published pending-write/account-switch limits remain explicit.                                   |
 
 Implementation and bounded evidence: [native auth review](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/reviews/atproto-native-alpha60.md),
 [extension investigation](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/reviews/extension-startup-2026-11-09.md)
 and [deployment instructions](https://github.com/delightful-labs/delightful-clipper/blob/main/docs/atproto-proof-deployment.md).
 Do not equate the implemented Clipper consumer with a finished reusable DLF
 AT Protocol integration or Finance migration.
+
+### Hosted Clipper round trip — passed 2026-11-10
+
+With user-approved production auth configuration, merge `168cd0b` on deployment
+`dpl_5qUpzSiG7Y8APNfgrW1rSQgQ9XD9` passed real Bluesky sign-in on
+`https://clipper.delightfullabs.com`. The user completed provider authentication
+in a separate visible Chromium context; Clipper returned an authenticated
+session and three reloads retained the same remembered Jazz account and visible
+library. Existing Playwright was used because Chrome MCP was unavailable.
+No password, token, cookie or recovery material was recorded; the browser was
+closed after verification.
+
+This passes the real-provider callback/reload check, not all hosted lifecycle
+qualification. Live-identity full browser-process/offline restart, refresh and
+revocation, backend restart and returning-device access remain open. The eight
+synthetic-provider offline cases remain separate evidence.
 
 ### Accepted publication direction; implementation remains open
 
@@ -67,7 +83,7 @@ and [technical proposal](https://github.com/delightful-labs/delightful-clipper/b
 Shared DLF work must not adopt Clipper's domain schema or turn the backup journal
 into a publication queue without separately evidenced reuse.
 
-Remaining sequence: verify the merged hosted identity path; review/extract only
+Remaining sequence: finish the remaining hosted lifecycle checks; review/extract only
 reusable DLF boundaries and qualify Finance separately; finish Clipper's local
 annotation model/editor; resolve the remaining publication choices with the user;
 then implement and qualify PDS synchronization. Existing backend availability is

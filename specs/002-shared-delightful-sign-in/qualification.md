@@ -10,13 +10,20 @@ CI on Clipper `152d679` passed tooling/types/build, but its browser job failed
 at `pnpm test:e2e` before extension tests ([run 42802719477](https://github.com/delightful-labs/delightful-clipper/actions/runs/42802719477)).
 Linux extension qualification therefore remains open.
 
-| Coverage                         | Evidence / remaining gap                                                                                                                                                                                                                                              |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q-02, Q-06–09, Q-21–22 (partial) | Clipper native callback/storage and ownership regressions plus eight production offline cases; synthetic provider identities with real Better Auth/Jazz persistence. Hosted consent, revocation and all upstream account-switch edge cases are not thereby qualified. |
-| Extension                        | 12 macOS/Chromium cases, including recovery sign-in, account switching, full offline restart, and 24 settings-close/capture cycles. SDK/worker storage-key round trips pass. Direct extension AT provider login and Linux qualification remain separate.              |
-| Q-01, Q-05, Q-12–13              | Two-app Finance/Clipper adoption and reusable DLF provider/server contract qualification remain open.                                                                                                                                                                 |
-| Q-14–18                          | Public record creation, updates/deletion, companion synchronization, unknown-outcome reconciliation and live interoperability remain unimplemented/unqualified.                                                                                                       |
-| Q-19–20, Q-23 (partial)          | Native plugin/adapter callback tests and source evidence exist; merged hosted real-provider consent, durable deployed refresh and full DID/PDS lifecycle evidence remain open.                                                                                        |
+| Coverage                         | Evidence / remaining gap                                                                                                                                                                                                                                                                           |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q-02, Q-06–09, Q-21–22 (partial) | Clipper native callback/storage and ownership regressions plus eight production offline cases; synthetic provider identities with real Better Auth/Jazz persistence. The hosted round trip now passes separately; revocation and all upstream account-switch edge cases are not thereby qualified. |
+| Extension                        | 12 macOS/Chromium cases, including recovery sign-in, account switching, full offline restart, and 24 settings-close/capture cycles. SDK/worker storage-key round trips pass. Direct extension AT provider login and Linux qualification remain separate.                                           |
+| Q-01, Q-05, Q-12–13              | Two-app Finance/Clipper adoption and reusable DLF provider/server contract qualification remain open.                                                                                                                                                                                              |
+| Q-14–18                          | Public record creation, updates/deletion, companion synchronization, unknown-outcome reconciliation and live interoperability remain unimplemented/unqualified.                                                                                                                                    |
+| Q-19–20, Q-23 (partial)          | Native plugin/adapter callback tests and source evidence exist; real-provider callback and three same-account reloads now pass on production merge `168cd0b`; durable deployed refresh and full DID/PDS lifecycle evidence remain open.                                                            |
+
+Hosted live-provider follow-up: the user completed actual Bluesky sign-in in an
+isolated visible Chromium context on deployment `dpl_5qUpzSiG7Y8APNfgrW1rSQgQ9XD9`
+(merge `168cd0b`). Clipper returned an authenticated session and retained the same
+account/library through three reloads. This is not a live-identity full-process
+offline restart, refresh/revocation or returning-device test. No credentials were
+recorded and the browser was closed. See the [dated checkpoint](spec.md#hosted-clipper-round-trip--passed-2026-11-10).
 
 Status: **Partial Clipper evidence; shared adoption and publication remain unqualified.** The checkpoint above records completed consumer tests. Rows below define the remaining/full acceptance contract and do not authorize new implementation or tests. Historical source inspection is recorded in [research](research.md).
 
