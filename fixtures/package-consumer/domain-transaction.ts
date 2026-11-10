@@ -1,4 +1,4 @@
-import { createActor, setup, toPromise, types } from 'xstate'
+import { createActor, setup, toPromise, types, type ActorRefFrom } from 'xstate'
 import { createDomainTransaction } from 'delightful-local-first/transactions/workflow'
 import type { TransactionDomainInput } from 'delightful-local-first/transactions/contracts'
 
@@ -13,7 +13,8 @@ const domain = setup({
 		context: types<Input>(),
 		input: types<Input>(),
 		output: types<Receipt>(),
-		events: { STAGE: types(), STAGED: types() }
+		events: { STAGE: types() },
+		internalEvents: { STAGED: types() }
 	}
 }).createMachine({
 	context: ({ input }) => input,
@@ -29,8 +30,8 @@ const domain = setup({
 			entry: ({ context, self }, enq) => {
 				enq(() => {
 					context.resource.writes.push(context.attempt.draft.name)
-					self.send({ type: 'STAGED' })
 				})
+				enq.sendTo(self, { type: 'STAGED' })
 			},
 			on: { STAGED: { target: 'done' } }
 		},
@@ -61,6 +62,11 @@ const actor = createActor(
 		}
 	}
 )
+function checkDomainProtocol(child: ActorRefFrom<typeof domain>) {
+	// @ts-expect-error Staging acknowledgement is private to the child.
+	child.send({ type: 'STAGED' })
+}
+void checkDomainProtocol
 function checkPublicProtocol() {
 	// @ts-expect-error Read/stage bridge requests are not public lifecycle commands.
 	actor.send({ type: 'READ' })

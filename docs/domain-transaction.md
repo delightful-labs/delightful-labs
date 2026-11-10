@@ -98,3 +98,13 @@ establish remote durability for arbitrary consumers. The subsequent compatible
 artifact also includes the qualified owned-operation supervisor; see
 [consumer adoption](owned-operation.md#consumer-adoption) for its source pin,
 ten caller migrations and final 673-test consumer qualification.
+
+## Private staging acknowledgement
+
+The public `TransactionDomainChild` protocol requires only `STAGE`. A child's
+post-mutation `STAGED` acknowledgement belongs in `schemas.internalEvents`. Queue
+the selected mutation first, then native self-delivery with `enq.sendTo(self, ...)`;
+a thrown mutation must prevent acknowledgement and receipt/commit. The package
+consumer checks that a private-acknowledgement child composes with the bridge and
+that application code cannot send that acknowledgement. Transaction settlement
+and custody remain unchanged.

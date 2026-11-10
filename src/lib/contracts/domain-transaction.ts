@@ -20,10 +20,8 @@ export type TransactionDomainInput<Draft, Resource> = {
 }
 /** Concrete producers keep their own full child input and event contracts. */
 export type TransactionChildSpawner = EnqueueObject<never, never, SystemRegistry, {}>['spawn']
-export type TransactionDomainChild<Receipt> = ActorInstance<
-	Snapshot<Receipt>,
-	{ type: 'STAGE' } | { type: 'STAGED' }
->
+/** STAGED is private self-coordination; the transaction owner commands only STAGE. */
+export type TransactionDomainChild<Receipt> = ActorInstance<Snapshot<Receipt>, { type: 'STAGE' }>
 export type TransactionDomainSpawner<Draft, Resource, Receipt> = (
 	spawn: TransactionChildSpawner,
 	input: TransactionDomainInput<Draft, Resource>
