@@ -5,8 +5,8 @@ provider-injected identity composition; Clipper retains HTTP/cookie policy and U
 feedback. No backend, provider, account-selection or domain policy is introduced.
 
 Input supplies an optional provider operation, the native session logout operation,
-stage deadlines and bounded overdue reporting. States select the provider stage
-when supplied, then the session stage only after provider success. Each stage owns
+stage deadlines, optional synchronous native identity observation and bounded overdue reporting. States select the provider stage
+when supplied, then observes native facts before mutation. An already signed-out native identity completes without another logout; replacement/unavailable facts refuse mutation. The session stage requires the original identity, and its capability must enforce atomic admission too. Each stage owns
 one original invocation through waiting and overdue. Failure completes with typed
 stage facts; no raw exception crosses the public result. Success means both calls
 settled successfully, with the consumer responsible for observing native identity

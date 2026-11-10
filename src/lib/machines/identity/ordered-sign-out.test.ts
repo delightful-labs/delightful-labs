@@ -2,6 +2,43 @@ import { expect, it, vi } from 'vitest'
 import { createActor, SimulatedClock, toPromise, waitFor } from 'xstate'
 import { createOrderedSignOutMachine } from './ordered-sign-out.js'
 
+it.each(['signed-out', 'replaced', 'unavailable'] as const)(
+	'observes %s after provider success without mutating a replacement identity',
+	async (status) => {
+		const provider = vi.fn(async () => {}),
+			session = vi.fn(async () => {}),
+			observeSession = vi.fn(() => status)
+		const actor = createActor(createOrderedSignOutMachine(), {
+			input: { provider, session, observeSession }
+		}).start()
+		expect(await toPromise(actor)).toEqual(
+			status === 'signed-out' ? { outcome: 'completed' } : { outcome: 'failed', stage: 'session' }
+		)
+		expect(provider).toHaveBeenCalledOnce()
+		expect(observeSession).toHaveBeenCalledOnce()
+		expect(session).not.toHaveBeenCalled()
+	}
+)
+it('selects native logout only after observing the original identity', async () => {
+	const calls: string[] = []
+	const actor = createActor(createOrderedSignOutMachine(), {
+		input: {
+			provider: async () => {
+				calls.push('provider')
+			},
+			observeSession: () => {
+				calls.push('observe')
+				return 'current'
+			},
+			session: async () => {
+				calls.push('session')
+			}
+		}
+	}).start()
+	expect(await toPromise(actor)).toEqual({ outcome: 'completed' })
+	expect(calls).toEqual(['provider', 'observe', 'session'])
+})
+
 it('skips an absent provider and returns a sanitized native rejection', async () => {
 	const session = vi.fn(async () => {
 		throw new Error('private native details')

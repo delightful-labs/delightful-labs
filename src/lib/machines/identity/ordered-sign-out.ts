@@ -34,6 +34,9 @@ export function createOrderedSignOutMachine() {
 	const session = createAsyncLogic<void, OrderedSignOutInput>({
 		run: ({ input }) => input.session()
 	})
+	const observation = createAsyncLogic({
+		run: async ({ input }: { input: OrderedSignOutInput }) => required(input.observeSession)()
+	})
 	return setup({
 		schemas: {
 			context: types<Context>(),
@@ -42,10 +45,11 @@ export function createOrderedSignOutMachine() {
 			events: { SHUTDOWN: types() },
 			children: {
 				provider: types<ActorRefFrom<typeof provider>>(),
-				session: types<ActorRefFrom<typeof session>>()
+				session: types<ActorRefFrom<typeof session>>(),
+				observation: types<ActorRefFrom<typeof observation>>()
 			}
 		},
-		actors: { provider, session },
+		actors: { provider, session, observation },
 		delays: {
 			providerDeadline: ({ context }) =>
 				required(context.input).providerDeadlineMs ?? DEFAULT_SIGN_OUT_DEADLINE_MS,
@@ -57,7 +61,9 @@ export function createOrderedSignOutMachine() {
 				validDeadline(required(context.input).providerDeadlineMs) &&
 				validDeadline(required(context.input).sessionDeadlineMs),
 			hasProvider: ({ context }: { context: Context }) =>
-				required(context.input).provider !== undefined
+				required(context.input).provider !== undefined,
+			hasObservation: ({ context }: { context: Context }) =>
+				required(context.input).observeSession !== undefined
 		}
 	}).createMachine({
 		id: 'ordered-sign-out',
@@ -76,7 +82,9 @@ export function createOrderedSignOutMachine() {
 							}
 						: args.guards.hasProvider(args)
 							? { target: 'provider' }
-							: { target: 'session' }
+							: args.guards.hasObservation(args)
+								? { target: 'observingSession' }
+								: { target: 'session' }
 			},
 			provider: {
 				initial: 'waiting',
@@ -84,7 +92,10 @@ export function createOrderedSignOutMachine() {
 					id: 'provider',
 					src: 'provider',
 					input: ({ context }) => required(context.input),
-					onDone: { target: 'session' },
+					onDone: (args) =>
+						args.guards.hasObservation(args)
+							? { target: 'observingSession' }
+							: { target: 'session' },
 					onError: {
 						target: 'settled',
 						context: { result: { outcome: 'failed', stage: 'provider' } }
@@ -95,6 +106,26 @@ export function createOrderedSignOutMachine() {
 					overdue: {
 						entry: ({ context }, enq) =>
 							enq(() => reportOverdue(required(context.input), 'provider'))
+					}
+				}
+			},
+			observingSession: {
+				invoke: {
+					id: 'observation',
+					src: 'observation',
+					input: ({ context }) => required(context.input),
+					onDone: ({ event }) =>
+						event.output === 'current'
+							? { target: 'session' }
+							: event.output === 'signed-out'
+								? { target: 'settled', context: { result: { outcome: 'completed' } } }
+								: {
+										target: 'settled',
+										context: { result: { outcome: 'failed', stage: 'session' } }
+									},
+					onError: {
+						target: 'settled',
+						context: { result: { outcome: 'failed', stage: 'session' } }
 					}
 				}
 			},

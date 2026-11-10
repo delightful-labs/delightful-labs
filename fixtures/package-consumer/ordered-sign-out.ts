@@ -13,6 +13,7 @@ const pending = new Promise<void>((resolve) => {
 const reports: SignOutStage[] = [],
 	calls: string[] = []
 const input: OrderedSignOutInput = {
+	observeSession: () => 'current',
 	provider: () => {
 		calls.push('provider')
 		return pending
