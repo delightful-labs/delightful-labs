@@ -1,3 +1,4 @@
+/// <reference lib="es2024.promise" />
 import { createActor, toPromise } from 'xstate'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createOwnedOperation } from './owned-operation.js'

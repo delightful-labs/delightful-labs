@@ -1,3 +1,4 @@
+/// <reference lib="es2024.promise" />
 import { types, createActor, setup, toPromise, createAsyncLogic } from 'xstate'
 import { expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'

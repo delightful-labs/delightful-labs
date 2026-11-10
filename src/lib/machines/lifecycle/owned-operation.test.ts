@@ -1,3 +1,4 @@
+/// <reference lib="es2024.promise" />
 import { createActor, createAsyncLogic, createCallbackLogic, setup, toPromise, types } from 'xstate'
 import type { EventFrom, SnapshotFrom } from 'xstate'
 import { afterEach, expect, it, vi } from 'vitest'

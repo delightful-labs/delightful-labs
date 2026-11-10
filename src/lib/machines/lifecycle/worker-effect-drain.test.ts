@@ -1,3 +1,4 @@
+/// <reference lib="es2024.promise" />
 import { createActor, setup, SimulatedClock, types, waitFor } from 'xstate'
 import type { EventFrom, SnapshotFrom } from 'xstate'
 import { afterEach, expect, it, vi } from 'vitest'

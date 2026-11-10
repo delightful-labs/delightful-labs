@@ -1,3 +1,4 @@
+/// <reference lib="es2023.array" />
 import { createActor, SimulatedClock, setup, types } from 'xstate'
 import type { EventFrom, SnapshotFrom } from 'xstate'
 import * as fc from 'fast-check'
