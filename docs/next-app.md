@@ -176,3 +176,8 @@ The [bounded worker channel](worker-channel.md) composes those request actors un
 one scoped owner. Import `createWorkerChannel` from `worker/channel/workflow` and
 its contracts from `worker/channel/contracts`. Inject separately owned data and
 control listeners; timeout never substitutes for the real host-close receipt.
+
+The [worker effect drain](worker-effect-drain.md) observes the original effect's
+quiescence receipt and the exact host-close receipt. Import its factory and types
+from `worker/effect-drain/workflow` and `worker/effect-drain/contracts`. The parent
+retains its lock and original unknown outcome until this chart returns proof.
