@@ -1,11 +1,15 @@
 import type {
-	WorkerPostReceipt,
 	WorkerRequestIdentity,
 	WorkerRequestReply,
 	WorkerRequestResult
 } from './worker-request.js'
 
 export const MAX_WORKER_CHANNEL_REQUESTS = 8
+/** Validate payloads before admission. A refused native post invalidates FIFO
+ * continuity, so it must fail the channel rather than leave a sequence gap. */
+export type WorkerChannelPostReceipt =
+	| { kind: 'posted' }
+	| { kind: 'not-issued'; reason: 'unavailable' }
 export type WorkerHostClosed = Readonly<{ scope: string; requestId: string }>
 export type WorkerChannelData<Response> =
 	| { type: 'REPLY'; reply: WorkerRequestReply<Response> }
@@ -41,7 +45,7 @@ export type WorkerChannelInput<Request, Response> = Readonly<{
 	maxInFlight?: number
 	requestTimeoutMs?: number
 	closeTimeoutMs?: number
-	post: (request: Request, identity: WorkerRequestIdentity) => WorkerPostReceipt
+	post: (request: Request, identity: WorkerRequestIdentity) => WorkerChannelPostReceipt
 	/** Wire adapter owns bounded validation and closes invalid transferred ports. */
 	listenData: (report: (event: WorkerChannelData<Response>) => void) => () => void
 	/** Must use an independent control transport, surviving data failure. */

@@ -5,6 +5,7 @@ import { createActor, setup, SimulatedClock, types, waitFor } from 'xstate'
 import { createWorkerChannel } from 'delightful-local-first/worker/channel/workflow'
 import type {
 	WorkerChannelInput,
+	WorkerChannelPostReceipt,
 	WorkerChannelResult,
 	WorkerHostClosed
 } from 'delightful-local-first/worker/channel/contracts'
@@ -160,6 +161,12 @@ const parent = setup({
 const clock = new SimulatedClock()
 const actor = createActor(parent, { input, clock })
 function checkPrivateReports() {
+	const invalidPost: WorkerChannelPostReceipt = {
+		kind: 'not-issued',
+		// @ts-expect-error Validate before admission; a native refusal must close FIFO continuity.
+		reason: 'rejected'
+	}
+	void invalidPost
 	const ref = createActor(channel, { input })
 	ref.send({
 		// @ts-expect-error Wire reports are delivered only by the injected native listener.

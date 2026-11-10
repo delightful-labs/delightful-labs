@@ -82,3 +82,10 @@ qualification also corrected blocked-channel refusal to report unavailable. The
 fixture enforces bounded native waits. Existing account operations and consumer
 archives remain unchanged; actual Window adapter/Web Lock qualification is still
 required before Clipper or Finance adoption.
+
+Native channel post receipts are restricted to posted or unavailable/not-issued.
+Payload validation belongs before channel admission, so a local refusal cannot
+consume a sequence and leave a healthy FIFO host expecting the missing number.
+An unavailable native post closes the channel; a decoded peer rejection consumes
+its posted sequence and can preserve healthy admission. This retains Finance's
+strict sequence boundary without weakening native execution evidence.
