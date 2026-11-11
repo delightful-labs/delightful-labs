@@ -4,8 +4,10 @@ Reviewed 2026-11-11 at source head
 `8ac042576360d82a21c64a643eab97f09e4bdf7c`, against source base
 `952ce14f37bc22efd4a9beeaeddd2093d62dfb46` and the current monorepo architecture.
 The [source PR](https://github.com/delightful-labs/delightful-finances/pull/67)
-remains a draft. This note records findings and a recommendation; the user has
-requested documentation, not adoption of the proposed salvage plan.
+remains a draft. After this review, the user deferred moving Finance's application
+off the UI thread while continuing to use the monorepo and shared libraries.
+The suggested salvage sequence below remains a recommendation for future review,
+not an adopted implementation plan. See the [migration closeout](closeout.md).
 
 ## Recommendation
 

@@ -1,50 +1,108 @@
 {
-  "checkedAt": "2026-11-11T12:31:50.565306+00:00",
+  "checkedAt": "2026-11-11T22:24:34.401950+00:00",
   "repositories": [
     {
       "repository": "delightful-labs/delightful-ui",
-      "imported": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "url": "https://github.com/delightful-labs/delightful-ui",
+      "isArchived": false,
       "defaultBranch": "main",
       "currentHead": "7a7f61b236220bb5edb2bef4390b9db075775e43",
-      "sameAsImport": true,
       "openPullRequests": [],
-      "disposition": "Main matches the imported commit; no open PRs."
+      "openIssues": [],
+      "imported": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "sameAsImport": true,
+      "developmentDestination": "delightful-labs/delightful-labs (master)",
+      "disposition": "Default branch matches the selected import; no open PRs or issues. Ongoing work belongs in the monorepo; source repository retained unarchived."
     },
     {
       "repository": "delightful-labs/delightful-local-first",
-      "imported": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "url": "https://github.com/delightful-labs/delightful-local-first",
+      "isArchived": false,
       "defaultBranch": "main",
       "currentHead": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
-      "sameAsImport": true,
       "openPullRequests": [],
-      "disposition": "Main matches the imported commit; no open PRs."
+      "openIssues": [],
+      "imported": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "sameAsImport": true,
+      "developmentDestination": "delightful-labs/delightful-labs (master)",
+      "disposition": "Default branch matches the selected import; no open PRs or issues. Ongoing work belongs in the monorepo; source repository retained unarchived."
     },
     {
       "repository": "delightful-labs/delightful-finances",
-      "imported": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "url": "https://github.com/delightful-labs/delightful-finances",
+      "isArchived": false,
       "defaultBranch": "main",
       "currentHead": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
-      "sameAsImport": true,
       "openPullRequests": [
         {
+          "baseRefName": "main",
+          "headRefOid": "8ac042576360d82a21c64a643eab97f09e4bdf7c",
+          "isDraft": true,
           "number": 67,
           "title": "feat(worker): move Finance application logic into a web worker",
+          "updatedAt": "2026-11-10T11:06:41Z",
           "url": "https://github.com/delightful-labs/delightful-finances/pull/67",
-          "head": "8ac042576360d82a21c64a643eab97f09e4bdf7c",
-          "base": "main"
+          "disposition": "Deferred application-worker migration; see finance-worker-pr67-review.md. Do not merge the entire draft as part of closeout."
         }
       ],
-      "disposition": "Main matches import. Draft PR #67 remains in the source repository; unfinished worker handoff is deliberately not imported or merged. Preserve it for subsequent Finance work."
+      "openIssues": [
+        {
+          "labels": [],
+          "number": 61,
+          "title": "chore(jazz): remove the alpha.59 archive once historical dependencies are retired",
+          "updatedAt": "2026-11-09T10:31:17Z",
+          "url": "https://github.com/delightful-labs/delightful-finances/issues/61",
+          "disposition": "Retain archive and active legacy-backup fixtures; revisit only after original issue completion criteria are met."
+        }
+      ],
+      "imported": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "sameAsImport": true,
+      "developmentDestination": "delightful-labs/delightful-labs (master)",
+      "disposition": "Default branch matches the selected import. Application-worker migration in draft PR #67 is deferred by the user; preserve it as a reference. Issue #61 remains deferred archive cleanup with compatibility fixtures retained. Neither blocks monorepo closeout."
     },
     {
       "repository": "delightful-labs/delightful-clipper",
-      "imported": "549e4b543bbca51b3a243fa7f88d4165f9f405f7",
+      "url": "https://github.com/delightful-labs/delightful-clipper",
+      "isArchived": false,
       "defaultBranch": "main",
-      "currentHead": "0fd1cb389e8fccc9e5eecb642f9c0f10fa42d5e6",
-      "sameAsImport": false,
+      "currentHead": "9930bc3c6de0d26b14bcd6ff148649f7fcb5b750",
       "openPullRequests": [],
-      "disposition": "Current main reconciled by unsquashed subtree merge 29cab027. Resolve overlapping test-only edits by retaining the already-qualified exact public-icon allow-list. The merge has no tree changes and the current source main is an ancestor.",
-      "reconciledBy": "29cab027"
+      "openIssues": [],
+      "imported": "549e4b543bbca51b3a243fa7f88d4165f9f405f7",
+      "sameAsImport": false,
+      "developmentDestination": "delightful-labs/delightful-labs (master)",
+      "sourceMainPreviouslyReconciledThrough": "0fd1cb389e8fccc9e5eecb642f9c0f10fa42d5e6",
+      "productImportedThrough": "4972bd3a43587c26afe854325f16bdc9d1d1d72e",
+      "productImportedInDestinationPR": 12,
+      "sourcePR38": {
+        "state": "MERGED",
+        "mergedAt": "2026-11-11T21:40:51Z",
+        "mergeCommit": "9930bc3c6de0d26b14bcd6ff148649f7fcb5b750",
+        "head": "8eccbd2dc70cb56a5c1f0ce2e8adf97a4dcfefb1",
+        "url": "https://github.com/delightful-labs/delightful-clipper/pull/38"
+      },
+      "additionalSourceCommits": [
+        {
+          "commit": "11997f6f",
+          "change": "Preinstalled Playwright image in source CI"
+        },
+        {
+          "commit": "8eccbd2d",
+          "change": "Firefox container home ownership in source CI"
+        }
+      ],
+      "comparisonFromImportedProduct": {
+        "base": "4972bd3a43587c26afe854325f16bdc9d1d1d72e",
+        "head": "9930bc3c6de0d26b14bcd6ff148649f7fcb5b750",
+        "changedPaths": [
+          ".github/workflows/ci.yml"
+        ],
+        "productDelta": false,
+        "destinationEquivalent": ".github/workflows/clipper.yml uses the same pinned Playwright v1.64.0 Noble image digest and effective-user home ownership in each browser job. Source-only CI commits/merge were not imported as product changes."
+      },
+      "disposition": "Source PR #38 is merged. Its product code was already imported with original history; only later CI changes remain, already equivalent in destination CI. No open PRs or issues; source remains unarchived."
     }
-  ]
+  ],
+  "destinationBase": "22be4bf0cfca32bb63ed592b5fb5e4f68fa423da",
+  "scope": "Read-only metadata audit of all four former source repositories, open PRs and issues, plus Clipper source tree comparison. No repository, issue or PR settings changed."
 }

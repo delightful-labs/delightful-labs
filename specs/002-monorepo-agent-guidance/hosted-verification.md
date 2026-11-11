@@ -1,5 +1,9 @@
 # PR #10 hosted verification
 
+Historical checkpoint record. Later completion, source handoff and deferred-work
+status are recorded in the [migration closeout](closeout.md). Pending-work
+statements below describe their original checkpoints, not current migration gaps.
+
 The user requested pre-merge testing on 2026-11-11. GitHub CLI access now uses the
 existing Keychain login after the shell PAT override was disabled. No source
 repository, organization token policy, protection rule or production deployment
