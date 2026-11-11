@@ -1,0 +1,406 @@
+import { extractionJobMachine, EXTRACTION_TIMEOUT_MS } from './worker.js'
+import type { BrowserWorkerJobInput } from '../../web/src/lib/machines/browser-worker-job.js'
+import type { ExtractionReply } from './protocol.js'
+import { withinResourceDeadline } from '../../web/src/lib/contracts/resource-waits.js'
+import type { EventPayload } from '../../web/src/lib/machines/events.js'
+import {
+	types,
+	createCallbackLogic,
+	setup,
+	createAsyncLogic,
+	type ActorRefFrom,
+	type SnapshotFrom,
+	matchesState
+} from 'xstate'
+
+import { z } from 'zod'
+import { captureSchema, sourceSchema, matchingContent } from './protocol.js'
+import type { Capture, Source } from './protocol.js'
+import type { ArticleContent } from '../../web/src/lib/contracts/articles.js'
+import { libraryMachine, selectLibraryView } from '../../web/src/lib/machines/capture/library.js'
+import { t } from '../../web/src/lib/localization/index.js'
+import type { WorkflowMessage } from '../../web/src/lib/contracts/feedback.js'
+type Library = ActorRefFrom<typeof libraryMachine>
+type Event =
+	| { type: 'SHUTDOWN' }
+	| { type: 'LIBRARY'; snapshot: SnapshotFrom<typeof libraryMachine> }
+type Context = {
+	capability: ClipCapability
+	extractionTimeoutMs?: number
+	id: string
+	capture: Capture | undefined
+	source: Source | undefined
+	content: ArticleContent | undefined
+	articleId: string | undefined
+	message: WorkflowMessage | undefined
+}
+const replySchema = z.object({ capture: captureSchema, source: sourceSchema.optional() })
+export type ClipCapability = {
+	library: Library
+	accountId: string
+	current: () => boolean
+	read: (id: string) => Promise<unknown>
+	extraction: (source: Source) => BrowserWorkerJobInput<Source, ExtractionReply>
+	issue: (capture: Capture, accountId: string) => Promise<void>
+	remove: (id: string) => Promise<void>
+}
+export function createClipMachine() {
+	const actors = {
+		current: createAsyncLogic({
+			run: async ({ input }: { input: ClipCapability }) => input.current()
+		}),
+		feedback: createCallbackLogic<never, Library>(({ input, sendBack }) => {
+			const subscription = input.subscribe((snapshot) => sendBack({ type: 'LIBRARY', snapshot }))
+			sendBack({ type: 'LIBRARY', snapshot: input.getSnapshot() })
+			return () => subscription.unsubscribe()
+		}),
+		read: createAsyncLogic({
+			run: ({ input }: { input: Pick<Context, 'capability' | 'id'> }) =>
+				input.capability.read(input.id)
+		}),
+		extract: extractionJobMachine,
+		issue: createAsyncLogic({
+			run: ({ input }: { input: { capability: ClipCapability; capture: Capture } }) =>
+				input.capability.issue(input.capture, input.capability.accountId)
+		}),
+		remove: createAsyncLogic({
+			run: ({ input }: { input: Pick<Context, 'capability' | 'id'> }) =>
+				input.capability.remove(input.id)
+		}),
+		save: createCallbackLogic<{ type: 'CANCEL' }, Context>(({ input, sendBack, receive }) => {
+			input.capability.library.send({
+				type: 'ADD',
+				url: input.capture!.url,
+				...(input.content ? { content: input.content } : {})
+			})
+			const subscription = input.capability.library.subscribe((snapshot) =>
+				sendBack({ type: 'LIBRARY', snapshot })
+			)
+			sendBack({ type: 'LIBRARY', snapshot: input.capability.library.getSnapshot() })
+			receive(() => input.capability.library.send({ type: 'CANCEL' }))
+			return () => subscription.unsubscribe()
+		})
+	}
+	const model = setup({
+		schemas: {
+			context: types<Context>(),
+			events: {
+				SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
+				LIBRARY: types<EventPayload<Event, 'LIBRARY'>>()
+			},
+			input: types<{ id: string; capability: ClipCapability; extractionTimeoutMs?: number }>(),
+			tags: types<string>(),
+			children: {
+				current: types<ActorRefFrom<typeof actors.current>>(),
+				feedback: types<import('xstate').ActorRefFrom<(typeof actors)['feedback']>>(),
+				read: types<import('xstate').ActorRefFrom<(typeof actors)['read']>>(),
+				extract: types<import('xstate').ActorRefFrom<(typeof actors)['extract']>>(),
+				issue: types<import('xstate').ActorRefFrom<(typeof actors)['issue']>>(),
+				remove: types<import('xstate').ActorRefFrom<(typeof actors)['remove']>>(),
+				save: types<import('xstate').ActorRefFrom<(typeof actors)['save']>>()
+			}
+		},
+		actors,
+		delays: {
+			extractionDeadline: ({ context }) => context.extractionTimeoutMs ?? EXTRACTION_TIMEOUT_MS
+		},
+		guards: {
+			stoppingExtraction: ({ value }) =>
+				matchesState({ running: { extracting: 'stopping' } }, value),
+			extractionOverdue: ({ value }) => matchesState({ running: { extracting: 'overdue' } }, value),
+			withinExtractionDeadline: ({ context }, result: { elapsedMs: number }) =>
+				withinResourceDeadline(
+					result.elapsedMs,
+					context.extractionTimeoutMs ?? EXTRACTION_TIMEOUT_MS
+				),
+			stopping: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ running: { issuing: 'stopping' } }, value),
+			validReply: (
+				_: { context: Context; value: import('xstate').StateValue },
+				{ value }: { value: unknown }
+			) => replySchema.safeParse(value).success,
+			issuedReply: (
+				_: { context: Context; value: import('xstate').StateValue },
+				{ value }: { value: unknown }
+			) =>
+				replySchema.safeParse(value).success && replySchema.parse(value).capture.phase === 'issued',
+			sourceReply: (
+				_: { context: Context; value: import('xstate').StateValue },
+				{ value }: { value: unknown }
+			) => replySchema.safeParse(value).success && !!replySchema.parse(value).source,
+			matchingContent: ({ context }: { context: Context }, { value }: { value: unknown }) =>
+				matchingContent(value, context.capture!)
+		},
+		actions: {
+			rememberReply: (
+				_: { context: Context; value: import('xstate').StateValue },
+				{ value }: { value: unknown }
+			) => {
+				const reply = replySchema.parse(value)
+				return { context: { capture: reply.capture, source: reply.source } }
+			}
+		}
+	})
+	const message =
+		(key: Parameters<typeof t>[0], variant: WorkflowMessage['variant'] = 'info') =>
+		() => ({ context: { message: { text: t(key), variant } } })
+
+	return model.createMachine({
+		id: 'extension-clip',
+		initial: 'running',
+		context: ({ input }) => ({
+			...input,
+			capture: undefined,
+			source: undefined,
+			content: undefined,
+			message: undefined,
+			articleId: undefined
+		}),
+		states: {
+			running: {
+				initial: 'loading',
+				states: {
+					loading: {
+						invoke: {
+							id: 'read',
+							src: 'read',
+							input: ({ context }: { context: Context }) => ({
+								id: context.id,
+								capability: context.capability
+							}),
+							onDone: (args) => {
+								const { event } = args
+								if (args.guards.issuedReply(args, { value: event.output })) {
+									return {
+										target: '#extension-clip.unknown',
+										context: args.actions.rememberReply(args, { value: event.output }).context
+									}
+								}
+								if (args.guards.sourceReply(args, { value: event.output })) {
+									return {
+										target: 'extracting',
+										context: args.actions.rememberReply(args, { value: event.output }).context
+									}
+								}
+								if (args.guards.validReply(args, { value: event.output })) {
+									return {
+										target: 'linkOnly',
+										context: args.actions.rememberReply(args, { value: event.output }).context
+									}
+								}
+								return { target: '#extension-clip.unknown' }
+							},
+							onError: { target: '#extension-clip.unknown' }
+						}
+					},
+					extracting: {
+						initial: 'active',
+						entry: message('capture.status.pending'),
+						on: {
+							SHUTDOWN: (_args, enq) => {
+								enq.sendTo('extract', { type: 'CANCEL' })
+								return { target: '.stopping' }
+							}
+						},
+						states: {
+							active: {
+								timeout: 'extractionDeadline',
+								onTimeout: (_args, enq) => {
+									enq.sendTo('extract', { type: 'CANCEL' })
+									return { target: 'overdue' }
+								}
+							},
+							overdue: {},
+							stopping: { on: { SHUTDOWN: {} } },
+							blocked: { entry: message('capture.status.save_failed', 'error') }
+						},
+						invoke: {
+							id: 'extract',
+							src: 'extract',
+							input: ({ context }) => context.capability.extraction(context.source!),
+							onSnapshot: ({ event }) =>
+								event.snapshot.matches('blocked') ? { target: '.blocked' } : undefined,
+							onError: { target: '.blocked' },
+							onDone: (args) => {
+								const result = args.event.output
+								if (args.guards.stoppingExtraction(args))
+									return { target: '#extension-clip.closed' }
+								if (result.kind === 'cancelled' && !args.guards.extractionOverdue(args))
+									return { target: '#extension-clip.closed' }
+								if (
+									result.kind === 'replied' &&
+									'content' in result.reply &&
+									!args.guards.extractionOverdue(args) &&
+									args.guards.withinExtractionDeadline(args, result) &&
+									args.guards.matchingContent(args, { value: result.reply.content })
+								)
+									return {
+										target: 'checkingIssue',
+										context: { content: result.reply.content, source: undefined }
+									}
+								return { target: 'linkOnly' }
+							}
+						}
+					},
+					linkOnly: {
+						entry: () => {
+							return { context: { source: undefined } }
+						},
+						always: { target: 'checkingIssue' }
+					},
+
+					checkingIssue: {
+						on: { SHUTDOWN: { target: '#extension-clip.closed' } },
+						invoke: {
+							id: 'current',
+							src: 'current',
+							input: ({ context }) => context.capability,
+							onDone: ({ event }) => ({
+								target: event.output ? 'issuing' : '#extension-clip.closed'
+							})
+						}
+					},
+
+					issuing: {
+						initial: 'active',
+						states: {
+							active: { on: { SHUTDOWN: { target: 'stopping' } } },
+							stopping: { on: { SHUTDOWN: {} } }
+						},
+						entry: message('capture.status.saving'),
+						invoke: {
+							id: 'issue',
+							src: 'issue',
+							input: ({ context }: { context: Context }) => ({
+								capture: context.capture!,
+								capability: context.capability
+							}),
+							onDone: (args) => {
+								if (args.guards.stopping(args)) {
+									return { target: '#extension-clip.closed' }
+								}
+								return { target: 'checkingSave' }
+							},
+							onError: { target: '#extension-clip.failed' }
+						}
+					},
+					checkingSave: {
+						on: { SHUTDOWN: { target: '#extension-clip.closed' } },
+						invoke: {
+							id: 'current',
+							src: 'current',
+							input: ({ context }) => context.capability,
+							onDone: ({ event }) => ({
+								target: event.output ? 'saving' : '#extension-clip.unknown'
+							})
+						}
+					},
+
+					saving: {
+						initial: 'active',
+						states: {
+							active: {
+								on: {
+									SHUTDOWN: (args, enq) => {
+										enq.sendTo('save', { type: 'CANCEL' })
+										return { target: 'stopping' }
+									}
+								}
+							},
+							stopping: { on: { SHUTDOWN: {} } }
+						},
+						invoke: {
+							id: 'save',
+							src: 'save',
+							input: ({ context }: { context: Context }) => context
+						},
+						on: {
+							LIBRARY: (args) => {
+								const { event } = args
+								if (event.snapshot.matches({ running: { capture: 'saved' } })) {
+									return {
+										target: 'clearing',
+										context: {
+											articleId: event.snapshot.context.captureId,
+											message: selectLibraryView(event.snapshot).captureMessage
+										}
+									}
+								}
+								if (
+									event.snapshot.matches({ running: { capture: 'uncertain' } }) ||
+									event.snapshot.matches({ running: { capture: 'canceled' } })
+								) {
+									return { target: '#extension-clip.unknown' }
+								}
+								if (
+									event.snapshot.matches({ running: { capture: 'failed' } }) ||
+									event.snapshot.status === 'done'
+								) {
+									return { target: '#extension-clip.failed' }
+								}
+							}
+						}
+					},
+					clearing: {
+						on: { SHUTDOWN: {} },
+						invoke: {
+							id: 'remove',
+							src: 'remove',
+							input: ({ context }: { context: Context }) => ({
+								id: context.id,
+								capability: context.capability
+							}),
+							onDone: { target: '#extension-clip.saved' },
+							onError: { target: '#extension-clip.saved' }
+						}
+					}
+				},
+				on: { SHUTDOWN: { target: '#extension-clip.closed' } }
+			},
+			saved: {
+				invoke: {
+					id: 'feedback',
+					src: 'feedback',
+					input: ({ context }) => context.capability.library
+				},
+				on: {
+					SHUTDOWN: { target: 'closed' },
+					LIBRARY: (args) => {
+						const { event } = args
+						if (!(args.context.articleId === event.snapshot.context.captureId)) return
+						return { context: { message: selectLibraryView(event.snapshot).captureMessage } }
+					}
+				},
+				entry: () => {
+					return { context: { source: undefined, content: undefined } }
+				}
+			},
+			unknown: {
+				on: { SHUTDOWN: { target: 'closed' } },
+				entry: () => ({
+					context: {
+						...message('capture.status.unknown', 'error')().context,
+						source: undefined,
+						content: undefined
+					}
+				})
+			},
+			failed: {
+				on: { SHUTDOWN: { target: 'closed' } },
+				entry: () => ({
+					context: {
+						...message('capture.status.save_failed', 'error')().context,
+						source: undefined,
+						content: undefined
+					}
+				})
+			},
+			closed: {
+				type: 'final',
+				entry: () => {
+					return { context: { source: undefined, content: undefined, capture: undefined } }
+				}
+			}
+		}
+	})
+}

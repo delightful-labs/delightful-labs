@@ -1,0 +1,52 @@
+{
+	"name": "@delightful-clipper/web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "pnpm build:parser-worker:dev && vite dev",
+		"build": "pnpm build:parser-worker && vite build",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig tsconfig.json --fail-on-warnings && tsc --project src/service-worker/tsconfig.json",
+		"prepare": "svelte-kit sync",
+		"dev:agent": "pnpm build:parser-worker:dev && vite dev --mode agent --port 5180",
+		"build:parser-worker:dev": "pnpm build:parser-worker --outfile=.clipper-dev/parser/extract-worker.mjs",
+		"build:parser-worker": "esbuild src/lib/server/capture/extract-worker.ts --bundle --platform=node --format=esm --target=node24 --external:jsdom --external:@mozilla/readability --external:dompurify --outfile=.netlify/v1/parser/extract-worker.mjs"
+	},
+	"dependencies": {
+		"@faker-js/faker": "10.6.0",
+		"@mozilla/readability": "0.6.0",
+		"@vercel/functions": "3.11.0",
+		"@vercel/sandbox": "3.9.1",
+		"delightful-local-first": "file:../../vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
+		"delightful-ui": "file:../../vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+		"dompurify": "3.4.17",
+		"i18next": "26.7.1",
+		"ipaddr.js": "2.3.0",
+		"jazz-napi": "2.0.0-alpha.60",
+		"jazz-tools": "2.0.0-alpha.60",
+		"jsdom": "29.1.1",
+		"microlighter": "2.2.0",
+		"minisearch": "7.2.0",
+		"svelte": "5.57.2",
+		"unicode-case-folding": "1.1.2",
+		"ws": "8.22.1",
+		"xstate": "6.0.0-beta.1",
+		"zod": "4.6.7",
+		"better-auth": "1.7.18",
+		"@kingironman2011/better-auth-bsky": "0.3.2"
+	},
+	"devDependencies": {
+		"@opentelemetry/api": "1.9.1",
+		"@poppanator/sveltekit-svg": "7.0.1",
+		"@sveltejs/adapter-netlify": "7.0.1",
+		"@sveltejs/adapter-vercel": "7.0.2",
+		"@sveltejs/kit": "3.0.1",
+		"@sveltejs/vite-plugin-svelte": "7.2.0",
+		"@types/jsdom": "28.0.3",
+		"esbuild": "0.27.7",
+		"svelte-check": "4.6.0",
+		"typescript": "6.0.3",
+		"vite": "8.3.4"
+	}
+}

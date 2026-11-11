@@ -1,0 +1,34 @@
+[
+	{
+		"file": "delightful-local-first-jazz-alpha60.tgz",
+		"sha256": "0123d73496656c02ed20727ed5226e151698a10d620edd0c3cbcffe0ef2646d2"
+	},
+	{
+		"file": "delightful-ui-dd358b8-typography.tgz",
+		"sha256": "7bc29ecf345c1a82ff2732ff04362b1f3f3402ac93da29c2b9ad33b1459a96cf"
+	},
+	{
+		"file": "delightful-local-first-dbc452e-xstate-v6-jazz-alpha60.tgz",
+		"sha256": "8bf38f5fb030e5fd233fdfb7a10a58e9da4dacbc438b662d5b7318794adf8709"
+	},
+	{
+		"file": "delightful-ui-7a7f61b-xstate-v6.tgz",
+		"sha256": "28d2139b7eb377e365a821743bb4fe998de2cbc59066ca15bd78862867891407"
+	},
+	{
+		"file": "delightful-local-first-domain-transaction-alpha60.tgz",
+		"sha256": "388faab60b1c2848b16e03f29d4038f30c5ff75874f58c4f08da73c01e22569b"
+	},
+	{
+		"file": "delightful-local-first-workflow-hardening-alpha60.tgz",
+		"sha256": "aaf16fe628393537aed32ba487d141d8cb7bc47b3000eff35556ff04a8b11fb7"
+	},
+	{
+		"file": "delightful-local-first-worker-transport-1571ba2-alpha60.tgz",
+		"sha256": "1ffa8d8490915da61fb7dc9a600733eed00dcce33cdc772ca0a12d1bbf0d95b1"
+	},
+	{
+		"file": "delightful-local-first-auth-lifecycle-5bb6605-alpha60.tgz",
+		"sha256": "eca27c4841b46340adaf4cd9fc5d2708cee17b702ae2d48610a74108d7f05783"
+	}
+]
