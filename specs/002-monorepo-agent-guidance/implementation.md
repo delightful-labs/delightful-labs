@@ -23,8 +23,13 @@ the original specification remains the reviewed requirements baseline.
   source and verified through the packed consumer and 63 Storybook tests.
 - Existing SDK runtime patches are [reconciled in one root patch](sdk-runtime-patches.md),
   with passing library native/restore checks and pending app qualification.
-- Finance and Clipper imports, consumer workspace links, cross-project guidance
-  reconciliation and remaining qualification are pending.
+- Finance is [imported and integrated](finance-import.md) with original history,
+  root lockfile, peer-specific workspace UI consumption and retained source CI
+  suites. Source and workspace baselines pass, including 1,940 unit tests,
+  account/recovery, authorization and cold-offline/unanswered-remote browser
+  tests. Its distinct Local First archive remains pending source reconciliation.
+- Clipper import, remaining consumer workspace links, cross-project guidance
+  reconciliation and hosted qualification remain pending.
 
 ## Slice 0: reproducible source inventory
 

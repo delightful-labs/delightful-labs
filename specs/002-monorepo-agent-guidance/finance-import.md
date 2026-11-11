@@ -111,3 +111,27 @@ checks, six browser selections, native/browser restore, six feature-flag cases
 and production PWA coverage. Only workspace context, pnpm version, artifact paths
 and destination default branch change. Nested original workflows remain inert
 provenance. Local qualification does not claim hosted Actions execution.
+
+A fresh `git archive 48a4849` checkout, with no prior generated files or
+node_modules, passes `pnpm install --frozen-lockfile` and `finance:check`.
+This confirms UI exports are prepared for clean peer-specific consumption.
+The [lock reconciliation](finance-lock-reconciliation.json) records every direct
+resolution and the deliberate UI link / worker TypeScript declaration.
+
+All 17 existing account/recovery browser tests and all 23 permission browser
+tests pass against the disposable in-memory agent server. All 7 production
+startup tests pass in the separate clean checkout, including complete browser
+restart with offline or unanswered remote connections, continued local saves,
+real server rejection and bank history retention. The agent server was stopped
+after verification; user servers and storage were untouched.
+
+The local Vercel-adapter build succeeds using placeholder deployment/build
+values, with no deployment. [Artifact inspection](finance-vercel-artifact.json)
+confirms the Node 24 handler exists, traced SDK native binaries and Wasm exist,
+browser worker Wasm is emitted, and no output symlinks are broken. Optional ws
+native acceleration addons produce non-fatal trace warnings. A hosted Linux
+build and live preview remain required before changing hosted settings.
+
+Shared library regressions under the final root lock pass: UI 131 tests / 30
+files and Local First 1,090 tests / 52 files. Full Finance source CI remains
+configured; local evidence above is not a claim that every matrix has run.

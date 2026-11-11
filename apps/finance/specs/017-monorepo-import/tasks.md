@@ -5,6 +5,7 @@
 - [x] Integrate root workspace, lockfile, nested worker tooling and UI dependency.
 - [x] Preserve scoped policy and establish independent feature selection.
 - [x] Qualify frozen install, app/service-worker checks, unit/worker tests and preview build.
-- [ ] Qualify disposable browser account and offline flows.
-- [ ] Inspect hosted build/tracing artifacts before proposing deployment settings.
+- [x] Qualify disposable browser account, permission and offline flows.
+- [x] Inspect local Vercel adapter tracing artifact.
+- [ ] Verify hosted Linux build/live preview before proposing deployment settings.
 - [ ] Reconcile active PRs and subsequent upstream commits before source handoff.
