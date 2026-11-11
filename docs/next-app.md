@@ -146,3 +146,38 @@ Consumers do not need an XState patch. See
 Adopt a rebuilt artifact across complete connected actor graphs. Consumer fixtures
 and native/browser behavior have not yet been qualified on v6. The vendored DUI
 archive still needs alignment with the reviewed v6 DUI build before app rollout.
+
+## Domain transaction composition
+
+`transactions/workflow` composes a consumer's typed domain chart with the existing
+DLF atomic transaction owner. Use `transactions/contracts` for generic attempt,
+resource, child-spawn and receipt contracts. See [domain transaction composition](domain-transaction.md)
+for the preparation/staging protocol, cancellation custody and extraction review
+gate. The existing workspace-creation API remains available.
+
+## Owned operation lifecycle
+
+`lifecycle/operation/workflow` supplies a state-owned supervisor for concrete
+capability-spawned children. `lifecycle/operation/contracts` preserves typed
+input, output and supported child commands. See [owned operation lifecycle](owned-operation.md)
+for distinct interruption/drain paths, native custody boundaries and the
+consumer migration map and library qualification results. Qualify each consumer
+against its actual compatible artifact before adoption.
+
+## Scoped worker requests
+
+`worker/request/workflow` and `worker/request/contracts` define one correlated
+native request with a finite deadline and explicit unknown-effect outcomes.
+See [scoped worker request lifecycle](worker-request.md) for the pinned consumer
+comparison and required independent host-close handshake. This source review
+unit has not been behaviorally qualified or adopted by a consumer.
+
+The [bounded worker channel](worker-channel.md) composes those request actors under
+one scoped owner. Import `createWorkerChannel` from `worker/channel/workflow` and
+its contracts from `worker/channel/contracts`. Inject separately owned data and
+control listeners; timeout never substitutes for the real host-close receipt.
+
+The [worker effect drain](worker-effect-drain.md) observes the original effect's
+quiescence receipt and the exact host-close receipt. Import its factory and types
+from `worker/effect-drain/workflow` and `worker/effect-drain/contracts`. The parent
+retains its lock and original unknown outcome until this chart returns proof.
