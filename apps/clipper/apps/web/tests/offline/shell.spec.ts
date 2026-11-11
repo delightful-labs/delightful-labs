@@ -171,8 +171,20 @@ test('production shell and DLF account restart with web and Jazz servers stopped
 					paths.push(new URL(request.url).pathname)
 			return paths
 		})
-		expect(cachePaths.every((path) => path === '/' || path.startsWith('/_app/immutable/'))).toBe(
-			true
+		// The public PWA manifest/icons ship in static/ alongside the immutable shell.
+		// Keep an exact allow-list so a cached private/API response still fails.
+		expect(
+			cachePaths.filter((path) => path !== '/' && !path.startsWith('/_app/immutable/')).sort()
+		).toEqual(
+			[
+				'/apple-touch-icon.png',
+				'/favicon-96x96.png',
+				'/favicon.ico',
+				'/favicon.svg',
+				'/site.webmanifest',
+				'/web-app-manifest-192x192.png',
+				'/web-app-manifest-512x512.png'
+			].sort()
 		)
 		expect(cachePaths.filter((path) => path.endsWith('.wasm'))).toHaveLength(1)
 

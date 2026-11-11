@@ -89,3 +89,18 @@ This includes browser jobs, broker lifetime, account custody/binding, fresh-proo
 renewal, refusal of expired/forged/wrong-audience/wrong-identity proofs with
 visible retry and offline edit retention, and resource failure/late-cleanup
 ownership. No real clock, user identity, profile or storage was altered.
+
+A clean archive of `5d059db8` passes frozen installation and app/coordinator
+checks with source-built UI and Local First exports. All eight production
+offline browser scenarios pass, including linked/existing/expired-provider
+accounts across two complete offline restarts, stopped web/Jazz servers,
+reconciliation, immutable-byte reuse, update failure and first-install retry.
+
+Qualification exposed an inherited source assertion mismatch: the cache check
+allowed only `/` and immutable paths, but source already includes seven public
+PWA icon/manifest files in static assets and deliberately precaches them. The
+test now requires those exact seven paths outside the immutable shell; unexpected
+private/API entries still fail, and the authorized private probe remains in the
+scenario. This changes test expectations/diagnostics only; cache policy and
+product behavior are unchanged. Source baseline contains the same old assertion
+and the same static files. The corrected complete offline suite passes 8/8.
