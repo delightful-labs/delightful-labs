@@ -198,3 +198,12 @@ the native file chooser and verifies input clearing before reselecting the same
 file; it passes five concurrent repetitions without retries or time sleeps.
 All 63 Storybook browser tests pass.
 The required full checks remain enabled; no qualification commit skips CI.
+
+## Monorepo consumer compatibility
+
+The Finance import preserves its existing optional storage-availability boundary
+in the session-acquisition owner and the Jazz registry observer. This is a source
+port of the active Finance archive patch, retaining cancellable waiting and
+attachment ownership before replacing the archive. See the scoped
+[migration design and evidence](../../../../specs/002-monorepo-agent-guidance/finance-session-availability.md).
+The pinned XState beta and backend/product boundaries remain unchanged.

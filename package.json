@@ -37,6 +37,7 @@
     "clipper:test:worker": "pnpm --filter delightful-clipper test:worker",
     "clipper:test:offline": "pnpm --filter delightful-clipper test:offline",
     "clipper:test:extension": "pnpm --filter delightful-clipper test:extension",
-    "clipper:test:e2e": "pnpm --filter delightful-clipper test:e2e"
+    "clipper:test:e2e": "pnpm --filter delightful-clipper test:e2e",
+    "monorepo:check-links": "node scripts/monorepo/check-links.mjs"
   }
 }

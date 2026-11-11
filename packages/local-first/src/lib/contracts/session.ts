@@ -10,6 +10,10 @@ export type SessionFailure = 'openFailed' | 'invalidRequest' | 'ownerFailed'
 /** One backend creation call; cache, sharing, retry, and release belong in the owner machine. */
 export type SessionOpenCapability<Session extends object> = Readonly<{
 	open: () => Promise<Session>
+	availability?: Readonly<{
+		classify: (error: unknown) => { resourceKey: string } | undefined
+		wait: (resourceKey: string, signal: AbortSignal) => Promise<void>
+	}>
 }>
 
 /** Private integration messages: session payloads must never be serialized or inspected. */

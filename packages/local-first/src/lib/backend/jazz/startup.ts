@@ -48,5 +48,10 @@ export function createJazzStartupRegistry(
 		}
 	}
 
-	return { getCurrentJazzSession, getJazzStartupBinding }
+	function getCurrentSessionAvailability() {
+		const snapshot = shared?.owner.getSnapshot()
+		return snapshot?.matches('waitingForAvailability') ? snapshot.context.availability : undefined
+	}
+
+	return { getCurrentJazzSession, getJazzStartupBinding, getCurrentSessionAvailability }
 }

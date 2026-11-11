@@ -43,6 +43,7 @@ export type SessionOwnerInput<Session extends object> = Readonly<{
 type Context<Session extends object> = {
 	binding: object
 	capability: SessionOpenCapability<Session>
+	availability: { resourceKey: string } | undefined
 	requests: Request<Session>[]
 	// Terminal attachment tokens are weakly retained to reject late messages without a token leak.
 	released: readonly WeakRef<object>[]
@@ -60,6 +61,12 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 	const actors = {
 		open: createAsyncLogic<Session, SessionOpenCapability<Session>>({
 			run: ({ input }) => input.open()
+		}),
+		waitForAvailability: createAsyncLogic<
+			void,
+			{ resourceKey: string; wait: (resourceKey: string, signal: AbortSignal) => Promise<void> }
+		>({
+			run: ({ input, signal }) => input.wait(input.resourceKey, signal)
 		})
 	}
 	const patches = {
@@ -186,6 +193,7 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 		context: ({ input }) => ({
 			binding: input.binding,
 			capability: input.capability,
+			availability: undefined,
 			requests: [],
 			released: [],
 			acquisition: {
@@ -278,6 +286,10 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 						}
 					},
 					onError: (args, enq) => {
+						const availability = args.context.capability.availability?.classify(args.event.error)
+						if (availability && args.context.requests.length > 0)
+							return { target: 'waitingForAvailability', context: { availability } }
+						if (availability) return { target: 'idle' }
 						for (const request of args.context.requests) {
 							enq.sendTo(request.replyTo, {
 								type: 'ACQUISITION_FAILED',
@@ -289,6 +301,66 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 					}
 				},
 				on: {
+					ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							return {
+								context: patches.remember(args) satisfies Partial<Context<Session>>
+							}
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					},
+					RETRY_ACQUIRE: (args, enq) => {
+						const { event } = args
+						if (args.guards.allowedRequest(args)) {
+							return {
+								context: patches.remember(args) satisfies Partial<Context<Session>>
+							}
+						}
+						enq.sendTo(event.replyTo, {
+							type: 'ACQUISITION_FAILED',
+							scope: event.scope,
+							reason: 'invalidRequest'
+						})
+						return {}
+					}
+				}
+			},
+			waitingForAvailability: {
+				invoke: {
+					src: actors.waitForAvailability,
+					input: ({ context }) => {
+						const availability = context.availability
+						const wait = context.capability.availability?.wait
+						if (!availability || !wait) throw new Error('Missing session availability boundary')
+						return { resourceKey: availability.resourceKey, wait }
+					},
+					onDone: () => ({ target: 'opening', context: { availability: undefined } }),
+					onError: ({ context }, enq) => {
+						for (const request of context.requests)
+							enq.sendTo(request.replyTo, {
+								type: 'ACQUISITION_FAILED',
+								scope: request.scope,
+								reason: 'openFailed'
+							})
+						return { target: 'failed', context: { availability: undefined } }
+					}
+				},
+				on: {
+					RELEASE: (args, enq) => {
+						const { event } = args
+						enq.sendTo(event.replyTo, { type: 'RELEASED', scope: event.scope })
+						if (!args.guards.allowedRelease(args)) return {}
+						const patch = patches.release(args)
+						if (patch.requests?.length === 0)
+							return { target: 'idle', context: { ...patch, availability: undefined } }
+						return { context: patch }
+					},
 					ACQUIRE: (args, enq) => {
 						const { event } = args
 						if (args.guards.allowedRequest(args)) {

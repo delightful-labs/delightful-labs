@@ -55,7 +55,7 @@ importers:
         version: 0.6.0
       delightful-local-first:
         specifier: workspace:*
-        version: file:packages/local-first(delightful-ui@file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2)))(jazz-tools@2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(xstate@6.0.0-beta.1)
+        version: file:packages/local-first(11641a9c529e532e21c93b6c53aa1597)
       delightful-ui:
         specifier: workspace:*
         version: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
@@ -228,8 +228,8 @@ importers:
         specifier: 6.0.0-beta.0
         version: 6.0.0-beta.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(xstate@6.0.0-beta.1)
       delightful-local-first:
-        specifier: file:vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz
-        version: file:apps/finance/vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz(delightful-ui@file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2)))(jazz-tools@2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(xstate@6.0.0-beta.1)
+        specifier: workspace:*
+        version: file:packages/local-first(11641a9c529e532e21c93b6c53aa1597)
       delightful-ui:
         specifier: workspace:*
         version: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
@@ -255,6 +255,8 @@ importers:
         specifier: 4.1.11
         version: 4.1.11
     dependenciesMeta:
+      delightful-local-first:
+        injected: true
       delightful-ui:
         injected: true
     devDependencies:
@@ -3619,23 +3621,6 @@ packages:
 
   delaunator@5.1.0:
     resolution: {integrity: sha512-AGrQ4QSgssa1NGmWmLPqN5NY2KajF5MqxetNEO+o0n3ZwZZeTmt7bBnvzHWrmkZFxGgr4HdyFgelzgi06otLuQ==}
-
-  delightful-local-first@file:apps/finance/vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz:
-    resolution: {integrity: sha512-QVwX3sPwKSlNwbql/NGlLl5BJtLko1im5pkkdCBPYa4P6Zdhr6aynnk8EL42HHgt+/2GFkvbuhXBHQ2w79U38Q==, tarball: file:apps/finance/vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz}
-    version: 0.0.0
-    engines: {node: ^22.17.0 || >=24.0.0}
-    peerDependencies:
-      delightful-ui: 0.0.25
-      jazz-tools: 2.0.0-alpha.60
-      svelte: ^5.57.2
-      xstate: 6.0.0-beta.1
-    peerDependenciesMeta:
-      delightful-ui:
-        optional: true
-      jazz-tools:
-        optional: true
-      xstate:
-        optional: true
 
   delightful-local-first@file:packages/local-first:
     resolution: {directory: packages/local-first, type: directory}
@@ -8283,15 +8268,6 @@ snapshots:
   delaunator@5.1.0:
     dependencies:
       robust-predicates: 3.0.3
-
-  delightful-local-first@file:apps/finance/vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz(delightful-ui@file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2)))(jazz-tools@2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(xstate@6.0.0-beta.1):
-    dependencies:
-      svelte: 5.57.2(@typescript-eslint/types@8.71.2)
-      zod: 4.1.11
-    optionalDependencies:
-      delightful-ui: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
-      jazz-tools: 2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
-      xstate: 6.0.0-beta.1
 
   delightful-local-first@file:packages/local-first(11641a9c529e532e21c93b6c53aa1597):
     dependencies:

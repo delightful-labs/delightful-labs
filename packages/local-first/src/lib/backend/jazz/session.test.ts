@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createActor } from 'xstate'
+import { createActor, createCallbackLogic } from 'xstate'
 import type { createJazzClient } from 'jazz-tools/client'
 import type { JazzClient, JazzSession, JazzClientConfig } from 'jazz-tools/client'
 import {
@@ -7,6 +7,8 @@ import {
 	selectAcquiredSession
 } from '../../machines/identity/session-acquisition.js'
 import { createJazzSessionAcquisition } from './session.js'
+import { createJazzStartupRegistry } from './startup.js'
+import type { SessionOwnerReply } from '../../contracts/session.js'
 
 const sdk = vi.hoisted(() => ({ create: vi.fn<typeof createJazzClient>() }))
 vi.mock('jazz-tools/client', () => ({ createJazzClient: sdk.create }))
@@ -88,5 +90,55 @@ describe('Jazz session acquisition leaf', () => {
 		}
 		expect(existing.close).not.toHaveBeenCalled()
 		expect(existing.logout).not.toHaveBeenCalled()
+	})
+})
+
+describe('Jazz registry availability observation', () => {
+	it('projects the owner wait and clears it when the current session becomes available', async () => {
+		const busy = new Error('Synthetic storage contention')
+		let release = () => {}
+		const available = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const registry = createJazzStartupRegistry((config) => {
+			const adapter = createJazzSessionAcquisition(config)
+			return {
+				...adapter,
+				capability: {
+					...adapter.capability,
+					availability: {
+						classify: (error) => (error === busy ? { resourceKey: 'registry-storage' } : undefined),
+						wait: async (_key: string, _signal: AbortSignal) => available
+					}
+				}
+			}
+		})
+		const selected = session()
+		sdk.create.mockRejectedValueOnce(busy).mockResolvedValueOnce(selected)
+		expect(registry.getCurrentSessionAvailability()).toBeUndefined()
+		const binding = registry.getJazzStartupBinding({
+			scope: 'availability',
+			serverUrl: 'http://127.0.0.1:9'
+		})
+		const recipient = createActor(
+			createCallbackLogic<SessionOwnerReply<JazzSession<JazzClient>>, undefined>(() => {}),
+			{ input: undefined }
+		).start()
+		try {
+			binding.owner.send({ type: 'ACQUIRE', scope: binding.scope, replyTo: recipient })
+			await vi.waitFor(() =>
+				expect(registry.getCurrentSessionAvailability()).toEqual({
+					resourceKey: 'registry-storage'
+				})
+			)
+			expect(registry.getCurrentJazzSession()).toBeUndefined()
+			release()
+			await vi.waitFor(() => expect(registry.getCurrentJazzSession()).toBe(selected))
+			expect(registry.getCurrentSessionAvailability()).toBeUndefined()
+			expect(sdk.create).toHaveBeenCalledTimes(2)
+		} finally {
+			binding.owner.send({ type: 'RELEASE', scope: binding.scope, replyTo: recipient })
+			recipient.stop()
+		}
 	})
 })

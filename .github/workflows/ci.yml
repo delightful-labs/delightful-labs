@@ -26,6 +26,7 @@ jobs:
           node-version: '24'
       - run: npm install --global pnpm@10.28.0
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
@@ -46,6 +47,7 @@ jobs:
           node-version: '24'
       - run: npm install --global pnpm@10.28.0
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm ui:check
       - run: pnpm ui:test
       - run: pnpm ui:build
@@ -67,6 +69,7 @@ jobs:
           node-version: '24'
       - run: npm install --global pnpm@10.28.0
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm --filter delightful-local-first format:check
       - run: pnpm --filter delightful-local-first lint
       - run: pnpm --filter delightful-local-first test:xstate-readiness

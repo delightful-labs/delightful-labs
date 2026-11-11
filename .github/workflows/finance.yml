@@ -32,6 +32,7 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm check
       - run: pnpm check:tests
       - run: pnpm check:e2e
@@ -90,6 +91,7 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm exec playwright install --with-deps chromium
       - name: Run against a disposable in-memory Jazz server
         run: pnpm exec playwright test --config=${{ matrix.config }} ${{ matrix.selection }} --forbid-only
@@ -115,6 +117,7 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - name: Verify native isolation and browser recovery against disposable Jazz servers
         run: pnpm exec vitest run --mode restore-experiment --reporter=verbose
@@ -164,6 +167,7 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm exec playwright install --with-deps chromium
       - name: Verify feature flags against an isolated runtime
         run: pnpm exec playwright test --config=${{ matrix.config }} --workers=1 --forbid-only
@@ -192,6 +196,7 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm exec playwright install --with-deps chromium
       - name: Build with the same-origin Jazz backend
         run: pnpm build

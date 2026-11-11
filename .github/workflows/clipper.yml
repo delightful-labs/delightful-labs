@@ -32,6 +32,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm verify
       - name: Preserve generated test counterexamples
         if: failure()
@@ -57,6 +58,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm exec playwright install --with-deps chromium firefox
       - run: pnpm test:e2e
       - run: pnpm test:schema

@@ -104,3 +104,21 @@ private/API entries still fail, and the authorized private probe remains in the
 scenario. This changes test expectations/diagnostics only; cache policy and
 product behavior are unchanged. Source baseline contains the same old assertion
 and the same static files. The corrected complete offline suite passes 8/8.
+
+The complete ordinary browser runner passes all 60 tests across eight specs:
+account 21, discovery 13, filter popovers 2, images 4, note drafts 2,
+organization 8, reader 9 and startup 1. Each spec owns and drains its disposable
+backend; these ran in the clean monorepo checkout.
+
+Extension browser qualification passes 9 of 12 scenarios, including direct
+offline capture, complete restart/reconciliation, account separation and issued
+reference retention. Three existing sign-in/settings scenarios fail. Repeating
+only those three against unchanged main `549e4b5`, its original vendored
+libraries, original SDK/auth patches and pnpm 10.22.0 reproduces the same three
+failures: sign-in popup does not close after valid restoration; stale-account
+and repeated-settings fixtures never confirm the connection. The sign-in trace
+shows completed identity restoration followed by a missing extension message
+receiver. No assertions/skips/deadlines or product behavior were changed to
+conceal these failures. This is a documented source-baseline limitation, not
+full extension sign-in acceptance. Review the source's existing platform notes
+in `apps/clipper/docs/reviews/image-browser-ci-2026-11-10.md` before release.

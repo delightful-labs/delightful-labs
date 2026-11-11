@@ -3,9 +3,10 @@
   "node": "24.22.2",
   "pnpm": "10.28.0",
   "notes": [
-    "UI archive replaced by an injected peer-specific workspace package.",
-    "Worker test package now declares TypeScript 6.0.3 explicitly.",
-    "Shared SDK patch, optional peer contexts, exact-version missing-peer extensions and root optional esbuild resolution change transitive closures."
+    "UI and Local First archives replaced with peer-specific workspace packages.",
+    "All consumers select one coherent Jazz/Svelte/XState/UI peer context; actual resolution is checked in CI.",
+    "SDK/auth patches and optional peer contexts are recorded in the root lock.",
+    "Finance nested worker tooling explicitly declares existing TypeScript 6.0.3."
   ],
   "directDependencies": [
     {
@@ -87,8 +88,8 @@
         "version": "file:vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz(delightful-ui@file:vendor/delightful-ui-7a7f61b-xstate-v6.tgz(svelte@5.57.2))(jazz-tools@2.0.0-alpha.60(patch_hash=c8b3fbdca60553d2c141455b5bb5039c0eb3122bbb9adbd6a4606d94a22487cf)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(svelte@5.57.2)(ws@8.22.1))(svelte@5.57.2)(xstate@6.0.0-beta.1)"
       },
       "after": {
-        "specifier": "file:vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
-        "version": "file:apps/finance/vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz(delightful-ui@file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2)))(jazz-tools@2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(xstate@6.0.0-beta.1)"
+        "specifier": "workspace:*",
+        "version": "file:packages/local-first(11641a9c529e532e21c93b6c53aa1597)"
       },
       "directVersionChanged": true
     },
@@ -116,7 +117,7 @@
       },
       "after": {
         "specifier": "2.0.0-alpha.60",
-        "version": "2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)"
+        "version": "2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.18(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)"
       },
       "directVersionChanged": false
     },
@@ -410,7 +411,7 @@
       },
       "after": {
         "specifier": "^4.1.8",
-        "version": "4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))"
+        "version": "4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))"
       },
       "directVersionChanged": false
     },
@@ -424,7 +425,7 @@
       },
       "after": {
         "specifier": "2.0.0-beta.0",
-        "version": "2.0.0-beta.0(fast-check@4.10.2)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(xstate@6.0.0-beta.1)(zod@4.6.7)"
+        "version": "2.0.0-beta.0(fast-check@4.10.2)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(xstate@6.0.0-beta.1)(zod@4.6.7)"
       },
       "directVersionChanged": false
     },
@@ -463,7 +464,7 @@
       },
       "after": {
         "specifier": "4.1.11",
-        "version": "4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))"
+        "version": "4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.7(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))"
       },
       "directVersionChanged": false
     },

@@ -4,6 +4,7 @@ import { createActor, createCallbackLogic, setup, waitFor, types } from 'xstate'
 import type { EventObject } from 'xstate'
 import type {
 	SessionOwnerReply,
+	SessionOpenCapability,
 	SessionScope,
 	SessionStartupReport
 } from '../../contracts/session.js'
@@ -48,13 +49,36 @@ function resource(): Session {
 function scope(binding: object, attachment = {}, generation = 0): SessionScope {
 	return { binding, attachment, generation }
 }
-function owner(open?: () => Promise<Session>, existing?: Session) {
+function owner(
+	open?: () => Promise<Session>,
+	existing?: Session,
+	availability?: SessionOpenCapability<Session>['availability']
+) {
 	const binding = {}
 	const session = resource()
 	const acquire = vi.fn(open ?? (async () => session))
-	const input = { binding, capability: { open: acquire }, ...(existing ? { existing } : {}) }
+	const input = {
+		binding,
+		capability: { open: acquire, ...(availability ? { availability } : {}) },
+		...(existing ? { existing } : {})
+	}
 	const actor = tracked(createActor(createSessionAcquisitionMachine<Session>(), { input }).start())
 	return { actor, binding, session, acquire }
+}
+function unavailableOwner() {
+	const busy = new Error('Synthetic storage contention')
+	const opening = deferred<Session>()
+	const availability = deferred<void>()
+	const wait = vi.fn((_key: string, _signal: AbortSignal) => availability.promise)
+	const acquire = vi
+		.fn<() => Promise<Session>>()
+		.mockRejectedValueOnce(busy)
+		.mockImplementation(() => opening.promise)
+	const source = owner(acquire, undefined, {
+		classify: (error) => (error === busy ? { resourceKey: 'shared-test-storage' } : undefined),
+		wait
+	})
+	return { ...source, opening, availability, wait }
 }
 function attachment() {
 	const reports = recipient<SessionStartupReport<Session>>()
@@ -477,5 +501,120 @@ describe('startup attachment lifecycle', () => {
 		app.actor.send({ type: 'SHUTDOWN' })
 		await closed(app)
 		expect(unsubscribe).toHaveBeenCalledOnce()
+	})
+})
+
+describe('session acquisition availability boundary', () => {
+	it('waits for storage admission before one re-open without reporting startup failure', async () => {
+		const source = unavailableOwner()
+		const app = attachment()
+		start(app, source)
+		await waitFor(source.actor, (snapshot) => snapshot.matches('waitingForAvailability'))
+		expect(source.acquire).toHaveBeenCalledTimes(1)
+		expect(source.wait.mock.calls[0]?.[0]).toBe('shared-test-storage')
+		expect(app.reports.some((event) => event.type === 'SESSION_STARTUP_FAILED')).toBe(false)
+		source.availability.resolve(undefined)
+		source.opening.resolve(source.session)
+		await attached(app)
+		expect(source.acquire).toHaveBeenCalledTimes(2)
+		expect(selectAcquiredSession(source.actor.getSnapshot())).toBe(source.session)
+	})
+
+	it('shares one resource wait and preserves a remaining attachment after another releases', async () => {
+		const source = unavailableOwner()
+		const first = attachment()
+		const second = attachment()
+		const captured = start(first, source)
+		await waitFor(source.actor, (snapshot) => snapshot.matches('waitingForAvailability'))
+		start(second, source)
+		source.actor.send({ type: 'RETRY_ACQUIRE', scope: captured, replyTo: first.actor })
+		first.actor.send({ type: 'SHUTDOWN' })
+		await closed(first)
+		expect(source.wait).toHaveBeenCalledTimes(1)
+		expect(source.wait.mock.calls[0]?.[1].aborted).toBe(false)
+		source.availability.resolve(undefined)
+		source.opening.resolve(source.session)
+		await attached(second)
+		expect(source.acquire).toHaveBeenCalledTimes(2)
+		expect(first.reports.some((event) => event.type === 'SESSION_ACQUIRED')).toBe(false)
+	})
+
+	it('cancels the waiter after the final release and ignores its late completion', async () => {
+		const source = unavailableOwner()
+		const app = attachment()
+		start(app, source)
+		await waitFor(source.actor, (snapshot) => snapshot.matches('waitingForAvailability'))
+		app.actor.send({ type: 'SHUTDOWN' })
+		await closed(app)
+		expect(source.wait.mock.calls[0]?.[1].aborted).toBe(true)
+		source.availability.resolve(undefined)
+		await source.availability.promise
+		// Let the canceled invocation's queued completion reach the actor boundary.
+		await new Promise<void>((resolve) => setTimeout(resolve, 0))
+		expect(source.actor.getSnapshot().matches('idle')).toBe(true)
+		expect(source.acquire).toHaveBeenCalledTimes(1)
+		expect(selectAcquiredSession(source.actor.getSnapshot())).toBeUndefined()
+	})
+
+	it('reports wait failure without retrying the SDK or exposing the storage error', async () => {
+		const source = unavailableOwner()
+		const app = attachment()
+		start(app, source)
+		await waitFor(source.actor, (snapshot) => snapshot.matches('waitingForAvailability'))
+		source.availability.reject(new Error('Synthetic private storage error'))
+		await failed(app)
+		expect(app.reports.at(-1)).toMatchObject({
+			type: 'SESSION_STARTUP_FAILED',
+			reason: 'openFailed'
+		})
+		expect(source.acquire).toHaveBeenCalledTimes(1)
+		expect(source.actor.getSnapshot().context.availability).toBeUndefined()
+	})
+
+	it('keeps unclassified errors on the existing explicit failure path', async () => {
+		const wait = vi.fn(async (_key: string, _signal: AbortSignal) => {})
+		const source = owner(
+			async () => {
+				throw new Error('Synthetic ordinary open failure')
+			},
+			undefined,
+			{
+				classify: () => undefined,
+				wait
+			}
+		)
+		const app = attachment()
+		start(app, source)
+		await failed(app)
+		expect(wait).not.toHaveBeenCalled()
+		expect(source.acquire).toHaveBeenCalledTimes(1)
+	})
+
+	it('does not let an invalid release cancel another attachment admission', async () => {
+		const source = unavailableOwner()
+		const app = attachment()
+		const captured = start(app, source)
+		await waitFor(source.actor, (snapshot) => snapshot.matches('waitingForAvailability'))
+		const other = recipient<SessionOwnerReply<Session>>()
+		source.actor.send({
+			type: 'RELEASE',
+			scope: { ...captured, binding: {} },
+			replyTo: other.actor
+		})
+		expect(source.wait.mock.calls[0]?.[1].aborted).toBe(false)
+		expect(source.actor.getSnapshot().matches('waitingForAvailability')).toBe(true)
+		source.availability.resolve(undefined)
+		source.opening.resolve(source.session)
+		await attached(app)
+		expect(selectAcquiredSession(source.actor.getSnapshot())).toBe(source.session)
+	})
+
+	it('aborts the state-owned availability waiter when its host owner stops', async () => {
+		const source = unavailableOwner()
+		start(attachment(), source)
+		await waitFor(source.actor, (snapshot) => snapshot.matches('waitingForAvailability'))
+		source.actor.stop()
+		expect(source.wait.mock.calls[0]?.[1].aborted).toBe(true)
+		expect(source.acquire).toHaveBeenCalledTimes(1)
 	})
 })
