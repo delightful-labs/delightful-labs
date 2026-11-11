@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks, unit tests, package, and Storybook
+    # Keep the runner compatible with the pinned Playwright browser dependencies.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm test:xstate-readiness
+      - run: pnpm check
+      - run: pnpm test:unit --run
+      - run: pnpm package
+      - run: pnpm check:consumer
+      - run: pnpm build-storybook
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm check:native-backup
+      - run: pnpm exec tsc --project fixtures/private-creation/tsconfig.json
+      - run: pnpm exec vitest run --config fixtures/private-creation/vitest.config.ts
+      - run: pnpm check:backup-restore
+      - run: pnpm test:storybook
+      - name: Upload generated XState failures
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: xstate-test-failures
+          path: .xstate-test/
+          retention-days: 14
+          if-no-files-found: ignore

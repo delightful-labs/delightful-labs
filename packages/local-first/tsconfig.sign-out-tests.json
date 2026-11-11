@@ -1,0 +1,7 @@
+{
+	"extends": "./tsconfig.json",
+	"include": [
+		"src/lib/machines/identity/ordered-sign-out.test.ts",
+		"src/lib/machines/identity/ordered-sign-out.model.test.ts"
+	]
+}
