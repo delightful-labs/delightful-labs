@@ -1,0 +1,3027 @@
+{
+	"environment": "Same isolated production scenarios as startup-baseline.json, with temporary performance marks at existing XState inspection and session-open boundaries; no production source changes retained",
+	"samples": [
+		{
+			"sample": 1,
+			"scenario": "first-visit-empty-workspace",
+			"sessionRequestMs": 228.5,
+			"sessionReadyMs": 454.8,
+			"sessionOpenDurationMs": 226.3,
+			"observedUsableMs": 2835.5,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 221.69999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 221.79999999701977
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 222.19999999552965
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 228.5
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 228.69999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 228.79999999701977
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 228.89999999850988
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 454.79999999701977
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 456.19999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 456.29999999701977
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 456.29999999701977
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 686.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 687.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 687.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 687.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 688.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 688.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 688.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 688.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 688.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 688.2999999970198
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 688.3999999985099
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 696.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 736.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 736.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 736.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 736.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 736.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 737
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 880.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 880.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 880.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1255.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1255.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1255.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1934.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1934.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1934.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2257
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2257.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2257.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 2257.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 2257.39999999851
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2258.5
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 2396.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2398
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2398.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2398.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2398.39999999851
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2398.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2398.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2418.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2452.89999999851
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2703.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2703.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2703.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2703.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2714.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2715
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2715.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2818.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2818.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2819
+				}
+			]
+		},
+		{
+			"sample": 1,
+			"scenario": "warm-saved-detail",
+			"sessionRequestMs": 71.7,
+			"sessionReadyMs": 159.8,
+			"sessionOpenDurationMs": 88.1,
+			"observedUsableMs": 2371.7,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 69.90000000596046
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 70
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 70.10000000149012
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 71.70000000298023
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 71.70000000298023
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 71.80000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 71.80000000447035
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 159.80000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 160.30000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 160.5
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 160.5
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 206.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.30000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 207.90000000596046
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 207.90000000596046
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 217.10000000149012
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 226.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 226.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 226.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 227
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 227.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 227.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 280.90000000596046
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 281
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 281
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 615.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 615.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 615.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 615.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 622.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 622.4000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 622.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 686.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 686.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 686.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 686.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 686.9000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 686.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 814.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 814.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 818
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 833.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 833.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 833.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 833.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 833.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 833.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 834.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 834.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 834.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 842.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1593.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1593.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1593.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1594.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1594.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1594.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1604.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1604.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1604.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1605.4000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1605.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1605.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1605.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1615.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1616
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1616
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1660.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1660.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1660.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1673.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1673.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1673.9000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1821.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1821.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1821.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1827
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1827.2000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1827.2000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1827.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1827.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1849.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1922
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1922.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1922.2000000029802
+				}
+			]
+		},
+		{
+			"sample": 1,
+			"scenario": "cold-offline-saved-detail",
+			"sessionRequestMs": 186.6,
+			"sessionReadyMs": 356.9,
+			"sessionOpenDurationMs": 170.3,
+			"observedUsableMs": 2659.2,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 177
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 177.19999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 178
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 186.60000000149012
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 187
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 187.10000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 187.19999999552965
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 356.8999999985099
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 358.3999999985099
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 358.5
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 358.5
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 443.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 444.29999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 444.69999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 444.79999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 444.79999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 444.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 445
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 445.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 445.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 445.1000000014901
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 445.19999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 460.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 483.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 483.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 483.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 484.19999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 484.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 484.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 542.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 542.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 542.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 872.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 872.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 872.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 872.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 879
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 879
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 879
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 943.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 944
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 944.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 944.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 944.6999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 944.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1061.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1061.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1064.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1081.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1081.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1081.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1081.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 1081.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 1081.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1082.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1082.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1082.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1088.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1865.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1865.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1865.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1866.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1866.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1866.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1877.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1877.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1877.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1878.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1878.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1878.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1878.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1888.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1888.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1889
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1931.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1931.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1931.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1942.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1942.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1942.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2103.1999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2103.1999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2103.2999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2109.39999999851
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2109.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2109.60000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2109.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2109.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2140.10000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2208.1999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2208.39999999851
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2208.39999999851
+				}
+			]
+		},
+		{
+			"sample": 2,
+			"scenario": "first-visit-empty-workspace",
+			"sessionRequestMs": 221.1,
+			"sessionReadyMs": 998.7,
+			"sessionOpenDurationMs": 777.6,
+			"observedUsableMs": 3817.4,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 212.30000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 212.5
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 213.20000000298023
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 221.10000000149012
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 221.5
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 221.60000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 221.70000000298023
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 998.7000000029802
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 1000.5
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 1000.8000000044703
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 1000.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 1237.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1239.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1239.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1239.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1239.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1240.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1240.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1240.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1240.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1240.3000000044703
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 1240.3999999985099
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 1261
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1301.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1301.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1301.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1301.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1302.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1302.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1453.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1453.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1453.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1931.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1931.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1931.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2524.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2524.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2524.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2852.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2852.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2852.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 2852.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 2852.89999999851
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2854.10000000149
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 2991.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2993.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2993.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2993.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2993.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2993.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2993.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 3010.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 3047.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 3285.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 3285.39999999851
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 3395.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3411.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3411.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3411.39999999851
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3411.39999999851
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3423.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3423.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3423.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3753.5
+				}
+			]
+		},
+		{
+			"sample": 2,
+			"scenario": "warm-saved-detail",
+			"sessionRequestMs": 197.5,
+			"sessionReadyMs": 339.7,
+			"sessionOpenDurationMs": 142.2,
+			"observedUsableMs": 2665.6,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 194.80000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 194.89999999850988
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 195.10000000149012
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 197.5
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 197.60000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 197.70000000298023
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 197.70000000298023
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 339.70000000298023
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 340.3999999985099
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 340.5
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 340.5
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 398.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 399.80000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 399.80000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 410.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 421.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 421.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 421.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 422.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 422.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 422.30000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 482.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 482.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 482.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 858.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 858.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 888.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 888.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 888.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 893.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 899.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 899.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 899.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 978.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 978.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 978.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 979.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 979.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 979.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1096.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1096.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1096.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1096.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 1096.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 1096.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1097.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1097.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1097.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1111.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1873.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1873.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1873.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1874.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1874.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1874.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1884.2000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1884.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1884.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1884.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1885
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1885.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1885.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1895.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1895.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1895.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2026.2000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2026.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2026.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2031.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2031.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2031.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2031.8999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2031.8999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2102.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2102.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2102.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2132.39999999851
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2132.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2132.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2143.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2162.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2162.39999999851
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2162.5
+				}
+			]
+		},
+		{
+			"sample": 2,
+			"scenario": "cold-offline-saved-detail",
+			"sessionRequestMs": 136.8,
+			"sessionReadyMs": 280.1,
+			"sessionOpenDurationMs": 143.3,
+			"observedUsableMs": 2776.3,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 130.39999999850988
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 130.5
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 131.10000000149012
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 136.79999999701977
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 137.10000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 137.19999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 137.29999999701977
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 280.1000000014901
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 281.3999999985099
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 281.6000000014901
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 281.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 363.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 365.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 365.69999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 365.79999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 365.79999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 366.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 366.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 366.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 366.19999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 366.19999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 366.29999999701977
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 387.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 426.69999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 426.79999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 426.79999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 427.19999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 427.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 427.69999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 507.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 507.19999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 507.19999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 842.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 842.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 874.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 874.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 875
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 893.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 901.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 901.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 901.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1002.1999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1002.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1002.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1003.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1003.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1003.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1142.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1142.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1142.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1142.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 1142.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 1142.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1143.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1143.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1143.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1153
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1921.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1921.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1921.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1922.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1922.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1922.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1933.8999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1934
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1934.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1934.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1934.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1934.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1935.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1946.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1947.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1947.1999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2110.10000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2110.2999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2110.2999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2117.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2117.60000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2117.60000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2117.89999999851
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2118
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2209.6999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2209.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2209.89999999851
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2242
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2242.10000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2242.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2257.2999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2272
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2272.10000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2272.10000000149
+				}
+			]
+		},
+		{
+			"sample": 3,
+			"scenario": "first-visit-empty-workspace",
+			"sessionRequestMs": 405.6,
+			"sessionReadyMs": 779.2,
+			"sessionOpenDurationMs": 373.6,
+			"observedUsableMs": 3355.6,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 396.30000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 396.5
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 397.20000000298023
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 405.6000000014901
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 406
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 406.20000000298023
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 406.30000000447035
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 779.2000000029802
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 780.8000000044703
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 780.9000000059605
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 780.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 1021.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1022.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1023.8000000044703
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 1023.9000000059605
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 1033.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1069.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1069.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1069.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1070.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1070.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1070.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1224.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1224.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"unselected\"}}",
+					"startTime": 1224.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1630.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1630.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 1630.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2340.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2340.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2340.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2674.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2674.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2674.60000000149
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 2674.60000000149
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 2675.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"unselected\",\"organization\":\"unselected\"}}",
+					"startTime": 2676.60000000149
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 2818.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2820.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2820.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2820.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2820.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2821.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2821.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2838.10000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 2876.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 3138.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3184.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3184.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3184.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3184.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3195
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3195.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3195.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 3270.3000000044703
+				}
+			]
+		},
+		{
+			"sample": 3,
+			"scenario": "warm-saved-detail",
+			"sessionRequestMs": 69.9,
+			"sessionReadyMs": 181,
+			"sessionOpenDurationMs": 111.1,
+			"observedUsableMs": 2387.1,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 68.20000000298023
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 68.30000000447035
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 68.40000000596046
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 69.90000000596046
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 69.90000000596046
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 70
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 70.10000000149012
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 181
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 181.40000000596046
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 181.5
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 181.5
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 235.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 235.90000000596046
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.30000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.30000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.40000000596046
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.40000000596046
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.40000000596046
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 236.60000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 236.60000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 247.20000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 258.30000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 258.40000000596046
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 258.40000000596046
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 258.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 258.70000000298023
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 258.80000000447035
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 313.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 313.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 313.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 622.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 639.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 640
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 640
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 645.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 645.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 707.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 707.9000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 708
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 708.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 708.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 708.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 839.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 839.9000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 839.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 840
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 857.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 857.2000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 857.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 857.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 857.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 857.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 858
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 858.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 858.3000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 863.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1628.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1628.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1628.7000000029802
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1629.8000000044703
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1629.9000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1629.9000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1638.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1638.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1638.4000000059605
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1638.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1639.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1639.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1649.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1649.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1649.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1649.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1682.2000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1682.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1682.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1839.7000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1839.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1839.8000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1845.2000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1845.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1845.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1845.4000000059605
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1845.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1866.3000000044703
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1932.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1932.2000000029802
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1932.3000000044703
+				}
+			]
+		},
+		{
+			"sample": 3,
+			"scenario": "cold-offline-saved-detail",
+			"sessionRequestMs": 143.2,
+			"sessionReadyMs": 310.5,
+			"sessionOpenDurationMs": 167.3,
+			"observedUsableMs": 2695.5,
+			"stateMarks": [
+				{
+					"name": "profile:state:session-startup:\"waiting\"",
+					"startTime": 136.10000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 136.29999999701977
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 136.79999999701977
+				},
+				{
+					"name": "profile:session-request",
+					"startTime": 143.19999999552965
+				},
+				{
+					"name": "profile:state:session-startup:\"starting\"",
+					"startTime": 143.5
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 143.60000000149012
+				},
+				{
+					"name": "profile:state:application-readiness:\"opening\"",
+					"startTime": 143.69999999552965
+				},
+				{
+					"name": "profile:session-ready",
+					"startTime": 310.5
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"transitioning\"}",
+					"startTime": 311.69999999552965
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 311.8999999985099
+				},
+				{
+					"name": "profile:state:session-startup:\"ready\"",
+					"startTime": 311.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"initializing\":\"active\"}",
+					"startTime": 392.29999999701977
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 393.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 394.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 394.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 394.69999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 394.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 395
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 395
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 395
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 395.1000000014901
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 395.1000000014901
+				},
+				{
+					"name": "profile:state:application-readiness:{\"running\":\"ready\"}",
+					"startTime": 414.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 447.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 448.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 448.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 448.5
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 448.69999999552965
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 448.8999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 516.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 516.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 516.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"waiting\",\"organization\":\"loadingMembership\"}}",
+					"startTime": 873.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 893.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 893.1000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 893.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 903.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 903.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 978.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 978.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 978.8999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 979.6999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 979.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 979.8999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1135.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1135.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1135.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"waiting\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1136
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1158.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1158.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1158.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1158.5
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"seeding\"}",
+					"startTime": 1158.5
+				},
+				{
+					"name": "profile:state:workspace-startup:{\"ready\":\"settled\"}",
+					"startTime": 1158.6000000014901
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1159.6999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1159.7999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1160
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1170.8999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1892.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1892.1999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1892.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1893.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1893.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1893.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1902
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1902.1000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1902.1999999955297
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1902.2999999970198
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1903.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1903.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1913.2999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1913.3999999985099
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1913.3999999985099
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 1913.6000000014901
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1948.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1948.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 1948.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2144
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2144
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2144.10000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2150.1999999955297
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2150.2999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2150.2999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2150.5
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2150.60000000149
+				},
+				{
+					"name": "profile:state:workspace-readiness:{\"active\":{\"session\":\"ready\",\"workspace\":\"ready\",\"selection\":\"selected\",\"organization\":\"ready\"}}",
+					"startTime": 2176.7999999970198
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2239.39999999851
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2239.60000000149
+				},
+				{
+					"name": "profile:state:transaction-edit-form:{\"running\":{\"lifecycle\":\"active\",\"form\":\"attached\",\"transfer\":\"unselected\",\"link\":\"idle\",\"unlink\":\"idle\",\"deletion\":\"idle\"}}",
+					"startTime": 2239.60000000149
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,147 @@
+{
+	"environment": "One isolated production profile, same small fixture; page-target CDP CPU profiler started before navigation; worker CPU excluded",
+	"timingDefinition": "requestAnimationFrame observes saved synthetic description and enabled amount input; this is DOM availability, not an input latency or first-paint measurement. Profiling and frame probes add overhead.",
+	"samples": [
+		{
+			"scenario": "first-visit-empty-workspace",
+			"observedFormEnabledMs": null,
+			"automationCaptureMs": 2770,
+			"profileDurationMs": 2661.8,
+			"sampledSelfTimeMs": {
+				"(program)": 164.2,
+				"(idle)": 1169.1,
+				"other": 260.0,
+				"(garbage collector)": 89.7,
+				"wasm": 976.5
+			},
+			"topWasmLeafFunctions": [
+				{
+					"function": "talc::base::Talc<S,B>::allocate::h64a94c8f5c27eb97",
+					"sampledSelfMs": 76.8
+				},
+				{
+					"function": "jazz_node::node::query_eval::maintained_views::<impl jazz_node::node::NodeState<S>>::apply_local_maintained_view_transitions_inner::{{closure}}::h0834f70f1ea5f220",
+					"sampledSelfMs": 66.5
+				},
+				{
+					"function": "groove::ivm::runtime::compilation::<impl groove::ivm::runtime::IvmRuntime>::add_dedup_graph_inner::he5718f3b064ad239",
+					"sampledSelfMs": 59.6
+				},
+				{
+					"function": "jazz_node::node::query_eval::read_sources::resolved_current_source_graph::hf236f810dbca5717",
+					"sampledSelfMs": 58.7
+				},
+				{
+					"function": "talc::base::Talc<S,B>::deallocate::h9e6f24431e15df09",
+					"sampledSelfMs": 48.5
+				},
+				{
+					"function": "core::hash::BuildHasher::hash_one::h898e896614424090",
+					"sampledSelfMs": 46.5
+				},
+				{
+					"function": "<alloc::string::String as core::clone::Clone>::clone::h1f3d9dad0a33cc99",
+					"sampledSelfMs": 41.3
+				},
+				{
+					"function": "groove::ivm::runtime::typed_projection::<impl groove::ivm::runtime::IvmRuntime>::projection_plan::h8ccbd75f495f33ea",
+					"sampledSelfMs": 41.3
+				}
+			]
+		},
+		{
+			"scenario": "warm-saved-detail",
+			"observedFormEnabledMs": 2161.2,
+			"automationCaptureMs": 2648,
+			"profileDurationMs": 2578.0,
+			"sampledSelfTimeMs": {
+				"(program)": 324.5,
+				"other": 208.7,
+				"(idle)": 1092.4,
+				"(garbage collector)": 4.8,
+				"wasm": 947.4
+			},
+			"topWasmLeafFunctions": [
+				{
+					"function": "talc::base::Talc<S,B>::allocate::h64a94c8f5c27eb97",
+					"sampledSelfMs": 178.1
+				},
+				{
+					"function": "talc::base::Talc<S,B>::deallocate::h9e6f24431e15df09",
+					"sampledSelfMs": 105.3
+				},
+				{
+					"function": "<alloc::string::String as core::clone::Clone>::clone::h1f3d9dad0a33cc99",
+					"sampledSelfMs": 45.2
+				},
+				{
+					"function": "memcmp",
+					"sampledSelfMs": 26.7
+				},
+				{
+					"function": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write::h9940cbd721f65498",
+					"sampledSelfMs": 26.5
+				},
+				{
+					"function": "groove::ivm::runtime::evaluator::TickEvaluator::cached_result_state_is_current::h394bcce19129c433",
+					"sampledSelfMs": 20.2
+				},
+				{
+					"function": "groove::ivm::graph::NodeDescriptor::node_id_of::h16e68d58c03ad902",
+					"sampledSelfMs": 16.2
+				},
+				{
+					"function": "__rustc[9e6a08e89e4b9111]::__rust_realloc",
+					"sampledSelfMs": 13.8
+				}
+			]
+		},
+		{
+			"scenario": "cold-offline-saved-detail",
+			"observedFormEnabledMs": 2188.9,
+			"automationCaptureMs": 2642.1,
+			"profileDurationMs": 2587.6,
+			"sampledSelfTimeMs": {
+				"(program)": 197.5,
+				"(idle)": 1093.7,
+				"other": 340.7,
+				"(garbage collector)": 18.6,
+				"wasm": 936.7
+			},
+			"topWasmLeafFunctions": [
+				{
+					"function": "talc::base::Talc<S,B>::allocate::h64a94c8f5c27eb97",
+					"sampledSelfMs": 180.7
+				},
+				{
+					"function": "talc::base::Talc<S,B>::deallocate::h9e6f24431e15df09",
+					"sampledSelfMs": 100.9
+				},
+				{
+					"function": "<alloc::string::String as core::clone::Clone>::clone::h1f3d9dad0a33cc99",
+					"sampledSelfMs": 42.3
+				},
+				{
+					"function": "groove::ivm::graph::NodeDescriptor::node_id_of::h16e68d58c03ad902",
+					"sampledSelfMs": 26.4
+				},
+				{
+					"function": "groove::ivm::runtime::evaluator::TickEvaluator::cached_result_state_is_current::h394bcce19129c433",
+					"sampledSelfMs": 21.9
+				},
+				{
+					"function": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write::h9940cbd721f65498",
+					"sampledSelfMs": 21.5
+				},
+				{
+					"function": "memcmp",
+					"sampledSelfMs": 21.3
+				},
+				{
+					"function": "<jazz_model::query::Predicate as core::clone::Clone>::clone::h0acc6b90df1f17e0[5]",
+					"sampledSelfMs": 21.2
+				}
+			]
+		}
+	]
+}

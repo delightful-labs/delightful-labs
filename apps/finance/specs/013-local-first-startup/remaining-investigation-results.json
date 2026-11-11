@@ -1,0 +1,981 @@
+{
+	"environment": {
+		"sdk": "jazz-tools@2.0.0-alpha.59",
+		"appCommit": "b39d9fa",
+		"schemaAndPermissionsMatchMainCheckout": true,
+		"frontend": "127.0.0.1:5192",
+		"backend": "127.0.0.1:6192",
+		"proxy": "127.0.0.1:6193",
+		"data": "synthetic; fresh disposable identities/profiles; no bank provider request or credential unlock"
+	},
+	"transportCorrection": {
+		"finding": "Page-level routeWebSocket mocking did not reliably block the SharedWorker transport. Earlier cold-query-follow-up timing/control claims were provisional.",
+		"replacement": "Real HTTP/WebSocket proxy forwards during acquisition, then accepts upgrades and holds all Jazz application traffic; cold profiles close every browser client and SharedWorker. Upgrades and client bytes are asserted.",
+		"status": "Selected subscription-only cold cases reverified across Chromium, Firefox and WebKit; large history reverified in Chromium."
+	},
+	"qualifiedPrimitive": {
+		"datasetQueries": "17 fixed permission-filtered table ID projections plus full current-user membership/grant subscriptions",
+		"tier": "Remote for background acquisition subscriptions only; ordinary foreground reads remain LocalFirst",
+		"ownership": "SDK client/session generation; public synchronous unsubscribe cleanup; per-query errors isolated",
+		"readiness": "Never an application readiness gate. First callback/count is not an assertion of global completeness or fresh online state.",
+		"liveChecks": {
+			"duplicateFileOccurrences": 1,
+			"linkRemovalAndRestoration": true,
+			"endpointGrantRevocation": true,
+			"accountRevocation": true,
+			"regrant": true,
+			"rootOrganizationStillCached": false,
+			"privateProfileRevocation": true,
+			"membershipRevocation": true,
+			"adminAdmission": true,
+			"adminDowngrade": true,
+			"noPostReleaseCallbacks": true,
+			"errors": []
+		}
+	},
+	"datasetCoverage": {
+		"organizations": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"profiles": {
+			"permittedFixtureRows": 1,
+			"deniedFixtureRows": 0
+		},
+		"organizationMembers": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"accountMemberships": {
+			"permittedFixtureRows": 4,
+			"deniedFixtureRows": 0
+		},
+		"accounts": {
+			"permittedFixtureRows": 4,
+			"deniedFixtureRows": 2
+		},
+		"categories": {
+			"permittedFixtureRows": 4,
+			"deniedFixtureRows": 0
+		},
+		"tags": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"transactions": {
+			"permittedFixtureRows": 6,
+			"deniedFixtureRows": 2
+		},
+		"transactionTags": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"checks": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"internalTransfers": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"transactionBatches": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"batchTemplates": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 0
+		},
+		"transactionAttachments": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 2
+		},
+		"files": {
+			"permittedFixtureRows": 2,
+			"deniedFixtureRows": 2
+		},
+		"simplefinConnections": {
+			"permittedFixtureRows": 0,
+			"deniedFixtureRows": 2
+		},
+		"simplefinAccountLinks": {
+			"permittedFixtureRows": 0,
+			"deniedFixtureRows": 2
+		}
+	},
+	"coldRelationships": {
+		"transport": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		},
+		"archivedAccountCategoryTag": true,
+		"checkBatchTagAndAttachmentMetadata": true,
+		"bothTransferEndpoints": true,
+		"offsetSubset": true,
+		"filePartsNotWarmed": true,
+		"providerRequestsObserved": 0
+	},
+	"crossBrowserSubscriptionOnly": {
+		"chromium": {
+			"coldTransactionQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 51.900000005960464
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 42
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 41
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						}
+					],
+					"ms": 40.900000005960464
+				}
+			],
+			"auditComplete": true,
+			"transactionWire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			},
+			"idSubscriptionCounts": [1, 1, 2, 3, 2],
+			"metadataWire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			},
+			"fileMetadata": [
+				{
+					"name": "synthetic.bin",
+					"size": 4,
+					"mime": "application/octet-stream"
+				}
+			],
+			"permittedLinks": 1,
+			"unrequestedPartRows": 0,
+			"unrequestedPartBytes": 0,
+			"explicitContent": {
+				"phase": "explicit-online-content",
+				"parts": 1,
+				"bytes": [1, 2, 3, 4]
+			},
+			"liveGlobalAccessWorkflow": {
+				"outcome": "passed",
+				"checks": [
+					"grant revocation and regrant",
+					"membership removal",
+					"private-profile revocation",
+					"admin admission and downgrade",
+					"attachment duplicate/link removal and restoration",
+					"no post-unsubscribe callbacks"
+				]
+			}
+		},
+		"firefox": {
+			"coldTransactionQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 866
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 64
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 62
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						}
+					],
+					"ms": 56
+				}
+			],
+			"auditComplete": true,
+			"transactionWire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			},
+			"idSubscriptionCounts": [1, 1, 2, 3, 2],
+			"metadataWire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			},
+			"fileMetadata": [
+				{
+					"name": "synthetic.bin",
+					"size": 4,
+					"mime": "application/octet-stream"
+				}
+			],
+			"permittedLinks": 1,
+			"unrequestedPartRows": 0,
+			"unrequestedPartBytes": 0,
+			"explicitContent": {
+				"phase": "explicit-online-content",
+				"parts": 1,
+				"bytes": [1, 2, 3, 4]
+			},
+			"liveGlobalAccessWorkflow": {
+				"outcome": "passed",
+				"checks": [
+					"grant revocation and regrant",
+					"membership removal",
+					"private-profile revocation",
+					"admin admission and downgrade",
+					"attachment duplicate/link removal and restoration",
+					"no post-unsubscribe callbacks"
+				]
+			}
+		},
+		"webkit": {
+			"coldTransactionQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 800
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 113
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 2,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						},
+						{
+							"amountMinor": 6789,
+							"description": "New through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-02"
+						}
+					],
+					"ms": 82
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"values": [
+						{
+							"amountMinor": 2345,
+							"description": "Existing updated through ID projection",
+							"currency": "USD",
+							"bookedOn": "2026-10-01"
+						}
+					],
+					"ms": 63
+				}
+			],
+			"auditComplete": true,
+			"transactionWire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			},
+			"idSubscriptionCounts": [1, 1, 2, 3, 2],
+			"metadataWire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			},
+			"fileMetadata": [
+				{
+					"name": "synthetic.bin",
+					"size": 4,
+					"mime": "application/octet-stream"
+				}
+			],
+			"permittedLinks": 1,
+			"unrequestedPartRows": 0,
+			"unrequestedPartBytes": 0,
+			"explicitContent": {
+				"phase": "explicit-online-content",
+				"parts": 1,
+				"bytes": [1, 2, 3, 4]
+			},
+			"liveGlobalAccessWorkflow": {
+				"outcome": "passed",
+				"checks": [
+					"grant revocation and regrant",
+					"membership removal",
+					"private-profile revocation",
+					"admin admission and downgrade",
+					"attachment duplicate/link removal and restoration",
+					"no post-unsubscribe callbacks"
+				]
+			}
+		}
+	},
+	"largeSubscriptionOnlyCold": {
+		"cold": {
+			"identityRetained": true,
+			"rows": 5006,
+			"scopedRows": 5003,
+			"allMinorAmountsValid": true,
+			"fixtureCheckedAmount": 1234,
+			"ms": 4372.79999999702
+		},
+		"wire": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		}
+	},
+	"pendingAcquisitionRelease": {
+		"beforeRelease": {
+			"updates": 0,
+			"keys": [],
+			"errors": []
+		},
+		"wire": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		},
+		"noLateCallbacksAfterResume": true
+	},
+	"queryErrorIsolation": {
+		"registration": {
+			"outcome": "registered"
+		},
+		"validSiblingStayedLive": true,
+		"errors": [
+			{
+				"dataset": "badQuery",
+				"message": "invalid uuid not-a-uuid"
+			}
+		]
+	},
+	"identityBinding": {
+		"identityChanged": true,
+		"oldRecordsDenied": true,
+		"oldCallbacksReleased": true
+	},
+	"partialReplica": {
+		"beforeRelease": {
+			"snapshots": {
+				"transactions": []
+			},
+			"updates": 1,
+			"events": []
+		},
+		"authorityPermittedRecords": 6,
+		"noPostReleaseCallbacks": true,
+		"wire": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		}
+	},
+	"namespaceEviction": {
+		"cold": {
+			"identityRetained": true,
+			"rows": 0
+		},
+		"ownedBefore": 1,
+		"ownedAfter": 1,
+		"wire": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		}
+	},
+	"workerAndStorage": {
+		"before": {
+			"workers": [
+				{
+					"type": "shared_worker",
+					"path": "/node_modules/.pnpm/jazz-tools@2.0.0-alpha.59_svelte@5.57.2/node_modules/jazz-tools/dist/worker/jazz-broker-worker.js",
+					"heap": {
+						"usedSize": 5983748,
+						"totalSize": 6651904,
+						"embedderHeapUsedSize": 505960,
+						"backingStorageSize": 4342687
+					}
+				}
+			],
+			"page": {
+				"usedSize": 29308308,
+				"totalSize": 30883840,
+				"embedderHeapUsedSize": 2506240,
+				"backingStorageSize": 17012648
+			}
+		},
+		"readableRows": 5006,
+		"retained": {
+			"workers": [
+				{
+					"type": "shared_worker",
+					"path": "/node_modules/.pnpm/jazz-tools@2.0.0-alpha.59_svelte@5.57.2/node_modules/jazz-tools/dist/worker/jazz-broker-worker.js",
+					"heap": {
+						"usedSize": 6019312,
+						"totalSize": 7176192,
+						"embedderHeapUsedSize": 495976,
+						"backingStorageSize": 4342257
+					}
+				}
+			],
+			"page": {
+				"usedSize": 40105440,
+				"totalSize": 41107456,
+				"embedderHeapUsedSize": 2510080,
+				"backingStorageSize": 17012716
+			}
+		},
+		"storage": {
+			"estimate": {
+				"quota": 10740681432,
+				"usage": 3263192,
+				"usageDetails": {
+					"caches": 6934,
+					"indexedDB": 2912256,
+					"serviceWorkerRegistrations": 344002
+				}
+			},
+			"persisted": false,
+			"persistGranted": false
+		},
+		"released": {
+			"workers": [
+				{
+					"type": "shared_worker",
+					"path": "/node_modules/.pnpm/jazz-tools@2.0.0-alpha.59_svelte@5.57.2/node_modules/jazz-tools/dist/worker/jazz-broker-worker.js",
+					"heap": {
+						"usedSize": 6017440,
+						"totalSize": 6914048,
+						"embedderHeapUsedSize": 165384,
+						"backingStorageSize": 4342257
+					}
+				}
+			],
+			"page": {
+				"usedSize": 29467584,
+				"totalSize": 31408128,
+				"embedderHeapUsedSize": 2509224,
+				"backingStorageSize": 17012662
+			}
+		}
+	},
+	"quotaControl": {
+		"status": "inconclusive: override was reported but did not enforce a write limit",
+		"observation": {
+			"before": {
+				"usage": 539352,
+				"quota": 1010496687,
+				"overrideActive": false,
+				"usageBreakdown": [
+					{
+						"storageType": "file_systems",
+						"usage": 0
+					},
+					{
+						"storageType": "indexeddb",
+						"usage": 188416
+					},
+					{
+						"storageType": "cache_storage",
+						"usage": 6934
+					},
+					{
+						"storageType": "service_workers",
+						"usage": 344002
+					}
+				]
+			},
+			"override": {
+				"usage": 539352,
+				"quota": 604888,
+				"overrideActive": true,
+				"usageBreakdown": [
+					{
+						"storageType": "file_systems",
+						"usage": 0
+					},
+					{
+						"storageType": "indexeddb",
+						"usage": 188416
+					},
+					{
+						"storageType": "cache_storage",
+						"usage": 6934
+					},
+					{
+						"storageType": "service_workers",
+						"usage": 344002
+					}
+				]
+			},
+			"writes": [
+				{
+					"outcome": "local-success"
+				},
+				{
+					"outcome": "local-success"
+				},
+				{
+					"outcome": "local-success"
+				}
+			],
+			"after": {
+				"usage": 3922648,
+				"quota": 604888,
+				"overrideActive": true,
+				"usageBreakdown": [
+					{
+						"storageType": "file_systems",
+						"usage": 0
+					},
+					{
+						"storageType": "indexeddb",
+						"usage": 3571712
+					},
+					{
+						"storageType": "cache_storage",
+						"usage": 6934
+					},
+					{
+						"storageType": "service_workers",
+						"usage": 344002
+					}
+				]
+			}
+		},
+		"qualification": "No real QuotaExceededError or quota-recovery guarantee established."
+	},
+	"initialAcquisition": {
+		"acquisitionPendingBeforeUi": true,
+		"formInteractionMs": 294,
+		"acquisitionObservedUpperBoundMs": 11493,
+		"frames": {
+			"frames": 503,
+			"maxFrameGapMs": 3016.600000000002,
+			"longTaskMs": [3027]
+		},
+		"noFormWriteIssued": true
+	},
+	"singleBurstControl": {
+		"formInteractionMs": 149,
+		"pages": [
+			{
+				"offset": 0,
+				"rows": 5006
+			}
+		],
+		"acquisitionObservedUpperBoundMs": 11133,
+		"frames": {
+			"frames": 497,
+			"maxFrameGapMs": 2866.4999999999964,
+			"longTaskMs": [2887]
+		},
+		"cold": {
+			"identityRetained": true,
+			"rows": 5006,
+			"amountsValid": true
+		},
+		"wire": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		}
+	},
+	"bounded200": {
+		"formInteractionMs": 167,
+		"pages": [
+			{
+				"offset": 0,
+				"rows": 200
+			},
+			{
+				"offset": 200,
+				"rows": 200
+			},
+			{
+				"offset": 400,
+				"rows": 200
+			},
+			{
+				"offset": 600,
+				"rows": 200
+			},
+			{
+				"offset": 800,
+				"rows": 200
+			},
+			{
+				"offset": 1000,
+				"rows": 200
+			},
+			{
+				"offset": 1200,
+				"rows": 200
+			},
+			{
+				"offset": 1400,
+				"rows": 200
+			},
+			{
+				"offset": 1600,
+				"rows": 200
+			},
+			{
+				"offset": 1800,
+				"rows": 200
+			},
+			{
+				"offset": 2000,
+				"rows": 200
+			},
+			{
+				"offset": 2200,
+				"rows": 200
+			},
+			{
+				"offset": 2400,
+				"rows": 200
+			},
+			{
+				"offset": 2600,
+				"rows": 200
+			},
+			{
+				"offset": 2800,
+				"rows": 200
+			},
+			{
+				"offset": 3000,
+				"rows": 200
+			},
+			{
+				"offset": 3200,
+				"rows": 200
+			},
+			{
+				"offset": 3400,
+				"rows": 200
+			},
+			{
+				"offset": 3600,
+				"rows": 200
+			},
+			{
+				"offset": 3800,
+				"rows": 200
+			},
+			{
+				"offset": 4000,
+				"rows": 200
+			},
+			{
+				"offset": 4200,
+				"rows": 200
+			},
+			{
+				"offset": 4400,
+				"rows": 200
+			},
+			{
+				"offset": 4600,
+				"rows": 200
+			},
+			{
+				"offset": 4800,
+				"rows": 200
+			},
+			{
+				"offset": 5000,
+				"rows": 6
+			}
+		],
+		"acquisitionObservedUpperBoundMs": 111131,
+		"frames": {
+			"frames": 6534,
+			"maxFrameGapMs": 116.69999999999709,
+			"longTaskMs": [
+				127, 124, 124, 116, 115, 123, 119, 119, 117, 114, 125, 121, 118, 119, 120, 124, 123, 124,
+				118, 115, 123, 131, 125, 120, 116
+			]
+		},
+		"cold": {
+			"identityRetained": true,
+			"rows": 5006,
+			"amountsValid": true
+		},
+		"wire": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		}
+	},
+	"bounded50WithMetadata": {
+		"formInteractionMs": 261,
+		"pages": [
+			{
+				"offset": 0,
+				"rows": 50
+			},
+			{
+				"offset": 50,
+				"rows": 50
+			},
+			{
+				"offset": 100,
+				"rows": 50
+			},
+			{
+				"offset": 150,
+				"rows": 50
+			},
+			{
+				"offset": 200,
+				"rows": 50
+			},
+			{
+				"offset": 250,
+				"rows": 50
+			},
+			{
+				"offset": 300,
+				"rows": 50
+			},
+			{
+				"offset": 350,
+				"rows": 50
+			},
+			{
+				"offset": 400,
+				"rows": 50
+			},
+			{
+				"offset": 450,
+				"rows": 50
+			},
+			{
+				"offset": 500,
+				"rows": 6
+			}
+		],
+		"acquisitionObservedUpperBoundMs": 55858,
+		"frames": {
+			"frames": 3338,
+			"maxFrameGapMs": 83.29999999999927,
+			"longTaskMs": [50, 51]
+		},
+		"cold": {
+			"identityRetained": true,
+			"rows": 506,
+			"amountsValid": true
+		},
+		"wire": {
+			"opened": 1,
+			"clientBytes": 1149,
+			"heldHttp": 0
+		}
+	},
+	"pageBoundaryMutations": {
+		"initialPageSizes": [2, 2, 2, 0],
+		"unselectedFieldEditObserved": true,
+		"tailFullSignalsGrowth": true,
+		"extendedTailRows": 1,
+		"deleteRebalancesPages": true,
+		"revocationRebalancesPages": true,
+		"regrantRebalancesPages": true,
+		"finalCounts": {
+			"0": 2,
+			"2": 2,
+			"4": 2,
+			"6": 2,
+			"8": 0
+		}
+	},
+	"rejectedControls": [
+		{
+			"mode": "Global LocalFirst ID subscriptions",
+			"observation": "Grant removal arrived in the fact stream, but transactions remained 6 versus 5 in a fresh Remote query; inherited transfer visibility also remained stale."
+		},
+		{
+			"mode": "Immediate LocalFirst unsubscribe/resubscribe",
+			"observation": "Did not resolve the stale authorization view, including with paused transport."
+		},
+		{
+			"mode": "Full/scoped authorization facts alone with LocalFirst global finance",
+			"observation": "Did not qualify the global LocalFirst model."
+		},
+		{
+			"mode": "Organization-scoped LocalFirst transaction query added to global aliases",
+			"observation": "Transaction visibility updated; the global transfer alias still failed."
+		},
+		{
+			"mode": "Scoped LocalFirst data/traversal",
+			"observation": "Finance/link grant cases worked, but cached global organization metadata could linger after membership removal; not used as the final acquisition primitive."
+		}
+	],
+	"decision": "Do not enable an unbounded automatic startup sweep. Remote ID subscriptions qualify for replication/authorization, but a large initial payload causes a roughly 3-second main-thread stall. Public bounded pages preserve tested cold coverage and live boundary behavior, with much slower acquisition. Any production owner requires explicit scheduling, progress, growth/error/lifecycle states and implementation review.",
+	"limits": [
+		"Single-sample desktop timings are not device budgets.",
+		"Broker JS and backing-storage metrics are not total process or complete Wasm resident memory; do not sum them as physical usage.",
+		"Explicit namespace deletion is not an OS eviction simulation or whole-origin identity recovery guarantee.",
+		"Quota control was not enforced; real quota failure behavior remains unverified.",
+		"No production preparation owner, durable recovery journal, automatic first-identity offline bootstrap, or deferred cross-build cache retention was implemented.",
+		"Browser UI tests cover an existing form during acquisition, not every foreground workflow or production startup with preparation integrated."
+	]
+}

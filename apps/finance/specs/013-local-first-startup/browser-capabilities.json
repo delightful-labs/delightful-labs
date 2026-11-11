@@ -1,0 +1,93 @@
+{
+	"scope": "Disposable localhost API probes; versions are Playwright browser builds, not a physical-device support certification",
+	"browsers": [
+		{
+			"name": "chromium",
+			"version": "156.0.8078.4",
+			"capability": {
+				"sw": {
+					"addRoutes": true,
+					"navigationPreload": true,
+					"sharedWorkerInServiceWorker": false
+				},
+				"moduleClone": true,
+				"idbModule": "DataCloneError",
+				"sharedWorkerInPage": true,
+				"storageEstimate": {
+					"quota": 10737492213,
+					"usage": 73973,
+					"usageDetails": {
+						"indexedDB": 73728,
+						"serviceWorkerRegistrations": 245
+					}
+				},
+				"storagePersisted": false
+			}
+		},
+		{
+			"name": "webkit",
+			"version": "27.2",
+			"capability": {
+				"sw": {
+					"addRoutes": true,
+					"navigationPreload": true,
+					"sharedWorkerInServiceWorker": false
+				},
+				"moduleClone": true,
+				"idbModule": "DataCloneError",
+				"sharedWorkerInPage": true,
+				"storageEstimate": {
+					"quota": 1048576000,
+					"usage": 18
+				},
+				"storagePersisted": false
+			}
+		},
+		{
+			"name": "firefox",
+			"version": "157.0",
+			"capability": {
+				"sw": {
+					"addRoutes": false,
+					"navigationPreload": true,
+					"sharedWorkerInServiceWorker": false
+				},
+				"moduleClone": true,
+				"idbModule": "DataCloneError",
+				"sharedWorkerInPage": true,
+				"storageEstimate": {
+					"quota": 10737418240,
+					"usage": 173025
+				},
+				"storagePersisted": false
+			}
+		}
+	],
+	"staticRouting": [
+		{
+			"name": "chromium",
+			"result": {
+				"/static": {
+					"status": 200,
+					"text": "cached"
+				},
+				"/static?workspace=probe": {
+					"error": "TypeError"
+				}
+			}
+		},
+		{
+			"name": "webkit",
+			"result": {
+				"/static": {
+					"status": 200,
+					"text": "cached"
+				},
+				"/static?workspace=probe": {
+					"error": "TypeError"
+				}
+			}
+		}
+	],
+	"staticRoutingFirefoxNote": "No addRoutes support. The separate minimal fallback-control probe was inconclusive; production offline/update workflows passed."
+}

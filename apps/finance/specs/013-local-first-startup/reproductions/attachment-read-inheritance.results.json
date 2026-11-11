@@ -1,0 +1,15 @@
+[
+	{
+		"scenario": "existence",
+		"outcome": "published"
+	},
+	{
+		"scenario": "single-column-inheritance",
+		"outcome": "published"
+	},
+	{
+		"scenario": "two-column-inheritance",
+		"outcome": "rejected",
+		"error": "Permissions publish failed: 400 Bad Request - {\"error\":\"permissions schema is not supported by the server shell: $.files.policies.select.using: converted read policy is invalid: UnknownColumn { table: \\\"links\\\", column: \\\"organizationId\\\" }\",\"code\":\"bad_request\"}"
+	}
+]

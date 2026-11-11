@@ -1,0 +1,716 @@
+{
+	"date": "2026-10-30",
+	"task": "T028",
+	"sdk": "jazz-tools@2.0.0-alpha.59",
+	"productionRevision": "0830a31 (documentation commit; app source remains b39d9fa)",
+	"environment": {
+		"browser": "Chromium",
+		"build": "production-mode isolated Vite preview; own dependencies and generated files",
+		"origin": "http://127.0.0.1:4185",
+		"backend": "per-run disposable in-memory Jazz through real forward/silent proxy",
+		"dataset": "one cash account and one saved expense; second workspace added during diagnostic phase",
+		"timingLimits": "two independent disposable profiles/backend runs; automation-completion upper bounds; no CPU/network throttling, physical-device budget, or measured speedup"
+	},
+	"instrumentation": {
+		"timingPhase": "observer/devMode/debug output disabled; temporary diagnostic code still present in build, so future comparisons must use same harness",
+		"countPhase": "devMode enabled only in disposable profile; installed SDK read-only dev introspection and built-in subscription debug output; none of these internal diagnostic APIs is proposed for production behavior",
+		"counts": "active SDK subscription registrations and subscribe/delta/destroy events, not every Svelte consumer listener or the internal Wasm query DAG; delta payloads discarded",
+		"sdkSourceModified": false
+	},
+	"baselineRuns": [
+		{
+			"firstVisitAccountsUsableUpperBoundMs": 1695,
+			"warmSavedDetailUsableUpperBoundMs": 1853,
+			"coldSilentSavedDetailUsableUpperBoundMs": 1118,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"firstVisitAccountsUsableUpperBoundMs": 2952,
+			"warmSavedDetailUsableUpperBoundMs": 1987,
+			"coldSilentSavedDetailUsableUpperBoundMs": 1414,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		}
+	],
+	"stages": {
+		"accountsClosedDialogs": {
+			"atMs": 1190.5,
+			"activeSubscriptions": 11,
+			"byTable": {
+				"organizationMembers": 2,
+				"organizations": 2,
+				"accounts": 2,
+				"transactions": 1,
+				"simplefinConnections": 1,
+				"simplefinAccountLinks": 1,
+				"accountMemberships": 2
+			},
+			"acquiredSinceSession": 11,
+			"releasedSinceSession": 0,
+			"duplicateExactNativeSignatures": 0
+		},
+		"accountsOpenDialog": {
+			"atMs": 1290.4000000059605,
+			"activeSubscriptions": 11,
+			"byTable": {
+				"organizationMembers": 2,
+				"organizations": 2,
+				"accounts": 2,
+				"transactions": 1,
+				"simplefinConnections": 1,
+				"simplefinAccountLinks": 1,
+				"accountMemberships": 2
+			},
+			"acquiredSinceSession": 11,
+			"releasedSinceSession": 0,
+			"duplicateExactNativeSignatures": 0
+		},
+		"accountsClosedAgain": {
+			"atMs": 1349.7000000029802,
+			"activeSubscriptions": 11,
+			"byTable": {
+				"organizationMembers": 2,
+				"organizations": 2,
+				"accounts": 2,
+				"transactions": 1,
+				"simplefinConnections": 1,
+				"simplefinAccountLinks": 1,
+				"accountMemberships": 2
+			},
+			"acquiredSinceSession": 11,
+			"releasedSinceSession": 0,
+			"duplicateExactNativeSignatures": 0
+		},
+		"savedDetail": {
+			"atMs": 2375.6000000089407,
+			"activeSubscriptions": 21,
+			"byTable": {
+				"organizationMembers": 2,
+				"organizations": 2,
+				"accounts": 3,
+				"transactions": 3,
+				"simplefinConnections": 1,
+				"simplefinAccountLinks": 1,
+				"accountMemberships": 2,
+				"tags": 2,
+				"categories": 2,
+				"transactionTags": 1,
+				"internalTransfers": 1,
+				"profiles": 1
+			},
+			"acquiredSinceSession": 21,
+			"releasedSinceSession": 0,
+			"duplicateExactNativeSignatures": 0
+		},
+		"secondWorkspaceInitial": {
+			"atMs": 3591.7000000029802,
+			"activeSubscriptions": 29,
+			"byTable": {
+				"organizationMembers": 3,
+				"organizations": 3,
+				"accounts": 5,
+				"transactions": 4,
+				"simplefinConnections": 2,
+				"simplefinAccountLinks": 2,
+				"accountMemberships": 2,
+				"tags": 2,
+				"categories": 2,
+				"transactionTags": 1,
+				"internalTransfers": 1,
+				"profiles": 2
+			},
+			"acquiredSinceSession": 29,
+			"releasedSinceSession": 0,
+			"duplicateExactNativeSignatures": 0
+		},
+		"secondWorkspaceAfterCleanup": {
+			"atMs": 33883.79999999702,
+			"activeSubscriptions": 11,
+			"byTable": {
+				"organizations": 2,
+				"organizationMembers": 2,
+				"accounts": 2,
+				"transactions": 1,
+				"simplefinConnections": 1,
+				"simplefinAccountLinks": 1,
+				"accountMemberships": 2
+			},
+			"acquiredSinceSession": 32,
+			"releasedSinceSession": 21,
+			"duplicateExactNativeSignatures": 0
+		}
+	},
+	"typingAdditionalAcquisitions": 0,
+	"remoteMemoEditObservedDeltaEvents": 3,
+	"sdkEventTotals": {
+		"subscribe": 32,
+		"delta": 49,
+		"destroy": 21
+	},
+	"scopeCleanupObservationMs": 30292.09999999404,
+	"accountsClosedDialogQueryShapes": [
+		{
+			"table": "organizationMembers",
+			"tier": "local",
+			"query": "{\"table\":\"organizationMembers\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}},{\"Cmp\":{\"left\":{\"column\":\"userId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-2>\"}}}}],\"array_subqueries\":[],\"limit\":1}"
+		},
+		{
+			"table": "organizations",
+			"tier": "local",
+			"query": "{\"table\":\"organizations\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"id\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}}],\"array_subqueries\":[],\"limit\":1}"
+		},
+		{
+			"table": "accounts",
+			"tier": "local",
+			"query": "{\"table\":\"accounts\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}},{\"IsNull\":{\"column\":{\"column\":\"archivedAt\"}}}],\"array_subqueries\":[]}"
+		},
+		{
+			"table": "organizations",
+			"tier": "local",
+			"query": "{\"table\":\"organizations\",\"conditions\":[],\"array_subqueries\":[],\"order_by\":[{\"column\":\"name\",\"direction\":\"Asc\"}]}"
+		},
+		{
+			"table": "accounts",
+			"tier": "local",
+			"query": "{\"table\":\"accounts\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}},{\"IsNull\":{\"column\":{\"column\":\"archivedAt\"}}}],\"array_subqueries\":[],\"order_by\":[{\"column\":\"name\",\"direction\":\"Asc\"}]}"
+		},
+		{
+			"table": "transactions",
+			"tier": "local",
+			"query": "{\"table\":\"transactions\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}}],\"array_subqueries\":[]}"
+		},
+		{
+			"table": "simplefinConnections",
+			"tier": "local",
+			"query": "{\"table\":\"simplefinConnections\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}},{\"Cmp\":{\"left\":{\"column\":\"ownerId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-2>\"}}}}],\"array_subqueries\":[]}"
+		},
+		{
+			"table": "simplefinAccountLinks",
+			"tier": "local",
+			"query": "{\"table\":\"simplefinAccountLinks\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}}],\"array_subqueries\":[]}"
+		},
+		{
+			"table": "accountMemberships",
+			"tier": "local",
+			"query": "{\"table\":\"accountMemberships\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}},{\"Cmp\":{\"left\":{\"column\":\"userId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-2>\"}}}}],\"array_subqueries\":[]}"
+		},
+		{
+			"table": "organizationMembers",
+			"tier": "local",
+			"query": "{\"table\":\"organizationMembers\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}}],\"array_subqueries\":[]}"
+		},
+		{
+			"table": "accountMemberships",
+			"tier": "local",
+			"query": "{\"table\":\"accountMemberships\",\"conditions\":[{\"Cmp\":{\"left\":{\"column\":\"organizationId\"},\"op\":\"Eq\",\"right\":{\"Literal\":{\"type\":\"Uuid\",\"value\":\"<fixture-id-1>\"}}}}],\"array_subqueries\":[]}"
+		}
+	],
+	"perKeyEventCounts": [
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"organizationMembers\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"userId\",\"op\":\"eq\",\"value\":\"<fixture-id-2>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[],\"limit\":1}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"organizations\",\"conditions\":[{\"column\":\"id\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[],\"limit\":1}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accounts\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"archivedAt\",\"op\":\"isNull\",\"value\":true}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"organizations\",\"conditions\":[],\"includes\":{},\"orderBy\":[[\"name\",\"asc\"]],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 3
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accounts\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"archivedAt\",\"op\":\"isNull\",\"value\":true}],\"includes\":{},\"orderBy\":[[\"name\",\"asc\"]],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"transactions\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 3,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"simplefinConnections\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"ownerId\",\"op\":\"eq\",\"value\":\"<fixture-id-2>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"simplefinAccountLinks\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accountMemberships\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"userId\",\"op\":\"eq\",\"value\":\"<fixture-id-2>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"organizationMembers\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accountMemberships\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"transactions\",\"conditions\":[{\"column\":\"id\",\"op\":\"eq\",\"value\":\"<fixture-id-4>\"},{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{\"account\":true,\"category\":true,\"tags\":{\"tag\":true},\"check\":true,\"attachments\":{\"file\":{\"parts\":true}}},\"select\":[\"*\",\"$createdBy\",\"$createdAt\",\"$updatedBy\",\"$updatedAt\"],\"orderBy\":[],\"hops\":[],\"limit\":1}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"tags\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"archivedAt\",\"op\":\"isNull\",\"value\":true}],\"includes\":{},\"orderBy\":[[\"name\",\"asc\"]],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"transactions\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"kind\",\"op\":\"eq\",\"value\":\"expense\"}],\"includes\":{},\"orderBy\":[[\"bookedOn\",\"desc\"]],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 2,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accounts\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"categories\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"tags\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"transactionTags\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"internalTransfers\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"categories\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-1>\"},{\"column\":\"kind\",\"op\":\"eq\",\"value\":\"expense\"},{\"column\":\"archivedAt\",\"op\":\"isNull\",\"value\":true}],\"includes\":{},\"orderBy\":[[\"name\",\"asc\"]],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"profiles\",\"conditions\":[{\"column\":\"userId\",\"op\":\"eq\",\"value\":\"<fixture-id-2>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[],\"limit\":1}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"profiles\",\"conditions\":[{\"column\":\"userId\",\"op\":\"eq\",\"value\":\"<fixture-id-5>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[],\"limit\":1}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1,
+				"destroy": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"organizationMembers\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"},{\"column\":\"userId\",\"op\":\"eq\",\"value\":\"<fixture-id-2>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[],\"limit\":1}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 4
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"organizations\",\"conditions\":[{\"column\":\"id\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[],\"limit\":1}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accounts\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"},{\"column\":\"archivedAt\",\"op\":\"isNull\",\"value\":true}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accounts\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"},{\"column\":\"archivedAt\",\"op\":\"isNull\",\"value\":true}],\"includes\":{},\"orderBy\":[[\"name\",\"asc\"]],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"transactions\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"simplefinConnections\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"},{\"column\":\"ownerId\",\"op\":\"eq\",\"value\":\"<fixture-id-2>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"simplefinAccountLinks\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accountMemberships\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"},{\"column\":\"userId\",\"op\":\"eq\",\"value\":\"<fixture-id-2>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"organizationMembers\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 3
+			}
+		},
+		{
+			"key": "<fixture-id-3>:{}:{\"table\":\"accountMemberships\",\"conditions\":[{\"column\":\"organizationId\",\"op\":\"eq\",\"value\":\"<fixture-id-6>\"}],\"includes\":{},\"orderBy\":[],\"hops\":[]}",
+			"counts": {
+				"subscribe": 1,
+				"delta": 1
+			}
+		}
+	],
+	"findings": [
+		"Jazz already shares identical QuerySubscription/One cache keys within one client. All sampled exact native signatures are unique.",
+		"AccountCreation active-account query lacks orderBy(name); WorkspaceBootstrap/accounts route/transaction entry use the same active-account predicate with orderBy(name). This produces an extra SDK subscription while the dialog is closed.",
+		"Opening/closing Add Account changes neither active native count nor cumulative acquisition count (11 throughout). Dialog-only wrappers are eager, not independently leaked.",
+		"Unsubmitted description typing produces no new native query acquisition in the saved-detail sample.",
+		"A remote memo change produces three observed SDK deltas; an additional editor-profile query is legitimate after a different author edits the row.",
+		"Workspace replacement releases old consumer bindings; SDK retains unused entries about 30 seconds. After observed cleanup, active entries return to 11 and no old-workspace-scoped query remains.",
+		"Historical list and edit-option queries differ in archive predicates, includes, ordering, or projection; their result requirements cannot be merged solely because the fixture is small."
+	],
+	"firstImplementationReview": {
+		"task": "T030",
+		"file": "src/lib/components/AccountCreation.svelte",
+		"change": "Add orderBy(name) to its existing active-account query so the current SDK shares the existing shell query. Keep component-owned consumers and SDK ownership; no helper, registry, statechart or authorization rewrite.",
+		"expectedStructuralEffect": "Verified: one fewer active-account key; Accounts 11 -> 10 and saved-detail navigation snapshot 21 -> 20. No latency improvement established.",
+		"semanticReason": "account creation uses accounts for order-independent duplicate-name checks; default currency comes from workspace",
+		"testImpact": [
+			"src/lib/machines/account-creation-access.test.ts",
+			"src/lib/machines/account-creation.test.ts",
+			"tests/workspace.e2e.ts account creation/reset/selected-workspace/live-account cases",
+			"tests/account-order.e2e.ts account creation while ordering",
+			"tests/startup-stalled-remote.e2e.ts local creation under silent transport"
+		],
+		"validationGate": "Implementation approved and focused validation passed; results are in queryAlignmentVerification. Later cleanup slices retain their own review gate."
+	},
+	"deferredUntilEvidence": [
+		"T029 rebinding changes: no unnecessary native reacquisition observed in typing sample",
+		"Creation-dialog gating remains unadopted because its data contributes to trigger readiness; T031 Manage Account query deferral is verified below",
+		"T032 lifecycle rewrite: no leaked old-workspace subscription found after SDK cleanup window"
+	],
+	"validation": {
+		"focusedTypeScript": "passed",
+		"productionDiagnostic": "passed twice; second run includes per-query delta counts and settled scope assertion",
+		"knownLimits": [
+			"small synthetic fixture, one desktop engine",
+			"not every route or identity-replacement path dynamically covered",
+			"no public SDK cache-delay override was adopted",
+			"temporary SDK diagnostics add count-phase overhead",
+			"broader T015 CPU/device/large-history attribution remains open"
+		],
+		"baselineProductionAppChanges": false
+	},
+	"queryAlignmentVerification": {
+		"productionChange": "AccountCreation.svelte adds orderBy(name) to the existing active-account query; filters, read tier, component ownership and lifecycle stay the same.",
+		"revision": "0830a31 plus uncommitted query alignment and cold-account regression coverage",
+		"activeSdkSubscriptions": {
+			"accountsClosedDialogs": {
+				"before": 11,
+				"after": 10
+			},
+			"accountsOpenDialog": {
+				"before": 11,
+				"after": 10
+			},
+			"accountsClosedAgain": {
+				"before": 11,
+				"after": 10
+			},
+			"savedDetail": {
+				"before": 21,
+				"after": 20
+			},
+			"secondWorkspaceAfterCleanup": {
+				"before": 11,
+				"after": 10
+			}
+		},
+		"sdkEventTotals": {
+			"subscribe": 30,
+			"delta": 49,
+			"destroy": 20
+		},
+		"typingAdditionalAcquisitions": 0,
+		"remoteMemoEditObservedDeltaEvents": 3,
+		"scopeCleanupObservationMs": 30438.70000000298,
+		"afterTimingSample": {
+			"firstVisitAccountsUsableUpperBoundMs": 1716,
+			"warmSavedDetailUsableUpperBoundMs": 1818,
+			"coldSilentSavedDetailUsableUpperBoundMs": 1342,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		"performanceConclusion": "Fewer distinct SDK query subscriptions confirmed. One post-change timing sample against two pre-change samples does not establish a startup speedup; no device budget or page-CPU improvement claimed.",
+		"checks": {
+			"unitTests": 28,
+			"unitSuites": ["account-creation-access.test.ts", "account-creation.test.ts"],
+			"browserWorkflows": 9,
+			"productionWorkflows": 4,
+			"agentAccountWorkflows": 5,
+			"applicationCheck": "0 errors, 0 warnings",
+			"focusedTestTypeScript": "passed",
+			"formatAndWhitespace": "passed"
+		},
+		"browserCoverage": [
+			"cold browser/SharedWorker exit and unanswered real wire: saved detail/edit/reload plus account creation and persisted account reload",
+			"negotiated connection stall and later acceptance",
+			"real server rejection after locally successful stale-authority save",
+			"production subscription-count/update/workspace-cleanup audit",
+			"account creation while ordering/storage fallback",
+			"empty account list/new account/reload",
+			"whitespace rejection and corrected cash/bank/card submissions",
+			"draft reset and selected workspace isolation",
+			"live sorted accounts, archive exclusion and workspace selection"
+		],
+		"testChanges": [
+			"Existing cold-start test now creates an account with the real Jazz wire held silent and verifies it after reload.",
+			"A temporary change to whitespace error expectations was reverted after inspecting FormFeedback: the implementation intentionally renders its full invalidMessages list. The original test passes; no workspace test diff remains."
+		],
+		"fixtureAdaptation": "Isolated production Node tests load a compiled copy of the unchanged app schema/permissions to avoid the known Playwright alias-loader issue; no SDK patch/backend credential is added to the browser.",
+		"statechartGate": "No production actors or async workflows changed. Query alignment is declarative; existing order-independent account duplicate-name validation is unchanged.",
+		"remaining": "T029/T031/T032 need their own evidence-backed scope/review; this verification does not authorize a broad lifecycle/dialog refactor."
+	},
+	"dialogDemandVerification": {
+		"task": "T031",
+		"revision": "816a7ac plus uncommitted Manage Account query deferral and regression coverage",
+		"productionChange": "Only the two Accounts-page workspace-wide member/grant query getters depend on native dialog visibility; permission-only QueryContent loading/error feedback; existing writer actor and local-first tiers unchanged.",
+		"initialSubscriptions": {
+			"before": 10,
+			"after": 8
+		},
+		"stages": {
+			"accountsClosedDialogs": {
+				"atMs": 1153.2000000029802,
+				"activeSdkSubscriptions": 8,
+				"broadAdminSubscriptions": 0,
+				"totalAcquisitions": 8,
+				"totalReleases": 0,
+				"duplicateExactNativeSignatures": 0
+			},
+			"accountsOpenDialog": {
+				"atMs": 1225.8999999910593,
+				"activeSdkSubscriptions": 8,
+				"broadAdminSubscriptions": 0,
+				"totalAcquisitions": 8,
+				"totalReleases": 0,
+				"duplicateExactNativeSignatures": 0
+			},
+			"accountsClosedAgain": {
+				"atMs": 1267.7999999970198,
+				"activeSdkSubscriptions": 8,
+				"broadAdminSubscriptions": 0,
+				"totalAcquisitions": 8,
+				"totalReleases": 0,
+				"duplicateExactNativeSignatures": 0
+			},
+			"savedDetail": {
+				"atMs": 1741.5999999940395,
+				"activeSdkSubscriptions": 18,
+				"broadAdminSubscriptions": 0,
+				"totalAcquisitions": 18,
+				"totalReleases": 0,
+				"duplicateExactNativeSignatures": 0
+			},
+			"secondWorkspaceAfterCleanup": {
+				"atMs": 33177.20000000298,
+				"activeSdkSubscriptions": 8,
+				"broadAdminSubscriptions": 0,
+				"totalAcquisitions": 26,
+				"totalReleases": 18,
+				"duplicateExactNativeSignatures": 0
+			},
+			"manageOpened": {
+				"atMs": 33397.79999999702,
+				"activeSdkSubscriptions": 10,
+				"broadAdminSubscriptions": 2,
+				"totalAcquisitions": 28,
+				"totalReleases": 18,
+				"duplicateExactNativeSignatures": 0
+			},
+			"manageClosedCached": {
+				"atMs": 33406.09999999404,
+				"activeSdkSubscriptions": 10,
+				"broadAdminSubscriptions": 2,
+				"totalAcquisitions": 28,
+				"totalReleases": 18,
+				"duplicateExactNativeSignatures": 0
+			},
+			"manageReopened": {
+				"atMs": 33453.70000000298,
+				"activeSdkSubscriptions": 10,
+				"broadAdminSubscriptions": 2,
+				"totalAcquisitions": 28,
+				"totalReleases": 18,
+				"duplicateExactNativeSignatures": 0
+			},
+			"manageAfterCleanup": {
+				"atMs": 63870.29999999702,
+				"activeSdkSubscriptions": 8,
+				"broadAdminSubscriptions": 0,
+				"totalAcquisitions": 28,
+				"totalReleases": 20,
+				"duplicateExactNativeSignatures": 0
+			}
+		},
+		"sdkEventTotals": {
+			"subscribe": 28,
+			"delta": 44,
+			"destroy": 20
+		},
+		"typingAdditionalAcquisitions": 0,
+		"remoteMemoEditObservedDeltaEvents": 3,
+		"closeCleanupObservationMs": 30416.59999999404,
+		"timingSample": {
+			"firstVisitAccountsUsableUpperBoundMs": 2322,
+			"warmSavedDetailUsableUpperBoundMs": 1842,
+			"coldSilentSavedDetailUsableUpperBoundMs": 1107,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		"performanceConclusion": "Two fewer distinct initial SDK subscriptions confirmed; callbacks are released on close, while Jazz retains unused native entries for its normal approximately 30-second window. One post-change desktop timing sample does not establish a startup speedup or device budget.",
+		"checks": {
+			"unitTests": 22,
+			"unitSuites": [
+				"account-actions-dialog.test.ts",
+				"loading-content.test.ts",
+				"account-archive.test.ts"
+			],
+			"browserWorkflows": 14,
+			"productionWorkflows": 6,
+			"agentRegressions": 8,
+			"applicationCheck": "0 errors, 0 warnings, including service-worker TypeScript",
+			"focusedTestTypeScript": "passed",
+			"formatAndWhitespace": "passed",
+			"expandedPermissionWorkflowRerun": "passed: second workspace has only its own member/grant controls; observed owner -> viewer removes controls; restoring owner restores them"
+		},
+		"coverage": [
+			"permission data ready/loading/error/restricted-role rendering; Archive independent of permission loading/errors",
+			"initial broad queries absent; native Manage open acquires exactly two; escape close, reopen reuse, native close and delayed cleanup",
+			"server grant change updates visible checkbox",
+			"grant checkbox click and native close in same JavaScript task; asynchronous local write reaches authority; reopening shows persisted grant",
+			"unanswered real wire does not prevent archive/local persistence/reload; later authority acceptance",
+			"cold browser/SharedWorker exit with real unanswered wire; saved transaction read/edit/save/reload and account creation/reload",
+			"established connection stall and later acceptance; real rejection after stale local write",
+			"offline archive preserves another account and survives reload",
+			"draft reset and workspace isolation; live sorted/archived account changes",
+			"archive roles: admin, all-account member, selected write member, selected read member, viewer with write grant",
+			"workspace replacement after closing the first dialog excludes prior-workspace controls; observed role downgrade/restore while the next dialog is open updates controls live"
+		],
+		"limits": [
+			"Chromium browser workflows and one desktop development environment; no physical-device budget or cross-engine certification added",
+			"SDK dev introspection/debug output is read-only isolated instrumentation, not a production API dependency",
+			"Node production fixtures load compiled unchanged app schema/permissions for the known alias-loader boundary; no SDK patches or backend browser credentials",
+			"Default local-first metadata semantics preserved: incomplete/empty local results do not prove a globally complete permission inventory; data never opened online is not guaranteed available offline",
+			"The page still acquires these queries for any Manage dialog; no new role-based acquisition or permission policy was introduced",
+			"Other closed creation-dialog metadata participates in trigger readiness and remains live"
+		],
+		"statechartGate": "No production async workflow or actor changed. Disclosure remains simple presentation state; SDK owns subscription cleanup. Existing account-delete-grants assesses complete writer input before operating, and owner shutdown drains operating.closing. Dialog close sends no shutdown.",
+		"status": "T031 focused slice verified; uncommitted. T033 validated for this slice; other evidence-backed tasks and broader measurement limits remain separate."
+	}
+}

@@ -1,0 +1,8 @@
+packages:
+  - tooling/worker-state-tests
+
+onlyBuiltDependencies:
+  - esbuild
+
+patchedDependencies:
+  jazz-tools@2.0.0-alpha.60: patches/jazz-tools@2.0.0-alpha.60.patch

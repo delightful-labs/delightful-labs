@@ -1,0 +1,24 @@
+{
+	"responses": 222,
+	"responseBodyBytes": 42783124,
+	"wasmEntries": [
+		{
+			"path": "/_app/immutable/assets/jazz_wasm_bg.ayzBUhbu.wasm",
+			"bytes": 19342148
+		},
+		{
+			"path": "/_app/immutable/workers/assets/jazz_wasm_bg-ayzBUhbu.wasm",
+			"bytes": 19342148
+		}
+	],
+	"originStorageEstimate": {
+		"quota": 10811859343,
+		"usage": 74441103,
+		"usageDetails": {
+			"caches": 71495424,
+			"indexedDB": 2934709,
+			"serviceWorkerRegistrations": 10970
+		}
+	},
+	"persisted": false
+}

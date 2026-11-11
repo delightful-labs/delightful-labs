@@ -1,0 +1,131 @@
+diff --git a/src/lib/backend/jazz/session.ts b/src/lib/backend/jazz/session.ts
+index 14ecd28..3d73747 100644
+--- a/src/lib/backend/jazz/session.ts
++++ b/src/lib/backend/jazz/session.ts
+@@ -1,2 +1,2 @@
+-import { createJazzSession } from 'jazz-tools'
+-import type { JazzSessionConfig } from 'jazz-tools/svelte'
++import { createJazzClient } from 'jazz-tools/client'
++import type { JazzClientConfig } from 'jazz-tools/client'
+@@ -6 +6 @@ import type { SessionOpenCapability } from '../../contracts/session.js'
+-export function createJazzSessionAcquisition(config: JazzSessionConfig): Readonly<{
++export function createJazzSessionAcquisition(config: JazzClientConfig): Readonly<{
+@@ -8 +8 @@ export function createJazzSessionAcquisition(config: JazzSessionConfig): Readonl
+-	capability: SessionOpenCapability<Awaited<ReturnType<typeof createJazzSession>>>
++	capability: SessionOpenCapability<Awaited<ReturnType<typeof createJazzClient>>>
+@@ -13 +13 @@ export function createJazzSessionAcquisition(config: JazzSessionConfig): Readonl
+-		capability: { open: () => createJazzSession(captured) }
++		capability: { open: () => createJazzClient(captured) }
+diff --git a/src/lib/backend/jazz/startup.ts b/src/lib/backend/jazz/startup.ts
+index cd874f6..3821a0b 100644
+--- a/src/lib/backend/jazz/startup.ts
++++ b/src/lib/backend/jazz/startup.ts
+@@ -3 +3 @@ import type { ActorRefFrom } from 'xstate'
+-import type { JazzClient, JazzSession, JazzSessionConfig } from 'jazz-tools/svelte'
++import type { JazzClient, JazzSession, JazzClientConfig } from 'jazz-tools/client'
+@@ -18 +18 @@ export function createJazzStartupRegistry(
+-	let shared: { owner: Owner; binding: object; config: JazzSessionConfig } | undefined
++	let shared: { owner: Owner; binding: object; config: JazzClientConfig } | undefined
+@@ -20 +20 @@ export function createJazzStartupRegistry(
+-	function sameConfiguration(left: JazzSessionConfig, right: JazzSessionConfig): boolean {
++	function sameConfiguration(left: JazzClientConfig, right: JazzClientConfig): boolean {
+@@ -34 +34 @@ export function createJazzStartupRegistry(
+-	function getJazzStartupBinding(config: JazzSessionConfig): JazzStartupBinding {
++	function getJazzStartupBinding(config: JazzClientConfig): JazzStartupBinding {
+@@ -51 +51,5 @@ export function createJazzStartupRegistry(
+-	return { getCurrentJazzSession, getJazzStartupBinding }
++	function getCurrentSessionAvailability() {
++		const snapshot = shared?.owner.getSnapshot()
++		return snapshot?.matches('waitingForAvailability') ? snapshot.context.availability : undefined
++	}
++	return { getCurrentJazzSession, getJazzStartupBinding, getCurrentSessionAvailability }
+diff --git a/src/lib/contracts/session.ts b/src/lib/contracts/session.ts
+index d9a6838..86ce088 100644
+--- a/src/lib/contracts/session.ts
++++ b/src/lib/contracts/session.ts
+@@ -12,0 +13,4 @@ export type SessionOpenCapability<Session extends object> = Readonly<{
++	availability?: Readonly<{
++		classify: (error: unknown) => { resourceKey: string } | undefined
++		wait: (resourceKey: string, signal: AbortSignal) => Promise<void>
++	}>
+diff --git a/src/lib/machines/identity/session-acquisition.ts b/src/lib/machines/identity/session-acquisition.ts
+index 684a885..1f7764d 100644
+--- a/src/lib/machines/identity/session-acquisition.ts
++++ b/src/lib/machines/identity/session-acquisition.ts
+@@ -45,0 +46 @@ type Context<Session extends object> = {
++	availability: { resourceKey: string } | undefined
+@@ -62,0 +64,6 @@ export function createSessionAcquisitionMachine<Session extends object>() {
++		}),
++		waitForAvailability: createAsyncLogic<
++			void,
++			{ resourceKey: string; wait: (resourceKey: string, signal: AbortSignal) => Promise<void> }
++		>({
++			run: ({ input, signal }) => input.wait(input.resourceKey, signal)
+@@ -188,0 +196 @@ export function createSessionAcquisitionMachine<Session extends object>() {
++			availability: undefined,
+@@ -280,0 +289,4 @@ export function createSessionAcquisitionMachine<Session extends object>() {
++						const availability = args.context.capability.availability?.classify(args.event.error)
++						if (availability && args.context.requests.length > 0)
++							return { target: 'waitingForAvailability', context: { availability } }
++						if (availability) return { target: 'idle' }
+@@ -293,0 +306,60 @@ export function createSessionAcquisitionMachine<Session extends object>() {
++						if (args.guards.allowedRequest(args)) {
++							return {
++								context: patches.remember(args) satisfies Partial<Context<Session>>
++							}
++						}
++						enq.sendTo(event.replyTo, {
++							type: 'ACQUISITION_FAILED',
++							scope: event.scope,
++							reason: 'invalidRequest'
++						})
++						return {}
++					},
++					RETRY_ACQUIRE: (args, enq) => {
++						const { event } = args
++						if (args.guards.allowedRequest(args)) {
++							return {
++								context: patches.remember(args) satisfies Partial<Context<Session>>
++							}
++						}
++						enq.sendTo(event.replyTo, {
++							type: 'ACQUISITION_FAILED',
++							scope: event.scope,
++							reason: 'invalidRequest'
++						})
++						return {}
++					}
++				}
++			},
++			waitingForAvailability: {
++				invoke: {
++					src: actors.waitForAvailability,
++					input: ({ context }) => {
++						const availability = context.availability
++						const wait = context.capability.availability?.wait
++						if (!availability || !wait) throw new Error('Missing session availability boundary')
++						return { resourceKey: availability.resourceKey, wait }
++					},
++					onDone: () => ({ target: 'opening', context: { availability: undefined } }),
++					onError: ({ context }, enq) => {
++						for (const request of context.requests)
++							enq.sendTo(request.replyTo, {
++								type: 'ACQUISITION_FAILED',
++								scope: request.scope,
++								reason: 'openFailed'
++							})
++						return { target: 'failed', context: { availability: undefined } }
++					}
++				},
++				on: {
++					RELEASE: (args, enq) => {
++						const { event } = args
++						enq.sendTo(event.replyTo, { type: 'RELEASED', scope: event.scope })
++						if (!args.guards.allowedRelease(args)) return {}
++						const patch = patches.release(args)
++						if (patch.requests?.length === 0)
++							return { target: 'idle', context: { ...patch, availability: undefined } }
++						return { context: patch }
++					},
++					ACQUIRE: (args, enq) => {
++						const { event } = args

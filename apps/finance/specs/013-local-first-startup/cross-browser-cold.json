@@ -1,0 +1,28 @@
+[
+	{
+		"browserName": "firefox",
+		"cachedWasm": [
+			"/_app/immutable/assets/jazz_wasm_bg.ayzBUhbu.wasm",
+			"/_app/immutable/workers/assets/jazz_wasm_bg-ayzBUhbu.wasm"
+		],
+		"browserExited": true,
+		"offlineRestart": true,
+		"httpCacheDisabled": true,
+		"status": 200,
+		"fromServiceWorker": true,
+		"errors": []
+	},
+	{
+		"browserName": "webkit",
+		"cachedWasm": [
+			"/_app/immutable/assets/jazz_wasm_bg.ayzBUhbu.wasm",
+			"/_app/immutable/workers/assets/jazz_wasm_bg-ayzBUhbu.wasm"
+		],
+		"browserExited": true,
+		"offlineRestart": true,
+		"httpCacheDisabled": false,
+		"status": 200,
+		"fromServiceWorker": true,
+		"errors": []
+	}
+]

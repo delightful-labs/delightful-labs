@@ -1,0 +1,1705 @@
+{
+	"archiveId": "b826987f-b502-4dbc-bda0-77c106ac07dc",
+	"profile": {
+		"id": "delightful.finance.workspace",
+		"version": 2
+	},
+	"source": {
+		"applicationId": "delightful-finances",
+		"workspaceId": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+	},
+	"capturedAt": "2026-11-07T23:19:50.054Z",
+	"coverage": {
+		"mode": "complete-supported-graph",
+		"recordTypes": [
+			"accountMemberships",
+			"accounts",
+			"batchTemplates",
+			"categories",
+			"checks",
+			"files",
+			"internalTransfers",
+			"organizationMembers",
+			"organizations",
+			"profiles",
+			"simplefinAccountLinks",
+			"simplefinConnections",
+			"simplefinSyncAccountResults",
+			"simplefinSyncAttempts",
+			"sourceDocuments",
+			"tags",
+			"transactionAttachments",
+			"transactionBatches",
+			"transactionTags",
+			"transactions"
+		],
+		"history": "current-data",
+		"deletedRecords": "excluded",
+		"consistency": "jazz-exclusive-transaction"
+	},
+	"records": [
+		{
+			"type": "accounts",
+			"id": "5f1127b6-3c7f-4d82-932f-6359c72b6711",
+			"fields": {
+				"archivedAt": {
+					"kind": "null"
+				},
+				"currency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "cash"
+				},
+				"name": {
+					"kind": "text",
+					"value": "Bank"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.964Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.964Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "accounts",
+			"id": "7c9bd9bf-c4e7-472f-ba8e-d88c8644c387",
+			"fields": {
+				"archivedAt": {
+					"kind": "timestamp",
+					"value": "1970-01-01T00:00:00.000Z"
+				},
+				"currency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "cash"
+				},
+				"name": {
+					"kind": "text",
+					"value": "Archived"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.964Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.964Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "accounts",
+			"id": "be104dfa-3cf7-42db-9fc0-473ea8925014",
+			"fields": {
+				"archivedAt": {
+					"kind": "null"
+				},
+				"currency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "cash"
+				},
+				"name": {
+					"kind": "text",
+					"value": "Cash"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.963Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.963Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "batchTemplates",
+			"id": "01a1b84f-9dfe-7170-9632-258f9ca67c4b",
+			"fields": {
+				"name": {
+					"kind": "text",
+					"value": "Template"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.966Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.966Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "categories",
+			"id": "a6faf1b0-2b2d-497f-b880-11fc1c282cc0",
+			"fields": {
+				"archivedAt": {
+					"kind": "null"
+				},
+				"isSystem": {
+					"kind": "boolean",
+					"value": false
+				},
+				"kind": {
+					"kind": "text",
+					"value": "income"
+				},
+				"name": {
+					"kind": "text",
+					"value": "Income"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "categories",
+			"id": "fecab367-9114-4e13-91bf-5cc9ae5ec996",
+			"fields": {
+				"archivedAt": {
+					"kind": "null"
+				},
+				"isSystem": {
+					"kind": "boolean",
+					"value": true
+				},
+				"kind": {
+					"kind": "text",
+					"value": "expense"
+				},
+				"name": {
+					"kind": "text",
+					"value": "Expense"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "checks",
+			"id": "011d7dde-f205-4d72-bfa8-92e8ef851fe7",
+			"fields": {
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "be104dfa-3cf7-42db-9fc0-473ea8925014"
+				},
+				"bankName": {
+					"kind": "null"
+				},
+				"checkDate": {
+					"kind": "date",
+					"value": "2026-11-02"
+				},
+				"checkNumber": {
+					"kind": "text",
+					"value": "002"
+				},
+				"memoOnCheck": {
+					"kind": "null"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"payerName": {
+					"kind": "null"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.966Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.966Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "checks",
+			"id": "6b4a2f46-0dee-47d8-b0a1-aa98d9d63ae7",
+			"fields": {
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "be104dfa-3cf7-42db-9fc0-473ea8925014"
+				},
+				"bankName": {
+					"kind": "null"
+				},
+				"checkDate": {
+					"kind": "date",
+					"value": "2026-11-01"
+				},
+				"checkNumber": {
+					"kind": "text",
+					"value": "001"
+				},
+				"memoOnCheck": {
+					"kind": "null"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"payerName": {
+					"kind": "text",
+					"value": "Exact payer"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.966Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.966Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "files",
+			"id": "4869f153-771f-4c8d-8cc9-24a454967762",
+			"fields": {
+				"accountId": {
+					"kind": "null"
+				},
+				"fileName": {
+					"kind": "text",
+					"value": "receipt.bin"
+				},
+				"mimeType": {
+					"kind": "text",
+					"value": "application/octet-stream"
+				},
+				"organizationId": {
+					"kind": "null"
+				},
+				"originalBytes": {
+					"kind": "attachment",
+					"id": "4869f153-771f-4c8d-8cc9-24a454967762"
+				},
+				"sizeBytes": {
+					"kind": "integer",
+					"value": "8"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.969Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.969Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"transactionId": {
+					"kind": "reference",
+					"type": "transactions",
+					"id": "dbd7c15b-3c0b-41e0-a3bb-c26e56d89b70"
+				}
+			}
+		},
+		{
+			"type": "internalTransfers",
+			"id": "f493e8a7-67ae-45e2-ba27-141b20eeee9b",
+			"fields": {
+				"amountMinor": {
+					"kind": "integer",
+					"value": "0"
+				},
+				"currency": {
+					"kind": "null"
+				},
+				"expenseAccountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "be104dfa-3cf7-42db-9fc0-473ea8925014"
+				},
+				"expenseAmountMinor": {
+					"kind": "integer",
+					"value": "12345"
+				},
+				"expenseCurrency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"expenseTransactionId": {
+					"kind": "reference",
+					"type": "transactions",
+					"id": "dbd7c15b-3c0b-41e0-a3bb-c26e56d89b70"
+				},
+				"incomeAccountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "5f1127b6-3c7f-4d82-932f-6359c72b6711"
+				},
+				"incomeAmountMinor": {
+					"kind": "integer",
+					"value": "12345"
+				},
+				"incomeCurrency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"incomeTransactionId": {
+					"kind": "reference",
+					"type": "transactions",
+					"id": "4b5fa98b-7ada-435f-be10-87b1988bd45f"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.968Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.968Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "organizations",
+			"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5",
+			"fields": {
+				"defaultCurrency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "personal"
+				},
+				"name": {
+					"kind": "text",
+					"value": "Exact household"
+				},
+				"ownerId": {
+					"kind": "text",
+					"value": "156fd3b4-a1a1-52de-b638-39094ffd4409"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.955Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.955Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "tags",
+			"id": "59d68221-dea7-444d-ac2c-615ba67d9886",
+			"fields": {
+				"archivedAt": {
+					"kind": "timestamp",
+					"value": "1970-01-01T00:00:00.001Z"
+				},
+				"categoryId": {
+					"kind": "reference",
+					"type": "categories",
+					"id": "fecab367-9114-4e13-91bf-5cc9ae5ec996"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "expense"
+				},
+				"name": {
+					"kind": "text",
+					"value": "  exact tag  "
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "transactionAttachments",
+			"id": "01a1b84f-9e01-7a53-9f64-782dbf897f34",
+			"fields": {
+				"fileId": {
+					"kind": "reference",
+					"type": "files",
+					"id": "4869f153-771f-4c8d-8cc9-24a454967762"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.969Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.969Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"transactionId": {
+					"kind": "reference",
+					"type": "transactions",
+					"id": "dbd7c15b-3c0b-41e0-a3bb-c26e56d89b70"
+				}
+			}
+		},
+		{
+			"type": "transactionBatches",
+			"id": "82fb90af-0875-4929-b9da-fbd63a913fa6",
+			"fields": {
+				"name": {
+					"kind": "text",
+					"value": "Batch"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.965Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "transactionTags",
+			"id": "01a1b84f-9e00-72c3-b11a-14d8be1965ae",
+			"fields": {
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.968Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.968Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"tagId": {
+					"kind": "reference",
+					"type": "tags",
+					"id": "59d68221-dea7-444d-ac2c-615ba67d9886"
+				},
+				"transactionId": {
+					"kind": "reference",
+					"type": "transactions",
+					"id": "dbd7c15b-3c0b-41e0-a3bb-c26e56d89b70"
+				}
+			}
+		},
+		{
+			"type": "transactions",
+			"id": "4b5fa98b-7ada-435f-be10-87b1988bd45f",
+			"fields": {
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "5f1127b6-3c7f-4d82-932f-6359c72b6711"
+				},
+				"amountMinor": {
+					"kind": "integer",
+					"value": "12345"
+				},
+				"batchId": {
+					"kind": "null"
+				},
+				"bookedOn": {
+					"kind": "date",
+					"value": "2026-11-01"
+				},
+				"categoryId": {
+					"kind": "reference",
+					"type": "categories",
+					"id": "a6faf1b0-2b2d-497f-b880-11fc1c282cc0"
+				},
+				"checkDetailsId": {
+					"kind": "null"
+				},
+				"checkId": {
+					"kind": "null"
+				},
+				"currency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"description": {
+					"kind": "null"
+				},
+				"externalId": {
+					"kind": "text",
+					"value": "provider-exact"
+				},
+				"internalTransferId": {
+					"kind": "reference",
+					"type": "internalTransfers",
+					"id": "f493e8a7-67ae-45e2-ba27-141b20eeee9b"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "income"
+				},
+				"memo": {
+					"kind": "null"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"paymentMethod": {
+					"kind": "null"
+				},
+				"source": {
+					"kind": "text",
+					"value": "simplefin"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.967Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.967Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "transactions",
+			"id": "bf46baec-8dd8-494e-b1c0-95ac4349cb5c",
+			"fields": {
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "be104dfa-3cf7-42db-9fc0-473ea8925014"
+				},
+				"amountMinor": {
+					"kind": "integer",
+					"value": "100"
+				},
+				"batchId": {
+					"kind": "null"
+				},
+				"bookedOn": {
+					"kind": "date",
+					"value": "2026-11-01"
+				},
+				"categoryId": {
+					"kind": "reference",
+					"type": "categories",
+					"id": "fecab367-9114-4e13-91bf-5cc9ae5ec996"
+				},
+				"checkDetailsId": {
+					"kind": "null"
+				},
+				"checkId": {
+					"kind": "reference",
+					"type": "checks",
+					"id": "6b4a2f46-0dee-47d8-b0a1-aa98d9d63ae7"
+				},
+				"currency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"description": {
+					"kind": "null"
+				},
+				"externalId": {
+					"kind": "null"
+				},
+				"internalTransferId": {
+					"kind": "null"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "expense"
+				},
+				"memo": {
+					"kind": "null"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"paymentMethod": {
+					"kind": "text",
+					"value": "check"
+				},
+				"source": {
+					"kind": "text",
+					"value": "manual"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.968Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.968Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "transactions",
+			"id": "dbd7c15b-3c0b-41e0-a3bb-c26e56d89b70",
+			"fields": {
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "be104dfa-3cf7-42db-9fc0-473ea8925014"
+				},
+				"amountMinor": {
+					"kind": "integer",
+					"value": "12345"
+				},
+				"batchId": {
+					"kind": "reference",
+					"type": "transactionBatches",
+					"id": "82fb90af-0875-4929-b9da-fbd63a913fa6"
+				},
+				"bookedOn": {
+					"kind": "date",
+					"value": "2026-11-01"
+				},
+				"categoryId": {
+					"kind": "reference",
+					"type": "categories",
+					"id": "fecab367-9114-4e13-91bf-5cc9ae5ec996"
+				},
+				"checkDetailsId": {
+					"kind": "null"
+				},
+				"checkId": {
+					"kind": "null"
+				},
+				"currency": {
+					"kind": "text",
+					"value": "USD"
+				},
+				"description": {
+					"kind": "text",
+					"value": "  Exact description  "
+				},
+				"externalId": {
+					"kind": "null"
+				},
+				"internalTransferId": {
+					"kind": "reference",
+					"type": "internalTransfers",
+					"id": "f493e8a7-67ae-45e2-ba27-141b20eeee9b"
+				},
+				"kind": {
+					"kind": "text",
+					"value": "expense"
+				},
+				"memo": {
+					"kind": "text",
+					"value": "private finance content"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"paymentMethod": {
+					"kind": "null"
+				},
+				"source": {
+					"kind": "text",
+					"value": "manual"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.967Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.967Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		}
+	],
+	"attachments": [
+		{
+			"id": "4869f153-771f-4c8d-8cc9-24a454967762",
+			"mediaType": "application/octet-stream",
+			"fileName": "receipt.bin",
+			"sizeBytes": 8,
+			"sha256": "d21bdb4c20a85671861445b8f34018dbfcb55c664b1baf2d2c08f493861c7541",
+			"data": "AAF//wkIBwY="
+		}
+	],
+	"references": [
+		{
+			"type": "accountMemberships",
+			"id": "01a1b84f-9dfc-7a61-a607-eccf48934811",
+			"fields": {
+				"access": {
+					"kind": "text",
+					"value": "write"
+				},
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "be104dfa-3cf7-42db-9fc0-473ea8925014"
+				},
+				"canDelete": {
+					"kind": "boolean",
+					"value": true
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.964Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.964Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"userId": {
+					"kind": "text",
+					"value": "156fd3b4-a1a1-52de-b638-39094ffd4409"
+				}
+			}
+		},
+		{
+			"type": "organizationMembers",
+			"id": "4e9a54f5-9b6d-4185-9930-bcbff35a5ba2",
+			"fields": {
+				"accountAccessMode": {
+					"kind": "text",
+					"value": "all"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"profileId": {
+					"kind": "reference",
+					"type": "profiles",
+					"id": "e554d0ec-10af-45b1-9f1f-a736d6083fae"
+				},
+				"role": {
+					"kind": "text",
+					"value": "owner"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.962Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.962Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"userId": {
+					"kind": "text",
+					"value": "156fd3b4-a1a1-52de-b638-39094ffd4409"
+				}
+			}
+		},
+		{
+			"type": "profiles",
+			"id": "e554d0ec-10af-45b1-9f1f-a736d6083fae",
+			"fields": {
+				"displayName": {
+					"kind": "text",
+					"value": "Visible person"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.962Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.962Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"userId": {
+					"kind": "text",
+					"value": "156fd3b4-a1a1-52de-b638-39094ffd4409"
+				}
+			}
+		},
+		{
+			"type": "simplefinAccountLinks",
+			"id": "01a1b84f-9e02-75f0-9c1d-deaeeeaf2dca",
+			"fields": {
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "5f1127b6-3c7f-4d82-932f-6359c72b6711"
+				},
+				"availableBalance": {
+					"kind": "text",
+					"value": "123.4500"
+				},
+				"balanceDate": {
+					"kind": "null"
+				},
+				"connectionId": {
+					"kind": "reference",
+					"type": "simplefinConnections",
+					"id": "0a1496e7-3d0b-410d-94a4-55a612c5e0e0"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"simplefinAccountId": {
+					"kind": "text",
+					"value": "provider-account"
+				},
+				"simplefinOrgId": {
+					"kind": "null"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.970Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.970Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "simplefinConnections",
+			"id": "0a1496e7-3d0b-410d-94a4-55a612c5e0e0",
+			"fields": {
+				"claimedAt": {
+					"kind": "timestamp",
+					"value": "1970-01-01T00:00:00.000Z"
+				},
+				"existingCount": {
+					"kind": "integer",
+					"value": "0"
+				},
+				"importedCount": {
+					"kind": "integer",
+					"value": "1"
+				},
+				"lastOutcome": {
+					"kind": "text",
+					"value": "succeeded"
+				},
+				"lastSyncAt": {
+					"kind": "null"
+				},
+				"omittedCount": {
+					"kind": "integer",
+					"value": "0"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"ownerId": {
+					"kind": "text",
+					"value": "156fd3b4-a1a1-52de-b638-39094ffd4409"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.970Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.970Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"status": {
+					"kind": "text",
+					"value": "active"
+				}
+			}
+		},
+		{
+			"type": "simplefinSyncAccountResults",
+			"id": "01a1b84f-9e03-7fa3-8536-4ff7e206a47b",
+			"fields": {
+				"accountId": {
+					"kind": "reference",
+					"type": "accounts",
+					"id": "5f1127b6-3c7f-4d82-932f-6359c72b6711"
+				},
+				"accountName": {
+					"kind": "text",
+					"value": "Bank"
+				},
+				"attemptId": {
+					"kind": "reference",
+					"type": "simplefinSyncAttempts",
+					"id": "bff31885-afde-4ea8-8597-7b4fa9ceae0c"
+				},
+				"existingCount": {
+					"kind": "integer",
+					"value": "0"
+				},
+				"failureCode": {
+					"kind": "null"
+				},
+				"importedCount": {
+					"kind": "integer",
+					"value": "1"
+				},
+				"omittedCount": {
+					"kind": "integer",
+					"value": "0"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"outcome": {
+					"kind": "text",
+					"value": "succeeded"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.971Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.971Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				}
+			}
+		},
+		{
+			"type": "simplefinSyncAttempts",
+			"id": "bff31885-afde-4ea8-8597-7b4fa9ceae0c",
+			"fields": {
+				"connectionId": {
+					"kind": "reference",
+					"type": "simplefinConnections",
+					"id": "0a1496e7-3d0b-410d-94a4-55a612c5e0e0"
+				},
+				"existingCount": {
+					"kind": "integer",
+					"value": "0"
+				},
+				"failureCode": {
+					"kind": "null"
+				},
+				"finishedAt": {
+					"kind": "timestamp",
+					"value": "1970-01-01T00:00:00.001Z"
+				},
+				"importSettlement": {
+					"kind": "text",
+					"value": "confirmed"
+				},
+				"importedCount": {
+					"kind": "integer",
+					"value": "1"
+				},
+				"initiatedBy": {
+					"kind": "text",
+					"value": "156fd3b4-a1a1-52de-b638-39094ffd4409"
+				},
+				"omittedCount": {
+					"kind": "integer",
+					"value": "0"
+				},
+				"organizationId": {
+					"kind": "reference",
+					"type": "organizations",
+					"id": "5b5d3b0b-a4e0-4bd9-a276-ff6fa998fcb5"
+				},
+				"outcome": {
+					"kind": "text",
+					"value": "succeeded"
+				},
+				"sourceCreatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.970Z"
+				},
+				"sourceCreatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceCreatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceCreatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"sourceUpdatedAt": {
+					"kind": "timestamp",
+					"value": "2026-11-07T23:19:47.970Z"
+				},
+				"sourceUpdatedBy": {
+					"kind": "text",
+					"value": "00000000-0000-0000-0000-000000000000"
+				},
+				"sourceUpdatedIssuer": {
+					"kind": "text",
+					"value": "urn:jazz:system"
+				},
+				"sourceUpdatedSubject": {
+					"kind": "text",
+					"value": "51256497-0c24-48aa-9502-739a2feaeee4"
+				},
+				"startedAt": {
+					"kind": "timestamp",
+					"value": "1970-01-01T00:00:00.000Z"
+				}
+			}
+		}
+	]
+}

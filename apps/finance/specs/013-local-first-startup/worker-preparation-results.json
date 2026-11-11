@@ -1,0 +1,283 @@
+{
+	"date": "2026-10-30",
+	"sdk": "jazz-tools@2.0.0-alpha.59",
+	"scope": "Diagnostic only; no production change or SDK patch.",
+	"answer": "Public APIs can run queries in a dedicated worker and avoid measured page blocking, but the worker client does not acquire into the app persistent replica. Do not adopt worker-hosted offline preparation on this SDK.",
+	"environment": {
+		"checkout": "isolated with its own dependencies",
+		"frontend": "Vite dev agent on 127.0.0.1:5192",
+		"backend": "disposable in-memory Jazz on 6192",
+		"transport": "real forwarding/silent HTTP-WebSocket proxy on 6193",
+		"fixture": "current application schema and permissions; selected-account viewer"
+	},
+	"publicApis": [
+		"createAccountManager",
+		"exportLocalFirstSecret",
+		"AccountManager.restoreLocalFirst",
+		"createDb",
+		"Db.subscribe with tier remote",
+		"Db.all with tier local-first",
+		"Db.shutdown"
+	],
+	"ownership": "XState creatingAccounts -> choosingIdentity with guarded restore/retain/create -> opening -> available.idle/observing -> draining -> stopped/failed. Subscription callback owns unsubscribe cleanup; separate leaf actors create manager, open Db, and shut down Db. No cancellation-during-open or production auth coordinator is claimed.",
+	"identity": "Disposable local-first root transferred only to same-origin diagnostic worker, restored through public account helper, never logged. Volatile AccountStore controls account selection only; cold page retains the original identity in its normal store.",
+	"acquisition": "17 table ID subscriptions plus full current-user membership and grant subscriptions; same appId/env/dbName and admitted account; no finance reads in page before worker acquisition.",
+	"coldProtocol": "Gracefully release all subscriptions/client, close full persistent browser including workers, reopen same profile and original identity in a page; real proxy accepts upgrades and forwards no Jazz application frames or HTTP replies.",
+	"bootstrap": [
+		{
+			"browser": "chromium",
+			"environment": {
+				"type": "environment",
+				"window": "undefined",
+				"document": "undefined",
+				"sharedWorker": "undefined",
+				"indexedDB": "object",
+				"locks": "object"
+			},
+			"defaultStoreError": "createAccountManager requires an AccountStore outside the browser",
+			"publicCustomAccountStoreOpensClient": true
+		},
+		{
+			"browser": "firefox",
+			"environment": {
+				"type": "environment",
+				"window": "undefined",
+				"document": "undefined",
+				"sharedWorker": "undefined",
+				"indexedDB": "object",
+				"locks": "object"
+			},
+			"defaultStoreError": "createAccountManager requires an AccountStore outside the browser",
+			"publicCustomAccountStoreOpensClient": true
+		},
+		{
+			"browser": "webkit",
+			"environment": {
+				"type": "environment",
+				"window": "undefined",
+				"document": "undefined",
+				"sharedWorker": "undefined",
+				"indexedDB": "object",
+				"locks": "object"
+			},
+			"defaultStoreError": "createAccountManager requires an AccountStore outside the browser",
+			"publicCustomAccountStoreOpensClient": true
+		}
+	],
+	"coldAndLiveMatrix": [
+		{
+			"browser": "chromium",
+			"location": "worker",
+			"configuredDriver": "persistent",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 0,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "chromium",
+			"location": "worker",
+			"configuredDriver": "memory",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 0,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "chromium",
+			"location": "page",
+			"configuredDriver": "persistent",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 3,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "firefox",
+			"location": "worker",
+			"configuredDriver": "persistent",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 0,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "firefox",
+			"location": "worker",
+			"configuredDriver": "memory",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 0,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "firefox",
+			"location": "page",
+			"configuredDriver": "persistent",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 3,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "webkit",
+			"location": "worker",
+			"configuredDriver": "persistent",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 0,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "webkit",
+			"location": "worker",
+			"configuredDriver": "memory",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 0,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		},
+		{
+			"browser": "webkit",
+			"location": "page",
+			"configuredDriver": "persistent",
+			"onlineReadableTransactions": 3,
+			"seededDeniedTransactions": 1,
+			"liveFieldEditObserved": true,
+			"grantRemovalObserved": true,
+			"grantRestorationObserved": true,
+			"noPostStopCallbacksIn200msWindow": true,
+			"coldPageReadableTransactions": 3,
+			"identityRetained": true,
+			"wire": {
+				"opened": 1,
+				"clientBytes": 1149,
+				"heldHttp": 0
+			}
+		}
+	],
+	"largeAcquisition": [
+		{
+			"where": "worker",
+			"count": 5000,
+			"acquisitionMs": 7342,
+			"metrics": {
+				"maxFrameGapMs": 16.80000000000109,
+				"frameCount": 442,
+				"longTasksMs": [],
+				"maxLongTaskMs": 0
+			}
+		},
+		{
+			"where": "page",
+			"count": 5000,
+			"acquisitionMs": 10754,
+			"metrics": {
+				"maxFrameGapMs": 2683.199999999999,
+				"frameCount": 459,
+				"longTasksMs": [127, 107, 235, 2698],
+				"maxLongTaskMs": 2698
+			}
+		}
+	],
+	"validation": {
+		"qualifiedDiagnosticCases": 14,
+		"bootstrapAcrossThreeEngines": 3,
+		"coldAndLiveAcrossThreeEngines": 9,
+		"largeChromiumComparisons": 2,
+		"focusedTypeScript": "passed"
+	},
+	"sourceFindings": [
+		"runtime/db.js isBrowserRuntime requires window and Worker; dedicated worker fails this check and uses createWithDirectConnection even with persistent driver.",
+		"runtime/default-runtime-source.js uses the same window-based test for persistent browser leases and non-durable foreground peers. The direct worker does not attach to the durable broker.",
+		"SharedWorker is undefined in all three tested dedicated-worker realms; IndexedDB and Web Locks exist, but their existence does not select the Jazz persistent browser path.",
+		"RuntimeSourcesConfig public overrides select Wasm/broker assets, not a worker attachment transport. browserWorkerPort/session and Db.createWithBrowserWorker are marked internal; no such surface was used.",
+		"Framework/session wrappers use the same createDb factory and do not supply a separate public worker-storage attachment."
+	],
+	"limits": [
+		"Performance values are one development-runtime sample per location on one desktop, not production startup improvements or supported-device budgets.",
+		"Large samples use a minimal diagnostic input rather than the app full form; main-thread frame gaps and long tasks are measured directly.",
+		"Worker sends IDs to page; full financial rows are not marshaled into UI. No valid public sync/import path for transferring its replica into page IndexedDB was established.",
+		"Local-first identity tested; external JWT/session generation coordination and production worker ownership were not implemented.",
+		"Default browser persistence uses Jazz SharedWorker. This experiment does not replace or modify that worker.",
+		"Early diagnostic harness issues (root state target, raw-secret property accidentally spread into createDb, Vite root HTML routing, evaluate argument serialization, reinsert of deleted grant) were corrected before qualified cases. Final grant recovery uses public restore; no application defect or SDK patch was hidden."
+	],
+	"sources": [
+		"https://jazz.tools/docs/getting-started/client-setup",
+		"https://jazz.tools/docs/reference/internals",
+		"installed alpha.59 package source and declarations"
+	],
+	"decision": "Keep automatic broad preparation disabled. Do not build a dedicated-worker preparation owner with the current supported API. Bounded page-side preparation remains a possible separately reviewed offline-availability feature; this experiment does not make it a startup speed optimization."
+}

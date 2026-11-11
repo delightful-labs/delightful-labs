@@ -1,0 +1,11 @@
+{
+	"extends": "../tsconfig.json",
+	"include": ["./**/*.ts", "../scripts/check-e2e-scopes.ts"],
+	"exclude": [],
+	"compilerOptions": {
+		"noEmit": true,
+		"paths": {
+			"#lib/*": ["../src/lib/*"]
+		}
+	}
+}
