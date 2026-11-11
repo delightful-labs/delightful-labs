@@ -53,23 +53,6 @@
         ],
         "accessWarmupErrorCount": 0
       },
-      "proposedProductionCutover": {
-        "requiresExplicitApproval": true,
-        "repository": "delightful-labs/delightful-labs",
-        "repositoryId": 52031385,
-        "productionBranch": "master",
-        "rootDirectory": "apps/finance",
-        "sourceFilesOutsideRootDirectory": true,
-        "outputDirectory": null,
-        "preserve": [
-          "project identity",
-          "custom domains",
-          "production environment variables",
-          "production Jazz core name and stored data",
-          "extension release identity"
-        ],
-        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval."
-      },
       "productionSettingsBeforeCutover": {
         "id": "prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa",
         "name": "delightful-finances",
@@ -106,12 +89,12 @@
         "stagedAcceptance": {
           "passed": true,
           "checks": [
-            "authenticated preview, native service-worker installation and control",
+            "native service-worker installation and control",
             "native account and expense creation, direct reload",
             "mobile layout fits viewport",
             "full browser restart offline after HTTP cache clear; retained data and new offline write",
             "second full offline browser restart retains offline write",
-            "reconnect and independent restored browser receives online and offline writes from preview backend"
+            "reconnect and independent restored browser receives online and offline writes from production backend"
           ],
           "pageErrors": 0,
           "authentication": "Approved deployment cookie applied only to same-origin service-worker-owned requests; unchanged remote bytes; disabled offline"
@@ -119,12 +102,12 @@
         "publicDomainAcceptance": {
           "passed": true,
           "checks": [
-            "authenticated preview, native service-worker installation and control",
+            "native service-worker installation and control",
             "native account and expense creation, direct reload",
             "mobile layout fits viewport",
             "full browser restart offline after HTTP cache clear; retained data and new offline write",
             "second full offline browser restart retains offline write",
-            "reconnect and independent restored browser receives online and offline writes from preview backend"
+            "reconnect and independent restored browser receives online and offline writes from production backend"
           ],
           "pageErrors": 0,
           "accessWarmupErrors": 0,
@@ -160,6 +143,23 @@
         },
         "testAccess": "One-hour deployment-only share grant revoked after staged verification; protectionBypass response empty. Public-domain acceptance required no deployment authentication transport.",
         "automaticDomainAssignmentRestored": true
+      },
+      "approvedProductionCutoverPlan": {
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "rootDirectory": "apps/finance",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "preserve": [
+          "project identity",
+          "custom domains",
+          "production environment variables",
+          "production Jazz core name and stored data",
+          "extension release identity"
+        ],
+        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval.",
+        "approvalRecorded": true
       }
     },
     {
@@ -215,23 +215,6 @@
         ],
         "accessWarmupErrorCount": 0
       },
-      "proposedProductionCutover": {
-        "requiresExplicitApproval": true,
-        "repository": "delightful-labs/delightful-labs",
-        "repositoryId": 52031385,
-        "productionBranch": "master",
-        "rootDirectory": "apps/clipper/apps/web",
-        "sourceFilesOutsideRootDirectory": true,
-        "outputDirectory": null,
-        "preserve": [
-          "project identity",
-          "custom domains",
-          "production environment variables",
-          "production Jazz core name and stored data",
-          "extension release identity"
-        ],
-        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval."
-      },
       "productionSettingsBeforeCutover": {
         "id": "prj_9Dw5akTMo6EogWyGPHPKdOsRNWHT",
         "name": "delightful-clipper",
@@ -268,12 +251,12 @@
         "stagedAcceptance": {
           "passed": true,
           "checks": [
-            "authenticated preview, native service-worker installation and control",
+            "native service-worker installation and control",
             "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
             "mobile layout fits viewport",
             "full browser restart offline after HTTP cache clear; retained data and new offline write",
             "second full offline browser restart retains offline write",
-            "reconnect and independent restored browser receives online and offline writes from preview backend"
+            "reconnect and independent restored browser receives online and offline writes from production backend"
           ],
           "pageErrors": 0,
           "authentication": "Approved deployment cookie applied only to same-origin service-worker-owned requests; unchanged remote bytes; disabled offline"
@@ -281,12 +264,12 @@
         "publicDomainAcceptance": {
           "passed": true,
           "checks": [
-            "authenticated preview, native service-worker installation and control",
+            "native service-worker installation and control",
             "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
             "mobile layout fits viewport",
             "full browser restart offline after HTTP cache clear; retained data and new offline write",
             "second full offline browser restart retains offline write",
-            "reconnect and independent restored browser receives online and offline writes from preview backend"
+            "reconnect and independent restored browser receives online and offline writes from production backend"
           ],
           "pageErrors": 0,
           "accessWarmupErrors": 0,
@@ -360,7 +343,24 @@
           "previewTextLength": 156,
           "readerTextLength": 181
         },
-        "captureTestReadiness": "The first staged live-gateway attempt returned 401 before native account synchronization. The diagnostic run waited for Private library synced and verified both endpoints returned 200 with native proof present; the public-domain run also passed with that readiness condition. No application code or authentication policy changed."
+        "captureTestReadiness": "The first staged live-gateway attempt returned 401 without waiting for native account synchronization. A diagnostic run waited for Private library synced and verified both endpoints returned 200 with native proof present; the public-domain run also passed with that readiness condition. This establishes capture after synchronization; it does not qualify capture before synchronization. No application code or authentication policy changed."
+      },
+      "approvedProductionCutoverPlan": {
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "rootDirectory": "apps/clipper/apps/web",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "preserve": [
+          "project identity",
+          "custom domains",
+          "production environment variables",
+          "production Jazz core name and stored data",
+          "extension release identity"
+        ],
+        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval.",
+        "approvalRecorded": true
       }
     }
   ],
