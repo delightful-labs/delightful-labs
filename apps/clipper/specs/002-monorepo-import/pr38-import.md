@@ -11,7 +11,9 @@ and `4972bd3a43587c26afe854325f16bdc9d1d1d72e`.
 The subtree integration maps source paths beneath `apps/clipper` and preserves
 source history. It is based on monorepo follow-up commit `3196f073`, which already
 contains the Finance fixture and Clipper CI job-budget fixes awaiting review in
-monorepo PR #11. The newer monorepo extension sign-in lifetime fix and exact
+monorepo PR #11. Follow-up commit `076674cd` adds the pinned official Playwright
+CI images after a fresh-runner control reproduced Ubuntu mirror DNS failures;
+that CI fix is also included. Merge PR #11 before this import. The newer monorepo extension sign-in lifetime fix and exact
 public-icon offline expectations are preserved. Source PR #38 remains open;
 this import does not merge or close it or publish a production deployment.
 
@@ -23,8 +25,9 @@ The source authorization and migration contract remain in
 [the metadata memory](../../docs/memory/article-metadata.md).
 
 All implementation files match the source PR byte for byte. Import adaptations
-retain the enabled Linux sign-in cases and exact offline icon expectations, and replace
-three CSS-class browser locators with paragraph-role locators to meet the common testing rules. No dependency,
+retain the enabled Linux sign-in cases and exact offline icon expectations, and
+replace three CSS-class browser locators with paragraph-role locators to meet the
+common testing rules. No dependency,
 permission, localized copy or capture/account ownership change was introduced
 by the integration.
 
