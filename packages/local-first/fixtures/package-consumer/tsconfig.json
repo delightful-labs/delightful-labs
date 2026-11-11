@@ -1,0 +1,41 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"paths": {},
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"types": [],
+		"skipLibCheck": false,
+		"exactOptionalPropertyTypes": false
+	},
+	"include": [
+		"../test-app/restore.ts",
+		"../test-app/restore-writer.ts",
+		"../test-app/restore-attachment-writer.ts",
+		"../test-app/restore-root-writer.ts",
+		"../test-app/restore-note-writer.ts",
+		"./consumer.ts",
+		"./restore-journal.ts",
+		"./restore-journal-runtime.js",
+		"./browser-restore-journal.ts",
+		"./cleanup.ts",
+		"./backup.js",
+		"./backup-envelope.js",
+		"./envelope-browser.ts",
+		"./test-app-browser.ts",
+		"./test-app.vite.config.ts",
+		"./journal-browser.ts",
+		"./journal.vite.config.ts",
+		"./import.js",
+		"./view.ts",
+		"./vite.config.ts",
+		"./envelope.vite.config.ts",
+		"./domain-transaction.ts",
+		"./owned-operation.ts",
+		"./worker-request.ts",
+		"./worker-channel.ts",
+		"./worker-effect-drain.ts",
+		"./ordered-sign-out.ts"
+	],
+	"exclude": []
+}

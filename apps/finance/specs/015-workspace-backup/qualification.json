@@ -1,0 +1,3830 @@
+{
+	"observedOn": "2026-11-07",
+	"scope": "T004 partial disposable qualification and T010 deployed fake-data recovery rehearsal; no production workspace recovery",
+	"financeCommit": "ab6c85073b0fbb2187283965a547eb50928f166c",
+	"dlfCommit": "ad99117",
+	"jazzVersion": "2.0.0-alpha.59",
+	"environment": {
+		"server": "pnpm dev:agent",
+		"publicDebug": true,
+		"backend": "disposable in-memory Jazz; reused serially until exit, restarted for fresh-ci",
+		"workers": 1
+	},
+	"limitations": [
+		"Development/debug bundle; not production-bundle latency or a service-level guarantee.",
+		"Synthetic manual Finance graph matches transaction scale, not the private 633-record source composition.",
+		"Attachment bytes repeat an eight-byte pattern; no real-world entropy or network corpus qualification.",
+		"Matrix and follow-ups share a growing backend in fixed order. Cross-browser timings are not a controlled engine comparison.",
+		"Page-only 4x CPU throttling does not throttle every SDK worker and does not qualify a phone.",
+		"Memory sampled every 500 ms; peaks may be missed. Page heap excludes workers. Browser RSS sums can double-count shared pages and exclude the backend.",
+		"Unsupported Firefox/WebKit longtask observations are null; memory measurements are unavailable in those engines.",
+		"Maximum aggregate/count, production-bundle performance, real phones and storage pressure remain unqualified.",
+		"Cancellation latency measured at review; pending-native-write cancellation qualification belongs to the merged recovery experiments.",
+		"Local matrix runs performed no deployed restore; the separate deployedFakeDataRehearsal uses only fake data. Production workspace data and credentials are excluded."
+	],
+	"stressObservation": {
+		"run": "normal-ci-final",
+		"result": "One normal restore reached its existing 180-second limit after many serial workloads.",
+		"backendExitCode": 137,
+		"backendListenerAbsent": true,
+		"cause": "A macOS Jetsam report at 09:49:38 -0500 coincides with the failure and establishes host memory pressure. The killed process and ownership of the largest Node process are not established; exit 137 remains unattributed.",
+		"control": "fresh-ci restarted disposable backend, unchanged 180-second test limit, all three cases passed.",
+		"initialHarnessFailure": "normal-ci waited only for a 15-second alert before the injected commit fault occurred. The test now first waits for that injection within its existing overall deadline; error and recovery assertions remain."
+	},
+	"readOnlyDeployment": {
+		"observedAt": "2026-11-07T14:16:52.526Z",
+		"origin": "https://finance.delightfullabs.com",
+		"frontendCommit": "ab6c85073b0fbb2187283965a547eb50928f166c",
+		"schemaHash": "c30773a877641832506f851ec904d84c100821c1f629f39b63c21dd23dcae0b5",
+		"sourceSchemaHash": "c30773a877641832506f851ec904d84c100821c1f629f39b63c21dd23dcae0b5",
+		"structurallyEqual": true,
+		"policyVersion": 9,
+		"policyMatches": true,
+		"sourcePolicySemanticSha256": "a52562c35101cf07526688a5f4dfbad4ce70e0a39015fe8d228600337defcdf9",
+		"serverPolicySemanticSha256": "a52562c35101cf07526688a5f4dfbad4ce70e0a39015fe8d228600337defcdf9",
+		"bundleHeadMatches": true,
+		"headStable": true,
+		"policyNormalization": {
+			"optionalNullFields": ["max_depth", "scope", "using", "with_check"],
+			"omittedVsNullOperationFields": 71
+		},
+		"tableCount": 23,
+		"netlifyDeploy": "6aef2b939f5346cb8c17af46"
+	},
+	"mergedCi": {
+		"run": 42376826034,
+		"restoreJob": 128416023848,
+		"restorePassed": 99,
+		"restoreTotal": 99,
+		"result": "success"
+	},
+	"runs": [
+		{
+			"label": "inventory-none",
+			"startedAt": "2026-11-07T14:04:40.972Z",
+			"durationMs": 40369.519,
+			"passed": 1,
+			"failed": 0,
+			"skipped": 0,
+			"cases": [
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [inventory]",
+					"status": "passed",
+					"durationMs": 36951,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "inventory",
+							"transactions": 521,
+							"payloadBytes": 786133,
+							"exportToDownloadMs": 2835,
+							"independentOpenMs": 80,
+							"records": 534,
+							"attachmentBytes": 0,
+							"fileBytes": 1048323,
+							"totalExportAndOpenMs": 3345,
+							"longestMainThreadTaskMs": 105
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 17988
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "inventory",
+								"transactions": 521,
+								"attachmentBytes": 0,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 53,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 49837060,
+								"pageHeapPeakBytes": 82448424,
+								"pageBackingPeakBytes": 45011886,
+								"browserProcessRssStartBytes": 861700096,
+								"browserProcessRssPeakBytes": 1154203648
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 2873,
+									"longestTaskMs": 105,
+									"longestFrameGapMs": 83.39999999999964,
+									"longestTimerDelayMs": 85.5
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 104,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.799999999999272,
+									"longestTimerDelayMs": 0
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 408,
+									"longestTaskMs": 98,
+									"longestFrameGapMs": 83.40000000000146,
+									"longestTimerDelayMs": 59.799999952316284
+								},
+								{
+									"name": "preparation",
+									"durationMs": 296,
+									"longestTaskMs": 77,
+									"longestFrameGapMs": 50,
+									"longestTimerDelayMs": 60.299999952316284
+								},
+								{
+									"name": "restore",
+									"durationMs": 17988,
+									"longestTaskMs": 87,
+									"longestFrameGapMs": 83.40000000000146,
+									"longestTimerDelayMs": 96.39999997615814
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 1596,
+									"longestTaskMs": 107,
+									"longestFrameGapMs": 116.69999999999709,
+									"longestTimerDelayMs": 101.10000002384186
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"label": "matrix",
+			"startedAt": "2026-11-07T14:06:53.851Z",
+			"durationMs": 1105226.877,
+			"passed": 12,
+			"failed": 0,
+			"skipped": 0,
+			"cases": [
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source [inventory]",
+					"status": "passed",
+					"durationMs": 40529,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "inventory",
+							"transactions": 521,
+							"payloadBytes": 786133,
+							"exportToDownloadMs": 4162,
+							"independentOpenMs": 124,
+							"records": 534,
+							"attachmentBytes": 0,
+							"fileBytes": 1048414,
+							"totalExportAndOpenMs": 4734,
+							"longestMainThreadTaskMs": 107
+						},
+						"restore-measurement": {
+							"protection": "password",
+							"transactions": 521,
+							"totalRestoreMs": 19577
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "inventory",
+								"transactions": 521,
+								"attachmentBytes": 0,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "password",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 59,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 49808580,
+								"pageHeapPeakBytes": 110761428,
+								"pageBackingPeakBytes": 43739273,
+								"browserProcessRssStartBytes": 920354816,
+								"browserProcessRssPeakBytes": 1204338688
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 4209,
+									"longestTaskMs": 107,
+									"longestFrameGapMs": 83.30000000000109,
+									"longestTimerDelayMs": 100.90000009536743
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 142,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.700000000000728,
+									"longestTimerDelayMs": 0.8000000715255737
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 431,
+									"longestTaskMs": 99,
+									"longestFrameGapMs": 83.29999999999927,
+									"longestTimerDelayMs": 57.60000002384186
+								},
+								{
+									"name": "preparation",
+									"durationMs": 401,
+									"longestTaskMs": 68,
+									"longestFrameGapMs": 50,
+									"longestTimerDelayMs": 51.39999997615814
+								},
+								{
+									"name": "restore",
+									"durationMs": 19577,
+									"longestTaskMs": 88,
+									"longestFrameGapMs": 83.29999999999563,
+									"longestTimerDelayMs": 92
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 1635,
+									"longestTaskMs": 101,
+									"longestFrameGapMs": 100,
+									"longestTimerDelayMs": 123.30000007152557
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [inventory]",
+					"status": "passed",
+					"durationMs": 43339,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "inventory",
+							"transactions": 521,
+							"payloadBytes": 786133,
+							"exportToDownloadMs": 5348,
+							"independentOpenMs": 56,
+							"records": 534,
+							"attachmentBytes": 0,
+							"fileBytes": 1048323,
+							"totalExportAndOpenMs": 5833,
+							"longestMainThreadTaskMs": 101
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 21010
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "inventory",
+								"transactions": 521,
+								"attachmentBytes": 0,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 64,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 49839248,
+								"pageHeapPeakBytes": 85066172,
+								"pageBackingPeakBytes": 50210901,
+								"browserProcessRssStartBytes": 870301696,
+								"browserProcessRssPeakBytes": 1113161728
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 5384,
+									"longestTaskMs": 101,
+									"longestFrameGapMs": 83.29999999999927,
+									"longestTimerDelayMs": 77.89999997615814
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 73,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.700000000000728,
+									"longestTimerDelayMs": 0
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 416,
+									"longestTaskMs": 100,
+									"longestFrameGapMs": 99.90000000000146,
+									"longestTimerDelayMs": 94.90000009536743
+								},
+								{
+									"name": "preparation",
+									"durationMs": 291,
+									"longestTaskMs": 76,
+									"longestFrameGapMs": 50,
+									"longestTimerDelayMs": 42.800000071525574
+								},
+								{
+									"name": "restore",
+									"durationMs": 21010,
+									"longestTaskMs": 89,
+									"longestFrameGapMs": 83.40000000000146,
+									"longestTimerDelayMs": 90.89999997615814
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 1615,
+									"longestTaskMs": 101,
+									"longestFrameGapMs": 83.40000000000146,
+									"longestTimerDelayMs": 91
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source [records-4x]",
+					"status": "passed",
+					"durationMs": 136780,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "records-4x",
+							"transactions": 2084,
+							"payloadBytes": 3107794,
+							"exportToDownloadMs": 10268,
+							"independentOpenMs": 292,
+							"records": 2097,
+							"attachmentBytes": 0,
+							"fileBytes": 4143962,
+							"totalExportAndOpenMs": 11987,
+							"longestMainThreadTaskMs": 411
+						},
+						"restore-measurement": {
+							"protection": "password",
+							"transactions": 2084,
+							"totalRestoreMs": 67796
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "records-4x",
+								"transactions": 2084,
+								"attachmentBytes": 0,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "password",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 175,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 47895712,
+								"pageHeapPeakBytes": 165739444,
+								"pageBackingPeakBytes": 126503786,
+								"browserProcessRssStartBytes": 967770112,
+								"browserProcessRssPeakBytes": 1429913600
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 10307,
+									"longestTaskMs": 368,
+									"longestFrameGapMs": 366.59999999999854,
+									"longestTimerDelayMs": 391.5
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 322,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.799999999995634,
+									"longestTimerDelayMs": 0.5
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 1412,
+									"longestTaskMs": 411,
+									"longestFrameGapMs": 399.90000000000146,
+									"longestTimerDelayMs": 394.60000002384186
+								},
+								{
+									"name": "preparation",
+									"durationMs": 703,
+									"longestTaskMs": 203,
+									"longestFrameGapMs": 183.1999999999971,
+									"longestTimerDelayMs": 171.10000002384186
+								},
+								{
+									"name": "restore",
+									"durationMs": 67796,
+									"longestTaskMs": 343,
+									"longestFrameGapMs": 333.40000000000873,
+									"longestTimerDelayMs": 402.2999999523163
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 3966,
+									"longestTaskMs": 362,
+									"longestFrameGapMs": 366.70000000001164,
+									"longestTimerDelayMs": 469.5
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [records-4x]",
+					"status": "passed",
+					"durationMs": 149968,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "records-4x",
+							"transactions": 2084,
+							"payloadBytes": 3107794,
+							"exportToDownloadMs": 15336,
+							"independentOpenMs": 223,
+							"records": 2097,
+							"attachmentBytes": 0,
+							"fileBytes": 4143871,
+							"totalExportAndOpenMs": 16977,
+							"longestMainThreadTaskMs": 413
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 2084,
+							"totalRestoreMs": 74507
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "records-4x",
+								"transactions": 2084,
+								"attachmentBytes": 0,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 198,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 47897592,
+								"pageHeapPeakBytes": 160152876,
+								"pageBackingPeakBytes": 125600427,
+								"browserProcessRssStartBytes": 1019068416,
+								"browserProcessRssPeakBytes": 1376649216
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 15375,
+									"longestTaskMs": 354,
+									"longestFrameGapMs": 350,
+									"longestTimerDelayMs": 340.39999997615814
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 254,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.70000000001164,
+									"longestTimerDelayMs": 0.3999999761581421
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 1402,
+									"longestTaskMs": 413,
+									"longestFrameGapMs": 416.6000000000058,
+									"longestTimerDelayMs": 428.2000000476837
+								},
+								{
+									"name": "preparation",
+									"durationMs": 611,
+									"longestTaskMs": 271,
+									"longestFrameGapMs": 266.6999999999971,
+									"longestTimerDelayMs": 258.60000002384186
+								},
+								{
+									"name": "restore",
+									"durationMs": 74507,
+									"longestTaskMs": 341,
+									"longestFrameGapMs": 350,
+									"longestTimerDelayMs": 400.6999999284744
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 4130,
+									"longestTaskMs": 359,
+									"longestFrameGapMs": 350,
+									"longestTimerDelayMs": 442.7999999523163
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source [attachment-1MiB]",
+					"status": "passed",
+					"durationMs": 82431,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "attachment-1MiB",
+							"transactions": 521,
+							"payloadBytes": 2186463,
+							"exportToDownloadMs": 21551,
+							"independentOpenMs": 215,
+							"records": 536,
+							"attachmentBytes": 1048576,
+							"fileBytes": 2915522,
+							"totalExportAndOpenMs": 22507,
+							"longestMainThreadTaskMs": 118
+						},
+						"restore-measurement": {
+							"protection": "password",
+							"transactions": 521,
+							"totalRestoreMs": 40938
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-1MiB",
+								"transactions": 521,
+								"attachmentBytes": 1048576,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "password",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 138,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 52550004,
+								"pageHeapPeakBytes": 204585904,
+								"pageBackingPeakBytes": 94546696,
+								"browserProcessRssStartBytes": 1071005696,
+								"browserProcessRssPeakBytes": 1075642368
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 21589,
+									"longestTaskMs": 118,
+									"longestFrameGapMs": 100,
+									"longestTimerDelayMs": 109
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 234,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.799999999995634,
+									"longestTimerDelayMs": 1.100000023841858
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 723,
+									"longestTaskMs": 96,
+									"longestFrameGapMs": 83.40000000000146,
+									"longestTimerDelayMs": 70.39999997615814
+								},
+								{
+									"name": "preparation",
+									"durationMs": 532,
+									"longestTaskMs": 159,
+									"longestFrameGapMs": 133.3000000000029,
+									"longestTimerDelayMs": 114.40000009536743
+								},
+								{
+									"name": "restore",
+									"durationMs": 40938,
+									"longestTaskMs": 192,
+									"longestFrameGapMs": 166.70000000000437,
+									"longestTimerDelayMs": 193.60000002384186
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 2252,
+									"longestTaskMs": 101,
+									"longestFrameGapMs": 133.3000000000029,
+									"longestTimerDelayMs": 119.80000007152557
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [attachment-1MiB]",
+					"status": "passed",
+					"durationMs": 79778,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "attachment-1MiB",
+							"transactions": 521,
+							"payloadBytes": 2186463,
+							"exportToDownloadMs": 22917,
+							"independentOpenMs": 127,
+							"records": 536,
+							"attachmentBytes": 1048576,
+							"fileBytes": 2915427,
+							"totalExportAndOpenMs": 23845,
+							"longestMainThreadTaskMs": 118
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 37277
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-1MiB",
+								"transactions": 521,
+								"attachmentBytes": 1048576,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 133,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 50006688,
+								"pageHeapPeakBytes": 134340320,
+								"pageBackingPeakBytes": 86676468,
+								"browserProcessRssStartBytes": 866877440,
+								"browserProcessRssPeakBytes": 1081851904
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 22966,
+									"longestTaskMs": 118,
+									"longestFrameGapMs": 100.10000000000218,
+									"longestTimerDelayMs": 104.5
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 147,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.700000000004366,
+									"longestTimerDelayMs": 0.09999990463256836
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 768,
+									"longestTaskMs": 99,
+									"longestFrameGapMs": 83.29999999999563,
+									"longestTimerDelayMs": 58.60000002384186
+								},
+								{
+									"name": "preparation",
+									"durationMs": 443,
+									"longestTaskMs": 149,
+									"longestFrameGapMs": 150,
+									"longestTimerDelayMs": 114.60000002384186
+								},
+								{
+									"name": "restore",
+									"durationMs": 37277,
+									"longestTaskMs": 190,
+									"longestFrameGapMs": 183.3000000000029,
+									"longestTimerDelayMs": 165.89999997615814
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 2009,
+									"longestTaskMs": 144,
+									"longestFrameGapMs": 116.69999999999709,
+									"longestTimerDelayMs": 147.20000004768372
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source [attachment-4MiB]",
+					"status": "passed",
+					"durationMs": 104303,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "attachment-4MiB",
+							"transactions": 521,
+							"payloadBytes": 6380767,
+							"exportToDownloadMs": 33399,
+							"independentOpenMs": 455,
+							"records": 536,
+							"attachmentBytes": 4194304,
+							"fileBytes": 8507926,
+							"totalExportAndOpenMs": 35405,
+							"longestMainThreadTaskMs": 190
+						},
+						"restore-measurement": {
+							"protection": "password",
+							"transactions": 521,
+							"totalRestoreMs": 46363
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-4MiB",
+								"transactions": 521,
+								"attachmentBytes": 4194304,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "password",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 176,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 45185648,
+								"pageHeapPeakBytes": 260775420,
+								"pageBackingPeakBytes": 98068657,
+								"browserProcessRssStartBytes": 894304256,
+								"browserProcessRssPeakBytes": 1228718080
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 33439,
+									"longestTaskMs": 190,
+									"longestFrameGapMs": 166.6999999999971,
+									"longestTimerDelayMs": 160.60000002384186
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 472,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.80000000000291,
+									"longestTimerDelayMs": 1.5
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 1551,
+									"longestTaskMs": 104,
+									"longestFrameGapMs": 83.30000000000291,
+									"longestTimerDelayMs": 73.80000007152557
+								},
+								{
+									"name": "preparation",
+									"durationMs": 1087,
+									"longestTaskMs": 464,
+									"longestFrameGapMs": 450,
+									"longestTimerDelayMs": 418.7999999523163
+								},
+								{
+									"name": "restore",
+									"durationMs": 46363,
+									"longestTaskMs": 535,
+									"longestFrameGapMs": 516.6999999999971,
+									"longestTimerDelayMs": 525.8999999761581
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 2730,
+									"longestTaskMs": 285,
+									"longestFrameGapMs": 283.1999999999971,
+									"longestTimerDelayMs": 276.6999999284744
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [attachment-4MiB]",
+					"status": "passed",
+					"durationMs": 109239,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "attachment-4MiB",
+							"transactions": 521,
+							"payloadBytes": 6380767,
+							"exportToDownloadMs": 35286,
+							"independentOpenMs": 290,
+							"records": 536,
+							"attachmentBytes": 4194304,
+							"fileBytes": 8507835,
+							"totalExportAndOpenMs": 37111,
+							"longestMainThreadTaskMs": 184
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 49923
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-4MiB",
+								"transactions": 521,
+								"attachmentBytes": 4194304,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 185,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 55300624,
+								"pageHeapPeakBytes": 302986944,
+								"pageBackingPeakBytes": 103546799,
+								"browserProcessRssStartBytes": 924614656,
+								"browserProcessRssPeakBytes": 1171865600
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 35322,
+									"longestTaskMs": 184,
+									"longestFrameGapMs": 166.6999999999971,
+									"longestTimerDelayMs": 185.20000004768372
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 307,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.799999999995634,
+									"longestTimerDelayMs": 0.6000000238418579
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 1532,
+									"longestTaskMs": 102,
+									"longestFrameGapMs": 83.40000000000146,
+									"longestTimerDelayMs": 73.29999995231628
+								},
+								{
+									"name": "preparation",
+									"durationMs": 952,
+									"longestTaskMs": 476,
+									"longestFrameGapMs": 483.29999999999563,
+									"longestTimerDelayMs": 430.6999999284744
+								},
+								{
+									"name": "restore",
+									"durationMs": 49923,
+									"longestTaskMs": 553,
+									"longestFrameGapMs": 550,
+									"longestTimerDelayMs": 533.8000000715256
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 2548,
+									"longestTaskMs": 324,
+									"longestFrameGapMs": 316.6000000000058,
+									"longestTimerDelayMs": 281.8000000715256
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source [attachment-8MiB]",
+					"status": "passed",
+					"durationMs": 75142,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "attachment-8MiB",
+							"transactions": 521,
+							"payloadBytes": 11973171,
+							"exportToDownloadMs": 49448,
+							"independentOpenMs": 775,
+							"records": 536,
+							"attachmentBytes": 8388608,
+							"fileBytes": 15964466,
+							"totalExportAndOpenMs": 52829,
+							"longestMainThreadTaskMs": 286
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-8MiB",
+								"transactions": 521,
+								"attachmentBytes": 8388608,
+								"cpuRate": 1,
+								"refusesRestore": true
+							},
+							"protection": "password",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 108,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 69542500,
+								"pageHeapPeakBytes": 125079524,
+								"pageBackingPeakBytes": 205062301,
+								"browserProcessRssStartBytes": 865615872,
+								"browserProcessRssPeakBytes": 918159360
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 49489,
+									"longestTaskMs": 286,
+									"longestFrameGapMs": 283.3000000000029,
+									"longestTimerDelayMs": 286.7999999523163
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 791,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.80000000000291,
+									"longestTimerDelayMs": 1.5
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 2601,
+									"longestTaskMs": 103,
+									"longestFrameGapMs": 83.30000000000291,
+									"longestTimerDelayMs": 92.80000007152557
+								},
+								{
+									"name": "preparation",
+									"durationMs": 996,
+									"longestTaskMs": 483,
+									"longestFrameGapMs": 483.3000000000029,
+									"longestTimerDelayMs": 478.60000002384186
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [attachment-8MiB]",
+					"status": "passed",
+					"durationMs": 78721,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "attachment-8MiB",
+							"transactions": 521,
+							"payloadBytes": 11973171,
+							"exportToDownloadMs": 51390,
+							"independentOpenMs": 502,
+							"records": 536,
+							"attachmentBytes": 8388608,
+							"fileBytes": 15964371,
+							"totalExportAndOpenMs": 54499,
+							"longestMainThreadTaskMs": 289
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-8MiB",
+								"transactions": 521,
+								"attachmentBytes": 8388608,
+								"cpuRate": 1,
+								"refusesRestore": true
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 111,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 68707120,
+								"pageHeapPeakBytes": 131849332,
+								"pageBackingPeakBytes": 225187022,
+								"browserProcessRssStartBytes": 826671104,
+								"browserProcessRssPeakBytes": 952877056
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 51462,
+									"longestTaskMs": 289,
+									"longestFrameGapMs": 283.3000000000029,
+									"longestTimerDelayMs": 244.90000009536743
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 519,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.70000000001164,
+									"longestTimerDelayMs": 0.10000002384185791
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 2574,
+									"longestTaskMs": 104,
+									"longestFrameGapMs": 83.30000000000291,
+									"longestTimerDelayMs": 65.60000002384186
+								},
+								{
+									"name": "preparation",
+									"durationMs": 665,
+									"longestTaskMs": 496,
+									"longestFrameGapMs": 500,
+									"longestTimerDelayMs": 458.3000000715256
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source [inventory-cpu4x]",
+					"status": "passed",
+					"durationMs": 104226,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "inventory-cpu4x",
+							"transactions": 521,
+							"payloadBytes": 786133,
+							"exportToDownloadMs": 25048,
+							"independentOpenMs": 138,
+							"records": 534,
+							"attachmentBytes": 0,
+							"fileBytes": 1048414,
+							"totalExportAndOpenMs": 26187,
+							"longestMainThreadTaskMs": 439
+						},
+						"restore-measurement": {
+							"protection": "password",
+							"transactions": 521,
+							"totalRestoreMs": 56230
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "inventory-cpu4x",
+								"transactions": 521,
+								"attachmentBytes": 0,
+								"cpuRate": 4,
+								"refusesRestore": false
+							},
+							"protection": "password",
+							"cpuRate": 4,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 181,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 49842872,
+								"pageHeapPeakBytes": 82733816,
+								"pageBackingPeakBytes": 44190634,
+								"browserProcessRssStartBytes": 1018675200,
+								"browserProcessRssPeakBytes": 1018675200
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 25107,
+									"longestTaskMs": 419,
+									"longestFrameGapMs": 433.40000000000146,
+									"longestTimerDelayMs": 462.5
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 155,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.700000000004366,
+									"longestTimerDelayMs": 0
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 987,
+									"longestTaskMs": 439,
+									"longestFrameGapMs": 450,
+									"longestTimerDelayMs": 463.90000009536743
+								},
+								{
+									"name": "preparation",
+									"durationMs": 865,
+									"longestTaskMs": 258,
+									"longestFrameGapMs": 250,
+									"longestTimerDelayMs": 221.89999997615814
+								},
+								{
+									"name": "restore",
+									"durationMs": 56230,
+									"longestTaskMs": 384,
+									"longestFrameGapMs": 450,
+									"longestTimerDelayMs": 438.2000000476837
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 4149,
+									"longestTaskMs": 404,
+									"longestFrameGapMs": 433.3000000000029,
+									"longestTimerDelayMs": 511.5
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [inventory-cpu4x]",
+					"status": "passed",
+					"durationMs": 100010,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "inventory-cpu4x",
+							"transactions": 521,
+							"payloadBytes": 786133,
+							"exportToDownloadMs": 26747,
+							"independentOpenMs": 89,
+							"records": 534,
+							"attachmentBytes": 0,
+							"fileBytes": 1048323,
+							"totalExportAndOpenMs": 27839,
+							"longestMainThreadTaskMs": 460
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 49418
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "inventory-cpu4x",
+								"transactions": 521,
+								"attachmentBytes": 0,
+								"cpuRate": 4,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 4,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 172,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 49804380,
+								"pageHeapPeakBytes": 96668664,
+								"pageBackingPeakBytes": 47711092,
+								"browserProcessRssStartBytes": 819232768,
+								"browserProcessRssPeakBytes": 862109696
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 26789,
+									"longestTaskMs": 417,
+									"longestFrameGapMs": 400,
+									"longestTimerDelayMs": 410.3000000715256
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 111,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.700000000004366,
+									"longestTimerDelayMs": 0.5
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 994,
+									"longestTaskMs": 460,
+									"longestFrameGapMs": 466.6999999999971,
+									"longestTimerDelayMs": 457.2999999523163
+								},
+								{
+									"name": "preparation",
+									"durationMs": 809,
+									"longestTaskMs": 334,
+									"longestFrameGapMs": 333.3999999999942,
+									"longestTimerDelayMs": 293.59999990463257
+								},
+								{
+									"name": "restore",
+									"durationMs": 49418,
+									"longestTaskMs": 378,
+									"longestFrameGapMs": 433.3999999999942,
+									"longestTimerDelayMs": 456.5
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 4654,
+									"longestTaskMs": 440,
+									"longestFrameGapMs": 450,
+									"longestTimerDelayMs": 510.3000000715256
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"label": "boundaries",
+			"startedAt": "2026-11-07T14:31:14.332Z",
+			"durationMs": 224356.621,
+			"passed": 2,
+			"failed": 0,
+			"skipped": 0,
+			"cases": [
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [attachment-4MiB]",
+					"status": "passed",
+					"durationMs": 134177,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "attachment-4MiB",
+							"transactions": 521,
+							"payloadBytes": 6380767,
+							"exportToDownloadMs": 45435,
+							"independentOpenMs": 317,
+							"records": 536,
+							"attachmentBytes": 4194304,
+							"fileBytes": 8507835,
+							"totalExportAndOpenMs": 47389,
+							"longestMainThreadTaskMs": 189
+						},
+						"backup-cancellation": {
+							"workload": "attachment-4MiB",
+							"scope": "review-before-destination",
+							"cancelToEditableMs": 35
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 60088
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-4MiB",
+								"transactions": 521,
+								"attachmentBytes": 4194304,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"longTasksSupported": true,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 232,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 65052660,
+								"pageHeapPeakBytes": 364536884,
+								"pageBackingPeakBytes": 128022590,
+								"browserProcessRssStartBytes": 773128192,
+								"browserProcessRssPeakBytes": 1160626176
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 45477,
+									"longestTaskMs": 189,
+									"longestFrameGapMs": 166.70000000000437,
+									"longestTimerDelayMs": 172.5
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 335,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.70000000001164,
+									"longestTimerDelayMs": 0.5
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 1635,
+									"longestTaskMs": 107,
+									"longestFrameGapMs": 99.89999999999418,
+									"longestTimerDelayMs": 106.30000007152557
+								},
+								{
+									"name": "preparation",
+									"durationMs": 919,
+									"longestTaskMs": 468,
+									"longestFrameGapMs": 450,
+									"longestTimerDelayMs": 427.2000000476837
+								},
+								{
+									"name": "review-cancel",
+									"durationMs": 504,
+									"longestTaskMs": 102,
+									"longestFrameGapMs": 83.40000000000873,
+									"longestTimerDelayMs": 85.59999990463257
+								},
+								{
+									"name": "re-preparation",
+									"durationMs": 858,
+									"longestTaskMs": 461,
+									"longestFrameGapMs": 466.8000000000029,
+									"longestTimerDelayMs": 414.6999999284744
+								},
+								{
+									"name": "restore",
+									"durationMs": 60088,
+									"longestTaskMs": 568,
+									"longestFrameGapMs": 550,
+									"longestTimerDelayMs": 556
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 2941,
+									"longestTaskMs": 335,
+									"longestFrameGapMs": 316.69999999998254,
+									"longestTimerDelayMs": 303.7999999523163
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [attachment-8MiB]",
+					"status": "passed",
+					"durationMs": 89281,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "attachment-8MiB",
+							"transactions": 521,
+							"payloadBytes": 11973171,
+							"exportToDownloadMs": 62062,
+							"independentOpenMs": 518,
+							"records": 536,
+							"attachmentBytes": 8388608,
+							"fileBytes": 15964371,
+							"totalExportAndOpenMs": 65105,
+							"longestMainThreadTaskMs": 298
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "attachment-8MiB",
+								"transactions": 521,
+								"attachmentBytes": 8388608,
+								"cpuRate": 1,
+								"refusesRestore": true
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"longTasksSupported": true,
+							"memorySamplingIntervalMs": 500,
+							"browser": "chromium",
+							"memory": {
+								"samples": 133,
+								"samplingFailed": false,
+								"pageHeapStartBytes": 67197228,
+								"pageHeapPeakBytes": 124786156,
+								"pageBackingPeakBytes": 161698540,
+								"browserProcessRssStartBytes": 874643456,
+								"browserProcessRssPeakBytes": 918880256
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 62097,
+									"longestTaskMs": 298,
+									"longestFrameGapMs": 283.40000000000873,
+									"longestTimerDelayMs": 270.6999999284744
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 534,
+									"longestTaskMs": 0,
+									"longestFrameGapMs": 16.80000000000291,
+									"longestTimerDelayMs": 0.8999999761581421
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 2525,
+									"longestTaskMs": 102,
+									"longestFrameGapMs": 83.30000000000291,
+									"longestTimerDelayMs": 67.69999992847443
+								},
+								{
+									"name": "preparation",
+									"durationMs": 1095,
+									"longestTaskMs": 503,
+									"longestFrameGapMs": 500,
+									"longestTimerDelayMs": 465.5
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"label": "firefox",
+			"startedAt": "2026-11-07T14:36:04.351Z",
+			"durationMs": 130902.591,
+			"passed": 1,
+			"failed": 0,
+			"skipped": 0,
+			"cases": [
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [inventory]",
+					"status": "passed",
+					"durationMs": 124542,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "inventory",
+							"transactions": 521,
+							"payloadBytes": 786133,
+							"exportToDownloadMs": 29136,
+							"independentOpenMs": 78,
+							"records": 534,
+							"attachmentBytes": 0,
+							"fileBytes": 1048323,
+							"totalExportAndOpenMs": 29936,
+							"longestMainThreadTaskMs": null
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 71016
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "inventory",
+								"transactions": 521,
+								"attachmentBytes": 0,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"longTasksSupported": false,
+							"memorySamplingIntervalMs": 500,
+							"browser": "firefox",
+							"memory": {
+								"samples": 217,
+								"samplingFailed": false,
+								"pageHeapStartBytes": null,
+								"pageHeapPeakBytes": null,
+								"pageBackingPeakBytes": null,
+								"browserProcessRssStartBytes": null,
+								"browserProcessRssPeakBytes": null
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 29148,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 183.8000000000029,
+									"longestTimerDelayMs": 151
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 80,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 4.680000000000291,
+									"longestTimerDelayMs": 1
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 761,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 125,
+									"longestTimerDelayMs": 121
+								},
+								{
+									"name": "preparation",
+									"durationMs": 549,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 162.5,
+									"longestTimerDelayMs": 168
+								},
+								{
+									"name": "restore",
+									"durationMs": 71016,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 133.3199999999997,
+									"longestTimerDelayMs": 121
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 4139,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 158.32000000000698,
+									"longestTimerDelayMs": 136
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"label": "webkit",
+			"startedAt": "2026-11-07T14:38:15.656Z",
+			"durationMs": 122938.426,
+			"passed": 1,
+			"failed": 0,
+			"skipped": 0,
+			"cases": [
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [inventory]",
+					"status": "passed",
+					"durationMs": 121769,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "inventory",
+							"transactions": 521,
+							"payloadBytes": 786133,
+							"exportToDownloadMs": 31373,
+							"independentOpenMs": 78,
+							"records": 534,
+							"attachmentBytes": 0,
+							"fileBytes": 1048323,
+							"totalExportAndOpenMs": 32106,
+							"longestMainThreadTaskMs": null
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 65289
+						},
+						"backup-qualification": {
+							"workload": {
+								"label": "inventory",
+								"transactions": 521,
+								"attachmentBytes": 0,
+								"cpuRate": 1,
+								"refusesRestore": false
+							},
+							"protection": "none",
+							"cpuRate": 1,
+							"longTasksSupported": false,
+							"memorySamplingIntervalMs": 500,
+							"browser": "webkit",
+							"memory": {
+								"samples": 209,
+								"samplingFailed": false,
+								"pageHeapStartBytes": null,
+								"pageHeapPeakBytes": null,
+								"pageBackingPeakBytes": null,
+								"browserProcessRssStartBytes": null,
+								"browserProcessRssPeakBytes": null
+							},
+							"phases": [
+								{
+									"name": "export",
+									"durationMs": 31388,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 107,
+									"longestTimerDelayMs": 94
+								},
+								{
+									"name": "independent-open",
+									"durationMs": 79,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 19,
+									"longestTimerDelayMs": 2
+								},
+								{
+									"name": "verify-export",
+									"durationMs": 647,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 117,
+									"longestTimerDelayMs": 82
+								},
+								{
+									"name": "preparation",
+									"durationMs": 435,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 113,
+									"longestTimerDelayMs": 104
+								},
+								{
+									"name": "restore",
+									"durationMs": 65289,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 114,
+									"longestTimerDelayMs": 77
+								},
+								{
+									"name": "verify-restore",
+									"durationMs": 3924,
+									"longestTaskMs": null,
+									"longestFrameGapMs": 166,
+									"longestTimerDelayMs": 154
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"label": "normal-ci",
+			"startedAt": "2026-11-07T14:40:18.980Z",
+			"durationMs": 17724.857,
+			"passed": 0,
+			"failed": 1,
+			"skipped": 2,
+			"cases": [
+				{
+					"name": "failed backup release remains recoverable after leaving settings",
+					"status": "failed",
+					"durationMs": 17013,
+					"measurements": {}
+				}
+			]
+		},
+		{
+			"label": "normal-ci-final",
+			"startedAt": "2026-11-07T14:44:59.342Z",
+			"durationMs": 341751.124,
+			"passed": 2,
+			"failed": 1,
+			"skipped": 0,
+			"cases": [
+				{
+					"name": "failed backup release remains recoverable after leaving settings",
+					"status": "passed",
+					"durationMs": 31992,
+					"measurements": {}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source",
+					"status": "passed",
+					"durationMs": 128872,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "baseline",
+							"transactions": 521,
+							"payloadBytes": 788359,
+							"exportToDownloadMs": 36852,
+							"independentOpenMs": 143,
+							"records": 536,
+							"attachmentBytes": 8,
+							"fileBytes": 1051382,
+							"totalExportAndOpenMs": 37658,
+							"longestMainThreadTaskMs": 105
+						},
+						"restore-measurement": {
+							"protection": "password",
+							"transactions": 521,
+							"totalRestoreMs": 67715
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source",
+					"status": "timedOut",
+					"durationMs": 180114,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "baseline",
+							"transactions": 521,
+							"payloadBytes": 788359,
+							"exportToDownloadMs": 38957,
+							"independentOpenMs": 78,
+							"records": 536,
+							"attachmentBytes": 8,
+							"fileBytes": 1051291,
+							"totalExportAndOpenMs": 39673,
+							"longestMainThreadTaskMs": 105
+						}
+					}
+				}
+			]
+		},
+		{
+			"label": "fresh-ci",
+			"startedAt": "2026-11-07T14:58:45.020Z",
+			"durationMs": 89139.67099999999,
+			"passed": 3,
+			"failed": 0,
+			"skipped": 0,
+			"cases": [
+				{
+					"name": "failed backup release remains recoverable after leaving settings",
+					"status": "passed",
+					"durationMs": 5602,
+					"measurements": {}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source",
+					"status": "passed",
+					"durationMs": 37304,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "password",
+							"workload": "baseline",
+							"transactions": 521,
+							"payloadBytes": 788359,
+							"exportToDownloadMs": 3409,
+							"independentOpenMs": 121,
+							"records": 536,
+							"attachmentBytes": 8,
+							"fileBytes": 1051382,
+							"totalExportAndOpenMs": 3981,
+							"longestMainThreadTaskMs": 114
+						},
+						"restore-measurement": {
+							"protection": "password",
+							"transactions": 521,
+							"totalRestoreMs": 17992
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source",
+					"status": "passed",
+					"durationMs": 42936,
+					"measurements": {
+						"backup-measurement": {
+							"protection": "none",
+							"workload": "baseline",
+							"transactions": 521,
+							"payloadBytes": 788359,
+							"exportToDownloadMs": 4739,
+							"independentOpenMs": 53,
+							"records": 536,
+							"attachmentBytes": 8,
+							"fileBytes": 1051291,
+							"totalExportAndOpenMs": 5192,
+							"longestMainThreadTaskMs": 108
+						},
+						"restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 20708
+						}
+					}
+				}
+			]
+		}
+	],
+	"hosts": [
+		{
+			"node": "v24.22.2",
+			"platform": "darwin",
+			"release": "25.6.0",
+			"arch": "arm64",
+			"cpu": "Apple M4 Pro",
+			"cores": 12,
+			"memoryBytes": 25769803776
+		}
+	],
+	"browsers": [
+		{
+			"name": "chromium",
+			"version": "156.0.8078.4"
+		},
+		{
+			"name": "firefox",
+			"version": "157.0"
+		},
+		{
+			"name": "webkit",
+			"version": "27.2"
+		}
+	],
+	"deployedFakeDataRehearsal": {
+		"origin": "https://6aef268f8874d12e026bf451--delightful-finance.netlify.app",
+		"appId": "b7fe11a2-065d-4213-8b16-1625e0a59d3c",
+		"deployId": "6aef268f8874d12e026bf451",
+		"commit": "23e811fafb0182f87efe2adde6e0af238bb62257",
+		"observations": [
+			{
+				"label": "source-password",
+				"protection": "password",
+				"durationMs": 11033,
+				"fileBytes": 274110,
+				"recordCounts": {
+					"accounts": 3,
+					"categories": 8,
+					"organizations": 1,
+					"transactions": 120
+				},
+				"references": 2,
+				"attachments": 0
+			},
+			{
+				"label": "restored-after-browser-restart",
+				"protection": "none",
+				"durationMs": 12909,
+				"fileBytes": 640255,
+				"recordCounts": {
+					"accounts": 3,
+					"categories": 8,
+					"organizations": 1,
+					"transactions": 120
+				},
+				"references": 3,
+				"attachments": 1
+			},
+			{
+				"label": "source-after-restore",
+				"protection": "none",
+				"durationMs": 10711,
+				"fileBytes": 274019,
+				"recordCounts": {
+					"accounts": 3,
+					"categories": 8,
+					"organizations": 1,
+					"transactions": 120
+				},
+				"references": 2,
+				"attachments": 0
+			}
+		],
+		"productionRequestsBlocked": 0,
+		"pageErrors": 0,
+		"restoreMs": 36570,
+		"sourcePreserved": true,
+		"freshBrowserBusinessComparison": true,
+		"exactRetainedPayload": true,
+		"noDuplicateDestination": true,
+		"sourcePayloadSha256": "26c05374cb16841f7258548bf8c6367e969cbd13dcd289827cc0d03b58c1c873",
+		"outcome": "passed",
+		"observedOn": "2026-11-07",
+		"publicBinding": {
+			"origin": "https://6aef268f8874d12e026bf451--delightful-finance.netlify.app",
+			"asset": "https://6aef268f8874d12e026bf451--delightful-finance.netlify.app/_app/immutable/chunks/yyYhRkyx.js",
+			"appId": "b7fe11a2-065d-4213-8b16-1625e0a59d3c",
+			"serverUrl": "https://v2.sync.jazz.tools/",
+			"assetsVisited": 25
+		},
+		"source": "Existing PUBLIC_FAKE_DATA startup seeder under a new anonymous test identity: 120 transactions, three accounts, eight categories; no original attachments.",
+		"browserSession": "Owned isolated persistent Chromium profile, entire browser closed and relaunched before destination verification; no user browser connection.",
+		"comparison": "Independent Node opening; all business fields/relationships compared after reference normalization; complete checked source payload compared byte-for-byte; original records/references/attachments including audit compared exactly after restore.",
+		"retainedFiles": "Fake-data .dlf files retained outside Git in a private temporary test directory.",
+		"limits": [
+			"One Chromium desktop fake graph; no real phone or maximum-size qualification.",
+			"No original financial attachments in this workload. Destination attachment is the retained checked source payload.",
+			"Production data, session and admin credential were not used.",
+			"Disposable preview Jazz app expires after 14 days; this is not a persistent staging environment."
+		],
+		"harnessSetupCorrection": "Initial direct navigation without a workspace selected showed the workspace picker. The harness was corrected to select the generated Personal workspace, reusing the same test identity. No application code changed and no timeout was increased."
+	},
+	"capacityAlignment": {
+		"implementation": "three existing application files; shared pure predicate and existing native validation/cleanup states",
+		"nativeTests": {
+			"passed": 32,
+			"total": 32,
+			"durationSeconds": 99.95
+		},
+		"applicationDiagnostics": {
+			"errors": 0,
+			"warnings": 0
+		},
+		"testTypes": "passed",
+		"e2eScopes": "passed",
+		"productionBuild": "passed; Netlify adapter 7.0.1 installed only in temporary build dependencies; repository lockfile unchanged",
+		"deployedFakeData": {
+			"origin": "https://6aef49eb6d8987a6c61293bb--delightful-finance.netlify.app",
+			"appId": "cbed0d21-9d25-4949-bacb-1ec3c0be1aa2",
+			"deployId": "6aef49eb6d8987a6c61293bb",
+			"baseCommit": "ab6c85073b0fbb2187283965a547eb50928f166c",
+			"uncommittedCapacityFix": true,
+			"observations": [
+				{
+					"label": "baseline-password",
+					"protection": "password",
+					"durationMs": 8159,
+					"fileBytes": 246074,
+					"recordCounts": {
+						"accounts": 1,
+						"categories": 1,
+						"organizations": 1,
+						"transactions": 120
+					},
+					"references": 2,
+					"attachments": 0
+				},
+				{
+					"label": "source-4MiB-password",
+					"protection": "password",
+					"durationMs": 19066,
+					"fileBytes": 7705586,
+					"recordCounts": {
+						"accounts": 1,
+						"categories": 1,
+						"files": 1,
+						"organizations": 1,
+						"transactionAttachments": 1,
+						"transactions": 120
+					},
+					"references": 2,
+					"attachments": 1
+				},
+				{
+					"label": "source-after-restore",
+					"protection": "none",
+					"durationMs": 19741,
+					"fileBytes": 7705491,
+					"recordCounts": {
+						"accounts": 1,
+						"categories": 1,
+						"files": 1,
+						"organizations": 1,
+						"transactionAttachments": 1,
+						"transactions": 120
+					},
+					"references": 2,
+					"attachments": 1
+				}
+			],
+			"productionRequestsBlocked": 0,
+			"pageErrors": 0,
+			"restoreMs": 51741,
+			"exportRefusals": [
+				{
+					"protection": "password",
+					"durationMs": 31426,
+					"downloads": 0,
+					"sourcePreserved": true
+				},
+				{
+					"protection": "none",
+					"durationMs": 25998,
+					"downloads": 0,
+					"sourcePreserved": true
+				}
+			],
+			"sourcePreserved": true,
+			"freshBrowserBusinessComparison": true,
+			"exactRetainedPayload": true,
+			"noDuplicateDestination": true,
+			"sourcePayloadSha256": "30a54484f817cc2ced2771a82cadadab7813eba0fd5d06ed42dbfb71152a404b",
+			"outcome": "partial: low-level checks passed; startup initialization not qualified",
+			"publicBinding": {
+				"origin": "https://6aef49eb6d8987a6c61293bb--delightful-finance.netlify.app",
+				"appId": "cbed0d21-9d25-4949-bacb-1ec3c0be1aa2",
+				"serverUrl": "https://v2.sync.jazz.tools/",
+				"assets": [
+					{
+						"url": "https://6aef49eb6d8987a6c61293bb--delightful-finance.netlify.app/_app/immutable/chunks/xcJ3SORN.js",
+						"sha256": "c288b92f31f16a0fef9c6cb1b7b99febd5c941df13febf9e911c401da2d6dd51"
+					}
+				]
+			},
+			"sourcePatchSha256": "00695cc0e77f45b6e4854ddfd49c0b82546fab3088ea19322680051544be686e",
+			"observedOn": "2026-11-07",
+			"sourceData": "Ordinary local-first test account recovered through Finance login; manually seeded 120 transactions, one account and one category, plus test-owned 4/8 MiB binary attachments. The manual profile omitted initialWorkspaceId.",
+			"comparison": "After complete browser close/relaunch: fresh remote rows compared by all captured business fields and reference content; every financial file part hash and the entire retained source payload checked; original archive records/references/attachments and source snapshot unchanged.",
+			"capacityRule": "Finance encoder payload ceiling 8 MiB, shared restore reservation predicate; no schema/format/DLF-limit changes or new serialization pass.",
+			"qualification": "Retained low-level 4 MiB restore/comparison and 8 MiB refusal evidence. Later inspection found the manual profile omitted initialWorkspaceId and root initialization failed; this run does not qualify healthy application startup.",
+			"setupCorrection": "Initial seeder mistakenly used a schema-admin credential for backend admission and was rejected with HTTP 401 before any data writes. Test changed to ordinary local-first authentication and existing recovery UI; no backend data credential or policy bypass was used.",
+			"limits": [
+				"Chromium desktop, controlled fake records/low-entropy binary data; no phone or maximum aggregate/count qualification.",
+				"No latency improvement claimed. Extended-run slowdown and prior disposable-server exit 137 remain unresolved.",
+				"Retained provenance consumes the same export budget, so a restored workspace can reach the next-generation export bound.",
+				"Unclaimed test app expires after 14 days. Production workspace data/session/credential excluded.",
+				"Manual fixture omitted profiles.initialWorkspaceId; do not use this run as healthy-startup/UI readiness qualification. Current stress investigation uses the actual deployed application startup seeder."
+			],
+			"reportedOutcome": "passed"
+		},
+		"normalUi": {
+			"passed": 3,
+			"durationMs": 88839.01400000001,
+			"cases": [
+				{
+					"name": "failed backup release remains recoverable after leaving settings",
+					"status": "passed",
+					"durationMs": 5449,
+					"measurements": {}
+				},
+				{
+					"name": "downloads and independently reopens a Finance password backup without changing source",
+					"status": "passed",
+					"durationMs": 36703,
+					"measurements": {
+						"finance-backup-measurement": {
+							"protection": "password",
+							"workload": "baseline",
+							"transactions": 521,
+							"payloadBytes": 788359,
+							"exportToDownloadMs": 3313,
+							"independentOpenMs": 122,
+							"records": 536,
+							"attachmentBytes": 8,
+							"fileBytes": 1051382,
+							"totalExportAndOpenMs": 3871,
+							"longestMainThreadTaskMs": 109
+						},
+						"finance-restore-measurement": {
+							"protection": "password",
+							"transactions": 521,
+							"totalRestoreMs": 17463
+						}
+					}
+				},
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source",
+					"status": "passed",
+					"durationMs": 42864,
+					"measurements": {
+						"finance-backup-measurement": {
+							"protection": "none",
+							"workload": "baseline",
+							"transactions": 521,
+							"payloadBytes": 788359,
+							"exportToDownloadMs": 4671,
+							"independentOpenMs": 73,
+							"records": 536,
+							"attachmentBytes": 8,
+							"fileBytes": 1051291,
+							"totalExportAndOpenMs": 5148,
+							"longestMainThreadTaskMs": 106
+						},
+						"finance-restore-measurement": {
+							"protection": "none",
+							"transactions": 521,
+							"totalRestoreMs": 20730
+						}
+					}
+				}
+			]
+		},
+		"boundaryUi": {
+			"passed": 1,
+			"durationMs": 33024.62,
+			"cases": [
+				{
+					"name": "downloads and independently reopens a Finance none backup without changing source [attachment-8MiB]",
+					"status": "passed",
+					"durationMs": 32420,
+					"measurements": {
+						"finance-backup-refusal": {
+							"protection": "none",
+							"workload": "attachment-8MiB",
+							"refusedAt": "export",
+							"durationMs": 13881
+						}
+					}
+				}
+			]
+		}
+	},
+	"stressInvestigation": {
+		"observedOn": "2026-11-07",
+		"appPatch": "No additional application changes during stress diagnosis; the existing capacity change is held constant.",
+		"isolation": {
+			"origin": "https://6aef49eb6d8987a6c61293bb--delightful-finance.netlify.app",
+			"appId": "cbed0d21-9d25-4949-bacb-1ec3c0be1aa2",
+			"productionDataAccess": false,
+			"accountCreation": "Actual deployed Finance startup and its built-in fake-data seeder; ordinary test-owned recovery phrase used only in memory to add 401 transactions to the default 120."
+		},
+		"hostPressure": {
+			"report": "JetsamEvent-2026-11-07-094938.ips",
+			"largestProcess": "node",
+			"largestNodePid": 61050,
+			"largestNodeAccountingPages": 4263158,
+			"pageSizeBytes": 16384,
+			"largestNodeFootprintAccountingBytes": 69847580672,
+			"note": "Footprint accounting includes compressed pages; this is not resident RAM. Ownership of PID 61050 is not established by this report.",
+			"nodeKillLogLines": []
+		},
+		"localServerFootprint": {
+			"pid": 58225,
+			"physicalFootprintGiB": 2.8,
+			"rssMiB": 111,
+			"phase": "Idle after prior qualification; not an attribution of the original termination. Footprint includes compressed memory.",
+			"cleanup": "Owned disposable PID 58225, command and port verified, terminated intentionally with SIGTERM after qualification; user ports 5173/5174 untouched."
+		},
+		"invalidInitialFixture": {
+			"outcome": "excluded from healthy-startup qualification",
+			"reason": "Manual profiles.initialWorkspaceId omitted; initializationMissing readiness failure. Earlier low-level results retained separately.",
+			"rounds": [
+				{
+					"label": "warm-1",
+					"exportMs": 9855,
+					"restoreMs": 93970
+				},
+				{
+					"label": "warm-2",
+					"exportMs": 13422,
+					"restoreMs": 104835
+				},
+				{
+					"label": "warm-3",
+					"outcome": "no download before observation deadline"
+				}
+			]
+		},
+		"startupSeededUi": {
+			"startedAt": "2026-11-07T16:48:53.689Z",
+			"finishedAt": "2026-11-07T17:01:15.971Z",
+			"browserVersion": "156.0.8078.4",
+			"rounds": [
+				{
+					"label": "warm-1",
+					"exportMs": 27560,
+					"records": 535,
+					"preparationMs": 210,
+					"restoreMs": 127946,
+					"visibleDestinations": 1,
+					"sourcePreserved": true,
+					"settledHeapMiB": 25,
+					"settledBrowserRssMiB": 719,
+					"workerTargets": 2,
+					"status": "passed"
+				},
+				{
+					"label": "warm-2",
+					"exportMs": 21999,
+					"records": 535,
+					"preparationMs": 214,
+					"restoreMs": 116443,
+					"visibleDestinations": 2,
+					"sourcePreserved": true,
+					"settledHeapMiB": 28,
+					"settledBrowserRssMiB": 775,
+					"workerTargets": 3,
+					"status": "passed"
+				},
+				{
+					"label": "warm-3",
+					"status": "failed"
+				},
+				{
+					"label": "restarted-browser",
+					"exportMs": 27240,
+					"records": 535,
+					"preparationMs": 175,
+					"restoreMs": 146481,
+					"visibleDestinations": 3,
+					"sourcePreserved": true,
+					"settledHeapMiB": 23,
+					"settledBrowserRssMiB": 744,
+					"workerTargets": 2,
+					"status": "passed"
+				}
+			],
+			"snapshots": [
+				{
+					"label": "initial",
+					"elapsedMs": 53610,
+					"pageHeapBytes": 35875864,
+					"pageBackingBytes": 4843189,
+					"browserRssSumBytes": 777666560,
+					"browserProcesses": 4,
+					"targetCounts": {
+						"shared_worker": 1,
+						"service_worker": 1,
+						"page": 1
+					},
+					"dom": {
+						"documents": 4,
+						"nodes": 4450,
+						"jsEventListeners": 107
+					},
+					"storage": {
+						"usageBytes": 76596495,
+						"quotaBytes": 10814014735
+					},
+					"node": {
+						"rss": 271695872,
+						"heapTotal": 212336640,
+						"heapUsed": 112716600,
+						"external": 6093961,
+						"arrayBuffers": 1471602
+					}
+				},
+				{
+					"label": "warm-1",
+					"elapsedMs": 211423,
+					"pageHeapBytes": 25726044,
+					"pageBackingBytes": 4321300,
+					"browserRssSumBytes": 754024448,
+					"browserProcesses": 4,
+					"targetCounts": {
+						"shared_worker": 2,
+						"service_worker": 1,
+						"page": 1
+					},
+					"dom": {
+						"documents": 2,
+						"nodes": 2368,
+						"jsEventListeners": 119
+					},
+					"storage": {
+						"usageBytes": 85600112,
+						"quotaBytes": 10823018352
+					},
+					"node": {
+						"rss": 165937152,
+						"heapTotal": 91406336,
+						"heapUsed": 76234120,
+						"external": 4590292,
+						"arrayBuffers": 351203
+					}
+				},
+				{
+					"label": "warm-2",
+					"elapsedMs": 350243,
+					"pageHeapBytes": 29159140,
+					"pageBackingBytes": 4014630,
+					"browserRssSumBytes": 812630016,
+					"browserProcesses": 4,
+					"targetCounts": {
+						"shared_worker": 3,
+						"service_worker": 1,
+						"page": 1
+					},
+					"dom": {
+						"documents": 2,
+						"nodes": 2411,
+						"jsEventListeners": 120
+					},
+					"storage": {
+						"usageBytes": 88973664,
+						"quotaBytes": 10826391904
+					},
+					"node": {
+						"rss": 155598848,
+						"heapTotal": 77250560,
+						"heapUsed": 71520504,
+						"external": 4583836,
+						"arrayBuffers": 351831
+					}
+				},
+				{
+					"label": "restarted-browser-initial",
+					"elapsedMs": 531592,
+					"pageHeapBytes": 22177932,
+					"pageBackingBytes": 4389203,
+					"browserRssSumBytes": 664535040,
+					"browserProcesses": 4,
+					"targetCounts": {
+						"shared_worker": 1,
+						"service_worker": 1,
+						"page": 1
+					},
+					"dom": {
+						"documents": 2,
+						"nodes": 2405,
+						"jsEventListeners": 103
+					},
+					"storage": {
+						"usageBytes": 90128821,
+						"quotaBytes": 10827547061
+					},
+					"node": {
+						"rss": 162332672,
+						"heapTotal": 83017728,
+						"heapUsed": 60937128,
+						"external": 4672673,
+						"arrayBuffers": 436592
+					}
+				},
+				{
+					"label": "restarted-browser",
+					"elapsedMs": 707531,
+					"pageHeapBytes": 23984672,
+					"pageBackingBytes": 3881293,
+					"browserRssSumBytes": 780238848,
+					"browserProcesses": 4,
+					"targetCounts": {
+						"shared_worker": 2,
+						"service_worker": 1,
+						"page": 1
+					},
+					"dom": {
+						"documents": 2,
+						"nodes": 2389,
+						"jsEventListeners": 119
+					},
+					"storage": {
+						"usageBytes": 88717567,
+						"quotaBytes": 10826135807
+					},
+					"node": {
+						"rss": 128499712,
+						"heapTotal": 77807616,
+						"heapUsed": 75440712,
+						"external": 7594159,
+						"arrayBuffers": 3358046
+					}
+				}
+			],
+			"outcome": "failed",
+			"warmFailure": "page.waitForEvent: Timeout 180000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================",
+			"failure": "NotObserved: Timed out waiting for query coverage",
+			"failureStatus": ["", "", "", " Online", "Done", ""],
+			"failureAlerts": ["", "Couldn\u2019t complete the request. Please try again.", ""],
+			"errors": 0,
+			"productionRequestsBlocked": 0
+		},
+		"exportOnlyDiagnostic": {
+			"diagnostic": "Original served bytes, passive conditional CDP breakpoints; timing is diagnostic only.",
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 37041,
+					"download": true,
+					"trace": [
+						{
+							"kind": "result",
+							"outcome": "exported",
+							"count": 1
+						}
+					],
+					"status": ["", "", "", " Online", "Download started.", ""],
+					"alerts": ["", ""]
+				},
+				{
+					"i": 2,
+					"durationMs": 32980,
+					"download": true,
+					"trace": [
+						{
+							"kind": "result",
+							"outcome": "exported",
+							"count": 1
+						}
+					],
+					"status": ["", "", "", " Online", "Download started.", ""],
+					"alerts": ["", ""]
+				},
+				{
+					"i": 3,
+					"durationMs": 52058,
+					"download": false,
+					"trace": [
+						{
+							"kind": "reader",
+							"event": "xstate.error.actor.0.(machine).metadata",
+							"errorName": "JazzExportError",
+							"errorCode": "failed",
+							"count": 1
+						},
+						{
+							"kind": "result",
+							"outcome": "failed",
+							"code": "failed",
+							"count": 1
+						}
+					],
+					"status": ["", "", "", " Online", ""],
+					"alerts": ["", "Couldn\u2019t complete the request. Please try again.", ""]
+				}
+			],
+			"startedAt": "2026-11-07T17:07:54.957Z",
+			"outcome": "export-failed",
+			"finishedAt": "2026-11-07T17:10:00.352Z"
+		},
+		"rawSdkFailureDiagnostic": {
+			"diagnostic": "Original served bytes, passive conditional CDP breakpoints; timing is diagnostic only.",
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 36047,
+					"download": true,
+					"trace": [
+						{
+							"kind": "result",
+							"outcome": "exported",
+							"count": 1
+						}
+					],
+					"status": ["", "", "", " Online", "Download started.", ""],
+					"alerts": ["", ""]
+				},
+				{
+					"i": 2,
+					"durationMs": 38003,
+					"download": true,
+					"trace": [
+						{
+							"kind": "result",
+							"outcome": "exported",
+							"count": 1
+						}
+					],
+					"status": ["", "", "", " Online", "Download started.", ""],
+					"alerts": ["", ""]
+				},
+				{
+					"i": 3,
+					"durationMs": 15944,
+					"download": false,
+					"trace": [
+						{
+							"kind": "readFailure",
+							"mode": "hydrate",
+							"errorName": "Error",
+							"errorCode": "not_observed",
+							"count": 14
+						},
+						{
+							"kind": "reader",
+							"event": "xstate.error.actor.0.(machine).metadata",
+							"errorName": "JazzExportError",
+							"errorCode": "failed",
+							"count": 1
+						},
+						{
+							"kind": "result",
+							"outcome": "failed",
+							"code": "failed",
+							"count": 1
+						}
+					],
+					"status": ["", "", "", " Online", ""],
+					"alerts": ["", "Couldn\u2019t complete the request. Please try again.", ""]
+				}
+			],
+			"startedAt": "2026-11-07T17:10:23.876Z",
+			"outcome": "export-failed",
+			"finishedAt": "2026-11-07T17:11:56.738Z"
+		},
+		"nodeReadControl": {
+			"control": "Ordinary public SDK memory client; existing fake account; read only, no export, transaction or restore",
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 6184,
+					"queries": 13,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 2,
+					"durationMs": 2692,
+					"queries": 13,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 3,
+					"durationMs": 3017,
+					"queries": 13,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 4,
+					"durationMs": 3302,
+					"queries": 13,
+					"countsMatch": true,
+					"errors": []
+				}
+			],
+			"startedAt": "2026-11-07T17:12:34.977Z",
+			"outcome": "passed",
+			"finishedAt": "2026-11-07T17:12:50.626Z",
+			"tables": [
+				"accounts",
+				"categories",
+				"tags",
+				"transactions",
+				"transactionTags",
+				"checks",
+				"internalTransfers",
+				"transactionBatches",
+				"batchTemplates",
+				"simplefinConnections",
+				"simplefinAccountLinks",
+				"simplefinSyncAttempts",
+				"simplefinSyncAccountResults"
+			],
+			"expectedCounts": {
+				"accounts": 3,
+				"categories": 8,
+				"tags": 0,
+				"transactions": 521,
+				"transactionTags": 0,
+				"checks": 0,
+				"internalTransfers": 0,
+				"transactionBatches": 0,
+				"batchTemplates": 0,
+				"simplefinConnections": 0,
+				"simplefinAccountLinks": 0,
+				"simplefinSyncAttempts": 0,
+				"simplefinSyncAccountResults": 0
+			}
+		},
+		"browserReadControl": {
+			"control": "Existing deployed browser persistent Db; ordinary public schema queries only; no backup submission, exclusive transaction, restore or Node SDK client. Original application bytes and a test-only schema module.",
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 6806,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 2,
+					"durationMs": 2989,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 3,
+					"durationMs": 2792,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 4,
+					"durationMs": 2998,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				}
+			],
+			"startedAt": "2026-11-07T17:14:09.647Z",
+			"outcome": "passed",
+			"finishedAt": "2026-11-07T17:14:26.480Z",
+			"tables": [
+				"accounts",
+				"accountMemberships",
+				"categories",
+				"tags",
+				"transactions",
+				"transactionTags",
+				"checks",
+				"internalTransfers",
+				"transactionBatches",
+				"batchTemplates",
+				"simplefinConnections",
+				"simplefinAccountLinks",
+				"simplefinSyncAttempts",
+				"simplefinSyncAccountResults"
+			],
+			"expectedCounts": {
+				"accounts": 3,
+				"accountMemberships": 0,
+				"categories": 8,
+				"tags": 0,
+				"transactions": 521,
+				"transactionTags": 0,
+				"checks": 0,
+				"internalTransfers": 0,
+				"transactionBatches": 0,
+				"batchTemplates": 0,
+				"simplefinConnections": 0,
+				"simplefinAccountLinks": 0,
+				"simplefinSyncAttempts": 0,
+				"simplefinSyncAccountResults": 0
+			}
+		},
+		"conclusions": [
+			"Two healthy startup-seeded warm UI round trips preserved source; third export failed. A complete browser restart restored successful export and restore on the same source/account.",
+			"Export-only diagnostics reproduced failure on the third attempt in two separately restarted browser runs, so intervening restore activity is not necessary.",
+			"Passive CDP breakpoints on original served bytes identified not_observed during hydrate metadata, before capture. The reader/root reached failed; this was not an unknown state or download-policy rejection.",
+			"Four groups of ordinary read-only queries passed in both a Node memory client and the deployed browser persistent client. This does not isolate every difference from capture.",
+			"Page heap stayed approximately 23-28 MiB after successful UI rounds; SharedWorker target counts alone do not establish active client leaks. SDK worker closure intentionally avoids workerGlobal.close() on lease release.",
+			"The fresh-account control failed in test setup with NotObserved before backup measurement; it is not a passing fresh-account comparison.",
+			"Original exit 137 remains unattributed. No timeout increases, retries, SDK private API workaround or consistency downgrade were applied.",
+			"Fourteen-query public native capture reproduced not_observed on the third capture after two accepted zero-write commits. Sequential transaction reads also failed on the third capture; serializing reads is not a demonstrated fix.",
+			"Eight captures of the three-row accounts query passed. Four captures of the 521-row transactions query also passed, but native reads took 12.3-13.0 seconds versus 1.2-1.5 seconds for warm ordinary reads. The successful native commit waits took 0.65-0.83 seconds. These controls do not prove an ordinal third-transaction rule or identify the exact SDK/core fault.",
+			"Do not rewrite Finance orchestration to address this evidence. Investigate the public native read/coverage path with the failing multi-query reproducer while preserving remote hydration, exclusive validation and finite cleanup.",
+			"Node public SDK capture also reproduced the problem after the Finance browser was closed: two zero-write captures accepted; the next ordinary hydration queries all failed with not_observed. The harness then attempted a capture that also failed; that extra failure is not evidence of a separately valid hydrated capture. This excludes Finance UI/backup runtime as a necessary condition, but not its schema/policy or the cloud service.",
+			"A longer ordinary-read-only Node control passed 112 queries in eight groups after the Finance browser closed. That query count alone does not reproduce the native-capture failure. Exact elapsed-time, client/core, cloud service and permission-evaluation causes remain unresolved."
+		],
+		"limits": [
+			"One desktop Chromium host, one preview/backend app, synthetic 521-transaction graph; phone, maximum aggregate and storage pressure unqualified.",
+			"Passive debugger controls are diagnostic, not production latency benchmarks.",
+			"The original invalid-fixture download control also stopped on a global initialization alert; it does not establish automatic-download blocking.",
+			"A subsequent manual profile/marker setup stalled before measurement and was terminated; no passing evidence is claimed.",
+			"All native controls retain the same Finance schema/policy and cloud service. No exact client/core/server/policy defect or universally failing transaction ordinal has been isolated."
+		],
+		"nativeCaptureControl": {
+			"control": "Original deployed persistent Db; 14 public remote metadata queries, exclusive transaction, same 14 public remote queries, zero application mutations, wait() verdict. No Finance backup submission, payload validation, encryption, handoff or restore.",
+			"startedAt": "2026-11-07T17:15:05.842Z",
+			"finishedAt": "2026-11-07T17:16:44.691Z",
+			"outcome": "read-failed",
+			"expectedCounts": {
+				"accounts": 3,
+				"accountMemberships": 0,
+				"categories": 8,
+				"tags": 0,
+				"transactions": 521,
+				"transactionTags": 0,
+				"checks": 0,
+				"internalTransfers": 0,
+				"transactionBatches": 0,
+				"batchTemplates": 0,
+				"simplefinConnections": 0,
+				"simplefinAccountLinks": 0,
+				"simplefinSyncAttempts": 0,
+				"simplefinSyncAccountResults": 0
+			},
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 34408,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 6490,
+					"capture": {
+						"outcome": "committed",
+						"durationMs": 27917,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 2,
+					"durationMs": 30411,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 4118,
+					"capture": {
+						"outcome": "committed",
+						"durationMs": 26292,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 3,
+					"durationMs": 33228,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 4215,
+					"capture": {
+						"outcome": "failed",
+						"errorName": "Error",
+						"errorCode": "not_observed",
+						"errorClass": "NotObserved",
+						"durationMs": 29012
+					}
+				}
+			]
+		},
+		"sequentialCaptureControl": {
+			"control": "Same as nativeCaptureControl; transaction queries executed sequentially; ordinary hydration remains parallel.",
+			"startedAt": "2026-11-07T17:19:27.624Z",
+			"finishedAt": "2026-11-07T17:21:14.421Z",
+			"outcome": "read-failed",
+			"expectedCounts": {
+				"accounts": 3,
+				"accountMemberships": 0,
+				"categories": 8,
+				"tags": 0,
+				"transactions": 521,
+				"transactionTags": 0,
+				"checks": 0,
+				"internalTransfers": 0,
+				"transactionBatches": 0,
+				"batchTemplates": 0,
+				"simplefinConnections": 0,
+				"simplefinAccountLinks": 0,
+				"simplefinSyncAttempts": 0,
+				"simplefinSyncAccountResults": 0
+			},
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 32000,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 7123,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 23027,
+						"commitWaitMs": 1848,
+						"durationMs": 24875,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 2,
+					"durationMs": 30125,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 3609,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 24910,
+						"commitWaitMs": 1607,
+						"durationMs": 26516,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 3,
+					"durationMs": 43928,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 3906,
+					"capture": {
+						"outcome": "failed",
+						"step": "reading",
+						"errorName": "Error",
+						"errorCode": "not_observed",
+						"errorClass": "NotObserved",
+						"durationMs": 40021
+					}
+				}
+			]
+		},
+		"smallQueryCaptureControl": {
+			"control": "Same public Db, accounts query only (three rows), eight repeated zero-mutation exclusive captures.",
+			"startedAt": "2026-11-07T17:18:22.624Z",
+			"finishedAt": "2026-11-07T17:18:31.212Z",
+			"outcome": "passed",
+			"expectedCounts": {
+				"accounts": 3
+			},
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 4218,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 3906,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 169,
+						"commitWaitMs": 144,
+						"durationMs": 312,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 2,
+					"durationMs": 476,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 174,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 171,
+						"commitWaitMs": 130,
+						"durationMs": 301,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 3,
+					"durationMs": 456,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 175,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 171,
+						"commitWaitMs": 110,
+						"durationMs": 281,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 4,
+					"durationMs": 503,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 187,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 191,
+						"commitWaitMs": 126,
+						"durationMs": 316,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 5,
+					"durationMs": 440,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 169,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 164,
+						"commitWaitMs": 107,
+						"durationMs": 271,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 6,
+					"durationMs": 477,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 201,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 164,
+						"commitWaitMs": 113,
+						"durationMs": 276,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 7,
+					"durationMs": 436,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 164,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 162,
+						"commitWaitMs": 111,
+						"durationMs": 272,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 8,
+					"durationMs": 523,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 190,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 204,
+						"commitWaitMs": 130,
+						"durationMs": 333,
+						"countsMatch": true
+					}
+				}
+			]
+		},
+		"transactionQueryCaptureControl": {
+			"control": "Same public Db, transactions query only (521 rows), four repeated zero-mutation exclusive captures; reads and commit wait measured separately.",
+			"startedAt": "2026-11-07T17:21:27.903Z",
+			"finishedAt": "2026-11-07T17:22:32.784Z",
+			"outcome": "passed",
+			"expectedCounts": {
+				"transactions": 521
+			},
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 20272,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 7130,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 12308,
+						"commitWaitMs": 833,
+						"durationMs": 13142,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 2,
+					"durationMs": 14912,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 1207,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 12994,
+						"commitWaitMs": 712,
+						"durationMs": 13706,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 3,
+					"durationMs": 14745,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 1452,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 12647,
+						"commitWaitMs": 646,
+						"durationMs": 13293,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 4,
+					"durationMs": 14225,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 1179,
+					"capture": {
+						"outcome": "committed",
+						"readMs": 12332,
+						"commitWaitMs": 714,
+						"durationMs": 13046,
+						"countsMatch": true
+					}
+				}
+			]
+		},
+		"reproduction": {
+			"localHarness": "/private/tmp/finance-stress-browser-native-capture.mjs",
+			"originalPageBytesUnchanged": true,
+			"testOnlySchemaBundle": "Same pinned Finance schema built from source; supplied only to the owned browser context. Public SDK methods used for reads, transactions, commit, wait and rollback.",
+			"appStillInitializesNormally": true,
+			"steps": [
+				"Open the deployed fake-account browser client and hydrate the 14 listed metadata queries at remote tier.",
+				"Begin one exclusive transaction; execute those same public queries at remote tier.",
+				"Commit with zero application mutations and await its native wait() verdict.",
+				"Repeat on the same client. Preserve the failure instead of retrying or treating it as an export refusal."
+			],
+			"limitations": "Existing fake-account graph, public cloud service and desktop persistent browser driver. Reproducer does not yet isolate an exact core change or establish equivalent behavior in all drivers."
+		},
+		"nodeNativeCaptureControl": {
+			"startedAt": "2026-11-07T17:27:36.794Z",
+			"finishedAt": "2026-11-07T17:29:21.721Z",
+			"outcome": "read-failed",
+			"control": "Ordinary public createJazzSession, memory driver, same fake account and schema/policy. Owned browser closed after recovery-phrase retrieval, before these reads; no Finance runtime, export, encryption or restore.",
+			"expectedCounts": {
+				"accounts": 3,
+				"accountMemberships": 0,
+				"categories": 8,
+				"tags": 0,
+				"transactions": 521,
+				"transactionTags": 0,
+				"checks": 0,
+				"internalTransfers": 0,
+				"transactionBatches": 0,
+				"batchTemplates": 0,
+				"simplefinConnections": 0,
+				"simplefinAccountLinks": 0,
+				"simplefinSyncAttempts": 0,
+				"simplefinSyncAccountResults": 0
+			},
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 38348,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 3869,
+					"ordinaryReadErrors": {},
+					"capture": {
+						"outcome": "committed",
+						"readMs": 31230,
+						"commitWaitMs": 3186,
+						"durationMs": 34416,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 2,
+					"durationMs": 36133,
+					"ordinaryReadsPassed": true,
+					"ordinaryReadsMaxMs": 4425,
+					"ordinaryReadErrors": {},
+					"capture": {
+						"outcome": "committed",
+						"readMs": 29885,
+						"commitWaitMs": 1823,
+						"durationMs": 31708,
+						"countsMatch": true
+					}
+				},
+				{
+					"i": 3,
+					"durationMs": 30013,
+					"ordinaryReadsPassed": false,
+					"ordinaryReadsMaxMs": 15008,
+					"ordinaryReadErrors": {
+						"accounts": "not_observed",
+						"accountMemberships": "not_observed",
+						"categories": "not_observed",
+						"tags": "not_observed",
+						"transactions": "not_observed",
+						"transactionTags": "not_observed",
+						"checks": "not_observed",
+						"internalTransfers": "not_observed",
+						"transactionBatches": "not_observed",
+						"batchTemplates": "not_observed",
+						"simplefinConnections": "not_observed",
+						"simplefinAccountLinks": "not_observed",
+						"simplefinSyncAttempts": "not_observed",
+						"simplefinSyncAccountResults": "not_observed"
+					},
+					"capture": {
+						"outcome": "failed",
+						"step": "reading",
+						"errorName": "Error",
+						"errorCode": "not_observed",
+						"errorClass": "NotObserved",
+						"durationMs": 15005
+					}
+				}
+			]
+		},
+		"manyOrdinaryReadsControl": {
+			"control": "Ordinary public SDK memory client; existing fake account; read only, no export, transaction or restore",
+			"startedAt": "2026-11-07T17:31:05.862Z",
+			"finishedAt": "2026-11-07T17:31:32.733Z",
+			"outcome": "passed",
+			"expectedCounts": {
+				"accounts": 3,
+				"accountMemberships": 0,
+				"categories": 8,
+				"tags": 0,
+				"transactions": 521,
+				"transactionTags": 0,
+				"checks": 0,
+				"internalTransfers": 0,
+				"transactionBatches": 0,
+				"batchTemplates": 0,
+				"simplefinConnections": 0,
+				"simplefinAccountLinks": 0,
+				"simplefinSyncAttempts": 0,
+				"simplefinSyncAccountResults": 0
+			},
+			"rounds": [
+				{
+					"i": 1,
+					"durationMs": 6356,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 2,
+					"durationMs": 2541,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 3,
+					"durationMs": 2851,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 4,
+					"durationMs": 3262,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 5,
+					"durationMs": 2696,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 6,
+					"durationMs": 2943,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 7,
+					"durationMs": 2769,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				},
+				{
+					"i": 8,
+					"durationMs": 2995,
+					"queries": 14,
+					"countsMatch": true,
+					"errors": []
+				}
+			]
+		},
+		"followUp": {
+			"observedOn": "2026-11-07",
+			"applicationChanges": "None added. The equivalent-role-predicate candidate was tested only in a temporary bundle/new fake backend and rejected; repository permissions/schema/runtime unchanged.",
+			"installedNativeArtifact": {
+				"version": "2.0.0-alpha.59",
+				"releaseBaseline": "204dc5b9c164de78267d63b35624e28848402790",
+				"releaseDate": "2026-10-02",
+				"engine": "Groove-based core, not the newer SQLite source in the existing Jazz checkout",
+				"nativeArtifactSha256": "f22b6162edb14627d70504bfcb9e29102da556f47d80fc1e92941e76c0185b41",
+				"manifestDirtyDiff": "0437c0384997d1a071aafea634c6ecb43f0d8a16f372881755e4afaf591f18b1",
+				"limit": "Manifest records a nonempty dirty diff; the Git release baseline alone is not proof of exact native source equivalence. No SDK binary was replaced."
+			},
+			"elapsedTimeControl": {
+				"control": "Ordinary public SDK memory client; existing fake account; elapsed-time control: one accounts query every 30 seconds for 120 seconds, no export or transaction; explicit reconnect diagnostic only after error",
+				"startedAt": "2026-11-07T17:41:45.105Z",
+				"finishedAt": "2026-11-07T17:43:45.676Z",
+				"rounds": [
+					{
+						"i": 0,
+						"elapsedMs": 0,
+						"count": 3,
+						"durationMs": 5147
+					},
+					{
+						"i": 1,
+						"elapsedMs": 30002,
+						"count": 3,
+						"durationMs": 99
+					},
+					{
+						"i": 2,
+						"elapsedMs": 60000,
+						"count": 3,
+						"durationMs": 99
+					},
+					{
+						"i": 3,
+						"elapsedMs": 90000,
+						"count": 3,
+						"durationMs": 147
+					},
+					{
+						"i": 4,
+						"elapsedMs": 120002,
+						"count": 3,
+						"durationMs": 93
+					}
+				],
+				"outcome": "passed"
+			},
+			"matchingQueryCaptureControl": {
+				"outcome": "passed",
+				"rounds": [
+					{
+						"i": 1,
+						"hydration": {
+							"outcome": "ready",
+							"durationMs": 4621,
+							"cpuMs": 595
+						},
+						"capture": {
+							"outcome": "ready",
+							"durationMs": 28643,
+							"cpuMs": 1661
+						},
+						"commit": {
+							"outcome": "ready",
+							"durationMs": 2445,
+							"cpuMs": 19
+						}
+					},
+					{
+						"i": 2,
+						"hydration": {
+							"outcome": "ready",
+							"durationMs": 2761,
+							"cpuMs": 251
+						},
+						"capture": {
+							"outcome": "ready",
+							"durationMs": 29712,
+							"cpuMs": 1192
+						},
+						"commit": {
+							"outcome": "ready",
+							"durationMs": 2376,
+							"cpuMs": 9
+						}
+					},
+					{
+						"i": 3,
+						"hydration": {
+							"outcome": "ready",
+							"durationMs": 3771,
+							"cpuMs": 333
+						},
+						"capture": {
+							"outcome": "ready",
+							"durationMs": 29304,
+							"cpuMs": 1025
+						},
+						"commit": {
+							"outcome": "ready",
+							"durationMs": 1772,
+							"cpuMs": 5
+						}
+					}
+				],
+				"socketCount": 1,
+				"limits": "Matching query projections/limit and query-object reuse differ from earlier control. Per-phase metadata persistence also yields to the event loop. This is not proof that matching projections fixes the failure."
+			},
+			"ordinaryColdFailure": {
+				"outcome": "native-read-failed",
+				"failedPhase": "hydration-default-projection",
+				"nativeCapturesBeforeFailure": 0,
+				"durationMs": 15857,
+				"cpuMs": 830,
+				"error": {
+					"name": "Error",
+					"code": "not_observed",
+					"class": "NotObserved"
+				},
+				"socketAtFailure": [
+					{
+						"id": 0,
+						"createdMs": 536,
+						"sent": 19,
+						"sentBytes": 3197,
+						"received": 45,
+						"receivedBytes": 14827,
+						"events": [
+							{
+								"type": "open",
+								"atMs": 1234
+							}
+						],
+						"lastSendMs": 4866,
+						"lastReceiveMs": 4930,
+						"readyState": 1,
+						"bufferedBytes": 0
+					}
+				],
+				"postReconnect": {
+					"outcome": "ready",
+					"durationMs": 7088,
+					"queryShape": "audit/limit projection; failed hydration used default projection, so reconnect alone is not isolated"
+				},
+				"limit": "Socket close/error after explicit disconnect is not spontaneous transport-failure evidence."
+			},
+			"queryShapeControl": {
+				"outcome": "passed",
+				"phases": [
+					{
+						"shape": "default",
+						"durationMs": 9891,
+						"queries": 14,
+						"errors": []
+					},
+					{
+						"shape": "audit",
+						"durationMs": 2650,
+						"queries": 14,
+						"errors": []
+					},
+					{
+						"shape": "default",
+						"durationMs": 2867,
+						"queries": 14,
+						"errors": []
+					},
+					{
+						"shape": "audit",
+						"durationMs": 2427,
+						"queries": 14,
+						"errors": []
+					}
+				]
+			},
+			"perTableProfile": {
+				"appId": "cbed0d21-9d25-4949-bacb-1ec3c0be1aa2",
+				"outcome": "passed",
+				"captureMs": 28553,
+				"captureCpuMs": 470,
+				"queries": [
+					{
+						"table": "accounts",
+						"count": 3,
+						"durationMs": 408,
+						"cpuMs": 8
+					},
+					{
+						"table": "accountMemberships",
+						"count": 0,
+						"durationMs": 246,
+						"cpuMs": 4
+					},
+					{
+						"table": "categories",
+						"count": 8,
+						"durationMs": 222,
+						"cpuMs": 5
+					},
+					{
+						"table": "tags",
+						"count": 0,
+						"durationMs": 361,
+						"cpuMs": 5
+					},
+					{
+						"table": "transactions",
+						"count": 521,
+						"durationMs": 10336,
+						"cpuMs": 147
+					},
+					{
+						"table": "transactionTags",
+						"count": 0,
+						"durationMs": 3169,
+						"cpuMs": 48
+					},
+					{
+						"table": "checks",
+						"count": 0,
+						"durationMs": 373,
+						"cpuMs": 7
+					},
+					{
+						"table": "internalTransfers",
+						"count": 0,
+						"durationMs": 11018,
+						"cpuMs": 203
+					},
+					{
+						"table": "transactionBatches",
+						"count": 0,
+						"durationMs": 437,
+						"cpuMs": 9
+					},
+					{
+						"table": "batchTemplates",
+						"count": 0,
+						"durationMs": 317,
+						"cpuMs": 8
+					},
+					{
+						"table": "simplefinConnections",
+						"count": 0,
+						"durationMs": 394,
+						"cpuMs": 8
+					},
+					{
+						"table": "simplefinAccountLinks",
+						"count": 0,
+						"durationMs": 427,
+						"cpuMs": 6
+					},
+					{
+						"table": "simplefinSyncAttempts",
+						"count": 0,
+						"durationMs": 328,
+						"cpuMs": 5
+					},
+					{
+						"table": "simplefinSyncAccountResults",
+						"count": 0,
+						"durationMs": 517,
+						"cpuMs": 7
+					}
+				]
+			},
+			"rolePredicateTrial": {
+				"outcome": "passed",
+				"decision": "rejected; no demonstrated performance benefit",
+				"change": "Combine owner/admin membership EXISTS branches into one role IN predicate, and member/viewer all-account branches into one; all other policy clauses unchanged. Pure predicate equivalence, no new lifecycle/workflow.",
+				"schemaHashPrefix": "c30773a87764",
+				"apps": [
+					{
+						"variant": "original",
+						"appId": "6abfc657-318e-4728-987e-c8a1f3e21789",
+						"stage": "seeded",
+						"sourceIdentityRebound": true,
+						"seedCounts": {
+							"organizations": 1,
+							"profiles": 1,
+							"organizationMembers": 1,
+							"accounts": 3,
+							"categories": 8,
+							"transactions": 521
+						},
+						"records": 535
+					},
+					{
+						"variant": "role-in",
+						"appId": "1d4eff05-fadb-4f6e-9ed4-440513a34855",
+						"stage": "seeded",
+						"sourceIdentityRebound": true,
+						"seedCounts": {
+							"organizations": 1,
+							"profiles": 1,
+							"organizationMembers": 1,
+							"accounts": 3,
+							"categories": 8,
+							"transactions": 521
+						},
+						"records": 535
+					}
+				],
+				"rounds": [
+					{
+						"i": 1,
+						"variant": "original",
+						"hydrationMs": 1489,
+						"captureMs": 4690,
+						"commitMs": 514,
+						"outcome": "accepted"
+					},
+					{
+						"i": 1,
+						"variant": "role-in",
+						"hydrationMs": 2262,
+						"captureMs": 5626,
+						"commitMs": 952,
+						"outcome": "accepted"
+					},
+					{
+						"i": 2,
+						"variant": "original",
+						"hydrationMs": 1704,
+						"captureMs": 4943,
+						"commitMs": 451,
+						"outcome": "accepted"
+					},
+					{
+						"i": 2,
+						"variant": "role-in",
+						"hydrationMs": 1871,
+						"captureMs": 6052,
+						"commitMs": 597,
+						"outcome": "accepted"
+					},
+					{
+						"i": 3,
+						"variant": "original",
+						"hydrationMs": 1966,
+						"captureMs": 5023,
+						"commitMs": 494,
+						"outcome": "accepted"
+					},
+					{
+						"i": 3,
+						"variant": "role-in",
+						"hydrationMs": 2459,
+						"captureMs": 6073,
+						"commitMs": 828,
+						"outcome": "accepted"
+					}
+				],
+				"limits": [
+					"Separate apps, sequential/interleaved order on shared cloud service; no statistical or cross-host generalization.",
+					"App-scoped identity bindings differ. Business graph/IDs, schema and role/access facts held equivalent.",
+					"Seed setup failures are retained privately: wrong CLI subpath, cross-app account-ID assertion, explicit optional-null inputs, then a refused seed. Corrected seeding verifies prior test-owned rows and omits optional nulls using public input conventions; no benchmark is claimed for failed setups.",
+					"New apps expire after 14 days. No original preview or production policy was changed."
+				]
+			},
+			"backendGrowthControl": {
+				"appId": "6abfc657-318e-4728-987e-c8a1f3e21789",
+				"control": "Existing-policy fresh fake app; unchanged 521-transaction source; add unrelated cloned workspaces; close and create a new public memory client before every measurement.",
+				"outcome": "passed",
+				"startedAt": "2026-11-07T18:14:35.881Z",
+				"finishedAt": "2026-11-07T18:16:14.570Z",
+				"measurements": [
+					{
+						"label": "one-workspace",
+						"ownedWorkspaces": 1,
+						"totalOwnedTransactions": 521,
+						"sourceTransactions": 521,
+						"sourceProjectionSha256": "54ce20a068de4d5988140ac86cb40c31a0ffe5ff4e615fb2a61ecabad5b98a2f",
+						"hydrationMs": 1659,
+						"captureMs": 4456,
+						"commitMs": 440,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 249,
+							"accountMemberships": 166,
+							"categories": 165,
+							"tags": 169,
+							"transactions": 1077,
+							"transactionTags": 401,
+							"checks": 205,
+							"internalTransfers": 955,
+							"transactionBatches": 210,
+							"batchTemplates": 191,
+							"simplefinConnections": 117,
+							"simplefinAccountLinks": 147,
+							"simplefinSyncAttempts": 164,
+							"simplefinSyncAccountResults": 241
+						}
+					},
+					{
+						"label": "two-workspaces",
+						"ownedWorkspaces": 2,
+						"totalOwnedTransactions": 1042,
+						"sourceTransactions": 521,
+						"sourceProjectionSha256": "54ce20a068de4d5988140ac86cb40c31a0ffe5ff4e615fb2a61ecabad5b98a2f",
+						"hydrationMs": 1732,
+						"captureMs": 6780,
+						"commitMs": 580,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 256,
+							"accountMemberships": 173,
+							"categories": 210,
+							"tags": 257,
+							"transactions": 1941,
+							"transactionTags": 743,
+							"checks": 227,
+							"internalTransfers": 1632,
+							"transactionBatches": 227,
+							"batchTemplates": 258,
+							"simplefinConnections": 221,
+							"simplefinAccountLinks": 228,
+							"simplefinSyncAttempts": 178,
+							"simplefinSyncAccountResults": 228
+						}
+					},
+					{
+						"label": "four-workspaces",
+						"ownedWorkspaces": 4,
+						"totalOwnedTransactions": 2084,
+						"sourceTransactions": 521,
+						"sourceProjectionSha256": "54ce20a068de4d5988140ac86cb40c31a0ffe5ff4e615fb2a61ecabad5b98a2f",
+						"hydrationMs": 2923,
+						"captureMs": 12056,
+						"commitMs": 708,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 465,
+							"accountMemberships": 316,
+							"categories": 227,
+							"tags": 252,
+							"transactions": 3959,
+							"transactionTags": 1187,
+							"checks": 385,
+							"internalTransfers": 3404,
+							"transactionBatches": 326,
+							"batchTemplates": 375,
+							"simplefinConnections": 302,
+							"simplefinAccountLinks": 301,
+							"simplefinSyncAttempts": 245,
+							"simplefinSyncAccountResults": 311
+						}
+					}
+				],
+				"clones": [
+					{
+						"index": 1,
+						"stage": "accepted",
+						"transactions": 521
+					},
+					{
+						"index": 2,
+						"stage": "accepted",
+						"transactions": 521
+					},
+					{
+						"index": 3,
+						"stage": "accepted",
+						"transactions": 521
+					}
+				],
+				"limits": [
+					"One measurement per growth level in fixed order on one cloud backend/host; temporal variation is not fully excluded.",
+					"Added workspaces belong to the same test account; cross-user scaling is not established.",
+					"Added rows also add commit history, so live-row and history costs are not separated.",
+					"Fingerprint covers the 14 source metadata projections including audit. Workspace/profile/membership records are not in that fingerprint; the clone procedure never modifies their original IDs.",
+					"No attachments, phone, maximum aggregate or storage-pressure qualification. This is an SDK control, not full UI latency."
+				]
+			},
+			"conclusions": [
+				"A universal third-capture failure, simple 90-second connection expiry and a projection-only bug are not established. Ordinary cold reads can also fail before native capture.",
+				"Source capture latency increases with unrelated owned workspace data/history while source contents and its audit projection remain unchanged, even with a fresh SDK client at every measurement.",
+				"A browser memory leak is unnecessary to reproduce this scaling effect. Original local exit 137 remains unattributed.",
+				"The role-predicate simplification is rejected; no new Finance workaround, retry, timeout increase, consistency downgrade or SDK private API application dependency is introduced.",
+				"Investigate scoped frozen-query input/permission evaluation on the alpha.59 runtime; do not read current SQLite source as if it were the installed native core. Exact causal SDK/core/server correction remains unimplemented.",
+				"The four-workspace cloud repeat accepted once at 9.9 s and then failed in its transaction snapshot query with not_observed despite successful source hydration; preserve both outcomes.",
+				"The growth effect also occurs on the pinned local disposable memory backend: unchanged source capture took 1.219/1.998/3.683 s for one/two/four owned workspaces, with fresh SDK clients. Cloud timing alone is unnecessary.",
+				"A new owner with one workspace on that local backend, alongside four other-owner workspaces, took 3.622-3.884 s across three diagnostic captures. Backend profiling points to maintained-query graph rehydration/compilation and operator hashing.",
+				"No SDK/source patch is retained. A correction must be tested against the actual alpha.59 runtime and preserve native snapshot/predicate validation; broad Finance state-machine changes and the rejected role rewrite are unsupported by these experiments."
+			],
+			"backendGrowthRepeat": {
+				"outcome": "failed",
+				"measurements": [
+					{
+						"label": "four-workspaces-repeat-1",
+						"workspaces": 4,
+						"hydrationMs": 1639,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "54ce20a068de4d5988140ac86cb40c31a0ffe5ff4e615fb2a61ecabad5b98a2f",
+						"captureMs": 9905,
+						"commitMs": 640,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 378,
+							"accountMemberships": 265,
+							"categories": 261,
+							"tags": 268,
+							"transactions": 2971,
+							"transactionTags": 1060,
+							"checks": 284,
+							"internalTransfers": 2892,
+							"transactionBatches": 252,
+							"batchTemplates": 245,
+							"simplefinConnections": 257,
+							"simplefinAccountLinks": 271,
+							"simplefinSyncAttempts": 261,
+							"simplefinSyncAccountResults": 239
+						}
+					},
+					{
+						"label": "four-workspaces-repeat-2",
+						"workspaces": 4,
+						"hydrationMs": 1539,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "54ce20a068de4d5988140ac86cb40c31a0ffe5ff4e615fb2a61ecabad5b98a2f",
+						"outcome": "failed",
+						"error": {
+							"name": "Error",
+							"code": "not_observed",
+							"class": "NotObserved"
+						},
+						"perTableMs": {
+							"accounts": 333,
+							"accountMemberships": 248,
+							"categories": 259,
+							"tags": 258
+						}
+					}
+				],
+				"failedQuery": "transactions",
+				"failedQueryIdentification": "Sequential loop completed accounts/accountMemberships/categories/tags, then the next transaction read raised not_observed; no new data was added between repeat samples.",
+				"limits": "One repeat accepted at 9.905 s; next failed. Do not call the four-workspace case fully qualified or treat 12.056 s as a stable guarantee."
+			},
+			"localGrowthControl": {
+				"appId": "15c04c01-f491-4f7c-a80e-f5eed389f86c",
+				"serverUrl": "http://127.0.0.1:60039",
+				"publicAppOrigin": "http://localhost:5198",
+				"backend": "Owned disposable in-memory agent server; pinned Jazz alpha.59; no cloud service used during measurement",
+				"outcome": "passed",
+				"measurements": [
+					{
+						"label": "one-workspace",
+						"workspaces": 1,
+						"hydrationMs": 414,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "997df0d6854c8f573c566c3fa18c130a3e30511906b06f58bb3df20ad7a5960c",
+						"captureMs": 1219,
+						"commitMs": 145,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 40,
+							"accountMemberships": 26,
+							"categories": 24,
+							"tags": 23,
+							"transactions": 356,
+							"transactionTags": 169,
+							"checks": 33,
+							"internalTransfers": 368,
+							"transactionBatches": 35,
+							"batchTemplates": 25,
+							"simplefinConnections": 25,
+							"simplefinAccountLinks": 30,
+							"simplefinSyncAttempts": 32,
+							"simplefinSyncAccountResults": 33
+						}
+					},
+					{
+						"label": "two-workspaces",
+						"workspaces": 2,
+						"hydrationMs": 493,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "997df0d6854c8f573c566c3fa18c130a3e30511906b06f58bb3df20ad7a5960c",
+						"captureMs": 1998,
+						"commitMs": 134,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 37,
+							"accountMemberships": 41,
+							"categories": 42,
+							"tags": 34,
+							"transactions": 596,
+							"transactionTags": 264,
+							"checks": 42,
+							"internalTransfers": 696,
+							"transactionBatches": 41,
+							"batchTemplates": 32,
+							"simplefinConnections": 41,
+							"simplefinAccountLinks": 47,
+							"simplefinSyncAttempts": 36,
+							"simplefinSyncAccountResults": 49
+						}
+					},
+					{
+						"label": "four-workspaces",
+						"workspaces": 4,
+						"hydrationMs": 684,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "997df0d6854c8f573c566c3fa18c130a3e30511906b06f58bb3df20ad7a5960c",
+						"captureMs": 3683,
+						"commitMs": 299,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 66,
+							"accountMemberships": 45,
+							"categories": 54,
+							"tags": 50,
+							"transactions": 1216,
+							"transactionTags": 404,
+							"checks": 71,
+							"internalTransfers": 1363,
+							"transactionBatches": 78,
+							"batchTemplates": 55,
+							"simplefinConnections": 64,
+							"simplefinAccountLinks": 60,
+							"simplefinSyncAttempts": 86,
+							"simplefinSyncAccountResults": 71
+						}
+					}
+				],
+				"sourceProjectionStable": true,
+				"limits": "Single local sequence, source projection hashes match within this local app; app-scoped identity differs from cloud. Local memory storage and cloud storage are not a controlled storage comparison."
+			},
+			"localOtherOwnerProfile": {
+				"outcome": "passed",
+				"knownOtherOwnerWorkspaces": 4,
+				"knownTotalBackendTransactions": 2605,
+				"sourceOwnerWorkspaces": 1,
+				"measurements": [
+					{
+						"label": "new-owner-source-profile-1",
+						"workspaces": 1,
+						"hydrationMs": 562,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "c2fcde19933dc43e4c0c9de63d356c27a5095755d829a25c3983f57129498b7c",
+						"captureMs": 3743,
+						"commitMs": 228,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 39,
+							"accountMemberships": 31,
+							"categories": 29,
+							"tags": 30,
+							"transactions": 1322,
+							"transactionTags": 462,
+							"checks": 44,
+							"internalTransfers": 1538,
+							"transactionBatches": 46,
+							"batchTemplates": 34,
+							"simplefinConnections": 40,
+							"simplefinAccountLinks": 42,
+							"simplefinSyncAttempts": 42,
+							"simplefinSyncAccountResults": 44
+						}
+					},
+					{
+						"label": "new-owner-source-profile-2",
+						"workspaces": 1,
+						"hydrationMs": 502,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "c2fcde19933dc43e4c0c9de63d356c27a5095755d829a25c3983f57129498b7c",
+						"captureMs": 3884,
+						"commitMs": 191,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 54,
+							"accountMemberships": 46,
+							"categories": 44,
+							"tags": 48,
+							"transactions": 1371,
+							"transactionTags": 474,
+							"checks": 46,
+							"internalTransfers": 1563,
+							"transactionBatches": 45,
+							"batchTemplates": 35,
+							"simplefinConnections": 34,
+							"simplefinAccountLinks": 42,
+							"simplefinSyncAttempts": 39,
+							"simplefinSyncAccountResults": 42
+						}
+					},
+					{
+						"label": "new-owner-source-profile-3",
+						"workspaces": 1,
+						"hydrationMs": 452,
+						"sourceTransactions": 521,
+						"sourceFingerprint": "c2fcde19933dc43e4c0c9de63d356c27a5095755d829a25c3983f57129498b7c",
+						"captureMs": 3622,
+						"commitMs": 191,
+						"outcome": "accepted",
+						"perTableMs": {
+							"accounts": 45,
+							"accountMemberships": 38,
+							"categories": 39,
+							"tags": 40,
+							"transactions": 1278,
+							"transactionTags": 460,
+							"checks": 44,
+							"internalTransfers": 1435,
+							"transactionBatches": 47,
+							"batchTemplates": 34,
+							"simplefinConnections": 37,
+							"simplefinAccountLinks": 43,
+							"simplefinSyncAttempts": 39,
+							"simplefinSyncAccountResults": 43
+						}
+					}
+				],
+				"profile": {
+					"tool": "macOS sample, 12 seconds, 1 ms requested interval",
+					"scope": "Known owned agent/backend PID 18140, fake data only; ordinary hydration, exclusive capture and zero-write verdict cycles on fresh clients",
+					"collected": true,
+					"physicalFootprintApproxGiB": 1.5,
+					"prominentFrames": [
+						"jazz_node::peer::PeerState::rehydrate_query_maintained_subscription_view",
+						"jazz_node::node::query_eval::open_seeded_maintained_subscription_view_in_authorization_mode",
+						"groove::ivm::runtime::compilation::add_dedup_source_graph",
+						"groove::ivm::graph::IvmGraph::dedup_node",
+						"groove::ivm::graph::NodeDescriptor::node_id_of",
+						"groove::ivm::graph::OpType::hash"
+					],
+					"interpretation": "Repeated maintained-graph reconstruction/compilation, including hashing inline-record operators, is prominent in the backend. This is a diagnostic profile, not causal proof of the exact coverage failure or a retained SDK optimization.",
+					"rawLocalArtifact": "/private/tmp/finance-local-growth-LSLeVd/local-backend.sample.txt"
+				},
+				"limits": "New test identity and new record IDs, so this is an additional other-owner control rather than an otherwise identical randomized comparison. No other user\u2019s rows were read by the ordinary source client."
+			}
+		}
+	},
+	"deliveryDecision": {
+		"date": "2026-11-07",
+		"authority": "User explicitly accepts documenting the limitation and revisiting it upon production occurrence.",
+		"financeDeliveredScope": "complete with accepted limitations",
+		"T004": "closed by acceptance of known limitation; not a full-platform pass or an SDK fix",
+		"knownLimitation": "Jazz alpha.59 capture latency grows with unrelated backend data/history; intermittent not_observed read failures remain unresolved.",
+		"nextPerformanceAction": "Reopen investigation if these symptoms occur in real production use. No further SDK/performance experiments scheduled now.",
+		"failedResults": "Retained unchanged; closure does not convert failures to passes.",
+		"unqualifiedClaims": [
+			"phone performance",
+			"maximum aggregate/count workloads",
+			"storage pressure"
+		],
+		"otherUnresolvedFinding": "Earlier exit 137 remains unattributed.",
+		"remainingSharedFunctionalTask": "T014: explicit same-operation retry after confirmed rejection and repaired authority; journal representation exists, writer integration remains open.",
+		"capacityPatch": "Existing uncommitted change still needs review/publication; no commit, merge or production deployment authorized by closure.",
+		"productionDataAccess": "Remains excluded from this task."
+	}
+}

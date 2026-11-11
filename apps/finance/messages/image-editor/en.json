@@ -1,0 +1,27 @@
+{
+	"image_editor": {
+		"instructions": "Move the crop area or its corners to choose what to keep. Use arrow keys to move a focused handle; hold Shift for larger steps.",
+		"crop_mode": "Crop shape",
+		"square": "Square",
+		"rectangle": "Freeform rectangle",
+		"perspective": "Perspective correction",
+		"black_white": "Black and white",
+		"contrast": "Contrast",
+		"failed": "This image could not be edited. Cancel and try again.",
+		"loading": "Loading image…",
+		"rendering": "Rendering preview…",
+		"exporting": "Preparing edited image…",
+		"closing": "Closing image editor…",
+		"image": "Image",
+		"edit": "Edit Image",
+		"reset": "Reset Image",
+		"preview": "Preview Image",
+		"cancel": "Cancel",
+		"apply_changes": "Apply changes",
+		"resize_top_left": "Resize crop from top left corner",
+		"resize_top_right": "Resize crop from top right corner",
+		"resize_bottom_left": "Resize crop from bottom left corner",
+		"resize_bottom_right": "Resize crop from bottom right corner",
+		"reposition": "Move crop area with arrow keys"
+	}
+}

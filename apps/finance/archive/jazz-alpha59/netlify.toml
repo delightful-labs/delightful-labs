@@ -1,0 +1,12 @@
+[build]
+command = "pnpm build"
+
+[context.production]
+command = "pnpm deploy:jazz && pnpm build"
+
+[context.deploy-preview]
+command = "pnpm build:deploy-preview"
+
+[context.deploy-preview.environment]
+PUBLIC_DEBUG = "true"
+PUBLIC_FAKE_DATA = "true"

@@ -1,0 +1,21 @@
+{
+	"extends": "$app/tsconfig",
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true
+	},
+	"include": ["src", "tests", "*.js", ".storybook"],
+	"exclude": [
+		"node_modules",
+		"dist",
+		".svelte-kit",
+		"storybook-static",
+		"storybook-test-static"
+	]
+}

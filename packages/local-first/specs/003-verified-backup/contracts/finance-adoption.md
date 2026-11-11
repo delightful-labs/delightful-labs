@@ -1,0 +1,95 @@
+# Finance backup profile and adoption procedure
+
+**Source inspected**: deployed Finance frontend `31f70cb3c5603dac244debe7c9fe726c60014a89`,
+verified through read-only Netlify metadata and public asset comparisons on 2026-11-05.
+SDK target: `jazz-tools@2.0.0-alpha.59`. Authenticated backend schema/policy comparison and the
+selected workspace's read-only inventory are complete; capture and restore remain unqualified.
+
+## Deployment evidence
+
+The [T007 inventory](../finance-deployment-inventory.md) identifies published Netlify deploy
+`6aea8e723a9b9fba60621b7a` and the served replacement Jazz namespace. The deployed source compiles
+to **22 tables**, correcting the earlier count of 23. The backend schema matches source hash
+`e5a4d82f60137eccad6e82481f77c943177118ca1d722ddda28b896cd5f5cc0a`; head v8 policies match after
+normalizing optional null defaults. Owner-scoped remote/local reads found 633 projected records,
+zero reachable attachments, no projected differences and no observed tracked pending writes.
+The comparison encoding is 672,633 bytes; the eventual Finance archive has not been implemented.
+
+Read-only Netlify lookup now succeeds, superseding the 2026-11-03 authentication failure for
+frontend metadata. Finance `specs/001-finance-mvp/status.md:122–130` records historical authenticated
+verification of the replacement backend's former 19-table catalogue. T007 now records the current
+authenticated catalogue/policy comparison, browser runtime identity, aggregate sizes and scope limits.
+Finance accepts 10 MiB image inputs but resizes/re-encodes before storage; input size alone does not
+prove the 8 MiB per-file archive limit is exceeded. No attachment bytes are present in this observed
+graph. Future image-heavy data needs actual stored-byte qualification without changing existing bytes.
+Repeat inventory if the deployment, permissions, workspace or device changes before adoption.
+Do not run `deploy:jazz`, a production build that publishes schema, or a dev server with
+auto-publication merely to inspect compatibility.
+
+## Initial profile inventory
+
+Profile ID proposal: `delightful.finance.workspace`, version 1. Each selected domain field requires an explicit allowlist and validator before the profile is implemented. This inventory is the scope to resolve against production, not permission to spread all rows into the archive.
+
+| Source tables                                                                                      | Archive treatment                                                                                         | Restore treatment                                                                                                        |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `organizations`                                                                                    | Workspace settings and source identity                                                                    | New organization ID and current owner; preserve settings; no existing workspace modification                             |
+| `accounts`, `categories`, `tags`, `transactions`, `transactionTags`, `checks`, `internalTransfers` | All supported current and archived records and graph edges in workspace scope                             | Fresh mapped IDs; exact currencies/amounts/date-only values; policy-compatible transaction groups                        |
+| `transactionBatches`, `batchTemplates`                                                             | Include present supported records, even where UI is not shipped                                           | Preserve fields and relations; fail if unsupported present content cannot be reconstructed                               |
+| `transactionAttachments`, `files`, `fileParts`                                                     | Association records, metadata, ordered complete original byte contents                                    | Recreate mapped associations and file parts; compare full reassembled bytes                                              |
+| `organizationMembers`, `accountMemberships`                                                        | Inert historical/reference information only                                                               | Create only the restoring user’s new owner access; no archived grants activated                                          |
+| `profiles`                                                                                         | Minimal allowlisted collaborator identity provenance where needed; not entire profiles/avatars by default | Do not replace or impersonate user profiles; retain provenance inertly                                                   |
+| `simplefinAccountLinks`, `simplefinSyncAttempts`, `simplefinSyncAccountResults`                    | Sanitized historical provenance with inert reference links                                                | Never recreate live bank links or attempts that require live credentials; retain in dedicated restore-provenance storage |
+| `simplefinConnections`                                                                             | Explicit minimal nonsecret descriptive reference only                                                     | No live connections; reconnection required                                                                               |
+| `uploads`                                                                                          | Exclude operational placeholder state; unfinished attachments prevent complete capture                    | Do not revive upload jobs                                                                                                |
+| `checkDetails` / `transactions.checkDetailsId`                                                     | Legacy unsupported shape, detect visible references and check deployment schema                           | Reject unsupported coverage; do not silently omit or guess conversion                                                    |
+
+There is no allocations table in inspected source. Future released allocations require a new supported profile version. Deleted records and full engine history are outside this current-data profile; archived records are included.
+
+Credentials excluded even when encrypted: legacy bank `accessUrl`, credential IDs, salts, IVs, ciphertext, session material, login recovery phrases. Do not copy arbitrary provider messages or error payloads as provenance; allowlist safe enum/count/time fields. Exact source audit metadata is stored as source provenance; destination engine audit fields reflect the actual restoring user and restore time. Do not forge `$createdBy` or `$updatedBy`.
+
+Current file permissions depend on valid transaction linkage. A client cannot establish that hidden orphan rows do not exist; legacy `checkDetails` is denied entirely. The promised scope is the complete supported application graph, not every hidden physical database row. Production schema compatibility and graph validation must make unsupported references visible or fail before a complete result.
+
+## Source capture decision
+
+The 2026-11-05 [native experiment](../../../fixtures/native-capture/README.md) replaces the former
+maintenance-window, writer-admission and repeated-comparison proposal. Use the existing pinned Jazz
+SDK; no SDK upgrade or mutation-workflow registration is needed.
+
+1. Confirm remote owner membership and consistent organization ownership. Selected-account access
+   and admin-only access do not satisfy owner-only backup. Read all supported scope through ordinary
+   remote queries, including archived records, relationships and bounded attachment contents.
+2. Open one exclusive transaction after complete hydration. Read the same complete declared scope
+   through its remote read capability; cold native snapshots alone can omit data. Do not truncate
+   result sets or treat unavailable/hidden rows as proof of absence.
+3. Validate reference closure, unsupported legacy references, attachment part sequence/length and
+   exact bytes, bounds, exact integer range and source audit provenance. Deposit only plain,
+   allowlisted immutable archive data. Recheck owner authority through the captured scope.
+4. Commit with zero application mutations and await the native exclusive verdict. Only acceptance
+   permits protection/download. A rejected/conflicting capture is discarded; an explicit retry
+   hydrates again and opens a fresh transaction. Offline confirmation may remain pending.
+
+DLF owns native receipts, binding checks, interruption, transaction cleanup and protection/handoff.
+Finance owns complete domain coverage, owner checks and bounded exact-byte handling. This protocol
+is qualified on synthetic data on alpha.59; Finance profile and actual-size qualification remain
+T008/T004. It cannot recover edits that exist only on another disconnected device. No disconnect,
+storage deletion, account replacement or schema publication is part of capture. See
+[native ownership and evidence](native-capture.md).
+
+## Restore decision
+
+Do not use normal workspace creation unchanged: it makes membership visible and seeds default categories. Proposed Finance changes are additive and require a separate reviewed schema/policy design:
+
+- Organization restore metadata: durable operation binding and `incomplete` / `complete` lifecycle. Existing organizations without restore metadata retain current behavior, subject to explicit cached-client compatibility verification.
+- A private restore-operation journal, stable mapping/receipt storage, and inert source-provenance storage. None recreates credentials or previous membership grants.
+- A distinct restore preparation path creates only the new organization and restoring owner access, without starter data. Its transaction IDs and allocated IDs are persisted before writes.
+- Ordinary workspace selectors, direct routes, data-resource acquisition, background writers, and mutations all recognize restore state. Backend policies prevent ordinary editing/sharing while incomplete; owner-scoped restore writes must have a separately reviewed policy lane that enforces the operation binding. A UI-only marker is insufficient. Do not assume a caller-supplied flag can create a trusted backend context.
+- The exact restore policy lane must be demonstrated using the alpha.59 policy compiler on a disposable app before destination implementation: validate allowed insertion/relation batches, allowed reconciliation reads, forbidden ordinary edits/invitations, ownership, and completion rules. If this cannot be expressed safely, redesign staging/activation explicitly; no permissive fallback is approved by this plan.
+- Restore transactions group cyclic internal-transfer links and any enforced cross-record invariants together. Domain plan determines grouping; the generic engine must not blindly restore tables in dependency order and hope policies accept intermediate rows.
+- Known IDs and archive-derived expected contents drive idempotency. Reconcile remote rows after uncertain outcomes. Matching existing content advances; authoritative absence may retry with the same IDs; differing/unknown results remain incomplete. Never overwrite conflicts or infer absence from a local-first result.
+- Compare all domain records using reverse mapping of destination references and compare full attachment bytes; compare source provenance separately from newly generated audit fields. Confirm global settlement before completion. Activation is a distinct confirmed operation and is reconciled if its response is lost.
+
+The policy-lane and pinned SDK behavior are implementation qualification work, not established capabilities. The shared archive and lifecycle contract can be implemented first. Do not begin real-data restore writes or claim restore readiness until the lane and isolation checks pass. No existing data is erased to make a test pass.
+
+## Live adoption
+
+Record the specific frontend/backend revision, selected workspace, profile support and aggregate size without publishing private contents. Export with the existing identity/storage setup, retain the file, reopen it independently, and restore to a new isolated destination. Reacquire the destination in a fresh app session and compare complete contents. Confirm original records unchanged and prior users/bank links not activated. Retain the original workspace and file when subsequent sign-in/storage work begins.

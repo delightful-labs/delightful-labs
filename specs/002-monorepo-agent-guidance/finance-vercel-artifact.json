@@ -1,0 +1,58 @@
+{
+  "kind": "local Vercel adapter artifact inspection; no deployment",
+  "node": "24.22.2",
+  "financeSource": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+  "workspaceCommit": "48a4849",
+  "functions": [
+    {
+      "path": "functions/![-]/catchall.func/.vc-config.json",
+      "runtime": "nodejs24.x",
+      "handler": "apps/finance/.svelte-kit/vercel-tmp/index.js",
+      "handlerExists": true
+    }
+  ],
+  "nativeAndWasmAssets": [
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/jazz-wasm@2.0.0-alpha.60/node_modules/jazz-wasm/pkg/jazz_wasm_bg.wasm",
+      "sha256": "0a2816a70b15b7676abfbc1bb1ec8868b017dedf52fe8c5e1a0659e69257d5d2"
+    },
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/jazz-tools@2.0.0-alpha.60_patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b_2b58fb6f768ce8f85c36ebbe1333bb96/node_modules/jazz-tools/dist/worker/jazz_wasm_bg.wasm",
+      "sha256": "0a2816a70b15b7676abfbc1bb1ec8868b017dedf52fe8c5e1a0659e69257d5d2"
+    },
+    {
+      "path": "static/_app/immutable/assets/jazz_wasm_bg.KR7h3v27.wasm",
+      "sha256": "0a2816a70b15b7676abfbc1bb1ec8868b017dedf52fe8c5e1a0659e69257d5d2"
+    },
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/@garden-co+jazz-napi-darwin-arm64@2.0.0-alpha.60/node_modules/@garden-co/jazz-napi-darwin-arm64/jazz-napi.darwin-arm64.node",
+      "sha256": "54ad08ab7e7c8c01d333f08b258e687e8647f0e34c2daea8edd3e2112261ee7a"
+    },
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/jazz-napi@2.0.0-alpha.60/node_modules/jazz-napi/jazz-napi.linux-x64-gnu.node",
+      "sha256": "24481880400d99fd2936ffb7ffc534bf3e2a8afe692c040dec5a37e37b1bcebf"
+    },
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/jazz-napi@2.0.0-alpha.60/node_modules/jazz-napi/jazz-napi.darwin-x64.node",
+      "sha256": "83326479d6ce2e4fa1e660c6ad18d2b33c80d4cf1a441d3a47d1d77ebdbd7864"
+    },
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/jazz-napi@2.0.0-alpha.60/node_modules/jazz-napi/jazz-napi.darwin-arm64.node",
+      "sha256": "54ad08ab7e7c8c01d333f08b258e687e8647f0e34c2daea8edd3e2112261ee7a"
+    },
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/jazz-napi@2.0.0-alpha.60/node_modules/jazz-napi/jazz-napi.linux-arm64-gnu.node",
+      "sha256": "9ac4765bd9a5b440d8756c608a8bf6d6857ff4d4f862eb30990816e06f1178c9"
+    },
+    {
+      "path": "functions/![-]/catchall.func/node_modules/.pnpm/jazz-napi@2.0.0-alpha.60/node_modules/jazz-napi/jazz-napi.win32-x64-msvc.node",
+      "sha256": "bec2303668453d85c29276dac47c31db8c9757d3dd94f16ec83961ffa92e6383"
+    }
+  ],
+  "brokenSymlinks": [],
+  "limitations": [
+    "Built on macOS; hosted Linux build and preview acceptance are pending.",
+    "Optional ws bufferutil and utf-8-validate addons are not installed; adapter warnings are non-fatal.",
+    "Hosted project Root Directory and required checks were not changed."
+  ]
+}

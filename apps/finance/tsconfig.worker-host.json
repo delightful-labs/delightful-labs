@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"target": "ES2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"lib": ["ES2024", "DOM"],
+		"strict": true,
+		"exactOptionalPropertyTypes": true,
+		"noUncheckedIndexedAccess": true,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
+	"include": [
+		"src/lib/runtime/worker/host-protocol.ts",
+		"src/lib/runtime/worker/host-drain.ts",
+		"src/lib/runtime/worker/host-drain.test.ts",
+		"src/lib/runtime/worker/host-legacy.test.ts",
+		"src/lib/runtime/worker/host-client.ts",
+		"src/lib/runtime/worker/window-host.ts",
+		"src/lib/runtime/worker/host-protocol.test.ts",
+		"src/lib/runtime/worker/host-channel.test.ts",
+		"vitest.worker-host.config.ts"
+	]
+}

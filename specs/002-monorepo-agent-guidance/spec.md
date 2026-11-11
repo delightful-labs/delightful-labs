@@ -150,7 +150,7 @@ through its documented rollback before accepting the slice.
 - Preserve each project's existing hosting platform and package interfaces. Consolidation does not select one host or one release schedule for all projects.
 - Root guidance covers shared working agreements, linked topic guides cover reusable practices, and scoped entry files cover local requirements. Topic paths and the treatment of existing memory directories are planning decisions.
 - This PR establishes a draft specification and its active-feature selection only. It does not import repositories, move the website, install dependencies, change live agent policy, or initiate deployment.
-- The existing website specification remains available at [Homepage and Native Open Thoughts](../001-homepage-native-blog/spec.md). This feature supersedes its exclusion of unrelated repository imports only for this separately reviewed migration; the website's product, content, typography, and publishing constraints continue to apply to the website.
+- The existing website specification remains available at [Homepage and Native Open Thoughts](../../apps/website/specs/001-homepage-native-blog/spec.md). This feature supersedes its exclusion of unrelated repository imports only for this separately reviewed migration; the website's product, content, typography, and publishing constraints continue to apply to the website.
 
 ### Key Entities
 

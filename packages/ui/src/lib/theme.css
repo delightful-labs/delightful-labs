@@ -1,0 +1,128 @@
+/* Import explicitly with `import 'delightful-ui/theme.css'`. */
+@import './fonts.css';
+
+@import './theme-properties.css';
+
+@layer dui-theme {
+	:root {
+		--dui-color-foreground: #262626;
+		--dui-color-background: #fff;
+		--dui-color-accent: #94ff47;
+		--dui-color-on-accent: #262626;
+		--dui-color-focus: var(--dui-color-foreground);
+		--dui-color-error: #b91c1c;
+		--dui-color-on-error: var(--dui-color-background);
+		--dui-font-family: 'Jost', system-ui, sans-serif;
+		--dui-font-family-mono: 'Cascadia Code', ui-monospace, monospace;
+		--dui-font-family-interactive: var(--dui-font-family-mono);
+		--dui-font-family-body: var(--dui-font-family);
+		--dui-font-size-xs: 0.75rem;
+		--dui-font-size-sm: 0.875rem;
+		--dui-font-size-md: 1rem;
+		--dui-font-size-lg: 1.125rem;
+		--dui-font-size-xl: 1.25rem;
+		--dui-font-size-xxl: 1.5rem;
+		--dui-spacing-xxs: 0.25rem;
+		--dui-spacing-xs: 0.5rem;
+		--dui-spacing-sm: 0.75rem;
+		/* Fluid spacing grows between viewport widths of 20rem and 80rem. */
+		--dui-spacing-md: clamp(1rem, calc(0.916667rem + 0.416667vw), 1.25rem);
+		--dui-spacing-lg: clamp(1.5rem, calc(1.333333rem + 0.833333vw), 2rem);
+		--dui-spacing-xl: clamp(2rem, calc(1.666667rem + 1.666667vw), 3rem);
+		--dui-spacing-xxl: clamp(3rem, calc(2.333333rem + 3.333333vw), 5rem);
+		--dui-space-xs: var(--dui-spacing-xs);
+		--dui-space-sm: var(--dui-spacing-md);
+		--dui-space-md: var(--dui-spacing-lg);
+		--dui-space-lg: var(--dui-spacing-xl);
+		--dui-border-width: 2px;
+		--dui-pressed-offset: 3px;
+		--dui-shadow: 3px 3px 0 var(--dui-color-foreground);
+		--dui-button-color-hover: var(--dui-color-on-accent);
+		--dui-button-background-color-hover: var(--dui-color-accent);
+		color-scheme: light;
+		accent-color: var(--dui-color-accent);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-dui-theme]) {
+			--dui-color-foreground: #fff;
+			--dui-color-background: #262626;
+			--dui-color-error: #ff8f8f;
+			--dui-button-color-destructive-hover: var(--dui-color-on-error);
+			--dui-button-background-color-destructive-hover: #ffb3b3;
+			--dui-button-border-color-destructive-hover: #ffb3b3;
+			--dui-button-color-primary: #262626;
+			--dui-button-background-color-primary: #fff;
+			color-scheme: dark;
+		}
+	}
+
+	:root[data-dui-theme='dark'] {
+		--dui-color-foreground: #fff;
+		--dui-color-background: #262626;
+		--dui-color-error: #ff8f8f;
+		--dui-button-color-destructive-hover: var(--dui-color-on-error);
+		--dui-button-background-color-destructive-hover: #ffb3b3;
+		--dui-button-border-color-destructive-hover: #ffb3b3;
+		--dui-button-color-primary: #262626;
+		--dui-button-background-color-primary: #fff;
+		color-scheme: dark;
+	}
+
+	*,
+	*::before,
+	*::after {
+		box-sizing: border-box;
+	}
+
+	body {
+		margin: 0;
+		font-family: var(--dui-font-family-body);
+		font-size: var(--dui-font-size-md, 1rem);
+		line-height: 1.5;
+		color: var(--dui-color-foreground);
+		background-color: var(--dui-color-background);
+	}
+
+	:where(button, input, select, textarea, summary, [role='menuitem']) {
+		font: inherit;
+		font-family: var(--dui-font-family-interactive);
+	}
+
+	a {
+		color: inherit;
+		text-decoration-color: var(--dui-color-accent);
+		text-decoration-thickness: 2px;
+		text-underline-offset: 0.2em;
+		text-decoration-skip-ink: auto;
+	}
+
+	a:hover {
+		text-decoration-style: dashed;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--dui-color-focus);
+		outline-offset: 4px;
+	}
+
+	:where(img, picture, video) {
+		max-width: 100%;
+		height: auto;
+	}
+
+	:where(code, pre, kbd, samp) {
+		font-family: var(--dui-font-family-mono);
+	}
+
+	pre {
+		overflow-x: auto;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:root {
+			scroll-behavior: auto;
+		}
+	}
+}

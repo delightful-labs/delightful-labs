@@ -1,0 +1,40 @@
+{
+	"actions": {
+		"show_subject": "Show {subject}",
+		"close": "Close",
+		"retry": "Retry"
+	},
+	"labels": {
+		"subject_recovery": "{subject} recovery"
+	},
+	"nouns": {
+		"account": [
+			{
+				"declarations": ["input count", "local countPlural = count: plural"],
+				"selectors": ["countPlural"],
+				"match": {
+					"countPlural=one": "Account",
+					"countPlural=*": "Accounts"
+				}
+			}
+		],
+		"recovery_phrase": [
+			{
+				"declarations": ["input count", "local countPlural = count: plural"],
+				"selectors": ["countPlural"],
+				"match": {
+					"countPlural=one": "Recovery phrase",
+					"countPlural=*": "Recovery phrases"
+				}
+			}
+		]
+	},
+	"recovery": {
+		"description": "Save this phrase somewhere private so you can restore your account on another device.",
+		"warning": "Anyone with this phrase can access your account and the data available to it, including in other apps using the same identity. Keep it private.",
+		"phrase_label": "Your recovery phrase",
+		"pending": "Loading your recovery phrase…",
+		"failure": "Your recovery phrase could not be loaded. Try again.",
+		"unavailable": "A recovery phrase is not available for this account."
+	}
+}

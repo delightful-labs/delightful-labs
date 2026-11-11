@@ -1,0 +1,145 @@
+name: Clipper qualification
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/clipper
+
+jobs:
+  plan:
+    name: Select affected projects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      website: ${{ steps.selection.outputs.website }}
+      ui: ${{ steps.selection.outputs.ui }}
+      local_first: ${{ steps.selection.outputs.local_first }}
+      finance: ${{ steps.selection.outputs.finance }}
+      clipper: ${{ steps.selection.outputs.clipper }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.22.2'
+      - id: selection
+        run: node scripts/monorepo/ci.mjs
+        working-directory: .
+
+  tooling:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
+    name: Tooling, types and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
+      - run: pnpm verify
+      - name: Preserve generated test counterexamples
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xstate-counterexamples
+          path: apps/clipper/.xstate-test/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
+  web-browser:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
+    name: Web, schema, worker and offline suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
+      - run: pnpm exec playwright install --with-deps chromium firefox
+      - run: pnpm test:e2e
+      - run: pnpm test:schema
+      - run: pnpm test:worker
+      - run: pnpm test:offline
+      - run: pnpm test:fake-data
+
+  extension:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
+    name: Packaged extension browser suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:extension
+
+  browser:
+    needs: [plan, web-browser, extension]
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
+    name: Account, library and offline browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
+      - name: Require both browser jobs to pass
+        env:
+          WEB_RESULT: ${{ needs.web-browser.result }}
+          EXTENSION_RESULT: ${{ needs.extension.result }}
+        run: |
+          test "$WEB_RESULT" = success
+          test "$EXTENSION_RESULT" = success
+        working-directory: .

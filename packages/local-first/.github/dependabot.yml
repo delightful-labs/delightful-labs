@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      storybook:
+        patterns: ['storybook', '@storybook/*']
+      svelte-toolchain:
+        patterns: ['svelte', 'svelte-check', '@sveltejs/*', 'vite', 'typescript', '@types/node']
+        update-types: [minor, patch]
+      development-tools:
+        patterns: ['oxfmt', 'oxlint', 'publint']
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore(deps)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci(deps)

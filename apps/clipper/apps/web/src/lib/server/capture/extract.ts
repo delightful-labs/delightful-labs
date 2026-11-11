@@ -1,0 +1,168 @@
+import { readableText } from '../../reader/text.js'
+import { articlePolicy, articlePurifier } from '../../reader/policy.js'
+import { Readability } from '@mozilla/readability'
+import { CaptureError } from './errors.js'
+import { sourceUrl } from './destination.js'
+export async function extract(body: Uint8Array, mediaType: string, url: string) {
+	if (!/^(text\/html|application\/xhtml\+xml|text\/plain)(;|$)/i.test(mediaType))
+		throw new CaptureError('unsupportedMedia', 415)
+	const { JSDOM, VirtualConsole } = await import('jsdom').catch((error: unknown) => {
+		const code =
+			error instanceof Error &&
+			'code' in error &&
+			typeof error.code === 'string' &&
+			/^[A-Z_]{1,64}$/.test(error.code)
+				? error.code
+				: 'DEPENDENCY_LOAD_FAILED'
+		console.error('captureParserUnavailable', {
+			code,
+			node: process.versions.node,
+			esmRequireEnabled:
+				process.env.NODE_OPTIONS?.includes('--experimental-require-module') ?? false,
+			requireDisabled: process.execArgv.includes('--no-experimental-require-module')
+		})
+		throw new CaptureError('gatewayUnavailable', 503, true)
+	})
+	const virtualConsole = new VirtualConsole()
+	const plain = /^text\/plain/i.test(mediaType)
+	let text = ''
+	if (plain) {
+		try {
+			text = new TextDecoder(mediaType.match(/charset=["']?([^;"'\s]+)/i)?.[1] ?? 'utf-8').decode(
+				body
+			)
+		} catch {
+			throw new CaptureError('unsupportedMedia', 415)
+		}
+	}
+	const dom = plain
+		? new JSDOM('<article><pre></pre></article>', { url, virtualConsole })
+		: new JSDOM(Buffer.from(body), { url, contentType: mediaType, virtualConsole })
+	try {
+		const document = dom.window.document
+		if (/^text\/plain/i.test(mediaType)) {
+			const pre = document.querySelector('pre')
+			if (pre) pre.textContent = text
+		}
+		if (document.querySelectorAll('*').length > 50000) throw new CaptureError('sourceTooLarge', 413)
+		// Preserve referenced footnote targets before Readability prunes the source DOM.
+		const notes = new Map<string, string>()
+		for (const link of document.querySelectorAll('a[href]')) {
+			const href = link.getAttribute('href')
+			if (!href?.startsWith('#') || href.length > 256 || notes.size >= 250) continue
+			let id: string
+			try {
+				id = decodeURIComponent(href.slice(1))
+			} catch {
+				continue
+			}
+			const target = document.getElementById(id)
+			if (target && /footnote|endnote|^fn\d|^note\d/i.test(id + ' ' + target.className))
+				notes.set(id, target.outerHTML)
+		}
+		const canonical = document.querySelector('link[rel="canonical"]')?.getAttribute('href')
+		let canonicalCandidate: string | undefined
+		if (canonical)
+			try {
+				canonicalCandidate = sourceUrl(new URL(canonical, url).href).href
+			} catch {
+				/* Evidence is optional; never changes identity. */
+			}
+		const article = /^text\/plain/i.test(mediaType)
+			? { title: new URL(url).hostname, byline: null, content: document.body.innerHTML }
+			: new Readability(document, { maxElemsToParse: 50000, keepClasses: true }).parse()
+		if (!article?.content) throw new CaptureError('parseFailed', 422)
+		const result = new JSDOM(article.content, { url, virtualConsole })
+		try {
+			const root = result.window.document
+			for (const link of root.querySelectorAll('a[href]')) {
+				try {
+					const target = new URL(link.getAttribute('href') ?? '', url)
+					const base = new URL(url)
+					if (
+						target.origin === base.origin &&
+						target.pathname === base.pathname &&
+						target.search === base.search &&
+						target.hash
+					)
+						link.setAttribute('href', target.hash)
+				} catch {
+					/* Invalid links are removed below. */
+				}
+			}
+			for (const [id, html] of notes)
+				if (
+					!root.getElementById(id) &&
+					Array.from(root.querySelectorAll('a[href]')).some(
+						(link) => link.getAttribute('href') === `#${id}`
+					)
+				)
+					root.body.insertAdjacentHTML('beforeend', html)
+			const images = root.querySelectorAll('img[src]')
+			const assetCandidates = Array.from(images)
+				.slice(0, 250)
+				.flatMap((img) => {
+					try {
+						return [
+							{
+								sourceUrl: sourceUrl(new URL(img.getAttribute('src') ?? '', url).href).href,
+								alt: img.getAttribute('alt') ?? ''
+							}
+						]
+					} catch {
+						return []
+					}
+				})
+			for (const img of root.querySelectorAll('img')) {
+				img.removeAttribute('data-clipper-image')
+				try {
+					const imageUrl = sourceUrl(new URL(img.getAttribute('src') ?? '', url).href).href
+					img.setAttribute('data-clipper-image', encodeURIComponent(imageUrl))
+				} catch {
+					img.remove()
+				}
+			}
+			for (const link of root.querySelectorAll('a[href]')) {
+				const href = link.getAttribute('href') ?? ''
+				if (!href.startsWith('#'))
+					try {
+						link.setAttribute('href', sourceUrl(new URL(href, url).href).href)
+					} catch {
+						link.removeAttribute('href')
+					}
+			}
+			const purify = articlePurifier(result.window)
+			const html = purify.sanitize(root.body.innerHTML, articlePolicy)
+			root.body.innerHTML = html
+			const normalizedText = readableText(root.body)
+			if (!normalizedText) throw new CaptureError('parseFailed', 422)
+			return {
+				canonicalCandidate,
+				candidate: {
+					title: article.title || new URL(url).hostname,
+					author: article.byline ?? undefined,
+					html,
+					text: normalizedText,
+					headings: Array.from(root.querySelectorAll('h1,h2,h3,h4,h5,h6'), (heading) => ({
+						text: heading.textContent ?? '',
+						level: Number(heading.tagName.slice(1)),
+						id: heading.id
+					})),
+					footnotes: Array.from(notes.keys()).filter((id) => root.getElementById(id)),
+					assetCandidates,
+					parserVersion: 'readability-0.6.0',
+					normalizationVersion: '1',
+					partialEvidence: [
+						...(assetCandidates.length ? ['assetsNotFetched'] : []),
+						...(images.length > 250 ? ['assetCandidateLimit'] : []),
+						...(notes.size >= 250 ? ['footnoteLimit'] : [])
+					]
+				}
+			}
+		} finally {
+			result.window.close()
+		}
+	} finally {
+		dom.window.close()
+	}
+}

@@ -1,0 +1,88 @@
+{
+	"baselineCommit": "fdcf11b",
+	"environment": "Local production preview, headless Chromium, no CPU/network throttling, disposable local Jazz; three profiles, one saved expense each",
+	"measurement": "Performance.now sampled after Playwright usability assertions and CDP metric collection; includes automation overhead. Page resource timing excludes the complete worker resource chain.",
+	"samples": [
+		{
+			"sample": 1,
+			"scenario": "first-visit-empty-workspace",
+			"observedUsableMs": 3325.4,
+			"documentResponseEndMs": 9.3,
+			"domContentLoadedMs": 40.9,
+			"firstContentfulPaintMs": 56,
+			"lastPageResourceResponseEndMs": 547.8
+		},
+		{
+			"sample": 1,
+			"scenario": "warm-saved-detail",
+			"observedUsableMs": 2458.4,
+			"documentResponseEndMs": 3.1,
+			"domContentLoadedMs": 19.3,
+			"firstContentfulPaintMs": 64,
+			"lastPageResourceResponseEndMs": 75.9
+		},
+		{
+			"sample": 1,
+			"scenario": "cold-offline-saved-detail",
+			"observedUsableMs": 2780.8,
+			"documentResponseEndMs": 16.9,
+			"domContentLoadedMs": 106.9,
+			"firstContentfulPaintMs": 284,
+			"lastPageResourceResponseEndMs": 299.7
+		},
+		{
+			"sample": 2,
+			"scenario": "first-visit-empty-workspace",
+			"observedUsableMs": 4233.3,
+			"documentResponseEndMs": 8.1,
+			"domContentLoadedMs": 57.6,
+			"firstContentfulPaintMs": 64,
+			"lastPageResourceResponseEndMs": 784.9
+		},
+		{
+			"sample": 2,
+			"scenario": "warm-saved-detail",
+			"observedUsableMs": 2652.6,
+			"documentResponseEndMs": 2.9,
+			"domContentLoadedMs": 20.7,
+			"firstContentfulPaintMs": 72,
+			"lastPageResourceResponseEndMs": 87.5
+		},
+		{
+			"sample": 2,
+			"scenario": "cold-offline-saved-detail",
+			"observedUsableMs": 2854.7,
+			"documentResponseEndMs": 14.6,
+			"domContentLoadedMs": 106.5,
+			"firstContentfulPaintMs": 284,
+			"lastPageResourceResponseEndMs": 302.3
+		},
+		{
+			"sample": 3,
+			"scenario": "first-visit-empty-workspace",
+			"observedUsableMs": 3747.6,
+			"documentResponseEndMs": 8.9,
+			"domContentLoadedMs": 113.4,
+			"firstContentfulPaintMs": 124,
+			"lastPageResourceResponseEndMs": 918.9
+		},
+		{
+			"sample": 3,
+			"scenario": "warm-saved-detail",
+			"observedUsableMs": 2507.2,
+			"documentResponseEndMs": 4.1,
+			"domContentLoadedMs": 27.1,
+			"firstContentfulPaintMs": 108,
+			"lastPageResourceResponseEndMs": 131.7
+		},
+		{
+			"sample": 3,
+			"scenario": "cold-offline-saved-detail",
+			"observedUsableMs": 2231.8,
+			"documentResponseEndMs": 9.4,
+			"domContentLoadedMs": 49.6,
+			"firstContentfulPaintMs": 196,
+			"lastPageResourceResponseEndMs": 210.8
+		}
+	]
+}

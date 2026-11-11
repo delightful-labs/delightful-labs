@@ -1,0 +1,10 @@
+node_modules/
+.svelte-kit/
+src/lib/paraglide/
+test-results/
+playwright-report/
+coverage/
+pnpm-lock.yaml
+
+# Preserve historical source formatting.
+archive/

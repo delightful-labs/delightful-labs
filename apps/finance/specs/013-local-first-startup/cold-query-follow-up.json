@@ -1,0 +1,219 @@
+{
+	"environment": "Jazz alpha.59; b39d9fa attachment policy; isolated checkout agent dev server 127.0.0.1:5192; headless Chromium; fresh persistent reader profiles; separate writer identity; synthetic data only",
+	"protocol": "Reader never opened shared finance pages. Writer created a workspace with two accounts and viewer/selected membership granting only one account, then archived the readable account. Reader acquired whole-table audit/plain transaction roots and authorization facts at Remote. All reader clients exited. Cold browser kept module HTTP requests available but intercepted Jazz WebSockets without forwarding; closed and unanswered-open controls were separate runs. Cold reads used LocalFirst. Metadata run warmed files and links roots without fileParts; subsequent online run explicitly requested content.",
+	"limits": [
+		"Dev executable assets remained available; this is not a production shell/cache or fully offline UI test.",
+		"Cold query timings are sequential in one restarted runtime, not independent startup latency samples or device budgets.",
+		"Earlier NotObserved result remains unexplained; successful controls do not establish that every query, permission scope or history is covered.",
+		"No live-subscription policy, physical byte-retention, storage/quota budget or all-relationship completeness guarantee established."
+	],
+	"scenarios": [
+		{
+			"scenario": "small-closed",
+			"seededTransactions": 2,
+			"permittedTransactions": 1,
+			"transport": "closed",
+			"identityRetained": true,
+			"warm": {
+				"audit": 1,
+				"plain": 1
+			},
+			"coldQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 656.5999999940395
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 209.5
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 87.90000000596046
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 78.79999999701977
+				}
+			]
+		},
+		{
+			"scenario": "small-silent",
+			"seededTransactions": 2,
+			"permittedTransactions": 1,
+			"transport": "silent",
+			"identityRetained": true,
+			"warm": {
+				"audit": 1,
+				"plain": 1
+			},
+			"coldQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 266.59999999403954
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 132.1000000089407
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 65.3999999910593
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 65.40000000596046
+				}
+			]
+		},
+		{
+			"scenario": "small-silent-disconnect",
+			"seededTransactions": 2,
+			"permittedTransactions": 1,
+			"transport": "silent then db.disconnect",
+			"identityRetained": true,
+			"warm": {
+				"audit": 1,
+				"plain": 1
+			},
+			"coldQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 59.1000000089407
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 44.8999999910593
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 42.79999999701977
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 43.30000001192093
+				}
+			]
+		},
+		{
+			"scenario": "large-silent",
+			"seededTransactions": 10000,
+			"permittedTransactions": 5000,
+			"transport": "silent",
+			"identityRetained": true,
+			"warm": {
+				"audit": 5000,
+				"plain": 5000
+			},
+			"coldQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 5000,
+					"ms": 1917.5
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 5000,
+					"ms": 1160.0999999940395
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 5000,
+					"ms": 1300.9000000059605
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 467.70000000298023
+				}
+			]
+		},
+		{
+			"scenario": "metadata-silent",
+			"seededTransactions": 2,
+			"permittedTransactions": 1,
+			"transport": "silent",
+			"identityRetained": true,
+			"warm": {
+				"files": 1,
+				"links": 1,
+				"audit": 1,
+				"plain": 1
+			},
+			"coldQueries": [
+				{
+					"shape": "exact-audit",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 392.90000000596046
+				},
+				{
+					"shape": "exact-plain",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 98.70000000298023
+				},
+				{
+					"shape": "workspace-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 46.29999999701977
+				},
+				{
+					"shape": "id-subset",
+					"outcome": "read",
+					"rows": 1,
+					"ms": 46.099999994039536
+				}
+			],
+			"coldMetadata": [
+				{
+					"shape": "files",
+					"rows": 1
+				},
+				{
+					"shape": "links",
+					"rows": 1
+				},
+				{
+					"shape": "parts-not-warmed",
+					"rows": 0,
+					"bytes": 0
+				}
+			],
+			"explicitOnlineContent": {
+				"parts": 1,
+				"bytes": [1, 2, 3, 4]
+			}
+		}
+	],
+	"validationUpdate": "See remaining-investigation-results.json. Earlier page-level WebSocket mocks were not reliable SharedWorker transport controls. Real-proxy cross-browser subscription-only and large-history cold tests supersede those control claims. Online memory/edit measurements remain valid; unbounded initial acquisition later exposed a roughly 3-second main-thread stall."
+}

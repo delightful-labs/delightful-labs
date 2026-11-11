@@ -1,0 +1,19 @@
+[
+	{
+		"file": "delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
+		"source": "dbc452eda6d874e67f24ec971be0a689dca8ef68",
+		"xstate": "6.0.0-beta.1",
+		"jazz": "2.0.0-alpha.60",
+		"adaptation": "Preserves the qualified v6 alpha.60 archive except for the session capability, acquisition owner, and Jazz startup/session adapter modules; adds cancellable availability waiting. Source delta is included in the adjacent patch.",
+		"adapterBaseline": {
+			"file": "delightful-local-first-2532309-xstate-v6-jazz-alpha60.tgz",
+			"sha256": "74d97cb7a5532bb07f07f2d9eac4e99c258e18f7e1b66fdf0fb842dd09570f44"
+		},
+		"recoveryPatch": "delightful-local-first-worker-recovery.patch",
+		"sha256": "9dac0f2658e3b12fdfe45462707b5894abeaa3a3ca086b29e809a39129a32abd",
+		"recoveryBaseline": {
+			"file": "delightful-local-first-dbc452e-xstate-v6-jazz-alpha60.tgz",
+			"sha256": "8bf38f5fb030e5fd233fdfb7a10a58e9da4dacbc438b662d5b7318794adf8709"
+		}
+	}
+]

@@ -1,0 +1,50 @@
+{
+  "checkedAt": "2026-11-11T12:31:50.565306+00:00",
+  "repositories": [
+    {
+      "repository": "delightful-labs/delightful-ui",
+      "imported": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "defaultBranch": "main",
+      "currentHead": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "sameAsImport": true,
+      "openPullRequests": [],
+      "disposition": "Main matches the imported commit; no open PRs."
+    },
+    {
+      "repository": "delightful-labs/delightful-local-first",
+      "imported": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "defaultBranch": "main",
+      "currentHead": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "sameAsImport": true,
+      "openPullRequests": [],
+      "disposition": "Main matches the imported commit; no open PRs."
+    },
+    {
+      "repository": "delightful-labs/delightful-finances",
+      "imported": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "defaultBranch": "main",
+      "currentHead": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "sameAsImport": true,
+      "openPullRequests": [
+        {
+          "number": 67,
+          "title": "feat(worker): move Finance application logic into a web worker",
+          "url": "https://github.com/delightful-labs/delightful-finances/pull/67",
+          "head": "8ac042576360d82a21c64a643eab97f09e4bdf7c",
+          "base": "main"
+        }
+      ],
+      "disposition": "Main matches import. Draft PR #67 remains in the source repository; unfinished worker handoff is deliberately not imported or merged. Preserve it for subsequent Finance work."
+    },
+    {
+      "repository": "delightful-labs/delightful-clipper",
+      "imported": "549e4b543bbca51b3a243fa7f88d4165f9f405f7",
+      "defaultBranch": "main",
+      "currentHead": "0fd1cb389e8fccc9e5eecb642f9c0f10fa42d5e6",
+      "sameAsImport": false,
+      "openPullRequests": [],
+      "disposition": "Current main reconciled by unsquashed subtree merge 29cab027. Resolve overlapping test-only edits by retaining the already-qualified exact public-icon allow-list. The merge has no tree changes and the current source main is an ancestor.",
+      "reconciledBy": "29cab027"
+    }
+  ]
+}

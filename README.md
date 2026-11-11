@@ -1,21 +1,16 @@
-# Delightful Labs foundation
+# Delightful Labs workspace
 
-SvelteKit 3 and Svelte 5, Delightful UI, and the Vercel adapter. The homepage
-contains only functional navigation; editorial content and typography are deferred.
+A pnpm workspace, starting with the website at [`apps/website`](apps/website/README.md).
+The UI library is at [`packages/ui`](packages/ui/README.md). The Local First source is at
+[`packages/local-first`](packages/local-first/README.md). Finance is at [`apps/finance`](apps/finance/README.md); Clipper web and extension are at `apps/clipper/apps/web` and
+`apps/clipper/apps/extension`. Progress is tracked in the
+[migration implementation record](specs/002-monorepo-agent-guidance/implementation.md).
 
-## Run locally
-
-Use Node.js 24 (`nvm use`) and pnpm 10.28.0.
+Use Node 24.22.2 (`nvm use`) and pnpm 10.28.0. From this directory:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
-```
-
-The development server binds to `0.0.0.0` and prints localhost and network URLs.
-Use `pnpm dev --port 5183 --strictPort` for an explicit available port.
-
-```sh
 pnpm check
 pnpm test
 pnpm build
@@ -23,105 +18,73 @@ pnpm test:build
 pnpm test:browser
 ```
 
-Browser tests require Playwright Chromium (`pnpm exec playwright install chromium`
-if not already installed). They start their own default-config server on port
-5185; use another available port/configuration rather than stopping an unknown
-server. `BASE_URL=http://localhost:5183 pnpm test:browser` tests an existing empty
-foundation server. Test fixtures stay in tests and do not appear in the app.
+These commands delegate to the website. For a distinct port, run
+`pnpm dev --port 5183 --strictPort`; Vite prints localhost and LAN URLs.
+You can also run app commands inside `apps/website`, or use
+`pnpm --filter delightful-labs <command>`. Root `pnpm exec` does not resolve app
+binaries; use `pnpm --filter delightful-labs exec <binary>` instead.
 
-## Publication configuration
+Environment files belong in `apps/website`; copy that app's `.env.example` there
+when needed. Existing local files in other checkouts are untouched.
+Generated output, browser evidence and caches belong to the app directory.
 
-Copy `.env.example` to `.env.local` when configuration is needed; do not commit
-local environment files. Open Thoughts now exists at
-https://open-thoughts.leaflet.pub/ and is configured in Vercel Preview. The
-application default stays unset; an unconfigured environment makes no upstream
-article requests.
+All consumers now use workspace UI with their own Svelte peer. The website and
+Local First Storybook import `delightful-ui/theme-classic.css` to retain their
+existing typography; the current default theme remains available to other apps.
+There is no Nx or additional task orchestrator.
+See the [archive findings](specs/002-monorepo-agent-guidance/archive-findings.md)
+before replacing an internal archive.
 
-- `LEAFLET_PUBLICATION_URI`: verified Open Thoughts URI
-  `at://did:plc:226m7t4kp7d7sg2qsdresypm/site.standard.publication/3mzv6a2yk522y`.
-- `LEAFLET_AUTHOR_DID`: defaults to Matt's confirmed `@derocher.me` identity,
-  `did:plc:226m7t4kp7d7sg2qsdresypm`. The publication owner must match.
-- `SITE_ORIGIN`: defaults to `https://delightfullabs.com` for native canonical URLs.
+For Vercel, the website's configuration and `.vercel/output` are now app-local.
+A hosted build needs Root Directory `apps/website`, with access to files outside
+that directory for the root workspace/lockfile. This branch changes no hosted
+project setting and deploys nothing; verify a preview before any source handoff.
+See the [website slice record](specs/002-monorepo-agent-guidance/website-move.md).
 
-These variables are declared as runtime, server-only values in `src/env.ts`.
-Public reading needs no publishing credentials. PDS location is resolved from
-the DID document, rather than permanently hard-coded.
+Read [AGENTS.md](AGENTS.md) for guidance scope and project-local Spec Kit usage.
 
-The index loads public AT Protocol records, follows every cursor, filters exact
-publication membership, and sorts original dates. Articles render semantic native
-HTML using `@standard-reader/renderer-svelte@0.4.0` and its matching core.
-The small integration wrapper uses existing Delightful UI defaults, safe links,
-PDS image resolution, and a source link in place of iframe blocks. Source theme
-and font settings are not adopted. Rendering follows the package's supported
-behavior; the owner accepted its current facet, checklist, page, and delimiter
-limitations before starting to publish. See the
-[renderer evaluation](specs/001-homepage-native-blog/evaluations/standard-reader/README.md).
+UI commands from the root: `pnpm ui:check`, `pnpm ui:test`, `pnpm ui:package`,
+and `pnpm ui:build`. Imported projects use the root lockfile. The UI source import
+retains original history; see [its slice record](specs/002-monorepo-agent-guidance/ui-import.md).
 
-The server bundle includes each dependency's resolved XState version so DUI's v5 internals stay separate from the app's v6 machines. `pnpm test:build`
-executes emitted SSR routes through Node, without Vite's development resolver.
+Local First package commands: `pnpm dlf:check`, `pnpm dlf:package`. Run the approved verification suite with `pnpm dlf:verify`. Its
+implementation review gate remains effective for subsequent changes; see
+[the import record](specs/002-monorepo-agent-guidance/local-first-import.md).
+The [alpha.60 source adapters](specs/002-monorepo-agent-guidance/alpha60-adapters.md)
+are qualified locally. Finance and Clipper consume its qualified workspace source; historical archives
+remain only where retained for provenance/fixtures.
 
-The server reader's cache/refresh lifecycle is an XState v6 machine, pinned to
-`6.0.0-beta.1` as requested. Fetching and Zod validation live in focused modules;
-the machine owns concurrency, freshness, stale fallback, retries and cancellation.
-See [the lifecycle contract](specs/001-homepage-native-blog/contracts/reader-lifecycle.md)
-for the state diagram and tested invariants. With `BLOB_STORE_ID` configured, it checks the shared durable snapshot on every
-read; local-only environments retain the original process cache.
+Finance commands: `pnpm finance:check`, `pnpm finance:test`,
+`pnpm finance:test:worker-state`, `pnpm finance:test:worker-host` and
+`pnpm finance:build`. Use `pnpm --filter delightful-finances <command>` for other
+app scripts. Frozen installation prepares the injected UI package; after editing
+UI, run `pnpm ui:package` to refresh its peer-specific copies.
+See [the Finance import record](specs/002-monorepo-agent-guidance/finance-import.md)
+for retained archives, isolated test configuration and remaining cutover work.
 
-## Local public-source proof
+Clipper commands: `pnpm clipper:check`, `pnpm clipper:test`,
+`pnpm clipper:build`, `pnpm clipper:build:extension` and `pnpm clipper:verify`.
+Its web and extension consume workspace UI and Local First packages, prepared
+on install and refreshed by `pnpm build:libraries`. Browser commands retain
+their disposable test backends; see the scoped Clipper guidance before running.
 
-The verification script accepts only an explicit local article URL. Run a separate
-local server with both author and publication overridden for an approved public
-example, then run `node scripts/verify-native.mjs <local-article-url>`. This checks
-initial HTML, browser text/links, a loaded image, no frames, and no page errors.
-Never use a demonstration publication as the committed or production default.
-Evidence from the initial proof is in the feature's `verification.md`.
-Run this proof after other dev/build/browser-test processes have stopped, or
-from a separate checkout: SvelteKit processes in one checkout share generated
-environment files, even when they use different ports.
+After installation, `pnpm monorepo:check-links` verifies all eight UI/foundation links, including
+website and Local First development. It checks each consumer's required Svelte,
+Jazz and XState instances. CI
+runs it before compilation. See [qualification and remaining work](specs/002-monorepo-agent-guidance/qualification.md).
 
-## Deployment status and remaining gates
+[UI compatibility qualification](specs/002-monorepo-agent-guidance/ui-workspace-links.md)
+records the retired snapshots, classic-theme provenance, packed-export checks
+and unchanged website screenshots.
 
-`pnpm build` generates `.vercel/output` with the explicit Node.js 24 adapter.
-The build is deployable output, not evidence of a hosted release. The repository is linked to the `delightful-labs` Vercel project for preview
-verification. Both custom domains are attached, but DNS still points to Netlify. No Leaflet publishing credentials are stored in the app.
+Shared engineering guidance starts at [AGENTS.md](AGENTS.md). The stricter common
+rules apply to every app and package; local constitutions and product contracts
+retain their own scope. Run `pnpm monorepo:check-guidance` for maintained guidance
+links, shared tooling ownership and read-only discovery in all six contexts.
+Run `pnpm monorepo:test-tooling` for the CI selector and guidance regressions.
 
-The Vercel connection is authorized for the selected team/project. If using
-the CLI, link before `vercel env pull .env.local` and keep preview configuration
-separate from production. Do not overwrite an existing local environment file
-without preserving its local settings.
-
-Durable snapshots use private Vercel Blob (`@vercel/blob@2.8.2`). Set
-`BLOB_STORE_ID` to enable them; Preview uses the connected
-`delightful-labs-snapshots` store. The SDK uses platform OIDC or the project's
-connected storage credentials; none are exposed to the browser. Local use without
-a store still works with the process cache. Production is configured with the same private store and a distinct Production
-namespace, plus the publication URI. No additional paid store was provisioned.
-
-Snapshots stay fresh for five minutes. Failed refreshes can use the latest
-stored snapshot for at most 24 hours from its original verification time. Every
-request checks storage without CDN caching. Conditional writes prevent competing
-refreshes from overwriting a newer snapshot; failures/conflicts re-read the winner.
-A confirmed empty archive replaces the old body. If storage cannot be read,
-requests return unavailable instead of serving an unchecked local copy. Preview
-branches, Production, and publications have distinct versioned keys. Each snapshot
-is bounded to 10 MB. See [the lifecycle contract](specs/001-homepage-native-blog/contracts/reader-lifecycle.md)
-for concurrency, availability, and validation details.
-
-All six original public posts are quietly published in the owner’s Leaflet
-publication. Native feeds, aliases, legacy redirects and preserved assets are
-implemented. Canonical alignment is deferred; no publication URL was changed.
-See the [cutover runbook](specs/001-homepage-native-blog/cutover.md) for the pending
-PR merge, production checks, DNS change and rollback. Keep Netlify available.
-
-See [the spec](specs/001-homepage-native-blog/spec.md),
-[implementation plan](specs/001-homepage-native-blog/plan.md),
-[tasks](specs/001-homepage-native-blog/tasks.md), and
-[research](specs/001-homepage-native-blog/research.md).
-
-## Blog content
-
-All posts and images live in Leaflet/AT Protocol. This repository retains no
-archived article bodies, captures, images or import tooling. The old blog
-repository remains the owner's archive. Only six compatibility mappings remain
-in `src/lib/server/publication/legacy.json` for redirects, aliases and stable feed
-IDs. New articles need no repository changes.
+Every PR gets a Conventional Commits title check, including drafts and app-only
+changes. Existing CI jobs select affected projects and transitive consumers;
+root/unknown paths, missing history and manual runs select all. The
+[shared-guidance/CI record](specs/002-monorepo-agent-guidance/shared-guidance-ci.md)
+records the exact policy resolution, dependency closure and local verification.

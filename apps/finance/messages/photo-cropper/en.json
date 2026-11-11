@@ -1,0 +1,12 @@
+{
+	"profile": {
+		"crop_apply": "Use this crop",
+		"crop_failed": "This image could not be cropped. Choose another image and try again.",
+		"crop_instruction": "Drag the crop area to choose which part of the image to keep.",
+		"crop_resize_bottom_left": "Resize crop from bottom left corner",
+		"crop_resize_bottom_right": "Resize crop from bottom right corner",
+		"crop_resize_top_left": "Resize crop from top left corner",
+		"crop_resize_top_right": "Resize crop from top right corner",
+		"crop_reposition": "Move crop area with arrow keys"
+	}
+}

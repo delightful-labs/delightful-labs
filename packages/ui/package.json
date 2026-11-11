@@ -1,0 +1,87 @@
+{
+	"name": "delightful-ui",
+	"version": "0.0.25",
+	"scripts": {
+		"dev": "vite dev --host 0.0.0.0",
+		"build": "vite build && pnpm run package",
+		"preview": "vite preview",
+		"package": "svelte-kit sync && svelte-package && publint",
+		"prepublishOnly": "pnpm run package",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
+		"test": "pnpm run build && playwright test",
+		"test:unit": "vitest",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
+		"storybook": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
+		"storybook:network": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
+		"build-storybook": "storybook build --disable-telemetry",
+		"test:storybook": "storybook build --config-dir tests/storybook --output-dir storybook-test-static --disable-telemetry && playwright test --config playwright.storybook.config.js",
+		"test:model": "vitest run src/swipe-actions.model.test.ts"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"svelte": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./theme.css": "./dist/theme.css",
+		"./theme-classic.css": "./dist/theme-classic.css"
+	},
+	"files": [
+		"dist",
+		"!dist/**/*.test.*",
+		"!dist/**/*.spec.*"
+	],
+	"peerDependencies": {
+		"svelte": "^5.57.2"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"@opentelemetry/api": "^1.9.0",
+		"@playwright/test": "^1.64.0",
+		"@poppanator/sveltekit-svg": "^7.0.1",
+		"@storybook/addon-docs": "^10.6.2",
+		"@storybook/addon-svelte-csf": "^5.1.5",
+		"@storybook/svelte": "^10.6.2",
+		"@storybook/svelte-vite": "^10.6.2",
+		"@sveltejs/adapter-auto": "^8.0.0",
+		"@sveltejs/kit": "^3.0.1",
+		"@sveltejs/package": "^3.0.0",
+		"@sveltejs/vite-plugin-svelte": "^7.3.1",
+		"@types/node": "^22.20.5",
+		"@typescript-eslint/eslint-plugin": "^8.71.2",
+		"@typescript-eslint/parser": "^8.71.2",
+		"@xstate/test": "2.0.0-beta.0",
+		"eslint": "^10.12.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-svelte": "^3.23.1",
+		"fast-check": "4.10.2",
+		"globals": "^17.13.0",
+		"prettier": "^3.9.10",
+		"prettier-plugin-svelte": "^4.1.1",
+		"publint": "^0.3.25",
+		"storybook": "^10.6.2",
+		"svelte": "^5.57.2",
+		"svelte-check": "^4.7.6",
+		"tslib": "^2.6.2",
+		"typescript": "^6.0.3",
+		"vite": "^8.3.4",
+		"vitest": "^4.1.11"
+	},
+	"svelte": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"type": "module",
+	"packageManager": "pnpm@10.28.0",
+	"engines": {
+		"node": "^22.17.0 || >=24.0.0"
+	},
+	"imports": {
+		"#lib": "./src/lib/index.js",
+		"#lib/*": "./src/lib/*"
+	},
+	"dependencies": {
+		"tdesign-icons-svg": "^0.4.7",
+		"xstate": "6.0.0-beta.1"
+	}
+}

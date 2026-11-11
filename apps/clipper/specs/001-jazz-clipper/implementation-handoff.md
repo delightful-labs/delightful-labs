@@ -1,0 +1,798 @@
+# Article notes — implementation started
+
+**AT Protocol status (2026-11-10):** [Merged implementation, accepted publication decisions and remaining work](atproto.md). This checkpoint supersedes historical JWT/Neon, alpha.59 and Netlify-only AT Protocol notes below; it does not mark annotation/publication requirements implemented.
+
+## Current AT Protocol proof — November 9, 2026
+
+PR #20 incorporates the current alpha.60/Vercel main branch. Better Auth and the
+installed AT Protocol plugin now use Jazz’s native Better Auth adapter over the
+existing backend store. No Neon connection, Postgres driver or SQL migration is
+required. Auth records have explicit deny-all client policies; the backend publishes
+an additive native migration using the shared schema and native catalogue.
+
+The user approved leaning into Jazz’s defaults. Native backend-account following
+owns guest linking, existing-account selection and remembered-account persistence.
+Clipper’s worker owns provider authorization and attempt-bound callback confirmation,
+with application drain and SDK close before redirect. Provider logout precedes native
+Jazz logout. The previous JWT source, selection record and manual connect/sign-in
+coordinator are removed. Earlier Netlify/Neon and token-integration entries below
+are historical and do not describe the current implementation.
+
+See [deployment instructions](../../docs/atproto-proof-deployment.md) for the two
+remaining auth variables and [qualification evidence](../../docs/reviews/atproto-native-alpha60.md).
+Existing disposable Neon auth records are neither imported nor deleted.
+
+## Startup performance
+
+Existing compatible libraries now take a read-only readiness path; only missing roots issue a write and track local/remote settlement. Search resources and full-text reads start on demand, while the collection coalesces initialized subscription results and search drains stale native loads before refreshing. Reader snapshot/asset/source reads run in parallel after header validation. Narrow selectors, immutable projection caching and 50-article rendering batches reduce main-thread work; keyboard focus is preserved through batching and coalesced tag updates. No catalogs, dependency pins, schema or service worker admission policy change.
+
+Production observations and ownership details are in [startup-performance.md](startup-performance.md). With 120 saved articles, a controlled 4× CPU comparison improved the median first list from 1,440 ms to 994 ms, rendering an initial batch of 50 rather than all 120. These localhost observations do not predict network/device performance. Search still reads full text once activated; capture worker coordination and automatic resumption remain intact.
+
+Validation: source verification passes 650 tests plus one platform skip, formatting, lint, strict types and production build. All five production offline, eleven packaged-extension and two sample-data cases pass. All 62 web cases are qualified across the complete run and targeted follow-ups: an obsolete repeated-root-write assertion was corrected, and one Firefox live-upgrade timeout passed in an isolated traced rerun without application changes. The initial full web run was 60/62, not green; see the detailed validation record in startup-performance.md.
+
+
+## Explicit persistence and notification workflow ownership
+
+Create, revision and legacy-import decisions now live in invoked domain charts in `notes/domain-machines.ts`. Read actors return decoded facts; `assign` stores them in chart context. Named guards admit the operation and select an existing note, article parent or legacy document parent. States order the selected mutations. The obsolete manually started parent-selection actor is removed, and the native adapter no longer stores article/note/import facts on its transaction resource.
+
+`machines/storage/domain-transaction.ts` bridges DLF's existing callback contract with typed read/stage messages. It invokes both the DLF transaction owner and the domain chart. DLF remains the sole owner of acquisition, cancellation/shutdown draining, commit, local persistence, rollback and unknown settlements. An assessment reply completes DLF's read callback; an explicit stage request permits mutations. The original attempt is returned unchanged and remote acceptance remains a separate receipt. No shared-library source or dependency pin changes are required.
+
+Draft recovery and exact-acknowledgment removal similarly use `draft-mutation-machine.ts`. A callback actor owns the native IndexedDB transaction and reports request results. Named guards select source validation, destination validation, atomic move, exact removal, no-op or abort. Follow-up commands run synchronously before the native request callback returns, preserving the same active transaction. Only transaction completion acknowledges durability. The public promise adapter starts one operation actor; I/O leaves do not manually start actors.
+
+The same shared transaction/domain boundary now owns article intent/publication, article creation/attachment/failure, organization/tag writes and image publication/failure. Native reads return article rows, causal parents and computed hashes as facts; only imperative transaction/receipt handles remain on `TransactionResource`. The old manually started staging helpers in `storage/mutations.ts` are removed. Each chart selects its mutation path and preserves DLF settlement and remote-receipt behavior.
+
+Extension WAITING/PROGRESS notifications now use `notification-machine.ts`. Named guards admit the message and sender; waiting messages read and validate the exact capture before display, while progress messages carry their own validated capture. The actor acknowledges only after the display operation completes and rejects storage/display failures. Existing rendering revision checks, document targeting and localized wording remain intact.
+
+Focused ownership, mutation-selection and notification regressions supplement the existing native policy, storage, image, organization and extension suites. Full verification results are recorded on PR #19 after publication.
+
+Local evidence includes 31 focused model/draft/ownership/native-offline tests, eight real native policy/migration tests and both browser draft cases on an isolated test port. Ownership regressions cover cancellation during acquisition/read/staging/commit, rollback failure and unknown commit/persistence outcomes without replay. Full verification and hosted results are recorded on PR #19 after publication.
+
+## Independent note entities — current implementation
+
+Following the user's AT Protocol/DLF clarification, the persistence layer now has an independent `notes` table (`id`, `libraryId`, nullable article/document references, exactly one current association) and immutable `noteRevisions` linked by `noteId`. Note IDs are caller-allocated operation identities, not article IDs, DIDs, provider subjects or AT record keys. Notes can be read by their own ID and their content projected without loading the article. Article/legacy-content aliases find associated entities without rewriting IDs. Highlight attachment remains a future entity relationship; no placeholder highlight table or AT publishing/account-linking system is added.
+
+Each create, revision write and legacy import is owned by a DLF transaction. Creation checks library/article ownership, operation identity and locally observed article-note cardinality inside that transaction. Revision writes check the note and same-note causal parents; known operations are blocked instead of replayed. Native policies enforce private library ownership, valid same-library note/article relations and immutable records. Offline concurrent creation can still yield distinct candidate note IDs; they must be reconciled without silently rewriting independently addressable identities. No global offline uniqueness guarantee is claimed.
+
+Structural migration `b7805d9b30d2 → 92a26a023aa5` adds both tables and preserves all prior schemas/rows. The old `articleNoteRevisions` table becomes read-only evidence. `records.notes.importLegacy` explicitly adopts an article's known alias-group history into a supplied independent note ID, in one native transaction. It preserves revision IDs, causal edges, literal text, timestamps and concurrent versions; the original rows remain available. It can import into an existing matching note, blocks identity/causal conflicts and refuses a repeated completed import. The operation owner must retain the supplied ID and consume local/remote outcomes separately. This is an explicit domain import API, not an automatic mutation inside a read or a startup migration currently invoked by the app; the future note/editor owner will admit/drain it before editing old notes.
+
+Drafts now use note IDs. IndexedDB version 2 retains the old `drafts` store and adds `noteDrafts`, keyed by deployment/library/note/editor. `readLegacy` exposes old article-keyed recovery data; `recoverLegacy` atomically copies it to a specific note and deletes only the exact matching source. Existing divergent/newer destination text or a stale source aborts the move, preserving recovery evidence. Article aliases must come from the bound native repository's `recoveryTarget` read; no note ID is guessed from an article ID. Strict transaction completion acknowledges recovery. The draft owner coalesces only the same note/editor and retains the previous admission, shutdown-drain and retry rules.
+
+Current local evidence: 20 focused model/draft/native-offline tests pass, including actual persisted independent notes and both article-parent kinds through restart. Strict root/web/service-worker/extension types, formatting, lint and production build pass. New hosted regressions cover private entity/revision policies, legacy native import/restart/idempotence and actual IndexedDB v1-to-v2 recovery with conflicting/stale draft rejection. Full hosted results are recorded on PR #19 after publication; no editor, highlight workflow or complete AT integration is claimed. No new dependency or catalog wording is added.
+
+## Recovered AT Protocol requirement and DLF boundary
+
+The user confirmed that "@Proto" means AT Protocol and that this was stated during original specification planning but omitted from the recorded spec. Notes and highlights must be separate, independently addressable entities with their own stable IDs and explicit article links. A highlight-attached note also links to its highlight. The initial choice to use the library/article pair as the only note identity was an unnecessary coupling; the existing Note record in the logical model should not have been replaced solely by revision rows.
+
+This requirement is now recorded in spec.md, data-model.md and design-decisions.md. The user clarified that DLF will handle the broader shared AT Protocol scope across apps, starting with identity. The current requirement is to avoid making later AT interoperability difficult, not to select publication versus source-of-truth behavior now. Preserve independent domain IDs and explicit article/highlight relationships; consume shared DLF identity capabilities, and do not create a Clipper-specific AT account-linking or publishing system. No new role decision is needed before designing independent notes and a preserving revision/draft migration. Lexicons, external record keys and publication/transport remain future shared-integration design. No native schema, migration, application behavior, catalog wording or dependency changed in this documentation pass. Prior CI success applies to the existing groundwork and does not validate the forthcoming entity redesign.
+
+## PR #19 CI correction — native parent relations
+
+The reported GitHub run `42232245433` fails both tooling/native and browser/schema-upgrade jobs because the native compiler rejects the original note insert policy: `JoinNotRefCompatible` on the undeclared polymorphic `articleId` join. The previous TypeScript/schema-loader validation did not exercise this native compilation boundary. Netlify deploy `6aede0e7e2d838ae16268036` also failed during the preview build; its connector exposes only the build-stage exit, not the detailed log, so its exact error has not been independently read.
+
+The correction retains the logical article identity and adds separate nullable `articleParentId` / `documentParentId` native relations. Insert policies require exactly one real, same-library parent reference and library ownership. The DLF transaction reads both parent rows, and a staging statechart selects the matching reference before its owner commits. Decoding validates reference/identity agreement and preserves historical rows with absent references. No authorization check is weakened to an unjoined UUID comparison.
+
+The original published schema/migration remains intact. A direct `dc1365b4b2ec → b7805d9b30d2` migration creates valid note records for image-era libraries; an additive `d7f861eae955 → b7805d9b30d2` migration preserves any already-registered interim schema and stored note fields. Existing upgrade fixtures use the corrected direct edge. Native permission regressions include absent, duplicate, missing and wrong-kind parent references.
+
+A new public-SDK regression opens the actual persisted local-first native runtime with sync disconnected, stages both URL-article and legacy-document notes, closes it and reopens both notes with the same identity. It runs without a server listener and catches the native policy compilation failure missed earlier. Local type/lint/format/build checks and focused tests are recorded when the correction is published; full server-policy/migration and browser qualification must come from the replacement hosted checks.
+
+The first correction head `e52b8b3` passes hosted `pnpm verify` with all 603 tests/90 files, and Netlify preview `6aede85f4091080cdccd1f93` is ready. Its browser run passes 57 of 58 cases, including the note draft adapter and all Chromium/Firefox schema upgrades. The first cold-start case times out at its five-second remote-sync assertion before checking usable local readiness. That test now waits explicitly for the Saved articles region (bounded to 30 seconds) before retaining the unchanged five-second acceptance assertion and no-signup checks. This separates cold module/WASM initialization from remote acceptance; the timing explanation is an inference from the first-only failure, not a captured startup trace. No application readiness behavior or synchronization criterion changes. Complete the replacement full browser/offline/extension/sample-data run before calling the PR green.
+
+The user requested starting article notes after reviewing the specification. Branch `feat/article-notes` starts from image head `5929f9b`. The GitHub connector subsequently confirmed image PR #18 was merged at `2052f32` on 2026-11-06; the local main ref is still older. The first bounded change added `notes/schema.ts` and focused regressions; the continuation below adds native records and local draft ownership. No working editor or application note-persistence/sync qualification is claimed yet.
+
+One logical article note is identified by the private library/article tuple. Immutable revisions preserve literal text and causal parents; projection retains every divergent head instead of selecting authored text by timestamp/UUID. Identical concurrent text is grouped for presentation while retaining both revision identities. Clearing is an empty revision and cannot dominate a concurrent unseen edit. Draft records include parent identity, edit sequence, text and observed base revision IDs. Only an acknowledgment of that exact draft can acknowledge its local durability. The initial payload guard is 256 KiB of UTF-8, with a matching pre-encoding string bound; this is a provisional technical admission bound, not approved product copy.
+
+Next implementation follows these ownership boundaries before asynchronous leaves are wired:
+
+- The library owns an account-bound notes child and its native revision subscription. Reader attachment selects an article editor; component unmount does not stop issued persistence. Shutdown stops admission and joins issued writes and draft flushes before closing the bound library.
+- Editor states load the local draft and native heads, compare their causal bases, then admit editing or retain divergent text for reconciliation. Native observation must never replace dirty editor text. A reconciliation write references only versions explicitly reconciled by the user; it cannot consume a subsequently arriving unseen head.
+- Every edit increments the sequence and queues a local draft write. A serial draft owner persists the latest queued edit, retaining the in-flight edit until acknowledgment. The 500 ms source-write debounce is independent; leaving flushes source writes and can navigate once the current recoverable draft is durable. If neither persistence boundary succeeds, navigation requires a warning.
+- Native writes reuse the DLF transaction owner, validate the library/article and causal references inside that same transaction, and retain stable operation identity. Issued uncertain writes enter reconciliation rather than blind retry. Separate local durability and remote receipt states retain text after rejection. Account changes drain writes bound to the old library and suppress stale observations.
+- Add private native revision policies and additive migration, qualify local draft restart/account isolation, then wire DUI Textarea and machine-owned feedback. Article identity must account for existing URL/content aliases using the established target lookup; never attach notes exclusively to immutable content snapshots. Highlight notes, annotation search and permanent deletion remain separate work.
+
+The foundation added no catalog strings or dependencies. Existing `nouns.note`, action templates, `status.save_unknown` and generic failure composition can be reused where accurate. The subsequent explicit copy approval is recorded below. Article-specific capture messages cannot be relabeled as note durability evidence.
+
+Foundation validation: all five focused tests pass, scoped Oxfmt/Oxlint pass, and `pnpm check` passes strict root, web, service-worker and extension checking with zero Svelte errors/warnings. No application behavior is wired yet, so browser/offline tests were not run for this step.
+
+## Article notes continuation — native records and local drafts
+
+Added the private immutable `articleNoteRevisions` table, owner/same-library article-or-legacy-document insertion policies, and additive migration `dc1365b4b2ec → d7f861eae955`. `records.notes` owns a DLF native stage: library, parent, alias membership, causal references and unused operation identity are checked inside its transaction. It inserts the exact submitted revision once, exposes a separate remote receipt, and blocks an existing operation rather than replaying it. `readRevision` validates the complete intended revision for future reconciliation; a local query observation is **not** a local durability acknowledgment. The library is not yet invoking a note editor or source-write owner.
+
+`notes/drafts.ts` adds authored recovery storage in IndexedDB, isolated by deployment namespace, library, article and per-editor UUID. Request success cannot acknowledge persistence: only strict-durability transaction completion resolves a write. Cleanup compares the exact draft sequence/text/base before deleting, so an older acknowledgment cannot delete newer text. Each editor has its own key, preventing competing tabs from overwriting one another. These drafts must never be deleted with disposable search indexes or shell caches.
+
+`noteDraftMachine` serializes accepted local draft writes, coalesces unissued edits per editor/article, rejects older/duplicate sequences and expired or foreign-account admission, retains the newest text after failure, and retries only explicitly. Shutdown stops admission and drains accepted work under its original storage binding. If persistence fails during shutdown, the result returns unsaved text to its parent instead of claiming a successful flush. The draft owner is implemented/tested but not yet attached to the application; 500 ms source autosave, durable operation-intent recovery, remote receipt ownership, editor conflict controls and navigation guarding remain open.
+
+Qualification for this continuation: 22 focused note/draft/reader/organization tests pass; root/web/service-worker/extension type checks, repository lint/format checks and production build pass. Jazz schema/permission validation accepts all 12 tables, retaining only the pre-existing storageOperations.createdAt provenance warning. A disposable isolated Chromium file fixture bundled the actual draft adapter and passed IndexedDB reopen, literal-text retention, independent-editor, deployment/account/article-isolation, cross-account-write rejection and exact-ack cleanup checks. This is adapter evidence, not offline application/restart/sync qualification. A repeatable Playwright draft case is added but has not run under the application harness.
+
+Native policy tests and both updated native migration tests were attempted; their local Jazz server failed to bind with `Operation not permitted (os error 1)` in this sandbox, before exercising the assertions. Do not report native permission/migration success. Upgrade regressions now walk the image-era schema before notes and include a post-upgrade note/reopen assertion. Application schema-upgrade browser cases are updated to publish the same chain but were not run here. No user-facing server, authority or browser profile was reset.
+
+The user explicitly approved the editor copy on 2026-11-06, replacing five proposed note-specific entries with shared templates. The catalog now contains `actions.saved_subject` / "{{subject}} saved", `actions.synced_subject` / "{{subject}} synced", `status.leave_warning` / "Changes have not been saved. Leave anyway?", `status.unavailable_subject` / "{{subject}} unavailable", and `errors.too_large_subject` / "{{subject}} exceeds the current save limit." The user approved the other two entries unchanged: `notes.conflict` / "This note has conflicting versions. Your text has been kept." and `notes.keep_text` / "Keep this text". Interpolated subjects reuse the existing plural-aware noun catalog; no new noun/plural/context forms or dependencies were added. Prior catalog review found the existing article-specific save/sync strings unsuitable for note feedback, and action/noun templates could not describe the conflict, navigation warning, unavailability or size limit. The generic saved/synced actions are typed automatically by the existing `action()` helper.
+
+These approved entries are ready for the owning editor/save states; the editor is not wired yet. Only an acknowledgment for the exact current edit may show the saved action, and only that native transaction's successful `wait({ tier: 'global' })` may show the synced action. Jazz defines global acceptance as authorized and durably accepted by Core; it does not prove another device has downloaded the write. IndexedDB draft persistence and optimistic/local query observations cannot claim Jazz synchronization. Preserve existing generic saving, failure, uncertain and rejected-save feedback where accurate. Copy approval resolves the catalog gate, not the remaining native/application qualification work.
+
+Draft [PR #19](https://github.com/delightful-labs/delightful-clipper/pull/19) targets main. The Git CLI could not resolve github.com at initial publication; publication used GitHub connector tree/commit APIs and verified exact local/remote tree equality. Local commits are retained, so the histories differ despite identical checked source: when CLI connectivity returns, fetch, verify trees and align the tracking branch before pushing. Hosted [CI run 42226678791](https://github.com/delightful-labs/delightful-clipper/actions/runs/42226678791) was pending at the initial checkpoint; the PR title check passed. Leave the PR draft and unmerged while editor integration and native/application qualification remain open.
+
+# Offline article images — current work
+
+The user merged reader PR #17 at `89ad4e7` and authorized bounded offline article images, full testing in this session and a final code review. Work is on `feat/offline-article-images` from updated main. See [offline-images.md](offline-images.md) for the state/resource model and scope. The implementation adds one private articleImages table and additive migration `3d99c179e109 → dc1365b4b2ec`; existing text/assets, identity, reader history and organization remain intact.
+
+New snapshots contain inert encoded image markers and alt text, with declarations inserted in the text publication transaction. The library-owned queue reconciles existing native operation IDs, fetches public image bytes through the existing authenticated redirect-safe gateway, invokes serial decode/resize/encode worker states, and drains native DLF image writes on shutdown. Attached-reader children own native byte reads and object URLs. Small DUI components render machine-owned feedback and Retry without replacing article text. No viewer or new dependency/catalog copy is included.
+
+Code review fixes include separating worker acquisition/posting, preserving issued-write drain during subscription failure, validating worker results, honoring Retry-After, rejecting stale scope and stale image-URL errors, limiting viewer capabilities to reads, and retaining uncertainty feedback when changing readers. Image retry is bounded to five attempts per runtime/connectivity cycle; permanent failures require Retry. Pending work resumes when a runtime and connectivity are available. Existing snapshots lacking markers are not refreshed; data URLs, source-authenticated images, downloaded SVG/AVIF and broad browser/device quality qualification remain limitations. Shared authority/network dev servers must be preserved.
+
+Qualification: pnpm verify passes vendor checks, formatting (including Svelte), lint, strict root/web/service-worker/extension types, 583 unit/native tests across 86 files plus one platform skip, and production build. All 57 web cases pass in a complete run. All five production offline cases pass, including a rendered image after full Chromium restart with both servers stopped and HTTP cache cleared. All eleven rebuilt extension and two sample-data browser cases pass. Actual PNG/JPEG/WebP/GIF worker paths are browser-tested. A disposable account on the network frontend also fetched a live public PNG through the real authenticated gateway and displayed its saved blob. Shared servers were preserved. The final queue-wide rate-limit regression prevents pending jobs bypassing Retry-After. Host Node 25.2.1 was used; CI is pinned to 24.22.2. See offline-images.md for remaining limits. [PR #18](https://github.com/delightful-labs/delightful-clipper/pull/18), feat(images): save article images for offline reading, is open against main. Leave it unmerged; hosted CI is tracked separately from these local results.
+
+## PR #18 transaction naming and input types
+
+The failure-persistence transaction is named recordImageFailure, distinguishing a recorded acquisition failure from a transaction failure. ReadyImageWrite and FailedImageWrite narrow the native transaction and capability inputs; the spawner preserves each draft type. This removes three redundant kind checks while retaining the DLF transaction state machine, processing-result validation, eligibility checks, persistence/rollback and unknown-outcome handling. Native tests use the same typed capability methods as the queue. Image transport binding is extracted to images/browser.ts as createImageCapability, leaving library.ts to compose the capability. The extraction preserves bounded response reading, scope/cancellation checks, error decoding and Retry-After handling. All eleven image transaction/queue tests, formatting, lint and strict root/web/service-worker/extension checks pass.
+
+## PR #18 CI follow-up — image fixture ordering
+
+[CI run 42161465175](https://github.com/delightful-labs/delightful-clipper/actions/runs/42161465175) passed tooling/types/build and 56 web cases, but the background-image/Retry case timed out with both declarations still pending. The fixture held slow.png while waiting for retry.png to fail, although the serial queue reads unordered native declarations. Selecting slow.png first therefore prevented the expected failure. The test now fails the first requested source, holds the other, and derives image labels from that actual source. It retains native failure/ready assertions, reader navigation, background completion, manual Retry and text preservation without a timeout increase or application behavior change. The corrected case passes ten consecutive browser runs; all four image browser cases pass together. Formatting, lint and strict root/web/service-worker/extension checks pass. Shared dev servers were preserved.
+
+# Reader experience — merged PR #17
+
+The user merged Clipper PR #16 and authorized the reader batch, with small reusable pure components and reusable compositions after inspecting DUI. Work is on `feat/reader-experience`, based on updated main `b21691f`. [PR #17](https://github.com/delightful-labs/delightful-clipper/pull/17), feat(reader): add synchronized reading preferences and progress, was merged in main `89ad4e7`. See [reader-experience.md](reader-experience.md) for state/resource ownership and boundaries. Reader/browser qualification, exact-copy approval and strict source checks are complete; hosted CI is tracked on the PR separately from these local results.
+
+Implemented work includes the additive readerOperations schema/policies/migration, native DLF transaction integration, library-owned reader machine and shutdown join, normalized text anchors, scoped viewport observation/restoration, independent preferences/progress and DUI reader compositions. The user approved the first 17 reader labels/errors, then explicitly approved the revised generic entries with "add them": actions.sync ("Sync"), status.failed_subject ("{{subject}} failed.") and status.save_unknown ("We couldn’t confirm whether your changes were saved. Check them before trying again."). The owning reader machine composes the failure template with the localized action. The user subsequently approved the development dependency @poppanator/sveltekit-svg 7.0.1, matching Finance/DUI, to use DUI's default caret; no runtime dependency was added. Existing source/reader/extension/identity/recovery behavior remains covered by regression checks.
+
+The user's fullscreen follow-up is implemented with native browser entry/exit, denied/unavailable fallback, native exit observation and a pending-request shutdown join in the reader machine. Progress ignores detached content and controls, works for short articles without scrolling, and retains location through typography, resize, fullscreen, navigation and restart. Native causal history follows the existing organization convention of passing validated observed heads into the write; library/document checks and insertion remain in the transaction.
+
+The viewport machine in reader/viewport.ts owns root/scroller DOM elements, the normalized text index, listeners/ResizeObserver, dimensions, restoration, scroll writes, measurement frames and final departure sampling. Reader.svelte only passes nodes. Controller creation, observer creation, target registration, listener registration, active observation and disposal are explicit states. Nested invoked scopes release each native resource independently, including partial startup failure and forced stop. The combined events callback/try-catch is removed. Raw RESIZE enters measuringSizes/comparingSizes; callbacks no longer read geometry or select failure outcomes. The reader experience directly owns the fullscreen Document; named guards decide support, actual fullscreen, native exit and exit admission. A registration state waits for fullscreen observation before issuing entry, so setup failure cannot leave an unowned request. The parent retains persistence/receipt/scope ownership and joins final sampling on shutdown. DUI Details supplies its default caret using the approved Finance SVG loader/configuration.
+
+Lifecycle qualification: pnpm verify passes 560 unit/native tests across 81 files with one platform skip, vendor integrity, formatting, lint, strict root/web/service-worker/extension types and production build. Twelve viewport and fifteen parent reader tests pass, including partial registration cleanup, resize errors, unsupported/unconfirmed fullscreen and fullscreen-listener startup failure. All 53 web browser cases pass in one complete run and all five production offline cases pass, including cold restart with both servers stopped and HTTP cache cleared. Real network Stately testing confirms 39% progress and actual fullscreen entry/exit with location retained. Shared authority/network servers were preserved and temporary harnesses removed. The preceding direct-DOM refactor passed all 53 web and five production offline cases; the earlier reader/caret batch also passed eleven rebuilt extension and two sample-data cases. Checks use host Node 25.2.1; CI's pinned 24.22.2 is not installed locally. No additional dependency, catalog or schema change was made for this correction.
+
+Live progress appears before the one-second storage debounce and retains its maximum when scrolling backwards. Leaving the reader flushes the final position; an abrupt process termination before an unissued observation is flushed can still lose that observation. Native fullscreen falls back to ordinary distraction-free mode when unavailable or denied. Men’s Journal remains blocked by its upstream DataDome challenge; rendered extension capture is the existing alternative. See reader-experience.md for the complete design and qualification boundaries.
+
+# Implementation handoff
+
+**Status**: Chromium toolbar clipping now prompts for sign-in when unconnected, and saves directly with a top bar after account confirmation; account recovery stays in trusted Options. PR #13 is merged at `2cd8731`; the user verified sign-in and saving into the web library. Basic library organization and the DUI/feedback follow-ups are merged in PR [#14](https://github.com/delightful-labs/delightful-clipper/pull/14) at `5e3c5c6`; the implementation is qualified at `741844e` with all source, browser, offline and extension checks passing. Foundation storage and hosted authenticated gateway are implemented and qualified. The Add Link batch adds a runtime-owned Add Link → automatic local save → saved reader, immutable source provenance and final-destination duplicate checks. Offline UI saves survive a full Chromium restart and sync to a restored profile. The offline-shell batch additionally qualifies cold startup with both servers stopped and HTTP cache cleared; see [offline-shell-implementation.md](offline-shell-implementation.md). The structured-reader batch uses dedicated SvelteKit `/articles/[id]` pages and displays saved HTML with isolated internal anchors and safe literal-text fallback; see [tasks.md](tasks.md). Images, full reader/annotation workflows and broader platform/release qualification remain open. See [tasks.md](tasks.md) and [add-link-implementation.md](add-link-implementation.md).
+
+## Firefox CI upgrade-test readiness
+
+CI run `42111799666` passed 46 web cases and failed the final Firefox live/rejected-upgrade case while opening Add Link after navigating back from the legacy reader. That navigation waited for the document but not the migrated collection; local admission can enable Add Link before row delivery, and the content-following floating action can move during a pointer click. The test now waits for the expected migrated legacy row after returning to the library before opening the modal. It retains the actual pointer action and all migration/account/reader/persistence assertions, with no sleep, retry, force click or production behavior change. Eight repetitions of the originally failing case passed before the change; the timing diagnosis remains an inference from the missing collection prerequisite and layout. All eight Chromium/Firefox cold/live and successful/rejected-deployment upgrade cases pass with the collection wait. Scoped formatting and lint pass. Temporary diagnostic harnesses were removed; shared development servers were preserved. Hosted corrective CI run [42114303582](https://github.com/delightful-labs/delightful-clipper/actions/runs/42114303582) passed at `d3bd5df`; PR #16 is merged in main `b21691f`.
+
+## Review simplification — PR #16 and DUI PR #15
+
+[DUI PR #15](https://github.com/delightful-labs/delightful-ui/pull/15) adds optional `TagInput.normalizeTag`. Duplicate admission, suggestion exclusion/deduplication and draft matching use the same comparison callback; displayed and bound names remain unchanged. The default remains lowercase comparison. Clipper supplies its existing NFC/full-case-fold policy, accepting arbitrary drafts separately from domain validation. No third-party package or catalog copy is added. The digest-verified `delightful-ui-20ef7be-tag-normalization.tgz` is packaged from that PR's commit `20ef7be`; both web and extension use the same pin. The DUI PR remains unmerged, so reviewers should coordinate it with Clipper PR #16. Unrelated changes in the original DUI worktree were preserved by using a separate clean worktree.
+
+The library chart now marks invalid-source, failed-save, uncertain-save and rejected-save states with a capture-problem feedback channel. Add Link renders that channel and the existing duplicate feedback; processing/success feedback stays quiet. Unused row/sync/organization message projections and search `matchedQuery` context are removed; receipts, rejection guards and write draining remain.
+
+Collection projection builds the content-alias lookup once per snapshot, groups operations by native parent and field/tag key, and merges only a row's relevant histories before selecting the existing causal heads. Canonical spelling, vocabulary ordering, causal dominance, conflict ties and legacy document aliases retain their policy. Organization subscriptions parse complete arrays with reusable Zod schemas; tag writes share their payload/insertion leaf while the existing mutation chart still chooses article/document and tag/scalar branches under the transaction owner. No schema migration or new async owner is introduced.
+
+DUI validation: lint, Svelte/type checks, 102 unit tests, production/package build and 12 TagInput browser cases across Chromium and mobile WebKit pass. Clipper validation: `pnpm format` and `pnpm verify` pass vendor integrity, formatting, lint, strict web/extension types, 521 unit tests with one platform skip across 75 files, and production build. All 47 web, five production offline, eleven rebuilt packaged extension and two sample-data browser cases pass. This includes invalid-source feedback, Unicode-equivalent announcements/suggestions, remote synchronization, native aliases and full offline restart. Suites ran sequentially on isolated ports 5194/5195 (production offline 5190/5191); temporary harnesses were removed and the shared authority was preserved. Large-library benchmarking remains open.
+
+## Library components and application connectivity — PR #16 follow-up
+
+The user requested decomposing Library.svelte and moving connectivity into the main application machine. Library is now an 85-line integration that subscribes to its existing actor, selects the view and coordinates the tag dialog. Five controlled components under apps/web/src/lib/components/library own search, filters, list/focus behavior, list-item presentation and article actions. They reuse DUI, native row values and typed callbacks; none creates an actor or owns async storage/search work. List borders, compact padding, flat favorite buttons, reader links, retry and tag editing are preserved. The list component restores focus to the next row, previous row or parent heading after removal.
+
+Browser connectivity now appears directly in the application-readiness state as active.connection.observing.checking/online/offline. The observing state invokes the browser event adapter; SHUTDOWN moves that region to closed and removes listeners immediately while account/library writes drain. Account observations/restoration do not restart the subscription. Localized connection metadata is selected alongside the existing application view and passed through the shell. ConnectionStatus.svelte is a seven-line renderer with no machine, listener or subscription. The standalone connection machine is removed. Browser connectivity remains independent of Jazz acceptance and local readiness.
+
+The same follow-up consolidates Trash into one unsuffixed mass-noun catalog entry and applies the user's capitalization correction, “Search is unavailable.” No new wording, dependency or storage schema is introduced.
+
+Validation: pnpm format and pnpm verify pass vendor/format/lint/strict web+extension types, 517 unit tests with one platform skip across 75 files, and production build. All 45 web cases pass, including Chromium/Firefox upgrades, actual connectivity events, query/tag/status/favorite/Trash controls, error/retry and computed row borders/padding/flat styling plus next/previous/heading focus. All five production offline, eleven rebuilt packaged extension and two fake-data cases pass. Three new application lifecycle regressions cover connectivity across account observation changes, immediate observer disposal during an issued root-write drain and actual browser-listener disposal on direct parent stop. Test harnesses used isolated ports 5194/5195 (production offline 5190/5191), were removed, and did not restart the shared development authority.
+
+## DUI TagInput editor — PR #16 follow-up
+
+The user corrected the custom tag editor. ArticleTags now uses the actual pinned DUI TagInput, following Finance's TransactionTagInput composition: shared chips/removal, suggestions, keyboard entry, duplicate handling, field error associations and announcements. The checkbox assignment list, standalone InputText/Add form and custom tag layout are removed. Global tag-filter checkboxes remain filters, not assignment controls. The existing DUI Dialog and Close action remain.
+
+The user explicitly approved four reused Finance templates: actions.remove_name, status.selected_subject_name, status.removed_subject_name and errors.already_selected_subject_name. They interpolate the existing tag noun and literal tag name; no plural/context forms or new selected-list label are added. Tags/Add tag and forms.enter_subject are reused. i18next interpolation stays literal for Svelte text rendering, avoiding escaped entities in names. No new row status/progress messages are introduced.
+
+DUI owns the draft and widget behavior. A small synchronous adapter validates the whole emitted selection, computes at most one desired membership change using full Unicode-folded keys, ignores equivalent re-selection, and rejects invalid/multiple edits. Explicit machine states delegate through sendTo to the unchanged native library owner; there is no async orchestration in the component or second tag store. The control reads authoritative native membership, is readonly during writes to preserve input focus, and resets its draft by unmounting on dialog closure. Initial focused qualification: ten browser cases pass, including actual keyboard suggestion selection, duplicate feedback, persistent chip removal, generic invalid-field feedback, Unicode aliases, restored-client sync and offline process restart. All 44 full web cases pass, with all ten discovery cases requalified after the final native-removal focus repair. Source verification passes 510 unit tests plus one platform skip across 75 files, vendor/format/lint/strict types/build. All five production offline and both fake-data startup cases pass using the actual DUI control; all eleven rebuilt packaged extension cases also pass with the shared localization changes. Temporary harnesses are removed.
+
+## Library original-link removal — PR #16 follow-up
+
+At the user's request, library rows never render Open original, including while newly saved URL articles await extraction. The URL/title placeholder and existing failure Retry remain; original-source navigation stays in the dedicated reader. Four browser cases pass for successful capture/reader source navigation, held extraction, two queued URL-only rows and link-only organization/content completion. Strict web/extension checks, Svelte formatting and lint pass. This is a presentation-only removal with no catalog, storage or workflow changes.
+
+## Finance-compatible fake-data follow-up — PR #16
+
+The user requested environment-gated population following Finance, including Faker. The existing PR remains the delivery branch. `PUBLIC_FAKE_DATA` is a strict static public true/false string, default false. Faker 10.6.0 is pinned exactly, following this repository's pin convention while using Finance's version and English locale. The generator is dynamically imported only after local/authoritative emptiness and ownership admission. It generates 24 complete native articles with stable scoped IDs, recent dates, statuses, favorites, tags and two Trash entries; reserved `.invalid` URLs never require gateway capture. There is no new locale copy or schema.
+
+The library owns a parallel fake-data child, independently of local readiness. Automatic actor done/error events join its lifecycle; shutdown forwards to the seed owner and waits for completion. Before writing, unavailable authority is bounded/skipped and observation can be canceled. The existing DLF transaction owner manages an exclusive native transaction, rechecking emptiness/ownership in that transaction, staging all rows atomically, committing and waiting for authoritative settlement. Its result preserves failed/unknown outcomes without replay. Native `prepareSave` and an extracted content-insertion leaf are shared with normal saves. No journal or alternate storage API is introduced. Existing data, legacy documents and storage intents always suppress seeding. Extension startup never seeds.
+
+Validation so far: six real native policy/transaction cases and five actor/lifecycle cases pass, including concurrent seeders, private isolation, existing content and issued-write drain. Both enabled/offline browser cases pass with no capture requests, custom-action or stopped-actor warnings. All 43 ordinary web cases pass with the flag explicitly false. `pnpm verify` passes vendor integrity, formatting, lint, strict web/extension types, 509 unit tests with one platform skip across 75 files, and production build. All five production offline and eleven packaged extension cases pass. Fake-data browser coverage is added to CI after the existing suites; temporary local harnesses are removed. See [design](fake-data.md) and [usage](../../docs/tooling.md#optional-fake-data). The shared dev server remains unchanged; enable the flag in an empty test profile rather than restarting/resetting its in-memory authority.
+
+## Current batch — search, article tags and Trash/restore
+
+The user requested a future MiniSearch/FlexSearch performance comparison. The unchecked [benchmark checklist](tasks.md#search-engine-performance-comparison--planned) covers semantic parity, representative corpora, cold/warm and update timings, memory, persisted index size, actual production bundle deltas, responsiveness, browser/device evidence and a reproducible decision report. No comparison has been run and no FlexSearch dependency has been installed; package/version approval precedes future harness setup.
+
+PR [#16](https://github.com/delightful-labs/delightful-clipper/pull/16), branch `feat/library-search-tags-trash`, starts from merged PR #15 (`72b6fc9`). The user authorized these capabilities and all testing in one session and one PR. Implementation and copy-dependent presentation are complete; do not merge without explicit authorization. [Search/tags/Trash design](search-tags-trash.md) records the model, approval and native policies.
+
+Delivered: DUI article-tag assignment/removal and AND-tag filters; actual Search articles input over saved title/URL/body text and tag names; all five status/Trash radios plus independent Favorites; per-row Move to Trash/Restore preserving content, status, favorites and tags; explicit Add Link/direct-reader Restore without automatic restoration on duplicate capture. Search/status/favorite/selected tags combine with AND. Default views exclude Trash; Trash is explicit. Row removal returns focus to the next surviving row, previous row or heading. Capture stays quiet except Already saved, and the compact sidebar follows browser online/offline events.
+
+Native immutable tag history has private owner/same-library parent policies and versioned full-Unicode-fold keys. Additive migration `5315ce57b805 → 86d3840835d8` creates only tag history and preserves populated older libraries. MiniSearch `7.2.0` and `unicode-case-folding` `1.1.2` are pinned; folding upgrades require deliberate durable-key migration. A library-owned search child manages native snapshot invalidation, scoped reads and a dedicated worker. Deployment/account-keyed IndexedDB stores only a disposable derived index. Missing/corrupt cache rebuilds from native records, and generation/query/scope guards reject stale results. Shutdown disposes worker/subscriptions. DLF identity/recovery and native storage remain authoritative.
+
+The user explicitly approved shared Search/Move to templates and the Trash noun, rejected preparation feedback, shortened the error to “Search is unavailable.” and requested the reusable `forms.enter_subject` / “Enter {{subject}}” validation template, following Finance, using the existing tag noun. See the design document for exact keys, variables and plural forms. There is no standalone search/move label, preparation entry or tag-specific length sentence. A synchronous tag-form actor owns editing/invalid states and uses built-in sendTo to delegate valid requests to existing library/storage actors. DUI TagInput renders the localized error with field associations; input/reset/Escape clear it. No callback orchestrates asynchronous storage. The subsequent Finance-template correction passes 11 focused localization/form unit tests, the real-browser invalid-tag/edit/Escape case, strict web/extension types, formatting and lint. The broader batch results below precede that copy-only correction.
+
+Local qualification: `pnpm format` and `pnpm verify` pass vendor integrity, Svelte formatting, lint, strict web/extension typing, 498 unit tests with one platform skip across 73 files and production build. All 43 web cases pass, including Chromium/Firefox upgrades, actual search/filter/Trash/retry/validation controls and remote search arrival. All 14 organization/discovery cases pass after the final form sendTo change, including a no-custom-action-warning assertion. All five production offline cases pass: delete the search index, close the full browser, stop web/Jazz, clear HTTP cache, cold-load saved content, use search/retained tags/Trash/restore, then reconnect and sync. All eleven rebuilt packaged extension cases pass, including re-clipping a trashed article without restoration/replacement and explicit Restore in the trusted reader. Temporary harnesses are removed.
+
+The previous Linux CI browser job timed out during Playwright browser/dependency installation, before any application/offline/extension test step. Its source/build job passed; this is separate from the local evidence above. Check the new head’s CI before claiming hosted/Linux qualification. Large-library throughput, broader mobile/platform release qualification, global tag rename/delete, annotation search/tags, permanent deletion, bulk actions, images and annotations remain outside this batch. The extension bar keeps Open article; Restore is explicit in the trusted saved reader.
+
+Shared development remains at http://127.0.0.1:5180 with Jazz 5181. Tests use isolated ports and preserve that in-memory authority; do not restart it just to run tests.
+
+## Tag-dialog keyboard follow-up
+
+When removing a tag causes the article to disappear under the active tag filter, native dialog focus restoration cannot return to the removed trigger. Library now supplies a focusable heading fallback when that trigger is disconnected; DUI retains normal restoration when the trigger survives. Closing the tag dialog also clears its draft for Close, Escape and backdrop closure. No catalog copy or asynchronous workflow changes are included. The existing six discovery browser cases pass with an explicit heading-focus assertion; strict web/extension checks and Svelte formatting pass. Search/Trash presentation is now exposed using the later explicit copy revisions.
+
+## Quiet capture and connection indicator — PR #16 follow-up
+
+The user requested removal of Add Link processing/status/sync text, Cancel and the separate Open saved article action, then explicitly retained Already saved as useful duplicate feedback. Add Link renders only the duplicate state's dedicated feedback channel and the existing explicit Restore action for a trashed duplicate. Normal title links open readers. Capture/save/receipt/cancellation machines remain intact; removing controls does not cancel processing or change native durability.
+
+The user also explicitly requested exact lowercase “online” and “offline” labels, following Finance. Neither label existed in Clipper’s approved catalog, and action/noun templates do not express connectivity. Those two requested strings are now in `connection.online`/`connection.offline`; these labels are separate from the later approved Search/Trash revisions above. The sidebar uses Finance’s compact DUI StatusMessage presentation. A connection actor owns online/offline states and the browser-event listener lifetime; localized state names supply its text. This reports browser connectivity, independently of shell-cache readiness or Jazz receipt acceptance. The offline-shell ready state is silent; actual preparation/admission, failure/retry and update handling remain intact. Browser tests use an awaited poll of actual service-worker activation to wait for readiness rather than the removed status sentence. All 40 web cases and five production offline cases pass, including real connectivity events, quiet active extraction, retained duplicate feedback, complete offline browser restart and cold shell startup. All eleven rebuilt packaged extension cases pass; the existing shared capture-message projection retains duplicate feedback for its bar. Source verification remains 497 passing tests plus one platform skip across 72 files, with formatting/lint/strict web+extension types/build passing.
+
+## Article list presentation — PR #15 follow-up
+
+At the user's request, the list has one 1px outer border and a bottom divider on each row except the last, preventing doubled borders. Rows have no bullets and use compact 12px DUI spacing for padding. Status and Favorite align at their bottom edges, and Favorite uses DUI appearance="flat". A larger DUI Heading contains each article title, with status/favorite controls in the same wrapping header row. Existing reader links and link-only source/retry actions are retained. Per-item progress/save/sync text is omitted at the user’s request; capture and library feedback remain outside the items. Empty views do not render an empty bordered list. No copy or workflow changes are included.
+
+Visual browser review confirms the outer border is 1px on all sides, only the first of two rows has a 1px bottom divider, and rows have padding without bullets. Desktop titles/controls share a row; mobile layout wraps without horizontal overflow. All five existing organization browser cases pass. `pnpm verify` passes vendor, formatting, lint, strict types, production build and 481 unit tests with one Linux-specific skip across 68 files. The compact-row refinement also passes formatting, strict type checks and desktop/mobile browser review, including aligned control bottoms and computed Favorite shadow of none. Temporary review/test files were removed.
+
+## DUI radio filters — current follow-up
+
+The user merged PR #14. This batch starts at updated main `5e3c5c6` on `feat/library-radio-filters`. Article views All/Inbox/Later/Archive now use the actual DUI `RadioGroup`/`RadioItem` components. Their checked value follows the existing library actor, and each change sends the same typed FILTER event. Favorites remains an independent AND toggle. The fieldset uses the approved Status label; no catalog copy, schema or asynchronous workflow changes are included. DUI owns all radio presentation and native keyboard behavior; Clipper adds only structural alignment.
+
+The pinned archive is `delightful-ui-04b3230-radio-group.tgz`, packaged from the clean sibling DUI commit `04b3230` and digest-verified in the vendor manifest. Compared with the previous floating-action archive, it adds the radio group/item/context files and exports; existing shared components and theme are byte-identical. Web and extension retain the same DUI pin.
+
+Local validation: `pnpm verify` passes (481 unit tests, one Linux-specific skip across 68 files), including vendor, Svelte formatting, lint, strict web/extension types and production build. All five organization browser cases pass on isolated ports, including native arrow-key selection/wrapping, exactly one checked view, mobile overflow and independent Favorites. All five production offline cases pass, including native radio filtering after full browser restart. A separate isolated browser confirms the new controls on the shared dev server at http://127.0.0.1:5180; its Jazz authority remains running. The packaged extension test build also passes with the shared DUI pin. Temporary local test/config files were removed. The Conventional Commits feature PR targets main and must remain unmerged.
+
+## Resume here after this thread
+
+Read the repository `AGENTS.md`, this handoff, [tasks.md](tasks.md), [spec.md](spec.md), [plan.md](plan.md) and [design-decisions.md](design-decisions.md). Read [localization memory](../../docs/memory/localization.md) before copy changes. Earlier batch descriptions below are historical implementation context, not the current outstanding task list.
+
+- Historical baseline: PR [#12](https://github.com/delightful-labs/delightful-clipper/pull/12) is merged into `main` at `3149ea4`. The browser-clipper batch is on `feat/browser-clipper`, PR [#13](https://github.com/delightful-labs/delightful-clipper/pull/13), branched from that baseline. Never push directly to `main` or merge without explicit authorization.
+- **Historical clipper runtime commit**: `dfc675c`. [Linux CI](https://github.com/delightful-labs/delightful-clipper/actions/runs/41916957144) passes source/build, web, offline and extension suites. [Netlify preview deploy](https://app.netlify.com/projects/delightful-clipper/deploys/6aeba44a6b6a9b64c1563876) is ready; [preview](https://deploy-preview-13--delightful-clipper.netlify.app/). This is the prior direct-clip baseline; the new sign-in gate has separate local validation below and awaits latest-head CI. Recheck the current PR/head before editing.
+- **Next action**: review PR #16 and its latest-head CI; the copy gate and local presentation qualification are complete. Preserve capture/reader/identity/recovery; Firefox, annotations and images remain outside this batch.
+- **Try the current build**: `pnpm build:extension`, then Reload Delightful Clipper at `chrome://extensions` (or Load unpacked from `apps/extension/dist`). Defaults target Jazz 5174 and web 5173; explicit public coordinates override them. A click saves and shows the bar; Close only dismisses it. Restore the same web account through extension Options. The extension is not automatically signed into the web origin.
+- **Testing isolation**: `pnpm test:extension` builds `apps/extension/.test-build`, leaving installed `dist` unchanged. Local/agent/E2E web build directories are separate; run the major suites sequentially because fixture ports still overlap. Recovery tests wait for local account controls before opening the dialog; the Linux failure was in this early UI interaction, not direct saving. Keep traces and recovery screenshots disabled.
+- **Chrome MCP works** when Chrome is open. This thread used it for isolated bar layout/accessibility/dismissal checks; real native saves were tested using disposable packaged-extension Chromium profiles. Do not call the presentation check a native save in the user’s Chrome profile or change their private browser data to manufacture evidence.
+- Add Link now saves the native URL article immediately. A dedicated module-worker XState machine processes missing content serially; optional supplied content uses the same save operation. The intake/observation/completion graph and custom IndexedDB journal are removed. See [durable-capture-design.md](durable-capture-design.md) for ownership, publication barriers and evidence limits.
+- Browser-clipper source validation: `pnpm verify` passes 442 tests with one platform-specific skip across 63 files, plus vendor, formatting, lint, strict web/extension checks and the production build. All 24 web integration tests, five production offline tests and eleven real Chromium extension tests pass sequentially. A frozen-lockfile install also passes.
+- Implemented: no-signup local-first DLF/Jazz startup; DUI URL input; automatic Add Link saving without preview/Save; explicit Open; dedicated `/articles/[id]` SvelteKit reader pages; layout-owned pending work; display sanitization and isolated footnote anchors; offline deep links; machine-owned localized feedback; Svelte/CSS formatting; static SVG and native disclosures. No new catalog copy, dependencies or schema were introduced by the SVG work.
+- Historical reader-baseline checks (superseded by the current evidence above): 235 unit tests/26 files via `pnpm verify`, 12 Chromium integration tests and five production offline tests. Static SVG and disclosures survive complete offline browser restart and restored-profile sync. Restart tests fixture upstream extraction but use real account/storage/browser/sync boundaries. Hosted real gateway/deep-link evidence is from earlier code; latest SVG changes have local/production-build browser evidence, not a new hosted manual proof. CI checks pass for `f0e5738`, and Netlify preview deploy `6aea3b05b5dae0f3763471f2` is ready.
+- SVG support is intentionally static: shapes/paths/groups/text/title/description, geometry and solid paints. Strip links/IDs/references, CSS, images, embedded HTML, filters and animation; gradients and `use` are unsupported. Native disclosures preserve `open` and keyboard behavior. The same namespace-aware DOMPurify hook runs on extraction and display. See `apps/web/src/lib/reader/policy.ts` and its extraction/reader/browser tests.
+- Do not move asynchronous workflow ownership into components/adapters, reintroduce preview/Save, require signup, show Sign out for automatic local identities, bypass DUI inputs, or map status codes to localized messages in components. Localization requires explicit approval for exact new/changed copy, a usage reason and confirmation after searching that no existing action/noun/string works.
+
+The user explicitly selected URL-first article saving and a dedicated serial worker. Preserve this design; do not reintroduce an intake subsystem. URL-only rows survive restart and failed fetching; Retry completes the same object. The main thread hosts trusted SDK/network leaves, while worker state owns capture sequencing. Preserve unknown-write non-replay and separate local/remote receipts. Images, annotations, richer reader controls, full retry scheduling and broader platform qualification remain open.
+
+Local development: `CAPTURE_GATEWAY_ENABLED=true pnpm dev` serves web 5173/Jazz 5174; confirm an old server is still running before reusing it. SvelteKit serves capture routes directly; no Netlify emulator is needed. `pnpm dev:agent` and integration tests use 5180/5181 and cannot run simultaneously. Run `pnpm verify`, `pnpm test:e2e`, then `pnpm test:offline` and `pnpm test:extension` sequentially because builds generate shared artifacts. Browser tests need permission to bind ports; the user authorized elevated test runs if necessary. See [tooling](../../docs/tooling.md). Netlify CLI is available; do not log credentials/recovery phrases or enable the production gateway without authorization.
+
+## Basic organization — 2026-11-05
+
+PR [#14](https://github.com/delightful-labs/delightful-clipper/pull/14) targets main from merged PR #13 (`2cd8731`); the user verified extension sign-in and saving into the web library before selecting this batch. Qualified runtime: `741844e`. Do not merge without explicit authorization.
+
+The library provides per-article Inbox/Later/Archive and independent favorites, All/status views and an AND Favorites filter. Existing, link-only and legacy document entries default to Inbox/unfavorited. Organization preserves original save ordering and immutable snapshots; projection and causal knowledge include aliases for the same content. DLF identity/recovery, DUI controls and native Jazz operations remain the integration boundaries. The user explicitly approved all nine exact catalog additions with “yes” in this conversation; machines own save/sync/error and filtered-empty messages.
+
+The new owner-scoped immutable operation table has exactly one native article/document parent reference. Server policies require a same-library parent and reject foreign reads/writes and history mutation. Its generated additive migration is `80988faa7219 → 5315ce57b805`. The transaction stages its checked parent branch through XState. Native NAPI tests passed before browser qualification exposed a hanging transaction history query: immutable causal history is now observed in a separate drained state before parent eligibility/staging/commit in the native transaction. See [library-organization.md](library-organization.md). There is no extra storage engine, toggle replay or automatic replay of uncertain writes.
+
+Organization adds another native subscription. A held-read regression demonstrated that unrelated row updates previously canceled/restarted an active reader. The library now guards automatic reopening with `not(readInFlight)` while retaining content-arrival reopening for missing link-only readers. All Chromium/Firefox upgrade-reader cases pass with this correction.
+
+[CI run](https://github.com/delightful-labs/delightful-clipper/actions/runs/42011312647) qualifies `pnpm verify`: 471 tests/67 files plus vendor integrity, formatting (including Svelte), lint, strict web/extension typing and production build. All 28 application browser tests and five production offline cases pass. Four new browser cases cover statuses/independent favorites/AND filtering, duplicate/reader preservation, bidirectional same-account synchronization, actual authority-offline edits with complete browser-process restart/reconnection, and link-only content completion. The production shell case also retains organization with web and Jazz stopped and HTTP cache cleared, then verifies it in a separately restored profile. All eleven packaged Chromium extension cases also pass, preserving sign-in, capture, identity/recovery and extension offline restart/sync behavior. Major suites ran sequentially in the browser job.
+
+[Netlify preview](https://deploy-preview-14--delightful-clipper.netlify.app/) is ready. A public example.com fixture in an isolated Chrome MCP context additionally qualified repeated status changes, independent favorite removal, combined filters and reload persistence through the actual hosted native runtime. Test tabs were closed; existing user tabs/accounts were untouched. This manual hosted check is distinct from CI's full offline-process proof.
+
+Local checks pass formatting, lint and strict types; 52 focused organization/reader/collection/mutation cases pass. Local full integration suites cannot bind listeners under this sandbox, so CI supplies native/browser/offline/extension evidence. Shell Git DNS is blocked; connected GitHub tools published commits with tree hashes verified against the local tree. The local feature branch tracks the exact published commits.
+
+Bulk actions, tags, Trash, search, images and annotations are excluded. Immutable organization history is retained; compaction, large-library throughput and broader mobile qualification remain open. No further feature is selected by this handoff.
+
+## Readable workflow names — follow-up across five areas
+
+The user requested the same state-name pattern for reader outcomes, background capture failures, organization receipt feedback, offline registration and account readiness. Each now declares readable localized names and severity at its owning states. A small `stateFeedback` projection separates parallel message channels and respects explicit priority; it does not choose domain outcomes or translate codes.
+
+Reader `shown` selects available/unavailable children. Worker failure selects explicit unknown/session-unavailable/rate-limited/canceled/capture-failed children while the existing parent retains the failure persistence operation. Original failure codes remain stored unchanged. Organization feedback selects local/pending/synced/rejected states, retaining rejection precedence across independent operations. Offline registration removes duplicated context status/message fields and exposes names from its existing states; retry uses state tags, and admission/timeout/retry/resource lifetimes are unchanged. Account states own their status names, with a separate parallel feedback region for identity/restoration outcomes. Explicit restoration result transitions raise feedback events. The extension observes those states through the same account owner; no credentials enter feedback metadata.
+
+No catalog wording, schemas, DLF behavior or presentation changes are included. Persisted per-article failure and receipt-code projections remain data projections; this refactor does not create an actor per library row. Focused tests cover parallel channels/priority, all worker failure names and stored codes, organization rejection precedence, reader outcomes, offline admission/retry and account restoration feedback. Local `pnpm verify` passes 481 tests with one Linux-specific skip across 68 files; all five production offline cases and eleven packaged extension cases pass. All 32 application browser cases also pass on isolated ports: 24 account/library/organization cases, followed by all eight Chromium/Firefox migration cases after correcting a hardcoded port in the temporary legacy test driver. That harness error caused the initial migration timeouts; no product change was needed. Temporary test copies/configurations were removed. The shared development server remains running in tmux.
+
+## Capture state names — follow-up
+
+The user requested readable state names as messages instead of capture selectors branching over failure flags. Capture states now declare localized `meta.name` and severity using unchanged catalog strings. Saved outcomes select explicit local, duplicate, synced, rejected or background child states through named guards; context updates raise an internal refresh event. The background state forwards the worker machine's already-localized message. Worker failure is explicit in the worker-lifetime region and retains its error name while its resource closes, without terminating an issued save. The selector only projects active metadata, with an explicit metadata priority for worker failure. Row, organization and reader feedback are outside this bounded refactor.
+
+Focused tests cover named outcomes, receipt/background updates, duplicate precedence, worker failure during a save/shutdown drain and replacing failure feedback after a successful in-flight save. `pnpm verify` passes (474 unit tests, one Linux-specific skip across 67 files), including vendor, formatting, lint, strict types and production build. Isolated desktop/mobile browser checks pass capture modal focus, dismissal and reader saves. No catalog or presentation changes are included. The preceding modal runtime has passing web and offline evidence at `676d354`, with all eleven packaged extension cases passing locally after the recovery-helper adjustment. Its subsequent CI run at `0c50b9a` passed all 32 web cases but timed out in one offline shell-update readiness case, before extension tests; this is separate from the capture-name refactor and must not be reported as a green full run.
+
+## DUI Add link modal — follow-up
+
+The shell now exposes the actual DUI `FloatingActionButton` on both library and reader routes. It opens DUI `Dialog` containing the existing bounded URL form with DUI `InputText` and `Button`. Native modal focus, Escape/Close dismissal and focus restoration are retained. Submission sends the existing library `ADD` event, closes the dialog and clears the submitted draft; save/worker actors remain layout-owned. Capture feedback, cancellation and Open saved article remain visible outside the modal. Closing an unsubmitted dialog does not save, and closing the modal does not cancel issued work.
+
+The pinned DUI archive is now Finance's `delightful-ui-0.0.25-floating-action.tgz`, verified in the vendor manifest. Its existing Svelte components are byte-identical to the previous archive; it adds the shared floating action components and exports. No catalog copy was added or changed, and app CSS remains structural.
+
+Local validation: `pnpm verify` passes (470 unit tests, one Linux-specific skip, 67 files), including vendor, Svelte formatting, lint, strict web/extension checks and production build. Isolated desktop (1280px) and mobile (390px) browsers pass URL autofocus, Close/Escape focus restoration, modal submission and saving from an existing reader without navigation. Permanent browser cases and existing capture/offline/migration cases use the modal. At `676d354`, CI passes source/build, all 32 application browser tests and five production offline cases. Ten of eleven extension cases pass; the remaining case failed while revealing recovery. It now waits for the synced account/root binding, with credential-free diagnostics on failure, and the affected packaged extension case passes three consecutive isolated local runs. Full CI requalification follows that test-only correction.
+
+## DUI account drawer — follow-up
+
+The user requested Finance-inspired navigation using reusable DUI components, then explicitly rejected custom Clipper styling. `AppShell.svelte` now composes the pinned DUI `TopNavigation`, `Drawer`, `Navigation`, `Heading` and `Button` with their default presentation. Clipper CSS is limited to structural layout and DUI spacing tokens. The experimental palette, typography overrides and article-card restyling were removed; library presentation remains unchanged. This instruction is recorded in AGENTS.md.
+
+Existing account controls are passed into the drawer through an optional Account presentation snippet. The account/session actor stays mounted when the drawer closes; trusted extension callers retain the original default presentation. Desktop docks the drawer; mobile uses the same inline drawer pattern as Finance, makes the content inert and restores focus on dismissal. All labels reuse the approved account/action catalog; no copy was added.
+
+Local validation after the correction: `pnpm verify` passes vendor, formatting, lint, strict web/extension checks, production build and 470 unit tests with one Linux-specific skip across 67 files. An isolated Playwright browser against the running dev server passes desktop drawer/account containment and mobile Escape/focus/inert/overflow checks. Two permanent browser cases cover the same behavior. Full CI follows the feature-branch push. The development server remains available in tmux `main:clipper-org` at http://127.0.0.1:5180; it uses the existing disposable agent authority on 5181.
+
+## Extension sign-in correction
+
+The user observed that the app and extension were saving to different accounts, then explicitly requested a sign-in popup for unconnected clicks and direct saving for connected clicks, with all decisions in XState. Separate origin-local databases remain intentional; matching account and deployment coordinates establish synchronization.
+
+`launch-machine.ts` owns confirmation loading, popup creation/wait/cancel, fresh confirmation detection tied to the current popup request, native-account verification and continuation of the original gesture. `signin-machine.ts` observes the actual DLF restoration lifecycle; READY alone never marks a silent identity connected. Confirmation is persisted before runtime notification. `authorization-machine.ts` admits only the confirmed account in the current SDK binding; RUN carries that account ID and is checked again by the runtime. Popup/hidden-runtime startup reuse existing identities without silently creating another one. Web startup remains local-first/no-signup. Legacy extension identities may need one explicit confirmation.
+
+The popup currently reuses the approved Recovery phrase / Restore account labels. A request for exact new Sign in/helper wording was presented under localization memory; do not add it without an explicit user approval. Credentials stay only in trusted DLF UI. Native save/unknown-write behavior is unchanged. New browser cases verify first-click sign-in into the app account already open, invalid/canceled sign-in and stale-account refusal; other connected/offline cases still pass. Local validation is 442 unit passes plus one platform-specific skip across 63 files, 24 web tests, five offline tests and eleven extension tests. Recheck this PR’s latest CI after the sign-in implementation push; the immutable CI links above describe the earlier direct-clip baseline.
+
+## Browser clipper MVP — 2026-11-04
+
+Toolbar activation now saves directly while the source page stays open. `apps/extension` packages a single trusted offscreen account/library runtime, a serialized launcher, sender/document-bound source reader, bounded Readability worker and a credential-free top bar. The former trusted Save confirmation page and manual save branch are removed. The bar displays owning-machine copy, Open article and Close; Close affects presentation only. Status revisions reject stale messages, and the bar is excluded from serialization. Web Add Link remains URL-first; optional extension content uses the same native save actors. No native schema or localization catalog changes.
+
+The offscreen runtime uses DLF local-first identity, native persistence and the existing receipt owner. Account/recovery controls remain in trusted Options. Restoring another account drains issued old-account work before reopening the hidden runtime against the persisted identity; old queued gestures are discarded. No credentials are sent to content scripts or the bar. Public coordinates must match the web app. Chrome offscreen adds one manifest permission; there are still no persistent source host permissions, remote scripts or website messaging bridge.
+
+Before native dispatch, a background-owned issued-reference marker prevents replay; native intent barriers remain authoritative. Chrome storage contains bounded source references, never captured HTML. A reference already marked issued cannot be overwritten as ready or admitted again. Restart does not automatically dispatch old references. Missing/oversized rendered content saves a URL article for the web worker to complete later. An extraction shutdown test uncovered competing parallel control transitions; clip states now abort unissued work, drain marking/writes and retain honest uncertain outcomes without that parallel region.
+
+See [tooling](../../docs/tooling.md#chromium-browser-clipper) for installation and configuration. Source validation passes 442 tests with one platform-specific skip across 63 files, plus vendor/format/lint/strict checks and production build. All 24 web integration tests, five production offline tests and eleven real Chromium extension tests pass sequentially. Extension cases cover direct saving with no new tab, rendered Unicode content and restored web reading without refetch, duplicates, document/sender restrictions, synthetic issued-reference restart, actual offline browser restart/sync, Close, account restoration and successive tab clicks. Chrome MCP separately checked the bar's layout, accessible controls and dismissal on an isolated page; native saves were exercised in disposable packaged-extension Chromium profiles. Firefox, store publication, annotations and images remain deferred. Full backoff scheduling is not required for this MVP.
+
+## First batch: application foundation and durable private root
+
+Items 1–5 are implemented for the session/private-root path; item 6 is implemented as a bounded repository capability in the current PR. Item 7 has storage/restart evidence; the production offline shell is qualified in Chromium; broader platform qualification remains open. See [session-implementation.md](session-implementation.md), [storage-implementation.md](storage-implementation.md) and [tasks.md](tasks.md) for evidence and remaining work. Tooling commands and scope are documented in [docs/tooling.md](../../docs/tooling.md).
+
+Build only the new workspace/toolchain and the smallest browser session → canonical private library → local text/bytes → reopen path. Start from the spec-only `main`; the old prototype remains preserved on the archive branch. The canonical root remains domain-owned; storage transactions reuse DLF’s generic transaction resource owner without introducing workspaces.
+
+1. Establish Clipper's repository agreements and minimal pnpm workspace. Pin the selected Svelte/Kit/Vite/XState/Jazz/TypeScript baseline, Node 24, and the exact DLF/DUI archives by digest. Verify archive export/peer compatibility rather than taking a different private `0.0.0` build. Lock extractor/search/localization packages only when the relevant module enters the batch; do not install future PDF/EPUB/viewer packages.
+2. Add the client-rendered SvelteKit shell and one minimal route, with localizable status descriptors and browser integration outside presentation. No speculative reader styling, account settings suite or workspace chooser. Use native CSS/DUI where applicable.
+3. Integrate the existing packaged DLF session acquisition, readiness and recovery/restoration exports. One runtime owner; account changes invalidate scoped work, drain issued writes and clear stale views. No new credential system or DLF production edits.
+4. Define the canonical root schema and actual storage policies: library ID equals the authenticated account UUID, immutable owner/bootstrap-format payload, owner-only reads, canonical-ID/owner guards on inserts and updates. Ensure only that identical immutable payload; never overwrite mutable records as a retry strategy. Catch unsupported query shapes as errors, not empty results.
+5. Model bootstrap and repository operations with XState ownership before async application code. Idempotent root ensure is Clipper domain persistence, not generic workspace creation. Article/note operations still need stable operation journals and honest unknown-write outcomes.
+6. Wire one small owner-scoped text/byte record path and explicit local versus sync status. Package and version the SDK WASM/broker assets at their actual requested URLs. Load them locally; measure the 19.3 MB raw WASM startup cost and avoid duplication.
+7. Qualify this batch under the actual Node 24 toolchain and browser build: strict source checking, appropriate lint/build, owner-denial checks, two independent same-account replicas ensuring one root, local byte persistence, page close/reopen and fully offline shell/process restart. The completed isolated experiments are supporting evidence, not replacements for these application checks.
+
+**Batch exit**: new shell builds; DLF restores the same account; the canonical root is private and stable; explicit local text/byte saving survives the qualified restart; no old-account data or optimistic-only Saved confirmation. Failures remain recoverable and visible. No Add Link or extension success claim before their batches.
+
+## Subsequent dependent batches
+
+| Order | Deliverable | Required proof before enabling it |
+| --- | --- | --- |
+| 2 | Authenticated public-source gateway and Add Link → saved snapshot → offline reading | Public SDK bearer/verifier adapter; registry failure classification; Linux native packaging; actual destination-pinned, redirect-safe transport; parser/sanitizer bounds; local persistence. |
+| 3 | Desktop clipping and source/reader annotations | Chromium direct clipping, CSP/runtime, sender validation and restart non-replay are delivered in PR #13. Firefox packaging and exact source/reader annotation anchoring remain open. |
+| 4 | Notes/highlights/images and reader controls | Single-note draft/conflict protection; overlap access and Undo; incremental byte processing; preserved footnotes; typography/theme, positions/progress, TOC and distraction-free accessibility. |
+| 5 | Organization/search/deletion and release qualification | Shared tags with distinct assignments; offline search and Trash scopes; tombstone cleanup; cross-device changes; Android share/iOS fallback; accessibility, performance and Netlify preview acceptance. |
+
+Design dependencies may require building a small underlying module earlier; that does not move its whole feature/UI into the first batch. Full product completion requires all retained requirements and SC-001–011.
+
+## Fixed technical choices
+
+- One repository; private account-scoped library and canonical immutable root; no collaboration or generic workspace UI.
+- DLF owns identity/recovery; Clipper owns library/domain data; DUI owns generic presentation. Generic DLF creation remains separate work.
+- Current SDK bearer is obtained only inside the trusted request adapter; no config/token snapshots in UI, logs, workers or content scripts. Public server verification binds to the app and canonical registry. Dedicated proof minting returned null in the tested managed-session path; do not export roots as a workaround.
+- Readability baseline: full inert DOM for fetched HTML, correctly serialized capture input for the lightweight worker parser. Collect/sanitize footnote targets before pruning and construct final text/anchor mapping afterward. No third-party extraction service.
+- i18next runtime instances; worker MiniSearch; native owner-scoped Jazz byte assets. Pin investigated versions and qualify on the selected runtime.
+- Desktop Chrome/Firefox extensions, supported Android PWA share intake, iOS Add Link. Actual minimum versions and all device claims require qualification.
+
+## Security/deployment work is implementation, not another discovery loop
+
+A qualified public fetch transport can use Node HTTP(S) request lookup/connection controls: resolve/check all returned addresses; select/pin an allowed address; retain original Host and TLS SNI/certificate verification; validate actual socket peer; disable uncontrolled proxy/pooled reuse; follow redirects manually with complete revalidation and total bounds. Reject credentials, non-HTTP(S), prohibited ports and every private/reserved form, including mapped IPv6. DNS preflight followed by ordinary auto-resolving fetch is insufficient. Build and exercise this boundary before enabling gateway use; Netlify preview must confirm the actual transport and native modules.
+
+The Node APIs are documented for the [target Node 24 HTTP runtime](https://nodejs.org/docs/latest-v24.x/api/http.html); address/redirect defenses follow [OWASP SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html). This is a design mapping, not a passed SSRF audit or deployed network proof.
+
+## URL-first capture implementation
+
+See [durable-capture-design.md](durable-capture-design.md). The former intake foundation is replaced by primary `articles` records, the common optional-content save operation and the dedicated worker queue. The actual Add Link UI uses these paths. Native storage intents bind to articles atomically before publication; an interrupted bound operation does not authorize replay. No new copy approval is required because this implementation reuses existing approved messages and actions.
+
+## Persisted-schema upgrade correction
+
+The developer authority retained pre-article schema `9251313c0afe`, so the earlier fresh-database validation missed a required migration. The missing path caused uncertain Add Link outcomes and library bootstrap failure after reload. The typed migration and both structural snapshots now connect it to `80988faa7219`, preserving the root and immutable content. The local authority was backed up before applying it; no browser/account data was reset. A real persistent-authority/local-first replica regression qualifies old content, migration, repeated deployment, new URL saving and reopening the same identity. Always check schema deployment output against persisted development data.
+
+Validation of the correction: `pnpm verify` passes 210 tests/28 files and all tooling/type/build checks. An isolated browser account against the actual migrated persistent developer authority saves a URL, retains it on upstream failure and reloads into a usable library. Existing user browser storage was not accessed or cleared. The original 15 integration/five production offline suite results remain recorded above; those unchanged paths were not rerun for this migration-only correction.
+
+## Shared logging and outstanding browser failure
+
+DLF's previous pinned archive did not export the shared logger. Clipper now uses Finance's existing `delightful-local-first-aaf718d-logger.tgz`, with a verified SHA-256 and lockfile integrity. `PUBLIC_DEBUG=true` explicitly enables Clipper's small machine observer through DLF's `diagnostics/logger`; it is enabled only in the ignored local environment for this investigation. See [tooling](../../docs/tooling.md#diagnostics). No raw console wrapper, actor context/event dump or new user-visible strings are used.
+
+The earlier statement that migration alone resolved the user's browser was too broad: diagnostics from the actual Firefox profile show `Protocol: invalid stored value: durable catalogue must have exactly one genesis schema` when root bootstrap reads. The extension's unrelated `trim` error did not identify it. The browser's native catalogue remains unresolved; do not clear IndexedDB, rotate identity or replay uncertain writes as a workaround. Preserve local data while investigating a supported catalogue repair. Shared logging is now operational and exposes this failure.
+
+Logging validation: `pnpm verify` passes 214 tests/29 files plus vendor/format/lint/type/build checks; all 15 Chromium application tests and five production offline tests pass sequentially with the upgraded DLF archive. The worker receives only the explicit debug flag in INIT, since SvelteKit's development environment module cannot run inside a dedicated worker. No new catalog copy is added. The user's existing Firefox catalogue failure remains visible through the shared logger and is not fixed by logging.
+
+Actual-profile catalogue investigation: the console export confirms session startup reaches root bootstrap, but Firefox collapses object details. A shared text-JSON console sink now preserves the existing selected diagnostic fields in exports, including worker messages. An isolated native experiment opening the new-schema replica before authority migration still passed after upgrade; it did not reproduce the Firefox failure and is not retained as a purported regression. Exact native provenance reports commit `204dc5b9c164de78267d63b35624e28848402790` plus a dirty diff. At that source revision, `crates/jazz/layers/node/src/node/state/lifecycle.rs::validate_durable_physical_identity_bindings` rejects stored schemas without one unique lineage root. This error alone does not distinguish a missing root from multiple roots. Corrupt/incomplete catalogue state is deliberately rejected rather than reconstructed from the caller's current schema. No public TypeScript/WASM repair API was found; recovery needs a qualified SDK repair, not deleting local storage or changing the app's database namespace. No private browser record values were read or changed.
+
+Text-export validation: `pnpm verify` passes 216 tests/30 files and all vendor/format/lint/type/build checks. Two tests qualify complete nested details in one console string and disabled output. The actual development server subsequently recorded the same native catalogue error as complete text JSON. The browser/offline suites from the preceding logger integration were not rerun for the sink-only change.
+
+## Requested browser upgrade test
+
+The requested real-browser upgrade matrix passes eight isolated cases: Chromium/Firefox × cold/live old-schema clients × migrated-first/rejected-first publication. The rejected path loads actual new application code and refreshes against the unmigrated authority before publishing the required migration. Live old/new schema clients reproduce a different, temporary SDK error (`incompatible persistent browser configuration`); closing the old clients and reopening recovers without a database reset. Exact legacy reader content, the same local identity and a new URL article's stable ID/save time survive refresh and complete process restart in all cases. None emitted the original `durable catalogue must have exactly one genesis schema` error. This narrows the evidence; it does not establish that the original catalogue failure cannot recur or that its cause was outside Clipper. The original missing migration was an application delivery defect and remains corrected.
+
+The fixture uses public Jazz APIs for old-schema seeding and the real current application for reads/writes; it is not a replay of the complete old Svelte build or the user's profile. Test accounts, authorities and profiles are disposable. The user's data was not read, deleted or reset. CI now installs Firefox alongside Chromium for these regressions.
+
+Upgrade-test validation: `pnpm verify` passes 216 unit tests/30 files plus vendor, format, lint, type and production-build checks. The full browser suite passes 23 cases, including the eight upgrade scenarios. Test-server logging is explicitly enabled in Playwright configuration, and CI installs Chromium plus Firefox. Five production offline checks last passed before this test-only batch; they were not repeated because production behavior is unchanged.
+
+CI correction: run `41744537713`, tooling job `126294111172`, failed the serial-queue assertion because two wall-clock fixture timestamps tied and random UUID tie-breaking reversed the array order. The queue correctly sorts by original save time then ID. The test now controls both timestamps and IDs, deliberately reverses subscription order, and qualifies both distinct-time ordering and equal-time ID ordering while preserving the single-active-extraction assertion. Production code is unchanged. Local `pnpm verify` passes 217 tests/30 files and all required source/build checks; the reported run's browser/offline job passed.
+
+Second CI correction: replacement run `41745377103` passed tooling but exposed the restored-profile reader-link race in the browser job. A completed native content row could remain hidden by pending/stale worker feedback. Reader-link availability now follows the native content pointer, independently of background status; feedback and explicit save-confirmation/native receipt boundaries are unchanged. Four deterministic before/after × pending/error status tests reproduce three failing event orders before the fix. Local verification passes 221 tests/30 files and required source/build checks; the reported browser scenario passes three consecutive local runs. CI is being rerun on the correction.
+
+The UI restart acceptance now waits for the explicit `Open saved article` acknowledgement, which remains gated by the native content-save result, before exiting the browser. The restored profile still reads through its ordinary collection link. This preserves the test's persistence boundary now that collection-reader access is intentionally independent of worker feedback. The adjusted case passes locally.
+
+## Worker host machine refactor
+
+The requested `articleWorkerOpen` refactor replaces its imperative closing flag, abort-controller map, task set and manually started storage actors with `createArticleWorkerHostMachine`. The host models opening, running, draining, releasing and closed; it spawns an `article-worker-call` machine per RPC/Retry. Native transaction children receive SHUTDOWN and settle before completion; network calls are aborted and their response cleanup is drained. Worker disposal has an explicit acknowledgement before BACKGROUND_CLOSED, so account release cannot precede resource termination. The browser adapter handles only worker/listener/subscription I/O and the repository adapter exposes machine send/completion. The article queue still runs in the dedicated worker. No schema, catalog copy or dependency changes are involved. See the state/resource diagram in [durable-capture-design.md](durable-capture-design.md).
+
+New tests cover initialization/synchronous rows, reconnect wake, cancellation and late response-body cleanup, response bounds, outstanding reads/native-write drain, worker/startup failure, Retry settlement and stale account bindings. Source verification passes 233 tests/32 files plus vendor, formatting, lint, strict types and production build. All 23 browser integration cases and five production offline tests pass after the refactor, run sequentially after source verification.
+
+## Remaining workflow review implementation
+
+Worker lock acquisition/control routing, the HTTP request wrapper and preview subprocess shutdown now have explicit machines; see the lifecycle ownership section in [durable-capture-design.md](durable-capture-design.md). The two-tab Retry regression reproduced the previous dropped control before the change and passes with the scoped control channel. Runtime tests cover retained pre-lock controls, acknowledgement, lock failure and deferred lock release. Request tests cover deadline/client cancellation without early admission release. Process tests cover repeated cancellation, timed escalation, spawn/signal errors and waiting for physical close. No product copy, schema or dependencies changed. Source verification passes 247 tests/35 files and formatting, lint, types and production build.
+
+Final validation for this batch: all 24 browser integration cases and five production offline checks pass, sequentially after `pnpm verify`. The browser suite includes the new cross-tab Retry regression and the existing eight Chromium/Firefox schema-upgrade cases.
+
+Netlify entry-point correction: the subprocess refactor introduced `.js` runtime imports into directly executed TypeScript tooling. Node's type stripping does not remap those extensions. Runtime imports now use `.ts`; a subprocess regression invokes the actual Netlify entry point with a non-preview context and verifies its expected refusal without provisioning. `pnpm verify` passes 248 tests/35 files plus formatting, lint, strict types and production build. Browser/offline paths are unchanged by this tooling-only correction.
+
+## Simplification and shared diagnostics follow-up
+
+Request interruption stages share a typed state helper and error projection. Worker calls share completion admission and error projection, preserving suppression during shutdown and account changes. Native article/content adapters share transaction acquisition, commit, local settlement, rollback and deferred global receipt mechanics; operation eligibility and mutations remain in their domain adapters.
+
+Future DLF work: qualify and export a reusable XState machine observer plus bounded error sanitization alongside the existing shared logger. Clipper currently owns these in `apps/web/src/lib/diagnostics/machines.ts`; the logger itself already comes from DLF. Preserve explicit opt-in and the exclusion of actor context, input, event payloads, credentials and source content. Keep Clipper-specific failure/status classification configurable. Do not move this into DLF merely by copying Clipper's domain rules; add shared tests and update the pinned archive only after the reusable API is qualified.
+
+Simplification validation: `pnpm verify` passes all 248 tests/35 files and source/build checks. All 24 browser cases and five production offline checks pass sequentially afterward. Existing cancellation, shutdown, stale-scope, unknown-write and native receipt regressions remain unchanged.
+
+## Actor-owned library collection
+
+The article repository's subscription adapter now starts an `article-collection` machine instead of maintaining two mutable row arrays and a `publish` closure. Invoked resources own the article/document subscriptions; actor context retains their latest rows, and actions publish the pure deterministic collection projection. Stop or either subscription failure releases both resources. Terminal context clears rows/callbacks, and stale account bindings suppress output. Startup failure of the second subscription also releases the first. Projection preserves earliest-article content deduplication, legacy document visibility, URL fallbacks and descending saved-time order. No catalog strings or schema changes are involved.
+
+Publication uses an invoked callback mailbox rather than calling consumers inside a custom action: consumers can construct actors, which otherwise triggers XState's built-in-action construction warning. Machine logic is defined once; repository binding supplies subscription capabilities through `provide()`.
+
+Final collection validation: `pnpm verify` passes 252 tests/36 files and all source/build checks; all 24 browser cases and five production offline checks pass sequentially afterward. The final browser run has no XState custom-action construction warnings. An earlier run encountered Firefox `page.reload: NS_ERROR_FAILURE` in the cold rejected-deployment schema test; the final full run passes that case.
+
+## Separate storage stage actors
+
+`records.ts` now binds distinct intent and publication transaction actors directly to the save machine's existing states. The shared mode-dependent `stageLogic(stage)` and its `stage === ...` branches are removed. Named `canBindIntent` and `canPublishContent` predicates assess eligibility against rows read in the same transaction. Intent only creates the operation barrier and binds/creates the article; publication only inserts immutable content/provenance and attaches it. Transaction reads, lifecycle plumbing and receipt handling remain shared. Account-scope checks and optional-field projections remain adapter checks. Unknown-write barriers, local/global receipts, schema and product copy are unchanged.
+
+Stage-split validation: `pnpm verify` passes all 252 tests/36 files plus formatting, lint, strict types and production build. The existing native regressions cover atomic publication, stranded-intent non-replay, permissions, provenance and supplied-content saves. All 24 browser cases and five production offline checks pass sequentially afterward.
+
+## Repository audit: decisions in statecharts
+
+The previous intent/publication split still hid create/update/attach/provenance decisions in staging callbacks. This audit corrects the distinction: a workflow branch belongs in a guard/transition; the selected action performs a defined effect. The repository agreement now makes that requirement explicit.
+
+The audit searched first-party TypeScript, JavaScript and Svelte source, service-worker and tooling paths for conditionals, asynchronous sequencing, subscriptions, timers and native writes, then traced the owners of those effects. Existing test harnesses, immutable deployed migrations, generated output and vendored code are not rewritten as product workflows. The accepted product scope, localization catalog and schema are unchanged.
+
+| Area | Corrected ownership |
+| --- | --- |
+| `backend/jazz/records.ts`, `machines/storage/mutations.ts` | Intent selects standalone, create-article or bind-article states; publication selects article attachment and provenance publication states. The native transaction actor still owns open/read/eligibility/staging/commit/local settlement/rollback. Synchronous mutation charts only stage changes in that transaction; staging errors return to the owner before commit. |
+| `backend/jazz/articles.ts` | Separate ensure and attachment actors replace the mode-selected stage. Attachment selects create versus update through chart guards. |
+| Worker host/runtime | Guarded transitions select command/status/cancellation handling, reconnect wakes, Retry/reply/error delivery, shared command versus acknowledgement handling and active-queue shutdown. Action callbacks no longer implement those decision trees. |
+| Library and sync owner | Guarded events select reader reopening, receipt-watch admission, settled sync reporting and failure reporting. Row cleanup and status projection remain pure transformations. |
+| Gateway/request | Resolve bypasses extraction through a transition. Request authorization, failed gateway outcomes, resolution/extraction encoding and post-encoding interruption use guarded transitions. Invoked encoding serializes one selected payload. |
+| Capture response | A decoding chart selects identity, gzip, Brotli, deflate or unsupported encoding; the transport retains pinned connection I/O, peer/size validation and bounded codec leaves. |
+| Capture admission | A process-local quota actor owns request windows, concurrent leases, bounded owner bookkeeping and idempotent release. No distributed quota is claimed. |
+| Service worker | Asset actors select cached reuse versus fetch, validation, invalid-body cancellation and cache storage. Runtime shell reads select cache versus network without caching runtime responses. The install owner still drains all started asset actors before discarding a failed partial cache. |
+
+Retained conditionals were checked for their role: schema/URL/size/peer validation; DOM extraction/sanitization and deterministic collection projection; SDK snapshot/capability memoization; native event/command translation; runtime path/platform selection; diagnostic formatting; optional resource cleanup and test-fixture assertions. These do not decide an unmodeled multi-step product workflow. Existing application readiness, account recovery, root bootstrap, save/read, parser worker, process termination and shell registration/cache owners already model their lifecycle transitions and remain in place.
+
+Added regressions cover mutation branch selection and failure propagation, selected codec invocation, shell cache/fetch selection and invalid-body drain, request quota concurrency/window/owner bounds and duplicate release, and resolve-mode extraction bypass. Existing native tests continue to exercise atomic publication, unknown-write non-replay and local/global receipt boundaries.
+
+The queue's save-content versus attach-existing choice and redirect-loop limits are also explicit guarded transitions. Host reports use an invoked output mailbox so consumer actors cannot run inside a custom action; Add Link/duplicate browser acceptance now asserts that no XState action-construction warning is emitted. The quota actor preserves existing limits and additionally makes duplicate release harmless. No account/browser data was reset.
+
+Final audit validation: `pnpm verify` passes 279 tests/40 files plus vendor integrity, formatting, lint, strict types and production build. All 24 Chromium/Firefox browser cases and five production offline checks pass sequentially afterward on the final code. The browser run emits no XState custom-action construction warnings; its Add Link/duplicate scenario asserts that condition. No user data or identity was reset, and no catalog strings, schema or dependencies changed.
+
+## Named article eligibility predicates
+
+Nested article eligibility expressions are replaced by `capture/article-policy.ts`: named binding, publication and attachment rules compose the shared pending-article/source checks using guard clauses. The native failure-metadata adapter and worker queue reuse `isPendingArticle`; the queue's repeated selection expression is a named `canProcessArticle` predicate. Native intent existence/payload-hash checks remain explicit at the transaction boundary. Tests distinguish missing, pending, complete, URL-mismatched, unreserved, correctly reserved and differently reserved articles; standalone saves and missing source metadata are qualified separately. No workflow transitions, persistence schema or catalog strings change. The repository agreement records the preference for shallow, named eligibility predicates.
+
+Predicate validation: `pnpm verify` passes 287 tests/41 files plus vendor, formatting, lint, strict types and production build. All four affected browser cases pass: Add Link/duplicate, serial pending-article queue, supplied-content bypass and complete-browser queue restart. The full 24-case browser and five-case production offline suites last passed on the preceding audit commit; they are not claimed as rerun for this predicate-only cleanup.
+
+## Shared validation and readable guards
+
+The follow-up predicate cleanup covers all five reviewed areas. `validation/values.ts` supplies UUID case variants, bounded nonblank strings, UTF-8 bounds, object-record recognition and HTTP/credential checks. Native article IDs keep their lowercase-only rule; operation/request IDs remain case-insensitive. `storage/policy.ts` owns shared content bounds while `prepare.ts` retains its existing limit exports and caller-specific errors. Empty stored text remains valid; extracted text must remain nonblank. Character bounds and UTF-8 byte bounds are not conflated.
+
+`storage/integrity.ts` names document, snapshot, asset and source checks. Snapshot `documentId` still matches immutable operation identity, while reader-facing source/document IDs may be article aliases. Optional invalid assets/provenance still leave readable text available. Library transitions reuse a registered readiness guard and named save/receipt/reader predicates. Request-body shape validation uses a named type guard. Client normalization, reader links and the server share protocol/credential checks; default-port restrictions remain server-only, and benign DNS absence is distinct from resolver failure.
+
+New boundary regressions cover UUID case and invalid types, inclusive string/byte limits, multibyte text, optional provenance bounds, cross-record ownership, reader aliases and DNS/port policy. No state transitions, schema, catalog copy or dependencies change.
+
+Reader routes and preview provisioning also reuse the case-insensitive UUID predicate. The preview tooling imports the pure validator with a `.ts` extension for direct Node type stripping; the existing actual-entry-point subprocess regression passes. No blanket replacement of caller-specific validation errors is used.
+
+Validation for the shared-validator cleanup: `pnpm verify` passes 300 tests/45 files and vendor, formatting, lint, strict type and production-build checks. All 24 browser cases and five production offline cases pass. SvelteKit's direct evaluation of the route matcher exposed a transitive `.js` source import during build; that import now uses `.ts`, with a direct Node regression covering the actual route module. The corrected production build and offline reader checks pass. Caller-specific error messages, limits and UUID case policies are retained.
+
+## Scope ownership without repeated leaf assertions
+
+The article and content repositories no longer define a `check()` callback or call it before/after each SDK operation. Their reads remain bound to the captured native DB and library ID; save/read/worker/collection owners decide admission and whether a returned result still belongs to their scope. Subscription adapters no longer duplicate the owner guards. The shared `transactionLifecycle` accepts `isCurrent` and enforces it only before opening a transaction and at the final synchronous commit boundary. That final boundary closes the notification race without spreading lifecycle rules through every mutation/read leaf.
+
+Article/content save actors now have explicit admission gates, and content preparation plus article reread failures use the owning scope guards. Existing application binding replacement still sends SHUTDOWN to the old library and drains issued writes before releasing it. Transaction actors retain their existing read/stage/rollback/local-settlement ownership; scope loss does not cancel an already committed write or authorize replay of an uncertain one.
+
+New actor tests hold each article preparation/read/document/intent/reread boundary and confirm late data/error suppression, no next-operation admission, shutdown drain and terminal reference cleanup. Real native transaction tests cover stale admission, scope loss before commit, shutdown during a held read, committed local-settlement drain and unresolved settlement after commit. Content-owner tests cover stale admission and late preparation success/failure. Repository agreements record this ownership boundary to prevent reintroducing the repeated-check pattern. No schema, dependencies or catalog copy change.
+
+Scope-cleanup validation: `pnpm verify` passes 316 tests/47 files plus vendor, formatting, lint, strict types and production build. All 24 browser cases and five production offline checks pass sequentially afterward. Native tests confirm no commit after pre-commit scope loss, local-settlement drain after an issued commit and preservation of unresolved outcomes. The article/content repositories contain no repeated scope assertion calls; the single shared transaction assertion is limited to open and commit.
+
+## Zod input-boundary schemas
+
+Zod `4.6.7` is now an exact runtime dependency of the web app, with the lockfile updated. `storage/policy.ts` defines reusable title/media/text/HTML/source and complete save-request schemas. Save-request/source input types are inferred from those schemas; obsolete handwritten predicates and unused boolean wrappers are removed. Named UTF-8 refinements preserve byte bounds separately from character limits, UUID syntax preserves content-derived IDs and case-specific caller rules, and no trimming/coercion/defaulting is applied to saved values.
+
+The input-boundary audit also replaces handwritten HTTP capture-body checks, resolution/extraction/error-envelope parsing, native article-record validation, parser-worker input, preview provisioning and the client build-manifest validator. HTTP request keys remain strict. Extraction evidence and build-manifest extension fields are retained explicitly where they were previously opaque; schema-derived DTO types replace the corresponding duplicate input interfaces. Direct-Node route/tooling imports remain qualified by the existing subprocess regressions.
+
+Schema consumers use `safeParse` and translate failures to existing stable error codes/messages. Raw Zod errors and rejected input are not logged or exposed in HTTP/worker/UI responses. Storage failure priority still distinguishes invalid core payloads from source-only metadata errors. Article library ownership, cross-record relationships, account scope, DNS/IP policy and workflow decisions remain named predicates/actor guards; Jazz's native persistence schemas and migrations are unchanged.
+
+New regression cases cover complete input shapes, non-coercion and unchanged whitespace/case, strict HTTP keys, error-code allowlists, malformed native article/worker data, extraction evidence and existing error mapping. Existing byte/character, record-integrity and Node entry-point regressions continue to pass.
+
+Fingerprint compatibility: validated source metadata is snapshotted before asynchronous hashing, while the pre-Zod serialization key order is retained for the durable intent fingerprint. A fixed legacy fingerprint regression also mutates the caller's metadata during hashing and confirms that the prepared record/fingerprint use the original snapshot. This prevents schema object reconstruction from changing operation fingerprints for otherwise identical valid inputs.
+
+Final Zod validation: `pnpm verify` passes 331 tests/49 files plus vendor integrity, formatting, lint, strict types and the production build. All 24 browser cases and five production offline checks pass sequentially afterward. Actual parser workers and direct Node tooling/route entry points are exercised; the production precache manifest retains its extension metadata and offline startup/reader behavior remains qualified. Persistence schemas, migration snapshots, catalog copy and actor/resource ownership are unchanged.
+
+## Preview process state ownership correction
+
+`process-io.ts` no longer accumulates diagnostic state or decides whether disposal should signal a child by inspecting `exitCode`/`signalCode`. It emits spawn, stderr, native error and close events; executes explicit signal/scope-probe commands; and detaches owner callbacks. A static detached-error sink prevents an asynchronous native spawn error from becoming unhandled after forced disposal, without retaining the owner/environment. The generic Node adapter is also exercised directly with real fixture subprocesses.
+
+The process machine now waits for spawn confirmation, models cancellation before spawn, owns SIGTERM/grace-period/SIGKILL transitions and probes the owned scope. On POSIX, a direct-child close does not cancel escalation while descendants remain in its process group. Both native close/stdio drain and scope disappearance precede explicit listener-release acknowledgement and final outcome. Failed probes do not authorize early release. Normal completion also cleans up surviving group members. Forced actor stop requests unconditional emergency SIGKILL before releasing its still-owned port; graceful callers continue to cancel and await completion.
+
+Parallel regions explicitly represent cancellation, pending/closed completion (successful/unsuccessful), and healthy/failed startup, runtime, signaling and cleanup. No issue array, optional close record or context flags drive workflow. The close event records its code once; duplicate close events cannot rewrite the completion result. Cleanup uses the completion state to join scope disappearance with native close. Spawn confirmation consults the cancellation state, avoiding a duplicate pre-spawn cancellation lifecycle. Outcome guards consult states, and the selected terminal transition projects failure fields into output before clearing input/diagnostic data. The callback resource dispatches defined native commands and retains only its owned handle, consumed by release or emergency disposal. A bounded diagnostic tail belongs to the machine; only an allowlisted operation's numeric HTTP status reaches the result. Parsing/truncation are pure diagnostic helpers.
+
+Regressions cover early cancellation, direct-child close during the grace period, group disappearance before stdio close, runtime versus spawn failure, failed signal/probe/release, diagnostic bounds and terminal clearing, emergency stop and late native spawn errors. Real native tests qualify spawn/error/close translation, listener-only release and a POSIX descendant that ignores SIGTERM and survives its direct parent until escalation. That process-group case is explicitly skipped on Windows; it does not claim Windows descendant-tree termination.
+
+Validation for this tooling correction: `pnpm verify` passes 344 tests/50 files, vendor integrity, formatting, lint, strict types and the production build. Browser/offline suites were not rerun for this tooling-only change; their previous 24/five passing cases remain recorded above.
+
+State-model correction validation: the full `pnpm verify` gate passes 346 tests/50 files. After the final pre-spawn cancellation simplification, formatting, lint, strict types and all 21 process machine/native adapter tests were rerun. Added regressions cover duplicate close data during descendant cleanup and simultaneous startup/signal/scope failures under cancellation. Application/browser/offline code is unchanged.
+
+## Lifecycle state audit correction
+
+Seven audited owners now keep workflow state in their charts rather than mutable lifecycle flags or output-selection helpers:
+
+- Library admission/closing and worker closure are parallel states. The existing save state supplies write ownership; shutdown joins write drain and worker acknowledgement in either order. Repeated shutdown sends one stop request, disables new save/read admission and hides stale presentation without discarding an issued write.
+- Worker calls have active/stopping control and state-specific shutdown commands. Network, lookup, save and failure-persistence invocations drain before completion guards either publish or suppress their results. A stale/stopping completion emits only its correlation ID; failure-receipt remote acceptance is admitted only by the current active completion branch.
+- Account lifecycle, acquisition-owner health, observer-cleanup health and observation-subscription health are orthogonal states. Restore/logout/replacement/shutdown use distinct stopping substates while the library invocation drains. Shutdown overrides another pending exit intent. A startup-completion event is routed within the lifecycle region so completion cannot reset sibling failure states. Cleanup failure retains precedence over owner failure; observer retry clears only observation health before DLF reobservation.
+- Article saves use active/stopping control and state-specific child shutdown, retaining issued reads and native stage invocations until they settle. Unknown local durability still outranks cancellation and scope loss; ordinary lookup scope checks retain their original priority.
+- Capture requests explicitly model active/cancelled/timed-out control while retaining the body/gateway/encoding work and admission lease. Deadline response precedence during a long cancellation drain and typed capture-error priority are preserved in guarded transitions. Wall-clock deadline checks remain admission facts for delayed timer delivery.
+- Offline registration separates latched local-library admission from retryable attempts. An attempt owns registration/status observation and its one-shot deadline; retries restart only the attempt, never session admission. Initial readiness cancels that attempt deadline while update observations continue on the same subscription. OfflineShell reads admission through the machine selector.
+- Content saves select named terminal states directly from native stage settlement, shutdown, scope and outcome guards. There is no `stageResultKind` helper or fallback/override decision in terminal assignments. Known local receipts remain separate from remote acceptance; unknown writes are never replayed.
+
+Regressions cover both shutdown join orders, duplicate shutdown, all article lookup drain boundaries, ensure/attachment local-settlement success and uncertainty, stale call success/error, network/lookup/save/failure-call drain, cancellation/deadline ordering, typed capture errors, repeated registration retry deadlines, retained admission during updates, native content-save outcomes and preparation drain, combined account-owner/cleanup failure, and shutdown superseding logout/restoration. Existing actual worker, native transaction, migration and process tests remain in the source gate. No persistence schema, catalog wording or user browser data was changed.
+
+Final audit validation: `pnpm verify` passes 378 tests/51 files, including 32 additional cases, plus vendor integrity, formatting, lint, strict types and the production build. All 24 application browser cases pass, including actual worker execution, cross-tab coordination, restart/sync and Chromium/Firefox schema upgrades. The final source gate was repeated after factoring registration state configurations for readability; all five production offline checks then pass against that final build, including cold reader startup with both servers stopped and HTTP cache cleared, update handling, and first-install failure → retry without replacing the local identity. `pnpm format` and `pnpm format:check` include the OfflineShell selector integration change. No suites ran concurrently.
+
+## Hosted process-group liveness correction
+
+Netlify deploy `6aeb4f715a1911a2e9d3d6d3` (commit `25f8915`) provisioned its disposable Jazz app, received readiness HTTP 200, then stayed in `deploying.running` until the 18-minute command timeout. An isolated deployment through the actual process machine against another disposable hosted app succeeds locally. The previous Linux probe nevertheless had a concrete liveness flaw: `kill(-pgid, 0)` treats an unreaped zombie as an existing group member, so close plus SIGKILL cannot settle the owner in a container whose init does not promptly reap descendants.
+
+Linux scope observation now enumerates `/proc` process-group membership after the kernel existence check and excludes zombie/dead members. Any runnable/sleeping/stopped member retains ownership; inaccessible or malformed observations fail the probe rather than declaring quiescence. A second enumeration detects children forked during the first observation. Other platforms retain their native probe. Pure table regressions cover live states, mixed groups, command-field parentheses, disappearing processes, rescanning and observation failure. A Linux-only native fixture deliberately retains a zombie in the owned group under a live supervisor outside it; it asserts kernel group existence while the process owner completes successfully without signaling dead members. The supervisor explicitly reaps its fixture child on cleanup. This Linux test runs in Ubuntu CI; it is skipped on the local macOS host.
+
+Preview subprocess phase logging now prints only static lifecycle names, deduplicating polling substates and never reading environment/diagnostic context. It distinguishes a running command from termination, scope settlement or release in future hosted build logs. The full local source gate passes 390 tests/52 files with the Linux-only regression skipped; final tooling/type checks follow the phase-log addition. Hosted CI/deploy qualification is recorded after pushing the correction. The 24 browser/five production offline cases from the lifecycle batch are unchanged and were not rerun for this tooling-only fix.
+
+### Tag-name search follow-up
+
+Search now indexes assigned tag display names alongside title/URL/body using the existing Unicode folding and AND keyword matching. The search child treats tag-name/membership changes as dataset changes, preserving its current query while rebuilding through the existing loading/indexing states. Adding the tag field changes document fingerprints even for untagged libraries, rebuilding older disposable indexes without a Jazz migration or a new cache store. Status/favorite/Trash-only updates still avoid reindexing. No UI or catalog strings change.
+
+Validation: `pnpm verify` passed (512 unit tests, one platform skip; formatting, lint, strict types and build). All ten discovery browser cases passed on isolated ports 5194/5195, including an open query reacting to another restored client adding/removing a tag. All five production offline cases passed; the cold-restart query combines a tag-only term with a saved-body term after deleting the derived cache and stopping web/Jazz. No shared development authority was restarted.
+
+### Fuzzy search follow-up
+
+At the user’s request, MiniSearch now allows 20% edit distance (rounded by the engine and capped at two edits) for terms of at least four characters. Short terms remain exact; every query term must still match. Existing engine ranking discounts fuzzy matches while preserving title boosts and stable date/ID ties. This query-time option applies equally to fresh and restored indexes, so no index/cache migration is needed. Worker/state/resource ownership and catalog copy are unchanged.
+
+Validation: `pnpm verify` passed (513 unit tests, one platform skip; formatting, lint, strict types and build). Ten discovery browser cases passed, including continue/continues and misspelled multiword queries through the actual search input. Five production offline cases passed, including fuzzy tag/body matching after a complete offline restart and derived-cache rebuild.
+
+### Dependency retention approval
+
+On 2026-11-05, after the separate MiniSearch and Unicode case-folding reviews, the user explicitly approved retaining both current packages “for now.” Keep MiniSearch 7.2.0 and unicode-case-folding 1.1.2. The MiniSearch/FlexSearch performance comparison remains an unchecked future task; this retention approval does not authorize installing FlexSearch or another new dependency. The approval and remaining evidence limits are recorded in search-tags-trash.md.
+
+### Trash mass-noun catalog correction
+
+At the user’s review, the two identical Trash plural entries are consolidated into the unsuffixed `nouns.trash` entry. Noun types accept both counted forms and plain mass-noun keys; existing i18next resolution handles counts without a special Trash branch or hardcoded fallback. Approved wording, Trash radio/action labels and behavior are unchanged. A regression exercises noun/action composition at zero, singular, plural and fractional counts; counted nouns retain their existing plural behavior.
+
+The user also explicitly corrected capitalization of `library.search_failed` to “Search is unavailable.” The owning search state still supplies the message; unit and browser failure/retry assertions use the corrected approved wording.
+
+## Reader branch continuation checkpoint
+
+The current uncommitted implementation is on `feat/reader-experience` based on merged main `b21691f`. Formatting/lint and the full 540-test unit/native suite pass (80 files, one platform skip). Svelte checking is blocked solely by 24 references to 19 proposed, unapproved reader catalog entries. The exact approval request is pending in the conversation. No catalog wording or third-party package has been added. Browser and production-offline reader tests are drafted, with existing footnote tests updated to follow the new popover's Open note link; these have not been run for this batch. Complete the copy gate, run the actual controls and restart/sync tests, fix any findings, run the full existing web/offline/extension/fake-data gates, then commit/push and create an unmerged PR. Preserve the shared development servers and unrelated DUI worktree changes.
+
+## Network development server
+
+The user clarified that user-facing dev servers must always be reachable on the network. AGENTS.md records the binding, tmux and browser-backend requirements. The existing authority was preserved. A separate HTTPS frontend is running in `main:7` (`clipper-network`) on 5182, with same-origin `/apps/` HTTP/WebSocket proxying to 5181 and isolated `.svelte-kit/network` output. `PUBLIC_JAZZ_SERVER_URL=same-origin` is resolved only in development by the layout; production service coordinates retain their prior behavior. Both LAN `https://192.168.8.183:5182/` and Tailscale `https://100.78.47.102:5182/` passed fresh-browser initialization/synchronization with the local development certificate trusted. See docs/tooling.md for the local configuration/launch command. No new dependency or catalog wording was added. Reader-copy approval and full reader qualification remain pending.
+
+## Source capture follow-up on the network frontend
+
+Stately `/docs/invoke` now parses and opens from actual Tailscale Add Link after weighting HTML above plain text in Accept. The supplied Men’s Journal article is blocked upstream by a DataDome HTTP 403 JavaScript challenge; server capture retains the URL instead of saving the challenge as an article. A reader-only DUI default SVG-caret runtime error discovered with Stately headings is fixed using DUI's caret snippet and Icon, with no dependency added. Transport/parser/gateway checks pass (17 cases); full unit/native checks pass (542 plus one platform skip); two existing capture/reader browser cases pass. The original/network user-facing servers and Jazz authority remain running; isolated harnesses were removed. Reader catalog approval and remaining full reader UI/offline qualification are still pending.
+
+## Disposable AT Protocol / JWT proof preparation
+
+Task-owned branch: `research/atproto-jwt-proof`, based on Clipper `3f51f70`. The user approved
+installing `better-auth` and `@kingironman2011/better-auth-bsky` for a minimal proof on the existing
+Jazz alpha.59 stack. Direct dependencies are pinned to Better Auth 1.7.18 and the plugin
+0.3.2 following the compatibility research below. Jazz and DLF versions remain unchanged.
+The lockfile was generated by a successful installation.
+
+Network/code-mode access recovered and installation now works in the task shell. No running
+service or original checkout was changed. No commits, pushes, PR or deployment are authorized
+by dependency installation.
+
+The proof concerns local use, real AT Protocol authentication, app JWT verification, preserving the
+local account when connected, and clean-browser access to that account. Offline cold restart is
+an evidence goal, with alpha.59's known external-selection risk retained. Transfers, merging,
+publication and extension authentication remain deferred.
+
+Before implementation, the user is being asked to approve the three required AT Protocol labels
+and using library-defined SQLite authentication tables in isolated local test storage. No new
+application/domain schema or exact callback/linking process is selected by this preparation.
+Continue through the existing application lifetime/session owner; do not mutate the SDK session
+from an independent component while library writers are active. Model any new async lifecycle
+before implementing it. Do not mount the SDK login-or-register provider connector over a local
+account before linking: it does not preserve that account automatically in alpha.59.
+
+### Dependency compatibility research — 2026-11-06
+
+Network/code-mode access recovered. The first installation downloaded packages but failed strict
+peer validation: proposed Better Auth 1.6.11 declares SvelteKit ^2, while installed Jazz alpha.59
+declares an optional exact Better Auth 1.7.1 peer. No peer checks were disabled.
+
+Registry research found current Better Auth 1.7.18 explicitly declares SvelteKit `^2.0.0 || ^3.0.0`;
+the official integration guide now uses SvelteKit 3 imports. The 1.7.1 peer metadata still declares
+SvelteKit ^2. The AT Protocol plugin declares Better Auth >=1.5.0, so 1.7.18 satisfies its range.
+The 1.7.18 tarball's SvelteKit public declarations were read without executing package code.
+
+Jazz's client connector uses a structural interface for session observation and `/token` fetching,
+with no Better Auth runtime import in that connector. Its separate `better-auth-adapter` imports
+Better Auth internals and is not needed for an auth store separate from library data. This makes
+1.7.18 a plausible prototype candidate, not runtime qualification of every Jazz/Better Auth API.
+
+Recommendation for review: retain Clipper's SvelteKit 3 and Jazz alpha.59, pin Better Auth 1.7.18,
+and apply one exact scoped pnpm allowance for `jazz-tools@2.0.0-alpha.59>better-auth` at 1.7.18,
+while retaining strict peer checks for every other edge. This acknowledges a declared compatibility
+exception rather than establishing upstream support. Type/build checks and actual JWT/linking
+behavior must validate the exercised boundary. Use maintained Better Auth JWT issuance; do not
+use Jazz as the Better Auth database adapter merely to satisfy the peer declaration.
+
+Alternative: isolate Better Auth 1.7.1 in a framework-neutral server package without SvelteKit,
+at the cost of another process and origin integration. Downgrading Clipper's framework or globally
+disabling strictPeerDependencies is not recommended.
+
+The user approved the recommendation. Better Auth 1.7.18 and the exact scoped peer allowance
+are now applied; strict peer validation remains enabled. Installation passed. Runtime OAuth,
+JWT verification and account linking remain unqualified.
+
+Sources: https://better-auth.com/docs/integrations/svelte-kit and
+https://pnpm.io/10.x/settings#peerdependencyrulesallowedversions, plus npm registry metadata for
+1.7.1/1.7.18 and installed Jazz/AT Protocol plugin manifests.
+
+### Netlify auth storage proof — 2026-11-06
+
+The user supplied Jazz test app `922a7e18-89b5-49d3-9f5b-f4fe20c48a9b` and
+configured branch-scoped Netlify credentials under the existing variable names.
+The branch-specific build command requires that exact app ID and bypasses the
+ordinary disposable Jazz provisioning path. It removes the Jazz admin secret
+before building the frontend. No remote configuration was changed by the agent.
+
+The user approved Netlify Database and its three direct packages. A generated
+library-defined auth migration and Postgres pool factory are prepared. Local
+Netlify database engine testing passed persistence across database/auth-instance
+restart for Better Auth users/sessions, AT Protocol state/sessions and JWT keys.
+This supersedes the earlier proposed SQLite proof store; UI string approval
+and exact auth/linking workflow decisions remain outstanding.
+
+The hosted database status check found no database branch for this proof branch.
+No hosted migration or deployment was attempted. See
+`docs/atproto-proof-deployment.md` for exact evidence, limitations and setup.
+
+### Direct Neon preparation — 2026-11-06
+
+PR #20 triggered Netlify preview deployment, which failed at `createSiteDatabase`
+with HTTP 403: `database feature not available for this account`. The user approved
+preparing direct Neon Postgres instead of changing the Netlify account plan.
+`@netlify/database` is removed; the existing `pg` factory now reads server-only
+`AUTH_DATABASE_URL`. The generated SQL moved unchanged to
+`apps/web/tooling/auth-migrations/20261106000100_auth.sql`, outside Netlify's
+automatic database provisioning/migration path. No new dependency or custom auth
+schema was introduced. The initial SQL application process awaits the user's
+choice; no automatic migration runner or hosted schema changes were made.
+
+### Shared token integration implementation
+
+User approved the shared DLF connect/current-library and sign-in/existing-library
+API direction, then its implementation/testing and the temporary tab-local OAuth
+intent (operation and library ID only). Clipper uses a bounded vendor patch over
+its existing DLF baseline, not a wholesale DLF development upgrade. The account
+panel uses the three explicitly approved AT Protocol labels. Its coordinator
+resumes only explicit intents and holds no stored JWT. The existing application
+actor drains library work before either shared operation and waits for issued
+calls to settle through shutdown. Existing-library sign-in rejects local saved
+work and note drafts; transfers/merging remain deferred. See deployment notes for
+qualification evidence and the uncommitted shared-source worktree.
+## XState v6 connected runtime implementation (2026-11-09)
+
+The web, application worker, reader UI adapter, service worker and extension now
+use published `xstate@6.0.0-beta.1`. The v5 baseline was 626 passing tests on the
+merged migration specification. Shared archives are rebuilt from merged DLF
+`2532309` and DUI `7a7f61b`; exact sources, hashes and the preserved Jazz alpha.60
+adapter delta are recorded under `vendor/`. Existing Jazz and DLF presentation
+patches are unchanged. There is no XState patch, declaration override or new
+untyped actor cast.
+
+The implementation includes manual ownership review beyond syntax conversion:
+state-owned native observation and identity issuance, an acknowledged account
+binding handoff, total pure choices, retained typed child refs and completion
+reports, source injection, full-root state predicates and parallel cancellation
+joins. Domain staging acknowledges its native mutations before receipt output;
+transaction commit/receipt handles stay inside the native adapter closure.
+Reader attachment retains pending surface custody until admission completes, and
+its synchronous identity callback preserves fullscreen user activation. Image
+quota waits use owned timers; wakes do not reset the quota window. Extension
+sign-in/connection IDs are issued before invocation input or storage uses them.
+
+Generated testing uses `@xstate/test@2.0.0-beta.0` and `fast-check@4.10.2` against
+an independent binding/pagination contract and the real worker host and children.
+Seed 60381, 100 runs, at most 60 commands, complete modeled state/event/transition
+coverage and a required A → B → A trace. Probes check predictive calls leave the
+actor unchanged; disposal checks stopped editors and exactly one SDK close.
+The bounded model supplements native coverage. CI retains built-in shrunk
+counterexamples on failure, and all PR check triggers remain enabled.
+
+Qualification uses Node 24.22.2 and pnpm 10.22.0. Frozen installation, vendor
+integrity and `pnpm verify` pass: formatting, lint, strict web/extension/tooling
+checks, 628 tests in 95 files, and production web/service-worker build. The
+extension production build also passes. Browser qualification records 55 account,
+library, capture, discovery, image, organization, reader and startup cases;
+8 Chromium/Firefox schema-upgrade cases; 6 worker cases; 5 production-offline
+cases (including both servers stopped and HTTP cache cleared); and 2 fake-data
+cases. All 11 packaged-extension cases also pass in Linux CI.
+
+Implementation commit `48ca801c1572fd6ea8d0de34b35cbc5994f20f31` passed
+[CI run 42673651355, attempt 2](https://github.com/delightful-labs/delightful-clipper/actions/runs/42673651355):
+628 unit/native tests and all 87 browser cases above. The title check and Vercel
+preview also passed. Attempt 1 failed with a GitHub internal server error before
+creating jobs; the unchanged rerun completed successfully.
+
+The production-offline suite caught early disposal of a pending reader surface;
+the actual worker adapter now retains that custody and the full offline suite
+passes. Native Chrome occasionally replaces its service-worker execution context
+between fixture commands. The extension harness retries only the explicit
+restart error once for idempotent fixture operations; it never retries toolbar
+gestures or issued article writes. Keep failures visible and distinguish this
+fixture accommodation from application retry or unknown-write recovery.
+Local macOS extension runs remained intermittent despite passing isolated cases;
+do not represent Linux CI as complete macOS release qualification. The unchanged
+main baseline `787ef25` also has an extension failure in
+[run 42644535410](https://github.com/delightful-labs/delightful-clipper/actions/runs/42644535410),
+where the stale-connection popup did not appear. No assertion or native case was
+removed, and no speculative account-admission or persistence change was retained.
+
+The beta pins remain experimental. Generated coverage is bounded and does not
+prove all native interleavings. Full browser support/release qualification and
+Finance's worker migration remain separate work.
+
+### Literal-typing review
+
+Removed 664 primitive literal `as const` assertions from the migration. Machine
+schemas supply contextual inference for configuration, events and context
+patches; reusable helpers and fixtures check their actual DTO/return contracts.
+The shared terminal-state and encoding-state factories use the setup's typed
+`createStateConfig` helper. Worker views retain inferred payload types with an
+explicitly typed `VIEW` envelope. Finite readonly tuples remain unchanged.
+
+The follow-up passes `pnpm verify` (628 tests in 95 files, strict types, lint,
+formatting, vendor integrity and production build) and all 6 worker-browser
+checks. Emitted JavaScript token streams are identical in 73 changed files. The
+remaining three use the published identity config helper or the typed worker
+view envelope; no machine decision, effect or persistence policy was changed.
+
+
+## PR #28 v6 review corrections (2026-11-09)
+
+Addressed all six review findings: direct supervised extension invocation; owned
+request time/cancellation observations; private self-only events; concrete
+transaction protocol/spawn contracts; domain/account typestates and binding
+state input; and expanded independent generated lifecycle coverage. See the
+migration specification's documentation-review corrections for ownership and
+campaign details. No dependency, Jazz patch, XState declaration, CI trigger or
+user-visible copy changed.
+
+Fresh `pnpm verify` passes with 633 tests in 97 files, strict web/extension/tooling
+checks, formatting, lint, vendor integrity and production build. The native
+HTTP/Jazz tests require local listener access; the sandbox-only run was not a
+passing qualification. The extension check and 15 clip/runtime regression cases
+also pass after the final capability-observation change. All six worker browser
+cases pass against the actual application worker and Jazz adapter.
+
+
+The macOS packaged-extension run passed 6/11 cases and failed five: four while
+waiting for the extension/account connection or bar, and one waiting for the web
+article after sign-in. All five failed cases passed in the isolated follow-up against the final
+rebuilt extension (5/5). This is consistent with previously observed local suite
+instability, but does not establish the cause of every failure. Keep the full
+Linux CI matrix and all native assertions as acceptance gates. The extension
+production build passes; fresh CI results must be checked on the pushed commit.
+
+
+## AT Protocol proof updated onto XState 6 main (2026-11-09)
+
+PR #20 merges main `4132edb` and retains its v6 runtime, matching shared archives,
+native transaction ownership and generated campaigns. OAuth and ordered sign-out
+are ported to the published v6 API. State-specific payloads and preparation facts
+preserve callback, stale-account and shutdown safeguards; `.can()` cannot issue
+an OAuth identity or request. The existing approved provider-plugin patch is
+unchanged. No new dependency patch, auth store or account coordinator was added.
+
+Strict types, vendor/format/lint checks, all 661 unit/native tests and all eight
+production offline restart cases pass on the merged worktree. The 55 general web,
+eight historical-schema, six worker and two fake-data cases pass, as does the
+Vercel production build with a synthetic preview hostname. See
+`docs/reviews/atproto-native-alpha60.md` for qualification details and remaining
+hosted-consent/macOS-extension limitations.

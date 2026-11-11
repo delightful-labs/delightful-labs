@@ -1,0 +1,445 @@
+{
+	"name": "delightful-local-first",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@10.28.0",
+	"engines": {
+		"node": "^22.17.0 || >=24.0.0"
+	},
+	"scripts": {
+		"format": "oxfmt .",
+		"format:check": "oxfmt --check .",
+		"lint": "oxlint --deny-warnings --no-error-on-unmatched-pattern .",
+		"storybook": "pnpm paraglide && storybook dev --host 127.0.0.1 --port 6006 --exact-port --disable-telemetry",
+		"build-storybook": "pnpm paraglide && storybook build --disable-telemetry",
+		"check": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc --noEmit --project tsconfig.json",
+		"check:watch": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --watch",
+		"package": "pnpm paraglide && svelte-package --tsconfig tsconfig.library.json --input src/lib --output dist && publint --strict",
+		"check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/test-app.vite.config.ts && vite build --config tests/fixtures/avatar-selection/vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:test-app && node --experimental-strip-types fixtures/package-consumer/domain-transaction.ts && node --experimental-strip-types fixtures/package-consumer/owned-operation.ts && node --experimental-strip-types fixtures/package-consumer/worker-request.ts && node --experimental-strip-types fixtures/package-consumer/worker-channel.ts && node --experimental-strip-types fixtures/package-consumer/worker-effect-drain.ts && node --experimental-strip-types fixtures/package-consumer/ordered-sign-out.ts",
+		"verify": "pnpm format:check && pnpm lint && pnpm check && pnpm test:unit --run && pnpm package && pnpm check:consumer && pnpm build-storybook",
+		"test:unit": "pnpm paraglide && vitest --config vitest.config.ts",
+		"paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --emit-ts-declarations --no-emit-readme --no-emit-prettier-ignore --no-emit-git-ignore",
+		"backup:inspect": "node fixtures/backup-reader/inspect.mjs",
+		"check:backup-reader": "tsc --noEmit --project fixtures/backup-reader/tsconfig.json",
+		"check:test-app": "tsc --project fixtures/test-app/tsconfig.json --noEmit false --rootDir fixtures/test-app --outDir .svelte-kit/test-app && node --test .svelte-kit/test-app/archive.test.js",
+		"test:storybook": "playwright test --config playwright.config.ts",
+		"measure:backup": "DLF_BACKUP_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures encrypted'",
+		"measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
+		"check:backup-restore": "tsc --noEmit --project fixtures/test-app/tsconfig.json && vitest run --config fixtures/test-app/restore.vitest.config.ts",
+		"check:native-backup": "tsc --noEmit --project fixtures/native-capture/tsconfig.json && vitest run --config fixtures/native-capture/vitest.config.ts",
+		"check:library": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.library.json --fail-on-warnings && tsc --noEmit --project tsconfig.library.json",
+		"test:xstate-readiness": "tsc --project tsconfig.xstate-tests.json && vitest run --config vitest.config.ts src/lib/machines/identity/session-readiness.test.ts src/lib/machines/identity/session-readiness.model.test.ts",
+		"prepublishOnly": "pnpm package"
+	},
+	"devDependencies": {
+		"@inlang/paraglide-js": "3.1.0",
+		"@opentelemetry/api": "1.9.1",
+		"@playwright/test": "1.60.0",
+		"@poppanator/sveltekit-svg": "7.0.1",
+		"@storybook/addon-docs": "10.6.6",
+		"@storybook/addon-svelte-csf": "5.1.6",
+		"@storybook/svelte-vite": "10.6.6",
+		"@sveltejs/package": "3.0.2",
+		"@sveltejs/vite-plugin-svelte": "7.3.1",
+		"@types/node": "26.6.6",
+		"@xstate/test": "2.0.0-beta.0",
+		"delightful-ui": "workspace:*",
+		"fast-check": "4.10.2",
+		"jazz-tools": "2.0.0-alpha.60",
+		"oxfmt": "0.76.0",
+		"oxlint": "1.91.0",
+		"publint": "0.3.25",
+		"storybook": "10.6.6",
+		"svelte": "5.57.3",
+		"svelte-check": "4.7.8",
+		"typescript": "6.0.3",
+		"vite": "8.3.6",
+		"vitest": "4.1.8",
+		"xstate": "6.0.0-beta.1"
+	},
+	"version": "0.0.0",
+	"description": "Reusable local-first identity and workspace foundations for Delightful apps.",
+	"exports": {
+		"./backend/jazz/backup": {
+			"types": "./dist/backend/jazz/backup-api.d.ts",
+			"default": "./dist/backend/jazz/backup-api.js"
+		},
+		"./backup/restore/journal/browser": {
+			"types": "./dist/backup/restore-journal-browser-api.d.ts",
+			"default": "./dist/backup/restore-journal-browser-api.js"
+		},
+		"./backup/restore/journal/workflow": {
+			"types": "./dist/machines/backup/restore-journal.d.ts",
+			"default": "./dist/machines/backup/restore-journal.js"
+		},
+		"./backup/restore/journal": {
+			"types": "./dist/backup/restore-journal.d.ts",
+			"default": "./dist/backup/restore-journal.js"
+		},
+		"./backup/binding": {
+			"types": "./dist/backup/binding.d.ts",
+			"default": "./dist/backup/binding.js"
+		},
+		"./backup/export/workflow": {
+			"types": "./dist/machines/backup/export.d.ts",
+			"default": "./dist/machines/backup/export.js"
+		},
+		"./backup/inspection": {
+			"types": "./dist/backup/inspection-api.d.ts",
+			"default": "./dist/backup/inspection-api.js"
+		},
+		"./backup/inspection/workflow": {
+			"types": "./dist/machines/backup/inspection.d.ts",
+			"default": "./dist/machines/backup/inspection.js"
+		},
+		"./backup/envelope": {
+			"types": "./dist/backup/envelope-api.d.ts",
+			"default": "./dist/backup/envelope-api.js"
+		},
+		"./backup/envelope/workflow": {
+			"types": "./dist/machines/backup/envelope.d.ts",
+			"default": "./dist/machines/backup/envelope.js"
+		},
+		"./backup/archive": {
+			"types": "./dist/backup/archive.d.ts",
+			"default": "./dist/backup/archive.js"
+		},
+		".": {
+			"types": "./dist/index.d.ts",
+			"svelte": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./recovery": {
+			"types": "./dist/recovery.d.ts",
+			"svelte": "./dist/recovery.js",
+			"default": "./dist/recovery.js"
+		},
+		"./recovery/workflow": {
+			"types": "./dist/machines/identity/recovery-phrase.d.ts",
+			"default": "./dist/machines/identity/recovery-phrase.js"
+		},
+		"./recovery/messages": {
+			"types": "./dist/localization/recovery.d.ts",
+			"default": "./dist/localization/recovery.js"
+		},
+		"./recovery/contracts": {
+			"types": "./dist/contracts/recovery-phrase.d.ts",
+			"default": "./dist/contracts/recovery-phrase.js"
+		},
+		"./recovery/svelte": {
+			"types": "./dist/integrations/identity/RecoveryPhrase.svelte.d.ts",
+			"svelte": "./dist/integrations/identity/RecoveryPhrase.svelte",
+			"default": "./dist/integrations/identity/RecoveryPhrase.svelte"
+		},
+		"./backend/jazz/recovery": {
+			"types": "./dist/backend/jazz/recovery-phrase.d.ts",
+			"default": "./dist/backend/jazz/recovery-phrase.js"
+		},
+		"./restoration/contracts": {
+			"types": "./dist/contracts/restoration.d.ts",
+			"default": "./dist/contracts/restoration.js"
+		},
+		"./restoration/workflow": {
+			"types": "./dist/machines/identity/restoration.d.ts",
+			"default": "./dist/machines/identity/restoration.js"
+		},
+		"./backend/jazz/restoration": {
+			"types": "./dist/backend/jazz/restoration.d.ts",
+			"default": "./dist/backend/jazz/restoration.js"
+		},
+		"./session/contracts": {
+			"types": "./dist/contracts/session.d.ts",
+			"default": "./dist/contracts/session.js"
+		},
+		"./session/workflow": {
+			"types": "./dist/session.d.ts",
+			"default": "./dist/session.js"
+		},
+		"./backend/jazz/session": {
+			"types": "./dist/backend/jazz/session.d.ts",
+			"default": "./dist/backend/jazz/session.js"
+		},
+		"./backend/jazz/session-readiness": {
+			"types": "./dist/backend/jazz/session-readiness.d.ts",
+			"default": "./dist/backend/jazz/session-readiness.js"
+		},
+		"./workspace/contracts": {
+			"types": "./dist/contracts/workspace-selection.d.ts",
+			"default": "./dist/contracts/workspace-selection.js"
+		},
+		"./workspace/workflow": {
+			"types": "./dist/machines/workspaces/selection.d.ts",
+			"default": "./dist/machines/workspaces/selection.js"
+		},
+		"./workspace/creation/contracts": {
+			"types": "./dist/contracts/workspace-creation.d.ts",
+			"default": "./dist/contracts/workspace-creation.js"
+		},
+		"./workspace/creation/workflow": {
+			"types": "./dist/machines/workspaces/creation-transaction.d.ts",
+			"default": "./dist/machines/workspaces/creation-transaction.js"
+		},
+		"./workspace": {
+			"types": "./dist/workspace.d.ts",
+			"svelte": "./dist/workspace.js",
+			"default": "./dist/workspace.js"
+		},
+		"./workspace/presentation": {
+			"types": "./dist/presentation/workspace-selector.d.ts",
+			"default": "./dist/presentation/workspace-selector.js"
+		},
+		"./workspace/naming/contracts": {
+			"types": "./dist/contracts/workspace-naming.d.ts",
+			"default": "./dist/contracts/workspace-naming.js"
+		},
+		"./workspace/naming/workflow": {
+			"types": "./dist/machines/workspaces/naming.d.ts",
+			"default": "./dist/machines/workspaces/naming.js"
+		},
+		"./forms/zod": {
+			"types": "./dist/validation/form-issues.d.ts",
+			"default": "./dist/validation/form-issues.js"
+		},
+		"./forms/contracts": {
+			"types": "./dist/contracts/scoped-form.d.ts",
+			"default": "./dist/contracts/scoped-form.js"
+		},
+		"./forms/readiness": {
+			"types": "./dist/machines/forms/readiness.d.ts",
+			"default": "./dist/machines/forms/readiness.js"
+		},
+		"./forms/submission": {
+			"types": "./dist/machines/forms/submission.d.ts",
+			"default": "./dist/machines/forms/submission.js"
+		},
+		"./forms/write": {
+			"types": "./dist/machines/forms/write.d.ts",
+			"default": "./dist/machines/forms/write.js"
+		},
+		"./forms/workflow": {
+			"types": "./dist/machines/forms/scoped-form.d.ts",
+			"default": "./dist/machines/forms/scoped-form.js"
+		},
+		"./forms/feedback": {
+			"types": "./dist/machines/forms/feedback.d.ts",
+			"default": "./dist/machines/forms/feedback.js"
+		},
+		"./forms/lifecycle": {
+			"types": "./dist/machines/forms/lifecycle.d.ts",
+			"default": "./dist/machines/forms/lifecycle.js"
+		},
+		"./forms/svelte": {
+			"types": "./dist/integrations/forms/controller.svelte.d.ts",
+			"default": "./dist/integrations/forms/controller.svelte.js"
+		},
+		"./forms/policy": {
+			"types": "./dist/machines/forms/policy.d.ts",
+			"default": "./dist/machines/forms/policy.js"
+		},
+		"./workspace/journal": {
+			"types": "./dist/machines/workspaces/journal.d.ts",
+			"default": "./dist/machines/workspaces/journal.js"
+		},
+		"./workspace/initialization": {
+			"types": "./dist/machines/workspaces/initialization.d.ts",
+			"default": "./dist/machines/workspaces/initialization.js"
+		},
+		"./workspace/creation-owner": {
+			"types": "./dist/machines/workspaces/creation-owner.d.ts",
+			"default": "./dist/machines/workspaces/creation-owner.js"
+		},
+		"./workspace/creation-operation": {
+			"types": "./dist/machines/workspaces/creation-operation.d.ts",
+			"default": "./dist/machines/workspaces/creation-operation.js"
+		},
+		"./workspace/creation-persistence": {
+			"types": "./dist/machines/workspaces/creation-persistence.d.ts",
+			"default": "./dist/machines/workspaces/creation-persistence.js"
+		},
+		"./profile/contracts": {
+			"types": "./dist/contracts/profile.d.ts",
+			"default": "./dist/contracts/profile.js"
+		},
+		"./profile/avatar": {
+			"types": "./dist/machines/identity/profile-avatar.d.ts",
+			"default": "./dist/machines/identity/profile-avatar.js"
+		},
+		"./profile/workflow": {
+			"types": "./dist/machines/identity/profile.d.ts",
+			"default": "./dist/machines/identity/profile.js"
+		},
+		"./workspace/startup": {
+			"types": "./dist/machines/workspaces/startup.d.ts",
+			"default": "./dist/machines/workspaces/startup.js"
+		},
+		"./workspace/startup-contracts": {
+			"types": "./dist/contracts/workspace-startup.d.ts",
+			"default": "./dist/contracts/workspace-startup.js"
+		},
+		"./data/observations": {
+			"types": "./dist/contracts/observation.d.ts",
+			"default": "./dist/contracts/observation.js"
+		},
+		"./backend/jazz/data": {
+			"types": "./dist/backend/jazz/data.svelte.d.ts",
+			"default": "./dist/backend/jazz/data.svelte.js"
+		},
+		"./recovery/coordination": {
+			"types": "./dist/machines/identity/session-recovery.d.ts",
+			"default": "./dist/machines/identity/session-recovery.js"
+		},
+		"./forms/content": {
+			"types": "./dist/components/forms/FormContent.svelte.d.ts",
+			"svelte": "./dist/components/forms/FormContent.svelte",
+			"default": "./dist/components/forms/FormContent.svelte"
+		},
+		"./forms/feedback-view": {
+			"types": "./dist/components/forms/FormFeedback.svelte.d.ts",
+			"svelte": "./dist/components/forms/FormFeedback.svelte",
+			"default": "./dist/components/forms/FormFeedback.svelte"
+		},
+		"./forms/modal": {
+			"types": "./dist/components/forms/FormModal.svelte.d.ts",
+			"svelte": "./dist/components/forms/FormModal.svelte",
+			"default": "./dist/components/forms/FormModal.svelte"
+		},
+		"./profile/name-view": {
+			"types": "./dist/components/profile/ProfileNameForm.svelte.d.ts",
+			"svelte": "./dist/components/profile/ProfileNameForm.svelte",
+			"default": "./dist/components/profile/ProfileNameForm.svelte"
+		},
+		"./profile/avatar-view": {
+			"types": "./dist/components/profile/Avatar.svelte.d.ts",
+			"svelte": "./dist/components/profile/Avatar.svelte",
+			"default": "./dist/components/profile/Avatar.svelte"
+		},
+		"./profile/avatar-form": {
+			"types": "./dist/integrations/profile/ProfileAvatarForm.svelte.d.ts",
+			"svelte": "./dist/integrations/profile/ProfileAvatarForm.svelte",
+			"default": "./dist/integrations/profile/ProfileAvatarForm.svelte"
+		},
+		"./backend/jazz/startup": {
+			"types": "./dist/backend/jazz/startup.d.ts",
+			"default": "./dist/backend/jazz/startup.js"
+		},
+		"./workspace/invitations/contracts": {
+			"types": "./dist/contracts/workspace-invitation.d.ts",
+			"default": "./dist/contracts/workspace-invitation.js"
+		},
+		"./workspace/invitations/workflow": {
+			"types": "./dist/machines/workspaces/invitation-redemption.d.ts",
+			"default": "./dist/machines/workspaces/invitation-redemption.js"
+		},
+		"./workspace/invitations/authority-contracts": {
+			"types": "./dist/contracts/workspace-invitation-authority.d.ts",
+			"default": "./dist/contracts/workspace-invitation-authority.js"
+		},
+		"./backend/jazz/invitation-authority": {
+			"types": "./dist/backend/jazz/invitation-authority.d.ts",
+			"default": "./dist/backend/jazz/invitation-authority.js"
+		},
+		"./workspace/invitations/authority-workflow": {
+			"types": "./dist/machines/workspaces/invitation-authority.d.ts",
+			"default": "./dist/machines/workspaces/invitation-authority.js"
+		},
+		"./diagnostics/logger": {
+			"types": "./dist/diagnostics/logger.d.ts",
+			"default": "./dist/diagnostics/logger.js"
+		},
+		"./backup/restore": {
+			"types": "./dist/backup/restore-api.d.ts",
+			"svelte": "./dist/backup/restore-api.js",
+			"default": "./dist/backup/restore-api.js"
+		},
+		"./backup/restore/workflow": {
+			"types": "./dist/machines/backup/restore.d.ts",
+			"svelte": "./dist/machines/backup/restore.js",
+			"default": "./dist/machines/backup/restore.js"
+		},
+		"./worker/effect-drain/contracts": {
+			"types": "./dist/contracts/worker-effect-drain.d.ts",
+			"default": "./dist/contracts/worker-effect-drain.js"
+		},
+		"./worker/effect-drain/workflow": {
+			"types": "./dist/machines/lifecycle/worker-effect-drain.d.ts",
+			"default": "./dist/machines/lifecycle/worker-effect-drain.js"
+		},
+		"./worker/channel/contracts": {
+			"types": "./dist/contracts/worker-channel.d.ts",
+			"default": "./dist/contracts/worker-channel.js"
+		},
+		"./worker/channel/workflow": {
+			"types": "./dist/machines/lifecycle/worker-channel.d.ts",
+			"default": "./dist/machines/lifecycle/worker-channel.js"
+		},
+		"./worker/request/contracts": {
+			"types": "./dist/contracts/worker-request.d.ts",
+			"default": "./dist/contracts/worker-request.js"
+		},
+		"./worker/request/workflow": {
+			"types": "./dist/machines/lifecycle/worker-request.d.ts",
+			"default": "./dist/machines/lifecycle/worker-request.js"
+		},
+		"./lifecycle/operation/contracts": {
+			"types": "./dist/contracts/owned-operation.d.ts",
+			"default": "./dist/contracts/owned-operation.js"
+		},
+		"./lifecycle/operation/workflow": {
+			"types": "./dist/machines/lifecycle/owned-operation.d.ts",
+			"default": "./dist/machines/lifecycle/owned-operation.js"
+		},
+		"./transactions/contracts": {
+			"types": "./dist/contracts/domain-transaction.d.ts",
+			"default": "./dist/contracts/domain-transaction.js"
+		},
+		"./transactions/workflow": {
+			"types": "./dist/machines/workspaces/domain-transaction.d.ts",
+			"default": "./dist/machines/workspaces/domain-transaction.js"
+		},
+		"./session/sign-out/contracts": {
+			"types": "./dist/contracts/sign-out.d.ts",
+			"default": "./dist/contracts/sign-out.js"
+		},
+		"./session/sign-out/workflow": {
+			"types": "./dist/machines/identity/ordered-sign-out.d.ts",
+			"default": "./dist/machines/identity/ordered-sign-out.js"
+		},
+		"./recovery/view": {
+			"types": "./dist/components/identity/RecoveryPhraseView.svelte.d.ts",
+			"svelte": "./dist/components/identity/RecoveryPhraseView.svelte",
+			"default": "./dist/components/identity/RecoveryPhraseView.svelte"
+		}
+	},
+	"svelte": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"!dist/**/*.test.*",
+		"!dist/**/*.spec.*"
+	],
+	"peerDependencies": {
+		"delightful-ui": "0.0.25",
+		"jazz-tools": "2.0.0-alpha.60",
+		"svelte": "^5.57.2",
+		"xstate": "6.0.0-beta.1"
+	},
+	"peerDependenciesMeta": {
+		"xstate": {
+			"optional": true
+		},
+		"delightful-ui": {
+			"optional": true
+		},
+		"jazz-tools": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"zod": "4.1.11"
+	},
+	"dependenciesMeta": {
+		"delightful-ui": {
+			"injected": true
+		}
+	}
+}

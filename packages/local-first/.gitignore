@@ -1,0 +1,30 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Generated Storybook and hosting state
+storybook-static/
+.netlify/
+
+# Generated library packages
+dist/
+*.tgz
+.svelte-kit/
+
+# Reviewed DUI development artifact
+!vendor/delightful-ui-0.0.25-details-animation.tgz
+
+# Rebuilt localization output and inlang cache
+src/lib/paraglide/
+project.inlang/cache/
+project.inlang/*.sqlite*
+
+# Browser verification artifacts
+playwright-report/
+test-results/
+.pnpm-store/v10/
+
+# Automatically shrunk XState failures; promote fixed regressions to tracked fixtures.
+.xstate-test/

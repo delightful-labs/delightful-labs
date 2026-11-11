@@ -1,0 +1,26 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Introduction" />
+
+# Delightful Local First
+
+A shared foundation for Delightful apps, using Jazz for v1 with focused integration
+boundaries for future backend replacement.
+
+This Storybook is the documentation and component workbench. No foundation components
+or runtime have been implemented yet. Future identity and workspace compositions will
+reuse Delightful UI and remain independently adoptable by existing apps.
+
+## Ownership
+
+- Delightful UI owns generic presentation primitives.
+- Local First owns reusable identity and workspace behavior and compositions.
+- Consumers own application routes, layouts, domain schemas, and domain workflows.
+
+## Development
+
+Run `pnpm storybook` to open the local workbench at `http://127.0.0.1:6006`.
+Run `pnpm build-storybook` to generate the static documentation site.
+
+The active requirements live in `specs/001-local-first-foundation/spec.md`.
+Component implementation and its tests remain subject to focused review.

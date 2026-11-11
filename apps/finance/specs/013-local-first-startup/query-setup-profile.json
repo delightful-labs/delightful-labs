@@ -1,0 +1,105 @@
+{
+	"scope": "Temporary wrappers around public Db all/one/subscribe methods after session-open; Svelte internal subscription path not captured; durations are synchronous setup only",
+	"samples": [
+		{
+			"scenario": "first-visit-empty-workspace",
+			"publicCalls": [
+				{
+					"name": "profile:db.all",
+					"startTime": 366.70000000298023,
+					"duration": 125.39999999850988
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 492.6000000014901,
+					"duration": 0.30000000447034836
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 1202.2000000029802,
+					"duration": 0.20000000298023224
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 1202.4000000059605,
+					"duration": 0.19999999552965164
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 1658.8000000044703,
+					"duration": 0.10000000149011612
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 1658.9000000059605,
+					"duration": 0.09999999403953552
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 1659,
+					"duration": 0
+				}
+			]
+		},
+		{
+			"scenario": "warm-saved-detail",
+			"publicCalls": [
+				{
+					"name": "profile:db.all",
+					"startTime": 243.29999999701977,
+					"duration": 32.600000001490116
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 276,
+					"duration": 0.09999999403953552
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 762.3999999985099,
+					"duration": 0.19999999552965164
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 762.5999999940395,
+					"duration": 0.10000000149011612
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 762.6999999955297,
+					"duration": 0
+				}
+			]
+		},
+		{
+			"scenario": "cold-offline-saved-detail",
+			"publicCalls": [
+				{
+					"name": "profile:db.all",
+					"startTime": 243.60000000149012,
+					"duration": 36.399999998509884
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 280.1000000014901,
+					"duration": 0.20000000298023224
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 829.2000000029802,
+					"duration": 0.20000000298023224
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 829.4000000059605,
+					"duration": 0.09999999403953552
+				},
+				{
+					"name": "profile:db.all",
+					"startTime": 829.5,
+					"duration": 0.10000000149011612
+				}
+			]
+		}
+	]
+}

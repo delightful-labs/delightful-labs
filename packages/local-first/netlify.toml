@@ -1,0 +1,9 @@
+[build]
+command = "pnpm build-storybook"
+publish = "storybook-static"
+
+[build.environment]
+NODE_VERSION = "24"
+PNPM_VERSION = "10.22.0"
+PNPM_FLAGS = "--frozen-lockfile"
+STORYBOOK_DISABLE_TELEMETRY = "1"

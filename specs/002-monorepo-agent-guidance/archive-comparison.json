@@ -1,0 +1,3816 @@
+{
+  "schemaVersion": 1,
+  "archives": [
+    {
+      "repository": "delightful-labs",
+      "commit": "c75d672f231e8d6e7087454431b80496dc353c67",
+      "path": "vendor/delightful-ui-0.0.25.tgz",
+      "sha256": "101ba149fe7fe93a4e20b3419420e77356ce50653dfdb9c2514484a295b44f73",
+      "consumers": [
+        {
+          "manifest": "package.json",
+          "field": "dependencies",
+          "package": "delightful-ui"
+        }
+      ],
+      "package": "delightful-ui",
+      "version": "0.0.25",
+      "selectedLibraryCommit": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "contract": {
+        "exports": {
+          "archive": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "selectedSource": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "equal": true
+        },
+        "peerDependencies": {
+          "archive": {
+            "svelte": "^5.57.2"
+          },
+          "selectedSource": {
+            "svelte": "^5.57.2"
+          },
+          "equal": true
+        },
+        "peerDependenciesMeta": {
+          "archive": {},
+          "selectedSource": {},
+          "equal": true
+        },
+        "dependencies": {
+          "archive": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "^5.33.3"
+          },
+          "selectedSource": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "6.0.0-beta.1"
+          },
+          "equal": false
+        }
+      },
+      "sourceComparison": {
+        "identical": [
+          {
+            "archivePath": "dist/Components/ButtonContent.svelte",
+            "sourcePath": "src/lib/Components/ButtonContent.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Dialog.svelte",
+            "sourcePath": "src/lib/Components/Dialog.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Drawer.svelte",
+            "sourcePath": "src/lib/Components/Drawer.svelte"
+          },
+          {
+            "archivePath": "dist/Components/DrawerSection.svelte",
+            "sourcePath": "src/lib/Components/DrawerSection.svelte"
+          },
+          {
+            "archivePath": "dist/Components/FloatingActionButton.svelte",
+            "sourcePath": "src/lib/Components/FloatingActionButton.svelte"
+          },
+          {
+            "archivePath": "dist/Components/FloatingActionLink.svelte",
+            "sourcePath": "src/lib/Components/FloatingActionLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Heading.svelte",
+            "sourcePath": "src/lib/Components/Heading.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Icon.svelte",
+            "sourcePath": "src/lib/Components/Icon.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarFilePicker.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarFilePicker.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarImageTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarImageTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputAvatar.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputAvatar.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputDate.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputDate.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImages.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImages.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputNumber.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputNumber.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputRange.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputRange.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputText.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputText.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Select.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Select.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Textarea.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Textarea.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingContent.svelte",
+            "sourcePath": "src/lib/Components/LoadingContent.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingScreen.svelte",
+            "sourcePath": "src/lib/Components/LoadingScreen.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingSpinner.svelte",
+            "sourcePath": "src/lib/Components/LoadingSpinner.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Navigation.svelte",
+            "sourcePath": "src/lib/Components/Navigation.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NavigationGroup.svelte",
+            "sourcePath": "src/lib/Components/NavigationGroup.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NumberKeypad.svelte",
+            "sourcePath": "src/lib/Components/NumberKeypad.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Pagination.svelte",
+            "sourcePath": "src/lib/Components/Pagination.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Popover.svelte",
+            "sourcePath": "src/lib/Components/Popover.svelte"
+          },
+          {
+            "archivePath": "dist/Components/ScreenReaderText.svelte",
+            "sourcePath": "src/lib/Components/ScreenReaderText.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SkipButton.svelte",
+            "sourcePath": "src/lib/Components/SkipButton.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SkipLink.svelte",
+            "sourcePath": "src/lib/Components/SkipLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/StatusMessage.svelte",
+            "sourcePath": "src/lib/Components/StatusMessage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Stepper.svelte",
+            "sourcePath": "src/lib/Components/Stepper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Table.svelte",
+            "sourcePath": "src/lib/Components/Table.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Text.svelte",
+            "sourcePath": "src/lib/Components/Text.svelte"
+          },
+          {
+            "archivePath": "dist/Components/TopNavigation.svelte",
+            "sourcePath": "src/lib/Components/TopNavigation.svelte"
+          }
+        ],
+        "different": [
+          {
+            "archivePath": "dist/Components/Button.svelte",
+            "sourcePath": "src/lib/Components/Button.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Details.svelte",
+            "sourcePath": "src/lib/Components/Details.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Checkbox.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Checkbox.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/FieldFeedback.svelte",
+            "sourcePath": "src/lib/Components/Inputs/FieldFeedback.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputCurrency.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputCurrency.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImage.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputWrapper.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputWrapper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/RadioGroup.svelte",
+            "sourcePath": "src/lib/Components/Inputs/RadioGroup.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/RadioItem.svelte",
+            "sourcePath": "src/lib/Components/Inputs/RadioItem.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/TagInput.svelte",
+            "sourcePath": "src/lib/Components/Inputs/TagInput.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NavigationLink.svelte",
+            "sourcePath": "src/lib/Components/NavigationLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/PaginationItem.svelte",
+            "sourcePath": "src/lib/Components/PaginationItem.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SwipeActions.svelte",
+            "sourcePath": "src/lib/Components/SwipeActions.svelte"
+          },
+          {
+            "archivePath": "dist/Components/internal/FloatingActionFrame.svelte",
+            "sourcePath": "src/lib/Components/internal/FloatingActionFrame.svelte"
+          },
+          {
+            "archivePath": "dist/Components/internal/SkipControlFrame.svelte",
+            "sourcePath": "src/lib/Components/internal/SkipControlFrame.svelte"
+          },
+          {
+            "archivePath": "dist/theme.css",
+            "sourcePath": "src/lib/theme.css"
+          }
+        ],
+        "generatedOrUnmapped": [
+          "dist/Components/Button.svelte.d.ts",
+          "dist/Components/ButtonContent.svelte.d.ts",
+          "dist/Components/Details.svelte.d.ts",
+          "dist/Components/Dialog.svelte.d.ts",
+          "dist/Components/Drawer.svelte.d.ts",
+          "dist/Components/DrawerSection.svelte.d.ts",
+          "dist/Components/FloatingActionButton.svelte.d.ts",
+          "dist/Components/FloatingActionLink.svelte.d.ts",
+          "dist/Components/Heading.svelte.d.ts",
+          "dist/Components/Icon.svelte.d.ts",
+          "dist/Components/Inputs/AvatarFilePicker.svelte.d.ts",
+          "dist/Components/Inputs/AvatarImageTile.svelte.d.ts",
+          "dist/Components/Inputs/AvatarTile.svelte.d.ts",
+          "dist/Components/Inputs/Checkbox.svelte.d.ts",
+          "dist/Components/Inputs/FieldFeedback.svelte.d.ts",
+          "dist/Components/Inputs/InputAvatar.svelte.d.ts",
+          "dist/Components/Inputs/InputCurrency.svelte.d.ts",
+          "dist/Components/Inputs/InputDate.svelte.d.ts",
+          "dist/Components/Inputs/InputImage.svelte.d.ts",
+          "dist/Components/Inputs/InputImages.svelte.d.ts",
+          "dist/Components/Inputs/InputNumber.svelte.d.ts",
+          "dist/Components/Inputs/InputRange.svelte.d.ts",
+          "dist/Components/Inputs/InputText.svelte.d.ts",
+          "dist/Components/Inputs/InputWrapper.svelte.d.ts",
+          "dist/Components/Inputs/RadioGroup.svelte.d.ts",
+          "dist/Components/Inputs/RadioItem.svelte.d.ts",
+          "dist/Components/Inputs/Select.svelte.d.ts",
+          "dist/Components/Inputs/TagInput.svelte.d.ts",
+          "dist/Components/Inputs/Textarea.svelte.d.ts",
+          "dist/Components/Inputs/image-input.d.ts",
+          "dist/Components/Inputs/image-input.js",
+          "dist/Components/Inputs/radio-group.d.ts",
+          "dist/Components/Inputs/radio-group.js",
+          "dist/Components/LoadingContent.svelte.d.ts",
+          "dist/Components/LoadingScreen.svelte.d.ts",
+          "dist/Components/LoadingSpinner.svelte.d.ts",
+          "dist/Components/Navigation.svelte.d.ts",
+          "dist/Components/NavigationGroup.svelte.d.ts",
+          "dist/Components/NavigationLink.svelte.d.ts",
+          "dist/Components/NumberKeypad.svelte.d.ts",
+          "dist/Components/Pagination.svelte.d.ts",
+          "dist/Components/PaginationItem.svelte.d.ts",
+          "dist/Components/Popover.svelte.d.ts",
+          "dist/Components/ScreenReaderText.svelte.d.ts",
+          "dist/Components/SkipButton.svelte.d.ts",
+          "dist/Components/SkipLink.svelte.d.ts",
+          "dist/Components/StatusMessage.svelte.d.ts",
+          "dist/Components/Stepper.svelte.d.ts",
+          "dist/Components/SwipeActions.svelte.d.ts",
+          "dist/Components/Table.svelte.d.ts",
+          "dist/Components/Text.svelte.d.ts",
+          "dist/Components/TopNavigation.svelte.d.ts",
+          "dist/Components/internal/FloatingActionFrame.svelte.d.ts",
+          "dist/Components/internal/SkipControlFrame.svelte.d.ts",
+          "dist/Components/internal/swipe-actions.d.ts",
+          "dist/Components/internal/swipe-actions.js",
+          "dist/index.d.ts",
+          "dist/index.js",
+          "dist/types.d.ts",
+          "dist/typography.d.ts",
+          "dist/typography.js"
+        ]
+      },
+      "status": "Pending reproducible packaged-build comparison and consumer verification."
+    },
+    {
+      "repository": "delightful-finances",
+      "commit": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "path": "vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
+      "sha256": "9dac0f2658e3b12fdfe45462707b5894abeaa3a3ca086b29e809a39129a32abd",
+      "consumers": [
+        {
+          "manifest": "package.json",
+          "field": "dependencies",
+          "package": "delightful-local-first"
+        }
+      ],
+      "package": "delightful-local-first",
+      "version": "0.0.0",
+      "selectedLibraryCommit": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "contract": {
+        "exports": {
+          "archive": {
+            "./backend/jazz/backup": {
+              "types": "./dist/backend/jazz/backup-api.d.ts",
+              "default": "./dist/backend/jazz/backup-api.js"
+            },
+            "./backup/restore/journal/browser": {
+              "types": "./dist/backup/restore-journal-browser-api.d.ts",
+              "default": "./dist/backup/restore-journal-browser-api.js"
+            },
+            "./backup/restore/journal/workflow": {
+              "types": "./dist/machines/backup/restore-journal.d.ts",
+              "default": "./dist/machines/backup/restore-journal.js"
+            },
+            "./backup/restore/journal": {
+              "types": "./dist/backup/restore-journal.d.ts",
+              "default": "./dist/backup/restore-journal.js"
+            },
+            "./backup/binding": {
+              "types": "./dist/backup/binding.d.ts",
+              "default": "./dist/backup/binding.js"
+            },
+            "./backup/export/workflow": {
+              "types": "./dist/machines/backup/export.d.ts",
+              "default": "./dist/machines/backup/export.js"
+            },
+            "./backup/inspection": {
+              "types": "./dist/backup/inspection-api.d.ts",
+              "default": "./dist/backup/inspection-api.js"
+            },
+            "./backup/inspection/workflow": {
+              "types": "./dist/machines/backup/inspection.d.ts",
+              "default": "./dist/machines/backup/inspection.js"
+            },
+            "./backup/envelope": {
+              "types": "./dist/backup/envelope-api.d.ts",
+              "default": "./dist/backup/envelope-api.js"
+            },
+            "./backup/envelope/workflow": {
+              "types": "./dist/machines/backup/envelope.d.ts",
+              "default": "./dist/machines/backup/envelope.js"
+            },
+            "./backup/archive": {
+              "types": "./dist/backup/archive.d.ts",
+              "default": "./dist/backup/archive.js"
+            },
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./recovery": {
+              "types": "./dist/recovery.d.ts",
+              "svelte": "./dist/recovery.js",
+              "default": "./dist/recovery.js"
+            },
+            "./recovery/workflow": {
+              "types": "./dist/machines/identity/recovery-phrase.d.ts",
+              "default": "./dist/machines/identity/recovery-phrase.js"
+            },
+            "./recovery/messages": {
+              "types": "./dist/localization/recovery.d.ts",
+              "default": "./dist/localization/recovery.js"
+            },
+            "./recovery/contracts": {
+              "types": "./dist/contracts/recovery-phrase.d.ts",
+              "default": "./dist/contracts/recovery-phrase.js"
+            },
+            "./recovery/svelte": {
+              "types": "./dist/integrations/identity/RecoveryPhrase.svelte.d.ts",
+              "svelte": "./dist/integrations/identity/RecoveryPhrase.svelte",
+              "default": "./dist/integrations/identity/RecoveryPhrase.svelte"
+            },
+            "./backend/jazz/recovery": {
+              "types": "./dist/backend/jazz/recovery-phrase.d.ts",
+              "default": "./dist/backend/jazz/recovery-phrase.js"
+            },
+            "./restoration/contracts": {
+              "types": "./dist/contracts/restoration.d.ts",
+              "default": "./dist/contracts/restoration.js"
+            },
+            "./restoration/workflow": {
+              "types": "./dist/machines/identity/restoration.d.ts",
+              "default": "./dist/machines/identity/restoration.js"
+            },
+            "./backend/jazz/restoration": {
+              "types": "./dist/backend/jazz/restoration.d.ts",
+              "default": "./dist/backend/jazz/restoration.js"
+            },
+            "./session/contracts": {
+              "types": "./dist/contracts/session.d.ts",
+              "default": "./dist/contracts/session.js"
+            },
+            "./session/workflow": {
+              "types": "./dist/session.d.ts",
+              "default": "./dist/session.js"
+            },
+            "./backend/jazz/session": {
+              "types": "./dist/backend/jazz/session.d.ts",
+              "default": "./dist/backend/jazz/session.js"
+            },
+            "./backend/jazz/session-readiness": {
+              "types": "./dist/backend/jazz/session-readiness.d.ts",
+              "default": "./dist/backend/jazz/session-readiness.js"
+            },
+            "./workspace/contracts": {
+              "types": "./dist/contracts/workspace-selection.d.ts",
+              "default": "./dist/contracts/workspace-selection.js"
+            },
+            "./workspace/workflow": {
+              "types": "./dist/machines/workspaces/selection.d.ts",
+              "default": "./dist/machines/workspaces/selection.js"
+            },
+            "./workspace/creation/contracts": {
+              "types": "./dist/contracts/workspace-creation.d.ts",
+              "default": "./dist/contracts/workspace-creation.js"
+            },
+            "./workspace/creation/workflow": {
+              "types": "./dist/machines/workspaces/creation-transaction.d.ts",
+              "default": "./dist/machines/workspaces/creation-transaction.js"
+            },
+            "./workspace": {
+              "types": "./dist/workspace.d.ts",
+              "svelte": "./dist/workspace.js",
+              "default": "./dist/workspace.js"
+            },
+            "./workspace/presentation": {
+              "types": "./dist/presentation/workspace-selector.d.ts",
+              "default": "./dist/presentation/workspace-selector.js"
+            },
+            "./workspace/naming/contracts": {
+              "types": "./dist/contracts/workspace-naming.d.ts",
+              "default": "./dist/contracts/workspace-naming.js"
+            },
+            "./workspace/naming/workflow": {
+              "types": "./dist/machines/workspaces/naming.d.ts",
+              "default": "./dist/machines/workspaces/naming.js"
+            },
+            "./forms/zod": {
+              "types": "./dist/validation/form-issues.d.ts",
+              "default": "./dist/validation/form-issues.js"
+            },
+            "./forms/contracts": {
+              "types": "./dist/contracts/scoped-form.d.ts",
+              "default": "./dist/contracts/scoped-form.js"
+            },
+            "./forms/readiness": {
+              "types": "./dist/machines/forms/readiness.d.ts",
+              "default": "./dist/machines/forms/readiness.js"
+            },
+            "./forms/submission": {
+              "types": "./dist/machines/forms/submission.d.ts",
+              "default": "./dist/machines/forms/submission.js"
+            },
+            "./forms/write": {
+              "types": "./dist/machines/forms/write.d.ts",
+              "default": "./dist/machines/forms/write.js"
+            },
+            "./forms/workflow": {
+              "types": "./dist/machines/forms/scoped-form.d.ts",
+              "default": "./dist/machines/forms/scoped-form.js"
+            },
+            "./forms/feedback": {
+              "types": "./dist/machines/forms/feedback.d.ts",
+              "default": "./dist/machines/forms/feedback.js"
+            },
+            "./forms/lifecycle": {
+              "types": "./dist/machines/forms/lifecycle.d.ts",
+              "default": "./dist/machines/forms/lifecycle.js"
+            },
+            "./forms/svelte": {
+              "types": "./dist/integrations/forms/controller.svelte.d.ts",
+              "default": "./dist/integrations/forms/controller.svelte.js"
+            },
+            "./forms/policy": {
+              "types": "./dist/machines/forms/policy.d.ts",
+              "default": "./dist/machines/forms/policy.js"
+            },
+            "./workspace/journal": {
+              "types": "./dist/machines/workspaces/journal.d.ts",
+              "default": "./dist/machines/workspaces/journal.js"
+            },
+            "./workspace/initialization": {
+              "types": "./dist/machines/workspaces/initialization.d.ts",
+              "default": "./dist/machines/workspaces/initialization.js"
+            },
+            "./workspace/creation-owner": {
+              "types": "./dist/machines/workspaces/creation-owner.d.ts",
+              "default": "./dist/machines/workspaces/creation-owner.js"
+            },
+            "./workspace/creation-operation": {
+              "types": "./dist/machines/workspaces/creation-operation.d.ts",
+              "default": "./dist/machines/workspaces/creation-operation.js"
+            },
+            "./workspace/creation-persistence": {
+              "types": "./dist/machines/workspaces/creation-persistence.d.ts",
+              "default": "./dist/machines/workspaces/creation-persistence.js"
+            },
+            "./profile/contracts": {
+              "types": "./dist/contracts/profile.d.ts",
+              "default": "./dist/contracts/profile.js"
+            },
+            "./profile/avatar": {
+              "types": "./dist/machines/identity/profile-avatar.d.ts",
+              "default": "./dist/machines/identity/profile-avatar.js"
+            },
+            "./profile/workflow": {
+              "types": "./dist/machines/identity/profile.d.ts",
+              "default": "./dist/machines/identity/profile.js"
+            },
+            "./workspace/startup": {
+              "types": "./dist/machines/workspaces/startup.d.ts",
+              "default": "./dist/machines/workspaces/startup.js"
+            },
+            "./workspace/startup-contracts": {
+              "types": "./dist/contracts/workspace-startup.d.ts",
+              "default": "./dist/contracts/workspace-startup.js"
+            },
+            "./data/observations": {
+              "types": "./dist/contracts/observation.d.ts",
+              "default": "./dist/contracts/observation.js"
+            },
+            "./backend/jazz/data": {
+              "types": "./dist/backend/jazz/data.svelte.d.ts",
+              "default": "./dist/backend/jazz/data.svelte.js"
+            },
+            "./recovery/coordination": {
+              "types": "./dist/machines/identity/session-recovery.d.ts",
+              "default": "./dist/machines/identity/session-recovery.js"
+            },
+            "./forms/content": {
+              "types": "./dist/components/forms/FormContent.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormContent.svelte",
+              "default": "./dist/components/forms/FormContent.svelte"
+            },
+            "./forms/feedback-view": {
+              "types": "./dist/components/forms/FormFeedback.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormFeedback.svelte",
+              "default": "./dist/components/forms/FormFeedback.svelte"
+            },
+            "./forms/modal": {
+              "types": "./dist/components/forms/FormModal.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormModal.svelte",
+              "default": "./dist/components/forms/FormModal.svelte"
+            },
+            "./profile/name-view": {
+              "types": "./dist/components/profile/ProfileNameForm.svelte.d.ts",
+              "svelte": "./dist/components/profile/ProfileNameForm.svelte",
+              "default": "./dist/components/profile/ProfileNameForm.svelte"
+            },
+            "./profile/avatar-view": {
+              "types": "./dist/components/profile/Avatar.svelte.d.ts",
+              "svelte": "./dist/components/profile/Avatar.svelte",
+              "default": "./dist/components/profile/Avatar.svelte"
+            },
+            "./profile/avatar-form": {
+              "types": "./dist/integrations/profile/ProfileAvatarForm.svelte.d.ts",
+              "svelte": "./dist/integrations/profile/ProfileAvatarForm.svelte",
+              "default": "./dist/integrations/profile/ProfileAvatarForm.svelte"
+            },
+            "./backend/jazz/startup": {
+              "types": "./dist/backend/jazz/startup.d.ts",
+              "default": "./dist/backend/jazz/startup.js"
+            },
+            "./workspace/invitations/contracts": {
+              "types": "./dist/contracts/workspace-invitation.d.ts",
+              "default": "./dist/contracts/workspace-invitation.js"
+            },
+            "./workspace/invitations/workflow": {
+              "types": "./dist/machines/workspaces/invitation-redemption.d.ts",
+              "default": "./dist/machines/workspaces/invitation-redemption.js"
+            },
+            "./workspace/invitations/authority-contracts": {
+              "types": "./dist/contracts/workspace-invitation-authority.d.ts",
+              "default": "./dist/contracts/workspace-invitation-authority.js"
+            },
+            "./backend/jazz/invitation-authority": {
+              "types": "./dist/backend/jazz/invitation-authority.d.ts",
+              "default": "./dist/backend/jazz/invitation-authority.js"
+            },
+            "./workspace/invitations/authority-workflow": {
+              "types": "./dist/machines/workspaces/invitation-authority.d.ts",
+              "default": "./dist/machines/workspaces/invitation-authority.js"
+            },
+            "./diagnostics/logger": {
+              "types": "./dist/diagnostics/logger.d.ts",
+              "default": "./dist/diagnostics/logger.js"
+            },
+            "./backup/restore": {
+              "types": "./dist/backup/restore-api.d.ts",
+              "svelte": "./dist/backup/restore-api.js",
+              "default": "./dist/backup/restore-api.js"
+            },
+            "./backup/restore/workflow": {
+              "types": "./dist/machines/backup/restore.d.ts",
+              "svelte": "./dist/machines/backup/restore.js",
+              "default": "./dist/machines/backup/restore.js"
+            }
+          },
+          "selectedSource": {
+            "./backend/jazz/backup": {
+              "types": "./dist/backend/jazz/backup-api.d.ts",
+              "default": "./dist/backend/jazz/backup-api.js"
+            },
+            "./backup/restore/journal/browser": {
+              "types": "./dist/backup/restore-journal-browser-api.d.ts",
+              "default": "./dist/backup/restore-journal-browser-api.js"
+            },
+            "./backup/restore/journal/workflow": {
+              "types": "./dist/machines/backup/restore-journal.d.ts",
+              "default": "./dist/machines/backup/restore-journal.js"
+            },
+            "./backup/restore/journal": {
+              "types": "./dist/backup/restore-journal.d.ts",
+              "default": "./dist/backup/restore-journal.js"
+            },
+            "./backup/binding": {
+              "types": "./dist/backup/binding.d.ts",
+              "default": "./dist/backup/binding.js"
+            },
+            "./backup/export/workflow": {
+              "types": "./dist/machines/backup/export.d.ts",
+              "default": "./dist/machines/backup/export.js"
+            },
+            "./backup/inspection": {
+              "types": "./dist/backup/inspection-api.d.ts",
+              "default": "./dist/backup/inspection-api.js"
+            },
+            "./backup/inspection/workflow": {
+              "types": "./dist/machines/backup/inspection.d.ts",
+              "default": "./dist/machines/backup/inspection.js"
+            },
+            "./backup/envelope": {
+              "types": "./dist/backup/envelope-api.d.ts",
+              "default": "./dist/backup/envelope-api.js"
+            },
+            "./backup/envelope/workflow": {
+              "types": "./dist/machines/backup/envelope.d.ts",
+              "default": "./dist/machines/backup/envelope.js"
+            },
+            "./backup/archive": {
+              "types": "./dist/backup/archive.d.ts",
+              "default": "./dist/backup/archive.js"
+            },
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./recovery": {
+              "types": "./dist/recovery.d.ts",
+              "svelte": "./dist/recovery.js",
+              "default": "./dist/recovery.js"
+            },
+            "./recovery/workflow": {
+              "types": "./dist/machines/identity/recovery-phrase.d.ts",
+              "default": "./dist/machines/identity/recovery-phrase.js"
+            },
+            "./recovery/messages": {
+              "types": "./dist/localization/recovery.d.ts",
+              "default": "./dist/localization/recovery.js"
+            },
+            "./recovery/contracts": {
+              "types": "./dist/contracts/recovery-phrase.d.ts",
+              "default": "./dist/contracts/recovery-phrase.js"
+            },
+            "./recovery/svelte": {
+              "types": "./dist/integrations/identity/RecoveryPhrase.svelte.d.ts",
+              "svelte": "./dist/integrations/identity/RecoveryPhrase.svelte",
+              "default": "./dist/integrations/identity/RecoveryPhrase.svelte"
+            },
+            "./backend/jazz/recovery": {
+              "types": "./dist/backend/jazz/recovery-phrase.d.ts",
+              "default": "./dist/backend/jazz/recovery-phrase.js"
+            },
+            "./restoration/contracts": {
+              "types": "./dist/contracts/restoration.d.ts",
+              "default": "./dist/contracts/restoration.js"
+            },
+            "./restoration/workflow": {
+              "types": "./dist/machines/identity/restoration.d.ts",
+              "default": "./dist/machines/identity/restoration.js"
+            },
+            "./backend/jazz/restoration": {
+              "types": "./dist/backend/jazz/restoration.d.ts",
+              "default": "./dist/backend/jazz/restoration.js"
+            },
+            "./session/contracts": {
+              "types": "./dist/contracts/session.d.ts",
+              "default": "./dist/contracts/session.js"
+            },
+            "./session/workflow": {
+              "types": "./dist/session.d.ts",
+              "default": "./dist/session.js"
+            },
+            "./backend/jazz/session": {
+              "types": "./dist/backend/jazz/session.d.ts",
+              "default": "./dist/backend/jazz/session.js"
+            },
+            "./backend/jazz/session-readiness": {
+              "types": "./dist/backend/jazz/session-readiness.d.ts",
+              "default": "./dist/backend/jazz/session-readiness.js"
+            },
+            "./workspace/contracts": {
+              "types": "./dist/contracts/workspace-selection.d.ts",
+              "default": "./dist/contracts/workspace-selection.js"
+            },
+            "./workspace/workflow": {
+              "types": "./dist/machines/workspaces/selection.d.ts",
+              "default": "./dist/machines/workspaces/selection.js"
+            },
+            "./workspace/creation/contracts": {
+              "types": "./dist/contracts/workspace-creation.d.ts",
+              "default": "./dist/contracts/workspace-creation.js"
+            },
+            "./workspace/creation/workflow": {
+              "types": "./dist/machines/workspaces/creation-transaction.d.ts",
+              "default": "./dist/machines/workspaces/creation-transaction.js"
+            },
+            "./workspace": {
+              "types": "./dist/workspace.d.ts",
+              "svelte": "./dist/workspace.js",
+              "default": "./dist/workspace.js"
+            },
+            "./workspace/presentation": {
+              "types": "./dist/presentation/workspace-selector.d.ts",
+              "default": "./dist/presentation/workspace-selector.js"
+            },
+            "./workspace/naming/contracts": {
+              "types": "./dist/contracts/workspace-naming.d.ts",
+              "default": "./dist/contracts/workspace-naming.js"
+            },
+            "./workspace/naming/workflow": {
+              "types": "./dist/machines/workspaces/naming.d.ts",
+              "default": "./dist/machines/workspaces/naming.js"
+            },
+            "./forms/zod": {
+              "types": "./dist/validation/form-issues.d.ts",
+              "default": "./dist/validation/form-issues.js"
+            },
+            "./forms/contracts": {
+              "types": "./dist/contracts/scoped-form.d.ts",
+              "default": "./dist/contracts/scoped-form.js"
+            },
+            "./forms/readiness": {
+              "types": "./dist/machines/forms/readiness.d.ts",
+              "default": "./dist/machines/forms/readiness.js"
+            },
+            "./forms/submission": {
+              "types": "./dist/machines/forms/submission.d.ts",
+              "default": "./dist/machines/forms/submission.js"
+            },
+            "./forms/write": {
+              "types": "./dist/machines/forms/write.d.ts",
+              "default": "./dist/machines/forms/write.js"
+            },
+            "./forms/workflow": {
+              "types": "./dist/machines/forms/scoped-form.d.ts",
+              "default": "./dist/machines/forms/scoped-form.js"
+            },
+            "./forms/feedback": {
+              "types": "./dist/machines/forms/feedback.d.ts",
+              "default": "./dist/machines/forms/feedback.js"
+            },
+            "./forms/lifecycle": {
+              "types": "./dist/machines/forms/lifecycle.d.ts",
+              "default": "./dist/machines/forms/lifecycle.js"
+            },
+            "./forms/svelte": {
+              "types": "./dist/integrations/forms/controller.svelte.d.ts",
+              "default": "./dist/integrations/forms/controller.svelte.js"
+            },
+            "./forms/policy": {
+              "types": "./dist/machines/forms/policy.d.ts",
+              "default": "./dist/machines/forms/policy.js"
+            },
+            "./workspace/journal": {
+              "types": "./dist/machines/workspaces/journal.d.ts",
+              "default": "./dist/machines/workspaces/journal.js"
+            },
+            "./workspace/initialization": {
+              "types": "./dist/machines/workspaces/initialization.d.ts",
+              "default": "./dist/machines/workspaces/initialization.js"
+            },
+            "./workspace/creation-owner": {
+              "types": "./dist/machines/workspaces/creation-owner.d.ts",
+              "default": "./dist/machines/workspaces/creation-owner.js"
+            },
+            "./workspace/creation-operation": {
+              "types": "./dist/machines/workspaces/creation-operation.d.ts",
+              "default": "./dist/machines/workspaces/creation-operation.js"
+            },
+            "./workspace/creation-persistence": {
+              "types": "./dist/machines/workspaces/creation-persistence.d.ts",
+              "default": "./dist/machines/workspaces/creation-persistence.js"
+            },
+            "./profile/contracts": {
+              "types": "./dist/contracts/profile.d.ts",
+              "default": "./dist/contracts/profile.js"
+            },
+            "./profile/avatar": {
+              "types": "./dist/machines/identity/profile-avatar.d.ts",
+              "default": "./dist/machines/identity/profile-avatar.js"
+            },
+            "./profile/workflow": {
+              "types": "./dist/machines/identity/profile.d.ts",
+              "default": "./dist/machines/identity/profile.js"
+            },
+            "./workspace/startup": {
+              "types": "./dist/machines/workspaces/startup.d.ts",
+              "default": "./dist/machines/workspaces/startup.js"
+            },
+            "./workspace/startup-contracts": {
+              "types": "./dist/contracts/workspace-startup.d.ts",
+              "default": "./dist/contracts/workspace-startup.js"
+            },
+            "./data/observations": {
+              "types": "./dist/contracts/observation.d.ts",
+              "default": "./dist/contracts/observation.js"
+            },
+            "./backend/jazz/data": {
+              "types": "./dist/backend/jazz/data.svelte.d.ts",
+              "default": "./dist/backend/jazz/data.svelte.js"
+            },
+            "./recovery/coordination": {
+              "types": "./dist/machines/identity/session-recovery.d.ts",
+              "default": "./dist/machines/identity/session-recovery.js"
+            },
+            "./forms/content": {
+              "types": "./dist/components/forms/FormContent.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormContent.svelte",
+              "default": "./dist/components/forms/FormContent.svelte"
+            },
+            "./forms/feedback-view": {
+              "types": "./dist/components/forms/FormFeedback.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormFeedback.svelte",
+              "default": "./dist/components/forms/FormFeedback.svelte"
+            },
+            "./forms/modal": {
+              "types": "./dist/components/forms/FormModal.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormModal.svelte",
+              "default": "./dist/components/forms/FormModal.svelte"
+            },
+            "./profile/name-view": {
+              "types": "./dist/components/profile/ProfileNameForm.svelte.d.ts",
+              "svelte": "./dist/components/profile/ProfileNameForm.svelte",
+              "default": "./dist/components/profile/ProfileNameForm.svelte"
+            },
+            "./profile/avatar-view": {
+              "types": "./dist/components/profile/Avatar.svelte.d.ts",
+              "svelte": "./dist/components/profile/Avatar.svelte",
+              "default": "./dist/components/profile/Avatar.svelte"
+            },
+            "./profile/avatar-form": {
+              "types": "./dist/integrations/profile/ProfileAvatarForm.svelte.d.ts",
+              "svelte": "./dist/integrations/profile/ProfileAvatarForm.svelte",
+              "default": "./dist/integrations/profile/ProfileAvatarForm.svelte"
+            },
+            "./backend/jazz/startup": {
+              "types": "./dist/backend/jazz/startup.d.ts",
+              "default": "./dist/backend/jazz/startup.js"
+            },
+            "./workspace/invitations/contracts": {
+              "types": "./dist/contracts/workspace-invitation.d.ts",
+              "default": "./dist/contracts/workspace-invitation.js"
+            },
+            "./workspace/invitations/workflow": {
+              "types": "./dist/machines/workspaces/invitation-redemption.d.ts",
+              "default": "./dist/machines/workspaces/invitation-redemption.js"
+            },
+            "./workspace/invitations/authority-contracts": {
+              "types": "./dist/contracts/workspace-invitation-authority.d.ts",
+              "default": "./dist/contracts/workspace-invitation-authority.js"
+            },
+            "./backend/jazz/invitation-authority": {
+              "types": "./dist/backend/jazz/invitation-authority.d.ts",
+              "default": "./dist/backend/jazz/invitation-authority.js"
+            },
+            "./workspace/invitations/authority-workflow": {
+              "types": "./dist/machines/workspaces/invitation-authority.d.ts",
+              "default": "./dist/machines/workspaces/invitation-authority.js"
+            },
+            "./diagnostics/logger": {
+              "types": "./dist/diagnostics/logger.d.ts",
+              "default": "./dist/diagnostics/logger.js"
+            },
+            "./backup/restore": {
+              "types": "./dist/backup/restore-api.d.ts",
+              "svelte": "./dist/backup/restore-api.js",
+              "default": "./dist/backup/restore-api.js"
+            },
+            "./backup/restore/workflow": {
+              "types": "./dist/machines/backup/restore.d.ts",
+              "svelte": "./dist/machines/backup/restore.js",
+              "default": "./dist/machines/backup/restore.js"
+            },
+            "./worker/effect-drain/contracts": {
+              "types": "./dist/contracts/worker-effect-drain.d.ts",
+              "default": "./dist/contracts/worker-effect-drain.js"
+            },
+            "./worker/effect-drain/workflow": {
+              "types": "./dist/machines/lifecycle/worker-effect-drain.d.ts",
+              "default": "./dist/machines/lifecycle/worker-effect-drain.js"
+            },
+            "./worker/channel/contracts": {
+              "types": "./dist/contracts/worker-channel.d.ts",
+              "default": "./dist/contracts/worker-channel.js"
+            },
+            "./worker/channel/workflow": {
+              "types": "./dist/machines/lifecycle/worker-channel.d.ts",
+              "default": "./dist/machines/lifecycle/worker-channel.js"
+            },
+            "./worker/request/contracts": {
+              "types": "./dist/contracts/worker-request.d.ts",
+              "default": "./dist/contracts/worker-request.js"
+            },
+            "./worker/request/workflow": {
+              "types": "./dist/machines/lifecycle/worker-request.d.ts",
+              "default": "./dist/machines/lifecycle/worker-request.js"
+            },
+            "./lifecycle/operation/contracts": {
+              "types": "./dist/contracts/owned-operation.d.ts",
+              "default": "./dist/contracts/owned-operation.js"
+            },
+            "./lifecycle/operation/workflow": {
+              "types": "./dist/machines/lifecycle/owned-operation.d.ts",
+              "default": "./dist/machines/lifecycle/owned-operation.js"
+            },
+            "./transactions/contracts": {
+              "types": "./dist/contracts/domain-transaction.d.ts",
+              "default": "./dist/contracts/domain-transaction.js"
+            },
+            "./transactions/workflow": {
+              "types": "./dist/machines/workspaces/domain-transaction.d.ts",
+              "default": "./dist/machines/workspaces/domain-transaction.js"
+            },
+            "./session/sign-out/contracts": {
+              "types": "./dist/contracts/sign-out.d.ts",
+              "default": "./dist/contracts/sign-out.js"
+            },
+            "./session/sign-out/workflow": {
+              "types": "./dist/machines/identity/ordered-sign-out.d.ts",
+              "default": "./dist/machines/identity/ordered-sign-out.js"
+            }
+          },
+          "equal": false
+        },
+        "peerDependencies": {
+          "archive": {
+            "delightful-ui": "0.0.25",
+            "jazz-tools": "2.0.0-alpha.60",
+            "svelte": "^5.57.2",
+            "xstate": "6.0.0-beta.1"
+          },
+          "selectedSource": {
+            "delightful-ui": "0.0.25",
+            "jazz-tools": "2.0.0-alpha.59",
+            "svelte": "^5.57.2",
+            "xstate": "6.0.0-beta.1"
+          },
+          "equal": false
+        },
+        "peerDependenciesMeta": {
+          "archive": {
+            "xstate": {
+              "optional": true
+            },
+            "delightful-ui": {
+              "optional": true
+            },
+            "jazz-tools": {
+              "optional": true
+            }
+          },
+          "selectedSource": {
+            "xstate": {
+              "optional": true
+            },
+            "delightful-ui": {
+              "optional": true
+            },
+            "jazz-tools": {
+              "optional": true
+            }
+          },
+          "equal": true
+        },
+        "dependencies": {
+          "archive": {
+            "zod": "4.1.11"
+          },
+          "selectedSource": {
+            "zod": "4.1.11"
+          },
+          "equal": true
+        }
+      },
+      "sourceComparison": {
+        "identical": [
+          {
+            "archivePath": "dist/components/forms/FormContent.svelte",
+            "sourcePath": "src/lib/components/forms/FormContent.svelte"
+          },
+          {
+            "archivePath": "dist/components/forms/FormFeedback.svelte",
+            "sourcePath": "src/lib/components/forms/FormFeedback.svelte"
+          },
+          {
+            "archivePath": "dist/components/forms/FormModal.svelte",
+            "sourcePath": "src/lib/components/forms/FormModal.svelte"
+          },
+          {
+            "archivePath": "dist/components/identity/RecoveryPhraseView.svelte",
+            "sourcePath": "src/lib/components/identity/RecoveryPhraseView.svelte"
+          },
+          {
+            "archivePath": "dist/components/profile/Avatar.svelte",
+            "sourcePath": "src/lib/components/profile/Avatar.svelte"
+          },
+          {
+            "archivePath": "dist/components/profile/ProfileNameForm.svelte",
+            "sourcePath": "src/lib/components/profile/ProfileNameForm.svelte"
+          },
+          {
+            "archivePath": "dist/components/workspaces/WorkspaceCreationDialog.svelte",
+            "sourcePath": "src/lib/components/workspaces/WorkspaceCreationDialog.svelte"
+          },
+          {
+            "archivePath": "dist/components/workspaces/WorkspaceSelector.svelte",
+            "sourcePath": "src/lib/components/workspaces/WorkspaceSelector.svelte"
+          },
+          {
+            "archivePath": "dist/integrations/identity/RecoveryPhrase.svelte",
+            "sourcePath": "src/lib/integrations/identity/RecoveryPhrase.svelte"
+          },
+          {
+            "archivePath": "dist/integrations/identity/RecoveryPhraseBinding.svelte",
+            "sourcePath": "src/lib/integrations/identity/RecoveryPhraseBinding.svelte"
+          },
+          {
+            "archivePath": "dist/integrations/profile/ProfileAvatarForm.svelte",
+            "sourcePath": "src/lib/integrations/profile/ProfileAvatarForm.svelte"
+          }
+        ],
+        "different": [],
+        "generatedOrUnmapped": [
+          "dist/backend/jazz/backup-api.d.ts",
+          "dist/backend/jazz/backup-api.js",
+          "dist/backend/jazz/backup.d.ts",
+          "dist/backend/jazz/backup.js",
+          "dist/backend/jazz/data.svelte.d.ts",
+          "dist/backend/jazz/data.svelte.js",
+          "dist/backend/jazz/invitation-authority.d.ts",
+          "dist/backend/jazz/invitation-authority.js",
+          "dist/backend/jazz/recovery-phrase.d.ts",
+          "dist/backend/jazz/recovery-phrase.js",
+          "dist/backend/jazz/restoration.d.ts",
+          "dist/backend/jazz/restoration.js",
+          "dist/backend/jazz/session-readiness.d.ts",
+          "dist/backend/jazz/session-readiness.js",
+          "dist/backend/jazz/session.d.ts",
+          "dist/backend/jazz/session.js",
+          "dist/backend/jazz/startup.d.ts",
+          "dist/backend/jazz/startup.js",
+          "dist/backup/archive.d.ts",
+          "dist/backup/archive.js",
+          "dist/backup/binary.d.ts",
+          "dist/backup/binary.js",
+          "dist/backup/binding.d.ts",
+          "dist/backup/binding.js",
+          "dist/backup/budget.d.ts",
+          "dist/backup/budget.js",
+          "dist/backup/envelope-api.d.ts",
+          "dist/backup/envelope-api.js",
+          "dist/backup/envelope-native.d.ts",
+          "dist/backup/envelope-native.js",
+          "dist/backup/envelope-operation.d.ts",
+          "dist/backup/envelope-operation.js",
+          "dist/backup/envelope.d.ts",
+          "dist/backup/envelope.js",
+          "dist/backup/inspection-api.d.ts",
+          "dist/backup/inspection-api.js",
+          "dist/backup/inspection-native.d.ts",
+          "dist/backup/inspection-native.js",
+          "dist/backup/inspection.d.ts",
+          "dist/backup/inspection.js",
+          "dist/backup/json.d.ts",
+          "dist/backup/json.js",
+          "dist/backup/payload.d.ts",
+          "dist/backup/payload.js",
+          "dist/backup/restore-api.d.ts",
+          "dist/backup/restore-api.js",
+          "dist/backup/restore-journal-browser-api.d.ts",
+          "dist/backup/restore-journal-browser-api.js",
+          "dist/backup/restore-journal-browser-native.d.ts",
+          "dist/backup/restore-journal-browser-native.js",
+          "dist/backup/restore-journal-browser.d.ts",
+          "dist/backup/restore-journal-browser.js",
+          "dist/backup/restore-journal-schemas.d.ts",
+          "dist/backup/restore-journal-schemas.js",
+          "dist/backup/restore-journal-successor.d.ts",
+          "dist/backup/restore-journal-successor.js",
+          "dist/backup/restore-journal.d.ts",
+          "dist/backup/restore-journal.js",
+          "dist/backup/restore.d.ts",
+          "dist/backup/restore.js",
+          "dist/backup/schemas.d.ts",
+          "dist/backup/schemas.js",
+          "dist/backup/types.d.ts",
+          "dist/backup/types.js",
+          "dist/backup/utf8.d.ts",
+          "dist/backup/utf8.js",
+          "dist/components/forms/FormContent.svelte.d.ts",
+          "dist/components/forms/FormFeedback.svelte.d.ts",
+          "dist/components/forms/FormModal.svelte.d.ts",
+          "dist/components/identity/RecoveryPhraseView.svelte.d.ts",
+          "dist/components/profile/Avatar.svelte.d.ts",
+          "dist/components/profile/ProfileNameForm.svelte.d.ts",
+          "dist/components/workspaces/WorkspaceCreationDialog.svelte.d.ts",
+          "dist/components/workspaces/WorkspaceSelector.svelte.d.ts",
+          "dist/contracts/machine-events.d.ts",
+          "dist/contracts/machine-events.js",
+          "dist/contracts/observation.d.ts",
+          "dist/contracts/observation.js",
+          "dist/contracts/profile.d.ts",
+          "dist/contracts/profile.js",
+          "dist/contracts/recovery-messages.d.ts",
+          "dist/contracts/recovery-messages.js",
+          "dist/contracts/recovery-phrase.d.ts",
+          "dist/contracts/recovery-phrase.js",
+          "dist/contracts/restoration.d.ts",
+          "dist/contracts/restoration.js",
+          "dist/contracts/scoped-form.d.ts",
+          "dist/contracts/scoped-form.js",
+          "dist/contracts/session.d.ts",
+          "dist/contracts/session.js",
+          "dist/contracts/transaction-custody.d.ts",
+          "dist/contracts/transaction-custody.js",
+          "dist/contracts/workspace-creation-dialog.d.ts",
+          "dist/contracts/workspace-creation-dialog.js",
+          "dist/contracts/workspace-creation.d.ts",
+          "dist/contracts/workspace-creation.js",
+          "dist/contracts/workspace-invitation-authority.d.ts",
+          "dist/contracts/workspace-invitation-authority.js",
+          "dist/contracts/workspace-invitation.d.ts",
+          "dist/contracts/workspace-invitation.js",
+          "dist/contracts/workspace-naming.d.ts",
+          "dist/contracts/workspace-naming.js",
+          "dist/contracts/workspace-selection.d.ts",
+          "dist/contracts/workspace-selection.js",
+          "dist/contracts/workspace-selector.d.ts",
+          "dist/contracts/workspace-selector.js",
+          "dist/contracts/workspace-startup.d.ts",
+          "dist/contracts/workspace-startup.js",
+          "dist/diagnostics/logger.d.ts",
+          "dist/diagnostics/logger.js",
+          "dist/index.d.ts",
+          "dist/index.js",
+          "dist/integrations/forms/controller.svelte.d.ts",
+          "dist/integrations/forms/controller.svelte.js",
+          "dist/integrations/identity/RecoveryPhrase.svelte.d.ts",
+          "dist/integrations/identity/RecoveryPhraseBinding.svelte.d.ts",
+          "dist/integrations/profile/ProfileAvatarForm.svelte.d.ts",
+          "dist/integrations/profile/avatar-selection.svelte.d.ts",
+          "dist/integrations/profile/avatar-selection.svelte.js",
+          "dist/localization/recovery.d.ts",
+          "dist/localization/recovery.js",
+          "dist/machines/backup/envelope.d.ts",
+          "dist/machines/backup/envelope.js",
+          "dist/machines/backup/export.d.ts",
+          "dist/machines/backup/export.js",
+          "dist/machines/backup/inspection.d.ts",
+          "dist/machines/backup/inspection.js",
+          "dist/machines/backup/reader.d.ts",
+          "dist/machines/backup/reader.js",
+          "dist/machines/backup/restore-journal-step.d.ts",
+          "dist/machines/backup/restore-journal-step.js",
+          "dist/machines/backup/restore-journal.d.ts",
+          "dist/machines/backup/restore-journal.js",
+          "dist/machines/backup/restore-operation-lock.d.ts",
+          "dist/machines/backup/restore-operation-lock.js",
+          "dist/machines/backup/restore-write-step.d.ts",
+          "dist/machines/backup/restore-write-step.js",
+          "dist/machines/backup/restore.d.ts",
+          "dist/machines/backup/restore.js",
+          "dist/machines/backup/scope.d.ts",
+          "dist/machines/backup/scope.js",
+          "dist/machines/forms/feedback.d.ts",
+          "dist/machines/forms/feedback.js",
+          "dist/machines/forms/lifecycle.d.ts",
+          "dist/machines/forms/lifecycle.js",
+          "dist/machines/forms/policy.d.ts",
+          "dist/machines/forms/policy.js",
+          "dist/machines/forms/readiness.d.ts",
+          "dist/machines/forms/readiness.js",
+          "dist/machines/forms/scoped-form.d.ts",
+          "dist/machines/forms/scoped-form.js",
+          "dist/machines/forms/submission.d.ts",
+          "dist/machines/forms/submission.js",
+          "dist/machines/forms/write.d.ts",
+          "dist/machines/forms/write.js",
+          "dist/machines/identity/avatar-selection.d.ts",
+          "dist/machines/identity/avatar-selection.js",
+          "dist/machines/identity/profile-avatar.d.ts",
+          "dist/machines/identity/profile-avatar.js",
+          "dist/machines/identity/profile-persistence.d.ts",
+          "dist/machines/identity/profile-persistence.js",
+          "dist/machines/identity/profile.d.ts",
+          "dist/machines/identity/profile.js",
+          "dist/machines/identity/recovery-phrase.d.ts",
+          "dist/machines/identity/recovery-phrase.js",
+          "dist/machines/identity/restoration.d.ts",
+          "dist/machines/identity/restoration.js",
+          "dist/machines/identity/session-acquisition.d.ts",
+          "dist/machines/identity/session-acquisition.js",
+          "dist/machines/identity/session-readiness.d.ts",
+          "dist/machines/identity/session-readiness.js",
+          "dist/machines/identity/session-recovery.d.ts",
+          "dist/machines/identity/session-recovery.js",
+          "dist/machines/identity/session-startup.d.ts",
+          "dist/machines/identity/session-startup.js",
+          "dist/machines/workspaces/creation-operation.d.ts",
+          "dist/machines/workspaces/creation-operation.js",
+          "dist/machines/workspaces/creation-owner.d.ts",
+          "dist/machines/workspaces/creation-owner.js",
+          "dist/machines/workspaces/creation-persistence.d.ts",
+          "dist/machines/workspaces/creation-persistence.js",
+          "dist/machines/workspaces/creation-transaction.d.ts",
+          "dist/machines/workspaces/creation-transaction.js",
+          "dist/machines/workspaces/initialization.d.ts",
+          "dist/machines/workspaces/initialization.js",
+          "dist/machines/workspaces/invitation-authority.d.ts",
+          "dist/machines/workspaces/invitation-authority.js",
+          "dist/machines/workspaces/invitation-redemption.d.ts",
+          "dist/machines/workspaces/invitation-redemption.js",
+          "dist/machines/workspaces/journal-native.d.ts",
+          "dist/machines/workspaces/journal-native.js",
+          "dist/machines/workspaces/journal.d.ts",
+          "dist/machines/workspaces/journal.js",
+          "dist/machines/workspaces/naming.d.ts",
+          "dist/machines/workspaces/naming.js",
+          "dist/machines/workspaces/selection.d.ts",
+          "dist/machines/workspaces/selection.js",
+          "dist/machines/workspaces/startup.d.ts",
+          "dist/machines/workspaces/startup.js",
+          "dist/machines/workspaces/transaction-custody.d.ts",
+          "dist/machines/workspaces/transaction-custody.js",
+          "dist/paraglide/messages.d.ts",
+          "dist/paraglide/messages.js",
+          "dist/paraglide/messages/_index.d.ts",
+          "dist/paraglide/messages/_index.js",
+          "dist/paraglide/messages/actions_close.d.ts",
+          "dist/paraglide/messages/actions_close.js",
+          "dist/paraglide/messages/actions_retry.d.ts",
+          "dist/paraglide/messages/actions_retry.js",
+          "dist/paraglide/messages/actions_show_subject.d.ts",
+          "dist/paraglide/messages/actions_show_subject.js",
+          "dist/paraglide/messages/labels_subject_recovery.d.ts",
+          "dist/paraglide/messages/labels_subject_recovery.js",
+          "dist/paraglide/messages/nouns_account.d.ts",
+          "dist/paraglide/messages/nouns_account.js",
+          "dist/paraglide/messages/nouns_recovery_phrase.d.ts",
+          "dist/paraglide/messages/nouns_recovery_phrase.js",
+          "dist/paraglide/messages/package.json",
+          "dist/paraglide/messages/recovery_description.d.ts",
+          "dist/paraglide/messages/recovery_description.js",
+          "dist/paraglide/messages/recovery_failure.d.ts",
+          "dist/paraglide/messages/recovery_failure.js",
+          "dist/paraglide/messages/recovery_pending.d.ts",
+          "dist/paraglide/messages/recovery_pending.js",
+          "dist/paraglide/messages/recovery_phrase_label.d.ts",
+          "dist/paraglide/messages/recovery_phrase_label.js",
+          "dist/paraglide/messages/recovery_unavailable.d.ts",
+          "dist/paraglide/messages/recovery_unavailable.js",
+          "dist/paraglide/messages/recovery_warning.d.ts",
+          "dist/paraglide/messages/recovery_warning.js",
+          "dist/paraglide/registry.d.ts",
+          "dist/paraglide/registry.js",
+          "dist/paraglide/runtime.d.ts",
+          "dist/paraglide/runtime.js",
+          "dist/paraglide/server.d.ts",
+          "dist/paraglide/server.js",
+          "dist/presentation/workspace-selector.d.ts",
+          "dist/presentation/workspace-selector.js",
+          "dist/recovery.d.ts",
+          "dist/recovery.js",
+          "dist/session.d.ts",
+          "dist/session.js",
+          "dist/validation/form-issues.d.ts",
+          "dist/validation/form-issues.js",
+          "dist/workspace.d.ts",
+          "dist/workspace.js"
+        ]
+      },
+      "status": "Pending reproducible packaged-build comparison and consumer verification."
+    },
+    {
+      "repository": "delightful-finances",
+      "commit": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "path": "vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+      "sha256": "28d2139b7eb377e365a821743bb4fe998de2cbc59066ca15bd78862867891407",
+      "consumers": [
+        {
+          "manifest": "package.json",
+          "field": "dependencies",
+          "package": "delightful-ui"
+        }
+      ],
+      "package": "delightful-ui",
+      "version": "0.0.25",
+      "selectedLibraryCommit": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "contract": {
+        "exports": {
+          "archive": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "selectedSource": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "equal": true
+        },
+        "peerDependencies": {
+          "archive": {
+            "svelte": "^5.57.2"
+          },
+          "selectedSource": {
+            "svelte": "^5.57.2"
+          },
+          "equal": true
+        },
+        "peerDependenciesMeta": {
+          "archive": {},
+          "selectedSource": {},
+          "equal": true
+        },
+        "dependencies": {
+          "archive": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "6.0.0-beta.1"
+          },
+          "selectedSource": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "6.0.0-beta.1"
+          },
+          "equal": true
+        }
+      },
+      "sourceComparison": {
+        "identical": [
+          {
+            "archivePath": "dist/Components/Button.svelte",
+            "sourcePath": "src/lib/Components/Button.svelte"
+          },
+          {
+            "archivePath": "dist/Components/ButtonContent.svelte",
+            "sourcePath": "src/lib/Components/ButtonContent.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Details.svelte",
+            "sourcePath": "src/lib/Components/Details.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Dialog.svelte",
+            "sourcePath": "src/lib/Components/Dialog.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Drawer.svelte",
+            "sourcePath": "src/lib/Components/Drawer.svelte"
+          },
+          {
+            "archivePath": "dist/Components/DrawerSection.svelte",
+            "sourcePath": "src/lib/Components/DrawerSection.svelte"
+          },
+          {
+            "archivePath": "dist/Components/FloatingActionButton.svelte",
+            "sourcePath": "src/lib/Components/FloatingActionButton.svelte"
+          },
+          {
+            "archivePath": "dist/Components/FloatingActionLink.svelte",
+            "sourcePath": "src/lib/Components/FloatingActionLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Heading.svelte",
+            "sourcePath": "src/lib/Components/Heading.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Icon.svelte",
+            "sourcePath": "src/lib/Components/Icon.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarFilePicker.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarFilePicker.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarImageTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarImageTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Checkbox.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Checkbox.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/FieldFeedback.svelte",
+            "sourcePath": "src/lib/Components/Inputs/FieldFeedback.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputAvatar.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputAvatar.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputCurrency.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputCurrency.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputDate.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputDate.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImage.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImages.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImages.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputNumber.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputNumber.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputRange.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputRange.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputText.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputText.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputWrapper.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputWrapper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/RadioGroup.svelte",
+            "sourcePath": "src/lib/Components/Inputs/RadioGroup.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/RadioItem.svelte",
+            "sourcePath": "src/lib/Components/Inputs/RadioItem.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Select.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Select.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/TagInput.svelte",
+            "sourcePath": "src/lib/Components/Inputs/TagInput.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Textarea.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Textarea.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingContent.svelte",
+            "sourcePath": "src/lib/Components/LoadingContent.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingScreen.svelte",
+            "sourcePath": "src/lib/Components/LoadingScreen.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingSpinner.svelte",
+            "sourcePath": "src/lib/Components/LoadingSpinner.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Navigation.svelte",
+            "sourcePath": "src/lib/Components/Navigation.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NavigationGroup.svelte",
+            "sourcePath": "src/lib/Components/NavigationGroup.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NavigationLink.svelte",
+            "sourcePath": "src/lib/Components/NavigationLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NumberKeypad.svelte",
+            "sourcePath": "src/lib/Components/NumberKeypad.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Pagination.svelte",
+            "sourcePath": "src/lib/Components/Pagination.svelte"
+          },
+          {
+            "archivePath": "dist/Components/PaginationItem.svelte",
+            "sourcePath": "src/lib/Components/PaginationItem.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Popover.svelte",
+            "sourcePath": "src/lib/Components/Popover.svelte"
+          },
+          {
+            "archivePath": "dist/Components/ScreenReaderText.svelte",
+            "sourcePath": "src/lib/Components/ScreenReaderText.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SkipButton.svelte",
+            "sourcePath": "src/lib/Components/SkipButton.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SkipLink.svelte",
+            "sourcePath": "src/lib/Components/SkipLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/StatusMessage.svelte",
+            "sourcePath": "src/lib/Components/StatusMessage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Stepper.svelte",
+            "sourcePath": "src/lib/Components/Stepper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SwipeActions.svelte",
+            "sourcePath": "src/lib/Components/SwipeActions.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Table.svelte",
+            "sourcePath": "src/lib/Components/Table.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Text.svelte",
+            "sourcePath": "src/lib/Components/Text.svelte"
+          },
+          {
+            "archivePath": "dist/Components/TopNavigation.svelte",
+            "sourcePath": "src/lib/Components/TopNavigation.svelte"
+          },
+          {
+            "archivePath": "dist/Components/internal/FloatingActionFrame.svelte",
+            "sourcePath": "src/lib/Components/internal/FloatingActionFrame.svelte"
+          },
+          {
+            "archivePath": "dist/Components/internal/SkipControlFrame.svelte",
+            "sourcePath": "src/lib/Components/internal/SkipControlFrame.svelte"
+          },
+          {
+            "archivePath": "dist/fonts.css",
+            "sourcePath": "src/lib/fonts.css"
+          },
+          {
+            "archivePath": "dist/fonts/CascadiaCode-OFL.txt",
+            "sourcePath": "src/lib/fonts/CascadiaCode-OFL.txt"
+          },
+          {
+            "archivePath": "dist/fonts/Jost-OFL.txt",
+            "sourcePath": "src/lib/fonts/Jost-OFL.txt"
+          },
+          {
+            "archivePath": "dist/fonts/README.txt",
+            "sourcePath": "src/lib/fonts/README.txt"
+          },
+          {
+            "archivePath": "dist/fonts/cascadia-code-italic-variable.ttf",
+            "sourcePath": "src/lib/fonts/cascadia-code-italic-variable.ttf"
+          },
+          {
+            "archivePath": "dist/fonts/cascadia-code-variable.ttf",
+            "sourcePath": "src/lib/fonts/cascadia-code-variable.ttf"
+          },
+          {
+            "archivePath": "dist/fonts/jost-italic-variable.ttf",
+            "sourcePath": "src/lib/fonts/jost-italic-variable.ttf"
+          },
+          {
+            "archivePath": "dist/fonts/jost-variable.ttf",
+            "sourcePath": "src/lib/fonts/jost-variable.ttf"
+          },
+          {
+            "archivePath": "dist/theme.css",
+            "sourcePath": "src/lib/theme.css"
+          }
+        ],
+        "different": [],
+        "generatedOrUnmapped": [
+          "dist/Components/Button.svelte.d.ts",
+          "dist/Components/ButtonContent.svelte.d.ts",
+          "dist/Components/Details.svelte.d.ts",
+          "dist/Components/Dialog.svelte.d.ts",
+          "dist/Components/Drawer.svelte.d.ts",
+          "dist/Components/DrawerSection.svelte.d.ts",
+          "dist/Components/FloatingActionButton.svelte.d.ts",
+          "dist/Components/FloatingActionLink.svelte.d.ts",
+          "dist/Components/Heading.svelte.d.ts",
+          "dist/Components/Icon.svelte.d.ts",
+          "dist/Components/Inputs/AvatarFilePicker.svelte.d.ts",
+          "dist/Components/Inputs/AvatarImageTile.svelte.d.ts",
+          "dist/Components/Inputs/AvatarTile.svelte.d.ts",
+          "dist/Components/Inputs/Checkbox.svelte.d.ts",
+          "dist/Components/Inputs/FieldFeedback.svelte.d.ts",
+          "dist/Components/Inputs/InputAvatar.svelte.d.ts",
+          "dist/Components/Inputs/InputCurrency.svelte.d.ts",
+          "dist/Components/Inputs/InputDate.svelte.d.ts",
+          "dist/Components/Inputs/InputImage.svelte.d.ts",
+          "dist/Components/Inputs/InputImages.svelte.d.ts",
+          "dist/Components/Inputs/InputNumber.svelte.d.ts",
+          "dist/Components/Inputs/InputRange.svelte.d.ts",
+          "dist/Components/Inputs/InputText.svelte.d.ts",
+          "dist/Components/Inputs/InputWrapper.svelte.d.ts",
+          "dist/Components/Inputs/RadioGroup.svelte.d.ts",
+          "dist/Components/Inputs/RadioItem.svelte.d.ts",
+          "dist/Components/Inputs/Select.svelte.d.ts",
+          "dist/Components/Inputs/TagInput.svelte.d.ts",
+          "dist/Components/Inputs/Textarea.svelte.d.ts",
+          "dist/Components/Inputs/image-input.d.ts",
+          "dist/Components/Inputs/image-input.js",
+          "dist/Components/Inputs/radio-group.d.ts",
+          "dist/Components/Inputs/radio-group.js",
+          "dist/Components/LoadingContent.svelte.d.ts",
+          "dist/Components/LoadingScreen.svelte.d.ts",
+          "dist/Components/LoadingSpinner.svelte.d.ts",
+          "dist/Components/Navigation.svelte.d.ts",
+          "dist/Components/NavigationGroup.svelte.d.ts",
+          "dist/Components/NavigationLink.svelte.d.ts",
+          "dist/Components/NumberKeypad.svelte.d.ts",
+          "dist/Components/Pagination.svelte.d.ts",
+          "dist/Components/PaginationItem.svelte.d.ts",
+          "dist/Components/Popover.svelte.d.ts",
+          "dist/Components/ScreenReaderText.svelte.d.ts",
+          "dist/Components/SkipButton.svelte.d.ts",
+          "dist/Components/SkipLink.svelte.d.ts",
+          "dist/Components/StatusMessage.svelte.d.ts",
+          "dist/Components/Stepper.svelte.d.ts",
+          "dist/Components/SwipeActions.svelte.d.ts",
+          "dist/Components/Table.svelte.d.ts",
+          "dist/Components/Text.svelte.d.ts",
+          "dist/Components/TopNavigation.svelte.d.ts",
+          "dist/Components/internal/FloatingActionFrame.svelte.d.ts",
+          "dist/Components/internal/SkipControlFrame.svelte.d.ts",
+          "dist/Components/internal/swipe-actions.d.ts",
+          "dist/Components/internal/swipe-actions.js",
+          "dist/index.d.ts",
+          "dist/index.js",
+          "dist/types.d.ts",
+          "dist/typography.d.ts",
+          "dist/typography.js"
+        ]
+      },
+      "status": "Pending reproducible packaged-build comparison and consumer verification."
+    },
+    {
+      "repository": "delightful-clipper",
+      "commit": "2e0ae22805185daf5b1565acdf75892fec87c2a0",
+      "path": "vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
+      "sha256": "8812fc4825b6b0f53ca199c84dc41b328cf7edb2c0163db425b6651c25a028ee",
+      "consumers": [
+        {
+          "manifest": "apps/extension/package.json",
+          "field": "dependencies",
+          "package": "delightful-local-first"
+        },
+        {
+          "manifest": "apps/web/package.json",
+          "field": "dependencies",
+          "package": "delightful-local-first"
+        }
+      ],
+      "package": "delightful-local-first",
+      "version": "0.0.0",
+      "selectedLibraryCommit": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "contract": {
+        "exports": {
+          "archive": {
+            "./backend/jazz/backup": {
+              "types": "./dist/backend/jazz/backup-api.d.ts",
+              "default": "./dist/backend/jazz/backup-api.js"
+            },
+            "./backup/restore/journal/browser": {
+              "types": "./dist/backup/restore-journal-browser-api.d.ts",
+              "default": "./dist/backup/restore-journal-browser-api.js"
+            },
+            "./backup/restore/journal/workflow": {
+              "types": "./dist/machines/backup/restore-journal.d.ts",
+              "default": "./dist/machines/backup/restore-journal.js"
+            },
+            "./backup/restore/journal": {
+              "types": "./dist/backup/restore-journal.d.ts",
+              "default": "./dist/backup/restore-journal.js"
+            },
+            "./backup/binding": {
+              "types": "./dist/backup/binding.d.ts",
+              "default": "./dist/backup/binding.js"
+            },
+            "./backup/export/workflow": {
+              "types": "./dist/machines/backup/export.d.ts",
+              "default": "./dist/machines/backup/export.js"
+            },
+            "./backup/inspection": {
+              "types": "./dist/backup/inspection-api.d.ts",
+              "default": "./dist/backup/inspection-api.js"
+            },
+            "./backup/inspection/workflow": {
+              "types": "./dist/machines/backup/inspection.d.ts",
+              "default": "./dist/machines/backup/inspection.js"
+            },
+            "./backup/envelope": {
+              "types": "./dist/backup/envelope-api.d.ts",
+              "default": "./dist/backup/envelope-api.js"
+            },
+            "./backup/envelope/workflow": {
+              "types": "./dist/machines/backup/envelope.d.ts",
+              "default": "./dist/machines/backup/envelope.js"
+            },
+            "./backup/archive": {
+              "types": "./dist/backup/archive.d.ts",
+              "default": "./dist/backup/archive.js"
+            },
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./recovery": {
+              "types": "./dist/recovery.d.ts",
+              "svelte": "./dist/recovery.js",
+              "default": "./dist/recovery.js"
+            },
+            "./recovery/workflow": {
+              "types": "./dist/machines/identity/recovery-phrase.d.ts",
+              "default": "./dist/machines/identity/recovery-phrase.js"
+            },
+            "./recovery/messages": {
+              "types": "./dist/localization/recovery.d.ts",
+              "default": "./dist/localization/recovery.js"
+            },
+            "./recovery/contracts": {
+              "types": "./dist/contracts/recovery-phrase.d.ts",
+              "default": "./dist/contracts/recovery-phrase.js"
+            },
+            "./recovery/svelte": {
+              "types": "./dist/integrations/identity/RecoveryPhrase.svelte.d.ts",
+              "svelte": "./dist/integrations/identity/RecoveryPhrase.svelte",
+              "default": "./dist/integrations/identity/RecoveryPhrase.svelte"
+            },
+            "./backend/jazz/recovery": {
+              "types": "./dist/backend/jazz/recovery-phrase.d.ts",
+              "default": "./dist/backend/jazz/recovery-phrase.js"
+            },
+            "./restoration/contracts": {
+              "types": "./dist/contracts/restoration.d.ts",
+              "default": "./dist/contracts/restoration.js"
+            },
+            "./restoration/workflow": {
+              "types": "./dist/machines/identity/restoration.d.ts",
+              "default": "./dist/machines/identity/restoration.js"
+            },
+            "./backend/jazz/restoration": {
+              "types": "./dist/backend/jazz/restoration.d.ts",
+              "default": "./dist/backend/jazz/restoration.js"
+            },
+            "./session/contracts": {
+              "types": "./dist/contracts/session.d.ts",
+              "default": "./dist/contracts/session.js"
+            },
+            "./session/workflow": {
+              "types": "./dist/session.d.ts",
+              "default": "./dist/session.js"
+            },
+            "./backend/jazz/session": {
+              "types": "./dist/backend/jazz/session.d.ts",
+              "default": "./dist/backend/jazz/session.js"
+            },
+            "./backend/jazz/session-readiness": {
+              "types": "./dist/backend/jazz/session-readiness.d.ts",
+              "default": "./dist/backend/jazz/session-readiness.js"
+            },
+            "./workspace/contracts": {
+              "types": "./dist/contracts/workspace-selection.d.ts",
+              "default": "./dist/contracts/workspace-selection.js"
+            },
+            "./workspace/workflow": {
+              "types": "./dist/machines/workspaces/selection.d.ts",
+              "default": "./dist/machines/workspaces/selection.js"
+            },
+            "./workspace/creation/contracts": {
+              "types": "./dist/contracts/workspace-creation.d.ts",
+              "default": "./dist/contracts/workspace-creation.js"
+            },
+            "./workspace/creation/workflow": {
+              "types": "./dist/machines/workspaces/creation-transaction.d.ts",
+              "default": "./dist/machines/workspaces/creation-transaction.js"
+            },
+            "./workspace": {
+              "types": "./dist/workspace.d.ts",
+              "svelte": "./dist/workspace.js",
+              "default": "./dist/workspace.js"
+            },
+            "./workspace/presentation": {
+              "types": "./dist/presentation/workspace-selector.d.ts",
+              "default": "./dist/presentation/workspace-selector.js"
+            },
+            "./workspace/naming/contracts": {
+              "types": "./dist/contracts/workspace-naming.d.ts",
+              "default": "./dist/contracts/workspace-naming.js"
+            },
+            "./workspace/naming/workflow": {
+              "types": "./dist/machines/workspaces/naming.d.ts",
+              "default": "./dist/machines/workspaces/naming.js"
+            },
+            "./forms/zod": {
+              "types": "./dist/validation/form-issues.d.ts",
+              "default": "./dist/validation/form-issues.js"
+            },
+            "./forms/contracts": {
+              "types": "./dist/contracts/scoped-form.d.ts",
+              "default": "./dist/contracts/scoped-form.js"
+            },
+            "./forms/readiness": {
+              "types": "./dist/machines/forms/readiness.d.ts",
+              "default": "./dist/machines/forms/readiness.js"
+            },
+            "./forms/submission": {
+              "types": "./dist/machines/forms/submission.d.ts",
+              "default": "./dist/machines/forms/submission.js"
+            },
+            "./forms/write": {
+              "types": "./dist/machines/forms/write.d.ts",
+              "default": "./dist/machines/forms/write.js"
+            },
+            "./forms/workflow": {
+              "types": "./dist/machines/forms/scoped-form.d.ts",
+              "default": "./dist/machines/forms/scoped-form.js"
+            },
+            "./forms/feedback": {
+              "types": "./dist/machines/forms/feedback.d.ts",
+              "default": "./dist/machines/forms/feedback.js"
+            },
+            "./forms/lifecycle": {
+              "types": "./dist/machines/forms/lifecycle.d.ts",
+              "default": "./dist/machines/forms/lifecycle.js"
+            },
+            "./forms/svelte": {
+              "types": "./dist/integrations/forms/controller.svelte.d.ts",
+              "default": "./dist/integrations/forms/controller.svelte.js"
+            },
+            "./forms/policy": {
+              "types": "./dist/machines/forms/policy.d.ts",
+              "default": "./dist/machines/forms/policy.js"
+            },
+            "./workspace/journal": {
+              "types": "./dist/machines/workspaces/journal.d.ts",
+              "default": "./dist/machines/workspaces/journal.js"
+            },
+            "./workspace/initialization": {
+              "types": "./dist/machines/workspaces/initialization.d.ts",
+              "default": "./dist/machines/workspaces/initialization.js"
+            },
+            "./workspace/creation-owner": {
+              "types": "./dist/machines/workspaces/creation-owner.d.ts",
+              "default": "./dist/machines/workspaces/creation-owner.js"
+            },
+            "./workspace/creation-operation": {
+              "types": "./dist/machines/workspaces/creation-operation.d.ts",
+              "default": "./dist/machines/workspaces/creation-operation.js"
+            },
+            "./workspace/creation-persistence": {
+              "types": "./dist/machines/workspaces/creation-persistence.d.ts",
+              "default": "./dist/machines/workspaces/creation-persistence.js"
+            },
+            "./profile/contracts": {
+              "types": "./dist/contracts/profile.d.ts",
+              "default": "./dist/contracts/profile.js"
+            },
+            "./profile/avatar": {
+              "types": "./dist/machines/identity/profile-avatar.d.ts",
+              "default": "./dist/machines/identity/profile-avatar.js"
+            },
+            "./profile/workflow": {
+              "types": "./dist/machines/identity/profile.d.ts",
+              "default": "./dist/machines/identity/profile.js"
+            },
+            "./workspace/startup": {
+              "types": "./dist/machines/workspaces/startup.d.ts",
+              "default": "./dist/machines/workspaces/startup.js"
+            },
+            "./workspace/startup-contracts": {
+              "types": "./dist/contracts/workspace-startup.d.ts",
+              "default": "./dist/contracts/workspace-startup.js"
+            },
+            "./data/observations": {
+              "types": "./dist/contracts/observation.d.ts",
+              "default": "./dist/contracts/observation.js"
+            },
+            "./backend/jazz/data": {
+              "types": "./dist/backend/jazz/data.svelte.d.ts",
+              "default": "./dist/backend/jazz/data.svelte.js"
+            },
+            "./recovery/coordination": {
+              "types": "./dist/machines/identity/session-recovery.d.ts",
+              "default": "./dist/machines/identity/session-recovery.js"
+            },
+            "./forms/content": {
+              "types": "./dist/components/forms/FormContent.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormContent.svelte",
+              "default": "./dist/components/forms/FormContent.svelte"
+            },
+            "./forms/feedback-view": {
+              "types": "./dist/components/forms/FormFeedback.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormFeedback.svelte",
+              "default": "./dist/components/forms/FormFeedback.svelte"
+            },
+            "./forms/modal": {
+              "types": "./dist/components/forms/FormModal.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormModal.svelte",
+              "default": "./dist/components/forms/FormModal.svelte"
+            },
+            "./profile/name-view": {
+              "types": "./dist/components/profile/ProfileNameForm.svelte.d.ts",
+              "svelte": "./dist/components/profile/ProfileNameForm.svelte",
+              "default": "./dist/components/profile/ProfileNameForm.svelte"
+            },
+            "./profile/avatar-view": {
+              "types": "./dist/components/profile/Avatar.svelte.d.ts",
+              "svelte": "./dist/components/profile/Avatar.svelte",
+              "default": "./dist/components/profile/Avatar.svelte"
+            },
+            "./profile/avatar-form": {
+              "types": "./dist/integrations/profile/ProfileAvatarForm.svelte.d.ts",
+              "svelte": "./dist/integrations/profile/ProfileAvatarForm.svelte",
+              "default": "./dist/integrations/profile/ProfileAvatarForm.svelte"
+            },
+            "./backend/jazz/startup": {
+              "types": "./dist/backend/jazz/startup.d.ts",
+              "default": "./dist/backend/jazz/startup.js"
+            },
+            "./workspace/invitations/contracts": {
+              "types": "./dist/contracts/workspace-invitation.d.ts",
+              "default": "./dist/contracts/workspace-invitation.js"
+            },
+            "./workspace/invitations/workflow": {
+              "types": "./dist/machines/workspaces/invitation-redemption.d.ts",
+              "default": "./dist/machines/workspaces/invitation-redemption.js"
+            },
+            "./workspace/invitations/authority-contracts": {
+              "types": "./dist/contracts/workspace-invitation-authority.d.ts",
+              "default": "./dist/contracts/workspace-invitation-authority.js"
+            },
+            "./backend/jazz/invitation-authority": {
+              "types": "./dist/backend/jazz/invitation-authority.d.ts",
+              "default": "./dist/backend/jazz/invitation-authority.js"
+            },
+            "./workspace/invitations/authority-workflow": {
+              "types": "./dist/machines/workspaces/invitation-authority.d.ts",
+              "default": "./dist/machines/workspaces/invitation-authority.js"
+            },
+            "./diagnostics/logger": {
+              "types": "./dist/diagnostics/logger.d.ts",
+              "default": "./dist/diagnostics/logger.js"
+            },
+            "./backup/restore": {
+              "types": "./dist/backup/restore-api.d.ts",
+              "svelte": "./dist/backup/restore-api.js",
+              "default": "./dist/backup/restore-api.js"
+            },
+            "./backup/restore/workflow": {
+              "types": "./dist/machines/backup/restore.d.ts",
+              "svelte": "./dist/machines/backup/restore.js",
+              "default": "./dist/machines/backup/restore.js"
+            },
+            "./transactions/contracts": {
+              "types": "./dist/contracts/domain-transaction.d.ts",
+              "default": "./dist/contracts/domain-transaction.js"
+            },
+            "./transactions/workflow": {
+              "types": "./dist/machines/workspaces/domain-transaction.d.ts",
+              "default": "./dist/machines/workspaces/domain-transaction.js"
+            },
+            "./lifecycle/operation/contracts": {
+              "types": "./dist/contracts/owned-operation.d.ts",
+              "default": "./dist/contracts/owned-operation.js"
+            },
+            "./lifecycle/operation/workflow": {
+              "types": "./dist/machines/lifecycle/owned-operation.d.ts",
+              "default": "./dist/machines/lifecycle/owned-operation.js"
+            },
+            "./worker/request/contracts": {
+              "types": "./dist/contracts/worker-request.d.ts",
+              "default": "./dist/contracts/worker-request.js"
+            },
+            "./worker/request/workflow": {
+              "types": "./dist/machines/lifecycle/worker-request.d.ts",
+              "default": "./dist/machines/lifecycle/worker-request.js"
+            },
+            "./worker/channel/contracts": {
+              "types": "./dist/contracts/worker-channel.d.ts",
+              "default": "./dist/contracts/worker-channel.js"
+            },
+            "./worker/channel/workflow": {
+              "types": "./dist/machines/lifecycle/worker-channel.d.ts",
+              "default": "./dist/machines/lifecycle/worker-channel.js"
+            },
+            "./worker/effect-drain/contracts": {
+              "types": "./dist/contracts/worker-effect-drain.d.ts",
+              "default": "./dist/contracts/worker-effect-drain.js"
+            },
+            "./worker/effect-drain/workflow": {
+              "types": "./dist/machines/lifecycle/worker-effect-drain.d.ts",
+              "default": "./dist/machines/lifecycle/worker-effect-drain.js"
+            },
+            "./session/sign-out/contracts": {
+              "types": "./dist/contracts/sign-out.d.ts",
+              "default": "./dist/contracts/sign-out.js"
+            },
+            "./session/sign-out/workflow": {
+              "types": "./dist/machines/identity/ordered-sign-out.d.ts",
+              "default": "./dist/machines/identity/ordered-sign-out.js"
+            }
+          },
+          "selectedSource": {
+            "./backend/jazz/backup": {
+              "types": "./dist/backend/jazz/backup-api.d.ts",
+              "default": "./dist/backend/jazz/backup-api.js"
+            },
+            "./backup/restore/journal/browser": {
+              "types": "./dist/backup/restore-journal-browser-api.d.ts",
+              "default": "./dist/backup/restore-journal-browser-api.js"
+            },
+            "./backup/restore/journal/workflow": {
+              "types": "./dist/machines/backup/restore-journal.d.ts",
+              "default": "./dist/machines/backup/restore-journal.js"
+            },
+            "./backup/restore/journal": {
+              "types": "./dist/backup/restore-journal.d.ts",
+              "default": "./dist/backup/restore-journal.js"
+            },
+            "./backup/binding": {
+              "types": "./dist/backup/binding.d.ts",
+              "default": "./dist/backup/binding.js"
+            },
+            "./backup/export/workflow": {
+              "types": "./dist/machines/backup/export.d.ts",
+              "default": "./dist/machines/backup/export.js"
+            },
+            "./backup/inspection": {
+              "types": "./dist/backup/inspection-api.d.ts",
+              "default": "./dist/backup/inspection-api.js"
+            },
+            "./backup/inspection/workflow": {
+              "types": "./dist/machines/backup/inspection.d.ts",
+              "default": "./dist/machines/backup/inspection.js"
+            },
+            "./backup/envelope": {
+              "types": "./dist/backup/envelope-api.d.ts",
+              "default": "./dist/backup/envelope-api.js"
+            },
+            "./backup/envelope/workflow": {
+              "types": "./dist/machines/backup/envelope.d.ts",
+              "default": "./dist/machines/backup/envelope.js"
+            },
+            "./backup/archive": {
+              "types": "./dist/backup/archive.d.ts",
+              "default": "./dist/backup/archive.js"
+            },
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./recovery": {
+              "types": "./dist/recovery.d.ts",
+              "svelte": "./dist/recovery.js",
+              "default": "./dist/recovery.js"
+            },
+            "./recovery/workflow": {
+              "types": "./dist/machines/identity/recovery-phrase.d.ts",
+              "default": "./dist/machines/identity/recovery-phrase.js"
+            },
+            "./recovery/messages": {
+              "types": "./dist/localization/recovery.d.ts",
+              "default": "./dist/localization/recovery.js"
+            },
+            "./recovery/contracts": {
+              "types": "./dist/contracts/recovery-phrase.d.ts",
+              "default": "./dist/contracts/recovery-phrase.js"
+            },
+            "./recovery/svelte": {
+              "types": "./dist/integrations/identity/RecoveryPhrase.svelte.d.ts",
+              "svelte": "./dist/integrations/identity/RecoveryPhrase.svelte",
+              "default": "./dist/integrations/identity/RecoveryPhrase.svelte"
+            },
+            "./backend/jazz/recovery": {
+              "types": "./dist/backend/jazz/recovery-phrase.d.ts",
+              "default": "./dist/backend/jazz/recovery-phrase.js"
+            },
+            "./restoration/contracts": {
+              "types": "./dist/contracts/restoration.d.ts",
+              "default": "./dist/contracts/restoration.js"
+            },
+            "./restoration/workflow": {
+              "types": "./dist/machines/identity/restoration.d.ts",
+              "default": "./dist/machines/identity/restoration.js"
+            },
+            "./backend/jazz/restoration": {
+              "types": "./dist/backend/jazz/restoration.d.ts",
+              "default": "./dist/backend/jazz/restoration.js"
+            },
+            "./session/contracts": {
+              "types": "./dist/contracts/session.d.ts",
+              "default": "./dist/contracts/session.js"
+            },
+            "./session/workflow": {
+              "types": "./dist/session.d.ts",
+              "default": "./dist/session.js"
+            },
+            "./backend/jazz/session": {
+              "types": "./dist/backend/jazz/session.d.ts",
+              "default": "./dist/backend/jazz/session.js"
+            },
+            "./backend/jazz/session-readiness": {
+              "types": "./dist/backend/jazz/session-readiness.d.ts",
+              "default": "./dist/backend/jazz/session-readiness.js"
+            },
+            "./workspace/contracts": {
+              "types": "./dist/contracts/workspace-selection.d.ts",
+              "default": "./dist/contracts/workspace-selection.js"
+            },
+            "./workspace/workflow": {
+              "types": "./dist/machines/workspaces/selection.d.ts",
+              "default": "./dist/machines/workspaces/selection.js"
+            },
+            "./workspace/creation/contracts": {
+              "types": "./dist/contracts/workspace-creation.d.ts",
+              "default": "./dist/contracts/workspace-creation.js"
+            },
+            "./workspace/creation/workflow": {
+              "types": "./dist/machines/workspaces/creation-transaction.d.ts",
+              "default": "./dist/machines/workspaces/creation-transaction.js"
+            },
+            "./workspace": {
+              "types": "./dist/workspace.d.ts",
+              "svelte": "./dist/workspace.js",
+              "default": "./dist/workspace.js"
+            },
+            "./workspace/presentation": {
+              "types": "./dist/presentation/workspace-selector.d.ts",
+              "default": "./dist/presentation/workspace-selector.js"
+            },
+            "./workspace/naming/contracts": {
+              "types": "./dist/contracts/workspace-naming.d.ts",
+              "default": "./dist/contracts/workspace-naming.js"
+            },
+            "./workspace/naming/workflow": {
+              "types": "./dist/machines/workspaces/naming.d.ts",
+              "default": "./dist/machines/workspaces/naming.js"
+            },
+            "./forms/zod": {
+              "types": "./dist/validation/form-issues.d.ts",
+              "default": "./dist/validation/form-issues.js"
+            },
+            "./forms/contracts": {
+              "types": "./dist/contracts/scoped-form.d.ts",
+              "default": "./dist/contracts/scoped-form.js"
+            },
+            "./forms/readiness": {
+              "types": "./dist/machines/forms/readiness.d.ts",
+              "default": "./dist/machines/forms/readiness.js"
+            },
+            "./forms/submission": {
+              "types": "./dist/machines/forms/submission.d.ts",
+              "default": "./dist/machines/forms/submission.js"
+            },
+            "./forms/write": {
+              "types": "./dist/machines/forms/write.d.ts",
+              "default": "./dist/machines/forms/write.js"
+            },
+            "./forms/workflow": {
+              "types": "./dist/machines/forms/scoped-form.d.ts",
+              "default": "./dist/machines/forms/scoped-form.js"
+            },
+            "./forms/feedback": {
+              "types": "./dist/machines/forms/feedback.d.ts",
+              "default": "./dist/machines/forms/feedback.js"
+            },
+            "./forms/lifecycle": {
+              "types": "./dist/machines/forms/lifecycle.d.ts",
+              "default": "./dist/machines/forms/lifecycle.js"
+            },
+            "./forms/svelte": {
+              "types": "./dist/integrations/forms/controller.svelte.d.ts",
+              "default": "./dist/integrations/forms/controller.svelte.js"
+            },
+            "./forms/policy": {
+              "types": "./dist/machines/forms/policy.d.ts",
+              "default": "./dist/machines/forms/policy.js"
+            },
+            "./workspace/journal": {
+              "types": "./dist/machines/workspaces/journal.d.ts",
+              "default": "./dist/machines/workspaces/journal.js"
+            },
+            "./workspace/initialization": {
+              "types": "./dist/machines/workspaces/initialization.d.ts",
+              "default": "./dist/machines/workspaces/initialization.js"
+            },
+            "./workspace/creation-owner": {
+              "types": "./dist/machines/workspaces/creation-owner.d.ts",
+              "default": "./dist/machines/workspaces/creation-owner.js"
+            },
+            "./workspace/creation-operation": {
+              "types": "./dist/machines/workspaces/creation-operation.d.ts",
+              "default": "./dist/machines/workspaces/creation-operation.js"
+            },
+            "./workspace/creation-persistence": {
+              "types": "./dist/machines/workspaces/creation-persistence.d.ts",
+              "default": "./dist/machines/workspaces/creation-persistence.js"
+            },
+            "./profile/contracts": {
+              "types": "./dist/contracts/profile.d.ts",
+              "default": "./dist/contracts/profile.js"
+            },
+            "./profile/avatar": {
+              "types": "./dist/machines/identity/profile-avatar.d.ts",
+              "default": "./dist/machines/identity/profile-avatar.js"
+            },
+            "./profile/workflow": {
+              "types": "./dist/machines/identity/profile.d.ts",
+              "default": "./dist/machines/identity/profile.js"
+            },
+            "./workspace/startup": {
+              "types": "./dist/machines/workspaces/startup.d.ts",
+              "default": "./dist/machines/workspaces/startup.js"
+            },
+            "./workspace/startup-contracts": {
+              "types": "./dist/contracts/workspace-startup.d.ts",
+              "default": "./dist/contracts/workspace-startup.js"
+            },
+            "./data/observations": {
+              "types": "./dist/contracts/observation.d.ts",
+              "default": "./dist/contracts/observation.js"
+            },
+            "./backend/jazz/data": {
+              "types": "./dist/backend/jazz/data.svelte.d.ts",
+              "default": "./dist/backend/jazz/data.svelte.js"
+            },
+            "./recovery/coordination": {
+              "types": "./dist/machines/identity/session-recovery.d.ts",
+              "default": "./dist/machines/identity/session-recovery.js"
+            },
+            "./forms/content": {
+              "types": "./dist/components/forms/FormContent.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormContent.svelte",
+              "default": "./dist/components/forms/FormContent.svelte"
+            },
+            "./forms/feedback-view": {
+              "types": "./dist/components/forms/FormFeedback.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormFeedback.svelte",
+              "default": "./dist/components/forms/FormFeedback.svelte"
+            },
+            "./forms/modal": {
+              "types": "./dist/components/forms/FormModal.svelte.d.ts",
+              "svelte": "./dist/components/forms/FormModal.svelte",
+              "default": "./dist/components/forms/FormModal.svelte"
+            },
+            "./profile/name-view": {
+              "types": "./dist/components/profile/ProfileNameForm.svelte.d.ts",
+              "svelte": "./dist/components/profile/ProfileNameForm.svelte",
+              "default": "./dist/components/profile/ProfileNameForm.svelte"
+            },
+            "./profile/avatar-view": {
+              "types": "./dist/components/profile/Avatar.svelte.d.ts",
+              "svelte": "./dist/components/profile/Avatar.svelte",
+              "default": "./dist/components/profile/Avatar.svelte"
+            },
+            "./profile/avatar-form": {
+              "types": "./dist/integrations/profile/ProfileAvatarForm.svelte.d.ts",
+              "svelte": "./dist/integrations/profile/ProfileAvatarForm.svelte",
+              "default": "./dist/integrations/profile/ProfileAvatarForm.svelte"
+            },
+            "./backend/jazz/startup": {
+              "types": "./dist/backend/jazz/startup.d.ts",
+              "default": "./dist/backend/jazz/startup.js"
+            },
+            "./workspace/invitations/contracts": {
+              "types": "./dist/contracts/workspace-invitation.d.ts",
+              "default": "./dist/contracts/workspace-invitation.js"
+            },
+            "./workspace/invitations/workflow": {
+              "types": "./dist/machines/workspaces/invitation-redemption.d.ts",
+              "default": "./dist/machines/workspaces/invitation-redemption.js"
+            },
+            "./workspace/invitations/authority-contracts": {
+              "types": "./dist/contracts/workspace-invitation-authority.d.ts",
+              "default": "./dist/contracts/workspace-invitation-authority.js"
+            },
+            "./backend/jazz/invitation-authority": {
+              "types": "./dist/backend/jazz/invitation-authority.d.ts",
+              "default": "./dist/backend/jazz/invitation-authority.js"
+            },
+            "./workspace/invitations/authority-workflow": {
+              "types": "./dist/machines/workspaces/invitation-authority.d.ts",
+              "default": "./dist/machines/workspaces/invitation-authority.js"
+            },
+            "./diagnostics/logger": {
+              "types": "./dist/diagnostics/logger.d.ts",
+              "default": "./dist/diagnostics/logger.js"
+            },
+            "./backup/restore": {
+              "types": "./dist/backup/restore-api.d.ts",
+              "svelte": "./dist/backup/restore-api.js",
+              "default": "./dist/backup/restore-api.js"
+            },
+            "./backup/restore/workflow": {
+              "types": "./dist/machines/backup/restore.d.ts",
+              "svelte": "./dist/machines/backup/restore.js",
+              "default": "./dist/machines/backup/restore.js"
+            },
+            "./worker/effect-drain/contracts": {
+              "types": "./dist/contracts/worker-effect-drain.d.ts",
+              "default": "./dist/contracts/worker-effect-drain.js"
+            },
+            "./worker/effect-drain/workflow": {
+              "types": "./dist/machines/lifecycle/worker-effect-drain.d.ts",
+              "default": "./dist/machines/lifecycle/worker-effect-drain.js"
+            },
+            "./worker/channel/contracts": {
+              "types": "./dist/contracts/worker-channel.d.ts",
+              "default": "./dist/contracts/worker-channel.js"
+            },
+            "./worker/channel/workflow": {
+              "types": "./dist/machines/lifecycle/worker-channel.d.ts",
+              "default": "./dist/machines/lifecycle/worker-channel.js"
+            },
+            "./worker/request/contracts": {
+              "types": "./dist/contracts/worker-request.d.ts",
+              "default": "./dist/contracts/worker-request.js"
+            },
+            "./worker/request/workflow": {
+              "types": "./dist/machines/lifecycle/worker-request.d.ts",
+              "default": "./dist/machines/lifecycle/worker-request.js"
+            },
+            "./lifecycle/operation/contracts": {
+              "types": "./dist/contracts/owned-operation.d.ts",
+              "default": "./dist/contracts/owned-operation.js"
+            },
+            "./lifecycle/operation/workflow": {
+              "types": "./dist/machines/lifecycle/owned-operation.d.ts",
+              "default": "./dist/machines/lifecycle/owned-operation.js"
+            },
+            "./transactions/contracts": {
+              "types": "./dist/contracts/domain-transaction.d.ts",
+              "default": "./dist/contracts/domain-transaction.js"
+            },
+            "./transactions/workflow": {
+              "types": "./dist/machines/workspaces/domain-transaction.d.ts",
+              "default": "./dist/machines/workspaces/domain-transaction.js"
+            },
+            "./session/sign-out/contracts": {
+              "types": "./dist/contracts/sign-out.d.ts",
+              "default": "./dist/contracts/sign-out.js"
+            },
+            "./session/sign-out/workflow": {
+              "types": "./dist/machines/identity/ordered-sign-out.d.ts",
+              "default": "./dist/machines/identity/ordered-sign-out.js"
+            }
+          },
+          "equal": true
+        },
+        "peerDependencies": {
+          "archive": {
+            "delightful-ui": "0.0.25",
+            "jazz-tools": "2.0.0-alpha.60",
+            "svelte": "^5.57.2",
+            "xstate": "6.0.0-beta.1"
+          },
+          "selectedSource": {
+            "delightful-ui": "0.0.25",
+            "jazz-tools": "2.0.0-alpha.59",
+            "svelte": "^5.57.2",
+            "xstate": "6.0.0-beta.1"
+          },
+          "equal": false
+        },
+        "peerDependenciesMeta": {
+          "archive": {
+            "xstate": {
+              "optional": true
+            },
+            "delightful-ui": {
+              "optional": true
+            },
+            "jazz-tools": {
+              "optional": true
+            }
+          },
+          "selectedSource": {
+            "xstate": {
+              "optional": true
+            },
+            "delightful-ui": {
+              "optional": true
+            },
+            "jazz-tools": {
+              "optional": true
+            }
+          },
+          "equal": true
+        },
+        "dependencies": {
+          "archive": {
+            "zod": "4.1.11"
+          },
+          "selectedSource": {
+            "zod": "4.1.11"
+          },
+          "equal": true
+        }
+      },
+      "sourceComparison": {
+        "identical": [
+          {
+            "archivePath": "dist/components/forms/FormContent.svelte",
+            "sourcePath": "src/lib/components/forms/FormContent.svelte"
+          },
+          {
+            "archivePath": "dist/components/forms/FormFeedback.svelte",
+            "sourcePath": "src/lib/components/forms/FormFeedback.svelte"
+          },
+          {
+            "archivePath": "dist/components/forms/FormModal.svelte",
+            "sourcePath": "src/lib/components/forms/FormModal.svelte"
+          },
+          {
+            "archivePath": "dist/components/identity/RecoveryPhraseView.svelte",
+            "sourcePath": "src/lib/components/identity/RecoveryPhraseView.svelte"
+          },
+          {
+            "archivePath": "dist/components/profile/Avatar.svelte",
+            "sourcePath": "src/lib/components/profile/Avatar.svelte"
+          },
+          {
+            "archivePath": "dist/components/profile/ProfileNameForm.svelte",
+            "sourcePath": "src/lib/components/profile/ProfileNameForm.svelte"
+          },
+          {
+            "archivePath": "dist/components/workspaces/WorkspaceCreationDialog.svelte",
+            "sourcePath": "src/lib/components/workspaces/WorkspaceCreationDialog.svelte"
+          },
+          {
+            "archivePath": "dist/components/workspaces/WorkspaceSelector.svelte",
+            "sourcePath": "src/lib/components/workspaces/WorkspaceSelector.svelte"
+          },
+          {
+            "archivePath": "dist/integrations/identity/RecoveryPhrase.svelte",
+            "sourcePath": "src/lib/integrations/identity/RecoveryPhrase.svelte"
+          },
+          {
+            "archivePath": "dist/integrations/identity/RecoveryPhraseBinding.svelte",
+            "sourcePath": "src/lib/integrations/identity/RecoveryPhraseBinding.svelte"
+          },
+          {
+            "archivePath": "dist/integrations/profile/ProfileAvatarForm.svelte",
+            "sourcePath": "src/lib/integrations/profile/ProfileAvatarForm.svelte"
+          }
+        ],
+        "different": [],
+        "generatedOrUnmapped": [
+          "dist/backend/jazz/backup-api.d.ts",
+          "dist/backend/jazz/backup-api.js",
+          "dist/backend/jazz/backup.d.ts",
+          "dist/backend/jazz/backup.js",
+          "dist/backend/jazz/data.svelte.d.ts",
+          "dist/backend/jazz/data.svelte.js",
+          "dist/backend/jazz/invitation-authority.d.ts",
+          "dist/backend/jazz/invitation-authority.js",
+          "dist/backend/jazz/recovery-phrase.d.ts",
+          "dist/backend/jazz/recovery-phrase.js",
+          "dist/backend/jazz/restoration.d.ts",
+          "dist/backend/jazz/restoration.js",
+          "dist/backend/jazz/session-readiness.d.ts",
+          "dist/backend/jazz/session-readiness.js",
+          "dist/backend/jazz/session.d.ts",
+          "dist/backend/jazz/session.js",
+          "dist/backend/jazz/startup.d.ts",
+          "dist/backend/jazz/startup.js",
+          "dist/backup/archive.d.ts",
+          "dist/backup/archive.js",
+          "dist/backup/binary.d.ts",
+          "dist/backup/binary.js",
+          "dist/backup/binding.d.ts",
+          "dist/backup/binding.js",
+          "dist/backup/budget.d.ts",
+          "dist/backup/budget.js",
+          "dist/backup/envelope-api.d.ts",
+          "dist/backup/envelope-api.js",
+          "dist/backup/envelope-native.d.ts",
+          "dist/backup/envelope-native.js",
+          "dist/backup/envelope-operation.d.ts",
+          "dist/backup/envelope-operation.js",
+          "dist/backup/envelope.d.ts",
+          "dist/backup/envelope.js",
+          "dist/backup/inspection-api.d.ts",
+          "dist/backup/inspection-api.js",
+          "dist/backup/inspection-native.d.ts",
+          "dist/backup/inspection-native.js",
+          "dist/backup/inspection.d.ts",
+          "dist/backup/inspection.js",
+          "dist/backup/json.d.ts",
+          "dist/backup/json.js",
+          "dist/backup/payload.d.ts",
+          "dist/backup/payload.js",
+          "dist/backup/restore-api.d.ts",
+          "dist/backup/restore-api.js",
+          "dist/backup/restore-journal-browser-api.d.ts",
+          "dist/backup/restore-journal-browser-api.js",
+          "dist/backup/restore-journal-browser-native.d.ts",
+          "dist/backup/restore-journal-browser-native.js",
+          "dist/backup/restore-journal-browser.d.ts",
+          "dist/backup/restore-journal-browser.js",
+          "dist/backup/restore-journal-schemas.d.ts",
+          "dist/backup/restore-journal-schemas.js",
+          "dist/backup/restore-journal-successor.d.ts",
+          "dist/backup/restore-journal-successor.js",
+          "dist/backup/restore-journal.d.ts",
+          "dist/backup/restore-journal.js",
+          "dist/backup/restore.d.ts",
+          "dist/backup/restore.js",
+          "dist/backup/schemas.d.ts",
+          "dist/backup/schemas.js",
+          "dist/backup/types.d.ts",
+          "dist/backup/types.js",
+          "dist/backup/utf8.d.ts",
+          "dist/backup/utf8.js",
+          "dist/components/forms/FormContent.svelte.d.ts",
+          "dist/components/forms/FormFeedback.svelte.d.ts",
+          "dist/components/forms/FormModal.svelte.d.ts",
+          "dist/components/identity/RecoveryPhraseView.svelte.d.ts",
+          "dist/components/profile/Avatar.svelte.d.ts",
+          "dist/components/profile/ProfileNameForm.svelte.d.ts",
+          "dist/components/workspaces/WorkspaceCreationDialog.svelte.d.ts",
+          "dist/components/workspaces/WorkspaceSelector.svelte.d.ts",
+          "dist/contracts/domain-transaction.d.ts",
+          "dist/contracts/domain-transaction.js",
+          "dist/contracts/machine-events.d.ts",
+          "dist/contracts/machine-events.js",
+          "dist/contracts/observation.d.ts",
+          "dist/contracts/observation.js",
+          "dist/contracts/owned-operation.d.ts",
+          "dist/contracts/owned-operation.js",
+          "dist/contracts/profile.d.ts",
+          "dist/contracts/profile.js",
+          "dist/contracts/recovery-messages.d.ts",
+          "dist/contracts/recovery-messages.js",
+          "dist/contracts/recovery-phrase.d.ts",
+          "dist/contracts/recovery-phrase.js",
+          "dist/contracts/restoration.d.ts",
+          "dist/contracts/restoration.js",
+          "dist/contracts/scoped-form.d.ts",
+          "dist/contracts/scoped-form.js",
+          "dist/contracts/session.d.ts",
+          "dist/contracts/session.js",
+          "dist/contracts/sign-out.d.ts",
+          "dist/contracts/sign-out.js",
+          "dist/contracts/transaction-custody.d.ts",
+          "dist/contracts/transaction-custody.js",
+          "dist/contracts/worker-channel.d.ts",
+          "dist/contracts/worker-channel.js",
+          "dist/contracts/worker-effect-drain.d.ts",
+          "dist/contracts/worker-effect-drain.js",
+          "dist/contracts/worker-request.d.ts",
+          "dist/contracts/worker-request.js",
+          "dist/contracts/workspace-creation-dialog.d.ts",
+          "dist/contracts/workspace-creation-dialog.js",
+          "dist/contracts/workspace-creation.d.ts",
+          "dist/contracts/workspace-creation.js",
+          "dist/contracts/workspace-invitation-authority.d.ts",
+          "dist/contracts/workspace-invitation-authority.js",
+          "dist/contracts/workspace-invitation.d.ts",
+          "dist/contracts/workspace-invitation.js",
+          "dist/contracts/workspace-naming.d.ts",
+          "dist/contracts/workspace-naming.js",
+          "dist/contracts/workspace-selection.d.ts",
+          "dist/contracts/workspace-selection.js",
+          "dist/contracts/workspace-selector.d.ts",
+          "dist/contracts/workspace-selector.js",
+          "dist/contracts/workspace-startup.d.ts",
+          "dist/contracts/workspace-startup.js",
+          "dist/diagnostics/logger.d.ts",
+          "dist/diagnostics/logger.js",
+          "dist/index.d.ts",
+          "dist/index.js",
+          "dist/integrations/forms/controller.svelte.d.ts",
+          "dist/integrations/forms/controller.svelte.js",
+          "dist/integrations/identity/RecoveryPhrase.svelte.d.ts",
+          "dist/integrations/identity/RecoveryPhraseBinding.svelte.d.ts",
+          "dist/integrations/profile/ProfileAvatarForm.svelte.d.ts",
+          "dist/integrations/profile/avatar-selection.svelte.d.ts",
+          "dist/integrations/profile/avatar-selection.svelte.js",
+          "dist/localization/recovery.d.ts",
+          "dist/localization/recovery.js",
+          "dist/machines/backup/envelope.d.ts",
+          "dist/machines/backup/envelope.js",
+          "dist/machines/backup/export.d.ts",
+          "dist/machines/backup/export.js",
+          "dist/machines/backup/inspection.d.ts",
+          "dist/machines/backup/inspection.js",
+          "dist/machines/backup/reader.d.ts",
+          "dist/machines/backup/reader.js",
+          "dist/machines/backup/restore-journal-step.d.ts",
+          "dist/machines/backup/restore-journal-step.js",
+          "dist/machines/backup/restore-journal.d.ts",
+          "dist/machines/backup/restore-journal.js",
+          "dist/machines/backup/restore-operation-lock.d.ts",
+          "dist/machines/backup/restore-operation-lock.js",
+          "dist/machines/backup/restore-write-step.d.ts",
+          "dist/machines/backup/restore-write-step.js",
+          "dist/machines/backup/restore.d.ts",
+          "dist/machines/backup/restore.js",
+          "dist/machines/backup/scope.d.ts",
+          "dist/machines/backup/scope.js",
+          "dist/machines/forms/feedback.d.ts",
+          "dist/machines/forms/feedback.js",
+          "dist/machines/forms/lifecycle.d.ts",
+          "dist/machines/forms/lifecycle.js",
+          "dist/machines/forms/policy.d.ts",
+          "dist/machines/forms/policy.js",
+          "dist/machines/forms/readiness.d.ts",
+          "dist/machines/forms/readiness.js",
+          "dist/machines/forms/scoped-form.d.ts",
+          "dist/machines/forms/scoped-form.js",
+          "dist/machines/forms/submission.d.ts",
+          "dist/machines/forms/submission.js",
+          "dist/machines/forms/write.d.ts",
+          "dist/machines/forms/write.js",
+          "dist/machines/identity/avatar-selection.d.ts",
+          "dist/machines/identity/avatar-selection.js",
+          "dist/machines/identity/ordered-sign-out.d.ts",
+          "dist/machines/identity/ordered-sign-out.js",
+          "dist/machines/identity/profile-avatar.d.ts",
+          "dist/machines/identity/profile-avatar.js",
+          "dist/machines/identity/profile-persistence.d.ts",
+          "dist/machines/identity/profile-persistence.js",
+          "dist/machines/identity/profile.d.ts",
+          "dist/machines/identity/profile.js",
+          "dist/machines/identity/recovery-phrase.d.ts",
+          "dist/machines/identity/recovery-phrase.js",
+          "dist/machines/identity/restoration.d.ts",
+          "dist/machines/identity/restoration.js",
+          "dist/machines/identity/session-acquisition.d.ts",
+          "dist/machines/identity/session-acquisition.js",
+          "dist/machines/identity/session-readiness.d.ts",
+          "dist/machines/identity/session-readiness.js",
+          "dist/machines/identity/session-recovery.d.ts",
+          "dist/machines/identity/session-recovery.js",
+          "dist/machines/identity/session-startup.d.ts",
+          "dist/machines/identity/session-startup.js",
+          "dist/machines/lifecycle/owned-operation.d.ts",
+          "dist/machines/lifecycle/owned-operation.js",
+          "dist/machines/lifecycle/worker-channel.d.ts",
+          "dist/machines/lifecycle/worker-channel.js",
+          "dist/machines/lifecycle/worker-effect-drain.d.ts",
+          "dist/machines/lifecycle/worker-effect-drain.js",
+          "dist/machines/lifecycle/worker-request.d.ts",
+          "dist/machines/lifecycle/worker-request.js",
+          "dist/machines/workspaces/creation-operation.d.ts",
+          "dist/machines/workspaces/creation-operation.js",
+          "dist/machines/workspaces/creation-owner.d.ts",
+          "dist/machines/workspaces/creation-owner.js",
+          "dist/machines/workspaces/creation-persistence.d.ts",
+          "dist/machines/workspaces/creation-persistence.js",
+          "dist/machines/workspaces/creation-transaction.d.ts",
+          "dist/machines/workspaces/creation-transaction.js",
+          "dist/machines/workspaces/domain-transaction.d.ts",
+          "dist/machines/workspaces/domain-transaction.js",
+          "dist/machines/workspaces/initialization.d.ts",
+          "dist/machines/workspaces/initialization.js",
+          "dist/machines/workspaces/invitation-authority.d.ts",
+          "dist/machines/workspaces/invitation-authority.js",
+          "dist/machines/workspaces/invitation-redemption.d.ts",
+          "dist/machines/workspaces/invitation-redemption.js",
+          "dist/machines/workspaces/journal-native.d.ts",
+          "dist/machines/workspaces/journal-native.js",
+          "dist/machines/workspaces/journal.d.ts",
+          "dist/machines/workspaces/journal.js",
+          "dist/machines/workspaces/naming.d.ts",
+          "dist/machines/workspaces/naming.js",
+          "dist/machines/workspaces/selection.d.ts",
+          "dist/machines/workspaces/selection.js",
+          "dist/machines/workspaces/startup.d.ts",
+          "dist/machines/workspaces/startup.js",
+          "dist/machines/workspaces/transaction-custody.d.ts",
+          "dist/machines/workspaces/transaction-custody.js",
+          "dist/paraglide/messages.d.ts",
+          "dist/paraglide/messages.js",
+          "dist/paraglide/messages/_index.d.ts",
+          "dist/paraglide/messages/_index.js",
+          "dist/paraglide/messages/actions_close.d.ts",
+          "dist/paraglide/messages/actions_close.js",
+          "dist/paraglide/messages/actions_retry.d.ts",
+          "dist/paraglide/messages/actions_retry.js",
+          "dist/paraglide/messages/actions_show_subject.d.ts",
+          "dist/paraglide/messages/actions_show_subject.js",
+          "dist/paraglide/messages/labels_subject_recovery.d.ts",
+          "dist/paraglide/messages/labels_subject_recovery.js",
+          "dist/paraglide/messages/nouns_account.d.ts",
+          "dist/paraglide/messages/nouns_account.js",
+          "dist/paraglide/messages/nouns_recovery_phrase.d.ts",
+          "dist/paraglide/messages/nouns_recovery_phrase.js",
+          "dist/paraglide/messages/package.json",
+          "dist/paraglide/messages/recovery_description.d.ts",
+          "dist/paraglide/messages/recovery_description.js",
+          "dist/paraglide/messages/recovery_failure.d.ts",
+          "dist/paraglide/messages/recovery_failure.js",
+          "dist/paraglide/messages/recovery_pending.d.ts",
+          "dist/paraglide/messages/recovery_pending.js",
+          "dist/paraglide/messages/recovery_phrase_label.d.ts",
+          "dist/paraglide/messages/recovery_phrase_label.js",
+          "dist/paraglide/messages/recovery_unavailable.d.ts",
+          "dist/paraglide/messages/recovery_unavailable.js",
+          "dist/paraglide/messages/recovery_warning.d.ts",
+          "dist/paraglide/messages/recovery_warning.js",
+          "dist/paraglide/registry.d.ts",
+          "dist/paraglide/registry.js",
+          "dist/paraglide/runtime.d.ts",
+          "dist/paraglide/runtime.js",
+          "dist/paraglide/server.d.ts",
+          "dist/paraglide/server.js",
+          "dist/presentation/workspace-selector.d.ts",
+          "dist/presentation/workspace-selector.js",
+          "dist/recovery.d.ts",
+          "dist/recovery.js",
+          "dist/session.d.ts",
+          "dist/session.js",
+          "dist/validation/form-issues.d.ts",
+          "dist/validation/form-issues.js",
+          "dist/workspace.d.ts",
+          "dist/workspace.js"
+        ]
+      },
+      "status": "Pending reproducible packaged-build comparison and consumer verification."
+    },
+    {
+      "repository": "delightful-clipper",
+      "commit": "2e0ae22805185daf5b1565acdf75892fec87c2a0",
+      "path": "vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+      "sha256": "28d2139b7eb377e365a821743bb4fe998de2cbc59066ca15bd78862867891407",
+      "consumers": [
+        {
+          "manifest": "apps/extension/package.json",
+          "field": "dependencies",
+          "package": "delightful-ui"
+        },
+        {
+          "manifest": "apps/web/package.json",
+          "field": "dependencies",
+          "package": "delightful-ui"
+        }
+      ],
+      "package": "delightful-ui",
+      "version": "0.0.25",
+      "selectedLibraryCommit": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "contract": {
+        "exports": {
+          "archive": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "selectedSource": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "equal": true
+        },
+        "peerDependencies": {
+          "archive": {
+            "svelte": "^5.57.2"
+          },
+          "selectedSource": {
+            "svelte": "^5.57.2"
+          },
+          "equal": true
+        },
+        "peerDependenciesMeta": {
+          "archive": {},
+          "selectedSource": {},
+          "equal": true
+        },
+        "dependencies": {
+          "archive": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "6.0.0-beta.1"
+          },
+          "selectedSource": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "6.0.0-beta.1"
+          },
+          "equal": true
+        }
+      },
+      "sourceComparison": {
+        "identical": [
+          {
+            "archivePath": "dist/Components/Button.svelte",
+            "sourcePath": "src/lib/Components/Button.svelte"
+          },
+          {
+            "archivePath": "dist/Components/ButtonContent.svelte",
+            "sourcePath": "src/lib/Components/ButtonContent.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Details.svelte",
+            "sourcePath": "src/lib/Components/Details.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Dialog.svelte",
+            "sourcePath": "src/lib/Components/Dialog.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Drawer.svelte",
+            "sourcePath": "src/lib/Components/Drawer.svelte"
+          },
+          {
+            "archivePath": "dist/Components/DrawerSection.svelte",
+            "sourcePath": "src/lib/Components/DrawerSection.svelte"
+          },
+          {
+            "archivePath": "dist/Components/FloatingActionButton.svelte",
+            "sourcePath": "src/lib/Components/FloatingActionButton.svelte"
+          },
+          {
+            "archivePath": "dist/Components/FloatingActionLink.svelte",
+            "sourcePath": "src/lib/Components/FloatingActionLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Heading.svelte",
+            "sourcePath": "src/lib/Components/Heading.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Icon.svelte",
+            "sourcePath": "src/lib/Components/Icon.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarFilePicker.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarFilePicker.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarImageTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarImageTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Checkbox.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Checkbox.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/FieldFeedback.svelte",
+            "sourcePath": "src/lib/Components/Inputs/FieldFeedback.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputAvatar.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputAvatar.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputCurrency.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputCurrency.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputDate.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputDate.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImage.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImages.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImages.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputNumber.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputNumber.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputRange.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputRange.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputText.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputText.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputWrapper.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputWrapper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/RadioGroup.svelte",
+            "sourcePath": "src/lib/Components/Inputs/RadioGroup.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/RadioItem.svelte",
+            "sourcePath": "src/lib/Components/Inputs/RadioItem.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Select.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Select.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/TagInput.svelte",
+            "sourcePath": "src/lib/Components/Inputs/TagInput.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Textarea.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Textarea.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingContent.svelte",
+            "sourcePath": "src/lib/Components/LoadingContent.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingScreen.svelte",
+            "sourcePath": "src/lib/Components/LoadingScreen.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingSpinner.svelte",
+            "sourcePath": "src/lib/Components/LoadingSpinner.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Navigation.svelte",
+            "sourcePath": "src/lib/Components/Navigation.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NavigationGroup.svelte",
+            "sourcePath": "src/lib/Components/NavigationGroup.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NavigationLink.svelte",
+            "sourcePath": "src/lib/Components/NavigationLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NumberKeypad.svelte",
+            "sourcePath": "src/lib/Components/NumberKeypad.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Pagination.svelte",
+            "sourcePath": "src/lib/Components/Pagination.svelte"
+          },
+          {
+            "archivePath": "dist/Components/PaginationItem.svelte",
+            "sourcePath": "src/lib/Components/PaginationItem.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Popover.svelte",
+            "sourcePath": "src/lib/Components/Popover.svelte"
+          },
+          {
+            "archivePath": "dist/Components/ScreenReaderText.svelte",
+            "sourcePath": "src/lib/Components/ScreenReaderText.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SkipButton.svelte",
+            "sourcePath": "src/lib/Components/SkipButton.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SkipLink.svelte",
+            "sourcePath": "src/lib/Components/SkipLink.svelte"
+          },
+          {
+            "archivePath": "dist/Components/StatusMessage.svelte",
+            "sourcePath": "src/lib/Components/StatusMessage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Stepper.svelte",
+            "sourcePath": "src/lib/Components/Stepper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/SwipeActions.svelte",
+            "sourcePath": "src/lib/Components/SwipeActions.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Table.svelte",
+            "sourcePath": "src/lib/Components/Table.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Text.svelte",
+            "sourcePath": "src/lib/Components/Text.svelte"
+          },
+          {
+            "archivePath": "dist/Components/TopNavigation.svelte",
+            "sourcePath": "src/lib/Components/TopNavigation.svelte"
+          },
+          {
+            "archivePath": "dist/Components/internal/FloatingActionFrame.svelte",
+            "sourcePath": "src/lib/Components/internal/FloatingActionFrame.svelte"
+          },
+          {
+            "archivePath": "dist/Components/internal/SkipControlFrame.svelte",
+            "sourcePath": "src/lib/Components/internal/SkipControlFrame.svelte"
+          },
+          {
+            "archivePath": "dist/fonts.css",
+            "sourcePath": "src/lib/fonts.css"
+          },
+          {
+            "archivePath": "dist/fonts/CascadiaCode-OFL.txt",
+            "sourcePath": "src/lib/fonts/CascadiaCode-OFL.txt"
+          },
+          {
+            "archivePath": "dist/fonts/Jost-OFL.txt",
+            "sourcePath": "src/lib/fonts/Jost-OFL.txt"
+          },
+          {
+            "archivePath": "dist/fonts/README.txt",
+            "sourcePath": "src/lib/fonts/README.txt"
+          },
+          {
+            "archivePath": "dist/fonts/cascadia-code-italic-variable.ttf",
+            "sourcePath": "src/lib/fonts/cascadia-code-italic-variable.ttf"
+          },
+          {
+            "archivePath": "dist/fonts/cascadia-code-variable.ttf",
+            "sourcePath": "src/lib/fonts/cascadia-code-variable.ttf"
+          },
+          {
+            "archivePath": "dist/fonts/jost-italic-variable.ttf",
+            "sourcePath": "src/lib/fonts/jost-italic-variable.ttf"
+          },
+          {
+            "archivePath": "dist/fonts/jost-variable.ttf",
+            "sourcePath": "src/lib/fonts/jost-variable.ttf"
+          },
+          {
+            "archivePath": "dist/theme.css",
+            "sourcePath": "src/lib/theme.css"
+          }
+        ],
+        "different": [],
+        "generatedOrUnmapped": [
+          "dist/Components/Button.svelte.d.ts",
+          "dist/Components/ButtonContent.svelte.d.ts",
+          "dist/Components/Details.svelte.d.ts",
+          "dist/Components/Dialog.svelte.d.ts",
+          "dist/Components/Drawer.svelte.d.ts",
+          "dist/Components/DrawerSection.svelte.d.ts",
+          "dist/Components/FloatingActionButton.svelte.d.ts",
+          "dist/Components/FloatingActionLink.svelte.d.ts",
+          "dist/Components/Heading.svelte.d.ts",
+          "dist/Components/Icon.svelte.d.ts",
+          "dist/Components/Inputs/AvatarFilePicker.svelte.d.ts",
+          "dist/Components/Inputs/AvatarImageTile.svelte.d.ts",
+          "dist/Components/Inputs/AvatarTile.svelte.d.ts",
+          "dist/Components/Inputs/Checkbox.svelte.d.ts",
+          "dist/Components/Inputs/FieldFeedback.svelte.d.ts",
+          "dist/Components/Inputs/InputAvatar.svelte.d.ts",
+          "dist/Components/Inputs/InputCurrency.svelte.d.ts",
+          "dist/Components/Inputs/InputDate.svelte.d.ts",
+          "dist/Components/Inputs/InputImage.svelte.d.ts",
+          "dist/Components/Inputs/InputImages.svelte.d.ts",
+          "dist/Components/Inputs/InputNumber.svelte.d.ts",
+          "dist/Components/Inputs/InputRange.svelte.d.ts",
+          "dist/Components/Inputs/InputText.svelte.d.ts",
+          "dist/Components/Inputs/InputWrapper.svelte.d.ts",
+          "dist/Components/Inputs/RadioGroup.svelte.d.ts",
+          "dist/Components/Inputs/RadioItem.svelte.d.ts",
+          "dist/Components/Inputs/Select.svelte.d.ts",
+          "dist/Components/Inputs/TagInput.svelte.d.ts",
+          "dist/Components/Inputs/Textarea.svelte.d.ts",
+          "dist/Components/Inputs/image-input.d.ts",
+          "dist/Components/Inputs/image-input.js",
+          "dist/Components/Inputs/radio-group.d.ts",
+          "dist/Components/Inputs/radio-group.js",
+          "dist/Components/LoadingContent.svelte.d.ts",
+          "dist/Components/LoadingScreen.svelte.d.ts",
+          "dist/Components/LoadingSpinner.svelte.d.ts",
+          "dist/Components/Navigation.svelte.d.ts",
+          "dist/Components/NavigationGroup.svelte.d.ts",
+          "dist/Components/NavigationLink.svelte.d.ts",
+          "dist/Components/NumberKeypad.svelte.d.ts",
+          "dist/Components/Pagination.svelte.d.ts",
+          "dist/Components/PaginationItem.svelte.d.ts",
+          "dist/Components/Popover.svelte.d.ts",
+          "dist/Components/ScreenReaderText.svelte.d.ts",
+          "dist/Components/SkipButton.svelte.d.ts",
+          "dist/Components/SkipLink.svelte.d.ts",
+          "dist/Components/StatusMessage.svelte.d.ts",
+          "dist/Components/Stepper.svelte.d.ts",
+          "dist/Components/SwipeActions.svelte.d.ts",
+          "dist/Components/Table.svelte.d.ts",
+          "dist/Components/Text.svelte.d.ts",
+          "dist/Components/TopNavigation.svelte.d.ts",
+          "dist/Components/internal/FloatingActionFrame.svelte.d.ts",
+          "dist/Components/internal/SkipControlFrame.svelte.d.ts",
+          "dist/Components/internal/swipe-actions.d.ts",
+          "dist/Components/internal/swipe-actions.js",
+          "dist/index.d.ts",
+          "dist/index.js",
+          "dist/types.d.ts",
+          "dist/typography.d.ts",
+          "dist/typography.js"
+        ]
+      },
+      "status": "Pending reproducible packaged-build comparison and consumer verification."
+    },
+    {
+      "repository": "delightful-local-first",
+      "commit": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "path": "vendor/delightful-ui-0.0.25-details-animation.tgz",
+      "sha256": "22485ae89113fd218af3d2d8f3211b16a8aa3a6428f09aeabd1568003bf038e2",
+      "consumers": [
+        {
+          "manifest": "package.json",
+          "field": "devDependencies",
+          "package": "delightful-ui"
+        }
+      ],
+      "package": "delightful-ui",
+      "version": "0.0.25",
+      "selectedLibraryCommit": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "contract": {
+        "exports": {
+          "archive": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "selectedSource": {
+            ".": {
+              "types": "./dist/index.d.ts",
+              "svelte": "./dist/index.js",
+              "default": "./dist/index.js"
+            },
+            "./theme.css": "./dist/theme.css"
+          },
+          "equal": true
+        },
+        "peerDependencies": {
+          "archive": {
+            "svelte": "^5.57.2"
+          },
+          "selectedSource": {
+            "svelte": "^5.57.2"
+          },
+          "equal": true
+        },
+        "peerDependenciesMeta": {
+          "archive": {},
+          "selectedSource": {},
+          "equal": true
+        },
+        "dependencies": {
+          "archive": {
+            "tdesign-icons-svg": "^0.4.7"
+          },
+          "selectedSource": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "6.0.0-beta.1"
+          },
+          "equal": false
+        }
+      },
+      "sourceComparison": {
+        "identical": [
+          {
+            "archivePath": "dist/Components/Inputs/AvatarFilePicker.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarFilePicker.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarImageTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarImageTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputAvatar.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputAvatar.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputDate.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputDate.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImages.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImages.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputNumber.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputNumber.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputText.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputText.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Select.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Select.svelte"
+          },
+          {
+            "archivePath": "dist/Components/ScreenReaderText.svelte",
+            "sourcePath": "src/lib/Components/ScreenReaderText.svelte"
+          }
+        ],
+        "different": [
+          {
+            "archivePath": "dist/Components/Button.svelte",
+            "sourcePath": "src/lib/Components/Button.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Details.svelte",
+            "sourcePath": "src/lib/Components/Details.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Dialog.svelte",
+            "sourcePath": "src/lib/Components/Dialog.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Drawer.svelte",
+            "sourcePath": "src/lib/Components/Drawer.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Heading.svelte",
+            "sourcePath": "src/lib/Components/Heading.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Icon.svelte",
+            "sourcePath": "src/lib/Components/Icon.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/AvatarTile.svelte",
+            "sourcePath": "src/lib/Components/Inputs/AvatarTile.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Checkbox.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Checkbox.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/FieldFeedback.svelte",
+            "sourcePath": "src/lib/Components/Inputs/FieldFeedback.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputCurrency.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputCurrency.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputImage.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputImage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputRange.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputRange.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/InputWrapper.svelte",
+            "sourcePath": "src/lib/Components/Inputs/InputWrapper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/TagInput.svelte",
+            "sourcePath": "src/lib/Components/Inputs/TagInput.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Inputs/Textarea.svelte",
+            "sourcePath": "src/lib/Components/Inputs/Textarea.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingScreen.svelte",
+            "sourcePath": "src/lib/Components/LoadingScreen.svelte"
+          },
+          {
+            "archivePath": "dist/Components/LoadingSpinner.svelte",
+            "sourcePath": "src/lib/Components/LoadingSpinner.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Navigation.svelte",
+            "sourcePath": "src/lib/Components/Navigation.svelte"
+          },
+          {
+            "archivePath": "dist/Components/NumberKeypad.svelte",
+            "sourcePath": "src/lib/Components/NumberKeypad.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Pagination.svelte",
+            "sourcePath": "src/lib/Components/Pagination.svelte"
+          },
+          {
+            "archivePath": "dist/Components/PaginationItem.svelte",
+            "sourcePath": "src/lib/Components/PaginationItem.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Popover.svelte",
+            "sourcePath": "src/lib/Components/Popover.svelte"
+          },
+          {
+            "archivePath": "dist/Components/StatusMessage.svelte",
+            "sourcePath": "src/lib/Components/StatusMessage.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Stepper.svelte",
+            "sourcePath": "src/lib/Components/Stepper.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Table.svelte",
+            "sourcePath": "src/lib/Components/Table.svelte"
+          },
+          {
+            "archivePath": "dist/Components/Text.svelte",
+            "sourcePath": "src/lib/Components/Text.svelte"
+          },
+          {
+            "archivePath": "dist/Components/TopNavigation.svelte",
+            "sourcePath": "src/lib/Components/TopNavigation.svelte"
+          },
+          {
+            "archivePath": "dist/theme.css",
+            "sourcePath": "src/lib/theme.css"
+          }
+        ],
+        "generatedOrUnmapped": [
+          "dist/Components/Button.svelte.d.ts",
+          "dist/Components/Details.svelte.d.ts",
+          "dist/Components/Dialog.svelte.d.ts",
+          "dist/Components/Drawer.svelte.d.ts",
+          "dist/Components/Heading.svelte.d.ts",
+          "dist/Components/Icon.svelte.d.ts",
+          "dist/Components/Inputs/AvatarFilePicker.svelte.d.ts",
+          "dist/Components/Inputs/AvatarImageTile.svelte.d.ts",
+          "dist/Components/Inputs/AvatarTile.svelte.d.ts",
+          "dist/Components/Inputs/Checkbox.svelte.d.ts",
+          "dist/Components/Inputs/FieldFeedback.svelte.d.ts",
+          "dist/Components/Inputs/InputAvatar.svelte.d.ts",
+          "dist/Components/Inputs/InputCurrency.svelte.d.ts",
+          "dist/Components/Inputs/InputDate.svelte.d.ts",
+          "dist/Components/Inputs/InputImage.svelte.d.ts",
+          "dist/Components/Inputs/InputImages.svelte.d.ts",
+          "dist/Components/Inputs/InputNumber.svelte.d.ts",
+          "dist/Components/Inputs/InputRange.svelte.d.ts",
+          "dist/Components/Inputs/InputText.svelte.d.ts",
+          "dist/Components/Inputs/InputWrapper.svelte.d.ts",
+          "dist/Components/Inputs/Select.svelte.d.ts",
+          "dist/Components/Inputs/TagInput.svelte.d.ts",
+          "dist/Components/Inputs/Textarea.svelte.d.ts",
+          "dist/Components/Inputs/image-input.d.ts",
+          "dist/Components/Inputs/image-input.js",
+          "dist/Components/LoadingScreen.svelte.d.ts",
+          "dist/Components/LoadingSpinner.svelte.d.ts",
+          "dist/Components/Navigation.svelte.d.ts",
+          "dist/Components/NumberKeypad.svelte.d.ts",
+          "dist/Components/Pagination.svelte.d.ts",
+          "dist/Components/PaginationItem.svelte.d.ts",
+          "dist/Components/Popover.svelte.d.ts",
+          "dist/Components/ScreenReaderText.svelte.d.ts",
+          "dist/Components/StatusMessage.svelte.d.ts",
+          "dist/Components/Stepper.svelte.d.ts",
+          "dist/Components/Table.svelte.d.ts",
+          "dist/Components/Text.svelte.d.ts",
+          "dist/Components/TopNavigation.svelte.d.ts",
+          "dist/index.d.ts",
+          "dist/index.js",
+          "dist/types.d.ts",
+          "dist/typography.d.ts",
+          "dist/typography.js"
+        ]
+      },
+      "status": "Pending reproducible packaged-build comparison and consumer verification."
+    }
+  ],
+  "comparisons": [
+    {
+      "left": 0,
+      "right": 2,
+      "onlyLeft": [],
+      "onlyRight": [
+        "dist/fonts.css",
+        "dist/fonts/CascadiaCode-OFL.txt",
+        "dist/fonts/Jost-OFL.txt",
+        "dist/fonts/README.txt",
+        "dist/fonts/cascadia-code-italic-variable.ttf",
+        "dist/fonts/cascadia-code-variable.ttf",
+        "dist/fonts/jost-italic-variable.ttf",
+        "dist/fonts/jost-variable.ttf"
+      ],
+      "different": [
+        "README.md",
+        "dist/Components/Button.svelte",
+        "dist/Components/Details.svelte",
+        "dist/Components/Inputs/AvatarTile.svelte",
+        "dist/Components/Inputs/Checkbox.svelte",
+        "dist/Components/Inputs/FieldFeedback.svelte",
+        "dist/Components/Inputs/InputCurrency.svelte",
+        "dist/Components/Inputs/InputImage.svelte",
+        "dist/Components/Inputs/InputWrapper.svelte",
+        "dist/Components/Inputs/RadioGroup.svelte",
+        "dist/Components/Inputs/RadioItem.svelte",
+        "dist/Components/Inputs/TagInput.svelte",
+        "dist/Components/NavigationLink.svelte",
+        "dist/Components/PaginationItem.svelte",
+        "dist/Components/SwipeActions.svelte",
+        "dist/Components/internal/FloatingActionFrame.svelte",
+        "dist/Components/internal/SkipControlFrame.svelte",
+        "dist/Components/internal/swipe-actions.d.ts",
+        "dist/Components/internal/swipe-actions.js",
+        "dist/theme.css",
+        "package.json"
+      ],
+      "identicalFileCount": 93
+    },
+    {
+      "left": 0,
+      "right": 4,
+      "onlyLeft": [],
+      "onlyRight": [
+        "dist/fonts.css",
+        "dist/fonts/CascadiaCode-OFL.txt",
+        "dist/fonts/Jost-OFL.txt",
+        "dist/fonts/README.txt",
+        "dist/fonts/cascadia-code-italic-variable.ttf",
+        "dist/fonts/cascadia-code-variable.ttf",
+        "dist/fonts/jost-italic-variable.ttf",
+        "dist/fonts/jost-variable.ttf"
+      ],
+      "different": [
+        "README.md",
+        "dist/Components/Button.svelte",
+        "dist/Components/Details.svelte",
+        "dist/Components/Inputs/AvatarTile.svelte",
+        "dist/Components/Inputs/Checkbox.svelte",
+        "dist/Components/Inputs/FieldFeedback.svelte",
+        "dist/Components/Inputs/InputCurrency.svelte",
+        "dist/Components/Inputs/InputImage.svelte",
+        "dist/Components/Inputs/InputWrapper.svelte",
+        "dist/Components/Inputs/RadioGroup.svelte",
+        "dist/Components/Inputs/RadioItem.svelte",
+        "dist/Components/Inputs/TagInput.svelte",
+        "dist/Components/NavigationLink.svelte",
+        "dist/Components/PaginationItem.svelte",
+        "dist/Components/SwipeActions.svelte",
+        "dist/Components/internal/FloatingActionFrame.svelte",
+        "dist/Components/internal/SkipControlFrame.svelte",
+        "dist/Components/internal/swipe-actions.d.ts",
+        "dist/Components/internal/swipe-actions.js",
+        "dist/theme.css",
+        "package.json"
+      ],
+      "identicalFileCount": 93
+    },
+    {
+      "left": 0,
+      "right": 5,
+      "onlyLeft": [
+        "dist/Components/ButtonContent.svelte",
+        "dist/Components/ButtonContent.svelte.d.ts",
+        "dist/Components/DrawerSection.svelte",
+        "dist/Components/DrawerSection.svelte.d.ts",
+        "dist/Components/FloatingActionButton.svelte",
+        "dist/Components/FloatingActionButton.svelte.d.ts",
+        "dist/Components/FloatingActionLink.svelte",
+        "dist/Components/FloatingActionLink.svelte.d.ts",
+        "dist/Components/Inputs/RadioGroup.svelte",
+        "dist/Components/Inputs/RadioGroup.svelte.d.ts",
+        "dist/Components/Inputs/RadioItem.svelte",
+        "dist/Components/Inputs/RadioItem.svelte.d.ts",
+        "dist/Components/Inputs/radio-group.d.ts",
+        "dist/Components/Inputs/radio-group.js",
+        "dist/Components/LoadingContent.svelte",
+        "dist/Components/LoadingContent.svelte.d.ts",
+        "dist/Components/NavigationGroup.svelte",
+        "dist/Components/NavigationGroup.svelte.d.ts",
+        "dist/Components/NavigationLink.svelte",
+        "dist/Components/NavigationLink.svelte.d.ts",
+        "dist/Components/SkipButton.svelte",
+        "dist/Components/SkipButton.svelte.d.ts",
+        "dist/Components/SkipLink.svelte",
+        "dist/Components/SkipLink.svelte.d.ts",
+        "dist/Components/SwipeActions.svelte",
+        "dist/Components/SwipeActions.svelte.d.ts",
+        "dist/Components/internal/FloatingActionFrame.svelte",
+        "dist/Components/internal/FloatingActionFrame.svelte.d.ts",
+        "dist/Components/internal/SkipControlFrame.svelte",
+        "dist/Components/internal/SkipControlFrame.svelte.d.ts",
+        "dist/Components/internal/swipe-actions.d.ts",
+        "dist/Components/internal/swipe-actions.js"
+      ],
+      "onlyRight": [],
+      "different": [
+        "README.md",
+        "dist/Components/Button.svelte",
+        "dist/Components/Button.svelte.d.ts",
+        "dist/Components/Details.svelte",
+        "dist/Components/Dialog.svelte",
+        "dist/Components/Drawer.svelte",
+        "dist/Components/Heading.svelte",
+        "dist/Components/Icon.svelte",
+        "dist/Components/Icon.svelte.d.ts",
+        "dist/Components/Inputs/AvatarTile.svelte",
+        "dist/Components/Inputs/Checkbox.svelte",
+        "dist/Components/Inputs/FieldFeedback.svelte",
+        "dist/Components/Inputs/InputCurrency.svelte",
+        "dist/Components/Inputs/InputRange.svelte",
+        "dist/Components/Inputs/InputWrapper.svelte",
+        "dist/Components/Inputs/TagInput.svelte",
+        "dist/Components/Inputs/TagInput.svelte.d.ts",
+        "dist/Components/Inputs/Textarea.svelte",
+        "dist/Components/LoadingScreen.svelte",
+        "dist/Components/LoadingSpinner.svelte",
+        "dist/Components/Navigation.svelte",
+        "dist/Components/NumberKeypad.svelte",
+        "dist/Components/Pagination.svelte",
+        "dist/Components/PaginationItem.svelte",
+        "dist/Components/Popover.svelte",
+        "dist/Components/StatusMessage.svelte",
+        "dist/Components/Stepper.svelte",
+        "dist/Components/Table.svelte",
+        "dist/Components/Text.svelte",
+        "dist/Components/TopNavigation.svelte",
+        "dist/index.d.ts",
+        "dist/index.js",
+        "dist/theme.css",
+        "package.json"
+      ],
+      "identicalFileCount": 48
+    },
+    {
+      "left": 1,
+      "right": 3,
+      "onlyLeft": [],
+      "onlyRight": [
+        "dist/contracts/domain-transaction.d.ts",
+        "dist/contracts/domain-transaction.js",
+        "dist/contracts/owned-operation.d.ts",
+        "dist/contracts/owned-operation.js",
+        "dist/contracts/sign-out.d.ts",
+        "dist/contracts/sign-out.js",
+        "dist/contracts/worker-channel.d.ts",
+        "dist/contracts/worker-channel.js",
+        "dist/contracts/worker-effect-drain.d.ts",
+        "dist/contracts/worker-effect-drain.js",
+        "dist/contracts/worker-request.d.ts",
+        "dist/contracts/worker-request.js",
+        "dist/machines/identity/ordered-sign-out.d.ts",
+        "dist/machines/identity/ordered-sign-out.js",
+        "dist/machines/lifecycle/owned-operation.d.ts",
+        "dist/machines/lifecycle/owned-operation.js",
+        "dist/machines/lifecycle/worker-channel.d.ts",
+        "dist/machines/lifecycle/worker-channel.js",
+        "dist/machines/lifecycle/worker-effect-drain.d.ts",
+        "dist/machines/lifecycle/worker-effect-drain.js",
+        "dist/machines/lifecycle/worker-request.d.ts",
+        "dist/machines/lifecycle/worker-request.js",
+        "dist/machines/workspaces/domain-transaction.d.ts",
+        "dist/machines/workspaces/domain-transaction.js"
+      ],
+      "different": [
+        "dist/backend/jazz/startup.d.ts",
+        "dist/backend/jazz/startup.js",
+        "dist/contracts/session.d.ts",
+        "dist/machines/identity/session-acquisition.d.ts",
+        "dist/machines/identity/session-acquisition.js",
+        "package.json"
+      ],
+      "identicalFileCount": 253
+    },
+    {
+      "left": 2,
+      "right": 4,
+      "onlyLeft": [],
+      "onlyRight": [],
+      "different": [],
+      "identicalFileCount": 122
+    },
+    {
+      "left": 2,
+      "right": 5,
+      "onlyLeft": [
+        "dist/Components/ButtonContent.svelte",
+        "dist/Components/ButtonContent.svelte.d.ts",
+        "dist/Components/DrawerSection.svelte",
+        "dist/Components/DrawerSection.svelte.d.ts",
+        "dist/Components/FloatingActionButton.svelte",
+        "dist/Components/FloatingActionButton.svelte.d.ts",
+        "dist/Components/FloatingActionLink.svelte",
+        "dist/Components/FloatingActionLink.svelte.d.ts",
+        "dist/Components/Inputs/RadioGroup.svelte",
+        "dist/Components/Inputs/RadioGroup.svelte.d.ts",
+        "dist/Components/Inputs/RadioItem.svelte",
+        "dist/Components/Inputs/RadioItem.svelte.d.ts",
+        "dist/Components/Inputs/radio-group.d.ts",
+        "dist/Components/Inputs/radio-group.js",
+        "dist/Components/LoadingContent.svelte",
+        "dist/Components/LoadingContent.svelte.d.ts",
+        "dist/Components/NavigationGroup.svelte",
+        "dist/Components/NavigationGroup.svelte.d.ts",
+        "dist/Components/NavigationLink.svelte",
+        "dist/Components/NavigationLink.svelte.d.ts",
+        "dist/Components/SkipButton.svelte",
+        "dist/Components/SkipButton.svelte.d.ts",
+        "dist/Components/SkipLink.svelte",
+        "dist/Components/SkipLink.svelte.d.ts",
+        "dist/Components/SwipeActions.svelte",
+        "dist/Components/SwipeActions.svelte.d.ts",
+        "dist/Components/internal/FloatingActionFrame.svelte",
+        "dist/Components/internal/FloatingActionFrame.svelte.d.ts",
+        "dist/Components/internal/SkipControlFrame.svelte",
+        "dist/Components/internal/SkipControlFrame.svelte.d.ts",
+        "dist/Components/internal/swipe-actions.d.ts",
+        "dist/Components/internal/swipe-actions.js",
+        "dist/fonts.css",
+        "dist/fonts/CascadiaCode-OFL.txt",
+        "dist/fonts/Jost-OFL.txt",
+        "dist/fonts/README.txt",
+        "dist/fonts/cascadia-code-italic-variable.ttf",
+        "dist/fonts/cascadia-code-variable.ttf",
+        "dist/fonts/jost-italic-variable.ttf",
+        "dist/fonts/jost-variable.ttf"
+      ],
+      "onlyRight": [],
+      "different": [
+        "README.md",
+        "dist/Components/Button.svelte",
+        "dist/Components/Button.svelte.d.ts",
+        "dist/Components/Details.svelte",
+        "dist/Components/Dialog.svelte",
+        "dist/Components/Drawer.svelte",
+        "dist/Components/Heading.svelte",
+        "dist/Components/Icon.svelte",
+        "dist/Components/Icon.svelte.d.ts",
+        "dist/Components/Inputs/AvatarTile.svelte",
+        "dist/Components/Inputs/Checkbox.svelte",
+        "dist/Components/Inputs/FieldFeedback.svelte",
+        "dist/Components/Inputs/InputCurrency.svelte",
+        "dist/Components/Inputs/InputImage.svelte",
+        "dist/Components/Inputs/InputRange.svelte",
+        "dist/Components/Inputs/InputWrapper.svelte",
+        "dist/Components/Inputs/TagInput.svelte",
+        "dist/Components/Inputs/TagInput.svelte.d.ts",
+        "dist/Components/Inputs/Textarea.svelte",
+        "dist/Components/LoadingScreen.svelte",
+        "dist/Components/LoadingSpinner.svelte",
+        "dist/Components/Navigation.svelte",
+        "dist/Components/NumberKeypad.svelte",
+        "dist/Components/Pagination.svelte",
+        "dist/Components/PaginationItem.svelte",
+        "dist/Components/Popover.svelte",
+        "dist/Components/StatusMessage.svelte",
+        "dist/Components/Stepper.svelte",
+        "dist/Components/Table.svelte",
+        "dist/Components/Text.svelte",
+        "dist/Components/TopNavigation.svelte",
+        "dist/index.d.ts",
+        "dist/index.js",
+        "dist/theme.css",
+        "package.json"
+      ],
+      "identicalFileCount": 47
+    },
+    {
+      "left": 4,
+      "right": 5,
+      "onlyLeft": [
+        "dist/Components/ButtonContent.svelte",
+        "dist/Components/ButtonContent.svelte.d.ts",
+        "dist/Components/DrawerSection.svelte",
+        "dist/Components/DrawerSection.svelte.d.ts",
+        "dist/Components/FloatingActionButton.svelte",
+        "dist/Components/FloatingActionButton.svelte.d.ts",
+        "dist/Components/FloatingActionLink.svelte",
+        "dist/Components/FloatingActionLink.svelte.d.ts",
+        "dist/Components/Inputs/RadioGroup.svelte",
+        "dist/Components/Inputs/RadioGroup.svelte.d.ts",
+        "dist/Components/Inputs/RadioItem.svelte",
+        "dist/Components/Inputs/RadioItem.svelte.d.ts",
+        "dist/Components/Inputs/radio-group.d.ts",
+        "dist/Components/Inputs/radio-group.js",
+        "dist/Components/LoadingContent.svelte",
+        "dist/Components/LoadingContent.svelte.d.ts",
+        "dist/Components/NavigationGroup.svelte",
+        "dist/Components/NavigationGroup.svelte.d.ts",
+        "dist/Components/NavigationLink.svelte",
+        "dist/Components/NavigationLink.svelte.d.ts",
+        "dist/Components/SkipButton.svelte",
+        "dist/Components/SkipButton.svelte.d.ts",
+        "dist/Components/SkipLink.svelte",
+        "dist/Components/SkipLink.svelte.d.ts",
+        "dist/Components/SwipeActions.svelte",
+        "dist/Components/SwipeActions.svelte.d.ts",
+        "dist/Components/internal/FloatingActionFrame.svelte",
+        "dist/Components/internal/FloatingActionFrame.svelte.d.ts",
+        "dist/Components/internal/SkipControlFrame.svelte",
+        "dist/Components/internal/SkipControlFrame.svelte.d.ts",
+        "dist/Components/internal/swipe-actions.d.ts",
+        "dist/Components/internal/swipe-actions.js",
+        "dist/fonts.css",
+        "dist/fonts/CascadiaCode-OFL.txt",
+        "dist/fonts/Jost-OFL.txt",
+        "dist/fonts/README.txt",
+        "dist/fonts/cascadia-code-italic-variable.ttf",
+        "dist/fonts/cascadia-code-variable.ttf",
+        "dist/fonts/jost-italic-variable.ttf",
+        "dist/fonts/jost-variable.ttf"
+      ],
+      "onlyRight": [],
+      "different": [
+        "README.md",
+        "dist/Components/Button.svelte",
+        "dist/Components/Button.svelte.d.ts",
+        "dist/Components/Details.svelte",
+        "dist/Components/Dialog.svelte",
+        "dist/Components/Drawer.svelte",
+        "dist/Components/Heading.svelte",
+        "dist/Components/Icon.svelte",
+        "dist/Components/Icon.svelte.d.ts",
+        "dist/Components/Inputs/AvatarTile.svelte",
+        "dist/Components/Inputs/Checkbox.svelte",
+        "dist/Components/Inputs/FieldFeedback.svelte",
+        "dist/Components/Inputs/InputCurrency.svelte",
+        "dist/Components/Inputs/InputImage.svelte",
+        "dist/Components/Inputs/InputRange.svelte",
+        "dist/Components/Inputs/InputWrapper.svelte",
+        "dist/Components/Inputs/TagInput.svelte",
+        "dist/Components/Inputs/TagInput.svelte.d.ts",
+        "dist/Components/Inputs/Textarea.svelte",
+        "dist/Components/LoadingScreen.svelte",
+        "dist/Components/LoadingSpinner.svelte",
+        "dist/Components/Navigation.svelte",
+        "dist/Components/NumberKeypad.svelte",
+        "dist/Components/Pagination.svelte",
+        "dist/Components/PaginationItem.svelte",
+        "dist/Components/Popover.svelte",
+        "dist/Components/StatusMessage.svelte",
+        "dist/Components/Stepper.svelte",
+        "dist/Components/Table.svelte",
+        "dist/Components/Text.svelte",
+        "dist/Components/TopNavigation.svelte",
+        "dist/index.d.ts",
+        "dist/index.js",
+        "dist/theme.css",
+        "package.json"
+      ],
+      "identicalFileCount": 47
+    }
+  ]
+}
