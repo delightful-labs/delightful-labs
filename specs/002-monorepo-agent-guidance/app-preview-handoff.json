@@ -1,0 +1,149 @@
+{
+  "checkedAt": "2026-11-11",
+  "status": "Preview builds ready; live acceptance and production cutover pending",
+  "verifiedMaster": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+  "postMergeCI": {
+    "foundation": 43070849739,
+    "finance": 43070849413,
+    "clipper": 43070849827,
+    "result": "all passed"
+  },
+  "upstreamReview": {
+    "financeMain": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+    "financeOpenDraft67": "8ac042576360d82a21c64a643eab97f09e4bdf7c",
+    "clipperMain": "0fd1cb389e8fccc9e5eecb642f9c0f10fa42d5e6",
+    "clipperPR38ImportedHead": "4972bd3a43587c26afe854325f16bdc9d1d1d72e",
+    "clipperPR38CurrentHead": "8eccbd2dc70cb56a5c1f0ce2e8adf97a4dcfefb1",
+    "clipperNewCommits": "Two source CI-only commits; no additional product delta. Corresponding image/home fixes already exist in monorepo CI. Source PR remains open."
+  },
+  "apps": [
+    {
+      "app": "finance",
+      "projectId": "prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa",
+      "productionSettingsVerifiedUnchanged": {
+        "id": "prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa",
+        "name": "delightful-finances",
+        "rootDirectory": null,
+        "framework": "sveltekit",
+        "sourceFilesOutsideRootDirectory": true,
+        "buildCommand": null,
+        "installCommand": null,
+        "outputDirectory": null,
+        "nodeVersion": "24.x",
+        "git": {
+          "type": "github",
+          "repo": "delightful-finances",
+          "repoId": 1414641322,
+          "org": "delightful-labs",
+          "productionBranch": "main"
+        }
+      },
+      "preview": {
+        "deploymentId": "dpl_AgyCZnW8913nmnLgvDCoNcxW1wPv",
+        "url": "https://delightful-finances-jsl3mwois-mjamesderochers-projects.vercel.app/",
+        "state": "READY",
+        "target": "preview",
+        "rootDirectory": "apps/finance",
+        "sourceFilesOutsideRootDirectory": true,
+        "skipGitConnectDuringLink": true,
+        "branch": "mono",
+        "sourceRepository": "delightful-labs/delightful-labs",
+        "commit": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+        "generatedDriveNameLength": 64,
+        "storageIsolation": "Native SDK project/preview/branch-specific name; production name unchanged"
+      },
+      "browserAcceptance": {
+        "pageHttpStatus": 200,
+        "pageErrorCount": 1,
+        "status": "Pending protected service-worker access approval; not qualified",
+        "observedServiceWorkerIssue": "Vercel authentication redirects the native service-worker script request despite short-lived OIDC headers on page requests"
+      },
+      "proposedProductionCutover": {
+        "requiresExplicitApproval": true,
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "rootDirectory": "apps/finance",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "preserve": [
+          "project identity",
+          "custom domains",
+          "production environment variables",
+          "production Jazz core name and stored data",
+          "extension release identity"
+        ],
+        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval."
+      }
+    },
+    {
+      "app": "clipper",
+      "projectId": "prj_9Dw5akTMo6EogWyGPHPKdOsRNWHT",
+      "productionSettingsVerifiedUnchanged": {
+        "id": "prj_9Dw5akTMo6EogWyGPHPKdOsRNWHT",
+        "name": "delightful-clipper",
+        "rootDirectory": "apps/web",
+        "framework": "sveltekit",
+        "sourceFilesOutsideRootDirectory": true,
+        "buildCommand": "pnpm run build",
+        "installCommand": "pnpm install --frozen-lockfile",
+        "outputDirectory": null,
+        "nodeVersion": "24.x",
+        "git": {
+          "type": "github",
+          "repo": "delightful-clipper",
+          "repoId": 481105109,
+          "org": "delightful-labs",
+          "productionBranch": "main"
+        }
+      },
+      "preview": {
+        "deploymentId": "dpl_E9dkf6NG749ZLwgYiJaWB2muo5VF",
+        "url": "https://delightful-clipper-ff05z7la8-mjamesderochers-projects.vercel.app/",
+        "state": "READY",
+        "target": "preview",
+        "rootDirectory": "apps/clipper/apps/web",
+        "sourceFilesOutsideRootDirectory": true,
+        "skipGitConnectDuringLink": true,
+        "branch": "mono",
+        "sourceRepository": "delightful-labs/delightful-labs",
+        "commit": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+        "generatedDriveNameLength": 64,
+        "storageIsolation": "Native SDK project/preview/branch-specific name; production name unchanged"
+      },
+      "browserAcceptance": {
+        "pageHttpStatus": 200,
+        "pageErrorCount": 0,
+        "status": "Pending protected service-worker access approval; not qualified",
+        "observedServiceWorkerIssue": "Vercel authentication redirects the native service-worker script request despite short-lived OIDC headers on page requests"
+      },
+      "proposedProductionCutover": {
+        "requiresExplicitApproval": true,
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "rootDirectory": "apps/clipper/apps/web",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "preserve": [
+          "project identity",
+          "custom domains",
+          "production environment variables",
+          "production Jazz core name and stored data",
+          "extension release identity"
+        ],
+        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval."
+      }
+    }
+  ],
+  "testAccess": {
+    "shortLivedDevelopmentOidc": "Page and asset requests accepted; native service-worker requests still redirect",
+    "existingBrowserSession": "Automatic approval review rejected reuse as not explicitly authorized; that path was not retried",
+    "temporaryShareLinks": "Explicit user approval requested for these two previews; no links created"
+  },
+  "cleanup": {
+    "accidentalCliProbeProject": "Created by unexpected env-run CLI behavior, then deleted; no app project was modified",
+    "privateDevelopmentTokenFiles": "Both temporary development-token files removed before handoff; no secrets committed. New short-lived credentials can be obtained if needed after access approval."
+  },
+  "previewRuntimeErrorScan": "Deployment-scoped error/fatal log queries returned no entries; this does not replace pending browser acceptance."
+}
