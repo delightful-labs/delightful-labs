@@ -16,7 +16,9 @@ the original specification remains the reviewed requirements baseline.
   wiring slice; [local qualification passed](local-first-import.md), including
   unit, packaged-consumer, native backup/restore and Storybook checks. A fixture
   Vite allow-list regression was fixed without changing library behavior.
-  Alpha.60 consumer adaptations remain a separate compatibility step.
+  The user also approved the [alpha.60 source adapters](alpha60-adapters.md);
+  their full unit, package, native, restore and Storybook qualification passed.
+  Consumer archives remain unchanged pending patch reconciliation and app imports.
 - Finance and Clipper imports, consumer workspace links, cross-project guidance
   reconciliation and remaining qualification are pending.
 

@@ -8,7 +8,7 @@ function callCount() {
 const detached = []
 const authority = createJazzInvitationAuthority(
 	{
-		withAttributionForRequest: async () => {
+		forReqUser: async () => {
 			calls++
 			const error = new Error('synthetic-private-credential')
 			error.name = 'RequestAuthenticationError'

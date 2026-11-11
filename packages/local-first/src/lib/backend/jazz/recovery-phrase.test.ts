@@ -11,6 +11,7 @@ async function hostAccount() {
 	const manager = await createAccountManager({
 		appId: 'recovery-adapter-unit',
 		serverUrl: 'http://127.0.0.1:9',
+		bearer: () => 'synthetic-host-token',
 		store: {
 			read: async () => stored,
 			update: async (transform) => {
@@ -160,10 +161,6 @@ describe('Jazz recovery adapter', () => {
 	it('keeps absent and SDK-issued external identities unavailable', async () => {
 		const { manager } = await hostAccount()
 		const identity = { issuer: 'https://identity.example.test', subject: 'external-fixture' }
-		const payload = Buffer.from(
-			JSON.stringify({ iss: identity.issuer, sub: identity.subject })
-		).toString('base64url')
-		const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
 		vi.mocked(fetch).mockResolvedValueOnce(
 			new Response(
 				JSON.stringify({
@@ -173,7 +170,7 @@ describe('Jazz recovery adapter', () => {
 				{ headers: { 'Content-Type': 'application/json' } }
 			)
 		)
-		const external: AccountHandle = await manager.loginJWT(`${header}.${payload}.fixture-signature`)
+		const external: AccountHandle = await manager.loginWithBackend()
 		const adapter = createJazzRecoveryAdapter(() => manager.getLoggedIn())
 		expect(adapter.observeAccount(undefined)).toEqual({ kind: 'unavailable' })
 		expect(adapter.observeAccount(external)).toEqual({ kind: 'unavailable' })

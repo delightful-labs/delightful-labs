@@ -10,7 +10,7 @@ import {
 import 'delightful-local-first/session/contracts'
 
 const backend = createJazzSessionAcquisition({
-	appId: 'package-session',
+	scope: 'package-session',
 	serverUrl: 'http://127.0.0.1:9'
 })
 if (typeof backend.capability.open !== 'function') throw new Error('Session creation entry missing')
@@ -83,11 +83,8 @@ const readinessBinding = createJazzSessionReadinessAdapter({
 	},
 	createLocalFirst: unused,
 	restoreLocalFirst: unused,
-	becomeBackend: unused,
-	registerJWT: unused,
-	loginJWT: unused,
-	loginOrRegisterJWT: unused,
-	linkJWT: unused,
+	loginWithBackend: unused,
+	linkWithBackend: unused,
 	logout: unused,
 	close: unused
 })

@@ -1,15 +1,15 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { schema as s, type Db, type Transaction } from 'jazz-tools'
-import { RequestAuthenticationError, type JazzClient } from 'jazz-tools/backend'
+import { RequestAuthenticationError, NoJazzAccountError, type Jazz } from 'jazz-tools/backend'
 import { createPolicyTestApp, type PolicyTestApp } from 'jazz-tools/testing'
 import { createActor } from 'xstate'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import { createInvitationAuthorityMachine } from '../../machines/workspaces/invitation-authority.js'
-import type { ExclusiveWriteHandle } from 'jazz-tools'
+import type { SerializableWriteHandle } from 'jazz-tools'
 import { createJazzInvitationAuthority } from './invitation-authority.js'
 
 // This is a native delegation fixture, not the future invitation schema or its access policy.
-const app = s.defineApp({ notes: s.table({ text: s.string() }, {}) })
+const app = s.defineApp({ notes: s.table({ text: s.string() }, {}) }, { migrations: 'none' })
 const permissions = s.definePermissions(app, ({ policy }) => {
 	policy.notes.allowRead.always()
 	policy.notes.allowInsert.always()
@@ -36,27 +36,27 @@ afterAll(async () => {
 })
 afterEach(() => vi.restoreAllMocks())
 function adapter() {
-	const verify = vi.fn<JazzClient['withAttributionForRequest']>().mockResolvedValue(db)
+	const verify = vi.fn<Jazz['forReqUser']>().mockResolvedValue(db)
 	const retain =
 		vi.fn<
 			(
 				accountId: string,
 				custody: import('../../contracts/transaction-custody.js').DetachedTransaction<
-					Transaction<'exclusive'>,
-					Readonly<{ write: ExclusiveWriteHandle }>
+					Transaction<'serializable'>,
+					Readonly<{ write: SerializableWriteHandle }>
 				>
 			) => void
 		>()
 	return {
 		verify,
 		retain,
-		authority: createJazzInvitationAuthority({ withAttributionForRequest: verify }, retain)
+		authority: createJazzInvitationAuthority({ forReqUser: verify }, retain)
 	}
 }
 function request() {
 	return new Request('https://example.test/redeem', {
 		method: 'POST',
-		headers: { authorization: 'Bearer synthetic-original', cookie: 'ignored-cookie' },
+		headers: { authorization: 'Bearer synthetic-original', cookie: 'synthetic-session=original' },
 		body: JSON.stringify({ accountId: 'forged-body-account', code: 'synthetic-private-code' })
 	})
 }
@@ -76,9 +76,14 @@ describe('Jazz invitation authority boundary', () => {
 		expect(result.outcome).toBe('admitted')
 		if (result.outcome !== 'admitted') throw new Error('Expected admission')
 		expect(result.accountId).toBe(accountId)
-		expect(f.verify).toHaveBeenCalledExactlyOnceWith({
-			headers: { authorization: 'Bearer synthetic-original' }
-		})
+		expect(f.verify).toHaveBeenCalledOnce()
+		const captured = f.verify.mock.calls[0]?.[0]
+		expect(captured).toBeInstanceOf(Request)
+		expect(captured?.url).toBe('https://example.test/redeem')
+		expect(captured?.method).toBe('POST')
+		expect(captured?.headers.get('authorization')).toBe('Bearer synthetic-original')
+		expect(captured?.headers.get('cookie')).toBe('synthetic-session=original')
+		expect(captured?.body).toBeNull()
 		expect(incoming.bodyUsed).toBe(false)
 		expect(Object.keys(result).sort()).toEqual(['accountId', 'outcome', 'transactions'])
 		expect(JSON.stringify(result)).not.toContain('synthetic-')
@@ -92,11 +97,16 @@ describe('Jazz invitation authority boundary', () => {
 		const incoming = request()
 		const result = f.authority.admit(incoming)
 		incoming.headers.set('authorization', 'Bearer synthetic-replaced')
+		incoming.headers.set('cookie', 'synthetic-session=replaced')
 		await result
-		expect(f.verify).toHaveBeenCalledExactlyOnceWith({
-			headers: { authorization: 'Bearer synthetic-original' }
-		})
-		expect(Object.isFrozen(f.verify.mock.calls[0]?.[0].headers)).toBe(true)
+		expect(f.verify).toHaveBeenCalledOnce()
+		const captured = f.verify.mock.calls[0]?.[0]
+		expect(captured).toBeInstanceOf(Request)
+		expect(captured?.url).toBe('https://example.test/redeem')
+		expect(captured?.method).toBe('POST')
+		expect(captured?.headers.get('authorization')).toBe('Bearer synthetic-original')
+		expect(captured?.headers.get('cookie')).toBe('synthetic-session=original')
+		expect(captured?.body).toBeNull()
 	})
 	it('keeps interleaved request credentials separate', async () => {
 		const f = adapter()
@@ -104,12 +114,10 @@ describe('Jazz invitation authority boundary', () => {
 			second = request()
 		second.headers.set('authorization', 'Bearer second-caller')
 		await Promise.all([f.authority.admit(first), f.authority.admit(second)])
-		expect(f.verify).toHaveBeenNthCalledWith(1, {
-			headers: { authorization: 'Bearer synthetic-original' }
-		})
-		expect(f.verify).toHaveBeenNthCalledWith(2, {
-			headers: { authorization: 'Bearer second-caller' }
-		})
+		expect(f.verify.mock.calls[0]?.[0].headers.get('authorization')).toBe(
+			'Bearer synthetic-original'
+		)
+		expect(f.verify.mock.calls[1]?.[0].headers.get('authorization')).toBe('Bearer second-caller')
 	})
 	it.each(['missing', 'malformed', 'expired', 'rejected'])(
 		'returns unauthenticated for an SDK %s credential rejection',
@@ -121,7 +129,7 @@ describe('Jazz invitation authority boundary', () => {
 			expect(await f.authority.admit(incoming)).toEqual({ outcome: 'unauthenticated' })
 			expect(f.verify).toHaveBeenCalledOnce()
 			if (reason === 'missing')
-				expect(f.verify).toHaveBeenCalledWith({ headers: { authorization: undefined } })
+				expect(f.verify.mock.calls[0]?.[0].headers.get('authorization')).toBeNull()
 		}
 	)
 	it('recognizes the documented cross-copy authentication error', async () => {
@@ -131,6 +139,22 @@ describe('Jazz invitation authority boundary', () => {
 		f.verify.mockRejectedValue(error)
 		expect(await f.authority.admit(request())).toEqual({ outcome: 'unauthenticated' })
 	})
+	it.each(['native', 'cross-copy'])(
+		'returns unauthenticated for a %s no-account verdict',
+		async (kind) => {
+			const f = adapter()
+			const error =
+				kind === 'native'
+					? new NoJazzAccountError('synthetic-user', 'fixture')
+					: Object.assign(new Error('synthetic-private-user'), {
+							name: 'NoJazzAccountError',
+							code: 'no_account'
+						})
+			f.verify.mockRejectedValue(error)
+			expect(await f.authority.admit(request())).toEqual({ outcome: 'unauthenticated' })
+			expect(f.verify).toHaveBeenCalledOnce()
+		}
+	)
 	it('keeps authority outage distinct from invalid authentication and drops raw error text', async () => {
 		const f = adapter()
 		f.verify.mockRejectedValue(new Error('Bearer synthetic-private-credential'))
@@ -145,24 +169,24 @@ describe('Jazz invitation authority boundary', () => {
 	it('contains header-capture errors without invoking admission', async () => {
 		const f = adapter()
 		const incoming = request()
-		vi.spyOn(incoming.headers, 'get').mockImplementation(() => {
+		vi.spyOn(incoming, 'headers', 'get').mockImplementation(() => {
 			throw new Error('synthetic-sensitive-header')
 		})
 		expect(await f.authority.admit(incoming)).toEqual({ outcome: 'unavailable' })
 		expect(f.verify).not.toHaveBeenCalled()
 	})
 	it('does not open a transaction on admission or close the host database', async () => {
-		const open = vi.spyOn(db, 'beginExclusiveTransaction'),
+		const open = vi.spyOn(db, 'beginSerializableTransaction'),
 			close = vi.spyOn(db, 'shutdown')
 		await admitted()
 		expect(open).not.toHaveBeenCalled()
 		expect(close).not.toHaveBeenCalled()
 	})
-	it('preserves the native exclusive receipt and confirms only through tierless authority wait', async () => {
+	it('preserves the native serializable receipt and confirms only through tierless authority wait', async () => {
 		const { result } = await admitted()
 		const access = result.transactions
 		const tx = await access.open()
-		expect(tx.kind).toBe('exclusive')
+		expect(tx.kind).toBe('serializable')
 		const row = await tx.one(app.notes.where({ id: noteId }))
 		expect(row?.text).toBe('before')
 		tx.update(app.notes, noteId, { text: 'confirmed' })
@@ -204,7 +228,7 @@ describe('Jazz invitation authority boundary', () => {
 	it('preserves acquisition failure without inventing an acquired handle', async () => {
 		const { result } = await admitted()
 		const failure = new Error('synthetic acquisition failure')
-		vi.spyOn(db, 'beginExclusiveTransaction').mockImplementation(() => {
+		vi.spyOn(db, 'beginSerializableTransaction').mockImplementation(() => {
 			throw failure
 		})
 		expect(() => result.transactions.open()).toThrow(failure)
@@ -222,7 +246,7 @@ describe('Jazz invitation authority boundary', () => {
 	})
 	it('preserves authority confirmation rejection and never substitutes local persistence', async () => {
 		const { result } = await admitted()
-		const tx: Transaction<'exclusive'> = await result.transactions.open()
+		const tx: Transaction<'serializable'> = await result.transactions.open()
 		const envelope = await result.transactions.commit(tx)
 		// Drain the real empty transaction before injecting a rejected confirmation for this boundary.
 		await envelope.write.wait()
@@ -234,7 +258,7 @@ describe('Jazz invitation authority boundary', () => {
 })
 
 describe('native transaction custody handoff', () => {
-	it('retains an actual Jazz exclusive transaction after owner stop for host rollback', async () => {
+	it('retains an actual Jazz serializable transaction after owner stop for host rollback', async () => {
 		const f = adapter(),
 			read = deferred<void>()
 		const actor = createActor(
@@ -268,7 +292,7 @@ describe('native transaction custody handoff', () => {
 			if (!handoff) throw new Error('Missing native custody')
 			expect(handoff[0]).toBe(accountId)
 			const native = await handoff[1].acquisition
-			expect(native.kind).toBe('exclusive')
+			expect(native.kind).toBe('serializable')
 			read.resolve()
 			await handoff[1].pending
 			expect(handoff[1].commit).toBeUndefined()

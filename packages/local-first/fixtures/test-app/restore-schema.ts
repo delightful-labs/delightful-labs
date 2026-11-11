@@ -1,75 +1,78 @@
 import { schema as s } from 'jazz-tools'
 
 /** Disposable restore-control lane, outside DLF domain exports. Activation is an owner-only phase transition. */
-export const testAppRestoreApp = s.defineApp({
-	restoreDestinations: s.table(
-		{
-			ownerId: s.uuid(),
-			operationId: s.string(),
-			payloadSha256: s.string(),
-			graphSha256: s.string(),
-			status: s.enum('incomplete', 'active')
-		},
-		{
-			attachments: s.reverse('restoreAttachments', 'destination'),
-			notebooks: s.reverse('restoreNotebooks', 'destination'),
-			notes: s.reverse('restoreNotes', 'destination')
-		}
-	),
-	restoreNotes: s.table(
-		{
-			destinationId: s.uuid(),
-			ownerId: s.uuid(),
-			operationId: s.string(),
-			notebookId: s.uuid(),
-			attachmentId: s.uuid().optional(),
-			body: s.string(),
-			archived: s.boolean()
-		},
-		{
-			destination: s.rel('restoreDestinations', 'destinationId'),
-			notebook: s.rel('restoreNotebooks', 'notebookId'),
-			attachment: s.rel('restoreAttachments', 'attachmentId')
-		}
-	),
+export const testAppRestoreApp = s.defineApp(
+	{
+		restoreDestinations: s.table(
+			{
+				ownerId: s.uuid(),
+				operationId: s.string(),
+				payloadSha256: s.string(),
+				graphSha256: s.string(),
+				status: s.enum('incomplete', 'active')
+			},
+			{
+				attachments: s.reverse('restoreAttachments', 'destination'),
+				notebooks: s.reverse('restoreNotebooks', 'destination'),
+				notes: s.reverse('restoreNotes', 'destination')
+			}
+		),
+		restoreNotes: s.table(
+			{
+				destinationId: s.uuid(),
+				ownerId: s.uuid(),
+				operationId: s.string(),
+				notebookId: s.uuid(),
+				attachmentId: s.uuid().optional(),
+				body: s.string(),
+				archived: s.boolean()
+			},
+			{
+				destination: s.rel('restoreDestinations', 'destinationId'),
+				notebook: s.rel('restoreNotebooks', 'notebookId'),
+				attachment: s.rel('restoreAttachments', 'attachmentId')
+			}
+		),
 
-	restoreNotebooks: s.table(
-		{
-			destinationId: s.uuid(),
-			ownerId: s.uuid(),
-			operationId: s.string(),
-			title: s.string()
-		},
-		{ destination: s.rel('restoreDestinations', 'destinationId') }
-	),
-	restoreAttachments: s.table(
-		{
-			destinationId: s.uuid(),
-			ownerId: s.uuid(),
-			operationId: s.string(),
-			mediaType: s.string(),
-			fileName: s.string(),
-			sizeBytes: s.int(),
-			sha256: s.string(),
-			contents: s.bytes()
-		},
-		{ destination: s.rel('restoreDestinations', 'destinationId') }
-	)
-})
+		restoreNotebooks: s.table(
+			{
+				destinationId: s.uuid(),
+				ownerId: s.uuid(),
+				operationId: s.string(),
+				title: s.string()
+			},
+			{ destination: s.rel('restoreDestinations', 'destinationId') }
+		),
+		restoreAttachments: s.table(
+			{
+				destinationId: s.uuid(),
+				ownerId: s.uuid(),
+				operationId: s.string(),
+				mediaType: s.string(),
+				fileName: s.string(),
+				sizeBytes: s.int(),
+				sha256: s.string(),
+				contents: s.bytes()
+			},
+			{ destination: s.rel('restoreDestinations', 'destinationId') }
+		)
+	},
+	{ migrations: 'none' }
+)
 
 export const testAppRestorePermissions = s.definePermissions(
 	testAppRestoreApp,
 	({ policy, session, allOf, anyOf }) => {
-		policy.restoreDestinations.allowRead.where({ ownerId: session.user.account })
+		policy.restoreDestinations.allowRead.where({ ownerId: session.user })
 		policy.restoreDestinations.allowInsert.where({
-			ownerId: session.user.account,
+			ownerId: session.user,
 			status: 'incomplete'
 		})
 		policy.restoreDestinations.allowUpdate
-			.whereOld({ ownerId: session.user.account, status: 'incomplete' })
+			.whereOld({ ownerId: session.user, status: 'incomplete' })
 			.whereNew((row) =>
 				allOf([
-					{ ownerId: session.user.account, status: 'active' },
+					{ ownerId: session.user, status: 'active' },
 					policy.restoreDestinations.exists.where({
 						id: row.id,
 						ownerId: row.ownerId,
@@ -83,27 +86,27 @@ export const testAppRestorePermissions = s.definePermissions(
 		policy.restoreDestinations.allowDelete.never()
 		policy.restoreNotes.allowRead.where((row) =>
 			allOf([
-				{ ownerId: session.user.account },
+				{ ownerId: session.user },
 				policy.restoreDestinations.exists.where({
 					id: row.destinationId,
-					ownerId: session.user.account,
+					ownerId: session.user,
 					operationId: row.operationId
 				})
 			])
 		)
 		policy.restoreNotes.allowInsert.where((row) =>
 			allOf([
-				{ ownerId: session.user.account },
+				{ ownerId: session.user },
 				policy.restoreDestinations.exists.where({
 					id: row.destinationId,
-					ownerId: session.user.account,
+					ownerId: session.user,
 					operationId: row.operationId,
 					status: 'incomplete'
 				}),
 				policy.restoreNotebooks.exists.where({
 					id: row.notebookId,
 					destinationId: row.destinationId,
-					ownerId: session.user.account,
+					ownerId: session.user,
 					operationId: row.operationId
 				}),
 				anyOf([
@@ -111,7 +114,7 @@ export const testAppRestorePermissions = s.definePermissions(
 					policy.restoreAttachments.exists.where({
 						id: row.attachmentId,
 						destinationId: row.destinationId,
-						ownerId: session.user.account,
+						ownerId: session.user,
 						operationId: row.operationId
 					})
 				])
@@ -122,20 +125,20 @@ export const testAppRestorePermissions = s.definePermissions(
 
 		policy.restoreNotebooks.allowRead.where((row) =>
 			allOf([
-				{ ownerId: session.user.account },
+				{ ownerId: session.user },
 				policy.restoreDestinations.exists.where({
 					id: row.destinationId,
-					ownerId: session.user.account,
+					ownerId: session.user,
 					operationId: row.operationId
 				})
 			])
 		)
 		policy.restoreNotebooks.allowInsert.where((row) =>
 			allOf([
-				{ ownerId: session.user.account },
+				{ ownerId: session.user },
 				policy.restoreDestinations.exists.where({
 					id: row.destinationId,
-					ownerId: session.user.account,
+					ownerId: session.user,
 					operationId: row.operationId,
 					status: 'incomplete'
 				})
@@ -146,20 +149,20 @@ export const testAppRestorePermissions = s.definePermissions(
 
 		policy.restoreAttachments.allowRead.where((row) =>
 			allOf([
-				{ ownerId: session.user.account },
+				{ ownerId: session.user },
 				policy.restoreDestinations.exists.where({
 					id: row.destinationId,
-					ownerId: session.user.account,
+					ownerId: session.user,
 					operationId: row.operationId
 				})
 			])
 		)
 		policy.restoreAttachments.allowInsert.where((row) =>
 			allOf([
-				{ ownerId: session.user.account },
+				{ ownerId: session.user },
 				policy.restoreDestinations.exists.where({
 					id: row.destinationId,
-					ownerId: session.user.account,
+					ownerId: session.user,
 					operationId: row.operationId,
 					status: 'incomplete'
 				})

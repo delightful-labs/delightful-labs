@@ -1,5 +1,9 @@
 # Slice 3: Local First source import — workspace integration qualified
 
+This record describes the qualified alpha.59 slice at `5e66936`. The subsequent
+[alpha.60 adapter implementation](alpha60-adapters.md) has separate review and
+qualification requirements; the results here do not qualify that later change.
+
 ## Source and history
 
 Source repository: `delightful-labs/delightful-local-first`, selected main revision

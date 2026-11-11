@@ -1,5 +1,5 @@
 import { RecoveryPhrase } from 'jazz-tools/passphrase'
-import type { JazzSession } from 'jazz-tools/svelte'
+import type { JazzSession } from 'jazz-tools/client'
 import type { RestorationCapability, RestorationScope } from '../../contracts/restoration.js'
 
 export type JazzRestorationAdapter = Readonly<{

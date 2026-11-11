@@ -36,15 +36,15 @@ describe('Jazz subscription function boundary', () => {
 		{ create: createQuerySubscription, constructor: native.many },
 		{ create: createQuerySubscriptionOne, constructor: native.one }
 	])('preserves caller tiers and re-evaluates reactive options', ({ create, constructor }) => {
-		let tier: 'local' | 'global' = 'global'
+		let tier: 'local-first' | 'remote' = 'remote'
 		const supplied = vi.fn(() => ({ tier }))
 		create(undefined, supplied)
 		expect(supplied).not.toHaveBeenCalled()
 		const options = constructor.mock.calls[0]?.[1]
 		if (typeof options !== 'function') throw new Error('Expected lazy native options')
-		expect(options()).toEqual({ tier: 'global' })
-		tier = 'local'
-		expect(options()).toEqual({ tier: 'local' })
+		expect(options()).toEqual({ tier: 'remote' })
+		tier = 'local-first'
+		expect(options()).toEqual({ tier: 'local-first' })
 		expect(supplied).toHaveBeenCalledTimes(2)
 	})
 	it('preserves explicit static options without mutating the caller object', () => {

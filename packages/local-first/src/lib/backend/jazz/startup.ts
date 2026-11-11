@@ -1,6 +1,6 @@
 import { createActor } from 'xstate'
 import type { ActorRefFrom } from 'xstate'
-import type { JazzClient, JazzSession, JazzSessionConfig } from 'jazz-tools/svelte'
+import type { JazzClient, JazzSession, JazzClientConfig } from 'jazz-tools/client'
 import { createJazzSessionAcquisition } from './session.js'
 import { createSessionAcquisitionMachine, selectAcquiredSession } from '../../session.js'
 import type { SessionOwnerRef } from '../../session.js'
@@ -15,9 +15,9 @@ export function createJazzStartupRegistry(
 	acquire: typeof createJazzSessionAcquisition = createJazzSessionAcquisition
 ) {
 	// One browser-scoped actor reference, not a second session/promise cache. The actor owns acquisition.
-	let shared: { owner: Owner; binding: object; config: JazzSessionConfig } | undefined
+	let shared: { owner: Owner; binding: object; config: JazzClientConfig } | undefined
 
-	function sameConfiguration(left: JazzSessionConfig, right: JazzSessionConfig): boolean {
+	function sameConfiguration(left: JazzClientConfig, right: JazzClientConfig): boolean {
 		const expected: Record<string, unknown> = { ...left }
 		const actual: Record<string, unknown> = { ...right }
 		return (
@@ -31,7 +31,7 @@ export function createJazzStartupRegistry(
 	}
 
 	/** Browser mount binding only. The retained owner survives layout detach and pending SDK creation. */
-	function getJazzStartupBinding(config: JazzSessionConfig): JazzStartupBinding {
+	function getJazzStartupBinding(config: JazzClientConfig): JazzStartupBinding {
 		if (shared && !sameConfiguration(shared.config, config)) {
 			throw new Error('Jazz environment replacement requires coordinated cleanup')
 		}

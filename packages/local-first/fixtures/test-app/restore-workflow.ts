@@ -61,7 +61,7 @@ export function createTestAppRestoreWorkflow(
 		identity: createCallbackLogic<RestoreEvent, BackupBinding>(({ input, sendBack }) => {
 			try {
 				return db.onAuthChanged((state) =>
-					sendBack({ type: 'IDENTITY', binding: input, identityId: state.session?.user.account })
+					sendBack({ type: 'IDENTITY', binding: input, identityId: state.session?.user })
 				)
 			} catch {
 				sendBack({ type: 'IDENTITY_FAILED', binding: input })

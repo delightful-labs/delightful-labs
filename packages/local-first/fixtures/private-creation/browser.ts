@@ -1,23 +1,31 @@
-import { createJazzSession, exportLocalFirstSecret } from 'jazz-tools'
+import { createJazzClient } from 'jazz-tools/client'
+import { exportLocalFirstSecret } from 'jazz-tools'
 import { app } from './schema.js'
 
 const config = new URLSearchParams(location.search)
 const appId = config.get('appId'),
 	serverUrl = config.get('serverUrl')
 if (!appId || !serverUrl) throw new Error('Missing isolated fixture configuration')
-const session = await createJazzSession({ appId, serverUrl, initial: 'local-first' })
+const session = await createJazzClient({
+	scope: appId,
+	serverUrl,
+	initial: 'local-first',
+	client: () => import('jazz-tools/local-first')
+})
 const snapshot = session.getSnapshot()
 if (!snapshot.client) throw new Error('Fixture session is not ready')
+await snapshot.client.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
 const db = snapshot.client.db
-await db.one(app.workspaces.where({ id: crypto.randomUUID() }), { tier: 'local' })
-const ownerId = snapshot.client.session?.user.account
+if (!db.isLocalFirst()) throw new Error('Fixture requires persistent local-first storage')
+await db.one(app.workspaces.where({ id: crypto.randomUUID() }), { tier: 'local-first' })
+const ownerId = snapshot.client.session?.user
 if (!ownerId) throw new Error('Fixture owner missing')
 
 // Test controls expose individual SDK boundaries; the test owns ordering and process termination.
-const transactions = new Map<string, ReturnType<typeof db.beginExclusiveTransaction>>()
+const transactions = new Map<string, ReturnType<typeof db.beginSerializableTransaction>>()
 const commits = new Map<
 	string,
-	ReturnType<ReturnType<typeof db.beginExclusiveTransaction>['commit']>
+	ReturnType<ReturnType<typeof db.beginSerializableTransaction>['commit']>
 >()
 const controls = {
 	ownerId,
@@ -30,7 +38,7 @@ const controls = {
 		return session.restoreLocalFirst(credential)
 	},
 	acquire(key: string) {
-		transactions.set(key, db.beginExclusiveTransaction())
+		transactions.set(key, db.beginSerializableTransaction())
 	},
 	stage(key: string, operationId: string, workspaceId: string) {
 		const tx = transactions.get(key)
@@ -57,10 +65,10 @@ const controls = {
 		if (!tx) throw new Error('Missing transaction')
 		return tx.rollback()
 	},
-	readWorkspace(id: string, tier: 'local' | 'remote') {
+	readWorkspace(id: string, tier: 'local-first' | 'remote') {
 		return db.one(app.workspaces.where({ id }), { tier })
 	},
-	readOperation(id: string, tier: 'local' | 'remote') {
+	readOperation(id: string, tier: 'local-first' | 'remote') {
 		return db.one(app.creationOperations.where({ id }), { tier })
 	}
 }

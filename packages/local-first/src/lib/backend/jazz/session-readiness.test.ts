@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { JazzSession } from 'jazz-tools/svelte'
+import type { JazzSession } from 'jazz-tools/client'
 import type { SessionStatus } from '../../contracts/session.js'
 import { createJazzSessionReadinessAdapter } from './session-readiness.js'
 
@@ -12,11 +12,8 @@ function fixture(status: SessionStatus = 'ready') {
 		retry: vi.fn(async () => {}),
 		createLocalFirst: unused,
 		restoreLocalFirst: unused,
-		becomeBackend: unused,
-		registerJWT: unused,
-		loginJWT: unused,
-		loginOrRegisterJWT: unused,
-		linkJWT: unused,
+		loginWithBackend: unused,
+		linkWithBackend: unused,
 		logout: unused,
 		close: unused
 	} satisfies JazzSession<object>

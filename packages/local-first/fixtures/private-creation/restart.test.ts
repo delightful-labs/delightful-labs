@@ -3,9 +3,9 @@ import { chromium } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
 import { createServer, searchForWorkspaceRoot } from 'vite'
 import type { ViteDevServer } from 'vite'
-import { jazzPlugin } from 'jazz-tools/dev/vite'
-import { startLocalJazzServer } from 'jazz-tools/testing'
-import type { LocalJazzServerHandle } from 'jazz-tools/testing'
+import { jazzFixtureAssets } from '../test-app/jazz-vite.js'
+import { startTestJazz } from 'jazz-tools/testing'
+import type { TestJazz } from 'jazz-tools/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
@@ -13,17 +13,21 @@ import { app } from './schema.js'
 import permissions from './permissions.js'
 import type {} from './browser.js'
 
-let authority: LocalJazzServerHandle, web: ViteDevServer, profile: string
+let authority: TestJazz, web: ViteDevServer, profile: string
 const contexts: BrowserContext[] = []
 let url: string
 beforeAll(async () => {
-	authority = await startLocalJazzServer({ schema: app, permissions })
+	authority = await startTestJazz({
+		app,
+		permissions,
+		jazz: { allowedOrigins: ['http://127.0.0.1:6198'] }
+	})
 	profile = await mkdtemp(join(tmpdir(), 'dlf-private-creation-'))
 	web = await createServer({
 		configFile: false,
+		...jazzFixtureAssets(),
 		cacheDir: resolve('node_modules/.vite/dlf-private-creation'),
 		root: resolve('fixtures/private-creation'),
-		plugins: [jazzPlugin({ server: false, appId: authority.appId, inspector: false })],
 		server: {
 			host: '127.0.0.1',
 			port: 6198,
@@ -74,8 +78,8 @@ it('confirms exclusive creation, restarts the browser process and recovers the e
 	expect(await browser.page.evaluate(() => window.creationFixture.ownerId)).toBe(owner)
 	const records = await browser.page.evaluate(
 		async (ids) => ({
-			workspace: await window.creationFixture.readWorkspace(ids.workspaceId, 'local'),
-			operation: await window.creationFixture.readOperation(ids.operationId, 'local')
+			workspace: await window.creationFixture.readWorkspace(ids.workspaceId, 'local-first'),
+			operation: await window.creationFixture.readOperation(ids.operationId, 'local-first')
 		}),
 		ids
 	)
@@ -234,8 +238,8 @@ it('reads the persisted accepted pair after process kill with the authority stop
 	// Establish the local read-back before destroying every browser runtime owner.
 	const before = await browser.page.evaluate(
 		async (ids) => ({
-			workspace: await window.creationFixture.readWorkspace(ids.workspaceId, 'local'),
-			operation: await window.creationFixture.readOperation(ids.operationId, 'local')
+			workspace: await window.creationFixture.readWorkspace(ids.workspaceId, 'local-first'),
+			operation: await window.creationFixture.readOperation(ids.operationId, 'local-first')
 		}),
 		ids
 	)
@@ -246,8 +250,8 @@ it('reads the persisted accepted pair after process kill with the authority stop
 	browser = await open()
 	const after = await browser.page.evaluate(
 		async (ids) => ({
-			workspace: await window.creationFixture.readWorkspace(ids.workspaceId, 'local'),
-			operation: await window.creationFixture.readOperation(ids.operationId, 'local')
+			workspace: await window.creationFixture.readWorkspace(ids.workspaceId, 'local-first'),
+			operation: await window.creationFixture.readOperation(ids.operationId, 'local-first')
 		}),
 		ids
 	)

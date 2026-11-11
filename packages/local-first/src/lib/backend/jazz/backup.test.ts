@@ -5,10 +5,10 @@ import {
 	createExportReader as reader,
 	testExportProfile as profile
 } from '../../../../fixtures/native-capture/export-reader.js'
-import { createJazzSession, type JazzClient } from 'jazz-tools/backend'
-import { startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
+import { createJazzClient, type JazzClient } from 'jazz-tools/backend'
+import { startTestJazz, type TestJazz } from 'jazz-tools/testing'
 import type { JazzSession } from 'jazz-tools/client'
-import type { Db, Transaction } from 'jazz-tools'
+import { PersistedWriteRejectedError, type Db, type Transaction } from 'jazz-tools'
 import {
 	app,
 	permissions,
@@ -27,45 +27,27 @@ import { createArchiveEnvelopeMachine } from '../../machines/backup/envelope.js'
 import { prepareArchiveOpen, type ArchiveProtection } from '../../backup/envelope-api.js'
 import type { ArchiveHandoffFile, ArchiveHandoffObservation } from './backup-api.js'
 
-let authority: LocalJazzServerHandle
+let authority: TestJazz
 const sessions: JazzSession<JazzClient>[] = []
 let db: Db, writer: Db
 let identityId: string
 beforeAll(async () => {
-	const server = await startLocalJazzServer({
-		schema: app,
-		permissions,
-		inMemory: true,
-		allowLocalFirstAuth: true
-	})
+	const server = await startTestJazz({ app, permissions })
 	authority = server
-	const selections: ('local-first' | { backendSecret: string })[] = [
-		'local-first',
-		{ backendSecret: server.backendSecret }
-	]
-	for (const initial of selections)
-		sessions.push(
-			await createJazzSession({
-				appId: server.appId,
-				serverUrl: server.url,
-				app,
-				permissions,
-				initial,
-				driver: { type: 'memory' }
-			})
-		)
-	const first = sessions[0]?.getSnapshot(),
-		second = sessions[1]?.getSnapshot()
-	if (
-		first?.status !== 'ready' ||
-		!first.client ||
-		second?.status !== 'ready' ||
-		!second.client ||
-		!first.account
-	)
+	const session = await createJazzClient({
+		appId: server.appId,
+		serverUrl: server.url,
+		app,
+		permissions,
+		initial: 'local-first',
+		driver: { type: 'memory' }
+	})
+	sessions.push(session)
+	const first = session.getSnapshot()
+	if (first.status !== 'ready' || !first.client || !first.account)
 		throw new Error('Disposable client startup failed')
 	db = first.client.db
-	writer = second.client.db
+	writer = server.jazz.db
 	identityId = first.account.id
 	db.onMutationError(() => {})
 }, 30000)
@@ -159,9 +141,9 @@ function start(
 }
 
 function observeTransaction() {
-	const begin = db.beginExclusiveTransaction.bind(db)
-	let opened: Transaction<'exclusive'> | undefined
-	vi.spyOn(db, 'beginExclusiveTransaction').mockImplementationOnce(() => {
+	const begin = db.beginSerializableTransaction.bind(db)
+	let opened: Transaction<'serializable'> | undefined
+	vi.spyOn(db, 'beginSerializableTransaction').mockImplementationOnce(() => {
 		opened = begin()
 		return opened
 	})
@@ -172,6 +154,23 @@ function observeTransaction() {
 }
 
 describe('native Jazz archive export', () => {
+	it.each(['serialization_conflict', 'exclusive_conflict', 'transaction_conflict'])(
+		'classifies %s as a changed source rather than a successful capture',
+		async (code) => {
+			const write = writer.insert(
+				app.workspaces,
+				{ revision: 0, allowed: true, visible: true },
+				{ id: crypto.randomUUID() }
+			)
+			await write.wait({ tier: 'global' })
+			expect(
+				classifyJazzArchiveFailure(
+					new PersistedWriteRejectedError(await write.txId, code, 'synthetic-conflict')
+				)
+			).toBe('sourceChanged')
+		}
+	)
+
 	it('releases an unstarted request once and rejects later use', async () => {
 		const graph = await seed(),
 			input = options(graph)
@@ -350,7 +349,7 @@ describe('native Jazz archive export', () => {
 		const graph = await seed(),
 			input = options(graph)
 		const transaction = observeTransaction()
-		let commit: MockInstance<Transaction<'exclusive'>['commit']> | undefined
+		let commit: MockInstance<Transaction<'serializable'>['commit']> | undefined
 		const prepare = payloadCodec.prepareArchivePayload
 		let encoded: Uint8Array | undefined
 		vi.spyOn(payloadCodec, 'prepareArchivePayload').mockImplementation((...args) => {

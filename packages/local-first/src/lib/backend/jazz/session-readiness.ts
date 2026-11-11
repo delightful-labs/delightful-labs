@@ -1,4 +1,4 @@
-import type { JazzSession } from 'jazz-tools/svelte'
+import type { JazzSession } from 'jazz-tools/client'
 import type { SessionReadinessBinding } from '../../contracts/session.js'
 
 /** Bind the host's acquired session without reading, subscribing, creating, or replacing it. */

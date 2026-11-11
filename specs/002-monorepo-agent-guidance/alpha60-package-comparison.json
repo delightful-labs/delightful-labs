@@ -1,0 +1,151 @@
+{
+  "package": "delightful-local-first",
+  "sourceBaselineCommit": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+  "sourceChanges": [
+    {
+      "path": "src/lib/backend/jazz/backup.test.ts",
+      "baselineSha256": "8dc9411bef090d0ff3b56c0fba207c1c44678effdf00ae01e119bc422c8952b6",
+      "workingSha256": "d40a456218077462f0fdcb1f3045ad9dcf831b0602e9474f27fb05f617fb310a"
+    },
+    {
+      "path": "src/lib/backend/jazz/backup.ts",
+      "baselineSha256": "2ee5694980870e64068001d5e7d395f65d8d96a0e171fec56a059a2dc60255b0",
+      "workingSha256": "e5948a34db318c000e31b64ce1465d7b1200ca21cbf0c8ce1db1e7f99cff7b2e"
+    },
+    {
+      "path": "src/lib/backend/jazz/data.test.ts",
+      "baselineSha256": "93e17af4ecfd3fd861694f316e88c10fd00813da55f30096a589b5f6d24d71a2",
+      "workingSha256": "44329d78f460535261a22389ae9ecc1e53db3d3d677c188a5ebaba18d3a3ed8e"
+    },
+    {
+      "path": "src/lib/backend/jazz/invitation-authority.test.ts",
+      "baselineSha256": "6c9865cdbdf961b232334c2059b9c91df97905de48602c7de185901993084fc0",
+      "workingSha256": "3571f9cc3392aaada87fd5b4c1227b9b75e626dd77ff031b34ddf6eeadb6cf34"
+    },
+    {
+      "path": "src/lib/backend/jazz/invitation-authority.ts",
+      "baselineSha256": "c71b657a8a02f7c9dc6208a4f7e0a86b1323f2363725a969e814f0d65400f55b",
+      "workingSha256": "f01919a05b01abb200cbd1779b59004149d2292b13725bab9c56794a010d488d"
+    },
+    {
+      "path": "src/lib/backend/jazz/invitation-policy.test.ts",
+      "baselineSha256": "52d6f928e511d505a95f98b7e21b59e44bf6d2d92bf25ceffeded0f96e2f1caf",
+      "workingSha256": "3454b56bd5d526fec6f34fd8c581ddb83ad1914c200cd5ea181ce4328dc28845"
+    },
+    {
+      "path": "src/lib/backend/jazz/recovery-phrase.test.ts",
+      "baselineSha256": "cb61c05089c72d1611d46e6528331d679318a711815ee58c7128a45759f06b79",
+      "workingSha256": "8e0a4957554ec2d72b1400d515753d173e1ed6092b87a53292d9094588781ff1"
+    },
+    {
+      "path": "src/lib/backend/jazz/restoration.test.ts",
+      "baselineSha256": "672ae4df0027c781049a768f2a09a6d6924cc9f895b093b87578eaa5faa47c92",
+      "workingSha256": "24dcf7636a7ed028346a296a0af510be5ef545e3e8cd64cbad74944fc077fecb"
+    },
+    {
+      "path": "src/lib/backend/jazz/restoration.ts",
+      "baselineSha256": "a645ff46bf2c0a003618cd8ed10e0b9c06d1b04c9a9c5e6287d4ab7109839d8c",
+      "workingSha256": "9f2fae161b4908b13832a3757ddb79c93506cc275021a0eb23abeffdb8c4b960"
+    },
+    {
+      "path": "src/lib/backend/jazz/session-readiness.test.ts",
+      "baselineSha256": "57ef25c98be29457a254fad1369d04718e484b441affe906dbd8481bbcfc7226",
+      "workingSha256": "53468f5eccdb724d34033ce421bdad567d8b1d23c347ad7fae155998677c724b"
+    },
+    {
+      "path": "src/lib/backend/jazz/session-readiness.ts",
+      "baselineSha256": "e94431f8be87f941bcfc617432a55176e16926b51487fb2b7be7e93f33d76a5f",
+      "workingSha256": "49c7562b00c05b708a1318373d70e48bd622a50de9b99f2b112956a3db206aea"
+    },
+    {
+      "path": "src/lib/backend/jazz/session.test.ts",
+      "baselineSha256": "4834f9e4e7e28d5bbf4176c53524f39ff713a8470b2068d27e4910cc2051805e",
+      "workingSha256": "0dfc393af55005727a5fa599ddcbd2b9b0c816c230521f0fbbe83e187eb9d6f5"
+    },
+    {
+      "path": "src/lib/backend/jazz/session.ts",
+      "baselineSha256": "51940c67eab768c882c17e80c654c1fb900aaa52d392c90c136b995c604a62a0",
+      "workingSha256": "1e934c4b43d6720e9cf897445b16d9ef7649dd0cb7a467020d9c1ce6b1afe305"
+    },
+    {
+      "path": "src/lib/backend/jazz/startup.test.ts",
+      "baselineSha256": "a67a8466692d662540b7e951132a6c25d0d0d458155e375fdb60c86f7b3891a3",
+      "workingSha256": "742f6c2247d60f93dacf2478279ca9aa436a6f7cb8e86df8d6c601ac0a319a42"
+    },
+    {
+      "path": "src/lib/backend/jazz/startup.ts",
+      "baselineSha256": "5319ba8331ab3a96ef504a3c843e45777b267117d96a53d66fbbc0ad75d602f6",
+      "workingSha256": "ce6953faa4aa32ffed994e4552480e28978589c61ab8717421f057500c68a93a"
+    }
+  ],
+  "sourceFilesChecked": 174,
+  "observedToolchain": {
+    "node": "v24.22.2",
+    "pnpm": "10.28.0"
+  },
+  "comparisonScope": "Publishable dist files after declared test/spec exclusions; package contracts audited separately.",
+  "results": [
+    {
+      "repository": "delightful-finances",
+      "sourceCommit": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "archive": "vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
+      "archiveSha256": "9dac0f2658e3b12fdfe45462707b5894abeaa3a3ca086b29e809a39129a32abd",
+      "identicalFileCount": 247,
+      "different": [
+        "dist/backend/jazz/backup.js",
+        "dist/backend/jazz/invitation-authority.d.ts",
+        "dist/backend/jazz/invitation-authority.js",
+        "dist/backend/jazz/startup.d.ts",
+        "dist/backend/jazz/startup.js",
+        "dist/contracts/session.d.ts",
+        "dist/machines/identity/session-acquisition.d.ts",
+        "dist/machines/identity/session-acquisition.js",
+        "dist/machines/workspaces/creation-persistence.d.ts",
+        "dist/machines/workspaces/journal.d.ts"
+      ],
+      "onlyArchive": [],
+      "onlyBuild": [
+        "dist/contracts/domain-transaction.d.ts",
+        "dist/contracts/domain-transaction.js",
+        "dist/contracts/owned-operation.d.ts",
+        "dist/contracts/owned-operation.js",
+        "dist/contracts/sign-out.d.ts",
+        "dist/contracts/sign-out.js",
+        "dist/contracts/worker-channel.d.ts",
+        "dist/contracts/worker-channel.js",
+        "dist/contracts/worker-effect-drain.d.ts",
+        "dist/contracts/worker-effect-drain.js",
+        "dist/contracts/worker-request.d.ts",
+        "dist/contracts/worker-request.js",
+        "dist/machines/identity/ordered-sign-out.d.ts",
+        "dist/machines/identity/ordered-sign-out.js",
+        "dist/machines/lifecycle/owned-operation.d.ts",
+        "dist/machines/lifecycle/owned-operation.js",
+        "dist/machines/lifecycle/worker-channel.d.ts",
+        "dist/machines/lifecycle/worker-channel.js",
+        "dist/machines/lifecycle/worker-effect-drain.d.ts",
+        "dist/machines/lifecycle/worker-effect-drain.js",
+        "dist/machines/lifecycle/worker-request.d.ts",
+        "dist/machines/lifecycle/worker-request.js",
+        "dist/machines/workspaces/domain-transaction.d.ts",
+        "dist/machines/workspaces/domain-transaction.js"
+      ]
+    },
+    {
+      "repository": "delightful-clipper",
+      "sourceCommit": "2e0ae22805185daf5b1565acdf75892fec87c2a0",
+      "archive": "vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
+      "archiveSha256": "8812fc4825b6b0f53ca199c84dc41b328cf7edb2c0163db425b6651c25a028ee",
+      "identicalFileCount": 276,
+      "different": [
+        "dist/backend/jazz/backup.js",
+        "dist/backend/jazz/invitation-authority.d.ts",
+        "dist/backend/jazz/invitation-authority.js",
+        "dist/machines/workspaces/creation-persistence.d.ts",
+        "dist/machines/workspaces/journal.d.ts"
+      ],
+      "onlyArchive": [],
+      "onlyBuild": []
+    }
+  ]
+}

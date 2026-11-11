@@ -4,10 +4,8 @@ import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { chromium, type Browser } from '@playwright/test'
 import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
-import { jazzPlugin } from 'jazz-tools/dev/vite'
-import { createJazzSession, type JazzClient } from 'jazz-tools/backend'
-import { startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
-import type { JazzSession } from 'jazz-tools/client'
+import { jazzFixtureAssets } from '../test-app/jazz-vite.js'
+import { startTestJazz, type TestJazz } from 'jazz-tools/testing'
 import type { Db } from 'jazz-tools'
 import { createActor, toPromise } from 'xstate'
 import { app, permissions, bytes, readGraph } from './schema.js'
@@ -16,32 +14,15 @@ import { prepareArchiveOpen } from '../../src/lib/backup/envelope-api.js'
 import { createArchiveEnvelopeMachine } from '../../src/lib/machines/backup/envelope.js'
 import type {} from './export-browser.js'
 
-let authority: LocalJazzServerHandle, session: JazzSession<JazzClient>, writer: Db
+let authority: TestJazz, writer: Db
 let web: ViteDevServer, browser: Browser, url: string, directory: string
 beforeAll(async () => {
-	authority = await startLocalJazzServer({
-		schema: app,
-		permissions,
-		inMemory: true,
-		allowLocalFirstAuth: true
-	})
-	session = await createJazzSession({
-		appId: authority.appId,
-		app,
-		permissions,
-		serverUrl: authority.url,
-		driver: { type: 'memory' },
-		initial: { backendSecret: authority.backendSecret }
-	})
-	const client = session.getSnapshot().client
-	if (!client) throw new Error('Disposable writer missing')
-	writer = client.db
 	web = await createServer({
 		configFile: false,
+		...jazzFixtureAssets(),
 		root: resolve('fixtures/native-capture'),
 		cacheDir: resolve('node_modules/.vite/native-export'),
 		plugins: [
-			jazzPlugin({ server: false, appId: authority.appId, inspector: false }),
 			{
 				name: 'native-export-document',
 				configureServer(host) {
@@ -65,6 +46,12 @@ beforeAll(async () => {
 	await web.listen()
 	const address = web.httpServer?.address()
 	if (!address || typeof address === 'string') throw new Error('Disposable listener missing')
+	authority = await startTestJazz({
+		app,
+		permissions,
+		jazz: { allowedOrigins: [`http://127.0.0.1:${address.port}`] }
+	})
+	writer = authority.jazz.db
 	url = `http://127.0.0.1:${address.port}/?appId=${authority.appId}&serverUrl=${encodeURIComponent(authority.url)}`
 	process.stdout.write(
 		`Disposable native export qualification: http://127.0.0.1:${address.port}/\n`
@@ -75,7 +62,6 @@ beforeAll(async () => {
 afterAll(async () => {
 	await browser?.close()
 	await web?.close()
-	await session?.close()
 	await authority?.stop()
 	if (directory) await rm(directory, { recursive: true, force: true })
 })
@@ -118,6 +104,8 @@ it.each(['none', 'password'])(
 			await page.goto(url)
 			await page.waitForFunction(() => Boolean(window.NativeArchiveExport))
 			const downloading = page.waitForEvent('download')
+			// Keep teardown from producing an unhandled rejection if an earlier assertion fails.
+			void downloading.catch(() => {})
 			const result = await page.evaluate(
 				({ graph, kind }) =>
 					window.NativeArchiveExport.export(

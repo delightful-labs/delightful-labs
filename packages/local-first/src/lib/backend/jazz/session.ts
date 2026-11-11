@@ -1,15 +1,15 @@
-import { createJazzSession } from 'jazz-tools'
-import type { JazzSessionConfig } from 'jazz-tools/svelte'
+import { createJazzClient } from 'jazz-tools/client'
+import type { JazzClientConfig } from 'jazz-tools/client'
 import type { SessionOpenCapability } from '../../contracts/session.js'
 
 /** Capture one configured backend leaf. The host creates/retains the acquisition owner in-browser. */
-export function createJazzSessionAcquisition(config: JazzSessionConfig): Readonly<{
+export function createJazzSessionAcquisition(config: JazzClientConfig): Readonly<{
 	binding: object
-	capability: SessionOpenCapability<Awaited<ReturnType<typeof createJazzSession>>>
+	capability: SessionOpenCapability<Awaited<ReturnType<typeof createJazzClient>>>
 }> {
 	const captured = { ...config }
 	return {
 		binding: Object.freeze({}),
-		capability: { open: () => createJazzSession(captured) }
+		capability: { open: () => createJazzClient(captured) }
 	}
 }

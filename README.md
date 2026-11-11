@@ -41,11 +41,12 @@ See the [website slice record](specs/002-monorepo-agent-guidance/website-move.md
 Read [AGENTS.md](AGENTS.md) for guidance scope and project-local Spec Kit usage.
 
 UI commands from the root: `pnpm ui:check`, `pnpm ui:test`, `pnpm ui:package`,
-and `pnpm ui:build`. Both projects use the root lockfile. The UI source import
+and `pnpm ui:build`. Imported projects use the root lockfile. The UI source import
 retains original history; see [its slice record](specs/002-monorepo-agent-guidance/ui-import.md).
 
 Local First package commands: `pnpm dlf:check`, `pnpm dlf:package`. Run the approved verification suite with `pnpm dlf:verify`. Its
 implementation review gate remains effective for subsequent changes; see
 [the import record](specs/002-monorepo-agent-guidance/local-first-import.md).
-Consumer archives stay in place until their alpha.60 adaptations are qualified
-in library source.
+The [alpha.60 source adapters](specs/002-monorepo-agent-guidance/alpha60-adapters.md)
+are qualified locally. Consumer archives remain in place until their workspace
+links and required presentation/runtime patches are qualified.

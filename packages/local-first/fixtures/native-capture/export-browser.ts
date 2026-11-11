@@ -2,7 +2,7 @@ import { createActor, toPromise } from 'xstate'
 import { prepareJazzArchiveExport } from 'delightful-local-first/backend/jazz/backup'
 import { createJazzArchiveExportMachine } from 'delightful-local-first/backup/export/workflow'
 import type { ArchiveProtection } from '../../src/lib/backup/envelope-api.js'
-import { createBrowserSession, type Graph } from './schema.js'
+import { createBrowserSession, loadLocalFirst, type Graph } from './schema.js'
 import { createExportReader, testExportProfile } from './export-reader.js'
 
 const config = new URLSearchParams(location.search)
@@ -10,15 +10,19 @@ const appId = config.get('appId'),
 	serverUrl = config.get('serverUrl')
 if (!appId || !serverUrl) throw new Error('Disposable configuration missing')
 const session = await createBrowserSession({
-	appId,
+	scope: appId,
 	serverUrl,
 	initial: 'local-first',
+	client: loadLocalFirst,
 	driver: { type: 'persistent', dbName: 'disposable-native-export' }
 })
 const snapshot = session.getSnapshot(),
-	db = snapshot.client?.db,
+	client = snapshot.client,
 	account = snapshot.account
-if (!db || !account) throw new Error('Disposable browser session not ready')
+if (!client || !account) throw new Error('Disposable browser session not ready')
+await client.db.upgradeToLocalFirst(loadLocalFirst)
+const db = client.db
+if (!db.isLocalFirst()) throw new Error('Native export requires local-first storage')
 
 const api = {
 	async export(graph: Graph, protection: ArchiveProtection) {

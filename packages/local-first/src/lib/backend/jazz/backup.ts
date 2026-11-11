@@ -72,7 +72,7 @@ export type JazzArchiveExportResult = {
 	| { outcome: 'failed'; code: JazzExportErrorCode }
 )
 type Options = {
-	db: Pick<Db, 'all' | 'beginExclusiveTransaction' | 'getAuthState'>
+	db: Pick<Db, 'all' | 'beginSerializableTransaction' | 'getAuthState'>
 	binding: BackupBinding
 	profile: ArchiveProfileValidator
 	protection: ArchiveProtection
@@ -93,7 +93,7 @@ type Data = {
 	input: (Omit<Options, 'protection'> & { protection: ArchiveProtection | undefined }) | undefined
 	abort: AbortController
 	pending: Set<Promise<unknown>>
-	transaction: Transaction<'exclusive'> | undefined
+	transaction: Transaction<'serializable'> | undefined
 	verdict: Promise<void> | undefined
 	reader: JazzArchiveReaderInput | undefined
 	captured: unknown
@@ -112,7 +112,11 @@ export function createJazzExportError(code: JazzExportErrorCode) {
 }
 export function jazzExportFailure(error: unknown): JazzExportErrorCode {
 	if (error instanceof PersistedWriteRejectedError) {
-		if (error.code === 'exclusive_conflict' || error.code === 'transaction_conflict')
+		if (
+			error.code === 'serialization_conflict' ||
+			error.code === 'exclusive_conflict' ||
+			error.code === 'transaction_conflict'
+		)
 			return 'sourceChanged'
 		if (error.code === 'permission_denied') return 'permissionDenied'
 	}
@@ -144,7 +148,7 @@ export function assertJazzExportCurrent(request: JazzArchiveExportRequest) {
 	const scope = data(request),
 		input = required(scope.input)
 	if (scope.abort.signal.aborted || !input.isCurrent()) throw createJazzExportError('sourceChanged')
-	if (input.db.getAuthState().session?.user.account !== scope.binding.identityId)
+	if (input.db.getAuthState().session?.user !== scope.binding.identityId)
 		throw createJazzExportError('permissionDenied')
 }
 export function claimJazzExport(request: JazzArchiveExportRequest) {
@@ -211,7 +215,7 @@ export function prepareJazzReaderInput(
 }
 export function openJazzExport(request: JazzArchiveExportRequest) {
 	assertJazzExportCurrent(request)
-	data(request).transaction = required(data(request).input).db.beginExclusiveTransaction()
+	data(request).transaction = required(data(request).input).db.beginSerializableTransaction()
 }
 export function activateJazzReader(
 	request: JazzArchiveExportRequest,

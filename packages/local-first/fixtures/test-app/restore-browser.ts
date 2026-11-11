@@ -1,3 +1,4 @@
+import { createJazzClient } from 'jazz-tools/client'
 import type { ActorRef, Snapshot } from 'xstate'
 import type { RestoreEvent } from 'delightful-local-first/backup/restore'
 import type { TestAppContinuationResult } from './restore-continuation.js'
@@ -5,7 +6,7 @@ import { testAppProfile } from './profile.js'
 import { createTestAppRestorePlanningMachine } from './restore-planning.js'
 import { createTestAppRestore, createTestAppRestoreWorkflow } from './restore-workflow.js'
 import { compareTestAppDestination, testAppDestinationGraphQuery } from './restore-comparison.js'
-import { createJazzSession, PersistedWriteRejectedError } from 'jazz-tools'
+import { PersistedWriteRejectedError } from 'jazz-tools'
 import {
 	createCallbackLogic,
 	createAsyncLogic,
@@ -29,7 +30,8 @@ import {
 	createTestAppPreparationWriter,
 	createTestAppPreparationWriteMachine,
 	createTestAppDestinationWriteMachine,
-	createTestAppTransactionWriter
+	createTestAppTransactionWriter,
+	observeTestAppWrites
 } from './restore-writer.js'
 import { createTestAppRestoreAttachmentMachine } from './restore-attachment.js'
 import {
@@ -48,28 +50,27 @@ const config = new URLSearchParams(location.search)
 const appId = config.get('appId'),
 	serverUrl = config.get('serverUrl')
 if (!appId || !serverUrl) throw new Error('Missing qualification configuration')
-const session = await createJazzSession({ appId, serverUrl, initial: 'local-first' })
+const session = await createJazzClient({
+	scope: appId,
+	serverUrl,
+	initial: 'local-first',
+	client: () => import('jazz-tools/local-first')
+})
 const client = session.getSnapshot().client
 if (!client) throw new Error('Qualification session not ready')
+await client.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
 const db = client.db
-const ownerId = client.session?.user.account
+if (!db.isLocalFirst()) throw new Error('Restore qualification requires local-first storage')
+const ownerId = client.session?.user
 if (!ownerId) throw new Error('Missing qualification owner')
 const detached: Parameters<Writer['retainDetached']>[0][] = []
-const native = createTestAppTransactionWriter(db, (receipt) => {
+let issued = 0
+observeTestAppWrites(db, () => {
+	issued++
+})
+const writer = createTestAppTransactionWriter(db, (receipt) => {
 	detached.push(receipt)
 })
-let issued = 0
-const begin = db.beginTransaction.bind(db)
-db.beginTransaction = () => {
-	const transaction = begin()
-	const commit = transaction.commit.bind(transaction)
-	transaction.commit = () => {
-		issued++
-		return commit()
-	}
-	return transaction
-}
-const writer: Writer = native
 const preparationWrite = createTestAppPreparationWriteMachine(db)
 const preparationDestination = createTestAppPreparationWriter(db, preparationWrite)
 const machine = createTestAppRestorePreparationMachine(writer, preparationDestination)
@@ -124,6 +125,7 @@ const api = {
 	prepareTestAppRootRestore,
 	attachmentPending,
 	createTestAppTransactionWriter,
+	createTestAppPreparationWriteMachine,
 	createTestAppAttachmentWriter,
 	createTestAppRestoreAttachmentMachine,
 	createTestAppAttachmentRestore,

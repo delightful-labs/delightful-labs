@@ -36,7 +36,7 @@ try {
 	const unexpected = async () => {
 		throw new Error('Unexpected package-host lifecycle call')
 	}
-	/** @type {import('jazz-tools/svelte').JazzSession<unknown>} */
+	/** @type {import('jazz-tools/client').JazzSession<unknown>} */
 	const session = {
 		getSnapshot: () => {
 			const selected = manager.getLoggedIn()
@@ -47,11 +47,8 @@ try {
 			manager.restoreLocalFirst(credential)
 		},
 		createLocalFirst: unexpected,
-		becomeBackend: unexpected,
-		registerJWT: unexpected,
-		loginJWT: unexpected,
-		loginOrRegisterJWT: unexpected,
-		linkJWT: unexpected,
+		loginWithBackend: unexpected,
+		linkWithBackend: unexpected,
 		logout: unexpected,
 		retry: unexpected,
 		close: unexpected

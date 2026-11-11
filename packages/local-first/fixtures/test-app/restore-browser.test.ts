@@ -15,25 +15,26 @@ import type { ArchiveRecord } from 'delightful-local-first/backup/archive'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
-import { jazzPlugin } from 'jazz-tools/dev/vite'
-import { deploy, startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
+import { jazzFixtureAssets } from './jazz-vite.js'
+import { startTestJazz, type TestJazz } from 'jazz-tools/testing'
 import { resolve } from 'node:path'
 import { testAppRestoreApp, testAppRestorePermissions } from './restore-schema.js'
 import type {} from './restore-browser.js'
 
-let authority: LocalJazzServerHandle, web: ViteDevServer, browser: Browser
+let authority: TestJazz, web: ViteDevServer, browser: Browser
 let url: string
 const contexts: BrowserContext[] = []
 beforeAll(async () => {
-	authority = await startLocalJazzServer({
-		schema: testAppRestoreApp,
-		permissions: testAppRestorePermissions
+	authority = await startTestJazz({
+		app: testAppRestoreApp,
+		permissions: testAppRestorePermissions,
+		jazz: { allowedOrigins: ['http://127.0.0.1:6199'] }
 	})
 	web = await createServer({
 		configFile: false,
+		...jazzFixtureAssets(),
 		cacheDir: resolve('node_modules/.vite/test-app-restore'),
 		root: resolve('fixtures/test-app'),
-		plugins: [jazzPlugin({ server: false, appId: authority.appId, inspector: false })],
 		server: {
 			host: '0.0.0.0',
 			port: 6199,
@@ -295,11 +296,8 @@ for (const recovery of ['same session', 'page reload', 'browser restart']) {
 		const value = await sample(page)
 		try {
 			await initialize(page, value)
-			await deploy({
-				appId: authority.appId,
-				serverUrl: authority.url,
-				adminSecret: authority.adminSecret,
-				schema: testAppRestoreApp,
+			await authority.redeploy({
+				app: testAppRestoreApp,
 				permissions: {
 					...testAppRestorePermissions,
 					restoreDestinations: {
@@ -316,11 +314,8 @@ for (const recovery of ['same session', 'page reload', 'browser restart']) {
 				throw new Error('Expected retained issued preparation')
 			expect(checkpoint.current.settlement.remote).toBe('rejected')
 			expect(checkpoint.current.transactionId).toEqual(expect.any(String))
-			await deploy({
-				appId: authority.appId,
-				serverUrl: authority.url,
-				adminSecret: authority.adminSecret,
-				schema: testAppRestoreApp,
+			await authority.redeploy({
+				app: testAppRestoreApp,
 				permissions: testAppRestorePermissions
 			})
 			if (recovery === 'browser restart') {
@@ -381,11 +376,8 @@ for (const recovery of ['same session', 'page reload', 'browser restart']) {
 			expect(complete.rows?.status).toBe('active')
 			expect(complete.rows?.notes).toHaveLength(3)
 		} finally {
-			await deploy({
-				appId: authority.appId,
-				serverUrl: authority.url,
-				adminSecret: authority.adminSecret,
-				schema: testAppRestoreApp,
+			await authority.redeploy({
+				app: testAppRestoreApp,
 				permissions: testAppRestorePermissions
 			})
 			await deleteJournal(page, value)
@@ -850,7 +842,7 @@ it('rejects conflicting actual bytes despite a matching declared digest without 
 				},
 				{ id }
 			)
-			const write = tx.commit()
+			const write = api.writer.commit(tx)
 			await write.wait({ tier: 'global' })
 		},
 		{ value, id: mapping.destinationId }
@@ -986,7 +978,7 @@ it('rejects a second claim without clearing the first restore actor’s resource
 								sendBack({
 									type: 'IDENTITY_OBSERVED',
 									binding: input.binding,
-									identityId: api.db.getAuthState().session?.user.account ?? undefined
+									identityId: api.db.getAuthState().session?.user ?? undefined
 								})
 							)
 						})
@@ -1208,13 +1200,13 @@ it('denies identity replacement at the actual native insert boundary', async () 
 			const state = read(),
 				session = state.session
 			if (!session) throw new Error('Missing qualification session')
-			api.db.getAuthState = () => ({
-				...state,
-				session: { ...session, user: { ...session.user, account: crypto.randomUUID() } }
+			const replacedIdentity = api.createTestAppPreparationWriteMachine({
+				onAuthChanged: api.db.onAuthChanged.bind(api.db),
+				getAuthState: () => ({ ...state, session: { ...session, user: crypto.randomUUID() } })
 			})
 			try {
 				const actor = api
-					.createActor(api.preparationWrite, {
+					.createActor(replacedIdentity, {
 						input: {
 							binding: value.binding,
 							databaseName: value.databaseName,
@@ -1232,7 +1224,6 @@ it('denies identity replacement at the actual native insert boundary', async () 
 				actor.stop()
 				return result
 			} finally {
-				api.db.getAuthState = read
 				await transaction.rollback()
 			}
 		},
@@ -3298,7 +3289,7 @@ for (const fault of ['stageFailure', 'cancelStaging', 'partialPresence']) {
 						},
 						{ id: mapping.destinationId }
 					)
-					const write = tx.commit()
+					const write = api.writer.commit(tx)
 					await write.wait({ tier: 'local' })
 					await write.wait({ tier: 'global' })
 				}

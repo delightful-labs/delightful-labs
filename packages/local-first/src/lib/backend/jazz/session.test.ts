@@ -1,30 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createActor } from 'xstate'
-import type { createJazzSession } from 'jazz-tools'
-import type { JazzClient, JazzSession, JazzSessionConfig } from 'jazz-tools/svelte'
+import type { createJazzClient } from 'jazz-tools/client'
+import type { JazzClient, JazzSession, JazzClientConfig } from 'jazz-tools/client'
 import {
 	createSessionAcquisitionMachine,
 	selectAcquiredSession
 } from '../../machines/identity/session-acquisition.js'
 import { createJazzSessionAcquisition } from './session.js'
 
-const sdk = vi.hoisted(() => ({ create: vi.fn<typeof createJazzSession>() }))
-vi.mock('jazz-tools', () => ({ createJazzSession: sdk.create }))
+const sdk = vi.hoisted(() => ({ create: vi.fn<typeof createJazzClient>() }))
+vi.mock('jazz-tools/client', () => ({ createJazzClient: sdk.create }))
 
-function session(): JazzSession<JazzClient> {
+function session(): Awaited<ReturnType<typeof createJazzClient>> {
 	const unused = vi.fn(async () => {})
 	return {
 		getSnapshot: () => ({ status: 'signed-out' }),
 		subscribe: () => () => {},
 		createLocalFirst: unused,
 		restoreLocalFirst: unused,
-		becomeBackend: unused,
-		registerJWT: unused,
-		loginJWT: unused,
-		loginOrRegisterJWT: unused,
-		linkJWT: unused,
+		loginWithBackend: unused,
+		linkWithBackend: unused,
 		logout: vi.fn(async () => {}),
 		retry: unused,
+		reauthenticate: unused,
 		close: vi.fn(async () => {})
 	}
 }
@@ -33,19 +31,19 @@ beforeEach(() => sdk.create.mockReset())
 describe('Jazz session acquisition leaf', () => {
 	it('captures host config without opening on factory construction', async () => {
 		const config = {
-			appId: 'original',
+			scope: 'original',
 			serverUrl: 'http://127.0.0.1:9',
 			initial: 'local-first'
-		} satisfies JazzSessionConfig
+		} satisfies JazzClientConfig
 		const adapter = createJazzSessionAcquisition(config)
-		config.appId = 'changed'
+		config.scope = 'changed'
 		config.serverUrl = 'http://127.0.0.1:10'
 		expect(sdk.create).not.toHaveBeenCalled()
 		const supplied = session()
 		sdk.create.mockResolvedValueOnce(supplied)
 		expect(await adapter.capability.open()).toBe(supplied)
 		expect(sdk.create).toHaveBeenCalledExactlyOnceWith({
-			appId: 'original',
+			scope: 'original',
 			serverUrl: 'http://127.0.0.1:9',
 			initial: 'local-first'
 		})
@@ -54,7 +52,7 @@ describe('Jazz session acquisition leaf', () => {
 	})
 
 	it('does not invent an initial identity or storage policy', async () => {
-		const config = { appId: 'configured', serverUrl: 'http://127.0.0.1:9' }
+		const config = { scope: 'configured', serverUrl: 'http://127.0.0.1:9' }
 		const adapter = createJazzSessionAcquisition(config)
 		sdk.create.mockResolvedValueOnce(session())
 		await adapter.capability.open()
@@ -64,7 +62,7 @@ describe('Jazz session acquisition leaf', () => {
 
 	it('preserves SDK rejection for the owner to sanitize without retrying', async () => {
 		const adapter = createJazzSessionAcquisition({
-			appId: 'failure',
+			scope: 'failure',
 			serverUrl: 'http://127.0.0.1:9'
 		})
 		const failure = new Error('synthetic SDK failure')
@@ -75,7 +73,7 @@ describe('Jazz session acquisition leaf', () => {
 
 	it('lets a supplied host reference bypass the SDK entirely', () => {
 		const adapter = createJazzSessionAcquisition({
-			appId: 'reuse',
+			scope: 'reuse',
 			serverUrl: 'http://127.0.0.1:9'
 		})
 		const existing = session()

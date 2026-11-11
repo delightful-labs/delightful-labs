@@ -17,6 +17,8 @@ import {
 import { sameBackupBinding } from 'delightful-local-first/backup/binding'
 import { testAppRestoreApp } from './restore-schema.js'
 
+type IdentitySource = Pick<Db, 'getAuthState' | 'onAuthChanged'>
+
 type DestinationInput = RestoreDestinationInput<Transaction<'mergeable'>>
 type DestinationWriteResult = Extract<
 	RestoreDestinationResult,
@@ -32,7 +34,7 @@ type IdentityReport =
 
 /** Owns identity admission and staging; its caller retains the borrowed transaction's lifetime. */
 export function createTestAppDestinationWriteMachine(
-	db: Db,
+	db: IdentitySource,
 	insert: (transaction: Transaction<'mergeable'>, input: DestinationInput) => void
 ) {
 	type Context = {
@@ -48,7 +50,7 @@ export function createTestAppDestinationWriteMachine(
 					sendBack({
 						type: 'IDENTITY_OBSERVED',
 						binding: input.binding,
-						identityId: state.session?.user.account ?? undefined
+						identityId: state.session?.user ?? undefined
 					} satisfies IdentityReport)
 				)
 			} catch {
@@ -59,7 +61,7 @@ export function createTestAppDestinationWriteMachine(
 			run: ({ input }) =>
 				restoreTransactionAccess(input).call((transaction) => {
 					// Synchronous invariant at the SDK write boundary, after machine-owned admission.
-					if (db.getAuthState().session?.user.account !== input.intent.operation.identityId)
+					if (db.getAuthState().session?.user !== input.intent.operation.identityId)
 						return 'identityMismatch'
 					insert(transaction, input)
 					return 'inserted'
@@ -262,7 +264,7 @@ export function testAppPreparationContents(intent: RestoreJournalIntent) {
 	} satisfies import('jazz-tools').schema.InsertOf<typeof testAppRestoreApp.restoreDestinations>
 }
 
-export function createTestAppPreparationWriteMachine(db: Db) {
+export function createTestAppPreparationWriteMachine(db: IdentitySource) {
 	return createTestAppDestinationWriteMachine(db, (transaction, input) => {
 		transaction.insert(
 			testAppRestoreApp.restoreDestinations,
@@ -458,6 +460,17 @@ export function createTestAppPreparationWriter(
 	})
 }
 
+// Per-disposable-Db test instrumentation. Every fixture writer reports through
+// this boundary, including writers created by attachment/root/note continuations.
+// It owns no SDK resource and never changes an SDK method or workflow decision.
+const writeObservers = new WeakMap<Db, () => void>()
+export function observeTestAppWrites(db: Db, observe: () => void): () => void {
+	writeObservers.set(db, observe)
+	return () => {
+		writeObservers.delete(db)
+	}
+}
+
 /** Native transaction operations shared by destination statecharts; no domain decisions. */
 export function createTestAppTransactionWriter(
 	db: Db,
@@ -465,7 +478,10 @@ export function createTestAppTransactionWriter(
 ) {
 	return {
 		open: () => db.beginTransaction(),
-		commit: (transaction) => transaction.commit(),
+		commit: (transaction) => {
+			writeObservers.get(db)?.()
+			return transaction.commit()
+		},
 		transactionId: (write) => write.txId,
 		persistLocal: (write) => write.wait({ tier: 'local' }),
 		acceptRemote: (write) => write.wait({ tier: 'global' }),

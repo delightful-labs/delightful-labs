@@ -85,3 +85,15 @@ actor lifetime, Jazz module sharing, and adapter/integration coverage.
 Identity restoration and session startup are implemented. Shared restoration coordination accepts host-owned draining and navigation capabilities; session acquisition stays retained across layout attachments.
 
 See [the next-app integration recipe](docs/next-app.md) for the extracted forms, data, initialization, creation, profile and session-lifetime APIs, and [the extraction audit](specs/001-local-first-foundation/finance-extraction.md) for Finance adoption and verification.
+
+## Workspace SDK baseline
+
+The monorepo source adapters target exactly `jazz-tools@2.0.0-alpha.60`, matching
+the existing Finance/Clipper adapter baseline. Alpha.59 is retained in history;
+this source does not advertise dual-version SDK compatibility. Package commands
+and test qualification use the root workspace lockfile and Node 24.
+
+See the [adapter qualification record](../../specs/002-monorepo-agent-guidance/alpha60-adapters.md)
+for source/consumer differences, fixture evidence and remaining patch/link gates.
+Consumer SDK patches and the recovery-view packaging patch remain separately
+owned until their source replacements and actual app builds are qualified.

@@ -158,7 +158,7 @@ describe('native invitation schema permissions', () => {
 				await db
 					.update(app.notebookInvitations, invitationId, { revoked: true })
 					.wait({ tier: 'global' })
-			}).rejects.toThrow(/read policy denied/)
+			}).rejects.toMatchObject({ code: 'permission_denied' })
 			await db.expectDenied((scope) => scope.delete(app.notebookInvitations, invitationId))
 			await db.expectDenied((scope) =>
 				scope.insert(app.notebookRedemptions, {
@@ -174,7 +174,7 @@ describe('native invitation schema permissions', () => {
 				await db
 					.update(app.notebookRedemptions, evidenceId, { acceptedAt: 1 })
 					.wait({ tier: 'global' })
-			}).rejects.toThrow(/read policy denied/)
+			}).rejects.toMatchObject({ code: 'permission_denied' })
 			await db.expectDenied((scope) => scope.delete(app.notebookRedemptions, evidenceId))
 		}
 	)

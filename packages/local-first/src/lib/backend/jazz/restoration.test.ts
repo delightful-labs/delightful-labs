@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAccountManager, exportLocalFirstSecret } from 'jazz-tools'
 import { RecoveryPhrase } from 'jazz-tools/passphrase'
-import type { JazzSession, JazzSessionSnapshot } from 'jazz-tools/svelte'
+import type { JazzSession, JazzSessionSnapshot } from 'jazz-tools/client'
 import { createJazzRestorationAdapter } from './restoration.js'
 
 function deferred<Value>() {
@@ -46,11 +46,8 @@ async function fixture() {
 		subscribe: vi.fn(() => () => {}),
 		restoreLocalFirst: restore,
 		createLocalFirst: unused,
-		becomeBackend: unused,
-		registerJWT: unused,
-		loginJWT: unused,
-		loginOrRegisterJWT: unused,
-		linkJWT: unused,
+		loginWithBackend: unused,
+		linkWithBackend: unused,
 		logout: unused,
 		retry: unused,
 		close: unused

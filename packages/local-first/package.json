@@ -44,7 +44,7 @@
 		"@xstate/test": "2.0.0-beta.0",
 		"delightful-ui": "file:vendor/delightful-ui-0.0.25-details-animation.tgz",
 		"fast-check": "4.10.2",
-		"jazz-tools": "2.0.0-alpha.59",
+		"jazz-tools": "2.0.0-alpha.60",
 		"oxfmt": "0.76.0",
 		"oxlint": "1.91.0",
 		"publint": "0.3.25",
@@ -413,7 +413,7 @@
 	],
 	"peerDependencies": {
 		"delightful-ui": "0.0.25",
-		"jazz-tools": "2.0.0-alpha.59",
+		"jazz-tools": "2.0.0-alpha.60",
 		"svelte": "^5.57.2",
 		"xstate": "6.0.0-beta.1"
 	},

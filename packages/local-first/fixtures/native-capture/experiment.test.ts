@@ -1,19 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Db, Transaction } from 'jazz-tools'
 import { app, permissions, bytes, readGraph, type Graph } from './schema.js'
-import { createJazzSession, type JazzClient } from 'jazz-tools/backend'
-import { startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
+import { createJazzClient, type JazzClient } from 'jazz-tools/backend'
+import { startTestJazz, type TestJazz } from 'jazz-tools/testing'
 import type { JazzSession } from 'jazz-tools/client'
 import { chromium, type Browser } from '@playwright/test'
 import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
-import { jazzPlugin } from 'jazz-tools/dev/vite'
+import { jazzFixtureAssets } from '../test-app/jazz-vite.js'
 import { resolve } from 'node:path'
 
 type BrowserLab = {
 	module: typeof import('./schema.js')
 	session: Awaited<ReturnType<typeof import('./schema.js').createBrowserSession>>
 	db: Db
-	tx: Transaction<'exclusive'> | undefined
+	tx: Transaction<'serializable'> | undefined
 }
 declare global {
 	interface Window {
@@ -28,20 +28,21 @@ type NativeObservation<Value> =
 	| { outcome: 'pending' }
 const transactions = new Set<Transaction>()
 const sessions: JazzSession<JazzClient>[] = []
-let server: LocalJazzServerHandle | undefined
+let server: TestJazz | undefined
 let reader: Db
 let writer: Db
 let web: ViteDevServer | undefined
 let browser: Browser | undefined
+let browserURL: string
 
 function record(name: string, facts: object) {
 	console.info(JSON.stringify({ experiment: name, ...facts }))
 }
-function transaction(kind: 'exclusive', db?: Db): Transaction<'exclusive'>
+function transaction(kind: 'serializable', db?: Db): Transaction<'serializable'>
 function transaction(kind: 'mergeable', db?: Db): Transaction<'mergeable'>
-function transaction(kind: 'exclusive' | 'mergeable', db?: Db): Transaction
-function transaction(kind: 'exclusive' | 'mergeable', db = reader) {
-	const tx = kind === 'exclusive' ? db.beginExclusiveTransaction() : db.beginTransaction()
+function transaction(kind: 'serializable' | 'mergeable', db?: Db): Transaction
+function transaction(kind: 'serializable' | 'mergeable', db = reader) {
+	const tx = kind === 'serializable' ? db.beginSerializableTransaction() : db.beginTransaction()
 	transactions.add(tx)
 	return tx
 }
@@ -157,40 +158,58 @@ function auditGraph(db: Db, graph: Graph) {
 }
 
 beforeAll(async () => {
-	server = await startLocalJazzServer({
-		schema: app,
+	web = await createServer({
+		configFile: false,
+		...jazzFixtureAssets(),
+		root: resolve('fixtures/native-capture'),
+		cacheDir: resolve('node_modules/.vite/native-capture'),
+		plugins: [
+			{
+				name: 'experiment-document',
+				configureServer(host) {
+					host.middlewares.use((request, response, next) => {
+						if (request.url !== '/') return next()
+						response.setHeader('Content-Type', 'text/html')
+						response.end(
+							'<!doctype html><title>Disposable native snapshot experiment</title><script type="module">import * as experiment from "/schema.ts"; window.NativeCaptureModule = experiment;</script>'
+						)
+					})
+				}
+			}
+		],
+		server: {
+			host: '127.0.0.1',
+			port: 0,
+			strictPort: true,
+			fs: { allow: [searchForWorkspaceRoot(process.cwd())] }
+		}
+	})
+	await web.listen()
+	const address = web.httpServer?.address()
+	if (!address || typeof address === 'string') throw new Error('Missing disposable web listener')
+	browserURL = `http://127.0.0.1:${address.port}/`
+	process.stdout.write(`Disposable browser experiment: ${browserURL}\n`)
+	server = await startTestJazz({
+		app,
 		permissions,
-		inMemory: true,
-		allowLocalFirstAuth: true
+		jazz: { allowedOrigins: [new URL(browserURL).origin] }
 	})
 	console.info(`Disposable native-capture server: ${server.url}`)
-	const selections: ('local-first' | { backendSecret: string })[] = [
-		'local-first',
-		{ backendSecret: server.backendSecret }
-	]
-	for (const initial of selections) {
-		const session = await createJazzSession({
-			appId: server.appId,
-			app,
-			permissions,
-			serverUrl: server.url,
-			driver: { type: 'memory' },
-			env: 'native-capture-experiment',
-			initial
-		})
-		sessions.push(session)
-	}
-	const readerSnapshot = sessions[0]?.getSnapshot(),
-		writerSnapshot = sessions[1]?.getSnapshot()
-	if (
-		readerSnapshot?.status !== 'ready' ||
-		!readerSnapshot.client ||
-		writerSnapshot?.status !== 'ready' ||
-		!writerSnapshot.client
-	)
+	const session = await createJazzClient({
+		appId: server.appId,
+		app,
+		permissions,
+		serverUrl: server.url,
+		driver: { type: 'memory' },
+		env: 'native-capture-experiment',
+		initial: 'local-first'
+	})
+	sessions.push(session)
+	const readerSnapshot = session.getSnapshot()
+	if (readerSnapshot.status !== 'ready' || !readerSnapshot.client)
 		throw new Error('Disposable client startup failed')
 	reader = readerSnapshot.client.db
-	writer = writerSnapshot.client.db
+	writer = server.jazz.db
 	reader.onMutationError(() => {})
 })
 afterAll(async () => {
@@ -211,8 +230,8 @@ describe('native snapshot export feasibility', () => {
 		expect(root?.revision).toBe(0)
 		expect(after.versions).toEqual([1, 1, 1, 1])
 	})
-	it.each(['exclusive', 'mergeable'] satisfies ('exclusive' | 'mergeable')[])(
-		'%s transaction: warmed graph remains coherent across a second client commit',
+	it.each(['serializable', 'mergeable'] satisfies ('serializable' | 'mergeable')[])(
+		'%s transaction: remote reads follow its documented isolation across a second client commit',
 		async (kind) => {
 			const graph = await seed()
 			expect((await readGraph(reader, graph)).versions).toEqual([0, 0, 0, 0])
@@ -224,24 +243,28 @@ describe('native snapshot export feasibility', () => {
 				const frozen = await observe(readGraph(tx, graph))
 				record(`${kind}-warm-concurrent`, { firstRoot: root?.revision, live, frozen })
 				expect(live.versions).toEqual([1, 1, 1, 1])
+				const capturedRevision = kind === 'serializable' ? 0 : 1
 				expect(frozen).toMatchObject({
 					outcome: 'resolved',
-					value: { versions: [0, 0, 0, 0], bytes: [Array.from(bytes(0))] }
+					value: {
+						versions: [capturedRevision, capturedRevision, capturedRevision, capturedRevision],
+						bytes: [Array.from(bytes(capturedRevision))]
+					}
 				})
 			} finally {
 				await release(tx)
 			}
 		}
 	)
-	it('cold transaction stays empty after hydration; a newly opened snapshot contains the graph', async () => {
+	it('serializable remote reads hydrate a complete cold snapshot without changing its point in time', async () => {
 		const graph = await seed()
-		const tx = transaction('exclusive')
+		const tx = transaction('serializable')
 		try {
 			const root = await tx.one(app.workspaces.where({ id: graph.workspace }), { tier: 'remote' })
 			const frozen = await observe(readGraph(tx, graph))
 			const hydrated = await readGraph(reader, graph)
 			const oldAfterHydration = await readGraph(tx, graph)
-			const fresh = transaction('exclusive')
+			const fresh = transaction('serializable')
 			let newlyOpened
 			try {
 				newlyOpened = await readGraph(fresh, graph)
@@ -257,20 +280,20 @@ describe('native snapshot export feasibility', () => {
 			})
 			expect(frozen).toMatchObject({
 				outcome: 'resolved',
-				value: { counts: [0, 0, 0, 0] }
+				value: { counts: [1, 1, 1, 1], versions: [0, 0, 0, 0] }
 			})
 			expect(hydrated.counts).toEqual([1, 1, 1, 1])
-			expect(oldAfterHydration.counts).toEqual([0, 0, 0, 0])
+			expect(oldAfterHydration).toEqual(hydrated)
 			expect(newlyOpened?.counts).toEqual([1, 1, 1, 1])
 		} finally {
 			await release(tx)
 		}
 	})
-	it('exclusive read-only commit: wait resolves and application rows stay unchanged', async () => {
+	it('serializable read-only commit: wait resolves and application rows stay unchanged', async () => {
 		const graph = await seed(),
 			before = await readGraph(reader, graph)
 		const beforeAudit = structuredClone(await auditGraph(reader, graph))
-		const tx = transaction('exclusive')
+		const tx = transaction('serializable')
 		try {
 			await readGraph(tx, graph)
 			const write = tx.commit()
@@ -293,7 +316,7 @@ describe('native snapshot export feasibility', () => {
 	it('a snapshot also isolates ordinary writes from the same client', async () => {
 		const graph = await seed()
 		await readGraph(reader, graph)
-		const tx = transaction('mergeable')
+		const tx = transaction('serializable')
 		try {
 			await tx.one(app.workspaces.where({ id: graph.workspace }), { tier: 'remote' })
 			await (await change(graph, 3, reader)).wait({ tier: 'global' })
@@ -309,7 +332,7 @@ describe('native snapshot export feasibility', () => {
 	it('a snapshot retains deleted children and excludes newly inserted children', async () => {
 		const graph = await seed()
 		await readGraph(reader, graph)
-		const tx = transaction('exclusive'),
+		const tx = transaction('serializable'),
 			nextEntry = crypto.randomUUID()
 		try {
 			await tx.one(app.workspaces.where({ id: graph.workspace }), { tier: 'remote' })
@@ -353,7 +376,7 @@ describe('native snapshot export feasibility', () => {
 				const write = await change(graph, 5, reader, accepted)
 				await write.wait({ tier: 'local' })
 				const beforeReconnect = await observe(write.wait({ tier: 'global' }), 100)
-				tx = transaction('exclusive')
+				tx = transaction('serializable')
 				const local = await observe(readGraph(tx, graph, 'local-first'))
 				const remote = await observe(readGraph(tx, graph, 'remote'), 250)
 				await reader.reconnect()
@@ -381,7 +404,7 @@ describe('native snapshot export feasibility', () => {
 	it('bounded byte ranges come from one snapshot across a concurrent byte replacement', async () => {
 		const graph = await seed()
 		await readGraph(reader, graph)
-		const tx = transaction('exclusive')
+		const tx = transaction('serializable')
 		try {
 			const head = await tx.all(
 				app.parts.where({ id: graph.part }).select({ data: { from: 0, to: 4 } }),
@@ -406,7 +429,7 @@ describe('native snapshot export feasibility', () => {
 	it('observes current read access separately from snapshot read access after permission changes', async () => {
 		const graph = await seed()
 		await readGraph(reader, graph)
-		const tx = transaction('exclusive')
+		const tx = transaction('serializable')
 		try {
 			const first = await tx.one(app.workspaces.where({ id: graph.workspace }), { tier: 'remote' })
 			await writer
@@ -434,10 +457,10 @@ describe('native snapshot export feasibility', () => {
 			if (transactions.has(tx)) await release(tx)
 		}
 	})
-	it('observes read-only exclusive acceptance after a conflicting concurrent change', async () => {
+	it('observes read-only serializable acceptance after a conflicting concurrent change', async () => {
 		const graph = await seed()
 		await readGraph(reader, graph)
-		const tx = transaction('exclusive')
+		const tx = transaction('serializable')
 		try {
 			await readGraph(tx, graph)
 			await (await change(graph, 7)).wait({ tier: 'global' })
@@ -451,9 +474,9 @@ describe('native snapshot export feasibility', () => {
 			if (transactions.has(tx)) await release(tx)
 		}
 	})
-	it('records whether read-only acceptance detects incomplete cold-replica coverage', async () => {
+	it('confirms a complete cold remote capture against the authority', async () => {
 		const graph = await seed(),
-			tx = transaction('exclusive')
+			tx = transaction('serializable')
 		try {
 			const captured = await readGraph(tx, graph)
 			const write = tx.commit()
@@ -461,17 +484,17 @@ describe('native snapshot export feasibility', () => {
 			const wait = await observe(write.wait()),
 				actual = await readGraph(writer, graph)
 			record('cold-read-only-verdict', { captured, wait, actual })
-			expect(captured.counts).toEqual([0, 0, 0, 0])
+			expect(captured).toEqual(actual)
 			expect(actual.counts).toEqual([1, 1, 1, 1])
-			expect(wait.outcome).toBe('rejected')
+			expect(wait.outcome).toBe('resolved')
 		} finally {
 			if (transactions.has(tx)) await release(tx)
 		}
 	})
-	it('records the exclusive verdict for a new matching row outside the frozen result', async () => {
+	it('records the serializable verdict for a new matching row outside the frozen result', async () => {
 		const graph = await seed()
 		await readGraph(reader, graph)
-		const tx = transaction('exclusive')
+		const tx = transaction('serializable')
 		try {
 			const captured = await tx.all(app.entries.where({ workspaceId: graph.workspace }), {
 				tier: 'remote'
@@ -503,7 +526,7 @@ describe('native snapshot export feasibility', () => {
 		await reader.disconnect()
 		const pending = await change(graph, 9, reader, false)
 		await pending.wait({ tier: 'local' })
-		const tx = transaction('exclusive')
+		const tx = transaction('serializable')
 		try {
 			const root = await tx.one(app.workspaces.where({ id: graph.workspace }), {
 				tier: 'local-first'
@@ -533,14 +556,14 @@ describe('native snapshot export feasibility', () => {
 		}
 	})
 	it.each([true, false])(
-		'read-only exclusive wait settles pending source writes accepted=%s',
+		'read-only serializable wait settles pending source writes accepted=%s',
 		async (accepted) => {
 			const graph = await seed()
 			await readGraph(reader, graph)
 			await reader.disconnect()
 			const pending = await change(graph, 10, reader, accepted)
 			await pending.wait({ tier: 'local' })
-			const tx = transaction('exclusive')
+			const tx = transaction('serializable')
 			try {
 				const captured = await readGraph(tx, graph, 'local-first')
 				const write = tx.commit()
@@ -558,9 +581,9 @@ describe('native snapshot export feasibility', () => {
 				expect(captured.versions).toEqual([10, 10, 10, 10])
 				expect(beforeReconnect.outcome).toBe('pending')
 				expect(sourceVerdict.outcome).toBe(accepted ? 'resolved' : 'rejected')
-				expect(captureVerdict.outcome).toBe('rejected')
+				expect(captureVerdict.outcome).toBe(accepted ? 'resolved' : 'rejected')
 				await readGraph(reader, graph)
-				const retry = transaction('exclusive')
+				const retry = transaction('serializable')
 				try {
 					const capturedAfterSettlement = await readGraph(retry, graph)
 					const result = retry.commit()
@@ -585,37 +608,7 @@ describe('native snapshot export feasibility', () => {
 	)
 	it('persistent Chromium SharedWorker: snapshot isolation, conflict verdict, cold coverage and fresh capture', async () => {
 		if (!server) throw new Error('Disposable authority missing')
-		web = await createServer({
-			configFile: false,
-			root: resolve('fixtures/native-capture'),
-			cacheDir: resolve('node_modules/.vite/native-capture'),
-			plugins: [
-				jazzPlugin({ server: false, appId: server.appId, inspector: false }),
-				{
-					name: 'experiment-document',
-					configureServer(host) {
-						host.middlewares.use((request, response, next) => {
-							if (request.url !== '/') return next()
-							response.setHeader('Content-Type', 'text/html')
-							response.end(
-								'<!doctype html><title>Disposable native snapshot experiment</title><script type="module">import * as experiment from "/schema.ts"; window.NativeCaptureModule = experiment;</script>'
-							)
-						})
-					}
-				}
-			],
-			server: {
-				host: '127.0.0.1',
-				port: 0,
-				strictPort: true,
-				fs: { allow: [searchForWorkspaceRoot(process.cwd())] }
-			}
-		})
-		await web.listen()
-		const address = web.httpServer?.address()
-		if (!address || typeof address === 'string') throw new Error('Missing disposable web listener')
-		const url = `http://127.0.0.1:${address.port}/`
-		process.stdout.write(`Disposable browser experiment: ${url}\n`)
+		const url = browserURL
 		browser = await chromium.launch({ headless: true, channel: 'chromium' })
 		const context = await browser.newContext(),
 			page = await context.newPage()
@@ -626,14 +619,18 @@ describe('native snapshot export feasibility', () => {
 				async (config) => {
 					const module = window.NativeCaptureModule
 					const session = await module.createBrowserSession({
-						appId: config.appId,
+						scope: config.appId,
 						serverUrl: config.serverUrl,
 						initial: 'local-first',
+						client: module.loadLocalFirst,
 						env: 'native-capture-experiment',
 						driver: { type: 'persistent', dbName: 'disposable-native-capture' }
 					})
 					const client = session.getSnapshot().client
 					if (!client) throw new Error('Browser native session startup failed')
+					await client.db.upgradeToLocalFirst(module.loadLocalFirst)
+					if (!client.db.isLocalFirst())
+						throw new Error('Native experiment requires local-first storage')
 					window.NativeCaptureExperiment = { module, session, db: client.db, tx: undefined }
 				},
 				{ appId: server.appId, serverUrl: server.url, moduleUrl: `${url}schema.ts` }
@@ -642,7 +639,7 @@ describe('native snapshot export feasibility', () => {
 			const first = await page.evaluate(async (graph) => {
 				const lab = window.NativeCaptureExperiment
 				const warmed = await lab.module.readGraph(lab.db, graph)
-				lab.tx = lab.db.beginExclusiveTransaction()
+				lab.tx = lab.db.beginSerializableTransaction()
 				const root = await lab.tx.one(lab.module.app.workspaces.where({ id: graph.workspace }), {
 					tier: 'remote'
 				})
@@ -666,7 +663,7 @@ describe('native snapshot export feasibility', () => {
 			}, graph)
 			const fresh = await page.evaluate(async (graph) => {
 				const lab = window.NativeCaptureExperiment,
-					tx = lab.db.beginExclusiveTransaction()
+					tx = lab.db.beginSerializableTransaction()
 				const captured = await lab.module.readGraph(tx, graph)
 				await tx.commit().wait()
 				return captured
@@ -674,7 +671,7 @@ describe('native snapshot export feasibility', () => {
 			const coldGraph = await seed()
 			const cold = await page.evaluate(async (graph) => {
 				const lab = window.NativeCaptureExperiment,
-					tx = lab.db.beginExclusiveTransaction()
+					tx = lab.db.beginSerializableTransaction()
 				const captured = await lab.module.readGraph(tx, graph)
 				const write = tx.commit()
 				let verdict = 'resolved'
@@ -684,7 +681,7 @@ describe('native snapshot export feasibility', () => {
 					verdict = 'rejected'
 				}
 				await lab.module.readGraph(lab.db, graph)
-				const next = lab.db.beginExclusiveTransaction()
+				const next = lab.db.beginSerializableTransaction()
 				const hydrated = await lab.module.readGraph(next, graph)
 				await next.commit().wait()
 				return { captured, verdict, hydrated }
@@ -696,8 +693,8 @@ describe('native snapshot export feasibility', () => {
 			expect(changed.frozen.bytes).toEqual([Array.from(bytes(0))])
 			expect(changed.verdict).toBe('rejected')
 			expect(fresh.versions).toEqual([11, 11, 11, 11])
-			expect(cold.captured.counts).toEqual([0, 0, 0, 0])
-			expect(cold.verdict).toBe('rejected')
+			expect(cold.captured.counts).toEqual([1, 1, 1, 1])
+			expect(cold.verdict).toBe('resolved')
 			expect(cold.hydrated.counts).toEqual([1, 1, 1, 1])
 			await page.evaluate(async () => {
 				const lab = window.NativeCaptureExperiment

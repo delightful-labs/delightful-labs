@@ -1,21 +1,25 @@
 import { schema as s, type Db } from 'jazz-tools'
-export { createJazzSession as createBrowserSession } from 'jazz-tools'
+export { createJazzClient as createBrowserSession } from 'jazz-tools/client'
+export const loadLocalFirst = () => import('jazz-tools/local-first')
 
-export const app = s.defineApp({
-	workspaces: s.table({ revision: s.int(), allowed: s.boolean(), visible: s.boolean() }, {}),
-	entries: s.table(
-		{ workspaceId: s.uuid(), fileId: s.uuid(), revision: s.int() },
-		{ workspace: s.rel('workspaces', 'workspaceId'), file: s.rel('files', 'fileId') }
-	),
-	files: s.table(
-		{ workspaceId: s.uuid(), revision: s.int(), sizeBytes: s.int() },
-		{ parts: s.reverse('parts', 'file') }
-	),
-	parts: s.table(
-		{ workspaceId: s.uuid(), fileId: s.uuid(), partIndex: s.int(), data: s.bytes() },
-		{ file: s.rel('files', 'fileId') }
-	)
-})
+export const app = s.defineApp(
+	{
+		workspaces: s.table({ revision: s.int(), allowed: s.boolean(), visible: s.boolean() }, {}),
+		entries: s.table(
+			{ workspaceId: s.uuid(), fileId: s.uuid(), revision: s.int() },
+			{ workspace: s.rel('workspaces', 'workspaceId'), file: s.rel('files', 'fileId') }
+		),
+		files: s.table(
+			{ workspaceId: s.uuid(), revision: s.int(), sizeBytes: s.int() },
+			{ parts: s.reverse('parts', 'file') }
+		),
+		parts: s.table(
+			{ workspaceId: s.uuid(), fileId: s.uuid(), partIndex: s.int(), data: s.bytes() },
+			{ file: s.rel('files', 'fileId') }
+		)
+	},
+	{ migrations: 'none' }
+)
 export const permissions = s.definePermissions(app, ({ policy }) => {
 	policy.workspaces.allowRead.where({ visible: true })
 	policy.workspaces.allowInsert.where({ allowed: true })
