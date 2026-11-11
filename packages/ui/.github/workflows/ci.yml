@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Unit and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test:unit --run
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm build
+      - name: App browser tests
+        run: pnpm exec playwright test --workers=1 --reporter=github,html
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report/app
+      - name: Storybook browser tests
+        run: pnpm test:storybook --workers=1 --reporter=github,html
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report/storybook
+      - name: Build public Storybook
+        run: pnpm build-storybook
+      - name: Upload browser reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-reports
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload generated test failures
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: xstate-test-failures
+          path: .xstate-test/
+          retention-days: 14
+          if-no-files-found: ignore

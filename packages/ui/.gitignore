@@ -1,0 +1,22 @@
+.DS_Store
+node_modules
+/build
+/dist
+/.svelte-kit
+/package
+.env
+.env.*
+!.env.example
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+/test-results
+/playwright-report
+/storybook-static
+/storybook-test-static
+debug-storybook.log
+
+/.vercel
+
+# Automatically shrunk failures; promote regressions to tracked fixtures.
+/.xstate-test/

@@ -1,0 +1,33 @@
+{
+	"MEASURE": [
+		{ "width": 400, "leftWidth": 176, "rightWidth": 176 },
+		{ "width": 300, "leftWidth": 176, "rightWidth": 176 }
+	],
+	"DOWN": [{ "pointerId": 1, "x": 0, "y": 0 }],
+	"MOVE": [
+		{ "pointerId": 1, "x": 180, "y": 0 },
+		{ "pointerId": 1, "x": 364, "y": 0 },
+		{ "pointerId": 1, "x": -364, "y": 0 },
+		{ "pointerId": 1, "x": 2, "y": 35 }
+	],
+	"UP": [{ "pointerId": 1 }, { "pointerId": 2 }],
+	"REVEAL": [{ "side": "left" }, { "side": "right" }],
+	"CHOOSE": [
+		{ "side": "left", "id": "archive" },
+		{ "side": "right", "id": "unread" }
+	],
+	"CONFIGURE": [
+		{
+			"configuration": {
+				"leftActions": [],
+				"rightActions": [],
+				"disabled": true
+			}
+		}
+	],
+	"CANCEL": [{}],
+	"CLOSE": [{}],
+	"CONSUME_CLICK": [{}],
+	"DISMISS_COMPLETE": [{}],
+	"RESET": [{}]
+}

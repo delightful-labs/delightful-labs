@@ -1,0 +1,11 @@
+{
+	"leftActions": [
+		{ "id": "archive", "label": "Archive" },
+		{ "id": "delete", "label": "Delete", "dismissOnSwipe": true }
+	],
+	"rightActions": [
+		{ "id": "favorite", "label": "Favorite" },
+		{ "id": "unread", "label": "Unread", "dismissOnSwipe": true }
+	],
+	"disabled": false
+}
