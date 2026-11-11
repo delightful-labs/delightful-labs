@@ -72,10 +72,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  browser:
+  web-browser:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
-    name: Account, library and offline browser tests
+    name: Web, schema, worker and offline suites
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -98,5 +98,48 @@ jobs:
       - run: pnpm test:schema
       - run: pnpm test:worker
       - run: pnpm test:offline
-      - run: pnpm test:extension
       - run: pnpm test:fake-data
+
+  extension:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
+    name: Packaged extension browser suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:extension
+
+  browser:
+    needs: [plan, web-browser, extension]
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
+    name: Account, library and offline browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
+      - name: Require both browser jobs to pass
+        env:
+          WEB_RESULT: ${{ needs.web-browser.result }}
+          EXTENSION_RESULT: ${{ needs.extension.result }}
+        run: |
+          test "$WEB_RESULT" = success
+          test "$EXTENSION_RESULT" = success
+        working-directory: .

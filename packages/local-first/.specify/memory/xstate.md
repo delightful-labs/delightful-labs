@@ -27,7 +27,6 @@ not current authoring instruction.
 
 ## Extracted workflow dependencies
 
-
 Forms, workspace initialization/startup, durable explicit-creation ownership/recovery, profile
 editing and restoration coordination expose typed factories under documented public subpaths.
 Consumers inject policy/schema/storage capabilities rather than fork these statecharts.

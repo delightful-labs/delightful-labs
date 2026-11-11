@@ -80,7 +80,7 @@ test('all existing check jobs retain fail-closed routing; title workflow has no 
 		assert.ok(jobs.length > 1)
 		for (const [, job, body] of jobs) {
 			if (job === 'plan') continue
-			assert.match(body, /needs: plan/u)
+			assert.match(body, /needs: (?:plan|\[plan, web-browser, extension\])/u)
 			assert.match(body, /always\(\) && \(needs.plan.result != 'success' \|\| needs.plan.outputs.\w+ == 'true'\)/u)
 			assert.match(body, /steps:\n      - name: Require successful check selection\n        if: \$\{\{ needs.plan.result != 'success' \}\}\n        run: exit 1/u)
 		}
@@ -89,4 +89,20 @@ test('all existing check jobs retain fail-closed routing; title workflow has no 
 	assert.match(title, /pull_request:\n\s+types: \[opened, edited, synchronize, reopened, ready_for_review\]/u)
 	assert.match(title, /node scripts\/monorepo\/ci.mjs --title/u)
 	assert.doesNotMatch(title, /(?:paths:|paths-ignore:|draft|pull_request_target|\$\{\{.*title)/u)
+})
+
+
+test('the existing Clipper browser check requires both independent browser jobs', () => {
+	const source = readFileSync(resolve(root, '.github/workflows/clipper.yml'), 'utf8')
+	const job = (name) => source.split(`  ${name}:\n`)[1]?.split(/\n  [\w-]+:\n/u)[0] ?? ''
+	const web = job('web-browser'), extension = job('extension'), required = job('browser')
+	for (const command of ['test:e2e', 'test:schema', 'test:worker', 'test:offline', 'test:fake-data']) assert.ok(web.includes(`run: pnpm ${command}`))
+	assert.doesNotMatch(web, /run: pnpm test:extension/u)
+	assert.match(extension, /run: pnpm test:extension/u)
+	assert.match(required, /needs: \[plan, web-browser, extension\]/u)
+	assert.match(required, /name: Account, library and offline browser tests/u)
+	assert.match(required, /WEB_RESULT: \$\{\{ needs.web-browser.result \}\}/u)
+	assert.match(required, /EXTENSION_RESULT: \$\{\{ needs.extension.result \}\}/u)
+	assert.ok(required.includes('test "$WEB_RESULT" = success'))
+	assert.ok(required.includes('test "$EXTENSION_RESULT" = success'))
 })
