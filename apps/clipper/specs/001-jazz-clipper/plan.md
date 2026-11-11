@@ -7,6 +7,10 @@
 **Baseline**: `main` (implementation through feature branches/PRs) · **Updated**: 2026-11-05 · **Spec**: [spec.md](spec.md)
 **Status**: Foundation, URL-first capture, saved reader/offline shell and Chromium direct extension clipping are implemented. PR #13 is merged and user-verified. Basic organization is merged in PR #14 and DUI radio/list refinements in PR #15 (`72b6fc9`). The merged PR #16 search/article-tags/Trash batch is described in [search-tags-trash.md](search-tags-trash.md), including approved action/noun composition and silent search preparation; see [library-organization.md](library-organization.md) for the state/resource model and the handoff for qualification. Reader experience is merged in PR #17 (`89ad4e7`); the bounded image batch follows [offline-images.md](offline-images.md), reusing native byte assets and the existing authenticated public-source gateway. Full runtime/release qualification remains open; see [tasks.md](tasks.md) and [implementation-handoff.md](implementation-handoff.md) for delivered evidence and the next-thread entry point.
 
+## Deferred reading-progress implementation
+
+Apply the [cleanup plan](data-model.md#reading-progress-cleanup-plan-implementation-deferred) with the Document/attachment migration, not as an isolated optional-to-required prop patch. Scope includes one worker state owner, canonical rules, creation/migration initialization, required render values and removal of redundant maps/defaults. Preserve reconciliation and settlement guarantees. Implementation and native qualification remain pending.
+
 ## Summary
 
 The product specification is complete; [design-decisions.md](design-decisions.md) records launch interaction defaults and [specification-review.md](specification-review.md) distinguishes specification completion from runtime qualification. The engineering gates apply before dependent workflows are enabled or released; they do not prevent the bounded foundation implementation that produces their evidence. See the [completed investigation](investigation-results.md).

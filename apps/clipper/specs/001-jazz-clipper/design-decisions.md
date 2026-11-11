@@ -84,6 +84,8 @@ Per-device observations use causal knowledge, interaction time and deterministic
 
 Display progress as the furthest observed reading position divided by the saved representation's readable text length, clamped to 0–100%; end-of-content reaches 100%. This measures position reached, not verified comprehension, reading time or a separate completed state. Last location may move backward while progress remains furthest reached. Every Document has required progress initialized to 0, including zero-length/link-only entries; progress is never undefined. The Document owns its resume position, whose locator references the attachment representation. Restore by verified locator/context first; if no reliable match exists, open at the beginning without overwriting the saved evidence until a new user interaction.
 
+The deferred [reading-progress cleanup plan](data-model.md#reading-progress-cleanup-plan-implementation-deferred) centralizes initialization, updates, reconciliation and projection under the Document/reader owner. It removes consumer defaults and repeated progress-map lookups; this documentation does not implement that refactor.
+
 ## Highlight deletion and article deletion
 
 Highlight-delete Undo restores the same annotation, anchors, note and assignments. Offer it for at least ten seconds; keep it available while its control is focused/hovered, pause expiry while the page is hidden, and provide an accessibility timing qualification before release. Do not announce an Undo that already expired. Parent permanent deletion or loss of permission prevents restoration with a clear outcome. No other broad Undo is added.
