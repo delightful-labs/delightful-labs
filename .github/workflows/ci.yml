@@ -43,13 +43,21 @@ jobs:
   verify:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.website == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --init --shm-size=1g
     timeout-minutes: 15
     steps:
       - name: Require successful check selection
         if: ${{ needs.plan.result != 'success' }}
         run: exit 1
         working-directory: .
+      - name: Match container home ownership
+        # Firefox requires the mounted home to belong to the effective container user.
+        run: chown "$(id -u):$(id -g)" "$HOME"
+        working-directory: /
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -63,20 +71,27 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm test:build
-      - run: pnpm --filter delightful-labs exec playwright install --with-deps chromium
       - run: pnpm test:browser
 
   ui:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.ui == 'true') }}
     name: UI checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --init --shm-size=1g
     timeout-minutes: 30
     steps:
       - name: Require successful check selection
         if: ${{ needs.plan.result != 'success' }}
         run: exit 1
         working-directory: .
+      - name: Match container home ownership
+        # Firefox requires the mounted home to belong to the effective container user.
+        run: chown "$(id -u):$(id -g)" "$HOME"
+        working-directory: /
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -89,7 +104,6 @@ jobs:
       - run: pnpm ui:check
       - run: pnpm ui:test
       - run: pnpm ui:build
-      - run: pnpm --filter delightful-ui exec playwright install --with-deps chromium webkit
       - run: pnpm --filter delightful-ui exec playwright test --workers=1
       - run: pnpm --filter delightful-ui test:storybook --workers=1
       - run: pnpm --filter delightful-ui build-storybook
@@ -99,12 +113,20 @@ jobs:
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.local_first == 'true') }}
     name: Local First checks, consumers and browser qualification
     runs-on: ubuntu-24.04
+    container:
+      # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
+      options: --init --shm-size=1g
     timeout-minutes: 15
     steps:
       - name: Require successful check selection
         if: ${{ needs.plan.result != 'success' }}
         run: exit 1
         working-directory: .
+      - name: Match container home ownership
+        # Firefox requires the mounted home to belong to the effective container user.
+        run: chown "$(id -u):$(id -g)" "$HOME"
+        working-directory: /
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -122,7 +144,6 @@ jobs:
       - run: pnpm dlf:package
       - run: pnpm --filter delightful-local-first check:consumer
       - run: pnpm --filter delightful-local-first build-storybook
-      - run: pnpm --filter delightful-local-first exec playwright install --with-deps chromium
       - run: pnpm --filter delightful-local-first check:native-backup
       - run: pnpm --filter delightful-local-first exec tsc --project fixtures/private-creation/tsconfig.json
       - run: pnpm --filter delightful-local-first exec vitest run --config fixtures/private-creation/vitest.config.ts

@@ -171,15 +171,18 @@ test(
 					})
 					.wait({ tier: 'local' })
 			}
-			await db
+			// Accounts must be created active; only the update policy allows archiving.
+			const archived = await db
 				.insert(app.accounts, {
 					organizationId: workspace.id,
 					name: 'Archived',
 					kind: 'bank',
-					currency: 'USD',
-					archivedAt: new Date()
+					currency: 'USD'
 				})
-				.wait({ tier: 'local' })
+				.wait({ tier: 'global' })
+			await db
+				.update(app.accounts, archived.id, { archivedAt: new Date() })
+				.wait({ tier: 'global' })
 			return workspace.id
 		})
 		await accounts.getByRole('button', { name: 'Edit Order', exact: true }).click()

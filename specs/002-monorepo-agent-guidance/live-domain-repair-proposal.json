@@ -1,0 +1,126 @@
+{
+  "status": "Applied and verified: DNS, ownership, apex/www HTTPS and live custom-domain browser checks pass",
+  "domain": "delightfullabs.com",
+  "dnsProvider": "Netlify DNS",
+  "zoneId": "5bd8b53d792f89382a368406",
+  "reason": "The merged source was automatically published by the legacy Netlify integration without a root index, causing live custom-domain 404s. The Vercel production deployment from the same commit passes live browser checks.",
+  "vercel": {
+    "teamId": "team_BTNYGrMtRdr3xz9w17ePXQmp",
+    "projectId": "prj_AboUhyJigV4njdGSoh2C5F47nR7D",
+    "deploymentId": "dpl_AGvCShc6dvnnEBHqhdmicyBYfx6e",
+    "commit": "a6f63dc08baf8201f1271cca9c1cf70964607a86"
+  },
+  "replaceRecords": [
+    {
+      "id": "5bd8b53d792f89382a368408",
+      "hostname": "delightfullabs.com",
+      "type": "NETLIFY",
+      "value": "youthful-goodall-78c6dd.netlify.com",
+      "ttl": 3600
+    },
+    {
+      "id": "5bd8b53e792f89382a36840a",
+      "hostname": "www.delightfullabs.com",
+      "type": "NETLIFY",
+      "value": "youthful-goodall-78c6dd.netlify.com",
+      "ttl": 3600
+    }
+  ],
+  "desiredRecords": [
+    {
+      "hostname": "delightfullabs.com",
+      "type": "A",
+      "value": "216.150.1.1",
+      "ttl": 300
+    },
+    {
+      "hostname": "delightfullabs.com",
+      "type": "A",
+      "value": "216.150.16.1",
+      "ttl": 300
+    },
+    {
+      "hostname": "www.delightfullabs.com",
+      "type": "CNAME",
+      "value": "dda4277d778e61d4.vercel-dns-017.com",
+      "ttl": 300
+    }
+  ],
+  "additionalProjectDomain": {
+    "name": "www.delightfullabs.com",
+    "redirect": "delightfullabs.com",
+    "redirectStatusCode": 308
+  },
+  "preserve": "Keep Netlify nameservers, registrar, mail/verification records, thoughts/Finance/Clipper and other subdomains unchanged. Keep existing sites/deployments and source repositories available.",
+  "acceptance": "Check authoritative and recursive DNS, Vercel domain verification, HTTPS, apex homepage/native-writing routes and www redirect. Existing 3600-second caches can delay global propagation.",
+  "appliedAt": "2026-11-11T13:57:32.888010+00:00",
+  "appliedChanges": [
+    {
+      "operation": "create",
+      "record": {
+        "id": "6af473ea83de736aed049428",
+        "hostname": "delightfullabs.com",
+        "type": "A",
+        "value": "216.150.1.1",
+        "ttl": 300
+      }
+    },
+    {
+      "operation": "create",
+      "record": {
+        "id": "6af473ebe0eb73030ae13ede",
+        "hostname": "delightfullabs.com",
+        "type": "A",
+        "value": "216.150.16.1",
+        "ttl": 300
+      }
+    },
+    {
+      "operation": "delete",
+      "record": {
+        "id": "5bd8b53d792f89382a368408",
+        "hostname": "delightfullabs.com",
+        "type": "NETLIFY",
+        "value": "youthful-goodall-78c6dd.netlify.com",
+        "ttl": 3600
+      }
+    },
+    {
+      "operation": "delete",
+      "record": {
+        "id": "5bd8b53e792f89382a36840a",
+        "hostname": "www.delightfullabs.com",
+        "type": "NETLIFY",
+        "value": "youthful-goodall-78c6dd.netlify.com",
+        "ttl": 3600
+      }
+    },
+    {
+      "operation": "create",
+      "record": {
+        "id": "6af473ee8b1304bf1bff307c",
+        "hostname": "www.delightfullabs.com",
+        "type": "CNAME",
+        "value": "dda4277d778e61d4.vercel-dns-017.com",
+        "ttl": 300
+      }
+    }
+  ],
+  "unrelatedRecordsPreserved": 9,
+  "certificate": {
+    "id": "cert_zObX5yLsc2wAqlu3gnQ0FAp3",
+    "cns": [
+      "delightfullabs.com"
+    ],
+    "authorization": "User explicitly approved apex certificate issuance after the separate security-configuration approval request",
+    "autoRenew": true
+  },
+  "acceptanceResults": {
+    "apexHomepage": 200,
+    "nativeWritingPage": 200,
+    "wwwRedirect": 308,
+    "wwwDestination": "https://delightfullabs.com/",
+    "unknownArticle": 404,
+    "liveBrowserChecks": "Passed desktop/mobile homepage, decoded portrait, app links, keyboard navigation, writing navigation/reload and six CSS/JavaScript assets; zero new fonts, page errors or failed app assets; external app embeds stubbed"
+  }
+}
