@@ -1,0 +1,1477 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "repository": "delightful-labs",
+      "remote": "https://github.com/delightful-labs/delightful-labs.git",
+      "defaultRef": "refs/remotes/origin/master",
+      "commit": "c75d672f231e8d6e7087454431b80496dc353c67",
+      "baselineStatus": "Candidate from local remote-tracking ref; fetch and review before import.",
+      "proposedDestinations": [
+        "apps/website"
+      ],
+      "workingTree": [],
+      "checkedOutBranch": "008-dark-portrait-inversion",
+      "localBranches": [
+        "001-homepage-native-blog 43bb7eaca52e65d73aaaaf3a829de4f6c74d4be8",
+        "002-site-foundation 0c36b2690e96f8d93f712eb1a361cabf3d0f89d7",
+        "003-vercel-preview 91f24e7c68286a8807c3179034e3a2dd1b8732bd",
+        "004-durable-snapshots a2a806bee88c83bcda0d0a9b80a4a20fd8790b44",
+        "005-migration-preparation cfcf9f7866c80215f9286ebe7125df98fb0c21dd",
+        "006-native-publication-proof 2ce82216c37f5fbe8dae36813bd3ace3e4cd1972",
+        "007-compact-app-embeds b2ea0ff69d44bf6cc502962d120c3a7bed2a75b8",
+        "008-dark-portrait-inversion 6bf72dbf02142f68657dd5b9b3dbe91d34307f75",
+        "feat/monorepo-foundation c75d672f231e8d6e7087454431b80496dc353c67",
+        "master 03cf537cdb49e5f5ee43a87c3946d89510fce3be",
+        "spec/monorepo-agent-guidance d25b23c39bd07b9b314b4ccf6fcbc752062a8469"
+      ],
+      "manifests": [
+        {
+          "path": "package.json",
+          "name": "delightful-labs",
+          "packageManager": "pnpm@10.28.0",
+          "engines": {
+            "node": ">=24"
+          },
+          "scripts": {
+            "dev": "vite dev --host 0.0.0.0",
+            "build": "vite build",
+            "preview": "vite preview --host 0.0.0.0",
+            "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+            "test": "vitest run",
+            "test:browser": "playwright test",
+            "prepare": "svelte-kit sync",
+            "test:build": "node scripts/verify-build.mjs"
+          },
+          "dependencies": {
+            "@paper-design/shaders": "0.0.82",
+            "@standard-reader/renderer-core": "0.4.0",
+            "@standard-reader/renderer-svelte": "0.4.0",
+            "@vercel/blob": "2.8.2",
+            "delightful-ui": "file:vendor/delightful-ui-0.0.25.tgz",
+            "feed": "6.0.0",
+            "ipaddr.js": "2.5.0",
+            "undici": "8.12.4",
+            "xml-js": "1.6.11",
+            "xstate": "6.0.0-beta.1",
+            "zod": "4.6.7"
+          },
+          "devDependencies": {
+            "@playwright/test": "1.64.0",
+            "@sveltejs/adapter-vercel": "7.0.2",
+            "@sveltejs/kit": "3.1.1",
+            "@sveltejs/vite-plugin-svelte": "7.3.1",
+            "@types/node": "^24.0.0",
+            "svelte": "5.57.3",
+            "svelte-check": "4.7.6",
+            "typescript": "6.0.3",
+            "vite": "8.3.7",
+            "vitest": "4.1.11"
+          }
+        }
+      ],
+      "guidance": [
+        {
+          "path": ".agents/skills/speckit-analyze/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ab275aa4d3ee768ff6739925d01d78149a5a3ecb"
+        },
+        {
+          "path": ".agents/skills/speckit-checklist/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3d76e4084da3eed137b3b21cb6e9a59fd1004ccc"
+        },
+        {
+          "path": ".agents/skills/speckit-clarify/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "24744364b327ec18b19621bf3c765646778c3f63"
+        },
+        {
+          "path": ".agents/skills/speckit-constitution/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "2dc7ef2fbb846a42a48ed7eae2bfb2d960b14811"
+        },
+        {
+          "path": ".agents/skills/speckit-converge/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "7a2ed52518d5a6cc674bf11d6783a68ca58b31f2"
+        },
+        {
+          "path": ".agents/skills/speckit-implement/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "b7b64cd479d291af30344dbe2b5b4cc912b39bf4"
+        },
+        {
+          "path": ".agents/skills/speckit-plan/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a5e4fd9306a0274adb5a5f0ac95d40892f85fd0f"
+        },
+        {
+          "path": ".agents/skills/speckit-specify/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "bfd498cad59d9f34421aedd26067aa3799f59fc4"
+        },
+        {
+          "path": ".agents/skills/speckit-tasks/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "bf9a08c40fac35faabe26594ffb65933a179fab6"
+        },
+        {
+          "path": ".agents/skills/speckit-taskstoissues/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a2990b2a7da2e5d2ce35ec662939911dcec22595"
+        },
+        {
+          "path": ".specify/scripts/bash/check-prerequisites.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "a6a8ad81596dac9eed02bffb0fb7cf3785660ebe"
+        },
+        {
+          "path": ".specify/scripts/bash/common.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "ff18cba4d9d06a04a33fea271631ae760e218b43"
+        },
+        {
+          "path": ".specify/scripts/bash/create-new-feature.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "3ce2f9011c12da25f33f3fd6ea6a950f36c5bda6"
+        },
+        {
+          "path": ".specify/scripts/bash/resolve-template.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "da05d2df6d014fcc4b7cada4ea0a0a05752f075e"
+        },
+        {
+          "path": ".specify/scripts/bash/setup-plan.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "aa394183cfc719fd65e145db8256bb328e3ac4eb"
+        },
+        {
+          "path": ".specify/scripts/bash/setup-tasks.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "0383f9f327107b6389c1fd70638fdcb4ea9e64d2"
+        },
+        {
+          "path": ".specify/templates/checklist-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "c4c4ffb4cee7661bb47ae532fcd770d196895f7d"
+        },
+        {
+          "path": ".specify/templates/constitution-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a4670ff46919b276a4c9663b4ca51830108fcfc0"
+        },
+        {
+          "path": ".specify/templates/plan-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "be1aa88056ce93c3417faf9f703760abe78558e5"
+        },
+        {
+          "path": ".specify/templates/spec-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ceb28776215a098e977650ac090c785dcbf53651"
+        },
+        {
+          "path": ".specify/templates/tasks-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "d46a1f1fb0a027e08fd758be547ac2ab198b445d"
+        },
+        {
+          "path": "AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "d71326375e2fdd2d3f39a9d76cc867749fb8ea0d"
+        }
+      ],
+      "featureSelectors": [
+        {
+          "path": ".specify/feature.json",
+          "value": {
+            "feature_directory": "specs/002-monorepo-agent-guidance"
+          }
+        }
+      ],
+      "archives": [
+        {
+          "path": "vendor/delightful-ui-0.0.25.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "c6b925711c3fe318f73db13911aba3f614534124"
+        }
+      ],
+      "integrations": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "15724393312b246c173d4837d8d88fa207b1ae4e"
+        },
+        {
+          "path": "vercel.json",
+          "mode": "100644",
+          "type": "blob",
+          "object": "c718f2fc7d5d2e8792d8c672556d3ebca30e0b96"
+        }
+      ],
+      "lockfiles": [
+        {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "f046f87f25784ded160ef38e6a21c26e75b3adf4"
+        }
+      ],
+      "pending": [
+        "Review each normative guidance rule and linked resources; assign shared/local/superseded/unresolved disposition.",
+        "Fetch and select import commit; inspect open PRs/issues, worktrees and platform settings.",
+        "Compare vendored archive contents with selected library sources, including consumer-only changes.",
+        "Record baseline checks, history retention, release evidence and source handoff before import."
+      ]
+    },
+    {
+      "repository": "delightful-finances",
+      "remote": "https://github.com/delightful-labs/delightful-finances.git",
+      "defaultRef": "refs/remotes/origin/main",
+      "commit": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "baselineStatus": "Candidate from local remote-tracking ref; fetch and review before import.",
+      "proposedDestinations": [
+        "apps/finance"
+      ],
+      "workingTree": [],
+      "checkedOutBranch": "feat/install-favicons",
+      "localBranches": [
+        "docs/complete-ui-extraction d195768e22e1afa7dc106871d7c85fd941f5b08d",
+        "docs/workspace-backup-qualification 852abaf688211b0c0e27b242229bc9eb493cf60d",
+        "docs/xstate-v6-design-review be8dd1fb7d9bd444a35962af28e4a5bed6b28ca5",
+        "feat/filter-popovers 11df7b7a7cae4c1d0aec5ac12874307672a0b8eb",
+        "feat/finance-worker-handoff 8ac042576360d82a21c64a643eab97f09e4bdf7c",
+        "feat/install-favicons 53365c54966ab5de9865c85fee6222bff4d6f0b2",
+        "feat/jazz-alpha60 01ee6f0bcbc19f47ef50246265e96c95306ca63b",
+        "feat/manual-css-fixes f727c93314115452df31273013f5eb4fd60dd115",
+        "feat/radio-date-filter 3f62f37567d9796a9e2877a72438f767b1244ac5",
+        "feat/self-hosted-ui-fonts d6e157f43cb78396d4949651df30a910a19bd1ec",
+        "feat/shared-diagnostics-logger 3eec71727d337a1845ea00ee61c5c9ad9d3e505c",
+        "feat/shared-sidebar-navigation c30312a4f52832238f4bbea1a3a6e09d116b2a7b",
+        "feat/workspace-backup-export 5819f184f99bac9d6901a1ff455e6da46453b9ef",
+        "feat/workspace-restore-experiment 23e811fafb0182f87efe2adde6e0af238bb62257",
+        "feat/xstate-v6-worker-runtime 1125c5f1dc3d99c484988b6c4053e5d25526a45a",
+        "feature/account-data-merge 710eaf4c9492e945a91ce280b82fb393555f6ba8",
+        "feature/local-first-startup d51c43ee95888d651ff1fd789902eaee7593c4b3",
+        "fix/finance-production-recovery 0dde55d477a0a78651cacfb9cde7ef109bc16dd1",
+        "fix/graceful-worker-update 1da34e36de2b695371074c91db185961d09a4135",
+        "fix/resilient-bank-sync 7b5e5ac7d32650d198ce8a8dec1e375ec9fe9cf8",
+        "fix/workspace-session-recovery 01ee6f0bcbc19f47ef50246265e96c95306ca63b",
+        "main fdf7d7aac0655ae949ba0575a4a2cdb363823502",
+        "refactor/remove-transaction-row-layout 0d6b1ba32ee5afcbc1d4ab2ab431e45a7ff26b11",
+        "refactor/shared-floating-action bc06fee7587589a4ddea3794514153503fc97995",
+        "refactor/shared-linked-list-row 9728d16ed649cce6a792aa89aa3fdaea898efbfe",
+        "refactor/shared-loading-content ae1cec1c7260736ca9e8487e84cd3cdda4c780a2",
+        "refactor/shared-skip-link 4df59734a4230d57f1d8c25a4770ee5da8f23556",
+        "test/finance-backup-qualification ab6c85073b0fbb2187283965a547eb50928f166c",
+        "test/jazz-alpha59-backup-source 699e6d9525393b8300d32f95f4f3aeb622062477",
+        "test/trim-shared-ui-e2e d05ecbfaebf7735b46c1acde39e601b3c8159178",
+        "transfer-result-state-labels b1ee9c7e3db3b3d2deeb534df559f9f0313966f1",
+        "ui/floating-navigation ef70f53290bc29bb0b35bb7122b0e7f8b8d7d901",
+        "ui/floating-navigation-before-main-20261109 0d6b1ba32ee5afcbc1d4ab2ab431e45a7ff26b11",
+        "verify/jazz-alpha60-production-build 699e6d9525393b8300d32f95f4f3aeb622062477"
+      ],
+      "manifests": [
+        {
+          "path": "package.json",
+          "name": "delightful-finances",
+          "packageManager": "pnpm@10.22.0",
+          "engines": {
+            "node": "24.x"
+          },
+          "scripts": {
+            "paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy cookie baseLocale --emit-ts-declarations",
+            "dev": "vite dev",
+            "dev:network": "vite dev --host 0.0.0.0",
+            "dev:agent": "vite dev --config vite.e2e.config.ts --port 5180",
+            "precheck": "pnpm paraglide",
+            "prebuild": "pnpm paraglide",
+            "pretest:unit": "pnpm paraglide",
+            "pretest:e2e": "pnpm paraglide",
+            "build": "vite build",
+            "preview": "vite preview",
+            "prepare": "pnpm paraglide && FINANCE_PREVIEW=true svelte-kit sync",
+            "check": "FINANCE_PREVIEW=true svelte-kit sync && FINANCE_PREVIEW=true svelte-check --tsconfig ./tsconfig.json && tsc --project src/service-worker/tsconfig.json --noEmit",
+            "check:watch": "FINANCE_PREVIEW=true svelte-kit sync && FINANCE_PREVIEW=true svelte-check --tsconfig ./tsconfig.json --watch",
+            "format": "prettier --write .",
+            "format:check": "prettier --check .",
+            "test:unit": "vitest",
+            "test:worker-state": "pnpm --filter @delightful-finances/worker-state-tests test",
+            "test:worker-host": "vitest run --config vitest.worker-host.config.ts",
+            "test": "pnpm test:unit --run && pnpm test:e2e",
+            "test:e2e": "playwright test",
+            "test:pwa": "playwright test --config tests/config/playwright.pwa.config.ts",
+            "test:auth": "playwright test --config tests/config/playwright.auth.config.ts",
+            "test:permissions": "playwright test --config tests/config/playwright.permissions.config.ts",
+            "test:workspace": "playwright test --config tests/config/playwright.workspace.config.ts",
+            "check:tests": "tsc --project tests/tsconfig.json --noEmit",
+            "test:attachments": "playwright test --config tests/config/playwright.transaction-attachments.config.ts",
+            "test:description": "playwright test --config tests/config/playwright.transaction-description.config.ts",
+            "test:startup": "playwright test --config tests/config/playwright.startup.config.ts",
+            "test:fake-data": "playwright test --config tests/config/playwright.fake-data.config.ts",
+            "check:e2e": "node --experimental-strip-types scripts/check-e2e-scopes.ts"
+          },
+          "dependencies": {
+            "@faker-js/faker": "^10.6.0",
+            "@opentelemetry/api": "^1.9.1",
+            "@vercel/functions": "3.11.0",
+            "@vercel/sandbox": "3.9.1",
+            "@xstate/svelte": "6.0.0-beta.0",
+            "delightful-local-first": "file:vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
+            "delightful-ui": "file:vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+            "jazz-tools": "2.0.0-alpha.60",
+            "layerchart": "^2.9.0",
+            "pica": "^10.0.3",
+            "tdesign-icons-svg": "^0.4.7",
+            "ws": "8.22.1",
+            "xstate": "6.0.0-beta.1",
+            "zod": "4.1.11"
+          },
+          "devDependencies": {
+            "@inlang/paraglide-js": "^2.18.2",
+            "@playwright/test": "^1.60.0",
+            "@poppanator/sveltekit-svg": "^7.0.1",
+            "@sveltejs/adapter-auto": "^8.0.0",
+            "@sveltejs/adapter-vercel": "7.0.2",
+            "@sveltejs/kit": "^3.0.1",
+            "@sveltejs/vite-plugin-svelte": "^7.2.0",
+            "@types/node": "^26.6.5",
+            "prettier": "^3.9.10",
+            "prettier-plugin-svelte": "^4.1.1",
+            "svelte": "^5.57.2",
+            "svelte-check": "^4.6.0",
+            "typescript": "^6.0.3",
+            "vite": "^8.3.0",
+            "vitest": "^4.1.8"
+          }
+        },
+        {
+          "path": "tooling/worker-state-tests/package.json",
+          "name": "@delightful-finances/worker-state-tests",
+          "scripts": {
+            "test": "vitest run --config vitest.config.ts",
+            "check": "tsc --project tsconfig.json"
+          },
+          "devDependencies": {
+            "@xstate/test": "2.0.0-beta.0",
+            "fast-check": "4.10.2",
+            "vitest": "4.1.11",
+            "xstate": "6.0.0-beta.1"
+          }
+        }
+      ],
+      "guidance": [
+        {
+          "path": ".agents/skills/speckit-analyze/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ab275aa4d3ee768ff6739925d01d78149a5a3ecb"
+        },
+        {
+          "path": ".agents/skills/speckit-checklist/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3d76e4084da3eed137b3b21cb6e9a59fd1004ccc"
+        },
+        {
+          "path": ".agents/skills/speckit-clarify/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "24744364b327ec18b19621bf3c765646778c3f63"
+        },
+        {
+          "path": ".agents/skills/speckit-constitution/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "2dc7ef2fbb846a42a48ed7eae2bfb2d960b14811"
+        },
+        {
+          "path": ".agents/skills/speckit-converge/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "7a2ed52518d5a6cc674bf11d6783a68ca58b31f2"
+        },
+        {
+          "path": ".agents/skills/speckit-implement/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "b7b64cd479d291af30344dbe2b5b4cc912b39bf4"
+        },
+        {
+          "path": ".agents/skills/speckit-plan/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a5e4fd9306a0274adb5a5f0ac95d40892f85fd0f"
+        },
+        {
+          "path": ".agents/skills/speckit-specify/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "bfd498cad59d9f34421aedd26067aa3799f59fc4"
+        },
+        {
+          "path": ".agents/skills/speckit-tasks/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "bf9a08c40fac35faabe26594ffb65933a179fab6"
+        },
+        {
+          "path": ".agents/skills/speckit-taskstoissues/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a2990b2a7da2e5d2ce35ec662939911dcec22595"
+        },
+        {
+          "path": ".specify/memory/.constitution-template.json",
+          "mode": "100644",
+          "type": "blob",
+          "object": "f52bdc915c63013fba3bf8949abbf59793f3849a"
+        },
+        {
+          "path": ".specify/memory/constitution.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "5305ce012d22f78f13ec1b420c57d8c7f70cf0f5"
+        },
+        {
+          "path": ".specify/memory/jazz.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "833f372c6be95c7ac05d7c4cf200d5484efaa9d9"
+        },
+        {
+          "path": ".specify/memory/localization.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "e3477eb0e1c7497779057e33afc5b5ef1d52a715"
+        },
+        {
+          "path": ".specify/memory/testing.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "458f236df0d7f5466e1c490b8535e33404ca1c94"
+        },
+        {
+          "path": ".specify/memory/xstate.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a2c306dc85a42371b38dcad9cbc03cd3d7a74b39"
+        },
+        {
+          "path": ".specify/scripts/bash/check-prerequisites.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "a6a8ad81596dac9eed02bffb0fb7cf3785660ebe"
+        },
+        {
+          "path": ".specify/scripts/bash/common.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "ff18cba4d9d06a04a33fea271631ae760e218b43"
+        },
+        {
+          "path": ".specify/scripts/bash/create-new-feature.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "3ce2f9011c12da25f33f3fd6ea6a950f36c5bda6"
+        },
+        {
+          "path": ".specify/scripts/bash/resolve-template.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "da05d2df6d014fcc4b7cada4ea0a0a05752f075e"
+        },
+        {
+          "path": ".specify/scripts/bash/setup-plan.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "aa394183cfc719fd65e145db8256bb328e3ac4eb"
+        },
+        {
+          "path": ".specify/scripts/bash/setup-tasks.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "0383f9f327107b6389c1fd70638fdcb4ea9e64d2"
+        },
+        {
+          "path": ".specify/templates/checklist-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "c4c4ffb4cee7661bb47ae532fcd770d196895f7d"
+        },
+        {
+          "path": ".specify/templates/constitution-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a4670ff46919b276a4c9663b4ca51830108fcfc0"
+        },
+        {
+          "path": ".specify/templates/plan-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "be1aa88056ce93c3417faf9f703760abe78558e5"
+        },
+        {
+          "path": ".specify/templates/spec-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ceb28776215a098e977650ac090c785dcbf53651"
+        },
+        {
+          "path": ".specify/templates/tasks-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "d46a1f1fb0a027e08fd758be547ac2ab198b445d"
+        },
+        {
+          "path": "AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "d930357d382e7f54232751254ff6a65af4038aef"
+        }
+      ],
+      "featureSelectors": [],
+      "archives": [
+        {
+          "path": "vendor/delightful-local-first-ad99117-backup.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "b4f85cf0bddc715ad824a188262cd4e94efc83f0"
+        },
+        {
+          "path": "vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "f620773873797ed5ab57b5d5ce1dea2391087642"
+        },
+        {
+          "path": "vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "8b84a5b25c236fc4bbbd22464f539d70a146e1d5"
+        }
+      ],
+      "integrations": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "b29440cd815fc9ebcf31f6385ad195f9e34bdcc1"
+        },
+        {
+          "path": ".github/workflows/pr-title.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3ff1498f8226f3db45386114bef70e4e54d5096e"
+        },
+        {
+          "path": "archive/jazz-alpha59/netlify.toml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "25a100d8393bad0a5a8c1f5334f8cc39c48a288b"
+        },
+        {
+          "path": "vercel.json",
+          "mode": "100644",
+          "type": "blob",
+          "object": "1bbdb9615f421efe408980574e3f2310f2f28b82"
+        }
+      ],
+      "lockfiles": [
+        {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "bdc25b2e46e44352d04abcae9c8b1376e340b6cc"
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "f8faf2bf0cc32cad393b7a9faadf08492aa2c2fd"
+        }
+      ],
+      "pending": [
+        "Review each normative guidance rule and linked resources; assign shared/local/superseded/unresolved disposition.",
+        "Fetch and select import commit; inspect open PRs/issues, worktrees and platform settings.",
+        "Compare vendored archive contents with selected library sources, including consumer-only changes.",
+        "Record baseline checks, history retention, release evidence and source handoff before import."
+      ]
+    },
+    {
+      "repository": "delightful-clipper",
+      "remote": "https://github.com/delightful-labs/delightful-clipper.git",
+      "defaultRef": "refs/remotes/origin/main",
+      "commit": "2e0ae22805185daf5b1565acdf75892fec87c2a0",
+      "baselineStatus": "Candidate from local remote-tracking ref; fetch and review before import.",
+      "proposedDestinations": [
+        "apps/clipper-web",
+        "apps/clipper-extension"
+      ],
+      "workingTree": [],
+      "checkedOutBranch": "feat/install-favicons",
+      "localBranches": [
+        "archive/pre-jazz-rewrite-2026-11-02 422ceffcb640f3d70a0bdf68bd5f7ac0aed719de",
+        "backup/workflow-hardening-pre-pr34-21f5ff3 21f5ff3e18e322a463d72e67c56537b0e4ba646f",
+        "chore/spec-baseline 95883614ee014be95d922d37d1b85bfce9fd94e9",
+        "chore/tooling-setup 2591f30842316761809fba5c942fb7fc859a8d67",
+        "docs/atproto-status 86c12d6cab3d6ac98706cceea9f426cb9e7e166a",
+        "docs/durable-capture-design a8d9df36a799017631463403fd281dd994bd9588",
+        "docs/workflow-ownership-spec cd85d976cd215de8da217a038917a65c46dd06f7",
+        "docs/xstate-v6-design-review e087f3f398ddbb6deaa8ce394394862733050dd4",
+        "feat/add-link-reader 36e98a323984cee7f7b956adb73965c068ea317a",
+        "feat/article-filter-popovers e658075b35951745bf942303bd406f64b37d238f",
+        "feat/article-notes 57106ed8fe9a539f653cd7197c1355f3537dd275",
+        "feat/browser-clipper e8316c966cbc3074be46e2eb12b39b71b23254f0",
+        "feat/dev-deploy-tooling 6c391dbdbaa92b820b1c92a3ede769da818b44c2",
+        "feat/drawer-navigation d0cded7f0ebfb3727849c9fbfa9bdce4f32892b2",
+        "feat/durable-capture-foundation d937bb1d70d4e69944d8033d47e179278edc9e9f",
+        "feat/durable-library-records 131d878a4aa92919803f5364867869b49cf077eb",
+        "feat/install-favicons 1ff9c6c3fd421159c0cfc3cbab6a1b4004b5c703",
+        "feat/jazz-latest fd5031afe19e4244be73a98da2b5cc9a56388c90",
+        "feat/library-organization 2fe24116b439271ccc52b0d4f7a3efb8d910a1f4",
+        "feat/library-radio-filters 40815bdd943912383c6e5af31d75a8a9c0a54dd2",
+        "feat/library-search-tags-trash d3bd5dfcefdf491e1dd62f6410f8cc25e66dfcaa",
+        "feat/offline-app-shell 816584aacdb13ffd42467cfed16f65e2f10b3ec7",
+        "feat/offline-article-images 5929f9bd0b5adbfc908784cd4f0fd5e8c36ca201",
+        "feat/private-library-foundation 2373b470d80c7ac44c879aa267a2017b0ef4525d",
+        "feat/public-source-gateway 9317c97ce557f7b292b22cd54bffa7107bce758c",
+        "feat/reader-experience 8ebcd04e815c9c642d7873181ec38f8b644a8f7a",
+        "feat/self-hosted-ui-fonts f984475ab93e62b0d23ca44881ee6ae3871d2d06",
+        "feat/structured-saved-reader a8d9df36a799017631463403fd281dd994bd9588",
+        "feat/worker-runtime 7541e185c8e01889f996fed4bd0315d49591bc63",
+        "feat/workflow-hardening fa05092ff366b26b9655531933b1437f61e2e0d6",
+        "feat/xstate-v6-runtime abc29d88737284ddda1531693e24963677c2dfd7",
+        "fix/netlify-framework-output d7e2ae5da63aae5a166afe59c083333c9a7d011a",
+        "fix/reader-direct-open 92a43586e4eee68d26f674e596ba2b28f1db4751",
+        "fix/reader-width 36e839599e30b446c08cfce741fe0ab4fcd708a5",
+        "main 89ad4e77a31f90f4edbf05938b70694816d40d58",
+        "perf/startup b511779433064ae87da9cf5ca42aef4a8f8de42a",
+        "research/atproto-jwt-proof 152d67922c5608ce365f6cfe8575efbaa63a1784",
+        "rewrite/jazz-clipper 6403f51ff02b80c0bba1259eb33a532243e5725e",
+        "test/atproto-cold-reader 78367af8eb0cc77bee18792aee370e8630503ca1",
+        "verify/clipper-drawer-ci d0cded7f0ebfb3727849c9fbfa9bdce4f32892b2",
+        "verify/jazz-alpha60-extension f1e41b0b2005a6f09a5beb6fce24c983bda6ca82",
+        "verify/jazz-alpha60-release f1e41b0b2005a6f09a5beb6fce24c983bda6ca82"
+      ],
+      "manifests": [
+        {
+          "path": "apps/extension/package.json",
+          "name": "@delightful-clipper/extension",
+          "scripts": {
+            "build": "vite build",
+            "check": "svelte-check --tsconfig tsconfig.json --fail-on-warnings"
+          },
+          "dependencies": {
+            "@mozilla/readability": "0.6.0",
+            "delightful-local-first": "file:../../vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
+            "delightful-ui": "file:../../vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+            "dompurify": "3.4.17",
+            "i18next": "26.7.1",
+            "jazz-tools": "2.0.0-alpha.60",
+            "svelte": "5.57.2",
+            "xstate": "6.0.0-beta.1",
+            "zod": "4.6.7"
+          },
+          "devDependencies": {
+            "@sveltejs/vite-plugin-svelte": "7.2.0",
+            "@types/chrome": "0.3.7",
+            "@types/jsdom": "28.0.3",
+            "jsdom": "29.1.1",
+            "svelte-check": "4.6.0",
+            "typescript": "6.0.3",
+            "vite": "8.3.4"
+          }
+        },
+        {
+          "path": "apps/web/package.json",
+          "name": "@delightful-clipper/web",
+          "scripts": {
+            "dev": "pnpm build:parser-worker:dev && vite dev",
+            "build": "pnpm build:parser-worker && vite build",
+            "preview": "vite preview",
+            "check": "svelte-kit sync && svelte-check --tsconfig tsconfig.json --fail-on-warnings && tsc --project src/service-worker/tsconfig.json",
+            "prepare": "svelte-kit sync",
+            "dev:agent": "pnpm build:parser-worker:dev && vite dev --mode agent --port 5180",
+            "build:parser-worker:dev": "pnpm build:parser-worker --outfile=.clipper-dev/parser/extract-worker.mjs",
+            "build:parser-worker": "esbuild src/lib/server/capture/extract-worker.ts --bundle --platform=node --format=esm --target=node24 --external:jsdom --external:@mozilla/readability --external:dompurify --outfile=.netlify/v1/parser/extract-worker.mjs"
+          },
+          "dependencies": {
+            "@faker-js/faker": "10.6.0",
+            "@mozilla/readability": "0.6.0",
+            "@vercel/functions": "3.11.0",
+            "@vercel/sandbox": "3.9.1",
+            "delightful-local-first": "file:../../vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
+            "delightful-ui": "file:../../vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+            "dompurify": "3.4.17",
+            "i18next": "26.7.1",
+            "ipaddr.js": "2.3.0",
+            "jazz-napi": "2.0.0-alpha.60",
+            "jazz-tools": "2.0.0-alpha.60",
+            "jsdom": "29.1.1",
+            "microlighter": "2.2.0",
+            "minisearch": "7.2.0",
+            "svelte": "5.57.2",
+            "unicode-case-folding": "1.1.2",
+            "ws": "8.22.1",
+            "xstate": "6.0.0-beta.1",
+            "zod": "4.6.7",
+            "better-auth": "1.7.18",
+            "@kingironman2011/better-auth-bsky": "0.3.2"
+          },
+          "devDependencies": {
+            "@opentelemetry/api": "1.9.1",
+            "@poppanator/sveltekit-svg": "7.0.1",
+            "@sveltejs/adapter-netlify": "7.0.1",
+            "@sveltejs/adapter-vercel": "7.0.2",
+            "@sveltejs/kit": "3.0.1",
+            "@sveltejs/vite-plugin-svelte": "7.2.0",
+            "@types/jsdom": "28.0.3",
+            "esbuild": "0.27.7",
+            "svelte-check": "4.6.0",
+            "typescript": "6.0.3",
+            "vite": "8.3.4"
+          }
+        },
+        {
+          "path": "experiments/netlify-jazz/package.json",
+          "name": "clipper-netlify-jazz-probe",
+          "packageManager": "pnpm@10.22.0",
+          "scripts": {
+            "probe": "node --experimental-strip-types probe.ts"
+          },
+          "dependencies": {
+            "jazz-tools": "2.0.0-alpha.60",
+            "jazz-napi": "2.0.0-alpha.60"
+          }
+        },
+        {
+          "path": "experiments/vercel-jazz/package.json",
+          "name": "delightful-vercel-jazz-proof",
+          "packageManager": "pnpm@10.22.0",
+          "engines": {
+            "node": "24.x"
+          },
+          "scripts": {
+            "dev": "vite dev --host 0.0.0.0",
+            "build": "vite build",
+            "check": "svelte-kit sync && tsc --noEmit",
+            "verify:remote": "node --experimental-strip-types verify.ts"
+          },
+          "dependencies": {
+            "@vercel/functions": "3.11.0",
+            "@vercel/sandbox": "3.9.1",
+            "jazz-napi": "2.0.0-alpha.60",
+            "jazz-tools": "2.0.0-alpha.60",
+            "svelte": "5.57.2",
+            "ws": "8.22.1"
+          },
+          "devDependencies": {
+            "@sveltejs/adapter-vercel": "7.0.2",
+            "@sveltejs/kit": "3.0.1",
+            "@sveltejs/vite-plugin-svelte": "7.2.0",
+            "@types/node": "24.19.2",
+            "typescript": "6.0.3",
+            "vercel": "65.12.1",
+            "vite": "8.3.4"
+          }
+        },
+        {
+          "path": "package.json",
+          "name": "delightful-clipper",
+          "packageManager": "pnpm@10.22.0",
+          "engines": {
+            "node": ">=24.22.2 <25",
+            "pnpm": "10.22.0"
+          },
+          "scripts": {
+            "preinstall": "node tooling/verify-vendor.mjs",
+            "dev": "pnpm --filter @delightful-clipper/web dev",
+            "build": "pnpm --filter @delightful-clipper/web build",
+            "preview": "pnpm --filter @delightful-clipper/web preview",
+            "check": "tsc --project tsconfig.json && pnpm --filter @delightful-clipper/web check && pnpm --filter @delightful-clipper/extension check",
+            "lint": "oxlint --deny-warnings .",
+            "format": "oxfmt .",
+            "format:check": "oxfmt --check .",
+            "verify:vendor": "node tooling/verify-vendor.mjs --installed",
+            "verify": "pnpm verify:vendor && pnpm format:check && pnpm lint && pnpm check && pnpm test:unit && pnpm build",
+            "test:unit": "pnpm --filter @delightful-clipper/web build:parser-worker:dev && vitest run",
+            "test:e2e": "node tooling/test-browser.mjs",
+            "test:schema": "playwright test --config playwright.schema.config.ts",
+            "dev:agent": "pnpm --filter @delightful-clipper/web dev:agent",
+            "test:offline": "node --experimental-strip-types apps/web/tests/offline-build.ts && playwright test --config playwright.offline.config.ts",
+            "build:extension": "pnpm --filter @delightful-clipper/extension build",
+            "test:extension": "node --experimental-strip-types apps/extension/tooling/test-build.ts && playwright test --config playwright.extension.config.ts",
+            "test:worker": "playwright test --config playwright.worker.config.ts",
+            "test:fake-data": "playwright test --config playwright.fake-data.config.ts"
+          },
+          "devDependencies": {
+            "@types/node": "24.19.2",
+            "oxfmt": "0.73.0",
+            "oxlint": "1.88.0",
+            "typescript": "6.0.3",
+            "vitest": "4.1.8",
+            "@playwright/test": "1.64.0",
+            "@xstate/test": "2.0.0-beta.0",
+            "fast-check": "4.10.2",
+            "xstate": "6.0.0-beta.1"
+          }
+        }
+      ],
+      "guidance": [
+        {
+          "path": "AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "da9fcff77bcd0d2b89ad3f6f561d5ccbc642ccff"
+        },
+        {
+          "path": "docs/memory/localization.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "709f80e3101814cec70898ad2a66ae0b045a2aa7"
+        },
+        {
+          "path": "docs/memory/worker-runtime.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "6e267af00a21e3bfd2692e21c20a9fada41bbec6"
+        },
+        {
+          "path": "docs/memory/xstate.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "7051d1e53ae5c1d659928040fb7557f90ce4ce31"
+        }
+      ],
+      "featureSelectors": [],
+      "archives": [
+        {
+          "path": "vendor/delightful-local-first-auth-lifecycle-5bb6605-alpha60.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "537b2ae8393cc4b6d4ac189b2246f97211b3938e"
+        },
+        {
+          "path": "vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "2d88b93b0e494f3a19421acb4e76e47894fa7e39"
+        },
+        {
+          "path": "vendor/delightful-local-first-dbc452e-xstate-v6-jazz-alpha60.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "8e734dfe605c5b8e3f96cad023733f0d1fe7b9ab"
+        },
+        {
+          "path": "vendor/delightful-local-first-domain-transaction-alpha60.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3f86fd9a8bb81b4dfc75319aa991d5a3e14aea97"
+        },
+        {
+          "path": "vendor/delightful-local-first-jazz-alpha60.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "c50ce55f6198d024e49b7b32e9e747917978bab3"
+        },
+        {
+          "path": "vendor/delightful-local-first-worker-transport-1571ba2-alpha60.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "5b328468150192230ffd938a7fff4ae75e4b1a30"
+        },
+        {
+          "path": "vendor/delightful-local-first-workflow-hardening-alpha60.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "94bc190017772b385d4cfa77528998e5c6bf5807"
+        },
+        {
+          "path": "vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "8b84a5b25c236fc4bbbd22464f539d70a146e1d5"
+        },
+        {
+          "path": "vendor/delightful-ui-dd358b8-typography.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a11fd5033b2512cc988a19b97c746ca67218fec6"
+        }
+      ],
+      "integrations": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "6d81f940bf48a0d229066f0ad868ca9ff7f3dfcb"
+        },
+        {
+          "path": ".github/workflows/pr-title.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3ff1498f8226f3db45386114bef70e4e54d5096e"
+        },
+        {
+          "path": "apps/web/vercel.json",
+          "mode": "100644",
+          "type": "blob",
+          "object": "eb78da158dd36ce4e4c8c68e28403422a498a69c"
+        },
+        {
+          "path": "archive/jazz-alpha59/netlify.toml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a607c40289f0954d3c0d3f7b18f4a657118e39bc"
+        },
+        {
+          "path": "experiments/vercel-jazz/vercel.json",
+          "mode": "100644",
+          "type": "blob",
+          "object": "1bbdb9615f421efe408980574e3f2310f2f28b82"
+        }
+      ],
+      "lockfiles": [
+        {
+          "path": "experiments/netlify-jazz/pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "baeace27026b79a34f7b7fb2b776429954e91e0a"
+        },
+        {
+          "path": "experiments/netlify-jazz/pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ecc8da50579991ad74a45f5939674f3e35c8e815"
+        },
+        {
+          "path": "experiments/vercel-jazz/pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "d9ccaf756f02d175cbcb9bb2ca343cc88342ca05"
+        },
+        {
+          "path": "experiments/vercel-jazz/pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "cf00641aa66d34bc944eb23deb0979941e447dae"
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a17bdd2a0ab3b27ad30c9e5e97ddf39c5bd68f2c"
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a44447453486bf1a8042cf5538a529f57da1fb4a"
+        }
+      ],
+      "pending": [
+        "Review each normative guidance rule and linked resources; assign shared/local/superseded/unresolved disposition.",
+        "Fetch and select import commit; inspect open PRs/issues, worktrees and platform settings.",
+        "Compare vendored archive contents with selected library sources, including consumer-only changes.",
+        "Record baseline checks, history retention, release evidence and source handoff before import."
+      ]
+    },
+    {
+      "repository": "delightful-ui",
+      "remote": "https://github.com/delightful-labs/delightful-ui.git",
+      "defaultRef": "refs/remotes/origin/main",
+      "commit": "7a7f61b236220bb5edb2bef4390b9db075775e43",
+      "baselineStatus": "Candidate from local remote-tracking ref; fetch and review before import.",
+      "proposedDestinations": [
+        "packages/ui"
+      ],
+      "workingTree": [],
+      "checkedOutBranch": "main",
+      "localBranches": [
+        "chore/vercel-storybook 5959a54e3de7ec2ee1f79a86e0bab659e37ddce2",
+        "docs/complete-ui-extraction a32c1180cf5b8518a48fce2853fed2fbb421dfd0",
+        "docs/xstate-v6-design-review c0dd68de25ce05074f66079869a447606c0e740e",
+        "docs/xstate-v6-migration-spec 4bd924e7a1d94b38d895260078202b51b13876e4",
+        "feat/button-style-radio-group 04b3230b1fb4f0233a9f04c7340a7a56504cdefb",
+        "feat/floating-action 5d66d8e73e212d217727f676ebc7e8aee48f98cd",
+        "feat/linked-list-row b60b09a0351f91278ab250f6ff1a8dcdf82ea939",
+        "feat/loading-content-region d98dce6c293a04bce2ce3158c50f38ec38a02fca",
+        "feat/self-hosted-typography dd358b85d149098ca40e56bb6fe143f8aea3d28d",
+        "feat/sidebar-navigation-primitives 177447664c8063edfb69886a5476db9854a73cb7",
+        "feat/skip-link a184369ad2471a203874cf0fc2ffda0835d947fd",
+        "feat/swipe-actions 5e9a504eb5814f570238d0b203235f9006b57035",
+        "feat/tag-input-normalization 20ef7be6bb19090d166d1d6c0cd17d1e28798e62",
+        "main a8fd11fcb3acd272c5ca26c55485b6bbfc51c068",
+        "refactor/remove-linked-list-row eaf1b98290944ef3a99c1fa183e227a61a8de2ee"
+      ],
+      "manifests": [
+        {
+          "path": "package.json",
+          "name": "delightful-ui",
+          "packageManager": "pnpm@10.22.0",
+          "engines": {
+            "node": "^22.17.0 || >=24.0.0"
+          },
+          "scripts": {
+            "dev": "vite dev --host 0.0.0.0",
+            "build": "vite build && pnpm run package",
+            "preview": "vite preview",
+            "package": "svelte-kit sync && svelte-package && publint",
+            "prepublishOnly": "pnpm run package",
+            "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
+            "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
+            "test": "pnpm run build && playwright test",
+            "test:unit": "vitest",
+            "lint": "prettier --check . && eslint .",
+            "format": "prettier --write .",
+            "storybook": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
+            "storybook:network": "storybook dev --host 0.0.0.0 --port 6006 --exact-port --disable-telemetry",
+            "build-storybook": "storybook build --disable-telemetry",
+            "test:storybook": "storybook build --config-dir tests/storybook --output-dir storybook-test-static --disable-telemetry && playwright test --config playwright.storybook.config.js",
+            "test:model": "vitest run src/swipe-actions.model.test.ts"
+          },
+          "dependencies": {
+            "tdesign-icons-svg": "^0.4.7",
+            "xstate": "6.0.0-beta.1"
+          },
+          "devDependencies": {
+            "@eslint/js": "^10.0.1",
+            "@opentelemetry/api": "^1.9.0",
+            "@playwright/test": "^1.64.0",
+            "@poppanator/sveltekit-svg": "^7.0.1",
+            "@storybook/addon-docs": "^10.6.2",
+            "@storybook/addon-svelte-csf": "^5.1.5",
+            "@storybook/svelte": "^10.6.2",
+            "@storybook/svelte-vite": "^10.6.2",
+            "@sveltejs/adapter-auto": "^8.0.0",
+            "@sveltejs/kit": "^3.0.1",
+            "@sveltejs/package": "^3.0.0",
+            "@sveltejs/vite-plugin-svelte": "^7.3.1",
+            "@types/node": "^22.20.5",
+            "@typescript-eslint/eslint-plugin": "^8.71.2",
+            "@typescript-eslint/parser": "^8.71.2",
+            "@xstate/test": "2.0.0-beta.0",
+            "eslint": "^10.12.0",
+            "eslint-config-prettier": "^10.1.8",
+            "eslint-plugin-svelte": "^3.23.1",
+            "fast-check": "4.10.2",
+            "globals": "^17.13.0",
+            "prettier": "^3.9.10",
+            "prettier-plugin-svelte": "^4.1.1",
+            "publint": "^0.3.25",
+            "storybook": "^10.6.2",
+            "svelte": "^5.57.2",
+            "svelte-check": "^4.7.6",
+            "tslib": "^2.6.2",
+            "typescript": "^6.0.3",
+            "vite": "^8.3.4",
+            "vitest": "^4.1.11"
+          },
+          "peerDependencies": {
+            "svelte": "^5.57.2"
+          }
+        }
+      ],
+      "guidance": [
+        {
+          "path": "AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "fc8b27ceb06d64c13b1ff21e9bc240e2c91aac46"
+        }
+      ],
+      "featureSelectors": [],
+      "archives": [],
+      "integrations": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "5cb5b122c0bb8d909e4e93c46fe4b85007be0cb3"
+        },
+        {
+          "path": ".github/workflows/pr-title.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3ff1498f8226f3db45386114bef70e4e54d5096e"
+        },
+        {
+          "path": "vercel.json",
+          "mode": "100644",
+          "type": "blob",
+          "object": "4330284fe337f4fc706d9da59bb78b5932dcf3a3"
+        }
+      ],
+      "lockfiles": [
+        {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "211c174c600a52c8d6d51e8a2fa77b8338f64f86"
+        }
+      ],
+      "pending": [
+        "Review each normative guidance rule and linked resources; assign shared/local/superseded/unresolved disposition.",
+        "Fetch and select import commit; inspect open PRs/issues, worktrees and platform settings.",
+        "Compare vendored archive contents with selected library sources, including consumer-only changes.",
+        "Record baseline checks, history retention, release evidence and source handoff before import."
+      ]
+    },
+    {
+      "repository": "delightful-local-first",
+      "remote": "https://github.com/delightful-labs/delightful-local-first.git",
+      "defaultRef": "refs/remotes/origin/main",
+      "commit": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+      "baselineStatus": "Candidate from local remote-tracking ref; fetch and review before import.",
+      "proposedDestinations": [
+        "packages/local-first"
+      ],
+      "workingTree": [],
+      "checkedOutBranch": "docs/atproto-status",
+      "localBranches": [
+        "chore/combine-dependabot 71855a2d6bec0f0ae7fcb5f9aa7c1ef4b5489c2c",
+        "docs/atproto-status 2574e89a9fdbd97c0eda829c498c6a4b1f19a36b",
+        "docs/finance-backup-qualification b6567ef8c0f2e4f86671d1e9b411306f1b7c53f0",
+        "docs/t007-finance-inventory f8c3cce76715f06b7d8b4441aebcf233f6cdd33f",
+        "docs/xstate-v6-migration-spec 3485c27c754a681d06dac8d180baa22ce7aaa023",
+        "feat/atproto-token-identity be40b8fd1e7e417ac447b45cd81437a407634675",
+        "feat/backup-archive f3bb617df638bdbb627265b0b51ad88ee9310eb5",
+        "feat/backup-envelope 280084b3ee02e5133663a355c8b3a498d42ab66c",
+        "feat/backup-inspector 69024a9b2890de25ddee9ef4498240e757e5b806",
+        "feat/backup-restore-journal b519d68762e500fda67ddacdbdd4c13951f9638a",
+        "feat/backup-workflow 06362cfc31f242092a0d5a9b92a734d6bf8051fc",
+        "feat/domain-transaction-workflow 0b0983829d508d750ccd230f89164282b0ac485e",
+        "feat/finance-backup-export 7805d24e9f7e983a6a9abea1e92245bd9ea403ba",
+        "feat/jazz-alpha60 24ce0379994c1c99eeeb8f5a62d49052f9bbe814",
+        "feat/notebook-restore-completion d8912685a1a199c29cdfb6aeb4d79142244dc6a2",
+        "feat/notebook-restore-note 7ae76123074663a9906fa9507833ca9931438505",
+        "feat/notebook-restore-preparation ee186822917e60e0f170198b3859a718108d7e32",
+        "feat/notebook-restore-record c6352c68c4c81480be8c261c605478f304b71aa0",
+        "feat/private-creation-fixture 0078f26f2c5ed2e3cbba2db241af615c92a2eb66",
+        "feat/restore-rejected-write-retry ac307dac258ac8b4a1c2d365efe411fe5ece069d",
+        "feat/shared-diagnostics-logger aaf718d43d8da5aa6401235790ba58d2e0087aa4",
+        "feat/verified-backup 280ecf1012acfbb2afecf0d438161fc7b5e4059f",
+        "fix/foundation-cleanup 43d1cc0181407961d4a504efb5015957c4132440",
+        "fix/v6-invoke-bindings dbc452eda6d874e67f24ec971be0a689dca8ef68",
+        "fix/v6-worker-update-recovery dbc452eda6d874e67f24ec971be0a689dca8ef68",
+        "fix/worker-update-recovery 24ce0379994c1c99eeeb8f5a62d49052f9bbe814",
+        "main 93cd1c7a67c2e5c02cb22f509a3b58e27aa9e01b",
+        "research/atproto-jazz-auth e73d7ff7ba580b12f9255e9b995cd8ba33df936b",
+        "spec/atproto-identity-publication d3bb918e687150205d2dfe7e79b71693d0941389",
+        "spec/shared-delightful-sign-in 356cd823fb8929f7299cca43fbccb745058b2fe5",
+        "test/foundation-cleanup 1acee364b5568e13db27656e643b8ff8875867d8",
+        "test/xstate-v6-session-readiness 37a8d97b4c851a45363bb72b8d7563d4fef076c8"
+      ],
+      "manifests": [
+        {
+          "path": "package.json",
+          "name": "delightful-local-first",
+          "packageManager": "pnpm@10.22.0",
+          "engines": {
+            "node": "^22.17.0 || >=24.0.0"
+          },
+          "scripts": {
+            "format": "oxfmt .",
+            "format:check": "oxfmt --check .",
+            "lint": "oxlint --deny-warnings --no-error-on-unmatched-pattern .",
+            "storybook": "pnpm paraglide && storybook dev --host 127.0.0.1 --port 6006 --exact-port --disable-telemetry",
+            "build-storybook": "pnpm paraglide && storybook build --disable-telemetry",
+            "check": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc --noEmit --project tsconfig.json",
+            "check:watch": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.json --watch",
+            "package": "pnpm paraglide && svelte-package --tsconfig tsconfig.library.json --input src/lib --output dist && publint --strict",
+            "check:consumer": "tsc --noEmit --project fixtures/package-consumer/tsconfig.json && node fixtures/package-consumer/backup.js && node fixtures/package-consumer/backup-envelope.js && node fixtures/package-consumer/restore-journal-runtime.js && node fixtures/package-consumer/import.js && vite build --config fixtures/package-consumer/vite.config.ts && vite build --config fixtures/package-consumer/envelope.vite.config.ts && vite build --config fixtures/package-consumer/journal.vite.config.ts && vite build --config fixtures/package-consumer/test-app.vite.config.ts && vite build --config tests/fixtures/avatar-selection/vite.config.ts && pnpm check:backup-reader && node --test fixtures/backup-reader/reader.test.mjs && pnpm check:test-app && node --experimental-strip-types fixtures/package-consumer/domain-transaction.ts && node --experimental-strip-types fixtures/package-consumer/owned-operation.ts && node --experimental-strip-types fixtures/package-consumer/worker-request.ts && node --experimental-strip-types fixtures/package-consumer/worker-channel.ts && node --experimental-strip-types fixtures/package-consumer/worker-effect-drain.ts && node --experimental-strip-types fixtures/package-consumer/ordered-sign-out.ts",
+            "verify": "pnpm format:check && pnpm lint && pnpm check && pnpm test:unit --run && pnpm package && pnpm check:consumer && pnpm build-storybook",
+            "test:unit": "pnpm paraglide && vitest --config vitest.config.ts",
+            "paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --emit-ts-declarations --no-emit-readme --no-emit-prettier-ignore --no-emit-git-ignore",
+            "backup:inspect": "node fixtures/backup-reader/inspect.mjs",
+            "check:backup-reader": "tsc --noEmit --project fixtures/backup-reader/tsconfig.json",
+            "check:test-app": "tsc --project fixtures/test-app/tsconfig.json --noEmit false --rootDir fixtures/test-app --outDir .svelte-kit/test-app && node --test .svelte-kit/test-app/archive.test.js",
+            "test:storybook": "playwright test --config playwright.config.ts",
+            "measure:backup": "DLF_BACKUP_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures encrypted'",
+            "measure:backup-records": "DLF_BACKUP_RECORD_MEASURE=1 vitest run --config fixtures/test-app/restore.vitest.config.ts -t 'measures record workload' --disableConsoleIntercept",
+            "check:backup-restore": "tsc --noEmit --project fixtures/test-app/tsconfig.json && vitest run --config fixtures/test-app/restore.vitest.config.ts",
+            "check:native-backup": "tsc --noEmit --project fixtures/native-capture/tsconfig.json && vitest run --config fixtures/native-capture/vitest.config.ts",
+            "check:library": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.library.json --fail-on-warnings && tsc --noEmit --project tsconfig.library.json",
+            "test:xstate-readiness": "tsc --project tsconfig.xstate-tests.json && vitest run --config vitest.config.ts src/lib/machines/identity/session-readiness.test.ts src/lib/machines/identity/session-readiness.model.test.ts"
+          },
+          "dependencies": {
+            "zod": "4.1.11"
+          },
+          "devDependencies": {
+            "@inlang/paraglide-js": "3.1.0",
+            "@opentelemetry/api": "1.9.1",
+            "@playwright/test": "1.60.0",
+            "@poppanator/sveltekit-svg": "7.0.1",
+            "@storybook/addon-docs": "10.6.6",
+            "@storybook/addon-svelte-csf": "5.1.6",
+            "@storybook/svelte-vite": "10.6.6",
+            "@sveltejs/package": "3.0.2",
+            "@sveltejs/vite-plugin-svelte": "7.3.1",
+            "@types/node": "26.6.6",
+            "@xstate/test": "2.0.0-beta.0",
+            "delightful-ui": "file:vendor/delightful-ui-0.0.25-details-animation.tgz",
+            "fast-check": "4.10.2",
+            "jazz-tools": "2.0.0-alpha.59",
+            "oxfmt": "0.76.0",
+            "oxlint": "1.91.0",
+            "publint": "0.3.25",
+            "storybook": "10.6.6",
+            "svelte": "5.57.3",
+            "svelte-check": "4.7.8",
+            "typescript": "6.0.3",
+            "vite": "8.3.6",
+            "vitest": "4.1.8",
+            "xstate": "6.0.0-beta.1"
+          },
+          "peerDependencies": {
+            "delightful-ui": "0.0.25",
+            "jazz-tools": "2.0.0-alpha.59",
+            "svelte": "^5.57.2",
+            "xstate": "6.0.0-beta.1"
+          }
+        }
+      ],
+      "guidance": [
+        {
+          "path": ".agents/skills/speckit-analyze/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ab275aa4d3ee768ff6739925d01d78149a5a3ecb"
+        },
+        {
+          "path": ".agents/skills/speckit-checklist/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3d76e4084da3eed137b3b21cb6e9a59fd1004ccc"
+        },
+        {
+          "path": ".agents/skills/speckit-clarify/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "24744364b327ec18b19621bf3c765646778c3f63"
+        },
+        {
+          "path": ".agents/skills/speckit-constitution/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "2dc7ef2fbb846a42a48ed7eae2bfb2d960b14811"
+        },
+        {
+          "path": ".agents/skills/speckit-converge/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "7a2ed52518d5a6cc674bf11d6783a68ca58b31f2"
+        },
+        {
+          "path": ".agents/skills/speckit-implement/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "b7b64cd479d291af30344dbe2b5b4cc912b39bf4"
+        },
+        {
+          "path": ".agents/skills/speckit-plan/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a5e4fd9306a0274adb5a5f0ac95d40892f85fd0f"
+        },
+        {
+          "path": ".agents/skills/speckit-specify/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "bfd498cad59d9f34421aedd26067aa3799f59fc4"
+        },
+        {
+          "path": ".agents/skills/speckit-tasks/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "bf9a08c40fac35faabe26594ffb65933a179fab6"
+        },
+        {
+          "path": ".agents/skills/speckit-taskstoissues/SKILL.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a2990b2a7da2e5d2ce35ec662939911dcec22595"
+        },
+        {
+          "path": ".specify/memory/components.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "f9853069afea7b5e57b34dd74e2d6cfd4caf6b1b"
+        },
+        {
+          "path": ".specify/memory/constitution.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "4bab9a7dc528fd0f2da6f2211c4764c76378ee6c"
+        },
+        {
+          "path": ".specify/memory/css.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "1bce289405c13d6ec3383f53f0bf10e07e58d58b"
+        },
+        {
+          "path": ".specify/memory/localization.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "9a1ac780c4f2a50cc0f6d774e3a22fb89d1768d8"
+        },
+        {
+          "path": ".specify/memory/xstate.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "94b5b8e45e64cb19f63612f000b6d02a64cab2e9"
+        },
+        {
+          "path": ".specify/scripts/bash/check-prerequisites.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "a6a8ad81596dac9eed02bffb0fb7cf3785660ebe"
+        },
+        {
+          "path": ".specify/scripts/bash/common.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "ff18cba4d9d06a04a33fea271631ae760e218b43"
+        },
+        {
+          "path": ".specify/scripts/bash/create-new-feature.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "3ce2f9011c12da25f33f3fd6ea6a950f36c5bda6"
+        },
+        {
+          "path": ".specify/scripts/bash/resolve-template.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "da05d2df6d014fcc4b7cada4ea0a0a05752f075e"
+        },
+        {
+          "path": ".specify/scripts/bash/setup-plan.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "aa394183cfc719fd65e145db8256bb328e3ac4eb"
+        },
+        {
+          "path": ".specify/scripts/bash/setup-tasks.sh",
+          "mode": "100755",
+          "type": "blob",
+          "object": "0383f9f327107b6389c1fd70638fdcb4ea9e64d2"
+        },
+        {
+          "path": ".specify/templates/checklist-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "c4c4ffb4cee7661bb47ae532fcd770d196895f7d"
+        },
+        {
+          "path": ".specify/templates/constitution-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "a4670ff46919b276a4c9663b4ca51830108fcfc0"
+        },
+        {
+          "path": ".specify/templates/plan-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "be1aa88056ce93c3417faf9f703760abe78558e5"
+        },
+        {
+          "path": ".specify/templates/spec-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ceb28776215a098e977650ac090c785dcbf53651"
+        },
+        {
+          "path": ".specify/templates/tasks-template.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "d46a1f1fb0a027e08fd758be547ac2ab198b445d"
+        },
+        {
+          "path": "AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "object": "47bbe33386e2ec43f0e20ef1edc37d865ae9f851"
+        }
+      ],
+      "featureSelectors": [
+        {
+          "path": ".specify/feature.json",
+          "value": {
+            "feature_directory": "specs/003-verified-backup"
+          }
+        }
+      ],
+      "archives": [
+        {
+          "path": "vendor/delightful-ui-0.0.25-details-animation.tgz",
+          "mode": "100644",
+          "type": "blob",
+          "object": "f8ea63c40d0d2aea99fb39dc1a48fb96bd39c5a1"
+        }
+      ],
+      "integrations": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "17bfeeed6fa1204c000ae6730a86d71494449993"
+        },
+        {
+          "path": ".github/workflows/pr-title.yml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "3ff1498f8226f3db45386114bef70e4e54d5096e"
+        },
+        {
+          "path": "netlify.toml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "ad5bdf2206616fca99c664c5872b4c0cae560125"
+        }
+      ],
+      "lockfiles": [
+        {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "object": "92ae699e0dfcf9478e08388f2bc776ceef86b490"
+        }
+      ],
+      "pending": [
+        "Review each normative guidance rule and linked resources; assign shared/local/superseded/unresolved disposition.",
+        "Fetch and select import commit; inspect open PRs/issues, worktrees and platform settings.",
+        "Compare vendored archive contents with selected library sources, including consumer-only changes.",
+        "Record baseline checks, history retention, release evidence and source handoff before import."
+      ]
+    }
+  ]
+}

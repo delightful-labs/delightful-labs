@@ -1,47 +1,19 @@
 {
-  "name": "delightful-labs",
+  "name": "delightful-labs-workspace",
   "private": true,
   "type": "module",
-  "imports": {
-    "#lib/*": "./src/lib/*"
-  },
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "dev": "vite dev --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run",
-    "test:browser": "playwright test",
-    "prepare": "svelte-kit sync",
-    "test:build": "node scripts/verify-build.mjs"
-  },
-  "dependencies": {
-    "@paper-design/shaders": "0.0.82",
-    "@standard-reader/renderer-core": "0.4.0",
-    "@standard-reader/renderer-svelte": "0.4.0",
-    "@vercel/blob": "2.8.2",
-    "delightful-ui": "file:vendor/delightful-ui-0.0.25.tgz",
-    "feed": "6.0.0",
-    "ipaddr.js": "2.5.0",
-    "undici": "8.12.4",
-    "xml-js": "1.6.11",
-    "xstate": "6.0.0-beta.1",
-    "zod": "4.6.7"
-  },
-  "devDependencies": {
-    "@playwright/test": "1.64.0",
-    "@sveltejs/adapter-vercel": "7.0.2",
-    "@sveltejs/kit": "3.1.1",
-    "@sveltejs/vite-plugin-svelte": "7.3.1",
-    "@types/node": "^24.0.0",
-    "svelte": "5.57.3",
-    "svelte-check": "4.7.6",
-    "typescript": "6.0.3",
-    "vite": "8.3.7",
-    "vitest": "4.1.11"
+    "dev": "pnpm --filter delightful-labs dev",
+    "build": "pnpm --filter delightful-labs build",
+    "preview": "pnpm --filter delightful-labs preview",
+    "check": "pnpm --filter delightful-labs check",
+    "test": "pnpm --filter delightful-labs test",
+    "test:browser": "pnpm --filter delightful-labs test:browser",
+    "test:build": "pnpm --filter delightful-labs test:build",
+    "monorepo:inventory": "node scripts/monorepo/inventory.mjs"
   }
 }
