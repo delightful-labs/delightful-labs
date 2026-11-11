@@ -24,7 +24,6 @@ const command = z.discriminatedUnion('type', [
 export function serveExtensionAccount(options: {
 	account: typeof accountInput
 	connected: (shutdown: () => void) => void
-	closed: (port: MessagePort) => void
 }) {
 	self.onmessage = ({ data }: MessageEvent<unknown>) => {
 		const decoded = initialize.safeParse(data)
@@ -110,7 +109,6 @@ export function serveExtensionAccount(options: {
 						connection.send({ type: 'SHUTDOWN' })
 						for (const call of pending.values()) call.reject(new Error('connectionUnavailable'))
 						pending.clear()
-						options.closed(port)
 						port.close()
 					}
 				}

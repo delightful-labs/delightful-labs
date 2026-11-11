@@ -122,3 +122,11 @@ receiver. No assertions/skips/deadlines or product behavior were changed to
 conceal these failures. This is a documented source-baseline limitation, not
 full extension sign-in acceptance. Review the source's existing platform notes
 in `apps/clipper/docs/reviews/image-browser-ci-2026-11-10.md` before release.
+
+
+The 2026-11-11 [extension completion repair](extension-signin-repair.md) supersedes
+the local 9/12 limitation above: all 12 packaged cases now pass locally, including
+the three failures and 24 settings teardown cycles. It fixes lost popup closure
+after acknowledged native drain; Linux skips are removed for hosted verification.
+The original source-baseline comparison remains historical evidence. No source
+checkout or hosted setting changed; hosted Linux qualification is still pending.

@@ -106,3 +106,26 @@ The skip reason references this known issue. Re-enable these cases after a repai
 is established and Linux qualification can resume. A green run with these skips
 does not resolve the issue or qualify Linux extension recovery sign-in. No product
 behavior, deadline, dependency or account data shape changes accompany this exclusion.
+
+## Sign-in completion repair — 2026-11-11
+
+The monorepo reproduced the same three failures on macOS. The first case completed
+restoration, durable connection confirmation and native host shutdown, but lost
+popup closure: CLOSE traveled over an account port while CLOSED traveled over the
+primary worker channel. The shared client could consume CLOSED and dispose the
+account port before its CLOSE handler ran. The offscreen notification's missing
+receiver was handled and did not prevent confirmation. A stale-account case run
+independently passed; the later setup failures followed the first failed case's
+fixture replacement.
+
+The sign-in page now supplies its window-close effect to the account adapter's
+release callback. The existing shared client releases it only after the primary
+CLOSED receipt and worker cleanup. The redundant account-port CLOSE protocol is
+removed; settings has no window-close callback. Native drain, account keys,
+trusted-page admission, approved strings and test deadlines are unchanged.
+
+The original three-case sequence now passes locally, including 24 settings
+teardown/capture cycles. Its temporary Linux skips are removed so hosted Linux
+qualification can exercise the repair. Local macOS results do not establish the
+hosted outcome. Full evidence and limits are in the workspace
+[repair record](../../../../specs/002-monorepo-agent-guidance/extension-signin-repair.md).

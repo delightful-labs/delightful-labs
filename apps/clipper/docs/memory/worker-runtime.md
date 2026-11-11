@@ -112,3 +112,11 @@ on another selection and must not be repeated. Explicit popup close waits for
 the shared host's native session-close acknowledgment. See the dated
 [startup investigation](../reviews/extension-startup-2026-11-09.md) for bounded
 macOS teardown evidence and remaining platform limits.
+
+Extension sign-in completion (2026-11-11): popup closure follows the shared UI
+client's primary CLOSED receipt and native resource release. Do not reintroduce
+an account-port CLOSE message: its separate task queue races with that port's
+disposal. Settings has no window-close callback. Durable trusted-page confirmation
+and the existing application/session/store/broker drain remain worker-owned; a
+shutdown request, timeout or failed worker is not a clean-close receipt. See the
+[repair record](../../../../specs/002-monorepo-agent-guidance/extension-signin-repair.md).

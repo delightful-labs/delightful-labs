@@ -29,7 +29,6 @@ support or repair existing extension failures.
 
 ## Installed v6 contracts
 
-
 The web, extension and workers use published `xstate@6.0.0-beta.1`. Read the
 installed `xstate/docs` mechanism guides and `xstate/docs/agents.md` when changing a
 chart. `setup({ schemas })` declares context, inputs, event payload maps, outputs

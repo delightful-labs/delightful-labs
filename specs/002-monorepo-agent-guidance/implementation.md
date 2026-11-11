@@ -6,6 +6,10 @@ the original specification remains the reviewed requirements baseline.
 
 ## Current progress
 
+- Clipper's [extension sign-in completion repair](extension-signin-repair.md)
+  passes 909 unit/native tests, type/format/lint checks and all 12 packaged browser
+  cases locally. Linux skips are removed; hosted Linux execution remains pending.
+
 Shared guidance and dependency-aware CI selection are now implemented; see the
 [2026-11-11 record](shared-guidance-ci.md). The user's stricter-all instruction
 supersedes the earlier proposed local-only approval/test scope below. Historical

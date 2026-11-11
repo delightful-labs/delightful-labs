@@ -78,8 +78,9 @@ peer-identity checks; hosted required checks were not changed.
 
 The following work remains explicit:
 
-1. Resolve Clipper's three reproduced source extension sign-in/settings failures
-   before release; do not count the migration as repairing that existing issue.
+1. Clipper's three reproduced extension failures are now repaired and locally
+   verified (12/12 extension cases); [repair evidence](extension-signin-repair.md).
+   The Linux skips are removed; hosted Linux qualification remains required.
 2. UI snapshot compatibility is now complete; see the
    [2026-11-11 qualification](ui-workspace-links.md). Both remaining consumers use
    workspace UI, existing defaults are preserved through its classic entry, and
@@ -121,3 +122,18 @@ repository settings changed. Twelve Node tooling tests, guidance/link validation
 four workflow YAML parses and the 66-file baseline hash audit passed locally.
 These docs/CI changes did not rerun the previously recorded app/browser suites;
 no application code, catalogs, dependencies or lockfile changed in this slice.
+
+## Extension completion repair — 2026-11-11
+
+The separate [extension repair](extension-signin-repair.md) resolves the previously
+recorded three-case limitation locally. A cross-channel close-message race lost
+popup closure after successful restoration and native drain. Sign-in now closes
+at the shared client's acknowledged resource-release boundary. No account policy,
+copy, dependency, SDK patch, storage key, test deadline or assertion changed.
+
+Clipper now passes 909 unit/native tests in 133 files, root/web/extension types
+with zero Svelte errors/warnings, formatting/lint and all 12 packaged extension
+cases, including offline restart and 24 settings teardown/capture cycles. Three
+regression tests were added; the temporary Linux skips are removed. This updates
+the earlier 9/12 local extension result, not the independently recorded UI/web/
+Finance runs. Hosted Linux Actions still needs to verify the enabled cases.

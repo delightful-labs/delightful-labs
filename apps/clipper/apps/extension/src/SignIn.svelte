@@ -16,7 +16,8 @@
 					new Worker(new URL('./signin.worker.ts', import.meta.url), { type: 'module' }),
 					(next) => {
 						view = next
-					}
+					},
+					() => window.close()
 				)
 				return native
 			},
