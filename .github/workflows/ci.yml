@@ -53,3 +53,39 @@ jobs:
       - run: pnpm --filter delightful-ui exec playwright test --workers=1
       - run: pnpm --filter delightful-ui test:storybook --workers=1
       - run: pnpm --filter delightful-ui build-storybook
+
+  local-first-package:
+    name: Local First checks, consumers and browser qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@10.28.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter delightful-local-first format:check
+      - run: pnpm --filter delightful-local-first lint
+      - run: pnpm --filter delightful-local-first test:xstate-readiness
+      - run: pnpm --filter delightful-local-first check
+      - run: pnpm dlf:test
+      - run: pnpm dlf:package
+      - run: pnpm --filter delightful-local-first check:consumer
+      - run: pnpm --filter delightful-local-first build-storybook
+      - run: pnpm --filter delightful-local-first exec playwright install --with-deps chromium
+      - run: pnpm --filter delightful-local-first check:native-backup
+      - run: pnpm --filter delightful-local-first exec tsc --project fixtures/private-creation/tsconfig.json
+      - run: pnpm --filter delightful-local-first exec vitest run --config fixtures/private-creation/vitest.config.ts
+      - run: pnpm --filter delightful-local-first check:backup-restore
+      - run: pnpm --filter delightful-local-first test:storybook
+      - name: Upload Local First generated failures
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-first-xstate-test-failures
+          path: packages/local-first/.xstate-test/
+          retention-days: 14
+          if-no-files-found: ignore

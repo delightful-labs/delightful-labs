@@ -1,6 +1,6 @@
 # Workspace guidance
 
-This is the Delightful Labs pnpm workspace. The website and UI library are imported. Work on the monorepo migration from
+This is the Delightful Labs pnpm workspace. The website, UI and Local First libraries are imported. Work on the monorepo migration from
 [the active migration spec](specs/002-monorepo-agent-guidance/spec.md) and
 [implementation record](specs/002-monorepo-agent-guidance/implementation.md).
 
@@ -11,7 +11,10 @@ This is the Delightful Labs pnpm workspace. The website and UI library are impor
   Website product and publishing restrictions apply to that app.
 - For UI work, read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) and its linked
   machine-design and testing guidance. UI policies remain scoped to the library.
-- Finance, Clipper and Local First have not been imported. Their source
+- For Local First work, read [packages/local-first/AGENTS.md](packages/local-first/AGENTS.md)
+  and its local constitution/memories. Its implementation-review-before-tests
+  gate remains effective; the root has not adopted its constitution globally.
+- Finance and Clipper have not been imported. Their source
   guidance remains effective in their repositories. Do not treat their policies
   as reconciled workspace rules. See the migration inventories and findings.
 - For state machines/resource ownership, localization, accessibility, testing,
@@ -32,5 +35,5 @@ This is the Delightful Labs pnpm workspace. The website and UI library are impor
   templates and helpers remain at root; website `.specify/` links to the reusable
   files. Run helpers from the target project directory, or set `SPECIFY_INIT_DIR`
   to its absolute path. Do not run a mutating helper against the wrong selector.
-- This repository has no ratified constitution. The constitution template is not
-  active policy. Website publishing and production-cutover gates remain local.
+- The workspace root has no ratified constitution. Root constitution templates
+  are not active policy; Local First retains its own scoped constitution. Website publishing and production-cutover gates remain local.

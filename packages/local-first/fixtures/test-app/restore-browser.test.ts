@@ -14,7 +14,7 @@ import { createActor, toPromise } from 'xstate'
 import type { ArchiveRecord } from 'delightful-local-first/backup/archive'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
-import { createServer, type ViteDevServer } from 'vite'
+import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
 import { jazzPlugin } from 'jazz-tools/dev/vite'
 import { deploy, startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
 import { resolve } from 'node:path'
@@ -34,7 +34,12 @@ beforeAll(async () => {
 		cacheDir: resolve('node_modules/.vite/test-app-restore'),
 		root: resolve('fixtures/test-app'),
 		plugins: [jazzPlugin({ server: false, appId: authority.appId, inspector: false })],
-		server: { host: '0.0.0.0', port: 6199, strictPort: true, fs: { allow: [process.cwd()] } }
+		server: {
+			host: '0.0.0.0',
+			port: 6199,
+			strictPort: true,
+			fs: { allow: [searchForWorkspaceRoot(process.cwd())] }
+		}
 	})
 	await web.listen()
 	url = `http://127.0.0.1:6199/restore.html?appId=${authority.appId}&serverUrl=${encodeURIComponent(authority.url)}`

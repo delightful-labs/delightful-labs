@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { chromium } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
-import { createServer } from 'vite'
+import { createServer, searchForWorkspaceRoot } from 'vite'
 import type { ViteDevServer } from 'vite'
 import { jazzPlugin } from 'jazz-tools/dev/vite'
 import { startLocalJazzServer } from 'jazz-tools/testing'
@@ -24,7 +24,12 @@ beforeAll(async () => {
 		cacheDir: resolve('node_modules/.vite/dlf-private-creation'),
 		root: resolve('fixtures/private-creation'),
 		plugins: [jazzPlugin({ server: false, appId: authority.appId, inspector: false })],
-		server: { host: '127.0.0.1', port: 6198, strictPort: true, fs: { allow: [process.cwd()] } }
+		server: {
+			host: '127.0.0.1',
+			port: 6198,
+			strictPort: true,
+			fs: { allow: [searchForWorkspaceRoot(process.cwd())] }
+		}
 	})
 	await web.listen()
 	url = `http://127.0.0.1:6198/?appId=${authority.appId}&serverUrl=${encodeURIComponent(authority.url)}`

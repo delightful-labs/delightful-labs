@@ -5,7 +5,7 @@ import { createJazzSession, type JazzClient } from 'jazz-tools/backend'
 import { startLocalJazzServer, type LocalJazzServerHandle } from 'jazz-tools/testing'
 import type { JazzSession } from 'jazz-tools/client'
 import { chromium, type Browser } from '@playwright/test'
-import { createServer, type ViteDevServer } from 'vite'
+import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
 import { jazzPlugin } from 'jazz-tools/dev/vite'
 import { resolve } from 'node:path'
 
@@ -604,7 +604,12 @@ describe('native snapshot export feasibility', () => {
 					}
 				}
 			],
-			server: { host: '127.0.0.1', port: 0, strictPort: true, fs: { allow: [process.cwd()] } }
+			server: {
+				host: '127.0.0.1',
+				port: 0,
+				strictPort: true,
+				fs: { allow: [searchForWorkspaceRoot(process.cwd())] }
+			}
 		})
 		await web.listen()
 		const address = web.httpServer?.address()

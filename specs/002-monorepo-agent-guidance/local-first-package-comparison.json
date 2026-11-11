@@ -1,0 +1,85 @@
+{
+  "package": "delightful-local-first",
+  "sourceCommit": "9d6dd84a50cbf62b13858a5a96d6e35e511ab088",
+  "sourceFilesChecked": 174,
+  "observedToolchain": {
+    "node": "v24.22.2",
+    "pnpm": "10.28.0"
+  },
+  "comparisonScope": "Publishable dist files after declared test/spec exclusions; package contracts audited separately.",
+  "results": [
+    {
+      "repository": "delightful-finances",
+      "sourceCommit": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "archive": "vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
+      "archiveSha256": "9dac0f2658e3b12fdfe45462707b5894abeaa3a3ca086b29e809a39129a32abd",
+      "identicalFileCount": 242,
+      "different": [
+        "dist/backend/jazz/backup.d.ts",
+        "dist/backend/jazz/backup.js",
+        "dist/backend/jazz/invitation-authority.d.ts",
+        "dist/backend/jazz/invitation-authority.js",
+        "dist/backend/jazz/restoration.d.ts",
+        "dist/backend/jazz/session-readiness.d.ts",
+        "dist/backend/jazz/session.d.ts",
+        "dist/backend/jazz/session.js",
+        "dist/backend/jazz/startup.d.ts",
+        "dist/backend/jazz/startup.js",
+        "dist/contracts/session.d.ts",
+        "dist/machines/identity/session-acquisition.d.ts",
+        "dist/machines/identity/session-acquisition.js",
+        "dist/machines/workspaces/creation-persistence.d.ts",
+        "dist/machines/workspaces/journal.d.ts"
+      ],
+      "onlyArchive": [],
+      "onlyBuild": [
+        "dist/contracts/domain-transaction.d.ts",
+        "dist/contracts/domain-transaction.js",
+        "dist/contracts/owned-operation.d.ts",
+        "dist/contracts/owned-operation.js",
+        "dist/contracts/sign-out.d.ts",
+        "dist/contracts/sign-out.js",
+        "dist/contracts/worker-channel.d.ts",
+        "dist/contracts/worker-channel.js",
+        "dist/contracts/worker-effect-drain.d.ts",
+        "dist/contracts/worker-effect-drain.js",
+        "dist/contracts/worker-request.d.ts",
+        "dist/contracts/worker-request.js",
+        "dist/machines/identity/ordered-sign-out.d.ts",
+        "dist/machines/identity/ordered-sign-out.js",
+        "dist/machines/lifecycle/owned-operation.d.ts",
+        "dist/machines/lifecycle/owned-operation.js",
+        "dist/machines/lifecycle/worker-channel.d.ts",
+        "dist/machines/lifecycle/worker-channel.js",
+        "dist/machines/lifecycle/worker-effect-drain.d.ts",
+        "dist/machines/lifecycle/worker-effect-drain.js",
+        "dist/machines/lifecycle/worker-request.d.ts",
+        "dist/machines/lifecycle/worker-request.js",
+        "dist/machines/workspaces/domain-transaction.d.ts",
+        "dist/machines/workspaces/domain-transaction.js"
+      ]
+    },
+    {
+      "repository": "delightful-clipper",
+      "sourceCommit": "2e0ae22805185daf5b1565acdf75892fec87c2a0",
+      "archive": "vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
+      "archiveSha256": "8812fc4825b6b0f53ca199c84dc41b328cf7edb2c0163db425b6651c25a028ee",
+      "identicalFileCount": 270,
+      "different": [
+        "dist/backend/jazz/backup.d.ts",
+        "dist/backend/jazz/backup.js",
+        "dist/backend/jazz/invitation-authority.d.ts",
+        "dist/backend/jazz/invitation-authority.js",
+        "dist/backend/jazz/restoration.d.ts",
+        "dist/backend/jazz/session-readiness.d.ts",
+        "dist/backend/jazz/session.d.ts",
+        "dist/backend/jazz/session.js",
+        "dist/backend/jazz/startup.d.ts",
+        "dist/machines/workspaces/creation-persistence.d.ts",
+        "dist/machines/workspaces/journal.d.ts"
+      ],
+      "onlyArchive": [],
+      "onlyBuild": []
+    }
+  ]
+}

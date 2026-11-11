@@ -18,6 +18,10 @@
     "ui:check": "pnpm --filter delightful-ui check",
     "ui:package": "pnpm --filter delightful-ui package",
     "ui:test": "pnpm --filter delightful-ui test:unit --run",
-    "ui:build": "pnpm --filter delightful-ui build"
+    "ui:build": "pnpm --filter delightful-ui build",
+    "dlf:check": "pnpm --filter delightful-local-first check:library",
+    "dlf:package": "pnpm --filter delightful-local-first package",
+    "dlf:test": "pnpm --filter delightful-local-first test:unit --run",
+    "dlf:verify": "pnpm --filter delightful-local-first verify"
   }
 }

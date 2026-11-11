@@ -1,8 +1,8 @@
 # Delightful Labs workspace
 
 A pnpm workspace, starting with the website at [`apps/website`](apps/website/README.md).
-The UI library is at [`packages/ui`](packages/ui/README.md). Finance, Clipper
-and Local First imports are tracked in the
+The UI library is at [`packages/ui`](packages/ui/README.md). The Local First source is at
+[`packages/local-first`](packages/local-first/README.md). Finance and Clipper imports are tracked in the
 [migration implementation record](specs/002-monorepo-agent-guidance/implementation.md).
 
 Use Node 24 (`nvm use`) and pnpm 10.28.0. From this directory:
@@ -43,3 +43,9 @@ Read [AGENTS.md](AGENTS.md) for guidance scope and project-local Spec Kit usage.
 UI commands from the root: `pnpm ui:check`, `pnpm ui:test`, `pnpm ui:package`,
 and `pnpm ui:build`. Both projects use the root lockfile. The UI source import
 retains original history; see [its slice record](specs/002-monorepo-agent-guidance/ui-import.md).
+
+Local First package commands: `pnpm dlf:check`, `pnpm dlf:package`. Run the approved verification suite with `pnpm dlf:verify`. Its
+implementation review gate remains effective for subsequent changes; see
+[the import record](specs/002-monorepo-agent-guidance/local-first-import.md).
+Consumer archives stay in place until their alpha.60 adaptations are qualified
+in library source.

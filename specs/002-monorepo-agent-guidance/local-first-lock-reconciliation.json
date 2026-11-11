@@ -1,0 +1,100 @@
+[
+  {
+    "section": "snapshots",
+    "key": "'@emnapi/core@1.11.0'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@emnapi/core@1.11.0':\n    dependencies:\n      '@emnapi/wasi-threads': 1.2.2\n      tslib: 2.8.1\n    optional: true\n\n",
+    "source": "  '@emnapi/core@1.11.0':\n    dependencies:\n      '@emnapi/wasi-threads': 1.2.2\n      tslib: 2.9.1\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@emnapi/core@1.9.2'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@emnapi/core@1.9.2':\n    dependencies:\n      '@emnapi/wasi-threads': 1.2.1\n      tslib: 2.8.1\n    optional: true\n\n",
+    "source": "  '@emnapi/core@1.9.2':\n    dependencies:\n      '@emnapi/wasi-threads': 1.2.1\n      tslib: 2.9.1\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@emnapi/runtime@1.11.0'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@emnapi/runtime@1.11.0':\n    dependencies:\n      tslib: 2.8.1\n    optional: true\n\n",
+    "source": "  '@emnapi/runtime@1.11.0':\n    dependencies:\n      tslib: 2.9.1\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@emnapi/runtime@1.9.2'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@emnapi/runtime@1.9.2':\n    dependencies:\n      tslib: 2.8.1\n    optional: true\n\n",
+    "source": "  '@emnapi/runtime@1.9.2':\n    dependencies:\n      tslib: 2.9.1\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@emnapi/wasi-threads@1.2.1'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@emnapi/wasi-threads@1.2.1':\n    dependencies:\n      tslib: 2.8.1\n    optional: true\n\n",
+    "source": "  '@emnapi/wasi-threads@1.2.1':\n    dependencies:\n      tslib: 2.9.1\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@emnapi/wasi-threads@1.2.2'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@emnapi/wasi-threads@1.2.2':\n    dependencies:\n      tslib: 2.8.1\n    optional: true\n\n",
+    "source": "  '@emnapi/wasi-threads@1.2.2':\n    dependencies:\n      tslib: 2.9.1\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@oxc-parser/binding-wasm32-wasi@0.127.0'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@oxc-parser/binding-wasm32-wasi@0.127.0':\n    dependencies:\n      '@emnapi/core': 1.9.2\n      '@emnapi/runtime': 1.9.2\n      '@napi-rs/wasm-runtime': 1.2.5(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)\n    optional: true\n\n",
+    "source": "  '@oxc-parser/binding-wasm32-wasi@0.127.0':\n    dependencies:\n      '@emnapi/core': 1.9.2\n      '@emnapi/runtime': 1.9.2\n      '@napi-rs/wasm-runtime': 1.2.7(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@oxc-resolver/binding-wasm32-wasi@11.21.2'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@oxc-resolver/binding-wasm32-wasi@11.21.2':\n    dependencies:\n      '@emnapi/core': 1.11.0\n      '@emnapi/runtime': 1.11.0\n      '@napi-rs/wasm-runtime': 1.2.5(@emnapi/core@1.11.0)(@emnapi/runtime@1.11.0)\n    optional: true\n\n",
+    "source": "  '@oxc-resolver/binding-wasm32-wasi@11.21.2':\n    dependencies:\n      '@emnapi/core': 1.11.0\n      '@emnapi/runtime': 1.11.0\n      '@napi-rs/wasm-runtime': 1.2.7(@emnapi/core@1.11.0)(@emnapi/runtime@1.11.0)\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@rollup/pluginutils@5.3.0'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@rollup/pluginutils@5.3.0':\n    dependencies:\n      '@types/estree': 1.0.9\n      estree-walker: 2.0.2\n      picomatch: 4.0.7\n\n",
+    "source": "  '@rollup/pluginutils@5.3.0':\n    dependencies:\n      '@types/estree': 1.0.10\n      estree-walker: 2.0.2\n      picomatch: 4.0.7\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@testing-library/jest-dom@6.9.1'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@testing-library/jest-dom@6.9.1':\n    dependencies:\n      '@adobe/css-tools': 4.5.0\n      aria-query: 5.3.1\n      css.escape: 1.5.1\n      dom-accessibility-api: 0.6.3\n      picocolors: 1.1.1\n      redent: 3.0.0\n\n",
+    "source": "  '@testing-library/jest-dom@6.9.1':\n    dependencies:\n      '@adobe/css-tools': 4.5.0\n      aria-query: 5.3.2\n      css.escape: 1.5.1\n      dom-accessibility-api: 0.6.3\n      picocolors: 1.1.1\n      redent: 3.0.0\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "'@tybys/wasm-util@0.10.4'",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  '@tybys/wasm-util@0.10.4':\n    dependencies:\n      tslib: 2.8.1\n    optional: true\n\n",
+    "source": "  '@tybys/wasm-util@0.10.4':\n    dependencies:\n      tslib: 2.9.1\n    optional: true\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "ast-types@0.16.3",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  ast-types@0.16.3:\n    dependencies:\n      tslib: 2.8.1\n\n",
+    "source": "  ast-types@0.16.3:\n    dependencies:\n      tslib: 2.9.1\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "esrap@1.2.2",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  esrap@1.2.2:\n    dependencies:\n      '@jridgewell/sourcemap-codec': 1.6.0\n      '@types/estree': 1.0.9\n\n",
+    "source": "  esrap@1.2.2:\n    dependencies:\n      '@jridgewell/sourcemap-codec': 1.6.0\n      '@types/estree': 1.0.10\n\n"
+  },
+  {
+    "section": "snapshots",
+    "key": "recast@0.23.21",
+    "resolution": "Retain existing workspace resolution; qualify Local First against it.",
+    "workspace": "  recast@0.23.21:\n    dependencies:\n      ast-types: 0.16.3\n      esprima: 4.0.1\n      source-map: 0.6.1\n      tiny-invariant: 1.3.3\n      tslib: 2.8.1\n\n",
+    "source": "  recast@0.23.21:\n    dependencies:\n      ast-types: 0.16.3\n      esprima: 4.0.1\n      source-map: 0.6.1\n      tiny-invariant: 1.3.3\n      tslib: 2.9.1\n\n"
+  }
+]

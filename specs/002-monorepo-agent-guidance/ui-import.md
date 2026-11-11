@@ -86,7 +86,7 @@ the selected original commit before comparing the build. Reproduce after
 `pnpm ui:package`:
 
 ```sh
-python3 scripts/monorepo/compare-ui-build.py /path/to/source-parent packages/ui > specs/002-monorepo-agent-guidance/ui-package-comparison.json
+python3 scripts/monorepo/compare-library-build.py /path/to/source-parent packages/ui > specs/002-monorepo-agent-guidance/ui-package-comparison.json
 ```
 
 UI browser verification passed: all 27 app checks and 191 Storybook checks

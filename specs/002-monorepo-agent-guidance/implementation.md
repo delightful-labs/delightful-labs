@@ -12,9 +12,13 @@ the original specification remains the reviewed requirements baseline.
   checks and rollback. Hosted preview verification and source handoff remain open.
 - UI imported with original history and qualified under the root toolchain; see
   [the UI slice record](ui-import.md) and [emitted package comparison](ui-package-comparison.json).
-- Local First, Finance and Clipper imports, remaining consumer workspace links,
-  cross-project guidance reconciliation and remaining toolchain qualification
-  are pending.
+- Local First source imported with original history. The user approved the
+  wiring slice; [local qualification passed](local-first-import.md), including
+  unit, packaged-consumer, native backup/restore and Storybook checks. A fixture
+  Vite allow-list regression was fixed without changing library behavior.
+  Alpha.60 consumer adaptations remain a separate compatibility step.
+- Finance and Clipper imports, consumer workspace links, cross-project guidance
+  reconciliation and remaining qualification are pending.
 
 ## Slice 0: reproducible source inventory
 
