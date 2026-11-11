@@ -1,5 +1,9 @@
 # Local migration qualification
 
+Historical checkpoint record. Later completion, source handoff and deferred-work
+status are recorded in the [migration closeout](closeout.md). Pending-work
+statements below describe their original checkpoints, not current migration gaps.
+
 All five source repositories are represented in the workspace. Finance, Clipper
 web and extension consume source UI and Local First packages. Root defaults
 continue to invoke the website. Work is committed on `feat/monorepo-foundation`;

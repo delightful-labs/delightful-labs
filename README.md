@@ -1,10 +1,19 @@
 # Delightful Labs workspace
 
-A pnpm workspace, starting with the website at [`apps/website`](apps/website/README.md).
+A pnpm workspace containing the website at [`apps/website`](apps/website/README.md).
 The UI library is at [`packages/ui`](packages/ui/README.md). The Local First source is at
 [`packages/local-first`](packages/local-first/README.md). Finance is at [`apps/finance`](apps/finance/README.md); Clipper web and extension are at `apps/clipper/apps/web` and
 `apps/clipper/apps/extension`. Progress is tracked in the
 [migration implementation record](specs/002-monorepo-agent-guidance/implementation.md).
+
+Ongoing development for all apps and libraries belongs in
+`delightful-labs/delightful-labs`, using feature branches and PRs targeting `master`.
+The core migration and application hosting handoff are complete. The
+[closeout record](specs/002-monorepo-agent-guidance/closeout.md) is the current
+status and outstanding-work inventory; older slice records retain historical
+evidence. Source repositories remain available and unarchived for history and
+their explicitly retained work. Finance's application-worker migration is deferred,
+and public extension release is out of scope for now.
 
 Use Node 24.22.2 (`nvm use`) and pnpm 10.28.0. From this directory:
 
@@ -36,10 +45,12 @@ See the [archive findings](specs/002-monorepo-agent-guidance/archive-findings.md
 before replacing an internal archive.
 
 For Vercel, the website's configuration and `.vercel/output` are now app-local.
-A hosted build needs Root Directory `apps/website`, with access to files outside
-that directory for the root workspace/lockfile. This branch changes no hosted
-project setting and deploys nothing; verify a preview before any source handoff.
-See the [website slice record](specs/002-monorepo-agent-guidance/website-move.md).
+A hosted website build uses Root Directory `apps/website`, with access to files
+outside that directory for the root workspace/lockfile. Finance uses
+`apps/finance`; Clipper uses `apps/clipper/apps/web`. All three applications are
+connected to this repository. Exact application cutover and rollback evidence is
+in the [handoff record](specs/002-monorepo-agent-guidance/app-preview-handoff.json);
+the closeout record links the website's hosting and domain verification.
 
 Read [AGENTS.md](AGENTS.md) for guidance scope and project-local Spec Kit usage.
 
@@ -60,7 +71,8 @@ Finance commands: `pnpm finance:check`, `pnpm finance:test`,
 app scripts. Frozen installation prepares the injected UI package; after editing
 UI, run `pnpm ui:package` to refresh its peer-specific copies.
 See [the Finance import record](specs/002-monorepo-agent-guidance/finance-import.md)
-for retained archives, isolated test configuration and remaining cutover work.
+for retained archives and isolated test configuration. Hosting cutover is complete;
+the [closeout inventory](specs/002-monorepo-agent-guidance/closeout.md) tracks deferred Finance work.
 
 Clipper commands: `pnpm clipper:check`, `pnpm clipper:test`,
 `pnpm clipper:build`, `pnpm clipper:build:extension` and `pnpm clipper:verify`.
@@ -71,7 +83,8 @@ their disposable test backends; see the scoped Clipper guidance before running.
 After installation, `pnpm monorepo:check-links` verifies all eight UI/foundation links, including
 website and Local First development. It checks each consumer's required Svelte,
 Jazz and XState instances. CI
-runs it before compilation. See [qualification and remaining work](specs/002-monorepo-agent-guidance/qualification.md).
+runs it before compilation. See [historical qualification](specs/002-monorepo-agent-guidance/qualification.md)
+and the current closeout record for subsequent hosted acceptance.
 
 [UI compatibility qualification](specs/002-monorepo-agent-guidance/ui-workspace-links.md)
 records the retired snapshots, classic-theme provenance, packed-export checks

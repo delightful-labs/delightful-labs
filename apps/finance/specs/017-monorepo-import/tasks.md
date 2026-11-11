@@ -7,5 +7,12 @@
 - [x] Qualify frozen install, app/service-worker checks, unit/worker tests and preview build.
 - [x] Qualify disposable browser account, permission and offline flows.
 - [x] Inspect local Vercel adapter tracing artifact.
-- [ ] Verify hosted Linux build/live preview before proposing deployment settings.
-- [ ] Reconcile active PRs and subsequent upstream commits before source handoff.
+- [x] Verify hosted Linux build/live preview before proposing deployment settings.
+- [x] Reconcile active PRs and subsequent upstream commits before source handoff.
+
+Hosted and public-domain acceptance, source handoff and rollback are recorded in
+the [application handoff](../../../../specs/002-monorepo-agent-guidance/app-preview-handoff.json).
+The [closeout inventory](../../../../specs/002-monorepo-agent-guidance/closeout.md)
+retains draft PR #67 as deferred application-worker work and issue #61 as deferred
+archive cleanup. Neither is an unfinished import task; existing archives and
+backup compatibility fixtures remain preserved.

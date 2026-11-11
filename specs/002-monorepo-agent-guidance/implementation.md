@@ -6,6 +6,29 @@ the original specification remains the reviewed requirements baseline.
 
 ## Current progress
 
+- Core source imports, workspace library consumption, shared guidance and CI
+  selection are implemented. The [closeout record](closeout.md) owns current
+  status, evidence and source-repository work dispositions.
+- Website, Finance and Clipper hosting now use the monorepo. Application preview,
+  staged-production and public-domain acceptance and rollback deployments are
+  recorded in [the handoff](app-preview-handoff.json).
+- The [production extension package](extension-release-handoff.json) is qualified
+  in isolated Chromium profiles against a synthetic production account. The
+  [release guide](../../apps/clipper/docs/extension-release.md) and opt-in check
+  are merged in PR #14. Public release is out of scope for now.
+- Finance's application-worker migration is deferred. PR #67 remains a reference;
+  see the [salvage review](finance-worker-pr67-review.md). Finance continues to run
+  from the monorepo with its existing Window-owned application and shared libraries.
+- The [refreshed upstream inventory](upstream-review.json) records Clipper source
+  PR #38 as merged, Finance draft #67 as deferred and Finance issue #61 as retained
+  cleanup work. Old repositories remain available and unarchived.
+
+## Historical slice checkpoints
+
+The entries below record earlier checkpoints and their then-pending work. Later
+qualification and the closeout record supersede those status statements; retain
+them as provenance rather than a current to-do list.
+
 - Clipper's [extension sign-in completion repair](extension-signin-repair.md)
   passes 909 unit/native tests, type/format/lint checks and all 12 packaged browser
   cases locally. Linux skips are removed; hosted Linux execution remains pending.

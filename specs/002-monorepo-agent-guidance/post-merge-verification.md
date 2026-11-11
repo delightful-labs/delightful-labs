@@ -1,5 +1,9 @@
 # Post-merge verification
 
+Historical checkpoint record. Later completion, source handoff and deferred-work
+status are recorded in the [migration closeout](closeout.md). Pending-work
+statements below describe their original checkpoints, not current migration gaps.
+
 The merge commit is `a6f63dc08baf8201f1271cca9c1cf70964607a86`. Its tree matches
 the qualified PR head; this record concerns subsequent master CI and live checks.
 

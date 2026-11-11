@@ -4,7 +4,20 @@
 
 **Created**: 2026-11-10
 
-**Status**: Draft — specification for review; migration implementation has not started
+**Status**: Core migration implemented and hosting handoff completed; closeout records under review (2026-11-11)
+
+The [closeout record](closeout.md) owns current completion evidence, development
+ownership and outstanding-work dispositions. The initial specification was
+followed by separately authorized implementation, shared-policy activation and
+production cutovers. Historical draft-only scope statements below describe the
+original specification PR, not the current implementation status. The adopted
+Clipper paths are `apps/clipper/apps/web` and `apps/clipper/apps/extension`.
+
+Finance's application-worker migration is deferred while its current application
+continues to use the monorepo and shared packages. Public extension release is
+out of scope for now. These choices do not block migration closeout or weaken
+the shared engineering rules for new and reworked code. Source-repository
+retirement and unrelated product work remain separate decisions.
 
 **Input**: Consolidate Delightful Clipper, Delightful Finance, Delightful UI,
 Delightful Local First, and the Delightful Labs website into the Delightful Labs
