@@ -43,7 +43,8 @@
       "currentHead": "0fd1cb389e8fccc9e5eecb642f9c0f10fa42d5e6",
       "sameAsImport": false,
       "openPullRequests": [],
-      "disposition": "Main has two commits for merged PR #37. Its public-icon offline assertion is already represented by the qualified migration correction; reconcile ancestry while retaining the current exact allow-list."
+      "disposition": "Current main reconciled by unsquashed subtree merge 29cab027. Resolve overlapping test-only edits by retaining the already-qualified exact public-icon allow-list. The merge has no tree changes and the current source main is an ancestor.",
+      "reconciledBy": "29cab027"
     }
   ]
 }

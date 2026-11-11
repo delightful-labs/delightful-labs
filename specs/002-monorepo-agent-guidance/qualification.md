@@ -89,9 +89,9 @@ The following work remains explicit:
    check are implemented and locally verified; see [the record](shared-guidance-ci.md).
    The stricter common engineering rules apply to every project by user direction;
    constitutions, product policies and translation/tool boundaries retain scope.
-4. Complete source PR inventory and reconcile newer upstream commits before
-   handoff. GitHub's configured token-lifetime restriction currently prevents
-   complete PR inventory; no authentication setting was altered.
+4. The [current source audit](upstream-review.json) is complete: three main heads
+   match the imports; Clipper's merged test correction is reconciled with history.
+   Finance's unfinished draft PR #67 stays in its source repository for later work.
 5. Verify hosted previews, deployment roots, required checks and independently
    approve source-of-truth cutover. No push, deployment, repository archival,
    branch rename, production migration or data operation was performed here.
@@ -137,3 +137,18 @@ cases, including offline restart and 24 settings teardown/capture cycles. Three
 regression tests were added; the temporary Linux skips are removed. This updates
 the earlier 9/12 local extension result, not the independently recorded UI/web/
 Finance runs. Hosted Linux Actions still needs to verify the enabled cases.
+
+## Hosted verification in progress — 2026-11-11
+
+[PR #10](https://github.com/delightful-labs/delightful-labs/pull/10) is open. Its
+first hosted run passes Finance's full CI matrix, website/UI checks and Clipper
+tooling. A Local First guidance-formatting failure is corrected. Clipper's Linux
+web/schema/worker/offline suites pass; its combined job exhausted the overall
+budget while running extension tests, so extension qualification now runs in
+parallel and the existing required browser check aggregates both results.
+
+The user approved the website Vercel root/output/workspace settings fix after its
+preview built but could not locate root output. Settings are applied; only the PR
+preview is being rebuilt. Production deployment, merge and source handoff remain
+separate actions. See [hosted verification](hosted-verification.md) for current
+checks, source audit, exact approved settings and remaining acceptance.

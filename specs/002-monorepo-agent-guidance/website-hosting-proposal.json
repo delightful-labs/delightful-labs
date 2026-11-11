@@ -12,5 +12,10 @@
   },
   "reason": "The SvelteKit adapter builds successfully inside apps/website, but the existing root deployment then searches for public. Use the app directory and framework-default output with access to shared workspace sources.",
   "scope": "Project settings apply to future preview and production builds. Existing deployed artifacts and domain assignments stay in place. Redeploy only this PR preview after approval; production release and merge require separate authorization.",
-  "status": "Awaiting explicit user approval before any hosted setting change or preview redeployment"
+  "status": "Explicitly approved by the user and applied on 2026-11-11; awaiting PR preview verification",
+  "appliedSettings": {
+    "rootDirectory": "apps/website",
+    "sourceFilesOutsideRootDirectory": true,
+    "outputDirectory": null
+  }
 }
