@@ -18,18 +18,28 @@ the original specification remains the reviewed requirements baseline.
   Vite allow-list regression was fixed without changing library behavior.
   The user also approved the [alpha.60 source adapters](alpha60-adapters.md);
   their full unit, package, native, restore and Storybook qualification passed.
-  Consumer archives remain unchanged pending patch reconciliation and app imports.
+  Finance and Clipper now consume qualified workspace source libraries.
 - The [recovery-view compatibility export](recovery-view-export.md) is now in
   source and verified through the packed consumer and 63 Storybook tests.
 - Existing SDK runtime patches are [reconciled in one root patch](sdk-runtime-patches.md),
-  with passing library native/restore checks and pending app qualification.
+  with passing library native/restore, Finance account/permission/startup and
+  Clipper worker/proof/offline qualification.
 - Finance is [imported and integrated](finance-import.md) with original history,
   root lockfile, peer-specific workspace UI consumption and retained source CI
   suites. Source and workspace baselines pass, including 1,940 unit tests,
   account/recovery, authorization and cold-offline/unanswered-remote browser
-  tests. Its distinct Local First archive remains pending source reconciliation.
-- Clipper import, remaining consumer workspace links, cross-project guidance
-  reconciliation and hosted qualification remain pending.
+  tests. Its existing [storage-availability behavior](finance-session-availability.md)
+  is preserved in source, and both library dependencies now use workspace packages.
+- Clipper web/extension are [imported and integrated](clipper-import.md), with
+  source library links and retained CI suites. Its 906 unit, 60 ordinary browser,
+  32 worker and 8 offline tests pass. Extension qualification passes 9/12;
+  all three failures reproduce against unchanged source and original dependencies.
+- A [module-identity check](../../scripts/monorepo/check-links.mjs) guards all six
+  app-to-library source edges in CI. Fresh install, source history reachability
+  and lockfile idempotence are verified. Final regression results are in
+  [the qualification record](qualification.md).
+- Website and library-development UI snapshot compatibility, shared topic-policy
+  reconciliation, source PR inventory and hosted qualification remain pending.
 
 ## Slice 0: reproducible source inventory
 

@@ -65,3 +65,7 @@ Clipper commands: `pnpm clipper:check`, `pnpm clipper:test`,
 Its web and extension consume workspace UI and Local First packages, prepared
 on install and refreshed by `pnpm build:libraries`. Browser commands retain
 their disposable test backends; see the scoped Clipper guidance before running.
+
+After installation, `pnpm monorepo:check-links` verifies that Finance and both
+Clipper apps share each source library's Svelte, Jazz and XState instances. CI
+runs it before compilation. See [qualification and remaining work](specs/002-monorepo-agent-guidance/qualification.md).

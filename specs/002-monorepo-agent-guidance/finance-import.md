@@ -135,3 +135,19 @@ build and live preview remain required before changing hosted settings.
 Shared library regressions under the final root lock pass: UI 131 tests / 30
 files and Local First 1,090 tests / 52 files. Full Finance source CI remains
 configured; local evidence above is not a claim that every matrix has run.
+
+## Final source-link qualification
+
+Finance now uses workspace UI and Local First source. Its existing archive-only
+[storage-availability extension](finance-session-availability.md) is preserved
+in library source and covered by eight new tests. App/library peer identities
+are coherent and guarded in CI. Historical DLF archives/patch provenance remain
+available for retained compatibility fixtures and rollback; package installation
+no longer consumes them.
+
+With both source links, Finance again passes zero-diagnostic app/service-worker
+checks, all 1,940 unit tests and the preview build. All 40 account/recovery and
+permission browser tests pass. In a fresh archive of `ca537bea`, frozen install,
+all six module-identity checks, Finance types and all seven cold-offline/remote
+startup tests pass. A subsequent offline lockfile-only install leaves the lock
+byte-identical. No user data, servers, strings or hosted settings are changed.
