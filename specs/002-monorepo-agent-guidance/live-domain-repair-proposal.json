@@ -1,5 +1,5 @@
 {
-  "status": "Applied after user instruction to continue both pending actions; DNS and ownership verified, HTTPS certificate acceptance pending",
+  "status": "Applied and verified: DNS, ownership, apex/www HTTPS and live custom-domain browser checks pass",
   "domain": "delightfullabs.com",
   "dnsProvider": "Netlify DNS",
   "zoneId": "5bd8b53d792f89382a368406",
@@ -106,5 +106,21 @@
       }
     }
   ],
-  "unrelatedRecordsPreserved": 9
+  "unrelatedRecordsPreserved": 9,
+  "certificate": {
+    "id": "cert_zObX5yLsc2wAqlu3gnQ0FAp3",
+    "cns": [
+      "delightfullabs.com"
+    ],
+    "authorization": "User explicitly approved apex certificate issuance after the separate security-configuration approval request",
+    "autoRenew": true
+  },
+  "acceptanceResults": {
+    "apexHomepage": 200,
+    "nativeWritingPage": 200,
+    "wwwRedirect": 308,
+    "wwwDestination": "https://delightfullabs.com/",
+    "unknownArticle": 404,
+    "liveBrowserChecks": "Passed desktop/mobile homepage, decoded portrait, app links, keyboard navigation, writing navigation/reload and six CSS/JavaScript assets; zero new fonts, page errors or failed app assets; external app embeds stubbed"
+  }
 }
