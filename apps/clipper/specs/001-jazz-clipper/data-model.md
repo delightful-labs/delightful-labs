@@ -1,6 +1,6 @@
 # Clipper logical data model
 
-**Updated**: 2026-11-06. Logical model for the full accepted product, not a claim that every row below exists. Native schemas and owner policies are implemented in `apps/web/src/lib/backend/jazz`; PR #19 now includes independent note entities, linked revisions and note-keyed recovery drafts. Highlight entities/workflows, the note editor and AT Protocol integration remain unimplemented. See tasks.md and the handoff for other implementation evidence.
+**Updated**: 2026-11-11. Logical model for the full accepted product, not a claim that every row below exists. Native schemas and owner policies are implemented in `apps/web/src/lib/backend/jazz`; PR #19 now includes independent note entities, linked revisions and note-keyed recovery drafts. Highlight entities/workflows, the note editor and AT Protocol integration remain unimplemented. See tasks.md and the handoff for other implementation evidence.
 
 ## Identity and authorization
 
@@ -11,19 +11,74 @@ Every source-of-truth row carries or inherits an enforced `libraryId`/owner rela
 | Record | Important fields | Relationships / invariants |
 | --- | --- | --- |
 | Library | ID = authenticated account UUID, immutable owner ID and bootstrap format 1 | One canonical root per account; idempotently ensure only this immutable payload. Empty replicas never trigger another identity or random root ID; mutable data/migrations are separate. |
-| Document | ID, libraryId, originalSavedAt, title/author, status, favorite, trashedAt?, priorStatus?, snapshotId?, captureState | Status is Inbox/Later/Archive. Trash is separate lifecycle. Saved snapshot immutable; no refresh selector. Original save time orders list newest first and does not change on re-clip. |
-| Article | ID, libraryId, url, originalSavedAt, contentId?, operationId?, failure? | Primary URL-first object; optional immutable content reference. Retry preserves identity/time. Bound uncertain publication is not replayed. |
+| Document | ID, libraryId, optional url, savedAt, readingProgress, resumePosition?, status, favorite, attachment? | User-owned library item. Progress is required, initially 0, bounded to 0–1. One attachment at most; pending capture has none. Saved URL is optional for direct file uploads. |
+| Article attachment | ID, owner scope, title, author?, publishedAt?, siteName?, language?, finalUrl, verified canonicalUrl?, representationId | Captured source metadata/content; attached to a Document. No savedAt/capturedAt, progress, resume location or user organization. PDF/EPUB are future attachment kinds, not additional attachments on the same Document. |
 | SourceIdentity | ID, libraryId, normalized accepted URL key, documentId, evidence kind/time, redirect target? | Preserve raw observed aliases separately. Revalidate shortening destinations. Duplicate reconciling must retain annotations and captures. |
 | Representation | ID, documentId, kind source/reader, normalizationVersion, selectorVersion, textHash, textLengthCodePoints, native sanitized payload, heading/footnote metadata | A successful reader snapshot is fixed in MVP. Source representation may retain selectors/quote/provenance rather than a full duplicate raw page. No historical revision UI required. |
 | Asset | ID, documentId, sourceURL, mediaType, byteCount, width/height?, content fingerprint when needed, native byte payload, processingVersion | Content-addressed only within owner scope; reference tracking prevents deleting bytes needed by another retained record. |
-| Highlight (annotation) | ID, libraryId, article link, originalQuote, createdAt, deletedAt?, defaultColor? | Independent entity with its own stable identity and explicit article association. One color in MVP, optional metadata supports future colors. One logical annotation can have multiple rendered spans and representations. Overlaps never merge. No resize command. |
+| Highlight (annotation) | ID, libraryId, documentId, originalQuote, createdAt, deletedAt?, defaultColor? | Independent entity with its own stable identity and explicit Document association. One color in MVP, optional metadata supports future colors. One logical annotation can have multiple rendered spans and representations. Overlaps never merge. No resize command. |
 | Anchor | ID, annotationId, representationId, selectors, normalizationVersion, status resolved/ambiguous/unresolved, derivedFrom? | W3C-compatible quote exact/prefix/suffix and code-point start/end; optional internal DOM path. Original selectors immutable. Deriving a reader anchor does not overwrite source evidence. No candidate repair workflow. |
-| Note | ID, libraryId, article link, optional highlight link, content, editedAt, deletedAt? | Independent entity with its own stable identity. Article association is a relationship rather than the note's identity. One active editable note per parent remains a cardinality rule; concurrent creation needs separate reconciliation. Plain text, linkification at view. Retain conflicting text until reconciled rather than last-write overwrite loss. |
+| Note | ID, libraryId, documentId, optional highlight link, content, editedAt, deletedAt? | Independent entity with its own stable identity. Document association is a relationship rather than the note's identity. One active editable note per parent remains a cardinality rule; concurrent creation needs separate reconciliation. Plain text, linkification at view. Retain conflicting text until reconciled rather than last-write overwrite loss. |
 | NoteRevision | ID, libraryId, noteId, text, causal parent revision IDs, editedAt | Current immutable full-text conflict storage. Content belongs to an independently identified note; revision IDs and timestamps cannot replace the note's identity. Concurrent heads are retained until explicitly reconciled. |
 | Tag | ID, libraryId, displayName, normalizedKey, deletedAt? | Trim outer whitespace; case-insensitive identity. Proposed Unicode NFC + locale-independent fold/version; implementation must qualify non-ASCII collisions before schema lock. Rename collision fails clearly rather than silently merge. |
 | TagAssignment | ID, tagId, targetType article/highlight, targetId | Unique relation, no inherited parent/child assignment. Global deletion removes/hides assignments including Trash. |
-| ReadingPosition | ID, account/document/representation/device, logical locator, quote/context?, lastInteractionAt, operationId, furthestLocator? | Per-device observations prevent sync write storms. Pick latest observed timestamp with deterministic operation-ID tie-breaker; clocks are imperfect. Apply only when opening, never jump an active article. Progress and last location separate. |
+| ReadingPosition | ID, account/document/representation/device, logical locator, quote/context?, lastInteractionAt, operationId, furthestLocator? | Per-device observations prevent sync write storms. Pick latest observed timestamp with deterministic operation-ID tie-breaker; clocks are imperfect. Apply only when opening, never jump an active article. Owned by the Document; its format-specific locator references the attachment representation. Initially absent. Progress and last location are separate. |
 | ReaderPreferences | ID, account, theme Light/Dark/System, fontFamily, fontSize, lineSpacing, readingWidth | Shared preferences with local cached value. No named presets, width matching, custom font upload, or per-device overrides. |
+
+
+## Accepted Document and attachment model (2026-11-11)
+
+This decision supersedes the earlier Article-as-primary-object and independent immutable-Document library-item descriptions. It is a target model; the native schema and migration are not implemented by this specification update.
+
+```ts
+type ReadingStatus = 'inbox' | 'later' | 'archive'
+
+type DocumentStatus =
+  | { status: ReadingStatus }
+  | {
+      status: 'trashed'
+      trashedAt: string
+      previousStatus: ReadingStatus
+    }
+
+type Document = DocumentStatus & {
+  id: string
+  libraryId: string
+  url: string | null
+  savedAt: string
+  readingProgress: number // Required, initially 0, bounded to 0–1
+  resumePosition: ReadingPosition | null // User-owned; initially null
+  favorite: boolean
+  attachment:
+    | { kind: 'article'; id: string }
+    | { kind: 'pdf'; id: string }
+    | { kind: 'epub'; id: string }
+    | null
+}
+
+type Article = {
+  id: string
+  libraryId: string
+  title: string
+  author: string | null
+  publishedAt: string | null
+  siteName: string | null
+  language: string | null
+  finalUrl: string
+  canonicalUrl: string | null // Only when verified
+  representationId: string
+}
+```
+
+`ReadingPosition` denotes a format-specific locator owned by the Document and referencing its attachment's representation. PDF/EPUB locator design and ingestion remain outside MVP. The Article's `libraryId` above expresses owner scope; direct storage versus inheritance through the Document remains an implementation choice. Separate entities do not authorize cross-user sharing.
+
+Saving creates the Document with progress 0 in the same owned transaction; all capture entry points must satisfy this invariant. Content attachment, failure, retry and re-clipping preserve Document identity, savedAt and existing progress. Required progress propagates to reader/library render contracts without optional fields or consumer `?? 0` defaults. A missing value on a known Document is an invariant failure, not a display fallback. Resume location may move backward while furthest progress remains unchanged.
+
+A trashed Document requires both trashedAt and previousStatus. Non-trashed variants omit these fields; restore returns to previousStatus and removes Trash-only fields. This union replaces separate logical Trash/status flags while keeping the user's previous reading status recoverable.
+
+Notes and highlights associate with the Document; anchors reference the attachment representation. The library lists Documents only, not independent attachment/content rows. Multiple formats of a book are separate Documents under this single-attachment decision. Source-identity deduplication must preserve user records and annotations; exact conversion of existing shared-content relationships remains a migration design gate.
+
+Migration must preserve existing progress from reader history, resume evidence, identities/links, saved times, organization and annotations; initialize genuinely unread items to 0; and account for legacy document-only items. A schema default of 0 alone is insufficient for already-read items. Qualify native migration, permissions, concurrent offline progress reconciliation and restart/reconnect behavior before claiming this target implemented. No schema migration, ownership relaxation or data reset is authorized by this documentation change.
 
 ## AT Protocol identity boundary
 
@@ -33,7 +88,7 @@ It consolidates accepted publication behavior and companion fields, with unappro
 kept separate. Jazz upgrade and backend hosting are being handled independently; this research
 does not authorize implementation or migration.
 
-AT Protocol support is confirmed product intent; the original planning conversation did not carry it into this specification. Notes and highlights therefore need their own records and identities, with explicit article relationships, regardless of the eventual AT storage/publication choice. The article must not be the only address through which an annotation can be retrieved. A note attached to a highlight has its own identity, not the highlight's identity.
+AT Protocol support is confirmed product intent; the original planning conversation did not carry it into this specification. Notes and highlights therefore need their own records and identities, with explicit Document relationships, regardless of the eventual AT storage/publication choice. The Document must not be the only address through which an annotation can be retrieved. A note attached to a highlight has its own identity, not the highlight's identity.
 
 AT Protocol addresses records with an AT URI containing repository identity, collection and record key. A version-specific strong reference additionally carries a CID; record address and content version are different concepts. See the official [data repository guide](https://atproto.com/guides/data-repos) and [AT URI specification](https://atproto.com/specs/at-uri-scheme). DLF owns shared identity integration and the broader cross-app AT Protocol boundary, starting with identity. Clipper domain IDs must remain independent of DIDs, provider subjects, AT record keys and content-version identifiers. No Lexicon namespace, record-key format, source-of-truth or publication lifecycle is selected here; those choices are not prerequisites for modeling independent local entities. A portable article reference also needs design because a private Jazz article ID alone is not an externally resolvable source reference.
 
@@ -41,7 +96,7 @@ PR #19 now implements independent `notes` and linked `noteRevisions`; `articleNo
 
 ## Device-local records (not synced authority)
 
-PWA Add Link saves native `articles` directly, with optional content through the same operation. Existing immutable documents/snapshots/assets hold readable content. A dedicated worker processes missing-content articles serially. No separate intake graph or IndexedDB journal is selected. See [durable-capture-design.md](durable-capture-design.md). Pre-session external intake remains a distinct future boundary.
+The accepted target creates a Document immediately for Add Link and optionally attaches supplied Article content through the same operation. Current native `articles` and immutable `documents` tables implement an older naming/ownership split; they are not the target logical entities. Snapshots/assets remain content storage records. A dedicated worker processes missing-content articles serially. No separate intake graph or IndexedDB journal is selected. See [durable-capture-design.md](durable-capture-design.md). Pre-session external intake remains a distinct future boundary.
 
 - Availability ledger keyed by account/representation/asset: native row availability and local write settlement; derive offline-complete only when required native text/byte values are locally available.
 - Chromium source references: at most eight small Chrome-storage records containing version/ID, tab/document, URL and ready/issued phase, with account ID on issued markers. They hold no article HTML or credentials and are not a second article database. The trusted offscreen runtime waits for identity, serializes saves and never replays issued references. Pre-session mobile-share handoff remains a separate future qualification; never silently attach old-account work to a new account.

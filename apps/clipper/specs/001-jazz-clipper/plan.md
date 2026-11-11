@@ -1,5 +1,7 @@
 # Technical Plan: Jazz Clipper and Reader
 
+**Accepted model update (2026-11-11; implementation pending):** [Document and single attachment](data-model.md#accepted-document-and-attachment-model-2026-11-11) supersedes earlier entity terminology below. Document owns optional saved URL, savedAt, required progress initially 0, resume location and organization. Article is its captured attachment. Trash is a discriminated status requiring trashedAt/previousStatus only when trashed. Existing native schema, shared-content/legacy-item conversion, progress reconciliation and migration qualification remain open; historical delivery evidence below does not establish this model implemented. PDF/EPUB support stays deferred.
+
 **AT Protocol status (2026-11-10):** [Merged implementation, accepted publication decisions and remaining work](atproto.md). This checkpoint supersedes historical JWT/Neon, alpha.59 and Netlify-only AT Protocol notes below; it does not mark annotation/publication requirements implemented.
 
 **Baseline**: `main` (implementation through feature branches/PRs) · **Updated**: 2026-11-05 · **Spec**: [spec.md](spec.md)

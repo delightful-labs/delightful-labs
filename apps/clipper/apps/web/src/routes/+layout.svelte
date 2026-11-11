@@ -38,3 +38,13 @@
 		}}
 	/>
 </div>
+
+<style>
+	/**
+	* @todo: these should be moved to DUI
+	*/
+	:global(body) {
+		--dui-border-width: 1px;
+		--dui-heading-font-weight: 500;
+	}
+</style>

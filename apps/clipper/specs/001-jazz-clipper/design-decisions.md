@@ -82,7 +82,7 @@ Save the first visible reading text position using its representation, normalize
 
 Per-device observations use causal knowledge, interaction time and deterministic operation ID to resolve available positions; device clock skew is a known limitation, not a claim of globally exact wall-clock ordering. An unsynced local observation is not discarded just because a remote value arrived later.
 
-Display progress as the furthest observed reading position divided by the saved representation's readable text length, clamped to 0–100%; end-of-content reaches 100%. This measures position reached, not verified comprehension, reading time or a separate completed state. Last location may move backward while progress remains furthest reached. Zero-length/link-only entries have no percentage. Restore by verified locator/context first; if no reliable match exists, open at the beginning without overwriting the saved evidence until a new user interaction.
+Display progress as the furthest observed reading position divided by the saved representation's readable text length, clamped to 0–100%; end-of-content reaches 100%. This measures position reached, not verified comprehension, reading time or a separate completed state. Last location may move backward while progress remains furthest reached. Every Document has required progress initialized to 0, including zero-length/link-only entries; progress is never undefined. The Document owns its resume position, whose locator references the attachment representation. Restore by verified locator/context first; if no reliable match exists, open at the beginning without overwriting the saved evidence until a new user interaction.
 
 ## Highlight deletion and article deletion
 
@@ -114,7 +114,7 @@ Extraction and display share a DOMPurify factory and namespace-specific attribut
 
 ## URL-first article saving
 
-Add Link immediately saves the article with its URL. The same save operation optionally accepts content from a browser clipper. A dedicated module-worker XState machine processes articles missing content serially, retaining the same object on failure and Retry. Main-thread code owns only trusted SDK/network leaves and resource draining. No separate intake graph or custom IndexedDB journal is used. See [durable-capture-design.md](durable-capture-design.md) for publication barriers and current evidence limits.
+The accepted 2026-11-11 model saves a user-owned Document immediately with its optional URL, savedAt and required readingProgress of 0. The same save operation optionally accepts an Article attachment from a browser clipper. A Document has at most one attachment; Article holds source metadata/content, while future PDF/EPUB attachments remain outside MVP. Retry preserves Document identity and savedAt. A dedicated worker processes missing-content Documents serially; no separate intake graph or custom IndexedDB journal is selected. The earlier native Article/immutable Document split is implementation history, not the target model. See [data-model.md](data-model.md#accepted-document-and-attachment-model-2026-11-11) for the agreed types, Trash union and migration gates; [durable-capture-design.md](durable-capture-design.md) retains historical publication evidence.
 
 
 ## Direct browser clipping and current batch boundary
