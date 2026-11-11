@@ -1,6 +1,6 @@
 {
   "checkedAt": "2026-11-11",
-  "status": "Preview builds ready; live acceptance and production cutover pending",
+  "status": "Finance and Clipper previews accepted; production cutover awaits explicit approval",
   "verifiedMaster": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
   "postMergeCI": {
     "foundation": 43070849739,
@@ -54,9 +54,22 @@
       },
       "browserAcceptance": {
         "pageHttpStatus": 200,
-        "pageErrorCount": 1,
-        "status": "Pending protected service-worker access approval; not qualified",
-        "observedServiceWorkerIssue": "Vercel authentication redirects the native service-worker script request despite short-lived OIDC headers on page requests"
+        "pageErrorCount": 0,
+        "status": "Passed live native and offline acceptance with scoped test authentication transport",
+        "onlineChecks": [
+          "approved authenticated preview entry",
+          "native account and expense creation, direct reload",
+          "mobile layout fits viewport"
+        ],
+        "checks": [
+          "authenticated preview, native service-worker installation and control",
+          "native account and expense creation, direct reload",
+          "mobile layout fits viewport",
+          "full browser restart offline after HTTP cache clear; retained data and new offline write",
+          "second full offline browser restart retains offline write",
+          "reconnect and independent restored browser receives online and offline writes from preview backend"
+        ],
+        "accessWarmupErrorCount": 0
       },
       "proposedProductionCutover": {
         "requiresExplicitApproval": true,
@@ -114,8 +127,38 @@
       "browserAcceptance": {
         "pageHttpStatus": 200,
         "pageErrorCount": 0,
-        "status": "Pending protected service-worker access approval; not qualified",
-        "observedServiceWorkerIssue": "Vercel authentication redirects the native service-worker script request despite short-lived OIDC headers on page requests"
+        "status": "Passed live native and offline acceptance with scoped test authentication transport",
+        "observedServiceWorkerIssue": "Protected preview redirects credential-free worker requests; scoped test authentication transport was required. Offline checks ran with this transport disabled.",
+        "onlineChecks": [
+          "approved authenticated preview entry",
+          "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
+          "mobile layout fits viewport"
+        ],
+        "liveCaptureGateway": {
+          "passed": true,
+          "responses": [
+            {
+              "path": "/api/capture/resolve",
+              "status": 200
+            },
+            {
+              "path": "/api/capture/extract",
+              "status": 200
+            }
+          ],
+          "title": "Example Domain",
+          "previewTextLength": 156,
+          "readerTextLength": 181
+        },
+        "checks": [
+          "authenticated preview, native service-worker installation and control",
+          "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
+          "mobile layout fits viewport",
+          "full browser restart offline after HTTP cache clear; retained data and new offline write",
+          "second full offline browser restart retains offline write",
+          "reconnect and independent restored browser receives online and offline writes from preview backend"
+        ],
+        "accessWarmupErrorCount": 0
       },
       "proposedProductionCutover": {
         "requiresExplicitApproval": true,
@@ -139,11 +182,15 @@
   "testAccess": {
     "shortLivedDevelopmentOidc": "Page and asset requests accepted; native service-worker requests still redirect",
     "existingBrowserSession": "Automatic approval review rejected reuse as not explicitly authorized; that path was not retried",
-    "temporaryShareLinks": "Explicit user approval requested for these two previews; no links created"
+    "temporaryShareLinks": "User approved links for both previews; created without exposing them. Links alone were insufficient for cookie-free module worker/cache requests.",
+    "deploymentBypassApproval": "User explicitly approved one-hour keys scoped to the two preview deployments and revocation after testing. Existing grants were rotated to one-hour expiry; project-wide protection and production unchanged.",
+    "workerTransport": "Browser harness authenticates only same-origin service-worker-owned network requests with the approved deployment cookie, forwards unchanged remote responses and preserves canonical script URL/options. This transport is disabled for all offline phases.",
+    "revocation": "Both one-hour deployment grants revoked after testing; API responses confirmed empty protectionBypass maps. Earlier share links were invalidated when rotated to the one-hour grants."
   },
   "cleanup": {
     "accidentalCliProbeProject": "Created by unexpected env-run CLI behavior, then deleted; no app project was modified",
-    "privateDevelopmentTokenFiles": "Both temporary development-token files removed before handoff; no secrets committed. New short-lived credentials can be obtained if needed after access approval."
+    "privateDevelopmentTokenFiles": "Both temporary development-token files removed before handoff; no secrets committed. New short-lived credentials can be obtained if needed after access approval.",
+    "browserProfiles": "Disposable browser profiles removed after tests; recovery phrases stayed in memory and were not printed, captured in screenshots, or committed."
   },
-  "previewRuntimeErrorScan": "Deployment-scoped error/fatal log queries returned no entries; this does not replace pending browser acceptance."
+  "previewRuntimeErrorScan": "Deployment-scoped error/fatal log queries returned no entries. Both full browser acceptance runs completed with zero page errors; Clipper live capture resolve/extract also returned HTTP 200."
 }
