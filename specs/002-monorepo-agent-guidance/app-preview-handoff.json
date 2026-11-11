@@ -1,0 +1,385 @@
+{
+  "checkedAt": "2026-11-11",
+  "status": "Finance and Clipper production cutover completed and public-domain acceptance passed",
+  "verifiedMaster": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+  "postMergeCI": {
+    "foundation": 43070849739,
+    "finance": 43070849413,
+    "clipper": 43070849827,
+    "result": "all passed"
+  },
+  "upstreamReview": {
+    "financeMain": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+    "financeOpenDraft67": "8ac042576360d82a21c64a643eab97f09e4bdf7c",
+    "clipperMain": "0fd1cb389e8fccc9e5eecb642f9c0f10fa42d5e6",
+    "clipperPR38ImportedHead": "4972bd3a43587c26afe854325f16bdc9d1d1d72e",
+    "clipperPR38CurrentHead": "8eccbd2dc70cb56a5c1f0ce2e8adf97a4dcfefb1",
+    "clipperNewCommits": "Two source CI-only commits; no additional product delta. Corresponding image/home fixes already exist in monorepo CI. Source PR remains open."
+  },
+  "apps": [
+    {
+      "app": "finance",
+      "projectId": "prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa",
+      "preview": {
+        "deploymentId": "dpl_AgyCZnW8913nmnLgvDCoNcxW1wPv",
+        "url": "https://delightful-finances-jsl3mwois-mjamesderochers-projects.vercel.app/",
+        "state": "READY",
+        "target": "preview",
+        "rootDirectory": "apps/finance",
+        "sourceFilesOutsideRootDirectory": true,
+        "skipGitConnectDuringLink": true,
+        "branch": "mono",
+        "sourceRepository": "delightful-labs/delightful-labs",
+        "commit": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+        "generatedDriveNameLength": 64,
+        "storageIsolation": "Native SDK project/preview/branch-specific name; production name unchanged"
+      },
+      "browserAcceptance": {
+        "pageHttpStatus": 200,
+        "pageErrorCount": 0,
+        "status": "Passed live native and offline acceptance with scoped test authentication transport",
+        "onlineChecks": [
+          "approved authenticated preview entry",
+          "native account and expense creation, direct reload",
+          "mobile layout fits viewport"
+        ],
+        "checks": [
+          "authenticated preview, native service-worker installation and control",
+          "native account and expense creation, direct reload",
+          "mobile layout fits viewport",
+          "full browser restart offline after HTTP cache clear; retained data and new offline write",
+          "second full offline browser restart retains offline write",
+          "reconnect and independent restored browser receives online and offline writes from preview backend"
+        ],
+        "accessWarmupErrorCount": 0
+      },
+      "productionSettingsBeforeCutover": {
+        "id": "prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa",
+        "name": "delightful-finances",
+        "rootDirectory": null,
+        "framework": "sveltekit",
+        "sourceFilesOutsideRootDirectory": true,
+        "buildCommand": null,
+        "installCommand": null,
+        "outputDirectory": null,
+        "nodeVersion": "24.x",
+        "git": {
+          "type": "github",
+          "repo": "delightful-finances",
+          "repoId": 1414641322,
+          "org": "delightful-labs",
+          "productionBranch": "main"
+        }
+      },
+      "productionCutover": {
+        "approved": true,
+        "deploymentId": "dpl_Gj95dJNiJQWFQHAfeX8q8Px76LSV",
+        "deploymentUrl": "https://delightful-finances-k3ts7yh4i-mjamesderochers-projects.vercel.app",
+        "publicUrl": "https://finance.delightfullabs.com/",
+        "state": "READY",
+        "target": "production",
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "commit": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+        "rootDirectory": "apps/finance",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "buildDurationSeconds": 82.154,
+        "stagedAcceptance": {
+          "passed": true,
+          "checks": [
+            "native service-worker installation and control",
+            "native account and expense creation, direct reload",
+            "mobile layout fits viewport",
+            "full browser restart offline after HTTP cache clear; retained data and new offline write",
+            "second full offline browser restart retains offline write",
+            "reconnect and independent restored browser receives online and offline writes from production backend"
+          ],
+          "pageErrors": 0,
+          "authentication": "Approved deployment cookie applied only to same-origin service-worker-owned requests; unchanged remote bytes; disabled offline"
+        },
+        "publicDomainAcceptance": {
+          "passed": true,
+          "checks": [
+            "native service-worker installation and control",
+            "native account and expense creation, direct reload",
+            "mobile layout fits viewport",
+            "full browser restart offline after HTTP cache clear; retained data and new offline write",
+            "second full offline browser restart retains offline write",
+            "reconnect and independent restored browser receives online and offline writes from production backend"
+          ],
+          "pageErrors": 0,
+          "accessWarmupErrors": 0,
+          "authentication": "Public production origin; no authentication transport"
+        },
+        "preservationChecks": {
+          "id": true,
+          "name": true,
+          "ssoProtection": true,
+          "passwordProtection": true,
+          "trustedIps": true,
+          "trustedSources": true,
+          "envUnchanged": true,
+          "domainPromoted": true,
+          "productionPromoted": true,
+          "root": true,
+          "master": true,
+          "repository": true,
+          "autoAssignRestored": true
+        },
+        "domains": [
+          "finance.delightfullabs.com",
+          "delightful-finances.vercel.app"
+        ],
+        "domainsVerifiedOnTestedDeployment": true,
+        "productionStorage": "Existing project identity, environment values and SDK project/production core naming preserved; no data reset or migration performed. Browser checks used disposable synthetic accounts, not existing user accounts.",
+        "rollback": {
+          "deploymentId": "dpl_DeyCap8mcN3HUpvRWByrB2w4LjmC",
+          "state": "READY",
+          "sourceRepository": "delightful-labs/delightful-finances",
+          "commit": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+          "procedure": "Promote the previous production deployment to restore traffic; restore recorded prior Git/root settings if reverting source ownership. Never reset storage."
+        },
+        "testAccess": "One-hour deployment-only share grant revoked after staged verification; protectionBypass response empty. Public-domain acceptance required no deployment authentication transport.",
+        "automaticDomainAssignmentRestored": true
+      },
+      "approvedProductionCutoverPlan": {
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "rootDirectory": "apps/finance",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "preserve": [
+          "project identity",
+          "custom domains",
+          "production environment variables",
+          "production Jazz core name and stored data",
+          "extension release identity"
+        ],
+        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval.",
+        "approvalRecorded": true
+      }
+    },
+    {
+      "app": "clipper",
+      "projectId": "prj_9Dw5akTMo6EogWyGPHPKdOsRNWHT",
+      "preview": {
+        "deploymentId": "dpl_E9dkf6NG749ZLwgYiJaWB2muo5VF",
+        "url": "https://delightful-clipper-ff05z7la8-mjamesderochers-projects.vercel.app/",
+        "state": "READY",
+        "target": "preview",
+        "rootDirectory": "apps/clipper/apps/web",
+        "sourceFilesOutsideRootDirectory": true,
+        "skipGitConnectDuringLink": true,
+        "branch": "mono",
+        "sourceRepository": "delightful-labs/delightful-labs",
+        "commit": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+        "generatedDriveNameLength": 64,
+        "storageIsolation": "Native SDK project/preview/branch-specific name; production name unchanged"
+      },
+      "browserAcceptance": {
+        "pageHttpStatus": 200,
+        "pageErrorCount": 0,
+        "status": "Passed live native and offline acceptance with scoped test authentication transport",
+        "observedServiceWorkerIssue": "Protected preview redirects credential-free worker requests; scoped test authentication transport was required. Offline checks ran with this transport disabled.",
+        "onlineChecks": [
+          "approved authenticated preview entry",
+          "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
+          "mobile layout fits viewport"
+        ],
+        "liveCaptureGateway": {
+          "passed": true,
+          "responses": [
+            {
+              "path": "/api/capture/resolve",
+              "status": 200
+            },
+            {
+              "path": "/api/capture/extract",
+              "status": 200
+            }
+          ],
+          "title": "Example Domain",
+          "previewTextLength": 156,
+          "readerTextLength": 181
+        },
+        "checks": [
+          "authenticated preview, native service-worker installation and control",
+          "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
+          "mobile layout fits viewport",
+          "full browser restart offline after HTTP cache clear; retained data and new offline write",
+          "second full offline browser restart retains offline write",
+          "reconnect and independent restored browser receives online and offline writes from preview backend"
+        ],
+        "accessWarmupErrorCount": 0
+      },
+      "productionSettingsBeforeCutover": {
+        "id": "prj_9Dw5akTMo6EogWyGPHPKdOsRNWHT",
+        "name": "delightful-clipper",
+        "rootDirectory": "apps/web",
+        "framework": "sveltekit",
+        "sourceFilesOutsideRootDirectory": true,
+        "buildCommand": "pnpm run build",
+        "installCommand": "pnpm install --frozen-lockfile",
+        "outputDirectory": null,
+        "nodeVersion": "24.x",
+        "git": {
+          "type": "github",
+          "repo": "delightful-clipper",
+          "repoId": 481105109,
+          "org": "delightful-labs",
+          "productionBranch": "main"
+        }
+      },
+      "productionCutover": {
+        "approved": true,
+        "deploymentId": "dpl_8W4RL6gAfjmTATtKebcfbfJVT8WQ",
+        "deploymentUrl": "https://delightful-clipper-ccrzpopij-mjamesderochers-projects.vercel.app",
+        "publicUrl": "https://clipper.delightfullabs.com/",
+        "state": "READY",
+        "target": "production",
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "commit": "05dba3670b8f042e567ed96ddee2e52f21f0ef72",
+        "rootDirectory": "apps/clipper/apps/web",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "buildDurationSeconds": 78.474,
+        "stagedAcceptance": {
+          "passed": true,
+          "checks": [
+            "native service-worker installation and control",
+            "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
+            "mobile layout fits viewport",
+            "full browser restart offline after HTTP cache clear; retained data and new offline write",
+            "second full offline browser restart retains offline write",
+            "reconnect and independent restored browser receives online and offline writes from production backend"
+          ],
+          "pageErrors": 0,
+          "authentication": "Approved deployment cookie applied only to same-origin service-worker-owned requests; unchanged remote bytes; disabled offline"
+        },
+        "publicDomainAcceptance": {
+          "passed": true,
+          "checks": [
+            "native service-worker installation and control",
+            "URL capture with controlled gateway responses, metadata excerpt, reader navigation and direct reload",
+            "mobile layout fits viewport",
+            "full browser restart offline after HTTP cache clear; retained data and new offline write",
+            "second full offline browser restart retains offline write",
+            "reconnect and independent restored browser receives online and offline writes from production backend"
+          ],
+          "pageErrors": 0,
+          "accessWarmupErrors": 0,
+          "authentication": "Public production origin; no authentication transport"
+        },
+        "preservationChecks": {
+          "id": true,
+          "name": true,
+          "ssoProtection": true,
+          "passwordProtection": true,
+          "trustedIps": true,
+          "trustedSources": true,
+          "envUnchanged": true,
+          "domainPromoted": true,
+          "productionPromoted": true,
+          "root": true,
+          "master": true,
+          "repository": true,
+          "autoAssignRestored": true
+        },
+        "domains": [
+          "clipper.delightfullabs.com",
+          "delightful-clipper.vercel.app"
+        ],
+        "domainsVerifiedOnTestedDeployment": true,
+        "productionStorage": "Existing project identity, environment values and SDK project/production core naming preserved; no data reset or migration performed. Browser checks used disposable synthetic accounts, not existing user accounts.",
+        "rollback": {
+          "deploymentId": "dpl_BTmjPnZEUg65raam8ZrkdwCuTA4X",
+          "state": "READY",
+          "sourceRepository": "delightful-labs/delightful-clipper",
+          "commit": "0fd1cb389e8fccc9e5eecb642f9c0f10fa42d5e6",
+          "procedure": "Promote the previous production deployment to restore traffic; restore recorded prior Git/root settings if reverting source ownership. Never reset storage."
+        },
+        "testAccess": "One-hour deployment-only share grant revoked after staged verification; protectionBypass response empty. Public-domain acceptance required no deployment authentication transport.",
+        "automaticDomainAssignmentRestored": true,
+        "stagedLiveCapture": {
+          "passed": true,
+          "responses": [
+            {
+              "path": "/api/capture/resolve",
+              "status": 200,
+              "proofPresent": true
+            },
+            {
+              "path": "/api/capture/extract",
+              "status": 200,
+              "proofPresent": true
+            }
+          ],
+          "remoteIdentityReady": true,
+          "title": "Example Domain",
+          "previewTextLength": 156,
+          "readerTextLength": 181
+        },
+        "publicLiveCapture": {
+          "passed": true,
+          "responses": [
+            {
+              "path": "/api/capture/resolve",
+              "status": 200,
+              "proofPresent": true
+            },
+            {
+              "path": "/api/capture/extract",
+              "status": 200,
+              "proofPresent": true
+            }
+          ],
+          "remoteIdentityReady": true,
+          "title": "Example Domain",
+          "previewTextLength": 156,
+          "readerTextLength": 181
+        },
+        "captureTestReadiness": "The first staged live-gateway attempt returned 401 without waiting for native account synchronization. A diagnostic run waited for Private library synced and verified both endpoints returned 200 with native proof present; the public-domain run also passed with that readiness condition. This establishes capture after synchronization; it does not qualify capture before synchronization. No application code or authentication policy changed."
+      },
+      "approvedProductionCutoverPlan": {
+        "repository": "delightful-labs/delightful-labs",
+        "repositoryId": 52031385,
+        "productionBranch": "master",
+        "rootDirectory": "apps/clipper/apps/web",
+        "sourceFilesOutsideRootDirectory": true,
+        "outputDirectory": null,
+        "preserve": [
+          "project identity",
+          "custom domains",
+          "production environment variables",
+          "production Jazz core name and stored data",
+          "extension release identity"
+        ],
+        "releasePlan": "Build a staged production deployment without assigning domains, verify using authorized access and disposable accounts, then promote only the tested production deployment after cutover approval.",
+        "approvalRecorded": true
+      }
+    }
+  ],
+  "testAccess": {
+    "shortLivedDevelopmentOidc": "Page and asset requests accepted; native service-worker requests still redirect",
+    "existingBrowserSession": "Automatic approval review rejected reuse as not explicitly authorized; that path was not retried",
+    "temporaryShareLinks": "User approved links for both previews; created without exposing them. Links alone were insufficient for cookie-free module worker/cache requests.",
+    "deploymentBypassApproval": "User explicitly approved one-hour keys scoped to the two preview deployments and revocation after testing. Existing grants were rotated to one-hour expiry; project-wide protection and production unchanged.",
+    "workerTransport": "Browser harness authenticates only same-origin service-worker-owned network requests with the approved deployment cookie, forwards unchanged remote responses and preserves canonical script URL/options. This transport is disabled for all offline phases.",
+    "revocation": "Both one-hour deployment grants revoked after testing; API responses confirmed empty protectionBypass maps. Earlier share links were invalidated when rotated to the one-hour grants.",
+    "productionTestGrants": "Separately approved one-hour grants for the two staged production builds; both revoked after verification. Project-wide protection unchanged."
+  },
+  "cleanup": {
+    "accidentalCliProbeProject": "Created by unexpected env-run CLI behavior, then deleted; no app project was modified",
+    "privateDevelopmentTokenFiles": "Both temporary development-token files removed before handoff; no secrets committed. New short-lived credentials can be obtained if needed after access approval.",
+    "browserProfiles": "Disposable browser profiles removed after tests; recovery phrases stayed in memory and were not printed, captured in screenshots, or committed."
+  },
+  "previewRuntimeErrorScan": "Deployment-scoped error/fatal log queries returned no entries. Both full browser acceptance runs completed with zero page errors; Clipper live capture resolve/extract also returned HTTP 200.",
+  "productionCutoverAuthorization": "User explicitly approved both source cutovers, staged production verification and promotion, then separately approved one-hour access keys scoped to the two staged production deployments.",
+  "productionRuntimeErrorScan": "Deployment-scoped error/fatal grouped queries returned no entries after staged and public-domain acceptance; the deliberately diagnosed pre-sync capture HTTP 401 was recorded separately.",
+  "remainingSourceWork": "Finance draft PR 67 remains separate. Clipper source PR 38 remains open; its product changes are imported and its later CI-only changes were already equivalent in the monorepo. Source repositories and extension release identity were not archived or changed."
+}
