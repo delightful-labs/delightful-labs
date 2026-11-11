@@ -1,9 +1,15 @@
 # Technical Plan: Jazz Clipper and Reader
 
+**Accepted model update (2026-11-11; implementation pending):** [Document and single attachment](data-model.md#accepted-document-and-attachment-model-2026-11-11) supersedes earlier entity terminology below. Document owns optional saved URL, savedAt, required progress initially 0, resume location and organization. Article is its captured attachment. Trash is a discriminated status requiring trashedAt/previousStatus only when trashed. Existing native schema, shared-content/legacy-item conversion, progress reconciliation and migration qualification remain open; historical delivery evidence below does not establish this model implemented. PDF/EPUB support stays deferred.
+
 **AT Protocol status (2026-11-10):** [Merged implementation, accepted publication decisions and remaining work](atproto.md). This checkpoint supersedes historical JWT/Neon, alpha.59 and Netlify-only AT Protocol notes below; it does not mark annotation/publication requirements implemented.
 
 **Baseline**: `main` (implementation through feature branches/PRs) · **Updated**: 2026-11-05 · **Spec**: [spec.md](spec.md)
 **Status**: Foundation, URL-first capture, saved reader/offline shell and Chromium direct extension clipping are implemented. PR #13 is merged and user-verified. Basic organization is merged in PR #14 and DUI radio/list refinements in PR #15 (`72b6fc9`). The merged PR #16 search/article-tags/Trash batch is described in [search-tags-trash.md](search-tags-trash.md), including approved action/noun composition and silent search preparation; see [library-organization.md](library-organization.md) for the state/resource model and the handoff for qualification. Reader experience is merged in PR #17 (`89ad4e7`); the bounded image batch follows [offline-images.md](offline-images.md), reusing native byte assets and the existing authenticated public-source gateway. Full runtime/release qualification remains open; see [tasks.md](tasks.md) and [implementation-handoff.md](implementation-handoff.md) for delivered evidence and the next-thread entry point.
+
+## Deferred reading-progress implementation
+
+Apply the [cleanup plan](data-model.md#reading-progress-cleanup-plan-implementation-deferred) with the Document/attachment migration, not as an isolated optional-to-required prop patch. Scope includes one worker state owner, canonical rules, creation/migration initialization, required render values and removal of redundant maps/defaults. Preserve reconciliation and settlement guarantees. Implementation and native qualification remain pending.
 
 ## Summary
 

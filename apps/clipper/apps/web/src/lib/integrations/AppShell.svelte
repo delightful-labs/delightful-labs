@@ -14,7 +14,6 @@
 	import type { ReaderPreferences } from '../reader/schema.js'
 	import { setAccountNavigation } from '../runtime/navigation.js'
 	import { setAccountSettings } from '../runtime/account-settings.js'
-	import AddLink from './AddLink.svelte'
 	import ConnectionStatus from './ConnectionStatus.svelte'
 	import { useWorkerLibrary } from '../runtime/worker/context.js'
 	import { action, noun, t } from '../localization/index.js'
@@ -155,11 +154,6 @@
 				{@render runtimeFeedback()}
 				{@render children()}
 			</div>
-			{#if library.actor && !readerFocused && page.url.pathname === '/'}
-				<div class="capture-control">
-					{#key library.actor}<AddLink actor={library.actor} />{/key}
-				</div>
-			{/if}
 		</main>
 		{#if modal && !readerFocused}
 			<button
@@ -176,7 +170,7 @@
 	.app-shell {
 		--app-control-size: 44px;
 		--app-padding: var(--dui-space-md, 1.5rem);
-		--dui-drawer-padding: var(--app-padding);
+		--dui-drawer-padding: var(--app-padding) 0;
 		--dui-drawer-height: 100%;
 		--dui-drawer-width: 20rem;
 		display: grid;
@@ -223,6 +217,11 @@
 		align-items: flex-start;
 		min-block-size: 0;
 		overflow: hidden;
+		--dui-drawer-panel-border-inline-end: var(
+				--dui-dialog-border-width,
+				var(--dui-border-width, 2px)
+			)
+			solid var(--dui-dialog-border-color, var(--dui-color-foreground, currentColor));
 	}
 
 	.sidebar-content {
@@ -253,13 +252,6 @@
 	.page-content {
 		grid-area: 1 / 1;
 		min-inline-size: 0;
-	}
-
-	.capture-control {
-		grid-area: 1 / 1;
-		align-self: end;
-		position: sticky;
-		inset-block-end: 0;
 	}
 
 	.content:has(:global(.reader-workspace)) {

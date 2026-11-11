@@ -30,14 +30,14 @@
 		"test:fake-data": "playwright test --config playwright.fake-data.config.ts"
 	},
 	"devDependencies": {
+		"@playwright/test": "1.64.0",
 		"@types/node": "24.19.2",
+		"@xstate/test": "2.0.0-beta.0",
+		"fast-check": "4.10.2",
 		"oxfmt": "0.73.0",
 		"oxlint": "1.88.0",
 		"typescript": "6.0.3",
 		"vitest": "4.1.8",
-		"@playwright/test": "1.64.0",
-		"@xstate/test": "2.0.0-beta.0",
-		"fast-check": "4.10.2",
 		"xstate": "6.0.0-beta.1"
 	}
 }

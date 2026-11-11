@@ -30,12 +30,12 @@
 
 <li {id} tabindex="-1" data-article-id={row.id}>
 	<div class="article-header">
-		<div class="article-title">
-			<Heading id={`${id}-title`} level="h3" size="xl">
-				{#if readable}<a href={articleHref(row.id)}>{row.title}</a>{:else}{row.title}{/if}
-			</Heading>
-			{#if row.excerpt}<p class="article-excerpt">{row.excerpt}</p>{/if}
-		</div>
+		<Heading id={`${id}-title`} level="h3" size="xl">
+			{#if readable}<a href={articleHref(row.id)}>{row.title}</a>{:else}{row.title}{/if}
+		</Heading>
+	</div>
+	<div class="article-metadata">
+		<ReadingProgress value={row.readingProgress} />
 		<ArticleActionsPopover label={t('library.article_actions')} descriptionId={`${id}-title`}>
 			{#snippet children(dismiss)}
 				<ArticleActions
@@ -66,7 +66,7 @@
 			{/snippet}
 		</ArticleActionsPopover>
 	</div>
-	<ReadingProgress value={row.readingProgress} />
+	{#if row.excerpt}<p class="article-excerpt">{row.excerpt}</p>{/if}
 </li>
 
 <style>
@@ -80,14 +80,15 @@
 		border-block-end: 0;
 	}
 
-	.article-header {
+	.article-header,
+	.article-metadata {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: start;
 		gap: var(--dui-spacing-sm);
 	}
 
-	.article-title {
+	.article-header {
 		min-inline-size: 0;
 		overflow-wrap: anywhere;
 	}

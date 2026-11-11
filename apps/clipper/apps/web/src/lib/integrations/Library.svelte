@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
+	import { createAttachmentKey } from 'svelte/attachments'
 	import type { LibraryClient } from '../runtime/worker/client.js'
 	import type { LibraryRender } from '../runtime/worker/views.js'
 	import PageNavigation from '../components/navigation/PageNavigation.svelte'
@@ -10,15 +11,24 @@
 	import ArticleList from '../components/library/ArticleList.svelte'
 	import ArticleTags from './ArticleTags.svelte'
 	import { action, t } from '../localization/index.js'
+	import AddLink from './AddLink.svelte'
+	import { Heading } from 'delightful-ui'
 	let {
-		actor,
-		gatewayEnabled
+		actor
 	}: {
 		actor: LibraryClient
 		gatewayEnabled?: boolean
 	} = $props()
 	let snapshot = $state<LibraryRender>()
 	let heading = $state<HTMLHeadingElement>()
+	const headingAttachment = {
+		[createAttachmentKey()]: (element: Element) => {
+			if (element instanceof HTMLHeadingElement) heading = element
+			return () => {
+				heading = undefined
+			}
+		}
+	}
 	let tagTrigger: HTMLElement | undefined
 	let tagArticleId = $state<string>()
 	let tagsOpen = $state(false)
@@ -36,7 +46,9 @@
 	<section aria-label={t('library.heading')}>
 		<div class="library-header">
 			<PageNavigation />
-			<h1 bind:this={heading} tabindex="-1">{t('library.heading')}</h1>
+			<Heading level="h1" size="xl" tabindex={-1} {...headingAttachment}
+				>{t('library.heading')}</Heading
+			>
 			<LibraryFilterPopovers
 				searchLabel={action('search', 'article', 2)}
 				onsearch={() => actor.send({ type: 'SEARCH_OPEN' })}
@@ -92,6 +104,9 @@
 			onemptyfocus={() => heading?.focus()}
 		/>
 	</section>
+	<div class="capture-control">
+		{#key actor}<AddLink {actor} />{/key}
+	</div>
 	<ArticleTags
 		{actor}
 		row={snapshot?.tagArticle && snapshot.tagArticle.id === tagArticleId
@@ -115,8 +130,11 @@
 		min-inline-size: 0;
 	}
 
-	.library-header h1 {
-		margin: 0;
+	.capture-control {
+		grid-area: 1 / 1;
+		align-self: end;
+		position: sticky;
+		inset-block-end: 0;
 	}
 
 	section {

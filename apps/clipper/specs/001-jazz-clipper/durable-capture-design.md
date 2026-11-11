@@ -1,5 +1,7 @@
 # URL-first articles and background content processing
 
+**Accepted model update (2026-11-11; implementation pending):** [Document and single attachment](data-model.md#accepted-document-and-attachment-model-2026-11-11) supersedes earlier entity terminology below. Document owns optional saved URL, savedAt, required progress initially 0, resume location and organization. Article is its captured attachment. Trash is a discriminated status requiring trashedAt/previousStatus only when trashed. Existing native schema, shared-content/legacy-item conversion, progress reconciliation and migration qualification remain open; historical delivery evidence below does not establish this model implemented. PDF/EPUB support stays deferred.
+
 The accepted interaction is simple: Add Link saves an article object containing the submitted URL immediately. The same save operation optionally accepts content, so a future browser clipper can supply extracted content without a second intake API. There is no separate intake graph or custom IndexedDB journal.
 
 ## Data and publication
