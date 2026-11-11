@@ -1,1 +1,1 @@
-import 'delightful-ui/theme.css'
+import 'delightful-ui/theme-classic.css'

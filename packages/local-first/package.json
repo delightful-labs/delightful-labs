@@ -43,7 +43,7 @@
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
 		"@types/node": "26.6.6",
 		"@xstate/test": "2.0.0-beta.0",
-		"delightful-ui": "file:vendor/delightful-ui-0.0.25-details-animation.tgz",
+		"delightful-ui": "workspace:*",
 		"fast-check": "4.10.2",
 		"jazz-tools": "2.0.0-alpha.60",
 		"oxfmt": "0.76.0",
@@ -436,5 +436,10 @@
 	},
 	"dependencies": {
 		"zod": "4.1.11"
+	},
+	"dependenciesMeta": {
+		"delightful-ui": {
+			"injected": true
+		}
 	}
 }

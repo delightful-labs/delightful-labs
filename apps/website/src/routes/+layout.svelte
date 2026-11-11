@@ -1,5 +1,5 @@
 <script lang="ts">
-  import "delightful-ui/theme.css";
+  import "delightful-ui/theme-classic.css";
   import { Navigation } from "delightful-ui";
   import { page } from "$app/state";
   let { children } = $props();

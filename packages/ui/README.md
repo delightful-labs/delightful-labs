@@ -35,6 +35,14 @@ import 'delightful-ui/theme.css'
 
 The theme supplies green accents (`#94ff47`), system-preference light/dark surfaces, shared spacing, and base typography/media/focus styles. Button hover uses green with dark text. Jost is the default font for body text and headings. Interactive components—including buttons, details summaries, navigation items, pagination, and form controls—use Cascadia Code through `--dui-font-family-interactive`, which defaults to `var(--dui-font-family-mono)`. Component-specific font-family properties still take precedence. Cascadia Code is used for `code`, `pre`, `kbd`, and `samp`. Both variable fonts are bundled and self-hosted, including real italics, with `font-display: swap`; no requests to external font services are made. Jost supports weights 100–900 and Cascadia Code supports 200–700. Override `--dui-font-family`, `--dui-font-family-body`, `--dui-font-family-mono`, or `--dui-font-family-interactive` to customize the stacks. Font licenses are included in `dist/fonts/`. Without this import, components retain their own styling fallbacks.
 
+Existing consumers that need the pre-bundled-font defaults can import
+`delightful-ui/theme-classic.css` instead. This compatibility entry preserves the
+Source Code Pro/monospace control and heading stack, system/sans-serif body
+stack, and existing sizes/colors/spacing. It maps `--dui-font-family-interactive`
+to the existing `--dui-font-family` token and does not import bundled fonts.
+Import one theme entry per application. The website and Local First's Storybook
+use this entry to retain their existing presentation while linking workspace UI.
+
 Component-specific `@property` registrations live in the owning component's `<style>` and load with that component, independently of the optional theme. Shared color, spacing, typography, border, shadow, and pressed-offset registrations live in `theme.css`. Each property has one registration owner, even when other components consume it. For example, Button owns `--dui-button-*`, InputWrapper owns shared field/input properties, and LoadingSpinner owns its spinner properties.
 
 Registrations remain global CSS definitions; component placement does not scope their names. Use unique `--dui-*` names, enable inheritance for ancestor overrides, and preserve existing fallback chains. Properties using universal syntax (`"*"`) without initial values preserve contextual or complex values; those registrations do not validate a narrower type. Typed registrations use computationally independent initial values. Theme declarations still provide relative units, aliases, fluid spacing, and light/dark colors.

@@ -24,7 +24,7 @@
     "@standard-reader/renderer-core": "0.4.0",
     "@standard-reader/renderer-svelte": "0.4.0",
     "@vercel/blob": "2.8.2",
-    "delightful-ui": "file:vendor/delightful-ui-0.0.25.tgz",
+    "delightful-ui": "workspace:*",
     "feed": "6.0.0",
     "ipaddr.js": "2.5.0",
     "undici": "8.12.4",
@@ -43,5 +43,10 @@
     "typescript": "6.0.3",
     "vite": "8.3.7",
     "vitest": "4.1.11"
+  },
+  "dependenciesMeta": {
+    "delightful-ui": {
+      "injected": true
+    }
   }
 }

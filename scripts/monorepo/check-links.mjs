@@ -4,7 +4,13 @@ import { resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
-const consumers = ['apps/finance', 'apps/clipper/apps/web', 'apps/clipper/apps/extension']
+const consumers = {
+	'apps/website': ['delightful-ui'],
+	'packages/local-first': ['delightful-ui'],
+	'apps/finance': ['delightful-ui', 'delightful-local-first'],
+	'apps/clipper/apps/web': ['delightful-ui', 'delightful-local-first'],
+	'apps/clipper/apps/extension': ['delightful-ui', 'delightful-local-first']
+}
 const peers = {
 	'delightful-ui': ['svelte'],
 	'delightful-local-first': ['svelte', 'jazz-tools/client', 'xstate', 'delightful-ui']
@@ -13,12 +19,13 @@ const peers = {
 // Branded SDK types and Svelte snippets must come from the consumer's instance.
 // Inspect actual installed resolution, including injected copies and peer contexts.
 let failures = 0
-for (const project of consumers) {
+for (const [project, dependencies] of Object.entries(consumers)) {
 	const directory = resolve(root, project)
 	const manifest = JSON.parse(readFileSync(resolve(directory, 'package.json'), 'utf8'))
 	const consumer = createRequire(resolve(directory, 'package.json'))
-	for (const [name, requirements] of Object.entries(peers)) {
-		if (manifest.dependencies?.[name] !== 'workspace:*') {
+	for (const name of dependencies) {
+		const requirements = peers[name]
+		if ((manifest.dependencies?.[name] ?? manifest.devDependencies?.[name]) !== 'workspace:*') {
 			console.error(`${project}: ${name} must use the workspace package`)
 			failures++
 			continue

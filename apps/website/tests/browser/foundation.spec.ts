@@ -81,3 +81,27 @@ test("navigation remains available at mobile width and via keyboard", async ({
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/open-thoughts\/$/);
 });
+
+test("workspace UI preserves navigation without downloading new fonts", async ({
+  page,
+}) => {
+  const fonts: string[] = [];
+  page.on("request", (request) => {
+    if (request.resourceType() === "font") fonts.push(request.url());
+  });
+  await page.route(
+    /^https:\/\/(clipper|finance)\.delightfullabs\.com\//,
+    (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<!doctype html><html><body></body></html>",
+      }),
+  );
+  await page.goto("/");
+  await page.getByRole("link", { name: "Open Thoughts", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Open Thoughts" }),
+  ).toBeVisible();
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  expect(fonts).toEqual([]);
+});

@@ -1,0 +1,88 @@
+{
+  "baselineCommit": "1a64389c",
+  "retiredArchives": [
+    {
+      "consumer": "website",
+      "retiredPath": "apps/website/vendor/delightful-ui-0.0.25.tgz",
+      "archiveSha256": "101ba149fe7fe93a4e20b3419420e77356ce50653dfdb9c2514484a295b44f73",
+      "themeSha256": "bdd1f72bd0aef25e0f20d0c8567c4e8e259dec900c7b66f8390545f64a7ddf3c",
+      "recoverFromGit": "git show 1a64389c:apps/website/vendor/delightful-ui-0.0.25.tgz"
+    },
+    {
+      "consumer": "local-first",
+      "retiredPath": "packages/local-first/vendor/delightful-ui-0.0.25-details-animation.tgz",
+      "archiveSha256": "22485ae89113fd218af3d2d8f3211b16a8aa3a6428f09aeabd1568003bf038e2",
+      "themeSha256": "ad46e0171171e1e2f7efb54b85a2e8e977ddf8bd8c2162179b473bec6bfe390d",
+      "recoverFromGit": "git show 1a64389c:packages/local-first/vendor/delightful-ui-0.0.25-details-animation.tgz"
+    }
+  ],
+  "classicTheme": {
+    "source": "packages/ui/src/lib/theme-classic.css",
+    "sha256": "bf25959ac2fafc8c940fc8df671957e69e2434d66095c075f547e10b71866948",
+    "preservesAllOriginalDeclarations": true,
+    "additions": [
+      "Comment identifying compatibility entry",
+      "Interactive font role aliases the existing control font token"
+    ]
+  },
+  "visualChecks": [
+    {
+      "viewport": "desktop",
+      "route": "home",
+      "baselineSha256": "15a3ac50010e95538ef762c274ba87bdb24717cf57401ce5270959c01b111259",
+      "workspaceSha256": "15a3ac50010e95538ef762c274ba87bdb24717cf57401ce5270959c01b111259",
+      "identical": true,
+      "pageErrors": [],
+      "fontRequests": []
+    },
+    {
+      "viewport": "desktop",
+      "route": "writing",
+      "baselineSha256": "39856189ae77398a426ea72f0203db6dec3978d4ffaa3ef4961d12338068d773",
+      "workspaceSha256": "39856189ae77398a426ea72f0203db6dec3978d4ffaa3ef4961d12338068d773",
+      "identical": true,
+      "pageErrors": [],
+      "fontRequests": []
+    },
+    {
+      "viewport": "mobile",
+      "route": "home",
+      "baselineSha256": "7f5a733ad0d6d000d3a15a2727507a282982e397ad87080cef2789a16327316c",
+      "workspaceSha256": "7f5a733ad0d6d000d3a15a2727507a282982e397ad87080cef2789a16327316c",
+      "identical": true,
+      "pageErrors": [],
+      "fontRequests": []
+    },
+    {
+      "viewport": "mobile",
+      "route": "writing",
+      "baselineSha256": "fed48f9edd1f1dd1a502790eacafbf240cd6ed94a708ce0842523d9c1e9f2210",
+      "workspaceSha256": "fed48f9edd1f1dd1a502790eacafbf240cd6ed94a708ce0842523d9c1e9f2210",
+      "identical": true,
+      "pageErrors": [],
+      "fontRequests": []
+    },
+    {
+      "viewport": "dark",
+      "route": "home",
+      "baselineSha256": "683a1d50f6f508a1c2b1651c5a7858ff170541831fe27c6401792d8a8bb8d790",
+      "workspaceSha256": "683a1d50f6f508a1c2b1651c5a7858ff170541831fe27c6401792d8a8bb8d790",
+      "identical": true,
+      "pageErrors": [],
+      "fontRequests": []
+    },
+    {
+      "viewport": "dark",
+      "route": "writing",
+      "baselineSha256": "f7b4f66ec538fc403970906d40fdcc3154dc96d9fe1278e4331ba61b6c4731ee",
+      "workspaceSha256": "f7b4f66ec538fc403970906d40fdcc3154dc96d9fe1278e4331ba61b6c4731ee",
+      "identical": true,
+      "pageErrors": [],
+      "fontRequests": []
+    }
+  ],
+  "limits": [
+    "Website comparisons use reduced motion and blank mocked app embeds; live embedded applications remain separately qualified.",
+    "No computed-style, inline-style or class assertions were introduced."
+  ]
+}

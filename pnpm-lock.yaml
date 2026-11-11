@@ -339,8 +339,8 @@ importers:
         specifier: 2.8.2
         version: 2.8.2
       delightful-ui:
-        specifier: file:vendor/delightful-ui-0.0.25.tgz
-        version: file:apps/website/vendor/delightful-ui-0.0.25.tgz(svelte@5.57.3(@typescript-eslint/types@8.71.2))
+        specifier: workspace:*
+        version: file:packages/ui(svelte@5.57.3(@typescript-eslint/types@8.71.2))
       feed:
         specifier: 6.0.0
         version: 6.0.0
@@ -359,6 +359,9 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    dependenciesMeta:
+      delightful-ui:
+        injected: true
     devDependencies:
       '@playwright/test':
         specifier: 1.64.0
@@ -396,6 +399,9 @@ importers:
       zod:
         specifier: 4.1.11
         version: 4.1.11
+    dependenciesMeta:
+      delightful-ui:
+        injected: true
     devDependencies:
       '@inlang/paraglide-js':
         specifier: 3.1.0
@@ -431,8 +437,8 @@ importers:
         specifier: 2.0.0-beta.0
         version: 2.0.0-beta.0(fast-check@4.10.2)(vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(xstate@6.0.0-beta.1)(zod@4.1.11)
       delightful-ui:
-        specifier: file:vendor/delightful-ui-0.0.25-details-animation.tgz
-        version: file:packages/local-first/vendor/delightful-ui-0.0.25-details-animation.tgz(svelte@5.57.3(@typescript-eslint/types@8.71.2))
+        specifier: workspace:*
+        version: file:packages/ui(svelte@5.57.3(@typescript-eslint/types@8.71.2))
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
@@ -3638,20 +3644,6 @@ packages:
       xstate:
         optional: true
 
-  delightful-ui@file:apps/website/vendor/delightful-ui-0.0.25.tgz:
-    resolution: {integrity: sha512-wHx2riqU1Yv1HcPWkiMn1nvb99e2X3P60xJg9IAtEGLpH0o4HoyXImq177MgmQFxCFFSJq7XFrwfiPza53UH5A==, tarball: file:apps/website/vendor/delightful-ui-0.0.25.tgz}
-    version: 0.0.25
-    engines: {node: ^22.17.0 || >=24.0.0}
-    peerDependencies:
-      svelte: ^5.57.2
-
-  delightful-ui@file:packages/local-first/vendor/delightful-ui-0.0.25-details-animation.tgz:
-    resolution: {integrity: sha512-jy0d9v9O6ynKG2x4fHv27sXhuawu0V9Mn4j741CR+ojcjUWHqGlIPAcPpt6bxbU7tuLj5nXJjOc4pZqk/PPGHA==, tarball: file:packages/local-first/vendor/delightful-ui-0.0.25-details-animation.tgz}
-    version: 0.0.25
-    engines: {node: ^22.17.0 || >=24.0.0}
-    peerDependencies:
-      svelte: ^5.57.2
-
   delightful-ui@file:packages/ui:
     resolution: {directory: packages/ui, type: directory}
     engines: {node: ^22.17.0 || >=24.0.0}
@@ -5536,9 +5528,6 @@ packages:
 
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
-
-  xstate@5.33.4:
-    resolution: {integrity: sha512-eGNMu3BNqU0Z85P+ouYG5OCZqIABU+QsW6vUieFt9p9gOGs3C+BL10Exg7XdRPSXPQKlP6XoYpYf93r9VmW8mQ==}
 
   xstate@6.0.0-beta.1:
     resolution: {integrity: sha512-HzG+CdBxkxcqBv91aUfbscjKhREhnu949en+Ype3kIZ0cUVmK7LsPWU06GMyu+O7z9bIq52eDPQfzlUM7AtJ9g==}
@@ -8287,20 +8276,15 @@ snapshots:
       jazz-tools: 2.0.0-alpha.60(patch_hash=8e7c22275783c7f91d38613f600ca1adcefe8d853db13f6a4b94a0f873bda089)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       xstate: 6.0.0-beta.1
 
-  delightful-ui@file:apps/website/vendor/delightful-ui-0.0.25.tgz(svelte@5.57.3(@typescript-eslint/types@8.71.2)):
-    dependencies:
-      svelte: 5.57.3(@typescript-eslint/types@8.71.2)
-      tdesign-icons-svg: 0.4.8
-      xstate: 5.33.4
-
-  delightful-ui@file:packages/local-first/vendor/delightful-ui-0.0.25-details-animation.tgz(svelte@5.57.3(@typescript-eslint/types@8.71.2)):
-    dependencies:
-      svelte: 5.57.3(@typescript-eslint/types@8.71.2)
-      tdesign-icons-svg: 0.4.7
-
   delightful-ui@file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2)):
     dependencies:
       svelte: 5.57.2(@typescript-eslint/types@8.71.2)
+      tdesign-icons-svg: 0.4.8
+      xstate: 6.0.0-beta.1
+
+  delightful-ui@file:packages/ui(svelte@5.57.3(@typescript-eslint/types@8.71.2)):
+    dependencies:
+      svelte: 5.57.3(@typescript-eslint/types@8.71.2)
       tdesign-icons-svg: 0.4.8
       xstate: 6.0.0-beta.1
 
@@ -10672,8 +10656,6 @@ snapshots:
   xml-name-validator@5.0.0: {}
 
   xmlchars@2.2.0: {}
-
-  xstate@5.33.4: {}
 
   xstate@6.0.0-beta.1: {}
 

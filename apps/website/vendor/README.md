@@ -1,4 +1,11 @@
-# Delightful UI source artifact
+# Retired Delightful UI artifact
+
+The website now consumes `delightful-ui` from the workspace. It imports the
+UI-owned `theme-classic.css` compatibility entry to preserve its existing
+typography and defaults. The superseded archive was removed after qualification;
+Git history retains it. See the [migration evidence](../../../specs/002-monorepo-agent-guidance/ui-workspace-links.md).
+
+## Original artifact provenance
 
 `delightful-ui-0.0.25.tgz` was built with `pnpm run package` and `pnpm pack`
 from the clean Delightful UI checkout at commit
@@ -10,6 +17,3 @@ from the clean Delightful UI checkout at commit
 - The npm registry's current 0.0.24 package still targets Svelte 4. This portable
   archive avoids an incompatible install or a dependency on a sibling checkout.
 - No library source or typography was changed. No npm package was published.
-
-When a compatible release is published, replace the file dependency with the
-verified release and remove this archive in that same dependency update.

@@ -25,7 +25,8 @@
 			"svelte": "./dist/index.js",
 			"default": "./dist/index.js"
 		},
-		"./theme.css": "./dist/theme.css"
+		"./theme.css": "./dist/theme.css",
+		"./theme-classic.css": "./dist/theme-classic.css"
 	},
 	"files": [
 		"dist",
