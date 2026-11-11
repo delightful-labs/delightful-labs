@@ -62,7 +62,7 @@
 		"@vercel/sandbox": "3.9.1",
 		"@xstate/svelte": "6.0.0-beta.0",
 		"delightful-local-first": "file:vendor/delightful-local-first-dbc452e-xstate-v6-worker-recovery.tgz",
-		"delightful-ui": "file:vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+		"delightful-ui": "workspace:*",
 		"jazz-tools": "2.0.0-alpha.60",
 		"layerchart": "^2.9.0",
 		"pica": "^10.0.3",
@@ -74,5 +74,10 @@
 	"engines": {
 		"node": "24.x"
 	},
-	"packageManager": "pnpm@10.22.0"
+	"packageManager": "pnpm@10.28.0",
+	"dependenciesMeta": {
+		"delightful-ui": {
+			"injected": true
+		}
+	}
 }

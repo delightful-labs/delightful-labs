@@ -22,6 +22,12 @@
     "dlf:check": "pnpm --filter delightful-local-first check:library",
     "dlf:package": "pnpm --filter delightful-local-first package",
     "dlf:test": "pnpm --filter delightful-local-first test:unit --run",
-    "dlf:verify": "pnpm --filter delightful-local-first verify"
+    "dlf:verify": "pnpm --filter delightful-local-first verify",
+    "build:libraries": "pnpm ui:package && pnpm dlf:package",
+    "finance:check": "pnpm --filter delightful-finances check",
+    "finance:test": "pnpm --filter delightful-finances test:unit --run",
+    "finance:build": "pnpm --filter delightful-finances build",
+    "finance:test:worker-state": "pnpm --filter delightful-finances test:worker-state",
+    "finance:test:worker-host": "pnpm --filter delightful-finances test:worker-host"
   }
 }

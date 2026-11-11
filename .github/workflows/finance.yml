@@ -1,0 +1,208 @@
+name: Finance qualification
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/finance
+
+jobs:
+  checks:
+    name: Types, unit tests, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm check:tests
+      - run: pnpm check:e2e
+      - run: pnpm test:unit --run
+      - run: pnpm --filter @delightful-finances/worker-state-tests check
+      - run: pnpm test:worker-state
+      - name: Retain generated worker-state counterexamples
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: worker-state-counterexamples
+          path: apps/finance/tooling/worker-state-tests/.xstate-test/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Build without a live or production Jazz service
+        run: pnpm build
+        env:
+          FINANCE_PREVIEW: 'true'
+          PUBLIC_JAZZ_APP_ID: ci-build
+          PUBLIC_JAZZ_SERVER_URL: http://127.0.0.1:9
+
+  browser:
+    name: Browser (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: application-1
+            config: playwright.config.ts
+            selection: --project=application --shard=1/2
+          - suite: application-2
+            config: playwright.config.ts
+            selection: --project=application --shard=2/2
+          - suite: authentication
+            config: playwright.config.ts
+            selection: --project=authentication
+          - suite: permissions
+            config: playwright.config.ts
+            selection: --project=permissions
+          - suite: workspace
+            config: playwright.config.ts
+            selection: --project=workspace
+          - suite: startup
+            config: tests/config/playwright.startup.config.ts
+            selection: ''
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run against a disposable in-memory Jazz server
+        run: pnpm exec playwright test --config=${{ matrix.config }} ${{ matrix.selection }} --forbid-only
+      - name: Retain browser diagnostics and durations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-results-${{ matrix.suite }}
+          path: apps/finance/test-results/
+          retention-days: 3
+
+  restore:
+    name: Workspace restore recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Verify native isolation and browser recovery against disposable Jazz servers
+        run: pnpm exec vitest run --mode restore-experiment --reporter=verbose
+
+  debugging:
+    name: Feature flags (${{ matrix.suite }}, debug=${{ matrix.debug }}, seed=${{ matrix.seed }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: debugging
+            debug: 'true'
+            seed: 'false'
+            config: tests/config/playwright.debug.config.ts
+          - suite: debugging
+            debug: 'false'
+            seed: 'false'
+            config: tests/config/playwright.debug.config.ts
+          - suite: fake-data
+            debug: 'true'
+            seed: 'true'
+            config: tests/config/playwright.fake-data.config.ts
+          - suite: fake-data
+            debug: 'false'
+            seed: 'true'
+            config: tests/config/playwright.fake-data.config.ts
+          - suite: fake-data
+            debug: 'true'
+            seed: 'false'
+            config: tests/config/playwright.fake-data.config.ts
+          - suite: fake-data
+            debug: 'false'
+            seed: 'false'
+            config: tests/config/playwright.fake-data.config.ts
+    env:
+      PUBLIC_DEBUG: ${{ matrix.debug }}
+      PUBLIC_FAKE_DATA: ${{ matrix.seed }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify feature flags against an isolated runtime
+        run: pnpm exec playwright test --config=${{ matrix.config }} --workers=1 --forbid-only
+      - name: Retain feature-flag diagnostics and durations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: flags-${{ matrix.suite }}-${{ matrix.debug }}-${{ matrix.seed }}
+          path: apps/finance/test-results/
+          retention-days: 3
+
+  pwa:
+    name: Production preview PWA
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PUBLIC_JAZZ_SERVER_URL: same-origin
+      FINANCE_EPHEMERAL_JAZZ: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Build with the same-origin Jazz backend
+        run: pnpm build
+        env:
+          FINANCE_PREVIEW: 'true'
+      - run: pnpm exec playwright test --config=tests/config/playwright.pwa.config.ts --workers=1 --forbid-only
+
+      - name: Retain PWA diagnostics and durations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pwa-results
+          path: apps/finance/test-results/
+          retention-days: 3

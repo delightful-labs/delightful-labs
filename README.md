@@ -2,7 +2,7 @@
 
 A pnpm workspace, starting with the website at [`apps/website`](apps/website/README.md).
 The UI library is at [`packages/ui`](packages/ui/README.md). The Local First source is at
-[`packages/local-first`](packages/local-first/README.md). Finance and Clipper imports are tracked in the
+[`packages/local-first`](packages/local-first/README.md). Finance is at [`apps/finance`](apps/finance/README.md); Clipper remains to be imported. Progress is tracked in the
 [migration implementation record](specs/002-monorepo-agent-guidance/implementation.md).
 
 Use Node 24 (`nvm use`) and pnpm 10.28.0. From this directory:
@@ -27,8 +27,8 @@ Environment files belong in `apps/website`; copy that app's `.env.example` there
 when needed. Existing local files in other checkouts are untouched.
 Generated output, browser evidence and caches belong to the app directory.
 
-The website retains its vendored UI package during this move. There are no
-library workspace links yet, and there is no Nx or additional task orchestrator.
+The website retains its vendored UI package during this move. Finance consumes the UI workspace package with its own Svelte peer. There is no
+Nx or additional task orchestrator.
 See the [archive findings](specs/002-monorepo-agent-guidance/archive-findings.md)
 before replacing an internal archive.
 
@@ -50,3 +50,11 @@ implementation review gate remains effective for subsequent changes; see
 The [alpha.60 source adapters](specs/002-monorepo-agent-guidance/alpha60-adapters.md)
 are qualified locally. Consumer archives remain in place until their workspace
 links and required presentation/runtime patches are qualified.
+
+Finance commands: `pnpm finance:check`, `pnpm finance:test`,
+`pnpm finance:test:worker-state`, `pnpm finance:test:worker-host` and
+`pnpm finance:build`. Use `pnpm --filter delightful-finances <command>` for other
+app scripts. Frozen installation prepares the injected UI package; after editing
+UI, run `pnpm ui:package` to refresh its peer-specific copies.
+See [the Finance import record](specs/002-monorepo-agent-guidance/finance-import.md)
+for retained archives, isolated test configuration and remaining cutover work.

@@ -28,7 +28,7 @@ export default defineConfig({
 		video: 'off'
 	},
 	webServer: {
-		command: `pnpm dev:agent --host 127.0.0.1 --port ${port} --strictPort`,
+		command: `pnpm dev:agent --host 0.0.0.0 --port ${port} --strictPort`,
 		url: baseURL,
 		reuseExistingServer: process.env.FINANCE_E2E_REUSE_SERVER === 'true' && !process.env.CI
 	}

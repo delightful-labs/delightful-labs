@@ -15,10 +15,5 @@
 			"file": "delightful-local-first-dbc452e-xstate-v6-jazz-alpha60.tgz",
 			"sha256": "8bf38f5fb030e5fd233fdfb7a10a58e9da4dacbc438b662d5b7318794adf8709"
 		}
-	},
-	{
-		"file": "delightful-ui-7a7f61b-xstate-v6.tgz",
-		"source": "7a7f61b236220bb5edb2bef4390b9db075775e43",
-		"xstate": "6.0.0-beta.1"
 	}
 ]
