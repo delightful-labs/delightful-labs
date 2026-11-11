@@ -20,7 +20,7 @@ An explicit `delightful-ui/theme-classic.css` export retains the existing theme
 and maps the newer interactive-font role to its existing control-font token.
 No new font, size, weight, spacing or color is chosen. UI remains the sole owner
 of its theme registrations; consumers import one theme entry. Current
-`theme.css` remains unchanged for Finance, Clipper and the UI development app.
+`theme.css` defaults remain unchanged for Finance, Clipper and the UI development app.
 
 Website and Local First use `workspace:*` UI dependencies. Both retain Svelte 5.57.3, while UI development resolves 5.57.2; peer-specific
 injected workspace copies preserve the consumer versions. Existing
@@ -48,3 +48,8 @@ Remove only superseded active UI archives after source links pass; preserve Git
 history, unrelated archives and all source/deployment restrictions. Fresh frozen
 installation must prepare exports and pass every module-identity check. Record
 results, remaining limitations and rollback below before completing this slice.
+
+Both theme entries import one `theme-properties.css` registration owner, avoiding
+duplicated token definitions. Expanding that import preserves the existing
+default theme declarations; the classic variant retains the old declarations
+plus the interactive-role alias and existing universal font-role registrations.

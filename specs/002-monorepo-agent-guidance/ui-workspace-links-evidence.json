@@ -18,12 +18,15 @@
   ],
   "classicTheme": {
     "source": "packages/ui/src/lib/theme-classic.css",
-    "sha256": "bf25959ac2fafc8c940fc8df671957e69e2434d66095c075f547e10b71866948",
+    "sha256": "7ad3aff01ae78941f5d4529eaecba95ee4d4ec8568862fca685feef6171cd34b",
     "preservesAllOriginalDeclarations": true,
     "additions": [
-      "Comment identifying compatibility entry",
-      "Interactive font role aliases the existing control font token"
-    ]
+      "Compatibility entry comment",
+      "Interactive font role aliases existing control-font token",
+      "Shared universal registrations for existing font roles"
+    ],
+    "sharedProperties": "packages/ui/src/lib/theme-properties.css",
+    "defaultThemeExpandedDeclarationsUnchanged": true
   },
   "visualChecks": [
     {

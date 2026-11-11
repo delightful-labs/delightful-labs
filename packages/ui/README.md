@@ -43,7 +43,7 @@ to the existing `--dui-font-family` token and does not import bundled fonts.
 Import one theme entry per application. The website and Local First's Storybook
 use this entry to retain their existing presentation while linking workspace UI.
 
-Component-specific `@property` registrations live in the owning component's `<style>` and load with that component, independently of the optional theme. Shared color, spacing, typography, border, shadow, and pressed-offset registrations live in `theme.css`. Each property has one registration owner, even when other components consume it. For example, Button owns `--dui-button-*`, InputWrapper owns shared field/input properties, and LoadingSpinner owns its spinner properties.
+Component-specific `@property` registrations live in the owning component's `<style>` and load with that component, independently of the optional theme. Shared color, spacing, typography, border, shadow, and pressed-offset registrations live in `theme-properties.css`, shared by both theme entries. Each property has one registration owner, even when other components consume it. For example, Button owns `--dui-button-*`, InputWrapper owns shared field/input properties, and LoadingSpinner owns its spinner properties.
 
 Registrations remain global CSS definitions; component placement does not scope their names. Use unique `--dui-*` names, enable inheritance for ancestor overrides, and preserve existing fallback chains. Properties using universal syntax (`"*"`) without initial values preserve contextual or complex values; those registrations do not validate a narrower type. Typed registrations use computationally independent initial values. Theme declarations still provide relative units, aliases, fluid spacing, and light/dark colors.
 
