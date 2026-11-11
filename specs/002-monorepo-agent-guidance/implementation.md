@@ -6,6 +6,11 @@ the original specification remains the reviewed requirements baseline.
 
 ## Current progress
 
+- Finance draft PR #67 has a [salvage review](finance-worker-pr67-review.md).
+  The recommendation is to preserve selected custody contracts/regression cases
+  as references rather than resume the entire unfinished worker cutover. It is
+  not a prerequisite for the monorepo handoff; adoption remains a separate decision.
+
 - Clipper's [extension sign-in completion repair](extension-signin-repair.md)
   passes 909 unit/native tests, type/format/lint checks and all 12 packaged browser
   cases locally. Linux skips are removed; hosted Linux execution remains pending.

@@ -14,3 +14,9 @@ on 2026-11-10; that session authorization covers these migration batches. Future
 application work retains Finance's normal implementation review gates.
 
 See the root Finance import record for results and remaining handoff work.
+
+The [draft PR #67 salvage review](../../../../specs/002-monorepo-agent-guidance/finance-worker-pr67-review.md)
+records the worker branch's build and feature-parity blockers, material worth
+preserving, and a suggested incremental path if that separate migration resumes.
+Import completion does not require rescuing the entire draft. The review is a
+recommendation, not an approved implementation or production cutover plan.
