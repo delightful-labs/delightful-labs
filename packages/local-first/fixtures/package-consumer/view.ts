@@ -35,3 +35,5 @@ export function subscribeToTypedNotes(query: NoteQuery) {
 	const oneTitle: string | undefined = one.current?.title
 	return { many, one, manyTitle, oneTitle }
 }
+
+export { default as RecoveryPhraseView } from 'delightful-local-first/recovery/view'

@@ -402,6 +402,11 @@
 		"./session/sign-out/workflow": {
 			"types": "./dist/machines/identity/ordered-sign-out.d.ts",
 			"default": "./dist/machines/identity/ordered-sign-out.js"
+		},
+		"./recovery/view": {
+			"types": "./dist/components/identity/RecoveryPhraseView.svelte.d.ts",
+			"svelte": "./dist/components/identity/RecoveryPhraseView.svelte",
+			"default": "./dist/components/identity/RecoveryPhraseView.svelte"
 		}
 	},
 	"svelte": "./dist/index.js",

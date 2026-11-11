@@ -19,6 +19,8 @@ the original specification remains the reviewed requirements baseline.
   The user also approved the [alpha.60 source adapters](alpha60-adapters.md);
   their full unit, package, native, restore and Storybook qualification passed.
   Consumer archives remain unchanged pending patch reconciliation and app imports.
+- The [recovery-view compatibility export](recovery-view-export.md) is now in
+  source and verified through the packed consumer and 63 Storybook tests.
 - Finance and Clipper imports, consumer workspace links, cross-project guidance
   reconciliation and remaining qualification are pending.
 

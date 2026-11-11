@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte'
 	import { Button, Dialog, StatusMessage, Textarea } from 'delightful-ui'
-	import type { RecoveryPhraseView } from '../../contracts/recovery-phrase.js'
+	import type { RecoveryPhraseView as RecoveryPhraseViewModel } from '../../contracts/recovery-phrase.js'
 	import type { RecoveryMessages } from '../../contracts/recovery-messages.js'
 
 	let {
@@ -11,7 +11,7 @@
 		onRetry,
 		onHide
 	}: {
-		view: RecoveryPhraseView
+		view: RecoveryPhraseViewModel
 		messages: RecoveryMessages
 		onReveal: () => void
 		onRetry: () => void
