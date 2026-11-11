@@ -2,10 +2,11 @@
 
 A pnpm workspace, starting with the website at [`apps/website`](apps/website/README.md).
 The UI library is at [`packages/ui`](packages/ui/README.md). The Local First source is at
-[`packages/local-first`](packages/local-first/README.md). Finance is at [`apps/finance`](apps/finance/README.md); Clipper remains to be imported. Progress is tracked in the
+[`packages/local-first`](packages/local-first/README.md). Finance is at [`apps/finance`](apps/finance/README.md); Clipper web and extension are at `apps/clipper/apps/web` and
+`apps/clipper/apps/extension`. Progress is tracked in the
 [migration implementation record](specs/002-monorepo-agent-guidance/implementation.md).
 
-Use Node 24 (`nvm use`) and pnpm 10.28.0. From this directory:
+Use Node 24.22.2 (`nvm use`) and pnpm 10.28.0. From this directory:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -58,3 +59,9 @@ app scripts. Frozen installation prepares the injected UI package; after editing
 UI, run `pnpm ui:package` to refresh its peer-specific copies.
 See [the Finance import record](specs/002-monorepo-agent-guidance/finance-import.md)
 for retained archives, isolated test configuration and remaining cutover work.
+
+Clipper commands: `pnpm clipper:check`, `pnpm clipper:test`,
+`pnpm clipper:build`, `pnpm clipper:build:extension` and `pnpm clipper:verify`.
+Its web and extension consume workspace UI and Local First packages, prepared
+on install and refreshed by `pnpm build:libraries`. Browser commands retain
+their disposable test backends; see the scoped Clipper guidance before running.

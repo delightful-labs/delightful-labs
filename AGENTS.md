@@ -1,6 +1,6 @@
 # Workspace guidance
 
-This is the Delightful Labs pnpm workspace. The website, Finance, UI and Local First libraries are imported. Work on the monorepo migration from
+This is the Delightful Labs pnpm workspace. The website, Finance, Clipper web/extension, UI and Local First libraries are imported. Work on the monorepo migration from
 [the active migration spec](specs/002-monorepo-agent-guidance/spec.md) and
 [implementation record](specs/002-monorepo-agent-guidance/implementation.md).
 
@@ -16,7 +16,10 @@ This is the Delightful Labs pnpm workspace. The website, Finance, UI and Local F
   gate remains effective; the root has not adopted its constitution globally.
 - For Finance work, read [apps/finance/AGENTS.md](apps/finance/AGENTS.md) and its
   scoped constitution, memories and feature selector. Finance product policies
-  remain local. Clipper has not yet been imported.
+  remain local.
+- For Clipper web or extension work, read [apps/clipper/AGENTS.md](apps/clipper/AGENTS.md)
+  and its scoped worker/XState/localization memories. The two packages retain
+  sibling paths under `apps/clipper/apps/` for shared contracts and tooling.
 - For state machines/resource ownership, localization, accessibility, testing,
   dependencies or releases, follow the applicable project's entry file and linked
   specification. The migration has not yet activated shared topic policies.
@@ -26,8 +29,7 @@ This is the Delightful Labs pnpm workspace. The website, Finance, UI and Local F
 
 ## Working in the workspace
 
-- Use pnpm 10.28.0 and Node 24 for the imported website and UI library.
-  Qualification for the remaining projects is pending. Root app commands delegate to `apps/website`.
+- Use pnpm 10.28.0 and Node 24.22.2 for this workspace. Root app commands delegate to `apps/website`.
 - Start development servers on `0.0.0.0`, announce localhost and LAN URLs when
   available, and use distinct available ports. Preserve unidentified servers.
 - Root `.specify/feature.json` selects migration work; the website has its own

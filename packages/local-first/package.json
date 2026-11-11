@@ -28,7 +28,8 @@
 		"check:backup-restore": "tsc --noEmit --project fixtures/test-app/tsconfig.json && vitest run --config fixtures/test-app/restore.vitest.config.ts",
 		"check:native-backup": "tsc --noEmit --project fixtures/native-capture/tsconfig.json && vitest run --config fixtures/native-capture/vitest.config.ts",
 		"check:library": "pnpm paraglide && svelte-check --tsconfig ./tsconfig.library.json --fail-on-warnings && tsc --noEmit --project tsconfig.library.json",
-		"test:xstate-readiness": "tsc --project tsconfig.xstate-tests.json && vitest run --config vitest.config.ts src/lib/machines/identity/session-readiness.test.ts src/lib/machines/identity/session-readiness.model.test.ts"
+		"test:xstate-readiness": "tsc --project tsconfig.xstate-tests.json && vitest run --config vitest.config.ts src/lib/machines/identity/session-readiness.test.ts src/lib/machines/identity/session-readiness.model.test.ts",
+		"prepublishOnly": "pnpm package"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "3.1.0",

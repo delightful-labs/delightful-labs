@@ -2,7 +2,7 @@
 
 - Run user-facing dev servers on the network (`0.0.0.0`) in a named tmux window. Provide a working LAN URL and ensure the browser’s Jazz URL is reachable there. Preserve existing authorities; localhost-only servers are for isolated tests or explicit user requests.
 
-- All subsequent work must use a feature branch and a pull request targeting `main`. Do not push directly to `main`. The specification-baseline reset was a one-time explicit user instruction.
+- All subsequent work must use a feature branch and a pull request targeting destination `master` (the source repository used `main`). Do not push directly to `master`. The specification-baseline reset was a one-time explicit user instruction.
 - Use Conventional Commits PR titles: `type(scope): description` (scope optional; `!` before the colon for breaking changes). The PR title workflow validates this format.
 - Do not merge a PR without explicit user authorization. Do not configure branch protection or change repository settings unless requested.
 - Follow `specs/001-jazz-clipper/spec.md`, `plan.md`, `design-decisions.md`, and `implementation-handoff.md`. Keep accepted scope cuts intact.
@@ -34,3 +34,7 @@
 - XState v6 migration follows [the migration/design specification](specs/001-jazz-clipper/xstate-v6-migration.md), including its installed-documentation review and source/native acceptance gates. Use published XState without patches or declaration overrides; the separately qualified Jazz patches retain their own ownership.
 
 - For v6 machine testing, follow the generated-testing section in `specs/001-jazz-clipper/xstate-v6-migration.md`: prefer `@xstate/test` campaigns with independent behavioral oracles; preserve integration tests and existing implementation-review gates.
+
+- In this monorepo, the scoped active feature is selected by `.specify/feature.json`.
+  Shared helpers resolve this coordinator; run them here or set `SPECIFY_INIT_DIR`.
+  Product policy and `specs/001-jazz-clipper` remain binding for product work.

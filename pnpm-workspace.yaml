@@ -2,8 +2,10 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'apps/finance/tooling/worker-state-tests'
+  - 'apps/clipper/apps/*'
 
 patchedDependencies:
+  '@kingironman2011/better-auth-bsky@0.3.2': apps/clipper/patches/better-auth-bsky-0.3.2-better-auth-1.7.patch
   jazz-tools@2.0.0-alpha.60: patches/jazz-tools@2.0.0-alpha.60.patch
 
 # Keep injected peer-specific UI copies current after packaging.
@@ -22,3 +24,14 @@ packageExtensions:
   '@layerstack/svelte-actions@1.0.1-next.20':
     peerDependencies:
       svelte: '^5.0.0'
+
+# Existing Clipper compatibility allowance; scoped to this SDK's peer.
+peerDependencyRules:
+  allowedVersions:
+    'jazz-tools@2.0.0-alpha.60>better-auth': '1.7.18'
+
+onlyBuiltDependencies:
+  - esbuild
+
+ignoredBuiltDependencies:
+  - protobufjs

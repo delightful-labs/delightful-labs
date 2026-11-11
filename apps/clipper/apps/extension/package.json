@@ -9,8 +9,8 @@
 	},
 	"dependencies": {
 		"@mozilla/readability": "0.6.0",
-		"delightful-local-first": "file:../../vendor/delightful-local-first-auth-lifecycle-9c13e3f-alpha60.tgz",
-		"delightful-ui": "file:../../vendor/delightful-ui-7a7f61b-xstate-v6.tgz",
+		"delightful-local-first": "workspace:*",
+		"delightful-ui": "workspace:*",
 		"dompurify": "3.4.17",
 		"i18next": "26.7.1",
 		"jazz-tools": "2.0.0-alpha.60",
@@ -26,5 +26,13 @@
 		"svelte-check": "4.6.0",
 		"typescript": "6.0.3",
 		"vite": "8.3.4"
+	},
+	"dependenciesMeta": {
+		"delightful-ui": {
+			"injected": true
+		},
+		"delightful-local-first": {
+			"injected": true
+		}
 	}
 }

@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.28.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.22.2 <25"
   },
   "scripts": {
     "dev": "pnpm --filter delightful-labs dev",
@@ -28,6 +28,15 @@
     "finance:test": "pnpm --filter delightful-finances test:unit --run",
     "finance:build": "pnpm --filter delightful-finances build",
     "finance:test:worker-state": "pnpm --filter delightful-finances test:worker-state",
-    "finance:test:worker-host": "pnpm --filter delightful-finances test:worker-host"
+    "finance:test:worker-host": "pnpm --filter delightful-finances test:worker-host",
+    "clipper:check": "pnpm --filter delightful-clipper check",
+    "clipper:test": "pnpm --filter delightful-clipper test:unit",
+    "clipper:build": "pnpm --filter delightful-clipper build",
+    "clipper:verify": "pnpm --filter delightful-clipper verify",
+    "clipper:build:extension": "pnpm --filter delightful-clipper build:extension",
+    "clipper:test:worker": "pnpm --filter delightful-clipper test:worker",
+    "clipper:test:offline": "pnpm --filter delightful-clipper test:offline",
+    "clipper:test:extension": "pnpm --filter delightful-clipper test:extension",
+    "clipper:test:e2e": "pnpm --filter delightful-clipper test:e2e"
   }
 }
