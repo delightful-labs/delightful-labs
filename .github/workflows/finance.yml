@@ -120,6 +120,10 @@ jobs:
         if: ${{ needs.plan.result != 'success' }}
         run: exit 1
         working-directory: .
+      - name: Match container home ownership
+        # Firefox requires the mounted home to belong to the effective container user.
+        run: chown "$(id -u):$(id -g)" "$HOME"
+        working-directory: /
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
@@ -155,6 +159,10 @@ jobs:
         if: ${{ needs.plan.result != 'success' }}
         run: exit 1
         working-directory: .
+      - name: Match container home ownership
+        # Firefox requires the mounted home to belong to the effective container user.
+        run: chown "$(id -u):$(id -g)" "$HOME"
+        working-directory: /
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
@@ -214,6 +222,10 @@ jobs:
         if: ${{ needs.plan.result != 'success' }}
         run: exit 1
         working-directory: .
+      - name: Match container home ownership
+        # Firefox requires the mounted home to belong to the effective container user.
+        run: chown "$(id -u):$(id -g)" "$HOME"
+        working-directory: /
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
@@ -252,6 +264,10 @@ jobs:
         if: ${{ needs.plan.result != 'success' }}
         run: exit 1
         working-directory: .
+      - name: Match container home ownership
+        # Firefox requires the mounted home to belong to the effective container user.
+        run: chown "$(id -u):$(id -g)" "$HOME"
+        working-directory: /
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:

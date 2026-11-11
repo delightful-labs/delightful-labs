@@ -637,6 +637,14 @@ test.describe('native mobile touch gestures', () => {
 				page.locator('output[aria-label="Chosen action"]')
 			).toHaveText(expected)
 			await expect(group).toHaveCount(0)
+			// Accessibility removal starts before dismissal finishes moving the reset control.
+			await expect(
+				page.getByRole('group', {
+					name: actionsName,
+					exact: true,
+					includeHidden: true
+				})
+			).toHaveJSProperty('hidden', true)
 			await page.getByRole('button', { name: 'Reset item', exact: true }).tap()
 			await expect(group.getByRole('link')).toBeVisible()
 		}

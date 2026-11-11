@@ -107,3 +107,17 @@ all test commands, fail-closed aggregation and time budgets remain unchanged.
 Containers use an init process and 1 GiB shared memory without privileged mode.
 See [Playwright's image documentation](https://playwright.dev/docs/docker).
 Fresh hosted qualification is required before merge.
+
+
+The first image-based run passed Website, Local First and packaged extension
+qualification and exposed two additional native fixture boundaries. Firefox
+rejected GitHub's mounted home because its owner did not match the container's
+effective user; jobs now correct that disposable directory's ownership without
+changing the HOME variable or browser sandbox settings. Finance restore ran
+95 cases successfully before its eight Firefox launches failed at this boundary.
+The UI mobile full-swipe test awaited accessibility removal, which begins before
+dismissal completes and the Reset button finishes moving. It now also awaits
+the retained row's native `hidden` property before tapping Reset. No production
+component, test assertion or deadline is weakened. Ten repeated native mobile
+cases pass with the stronger wait; full local Storybook qualification passes: 191 cases, with the same 11
+platform-scoped skips as the existing suite.
