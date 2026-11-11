@@ -28,8 +28,10 @@ Environment files belong in `apps/website`; copy that app's `.env.example` there
 when needed. Existing local files in other checkouts are untouched.
 Generated output, browser evidence and caches belong to the app directory.
 
-The website retains its vendored UI package during this move. Finance consumes the UI workspace package with its own Svelte peer. There is no
-Nx or additional task orchestrator.
+All consumers now use workspace UI with their own Svelte peer. The website and
+Local First Storybook import `delightful-ui/theme-classic.css` to retain their
+existing typography; the current default theme remains available to other apps.
+There is no Nx or additional task orchestrator.
 See the [archive findings](specs/002-monorepo-agent-guidance/archive-findings.md)
 before replacing an internal archive.
 
@@ -49,8 +51,8 @@ Local First package commands: `pnpm dlf:check`, `pnpm dlf:package`. Run the appr
 implementation review gate remains effective for subsequent changes; see
 [the import record](specs/002-monorepo-agent-guidance/local-first-import.md).
 The [alpha.60 source adapters](specs/002-monorepo-agent-guidance/alpha60-adapters.md)
-are qualified locally. Consumer archives remain in place until their workspace
-links and required presentation/runtime patches are qualified.
+are qualified locally. Finance and Clipper consume its qualified workspace source; historical archives
+remain only where retained for provenance/fixtures.
 
 Finance commands: `pnpm finance:check`, `pnpm finance:test`,
 `pnpm finance:test:worker-state`, `pnpm finance:test:worker-host` and
@@ -66,6 +68,11 @@ Its web and extension consume workspace UI and Local First packages, prepared
 on install and refreshed by `pnpm build:libraries`. Browser commands retain
 their disposable test backends; see the scoped Clipper guidance before running.
 
-After installation, `pnpm monorepo:check-links` verifies that Finance and both
-Clipper apps share each source library's Svelte, Jazz and XState instances. CI
+After installation, `pnpm monorepo:check-links` verifies all eight UI/foundation links, including
+website and Local First development. It checks each consumer's required Svelte,
+Jazz and XState instances. CI
 runs it before compilation. See [qualification and remaining work](specs/002-monorepo-agent-guidance/qualification.md).
+
+[UI compatibility qualification](specs/002-monorepo-agent-guidance/ui-workspace-links.md)
+records the retired snapshots, classic-theme provenance, packed-export checks
+and unchanged website screenshots.

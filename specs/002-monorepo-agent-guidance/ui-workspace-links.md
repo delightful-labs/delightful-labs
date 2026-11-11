@@ -53,3 +53,70 @@ Both theme entries import one `theme-properties.css` registration owner, avoidin
 duplicated token definitions. Expanding that import preserves the existing
 default theme declarations; the classic variant retains the old declarations
 plus the interactive-role alias and existing universal font-role registrations.
+
+## Results — 2026-11-11
+
+Implemented in `98d83751`, with canonical shared registrations in `265b3efc`.
+The two active UI archives are removed; their original source/archive hashes and
+Git recovery paths remain in [the evidence](ui-workspace-links-evidence.json).
+No active UI file dependency remains in the root lockfile. Historical Clipper
+artifacts are retained as unrelated provenance.
+
+All eight installed source-library edges pass the expanded identity check. The
+new website and Local First copies retain Svelte 5.57.3; Finance/Clipper retain
+5.57.2. Reconciliation preserves their already-qualified shared SDK peer context,
+including the pnpm optional-peer deduplication behavior recorded in the earlier
+Finance source-link slice. No package version upgrade is introduced.
+
+| Verification | Result |
+| --- | --- |
+| UI Svelte check, package/publint, production build | Pass |
+| UI unit / native browser tests | 131 / 27 pass |
+| Website Svelte check, unit tests | Zero diagnostics / 152 pass |
+| Website production output, feeds, redirects and sitemap checks | Pass |
+| Website browser tests | 7 pass, including no new font downloads |
+| Local First full Svelte/TypeScript, format and lint | Pass |
+| Local First unit tests | 1,098 pass |
+| Local First package/publint and public consumer fixtures | Pass |
+| Local First Storybook build / browser tests | Pass / 63 pass |
+| Finance types / unit regressions | Zero diagnostics / 1,940 pass |
+| Clipper web/extension types / unit regressions | Zero diagnostics / 906 pass |
+| Standalone consumer installed from packed UI tarball | Build passes with public classic-theme import |
+
+The unit total remains 4,227. The UI, website and Local First browser suites pass
+97 tests. UI and Local First browser suites were rerun after extracting the
+shared registration file, and the final website build was rechecked afterward.
+No assertions about computed/inline styles or CSS classes were introduced.
+
+All six website screenshots are byte-identical to the old-archive baseline:
+homepage and writing index at desktop/mobile light mode and desktop dark mode.
+Comparisons use reduced motion, fully loaded images, fixed viewports and blank
+mocked app embeds. Both baseline and final captures have no page errors or font
+requests. Screenshot hashes are in the evidence JSON; local PNG artifacts are
+under `apps/website/test-results/ui-workspace/`. Live embedded applications and
+published article content are not claimed as screenshot fixtures.
+
+The classic declaration audit preserves every original website theme declaration,
+with only the documented role alias and existing universal role registrations.
+Expanding the shared-property import leaves the current default theme declarations
+unchanged, so Finance/Clipper retain their chosen bundled-font defaults.
+
+A fresh archive of `265b3efc`, without node_modules or generated exports, passes
+frozen installation, all eight identities, website types and library types.
+An offline lockfile-only install leaves the lock byte-identical (SHA-256
+`3cbc39d287c8be21a257f3c95efd655703770fd764741c38d6b37bd5f304725b`).
+The new public CSS entry and its shared internal asset also build in an isolated
+consumer that installs the packed UI tarball, without workspace source aliases.
+
+## Scope and rollback
+
+Feature selectors, content, localization, application state machines, independent
+release identities, user data and hosted settings are unchanged. No deployment,
+push or publication was performed. The earlier source-baseline Clipper extension
+sign-in failures remain outside this UI slice; this work does not claim to repair
+them. Shared guidance and hosted cutover remain subsequent migration work.
+
+Rollback reverts the dependency/theme-import commits and restores the two archived
+artifacts from retained Git history. It requires no data migration. Keep both
+theme entry points explicit: one chosen theme per application, UI-owned shared
+registrations, and consumer-owned page layout.

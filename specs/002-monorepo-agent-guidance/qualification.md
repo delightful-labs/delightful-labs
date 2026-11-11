@@ -80,11 +80,10 @@ The following work remains explicit:
 
 1. Resolve Clipper's three reproduced source extension sign-in/settings failures
    before release; do not count the migration as repairing that existing issue.
-2. Reconcile the website and Local First development UI snapshots. The website's
-   Heading/Text/Navigation source matches current UI, but theme defaults differ
-   (Source Code Pro/system fonts versus Jost/Cascadia and new font roles). Keep
-   current snapshots until a behavior/presentation-preserving compatibility
-   slice is reviewed and qualified. No new theme or typography is introduced.
+2. UI snapshot compatibility is now complete; see the
+   [2026-11-11 qualification](ui-workspace-links.md). Both remaining consumers use
+   workspace UI, existing defaults are preserved through its classic entry, and
+   the two active snapshots are removed. No new font choices were introduced.
 3. Finish shared topic-policy activation and Clipper's PR-title check scope while
    preserving local approval/constitution/localization exceptions.
 4. Complete source PR inventory and reconcile newer upstream commits before
@@ -93,3 +92,14 @@ The following work remains explicit:
 5. Verify hosted previews, deployment roots, required checks and independently
    approve source-of-truth cutover. No push, deployment, repository archival,
    branch rename, production migration or data operation was performed here.
+
+## UI links completed — 2026-11-11
+
+The website and Local First development UI snapshots are replaced by peer-specific
+workspace packages. Unit regressions still pass 4,227 tests; the affected UI,
+website and Local First browser suites pass 97 tests. All six deterministic website
+screenshots match the old-archive baseline byte-for-byte. A final clean frozen
+install passes all eight installed dependency-identity checks and consumer types.
+The packed UI tarball builds in a separate consumer, including its new public
+classic stylesheet and shared registration asset. Details and limits are in the
+[UI link record](ui-workspace-links.md) and its linked evidence.

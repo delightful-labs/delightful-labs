@@ -3,6 +3,10 @@
 SvelteKit 3 and Svelte 5, Delightful UI, and the Vercel adapter. The homepage
 contains only functional navigation; editorial content and typography are deferred.
 
+The site uses workspace Delightful UI with `theme-classic.css`, preserving its
+existing typography and theme defaults. Font choices remain owner-controlled.
+See the [UI workspace compatibility record](../../specs/002-monorepo-agent-guidance/ui-workspace-links.md).
+
 ## Run locally
 
 Use Node.js 24 (`nvm use`) and pnpm 10.28.0.

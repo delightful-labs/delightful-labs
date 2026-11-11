@@ -34,12 +34,16 @@ the original specification remains the reviewed requirements baseline.
   source library links and retained CI suites. Its 906 unit, 60 ordinary browser,
   32 worker and 8 offline tests pass. Extension qualification passes 9/12;
   all three failures reproduce against unchanged source and original dependencies.
-- A [module-identity check](../../scripts/monorepo/check-links.mjs) guards all six
-  app-to-library source edges in CI. Fresh install, source history reachability
+- A [module-identity check](../../scripts/monorepo/check-links.mjs) guards all eight
+  application/development source-library edges in CI. Fresh install, source history reachability
   and lockfile idempotence are verified. Final regression results are in
   [the qualification record](qualification.md).
-- Website and library-development UI snapshot compatibility, shared topic-policy
-  reconciliation, source PR inventory and hosted qualification remain pending.
+- The [remaining UI workspace links](ui-workspace-links.md) are complete:
+  website and Local First development consume source UI with a shared classic
+  theme entry preserving existing typography. Both active archives are retired;
+  97 browser tests pass and all six website screenshot comparisons are identical.
+- Shared topic-policy reconciliation, source PR inventory and hosted
+  qualification remain pending.
 
 ## Slice 0: reproducible source inventory
 
