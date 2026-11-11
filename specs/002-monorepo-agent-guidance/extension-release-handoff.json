@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-11-11",
+  "sourceCommit": "e2b70d3453e662f860e8d5b290c70157aade6dca",
+  "status": "Production Chromium package qualified; publication not performed",
+  "artifact": {
+    "manifestVersion": 3,
+    "version": "0.0.3",
+    "extensionId": "inbajlgglggigfebfkmlkfbdenddpphf",
+    "archiveName": "delightful-clipper-0.0.3-monorepo-e2b70d34.zip",
+    "sha256": "7daca16d15f7ab69020af73926af9700e628c7067b655deefb523a8ff87996a9",
+    "fileCount": 60,
+    "productionWebUrl": "https://clipper.delightfullabs.com/",
+    "productionJazzUrl": "https://clipper.delightfullabs.com/jazz",
+    "productionJazzAppId": "9c0871ad-3ea3-49d0-9eaf-b034914da924",
+    "nativeWasmIncluded": true,
+    "testedDirectoryMatchesArchive": true
+  },
+  "browserAcceptance": {
+    "extensionId": "inbajlgglggigfebfkmlkfbdenddpphf",
+    "checks": [
+      "unconnected native toolbar gesture opens trusted extension sign-in without clipping",
+      "invalid recovery phrase rejected without creating a confirmed connection",
+      "restoring a disposable production account confirms connection and resumes the original gesture to remote acceptance",
+      "independent restored web replica receives rendered content and excludes form values",
+      "duplicate toolbar gesture reports Already saved without replacing the article",
+      "full browser restart retains confirmed connection and syncs another capture"
+    ],
+    "errors": [],
+    "passed": true
+  },
+  "testBoundary": "Unmodified production package; native Chromium extension toolbar command, real production backend, disposable synthetic identity and independent web replica. Only source HTML at example.com is fulfilled by the test to include rendered text, metadata and a form sentinel. No application/backend/auth responses are mocked. This is not a real installed store update test.",
+  "harnessCorrection": "First attempt stopped at an ambiguous nested article locator after successful sync. Reader assertions were scoped to the unique title heading; complete corrected sequence then passed. No application change was needed.",
+  "cleanup": "Browser profiles removed; recovery phrase retained only in process memory. No trace or credential screenshot was created. Existing user profiles/accounts and extension installations were not touched.",
+  "mergedCI": {
+    "pullRequest": 13,
+    "extensionRun": 43099322158,
+    "packagedExtensionSuite": "passed against isolated fixture backend"
+  },
+  "remainingGates": [
+    "Store/listing ownership and current published version must be established before choosing a new release version.",
+    "Store installation/update and full supported browser/OS/minimum-version qualification remain open.",
+    "Production cold offline extension capture is not claimed by this live smoke test; isolated native offline regression coverage remains in CI.",
+    "No upload, publication, signing credential change or source repository retirement was performed."
+  ],
+  "repositoryQualificationCommand": "pnpm --filter delightful-clipper exec node apps/extension/tooling/qualify-production.ts <unpacked-production-package> <result-json>",
+  "repositoryCommandVerified": true
+}
