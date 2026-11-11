@@ -18,18 +18,46 @@ defaults:
     working-directory: apps/finance
 
 jobs:
+  plan:
+    name: Select affected projects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      website: ${{ steps.selection.outputs.website }}
+      ui: ${{ steps.selection.outputs.ui }}
+      local_first: ${{ steps.selection.outputs.local_first }}
+      finance: ${{ steps.selection.outputs.finance }}
+      clipper: ${{ steps.selection.outputs.clipper }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.22.2'
+      - id: selection
+        run: node scripts/monorepo/ci.mjs
+        working-directory: .
+
   checks:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Types, unit tests, and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '24.22.2'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
@@ -56,6 +84,8 @@ jobs:
           PUBLIC_JAZZ_SERVER_URL: http://127.0.0.1:9
 
   browser:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Browser (${{ matrix.suite }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -82,13 +112,17 @@ jobs:
             config: tests/config/playwright.startup.config.ts
             selection: ''
     steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '24.22.2'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
@@ -104,17 +138,23 @@ jobs:
           retention-days: 3
 
   restore:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Workspace restore recovery
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '24.22.2'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
@@ -123,6 +163,8 @@ jobs:
         run: pnpm exec vitest run --mode restore-experiment --reporter=verbose
 
   debugging:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Feature flags (${{ matrix.suite }}, debug=${{ matrix.debug }}, seed=${{ matrix.seed }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -158,13 +200,17 @@ jobs:
       PUBLIC_DEBUG: ${{ matrix.debug }}
       PUBLIC_FAKE_DATA: ${{ matrix.seed }}
     steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '24.22.2'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
@@ -180,6 +226,8 @@ jobs:
           retention-days: 3
 
   pwa:
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Production preview PWA
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -187,13 +235,17 @@ jobs:
       PUBLIC_JAZZ_SERVER_URL: same-origin
       FINANCE_EPHEMERAL_JAZZ: 'true'
     steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '24.22.2'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links

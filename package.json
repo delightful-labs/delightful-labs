@@ -38,6 +38,8 @@
     "clipper:test:offline": "pnpm --filter delightful-clipper test:offline",
     "clipper:test:extension": "pnpm --filter delightful-clipper test:extension",
     "clipper:test:e2e": "pnpm --filter delightful-clipper test:e2e",
-    "monorepo:check-links": "node scripts/monorepo/check-links.mjs"
+    "monorepo:check-links": "node scripts/monorepo/check-links.mjs",
+    "monorepo:check-guidance": "node scripts/monorepo/check-guidance.mjs",
+    "monorepo:test-tooling": "node --test scripts/monorepo/ci.test.mjs scripts/monorepo/guidance.test.mjs"
   }
 }

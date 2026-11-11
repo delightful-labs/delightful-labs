@@ -1,18 +1,25 @@
-# Repository working agreements
+# Local First project guidance
 
-- Follow the active feature in `.specify/feature.json` and its artifacts under `specs/`. Follow `.specify/memory/constitution.md` if one is adopted.
-- Before designing workflows or async actors, read `.specify/memory/xstate.md`. Before changing localized text, read `.specify/memory/localization.md`. Before styling or composing components, read `.specify/memory/css.md` and `.specify/memory/components.md`. These adapt shared lessons from Finance and DUI; domain-specific reference behavior is not an implicit library requirement.
-- Machine changes use the pinned, unpatched XState v6 beta. Adapt library logic to its published APIs and types; do not patch XState. Follow the migration notes in `specs/003-verified-backup/xstate-v6-implementation.md`; retain generic contracts and the existing implementation-test review gate. Read the installed XState agent guide/stability manifest and apply `specs/003-verified-backup/xstate-v6-design-review.md` before treating a conversion as complete.
-- The current monorepo task authorizes source relocation and workspace wiring. It does not authorize new foundation behavior, backend plugins, demonstration apps, or consumer SDK migrations. The former specification-only phase remains recorded in history.
-- Follow the Jazz-first MVP decisions in the active spec. Earlier Q1/Q2 decisions are resolved; the 2026-10-31 scope revision defers portable schemas and multi-backend qualification.
-- Jazz is the only required v1 backend. Keep SDK access behind documented integration boundaries for later replacement; independent plugins and a second backend are deferred. Do not silently weaken app-required capabilities, permissions, or durability.
-- Keep Finance and Clipper domain behavior outside the shared foundation. DUI owns generic presentation; this foundation owns identity/workspace compositions.
-- Work on one task at a time and present it for review before beginning another. Change no more than one route or component per review cycle unless the user authorizes otherwise.
-- Use functions, closures and plain data for application code. Do not introduce application-owned classes or inheritance; stateful lifecycles belong to XState machines.
-- Do not use `switch` statements or `case` clauses in new application code; prefer narrowing, lookup records, or clear conditionals. Bundled Spec Kit scripts are inherited tooling.
-- Do not add or run implementation tests before the user reviews and approves the implementation they cover.
-- Use the repository Oxlint and Oxfmt configurations and avoid unrelated formatting.
-- When starting a development server, tell the user and provide its URL.
-- Never commit or publish without explicit authorization.
+Read the [workspace entry](../../AGENTS.md) and shared guides first. The stricter
+common engineering/review requirements apply. Follow the local
+[constitution](.specify/memory/constitution.md), active feature selector and
+public contracts; no consumer constitution or domain schema becomes library policy.
 
-- For v6 machine testing, follow the generated-testing section in `specs/003-verified-backup/xstate-v6-design-review.md`: prefer `@xstate/test` campaigns with independent behavioral oracles; preserve integration tests and existing implementation-review gates.
+- Jazz is the sole required v1 backend. Keep SDK access behind documented
+  identity/workspace/data integration boundaries; presentation and ordinary
+  workflows consume capabilities. Independent plugins, universal schemas and a
+  second backend remain deferred. Preserve app-required permissions/durability.
+- UI owns generic controls/theme; this library owns reusable identity/workspace
+  composition and local-first lifecycle contracts. Consumers own domain policies,
+  schemas and operations. Do not copy consumer statecharts into the foundation.
+- Read local [workflow extensions](.specify/memory/xstate.md) and the pinned-v6
+  [implementation](specs/003-verified-backup/xstate-v6-implementation.md) /
+  [design review](specs/003-verified-backup/xstate-v6-design-review.md) for generics,
+  factory and native resource qualification.
+- Local [localization](.specify/memory/localization.md),
+  [composition](.specify/memory/components.md) and [CSS](.specify/memory/css.md)
+  details supplement the shared guides. Paraglide compositions expose supported
+  contracts; consumers do not reach into private catalogs.
+- Use Oxfmt/Oxlint and the scoped package/consumer/native/browser commands. The
+  constitution's implementation-review and commit/publish approvals remain in
+  effect; the stricter shared baseline now applies to all workspace projects.

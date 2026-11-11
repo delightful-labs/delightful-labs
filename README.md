@@ -76,3 +76,15 @@ runs it before compilation. See [qualification and remaining work](specs/002-mon
 [UI compatibility qualification](specs/002-monorepo-agent-guidance/ui-workspace-links.md)
 records the retired snapshots, classic-theme provenance, packed-export checks
 and unchanged website screenshots.
+
+Shared engineering guidance starts at [AGENTS.md](AGENTS.md). The stricter common
+rules apply to every app and package; local constitutions and product contracts
+retain their own scope. Run `pnpm monorepo:check-guidance` for maintained guidance
+links, shared tooling ownership and read-only discovery in all six contexts.
+Run `pnpm monorepo:test-tooling` for the CI selector and guidance regressions.
+
+Every PR gets a Conventional Commits title check, including drafts and app-only
+changes. Existing CI jobs select affected projects and transitive consumers;
+root/unknown paths, missing history and manual runs select all. The
+[shared-guidance/CI record](specs/002-monorepo-agent-guidance/shared-guidance-ci.md)
+records the exact policy resolution, dependency closure and local verification.

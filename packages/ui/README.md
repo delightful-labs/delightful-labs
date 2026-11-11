@@ -702,7 +702,7 @@ Native attributes/events, class and style pass through to the active container; 
 
 Overlay mode slides/fades; inline mode animates its reserved width. Both respect reduced motion, and retain the inert visual panel until exit motion finishes. Inline focus restoration waits for caller-hidden triggers to become visible. Without motion support, visibility changes immediately. Both variants fill the viewport height by default; inline placement sticks to the top during page scrolling. The body scrolls independently beneath the close control. Set `--dui-drawer-height` for a contained layout. Customize `--dui-drawer-width` (default `24rem`), `--dui-drawer-gap` and `--dui-drawer-duration` (default `200ms`). Colors, borders and padding use Dialog tokens; backdrop tokens apply only to overlay mode. No touch/swipe gesture or automatic responsive breakpoint is included.
 
-See the [accessibility specification](docs/finance-component-spec.md#drawer--implemented-awaiting-review) for each mode's behavior and pending verification.
+See the [accessibility specification](docs/finance-component-spec.md#drawer--implemented-and-tested) for each mode's behavior and pending verification.
 
 ## Storybook
 

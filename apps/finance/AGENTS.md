@@ -1,25 +1,27 @@
-# Repository working agreements
+# Finance project guidance
 
-- Follow `.specify/memory/constitution.md` and the active feature artifacts under `specs/`. Before designing or changing complex state, read `.specify/memory/xstate.md`. Before designing Jazz schemas, permissions, or persistence behavior, read `.specify/memory/jazz.md`.
-- Never edit Paraglide catalogs, configuration, or generated files without explicit user authorization. Before proposing new strings, list each exact string, its code purpose/location, and why existing strings or generic actions/labels cannot work; wait for approval. Treat local saves as “Saved” in UI, without local/remote caveats or unsolicited sync notices. See `.specify/memory/localization.md`.
-- Before adding or changing localized strings, read `.specify/memory/localization.md`. Consolidate reusable action/label structures, use shared plural nouns, and name variable-bearing keys and inputs consistently (for example, `actions.select_subject: "Select {subject}"`).
-- Do not use `switch` statements or `case` clauses; use discriminated-union narrowing, lookup records, or clear conditional expressions.
-- Work on one task at a time. Do not start another task until the current change has been shown to the user and reviewed.
-- Use a small related set of files per focused review cycle, typically 4–6 implementation files. Multiple routes/components may change together. Discuss larger batches first; do not edit dozens of files without explicit authorization.
-- Keep Jazz subscriptions, dependency binding, and actor lifecycle wiring in the page or integration component. Define complex workflows and reusable authorization/readiness decisions as focused XState machines under `src/lib/machines/`, composed through child actors. Those files compose imported pure components rather than declaring native HTML from scratch. Pure presentation components receive data and callbacks through props; simple presentation state, UI-library controls, and localization belong there. Extract shared helpers only for genuinely reused logic, not merely to move a page script into a controller file. Do not create components merely to relocate page templates.
-- Before writing an async workflow or `fromPromise` body, apply the mandatory machine-first gate in `.specify/memory/xstate.md`. Multiple independently meaningful steps, read/check/write decisions, or an acquired resource with commit/rollback/cleanup paths MUST start as a statechart, including inside transaction callbacks and existing actors. Implement the machine first; promise actors perform individual leaf operations. Wrapping or relocating an async function does not satisfy this rule. Before presenting the change, inspect every new/changed actor and its helpers recursively for hidden orchestration. Use explicit success, partial, cancellation, and failure states; do not mirror lifecycle state in context flags.
-- Keep status-to-message mappings in the owning machine or its public view selector, including persisted history outcomes, settlement and failure reasons. Consuming components translate supplied message descriptors and render them; do not interpret domain statuses with component-local lookup maps.
-- Keep components small and reusable. Do not invent visual styling or add decorative UI unless the user approves that direction.
-- Name entity validation files to match their schema files (for example, `schema/transactions.ts` and `validation/transactions.ts`). Keep canonical validation and its derived form adapters together.
-- Do not add or run tests until the user has reviewed and approved the implementation that those tests will cover. Identify affected unit and Playwright tests during implementation review; after approval, update their fixtures, helpers, and assertions by inspecting the implementation before running them. Follow `.specify/memory/testing.md`; do not use repeated test runs to discover drift that static inspection can reveal. Run only the relevant checks.
-- Use the repository Prettier configuration. Do not format unrelated files.
-- Whenever starting a development server, tell the user and provide its URL so they can open the same server.
-- Use `pnpm dev:agent` for agent browser work (default `http://localhost:5180`); it uses disposable in-memory Jazz storage. Agent servers may stay running and be reused across focused tests; start one server and point subsequent Playwright runs at it instead of restarting it for each test. For concurrent sessions or occupied ports, use a distinct app port, for example `pnpm dev:agent --port 5182`, with a matching Playwright base URL and server-reuse configuration. The restriction is specifically on the user's `pnpm dev` environment (app port 5173 and Jazz port 5174), not on keeping agent servers running. Do not clear the user's browser storage or Jazz data, or stop their server. Reuse only a known agent server; do not stop an unidentified process to reclaim a port. See `.specify/memory/testing.md`.
-- Do all work on feature branches. Before making changes, create or switch to an appropriate feature branch; never work directly on or push directly to `main`.
-- When updating the vendored DUI dependency, remove superseded DUI archives in the same change. Keep only the archive referenced by `package.json` and `pnpm-lock.yaml`; Git history preserves older snapshots.
-- Never commit unless the user explicitly authorizes the commit.
-- Delightful Labs operates through open source and open learning. Create its GitHub repositories as public unless the user explicitly requests otherwise.
+Read the [workspace entry](../../AGENTS.md) and shared guides first. The user's
+stricter common engineering, copy, type and test-review requirements apply.
+Follow the [constitution](.specify/memory/constitution.md) and local active
+feature for financial, organization/access, provider-secret and persistence rules.
 
-- The coordinated XState v6 and UI/worker migration follows [its design specification](specs/013-local-first-startup/xstate-v6-migration.md). Review the exact installed v6 docs and stability manifest, adapt logic to published APIs without patching XState, and preserve implementation review before tests.
-
-- For v6 machine testing, follow the generated-testing section in `specs/013-local-first-startup/xstate-v6-migration.md`: prefer `@xstate/test` campaigns with independent behavioral oracles; preserve integration tests and existing implementation-review gates.
+- Before Finance workflows or SDK work, read [workflow extensions](.specify/memory/xstate.md)
+  and [Jazz/schema memory](.specify/memory/jazz.md). Generic foundation lifecycles
+  belong in Local First; native finance schemas, policy, routing, provider work
+  and financial resource drains remain here.
+- Use the local [Paraglide conventions](.specify/memory/localization.md) for noun/
+  action/input naming, component catalogs and descriptor-based feedback. The
+  shared explicit string/catalog/generation approval rule takes precedence over
+  any instruction to consolidate or regenerate copy automatically.
+- Keep components small and composed from UI primitives. Schema and validation
+  filenames correspond (for example transactions.ts in both directories); keep
+  canonical validation and derived form adapters together. Page/integration
+  bridges bind dependencies and observations; domain work follows shared worker
+  ownership rather than being hidden in component scripts/controllers.
+- Use the existing Prettier configuration. Read [testing environment details](.specify/memory/testing.md)
+  before browser work. The user's 5173/5174 environment and data are protected;
+  `pnpm dev:agent` uses disposable in-memory Jazz storage. Reuse only known agent
+  servers with distinct ports and isolated generated files/node_modules.
+- The [v6 migration design](specs/013-local-first-startup/xstate-v6-migration.md)
+  and active feature own current runtime qualification. Historical alpha.59/v5
+  research is not current SDK/API syntax. Read exact installed docs before changes.

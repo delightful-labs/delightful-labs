@@ -84,8 +84,10 @@ The following work remains explicit:
    [2026-11-11 qualification](ui-workspace-links.md). Both remaining consumers use
    workspace UI, existing defaults are preserved through its classic entry, and
    the two active snapshots are removed. No new font choices were introduced.
-3. Finish shared topic-policy activation and Clipper's PR-title check scope while
-   preserving local approval/constitution/localization exceptions.
+3. Shared topic guidance, dependency-aware CI selection and the all-PR title
+   check are implemented and locally verified; see [the record](shared-guidance-ci.md).
+   The stricter common engineering rules apply to every project by user direction;
+   constitutions, product policies and translation/tool boundaries retain scope.
 4. Complete source PR inventory and reconcile newer upstream commits before
    handoff. GitHub's configured token-lifetime restriction currently prevents
    complete PR inventory; no authentication setting was altered.
@@ -103,3 +105,19 @@ install passes all eight installed dependency-identity checks and consumer types
 The packed UI tarball builds in a separate consumer, including its new public
 classic stylesheet and shared registration asset. Details and limits are in the
 [UI link record](ui-workspace-links.md) and its linked evidence.
+
+## Shared guidance and CI completed — 2026-11-11
+
+Seven shared engineering guides own common practice. The stricter baseline now
+applies to all apps/packages by explicit user direction; domain constitutions
+remain local. Finance and Local First link the ten byte-identical root Spec Kit
+skills. All six discovery contexts retain their intended feature selectors.
+
+The built-in CI planner selects transitive consumers, handles both paths of moves
+and divergent push comparisons, and falls back to all projects when history is
+unavailable. Existing jobs fail if planning fails. The independent title workflow
+covers every PR, including drafts and title edits. No hosted required checks or
+repository settings changed. Twelve Node tooling tests, guidance/link validation,
+four workflow YAML parses and the 66-file baseline hash audit passed locally.
+These docs/CI changes did not rerun the previously recorded app/browser suites;
+no application code, catalogs, dependencies or lockfile changed in this slice.

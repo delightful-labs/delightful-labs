@@ -1,4 +1,8 @@
-# Project guidance
+# Website project guidance
+
+Read the [workspace entry](../../AGENTS.md) and shared guides first. The stricter
+common engineering, review, copy, dependency and testing requirements apply.
+The owner-specific product/content/typography requirements below remain local.
 
 - Use Svelte and Delightful UI as the foundation for the new site.
 - Set up the basic site before content work. Do not add homepage content, filler copy, marketing text, project listings, or contact sections, or automatically copy old studio content forward. Defer positioning and content questions until the foundation is ready. Existing blog article preservation/migration remains in scope; keep test fixtures out of public content.
