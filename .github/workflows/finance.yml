@@ -87,7 +87,11 @@ jobs:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Browser (${{ matrix.suite }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --init --shm-size=1g
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -126,7 +130,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
-      - run: pnpm exec playwright install --with-deps chromium
       - name: Run against a disposable in-memory Jazz server
         run: pnpm exec playwright test --config=${{ matrix.config }} ${{ matrix.selection }} --forbid-only
       - name: Retain browser diagnostics and durations
@@ -141,7 +144,11 @@ jobs:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Workspace restore recovery
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --init --shm-size=1g
     timeout-minutes: 20
     steps:
       - name: Require successful check selection
@@ -158,7 +165,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
-      - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - name: Verify native isolation and browser recovery against disposable Jazz servers
         run: pnpm exec vitest run --mode restore-experiment --reporter=verbose
 
@@ -166,7 +172,11 @@ jobs:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Feature flags (${{ matrix.suite }}, debug=${{ matrix.debug }}, seed=${{ matrix.seed }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --init --shm-size=1g
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -214,7 +224,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
-      - run: pnpm exec playwright install --with-deps chromium
       - name: Verify feature flags against an isolated runtime
         run: pnpm exec playwright test --config=${{ matrix.config }} --workers=1 --forbid-only
       - name: Retain feature-flag diagnostics and durations
@@ -229,7 +238,11 @@ jobs:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Production preview PWA
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --init --shm-size=1g
     timeout-minutes: 30
     env:
       PUBLIC_JAZZ_SERVER_URL: same-origin
@@ -249,7 +262,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
-      - run: pnpm exec playwright install --with-deps chromium
       - name: Build with the same-origin Jazz backend
         run: pnpm build
         env:

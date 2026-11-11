@@ -71,3 +71,39 @@ Vercel domain API provides the exact proposed replacement targets. The Netlify
 connector does not expose DNS mutation, so any approved repair would use the
 installed CLI's scoped record operations. The DNS zone and other records are
 preserved; no registrar/nameserver transfer is part of this proposal.
+
+## Live-domain repair accepted
+
+The user explicitly approved apex TLS certificate issuance after the automatic
+reviewer required that separate security-configuration approval. Vercel issued
+`cert_zObX5yLsc2wAqlu3gnQ0FAp3` for `delightfullabs.com`. Normal public HTTPS
+requests now return 200 for the apex homepage and native writing page; www returns
+308 to the apex. Live disposable-browser checks on the actual custom domain pass
+desktop/mobile homepage, decoded portrait, app links, keyboard navigation, writing
+navigation/reload, unknown-article 404 and six CSS/JavaScript assets. No new fonts,
+page errors or failed app assets were observed; external embeds were stubbed to
+avoid production account writes. Deployment protection and all nine unrelated
+DNS records remain unchanged.
+
+## Follow-up PR qualification
+
+PR #11 publishes the fixture and CI-job fixes. Its first hosted browser jobs stop
+at browser dependency installation because runner DNS cannot resolve
+`security.ubuntu.com`; these are setup failures, not application-test failures.
+Tooling/types/build jobs pass. After diagnosis, one website job is retried on a
+fresh runner as a control before any broader retries. The control failed at the
+same apt step, resolving neither the Azure, archive nor security Ubuntu hosts. No tests are skipped,
+assertions weakened, deadlines extended, apt security settings relaxed or package
+mirrors changed to conceal the infrastructure failure. Hosted application
+qualification remains outstanding until the dependency setup can complete.
+
+
+Browser jobs now run in the official Playwright Noble CI images, pinned to
+registry-verified immutable digests and matching the frozen package versions:
+1.64.0 for Website/UI/Finance/Clipper, 1.60.0 for Local First. These images include
+the browser binaries and system libraries; per-job apt/browser installation is
+removed. Node 24.22.2, frozen workspace installation, job names, check selection,
+all test commands, fail-closed aggregation and time budgets remain unchanged.
+Containers use an init process and 1 GiB shared memory without privileged mode.
+See [Playwright's image documentation](https://playwright.dev/docs/docker).
+Fresh hosted qualification is required before merge.
