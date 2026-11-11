@@ -1,0 +1,83 @@
+{
+  "version": "2.0.0-alpha.60",
+  "sources": [
+    {
+      "repository": "delightful-finances",
+      "commit": "230bc7cc38db3745d75b3c6fd40c861855fa0cf1",
+      "sha256": "c8b3fbdca60553d2c141455b5bb5039c0eb3122bbb9adbd6a4606d94a22487cf"
+    },
+    {
+      "repository": "delightful-clipper",
+      "commit": "549e4b543bbca51b3a243fa7f88d4165f9f405f7",
+      "sha256": "494ab07875c34920f36feaf5d2aa34a7bbf3a4e8a5639c5e528d4440e5db0d85"
+    }
+  ],
+  "resolution": "Combine nonconflicting hunks. For acceptPeer in module, declaration and worker bundle, retain Clipper owner-pinned appId/author and refresh only the joining token after equality checks. Finance admits the same proof under the same equality constraints; its other standalone broker-core/session fixes remain included.",
+  "files": [
+    {
+      "path": "dist/backend/create-jazz.js",
+      "baseSha256": "0f3f3a68799a9c1535dc11b0eaf23891c5c0538deaf701102b5ffa78e0335f63",
+      "mergedSha256": "fc2b6e3db2670bac70668f5549dce9bc40f1e9541effa0e03009fc15e7142bda"
+    },
+    {
+      "path": "dist/backend/vercel-store.js",
+      "baseSha256": "350464dd237574a0b25e52288b9a55459f204bc8ce93e67ca29f9f4f44b7a12e",
+      "mergedSha256": "72d063c02124ad9ebcbd738b18535c7edcb780b7deb50ca04fb647b6fc0e7885"
+    },
+    {
+      "path": "dist/runtime/client.js",
+      "baseSha256": "bfa01c8593bc7de6845dad6411c850e0f13491d4217544dda5e33c48a22bcb92",
+      "mergedSha256": "0ca919d76ea394568669a53b615f58fb4d822fe1c44d2a6710da1823ec8629fc"
+    },
+    {
+      "path": "dist/runtime/context.d.ts",
+      "baseSha256": "91e5167deabb16cf403b12cca8b676f25bcbac785192ee13ad90d070232b5087",
+      "mergedSha256": "6c7292765ec925085dfa1d5a51e6858bbdb9fd3b0a1ea22cda93b9bc5a28625a"
+    },
+    {
+      "path": "dist/runtime/db.js",
+      "baseSha256": "445e37439a19be03dc7241b4bc172f105995606f90531b6894bfb05cae91a06f",
+      "mergedSha256": "b6f25262ce97ff16d50bd5c0ba3ab1150930556a380cd121ab7e5e4aebf52d9d"
+    },
+    {
+      "path": "dist/runtime/default-runtime-source.js",
+      "baseSha256": "3746f27e18911d56f39d858377ce137ed99a3570c7fee011d06017c9b8451817",
+      "mergedSha256": "a5c97cf396990056b69827cac3bf588af64a5209c526edd793db36667eab7a07"
+    },
+    {
+      "path": "dist/runtime/native-runtime/browser-shared-worker-connection.js",
+      "baseSha256": "2f2e113b9f71e8f6d542b63a83ee0b7a36e52af236289b3149dc0c324e609fef",
+      "mergedSha256": "8b7b4e6fd0ccca956645e274d6cd42874cd6674bf4860eeb0de3a42eac65f1f4"
+    },
+    {
+      "path": "dist/runtime/native-runtime/native-runtime-adapter.d.ts",
+      "baseSha256": "c63fbc00b4c54aec90e5e9d6a0d79e89d7de8bda7a59e9b4687971a7752f96a1",
+      "mergedSha256": "3bf5364e3f735a14e1548b95800d79f66f8d142db81a0659ad487664e6e2c446"
+    },
+    {
+      "path": "dist/runtime/native-runtime/native-runtime-adapter.js",
+      "baseSha256": "11b1e6ca5526ac51548ff55c5b622a06cd5481e189e137bb66523eb56d9fd682",
+      "mergedSha256": "bb3aecf2684c8b0abbfa7ae859d053d682dd76e7a97e8419ce90cd81707be1af"
+    },
+    {
+      "path": "dist/session/create-jazz-session.js",
+      "baseSha256": "27677a44a1271b1434cb9b69f618c83de2eb62bab6904e803bd5da4ce05a7c88",
+      "mergedSha256": "639137ac55c4c9e26060c5fb45afc3d1fa3fecf6b4c063147f1396fdf4619495"
+    },
+    {
+      "path": "dist/session/state.js",
+      "baseSha256": "73d29f7c514a6eb1ed0d1ad210e2ae892e782c2082849cf53ed9e1ed91028326",
+      "mergedSha256": "c4c520a364c70ec692240b1db9ea92cd87d8c0073bdeecfc10a05afdb8fb3aca"
+    },
+    {
+      "path": "dist/worker/jazz-broker-worker-core.js",
+      "baseSha256": "48761b33d30dec6c3a78873625ddbd5523481b18c2b66740efb64c58dd2a2806",
+      "mergedSha256": "0f640411fb2243edad18067a7546c08f305685ed59664a3a6aae9261eb698035"
+    },
+    {
+      "path": "dist/worker/jazz-broker-worker.js",
+      "baseSha256": "a8a1d1942145135a658acea79aa05770c7a306e161b514ea6d41b7f9203d244f",
+      "mergedSha256": "4ed3c2a1dbbf12a0a5c84d3bc2427c91936ff2c49f072b158b2cc1e972f739e1"
+    }
+  ]
+}

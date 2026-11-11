@@ -21,6 +21,8 @@ the original specification remains the reviewed requirements baseline.
   Consumer archives remain unchanged pending patch reconciliation and app imports.
 - The [recovery-view compatibility export](recovery-view-export.md) is now in
   source and verified through the packed consumer and 63 Storybook tests.
+- Existing SDK runtime patches are [reconciled in one root patch](sdk-runtime-patches.md),
+  with passing library native/restore checks and pending app qualification.
 - Finance and Clipper imports, consumer workspace links, cross-project guidance
   reconciliation and remaining qualification are pending.
 
