@@ -17,6 +17,7 @@ type ImageEvidence = {
 	error: string | undefined
 }
 const evidence = new WeakMap<Page, ImageEvidence[]>()
+const seededArticles = new WeakMap<Page, Set<string>>()
 test.beforeEach(({ page }) => {
 	const states: ImageEvidence[] = []
 	evidence.set(page, states)
@@ -105,11 +106,8 @@ async function png(page: Page, width = 3000, height = 1000, mediaType = 'image/p
 async function seed(page: Page, urls: string[]) {
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
-	const previous = new Set(
-		await page
-			.locator('[data-article-id]')
-			.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-article-id')))
-	)
+	// Keep fixture history independently of a reload's partially hydrated library.
+	const previous = seededArticles.get(page) ?? new Set<string>()
 	const url = 'https://example.com/images-' + crypto.randomUUID()
 	const html = `<p>Saved text stays readable while images load.</p>${urls.map((url, index) => `<figure><img data-clipper-image="${encodeURIComponent(url)}" alt="Saved image ${index + 1}" src="https://images.example/never-load-from-reader.png"><figcaption>Figure ${index + 1}</figcaption></figure>`).join('')}<p>Article ending.</p>`
 	const extract = async (route: import('@playwright/test').Route) => {
@@ -153,6 +151,15 @@ async function seed(page: Page, urls: string[]) {
 			).filter((id) => !!id && !previous.has(id))
 		await expect.poll(newIds).toHaveLength(1)
 		const id = (await newIds())[0]!
+		const expected = [...previous, id].sort()
+		await expect
+			.poll(() =>
+				page
+					.locator('[data-article-id]')
+					.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-article-id')).sort())
+			)
+			.toEqual(expected)
+		seededArticles.set(page, new Set(expected))
 		await expect(
 			page
 				.locator(`[data-article-id="${id}"]`)
