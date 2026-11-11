@@ -27,7 +27,11 @@ The source authorization and migration contract remain in
 All implementation files match the source PR byte for byte. Import adaptations
 retain the enabled Linux sign-in cases and exact offline icon expectations, and
 replace three CSS-class browser locators with paragraph-role locators to meet the
-common testing rules. No dependency,
+common testing rules. Hosted general web coverage also exposed an image-fixture
+reload race: its DOM snapshot could precede hydration, counting older captures as
+new. The fixture now tracks its own seeded IDs across reloads and asserts the
+exact rendered ID set as well as one new article. The failure was reproduced
+locally before correction; all four native image browser cases pass afterward. No dependency,
 permission, localized copy or capture/account ownership change was introduced
 by the integration.
 
@@ -49,3 +53,6 @@ by the integration.
 
 All native tests use disposable authorities, databases and browser profiles.
 These are local results; they do not establish hosted CI or production cutover.
+
+The image-fixture follow-up changes only test bookkeeping. No image-processing,
+metadata, projection, persistence or account implementation changed.
