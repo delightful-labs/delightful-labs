@@ -10,8 +10,11 @@ the original specification remains the reviewed requirements baseline.
 - Website workspace move implemented and locally verified; see
   [the slice record](website-move.md) for exact mapping, guidance dispositions,
   checks and rollback. Hosted preview verification and source handoff remain open.
-- Library and application imports, cross-project guidance reconciliation, and
-  common-toolchain qualification beyond the website remain pending.
+- UI imported with original history and qualified under the root toolchain; see
+  [the UI slice record](ui-import.md) and [emitted package comparison](ui-package-comparison.json).
+- Local First, Finance and Clipper imports, remaining consumer workspace links,
+  cross-project guidance reconciliation and remaining toolchain qualification
+  are pending.
 
 ## Slice 0: reproducible source inventory
 

@@ -1,7 +1,6 @@
 # Workspace guidance
 
-This is the Delightful Labs pnpm workspace. The website is currently the only
-imported app. Work on the monorepo migration from
+This is the Delightful Labs pnpm workspace. The website and UI library are imported. Work on the monorepo migration from
 [the active migration spec](specs/002-monorepo-agent-guidance/spec.md) and
 [implementation record](specs/002-monorepo-agent-guidance/implementation.md).
 
@@ -10,7 +9,9 @@ imported app. Work on the monorepo migration from
 - For website source, configuration, tests, publishing or content, read
   [apps/website/AGENTS.md](apps/website/AGENTS.md) and its project-local active feature.
   Website product and publishing restrictions apply to that app.
-- Finance, Clipper, UI and Local First have not been imported. Their source
+- For UI work, read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) and its linked
+  machine-design and testing guidance. UI policies remain scoped to the library.
+- Finance, Clipper and Local First have not been imported. Their source
   guidance remains effective in their repositories. Do not treat their policies
   as reconciled workspace rules. See the migration inventories and findings.
 - For state machines/resource ownership, localization, accessibility, testing,
@@ -22,8 +23,8 @@ imported app. Work on the monorepo migration from
 
 ## Working in the workspace
 
-- Use pnpm 10.28.0 and Node 24 for this website slice. Qualification for other
-  projects remains pending. Root app commands delegate to `apps/website`.
+- Use pnpm 10.28.0 and Node 24 for the imported website and UI library.
+  Qualification for the remaining projects is pending. Root app commands delegate to `apps/website`.
 - Start development servers on `0.0.0.0`, announce localhost and LAN URLs when
   available, and use distinct available ports. Preserve unidentified servers.
 - Root `.specify/feature.json` selects migration work; the website has its own

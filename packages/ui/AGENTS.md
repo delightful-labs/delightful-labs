@@ -9,7 +9,7 @@
 
 ## Development servers
 
-- Start development servers on the network by default (`0.0.0.0`), unless the user explicitly requests localhost-only access. Provide both localhost and LAN URLs.
+Follow the shared [workspace server guidance](../../AGENTS.md#working-in-the-workspace).
 
 ## Tests
 

@@ -14,6 +14,10 @@
     "test": "pnpm --filter delightful-labs test",
     "test:browser": "pnpm --filter delightful-labs test:browser",
     "test:build": "pnpm --filter delightful-labs test:build",
-    "monorepo:inventory": "node scripts/monorepo/inventory.mjs"
+    "monorepo:inventory": "node scripts/monorepo/inventory.mjs",
+    "ui:check": "pnpm --filter delightful-ui check",
+    "ui:package": "pnpm --filter delightful-ui package",
+    "ui:test": "pnpm --filter delightful-ui test:unit --run",
+    "ui:build": "pnpm --filter delightful-ui build"
   }
 }
