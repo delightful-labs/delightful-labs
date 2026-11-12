@@ -3,9 +3,28 @@ import permissions from './permissions.js'
 
 /** Historical fixtures use current policies only for tables present at that step. */
 export function permissionsForSchema(schema: { wasmSchema: object }) {
-	return Object.fromEntries(
-		Object.entries(permissions).filter(([table]) => Object.hasOwn(schema.wasmSchema, table))
-	)
+	const tables = new Set(Object.keys(schema.wasmSchema))
+	const historicalName =
+		tables.has('documents') && !tables.has('contentRepresentations')
+			? 'documents'
+			: 'contentRepresentations'
+	const renameReferences = (value: unknown): unknown => {
+		if (value === 'contentRepresentations' && historicalName === 'documents') return 'documents'
+		if (Array.isArray(value)) return value.map(renameReferences)
+		if (value && typeof value === 'object') {
+			return Object.fromEntries(
+				Object.entries(value).map(([key, item]) => [key, renameReferences(item)])
+			)
+		}
+		return value
+	}
+	const historicalPermissions: Record<string, unknown> = {}
+	for (const [table, policy] of Object.entries(permissions)) {
+		const targetTable =
+			historicalName === 'documents' && table === 'contentRepresentations' ? 'documents' : table
+		if (tables.has(targetTable)) historicalPermissions[targetTable] = renameReferences(policy)
+	}
+	return historicalPermissions as typeof permissions
 }
 
 /** The SDK policy fixture deploys one schema without its migration graph. Give

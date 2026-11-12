@@ -60,7 +60,7 @@ export function createNoteRecords(
 		const article = await tx.one(app.articles.where({ id: targetId, libraryId }), {
 			tier: ReadTier.LocalFirst
 		})
-		const document = await tx.one(app.documents.where({ id: targetId, libraryId }), {
+		const document = await tx.one(app.contentRepresentations.where({ id: targetId, libraryId }), {
 			tier: ReadTier.LocalFirst
 		})
 		const aliases = await tx.all(

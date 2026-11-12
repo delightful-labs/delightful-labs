@@ -19,7 +19,7 @@ const documentFieldsSchema = z.object({
 	language: z.string().max(128).nullable(),
 	finalUrl: webUrlSchema.nullable(),
 	canonicalUrl: webUrlSchema.nullable(),
-	representationId: lowercaseUuidSchema.nullable()
+	contentRepresentationId: lowercaseUuidSchema.nullable()
 })
 
 const activeDocumentSchema = documentFieldsSchema

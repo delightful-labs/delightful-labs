@@ -36,7 +36,7 @@ export function createReaderRecords(
 					tier: ReadTier.LocalFirst
 				})
 				const document = await resource.tx.one(
-					app.documents.where({ id: change.documentId ?? libraryId, libraryId }),
+					app.contentRepresentations.where({ id: change.documentId ?? libraryId, libraryId }),
 					{ tier: ReadTier.LocalFirst }
 				)
 				return { library, document }

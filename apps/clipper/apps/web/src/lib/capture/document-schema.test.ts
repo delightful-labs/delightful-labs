@@ -16,7 +16,7 @@ const document = {
 	language: null,
 	finalUrl: null,
 	canonicalUrl: null,
-	representationId: null,
+	contentRepresentationId: null,
 	status: 'inbox'
 } as const
 
@@ -54,7 +54,7 @@ it('validates article metadata and its direct content relationship on the Docume
 		siteName: 'Example',
 		language: 'en',
 		finalUrl: 'https://example.com/final',
-		representationId: id
+		contentRepresentationId: id
 	}
 	expect(documentSchema.parse(withArticle)).toEqual(withArticle)
 	expect(documentSchema.safeParse({ ...withArticle, finalUrl: 'file:///private' }).success).toBe(

@@ -34,6 +34,7 @@ import metadataMigration from './migrations/20261110T161543-article-metadata-5e7
 import documentMigration from './migrations/20261112T001319-document-attachments-8a4e11c993e0-147cca2a3088.js'
 import savedAtMigration from './migrations/20261112T011128-remove-saved-at-147cca2a3088-f51d40bd10a8.js'
 import cleanDocumentMigration from './migrations/20261112T012648-collapse-article-data-onto-document-f51d40bd10a8-f3a133184527.js'
+import renameContentMigration from './migrations/20261112T020739-clarify-content-representation-link-f3a133184527-3b875a72f847.js'
 import { app as beforeExcerpts } from '../../../../tests/fixtures/schema-history/preexcerpt-schema.test-support.js'
 import excerptMigration from './migrations/20261110T152256-article-excerpts-7c74c142a5dc-5e70efdb5795.js'
 import { legacyApp } from '../../../../tests/fixtures/schema-history/legacy-schema.test-support.js'
@@ -90,6 +91,13 @@ const beforeCleanSchema: typeof app.wasmSchema = JSON.parse(
 	)
 )
 const beforeCleanApp = { wasmSchema: beforeCleanSchema }
+const beforeRenameSchema: typeof app.wasmSchema = JSON.parse(
+	await readFile(
+		new URL('./migrations/snapshots/20261112T012648-f3a133184527.json', import.meta.url),
+		'utf8'
+	)
+)
+const beforeRenameApp = { wasmSchema: beforeRenameSchema }
 // Alpha.60 uses a different structural schema hash. Preserve the historical
 // witnesses and lenses, resolving their endpoints to the same full fixture
 // schemas compiled by the current SDK. This does not claim a cross-SDK upgrade.
@@ -108,7 +116,8 @@ const historicalSchemas: Record<string, { wasmSchema: typeof app.wasmSchema }> =
 	'8a4e11c993e0': beforeDocumentsApp,
 	'147cca2a3088': beforeSavedAtApp,
 	f51d40bd10a8: beforeCleanApp,
-	f3a133184527: app
+	f3a133184527: beforeRenameApp,
+	'3b875a72f847': app
 }
 async function deploy(input: Parameters<typeof deployCore>[0]) {
 	if (!input.migration) return deployCore(input)
@@ -125,7 +134,8 @@ async function deploy(input: Parameters<typeof deployCore>[0]) {
 					{ schema: beforeDocumentsApp, migration: metadataMigration },
 					{ schema: beforeSavedAtApp, migration: documentMigration },
 					{ schema: beforeCleanApp, migration: savedAtMigration },
-					{ schema: app, migration: cleanDocumentMigration }
+					{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+					{ schema: app, migration: renameContentMigration }
 				]
 			: to === beforeExcerpts
 				? [
@@ -133,29 +143,38 @@ async function deploy(input: Parameters<typeof deployCore>[0]) {
 						{ schema: beforeDocumentsApp, migration: metadataMigration },
 						{ schema: beforeSavedAtApp, migration: documentMigration },
 						{ schema: beforeCleanApp, migration: savedAtMigration },
-						{ schema: app, migration: cleanDocumentMigration }
+						{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+						{ schema: app, migration: renameContentMigration }
 					]
 				: to === beforeMetadata
 					? [
 							{ schema: beforeDocumentsApp, migration: metadataMigration },
 							{ schema: beforeSavedAtApp, migration: documentMigration },
 							{ schema: beforeCleanApp, migration: savedAtMigration },
-							{ schema: app, migration: cleanDocumentMigration }
+							{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+							{ schema: app, migration: renameContentMigration }
 						]
 					: to === beforeDocumentsApp
 						? [
 								{ schema: beforeSavedAtApp, migration: documentMigration },
 								{ schema: beforeCleanApp, migration: savedAtMigration },
-								{ schema: app, migration: cleanDocumentMigration }
+								{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+								{ schema: app, migration: renameContentMigration }
 							]
 						: to === beforeSavedAtApp
 							? [
 									{ schema: beforeCleanApp, migration: savedAtMigration },
-									{ schema: app, migration: cleanDocumentMigration }
+									{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+									{ schema: app, migration: renameContentMigration }
 								]
 							: to === beforeCleanApp
-								? [{ schema: app, migration: cleanDocumentMigration }]
-								: []
+								? [
+										{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+										{ schema: app, migration: renameContentMigration }
+									]
+								: to === beforeRenameApp
+									? [{ schema: app, migration: renameContentMigration }]
+									: []
 	const result = await deployCore({
 		...input,
 		schemas: [from, to, ...remaining.map((step) => step.schema)],

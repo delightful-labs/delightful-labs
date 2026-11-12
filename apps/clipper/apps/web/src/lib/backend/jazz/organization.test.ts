@@ -128,7 +128,7 @@ it('organizes a legacy document through its native reference without altering th
 	const saved = await toPromise(createActor(a.records.saveMachine, { input }).start())
 	if (saved.kind !== 'saved') throw new Error('Expected legacy document')
 	await Promise.all(saved.receipts.map((r) => r.global()))
-	const before = await a.db.one(app.documents.where({ id }))
+	const before = await a.db.one(app.contentRepresentations.where({ id }))
 	const result = await toPromise(
 		createActor(a.records.articles.organization.machine, {
 			input: { id, field: 'status', value: 'archive' }
@@ -140,7 +140,7 @@ it('organizes a legacy document through its native reference without altering th
 	expect(await a.db.all(app.organizationOperations.where({ libraryId: a.id }))).toEqual([
 		expect.objectContaining({ articleId: null, documentId: id, field: 'status', value: 'archive' })
 	])
-	expect(await a.db.one(app.documents.where({ id }))).toEqual(before)
+	expect(await a.db.one(app.contentRepresentations.where({ id }))).toEqual(before)
 	const row = await a.db.one(app.organizationOperations.where({ libraryId: a.id }))
 	expect(organizationOperationSchema.parse(row)).toMatchObject({ articleId: id, value: 'archive' })
 })

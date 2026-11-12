@@ -120,10 +120,13 @@ export function createLibraryRecords(
 				const article = await db.one(app.articles.where({ id, libraryId }), {
 					tier: ReadTier.LocalFirst
 				})
-				const row = await db.one(app.documents.where({ id: article?.contentId ?? id, libraryId }), {
-					tier: ReadTier.LocalFirst,
-					firstLoadRemoteWaitMs: 5_000
-				})
+				const row = await db.one(
+					app.contentRepresentations.where({ id: article?.contentId ?? id, libraryId }),
+					{
+						tier: ReadTier.LocalFirst,
+						firstLoadRemoteWaitMs: 5_000
+					}
+				)
 
 				return row && article ? { ...row, id: article.id } : row
 			},
@@ -172,7 +175,7 @@ export function createLibraryRecords(
 		): Promise<SearchDocument[]> => {
 			signal.throwIfAborted()
 			const [documents, snapshots] = await Promise.allSettled([
-				db.all(app.documents.where({ libraryId }), { tier: ReadTier.LocalFirst }),
+				db.all(app.contentRepresentations.where({ libraryId }), { tier: ReadTier.LocalFirst }),
 				db.all(app.snapshots.where({ libraryId }), { tier: ReadTier.LocalFirst })
 			])
 			signal.throwIfAborted()
@@ -200,7 +203,7 @@ export function createLibraryRecords(
 		),
 		isCurrent,
 		hasDocument: async (id: string) => {
-			const row = await db.one(app.documents.where({ id, libraryId }), {
+			const row = await db.one(app.contentRepresentations.where({ id, libraryId }), {
 				tier: ReadTier.LocalFirst,
 				firstLoadRemoteWaitMs: 5_000
 			})
@@ -220,7 +223,7 @@ export function createLibraryRecords(
 			error: () => void
 		) =>
 			db.subscribe(
-				app.documents.where({ libraryId }),
+				app.contentRepresentations.where({ libraryId }),
 				{
 					onUpdate: (rows) => {
 						next(rows)

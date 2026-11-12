@@ -58,7 +58,7 @@ it('stores an owner-scoped Document and its content representation reference', a
 				favorite: false,
 				title: 'Captured article',
 				finalUrl: 'https://example.com/article',
-				representationId: contentId
+				contentRepresentationId: contentId
 			},
 			{ id: documentId }
 		)
@@ -68,7 +68,7 @@ it('stores an owner-scoped Document and its content representation reference', a
 		libraryId: account.id,
 		readingProgress: 0,
 		title: 'Captured article',
-		representationId: contentId
+		contentRepresentationId: contentId
 	})
 })
 
@@ -99,7 +99,7 @@ it('denies a Document that points to another library representation', async () =
 					readingProgress: 0,
 					status: 'inbox',
 					favorite: false,
-					representationId: contentId
+					contentRepresentationId: contentId
 				},
 				{ id: documentId }
 			)

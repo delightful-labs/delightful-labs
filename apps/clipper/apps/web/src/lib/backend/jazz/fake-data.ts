@@ -15,7 +15,7 @@ export function createFakeDataRecords(db: FakeDataDb, libraryId: string, isCurre
 		const options = tier === undefined ? undefined : { tier }
 		const [articles, documents, intents, root] = await Promise.all([
 			reader.all(app.articles.where({ libraryId }).limit(1), options),
-			reader.all(app.documents.where({ libraryId }).limit(1), options),
+			reader.all(app.contentRepresentations.where({ libraryId }).limit(1), options),
 			reader.all(app.storageOperations.where({ libraryId }).limit(1), options),
 			reader.one(app.libraries.where({ id: libraryId }), options)
 		])

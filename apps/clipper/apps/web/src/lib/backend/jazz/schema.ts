@@ -12,7 +12,7 @@ export const app = s.defineApp(
 			{
 				library: s.rel('libraries', 'libraryId'),
 				article: s.rel('articles', 'articleId'),
-				document: s.rel('documents', 'documentId')
+				document: s.rel('contentRepresentations', 'documentId')
 			}
 		),
 		noteRevisions: s.table(
@@ -38,7 +38,7 @@ export const app = s.defineApp(
 			{
 				library: s.rel('libraries', 'libraryId'),
 				articleParent: s.rel('articles', 'articleParentId'),
-				documentParent: s.rel('documents', 'documentParentId')
+				documentParent: s.rel('contentRepresentations', 'documentParentId')
 			}
 		),
 		articleImages: s.table(
@@ -52,7 +52,7 @@ export const app = s.defineApp(
 			},
 			{
 				library: s.rel('libraries', 'libraryId'),
-				document: s.rel('documents', 'documentId'),
+				document: s.rel('contentRepresentations', 'documentId'),
 				asset: s.rel('assets', 'assetId')
 			}
 		),
@@ -64,7 +64,10 @@ export const app = s.defineApp(
 				value: s.string(),
 				parents: s.string()
 			},
-			{ library: s.rel('libraries', 'libraryId'), document: s.rel('documents', 'documentId') }
+			{
+				library: s.rel('libraries', 'libraryId'),
+				document: s.rel('contentRepresentations', 'documentId')
+			}
 		),
 		tagOperations: s.table(
 			{
@@ -79,7 +82,7 @@ export const app = s.defineApp(
 			{
 				library: s.rel('libraries', 'libraryId'),
 				article: s.rel('articles', 'articleId'),
-				document: s.rel('documents', 'documentId')
+				document: s.rel('contentRepresentations', 'documentId')
 			}
 		),
 		organizationOperations: s.table(
@@ -94,7 +97,7 @@ export const app = s.defineApp(
 			{
 				library: s.rel('libraries', 'libraryId'),
 				article: s.rel('articles', 'articleId'),
-				document: s.rel('documents', 'documentId')
+				document: s.rel('contentRepresentations', 'documentId')
 			}
 		),
 		articles: s.table(
@@ -106,9 +109,12 @@ export const app = s.defineApp(
 				operationId: s.uuid().optional(),
 				failure: s.string().optional()
 			},
-			{ library: s.rel('libraries', 'libraryId'), content: s.rel('documents', 'contentId') }
+			{
+				library: s.rel('libraries', 'libraryId'),
+				content: s.rel('contentRepresentations', 'contentId')
+			}
 		),
-		// The legacy `documents` table stores immutable content bundles; this table owns saved-library state.
+		// This table owns saved-library state; captured content lives in `contentRepresentations`.
 		libraryDocuments: s.table(
 			{
 				libraryId: s.uuid(),
@@ -125,11 +131,11 @@ export const app = s.defineApp(
 				language: s.string().optional(),
 				finalUrl: s.string().optional(),
 				canonicalUrl: s.string().optional(),
-				representationId: s.uuid().optional()
+				contentRepresentationId: s.uuid().optional()
 			},
 			{
 				library: s.rel('libraries', 'libraryId'),
-				representation: s.rel('documents', 'representationId')
+				contentRepresentation: s.rel('contentRepresentations', 'contentRepresentationId')
 			}
 		),
 		articleSources: s.table(
@@ -140,7 +146,10 @@ export const app = s.defineApp(
 				submittedUrl: s.string(),
 				provenance: s.string()
 			},
-			{ library: s.rel('libraries', 'libraryId'), document: s.rel('documents', 'documentId') }
+			{
+				library: s.rel('libraries', 'libraryId'),
+				document: s.rel('contentRepresentations', 'documentId')
+			}
 		),
 		libraries: s.table({ ownerId: s.uuid(), bootstrapVersion: s.string() }, {}),
 		storageOperations: s.table(
@@ -173,7 +182,7 @@ export const app = s.defineApp(
 				operation: s.rel('storageOperations', 'documentId')
 			}
 		),
-		documents: s.table(
+		contentRepresentations: s.table(
 			{
 				libraryId: s.uuid(),
 				operationId: s.uuid(),
