@@ -1,6 +1,6 @@
 # Clipper logical data model
 
-**Updated**: 2026-11-11. Logical model for the full accepted product, not a claim that every row below exists. Native schemas and owner policies are implemented in `apps/web/src/lib/backend/jazz`; PR #19 now includes independent note entities, linked revisions and note-keyed recovery drafts. Highlight entities/workflows, the note editor and AT Protocol integration remain unimplemented. See tasks.md and the handoff for other implementation evidence.
+**Updated**: 2026-11-12. Logical model for the full accepted product, not a claim that every row below exists. Native schemas and owner policies are implemented in `apps/web/src/lib/backend/jazz`; PR #19 now includes independent note entities, linked revisions and note-keyed recovery drafts. Highlight entities/workflows, the note editor and AT Protocol integration remain unimplemented. See tasks.md and the handoff for other implementation evidence.
 
 ## Identity and authorization
 
@@ -11,8 +11,7 @@ Every source-of-truth row carries or inherits an enforced `libraryId`/owner rela
 | Record | Important fields | Relationships / invariants |
 | --- | --- | --- |
 | Library | ID = authenticated account UUID, immutable owner ID and bootstrap format 1 | One canonical root per account; idempotently ensure only this immutable payload. Empty replicas never trigger another identity or random root ID; mutable data/migrations are separate. |
-| Document | ID, libraryId, optional url, savedAt, readingProgress, resumePosition?, status, favorite, attachment? | User-owned library item. Progress is required, initially 0, bounded to 0–1. One attachment at most; pending capture has none. Saved URL is optional for direct file uploads. |
-| Article attachment | ID, owner scope, title, author?, publishedAt?, siteName?, language?, finalUrl, verified canonicalUrl?, representationId | Captured source metadata/content; attached to a Document. No savedAt/capturedAt, progress, resume location or user organization. PDF/EPUB are future attachment kinds, not additional attachments on the same Document. |
+| Document | ID, libraryId, optional url, readingProgress, resumePosition?, status, favorite, captured article metadata?, representationId? | User-owned library item. Jazz `$createdAt` supplies its creation time. Progress is required, initially 0, bounded to 0–1. Captured article metadata and its optional immutable content representation live directly on the Document. Saved URL is optional for direct file uploads. |
 | SourceIdentity | ID, libraryId, normalized accepted URL key, documentId, evidence kind/time, redirect target? | Preserve raw observed aliases separately. Revalidate shortening destinations. Duplicate reconciling must retain annotations and captures. |
 | Representation | ID, documentId, kind source/reader, normalizationVersion, selectorVersion, textHash, textLengthCodePoints, native sanitized payload, heading/footnote metadata | A successful reader snapshot is fixed in MVP. Source representation may retain selectors/quote/provenance rather than a full duplicate raw page. No historical revision UI required. |
 | Asset | ID, documentId, sourceURL, mediaType, byteCount, width/height?, content fingerprint when needed, native byte payload, processingVersion | Content-addressed only within owner scope; reference tracking prevents deleting bytes needed by another retained record. |
@@ -26,7 +25,7 @@ Every source-of-truth row carries or inherits an enforced `libraryId`/owner rela
 | ReaderPreferences | ID, account, theme Light/Dark/System, fontFamily, fontSize, lineSpacing, readingWidth | Shared preferences with local cached value. No named presets, width matching, custom font upload, or per-device overrides. |
 
 
-## Accepted Document and attachment model (2026-11-11)
+## Accepted Document model (2026-11-12)
 
 This decision supersedes the earlier Article-as-primary-object and independent immutable-Document library-item descriptions. It is a target model; the native schema and migration are not implemented by this specification update.
 
@@ -37,7 +36,6 @@ type DocumentStatus =
   | { status: ReadingStatus }
   | {
       status: 'trashed'
-      trashedAt: string
       previousStatus: ReadingStatus
     }
 
@@ -45,40 +43,29 @@ type Document = DocumentStatus & {
   id: string
   libraryId: string
   url: string | null
-  savedAt: string
   readingProgress: number // Required, initially 0, bounded to 0–1
   resumePosition: ReadingPosition | null // User-owned; initially null
   favorite: boolean
-  attachment:
-    | { kind: 'article'; id: string }
-    | { kind: 'pdf'; id: string }
-    | { kind: 'epub'; id: string }
-    | null
-}
-
-type Article = {
-  id: string
-  libraryId: string
-  title: string
+  title: string | null
   author: string | null
   publishedAt: string | null
   siteName: string | null
   language: string | null
-  finalUrl: string
+  finalUrl: string | null
   canonicalUrl: string | null // Only when verified
-  representationId: string
+  representationId: string | null
 }
 ```
 
-`ReadingPosition` denotes a format-specific locator owned by the Document and referencing its attachment's representation. PDF/EPUB locator design and ingestion remain outside MVP. The Article's `libraryId` above expresses owner scope; direct storage versus inheritance through the Document remains an implementation choice. Separate entities do not authorize cross-user sharing.
+`representationId`, when present, points directly to the immutable captured content bundle. Its UUID is distinct from the user-owned Document ID because they identify different records. PDF/EPUB locator design and ingestion remain outside MVP.
 
-Saving creates the Document with progress 0 in the same owned transaction; all capture entry points must satisfy this invariant. Content attachment, failure, retry and re-clipping preserve Document identity, savedAt and existing progress. Required progress propagates to reader/library render contracts without optional fields or consumer `?? 0` defaults. A missing value on a known Document is an invariant failure, not a display fallback. Resume location may move backward while furthest progress remains unchanged.
+Saving creates the Document with progress 0 in the same owned transaction; all capture entry points must satisfy this invariant. Jazz `$createdAt` records when the Document was created. Content attachment, failure, retry and re-clipping preserve Document identity and existing progress. Required progress propagates to reader/library render contracts without optional fields or consumer `?? 0` defaults. A missing value on a known Document is an invariant failure, not a display fallback. Resume location may move backward while furthest progress remains unchanged.
 
-A trashed Document requires both trashedAt and previousStatus. Non-trashed variants omit these fields; restore returns to previousStatus and removes Trash-only fields. This union replaces separate logical Trash/status flags while keeping the user's previous reading status recoverable.
+A trashed Document requires previousStatus. Non-trashed variants omit it; restore returns to previousStatus and removes the Trash-only field. This union replaces separate logical Trash/status flags while keeping the user's previous reading status recoverable.
 
 Notes and highlights associate with the Document; anchors reference the attachment representation. The library lists Documents only, not independent attachment/content rows. Multiple formats of a book are separate Documents under this single-attachment decision. Source-identity deduplication must preserve user records and annotations; exact conversion of existing shared-content relationships remains a migration design gate.
 
-Migration must preserve existing progress from reader history, resume evidence, identities/links, saved times, organization and annotations; initialize genuinely unread items to 0; and account for legacy document-only items. A schema default of 0 alone is insufficient for already-read items. Qualify native migration, permissions, concurrent offline progress reconciliation and restart/reconnect behavior before claiming this target implemented. No schema migration, ownership relaxation or data reset is authorized by this documentation change.
+Migration must preserve existing progress from reader history, resume evidence, identities/links, organization and annotations; initialize genuinely unread items to 0; and account for legacy document-only items. A schema default of 0 alone is insufficient for already-read items. Jazz `$createdAt` records the creation time of each new Document row. Qualify native migration, permissions, concurrent offline progress reconciliation and restart/reconnect behavior before claiming this target implemented. No schema migration, ownership relaxation or data reset is authorized by this documentation change.
 
 ### Reading-progress cleanup plan (implementation deferred)
 

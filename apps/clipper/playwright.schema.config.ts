@@ -1,12 +1,14 @@
 import { defineConfig } from '@playwright/test'
 import base from './playwright.config.js'
+const port = process.env.CLIPPER_SCHEMA_PORT ?? '5180'
+const jazzPort = process.env.CLIPPER_SCHEMA_JAZZ_PORT ?? '5181'
 export default defineConfig({
 	...base,
 	testIgnore: [],
 	testMatch: 'schema-upgrade.spec.ts',
 	webServer: {
-		command: 'pnpm --filter @delightful-clipper/web dev --port 5180',
-		url: 'http://127.0.0.1:5180',
+		command: `pnpm --filter @delightful-clipper/web dev --port ${port}`,
+		url: `http://127.0.0.1:${port}`,
 		reuseExistingServer: false,
 		timeout: 60000,
 		env: {
@@ -17,7 +19,7 @@ export default defineConfig({
 			PUBLIC_DEBUG: 'true',
 			CAPTURE_GATEWAY_ENABLED: 'true',
 			PUBLIC_JAZZ_APP_ID: '2db98ae3-fcf1-41e8-b7d3-9818496bde60',
-			PUBLIC_JAZZ_SERVER_URL: 'http://127.0.0.1:5181/jazz'
+			PUBLIC_JAZZ_SERVER_URL: `http://127.0.0.1:${jazzPort}/jazz`
 		}
 	}
 })

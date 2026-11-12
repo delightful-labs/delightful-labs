@@ -29,7 +29,7 @@ async function owner(name: string) {
 	return { db, id, records: createLibraryRecords(db, id, () => true) }
 }
 
-it('stores an owner-scoped Document and links at most its selected Article attachment', async () => {
+it('stores an owner-scoped Document and its content representation reference', async () => {
 	const account = await owner('document-owner')
 	const contentId = crypto.randomUUID()
 	const saved = await toPromise(
@@ -47,59 +47,59 @@ it('stores an owner-scoped Document and links at most its selected Article attac
 	await Promise.all(saved.receipts.map((receipt) => receipt.global()))
 
 	const documentId = crypto.randomUUID()
-	const attachmentId = crypto.randomUUID()
 	await account.db
 		.insert(
 			app.libraryDocuments,
 			{
 				libraryId: account.id,
 				url: 'https://example.com/article',
-				savedAt: '2026-11-12T12:00:00.000Z',
 				readingProgress: 0,
 				status: 'inbox',
 				favorite: false,
-				articleAttachmentId: attachmentId
-			},
-			{ id: documentId }
-		)
-		.wait({ tier: 'global' })
-	await account.db
-		.insert(
-			app.articleAttachments,
-			{
-				libraryId: account.id,
-				documentId,
 				title: 'Captured article',
 				finalUrl: 'https://example.com/article',
 				representationId: contentId
 			},
-			{ id: attachmentId }
+			{ id: documentId }
 		)
 		.wait({ tier: 'global' })
 	const document = await account.db.one(app.libraryDocuments.where({ id: documentId }))
-	const attachment = await account.db.one(app.articleAttachments.where({ id: attachmentId }))
 	expect(document).toMatchObject({
 		libraryId: account.id,
 		readingProgress: 0,
-		articleAttachmentId: attachmentId
+		title: 'Captured article',
+		representationId: contentId
 	})
-	expect(attachment).toMatchObject({ documentId, representationId: contentId })
 })
 
-it('denies cross-library Document and attachment relationships', async () => {
+it('denies a Document that points to another library representation', async () => {
 	const ownerAccount = await owner('document-owner-scope')
 	const foreignAccount = await owner('document-foreign-scope')
+	const contentId = crypto.randomUUID()
+	const saved = await toPromise(
+		createActor(ownerAccount.records.saveMachine, {
+			input: {
+				operationId: contentId,
+				title: 'Private content',
+				text: 'Private content',
+				bytes: new TextEncoder().encode('Private content'),
+				mediaType: 'text/plain'
+			}
+		}).start()
+	)
+	if (saved.kind !== 'saved') throw new Error('Expected article representation')
+	await Promise.all(saved.receipts.map((receipt) => receipt.global()))
 	const documentId = crypto.randomUUID()
 	await expect(
 		foreignAccount.db
 			.insert(
 				app.libraryDocuments,
 				{
-					libraryId: ownerAccount.id,
-					savedAt: '2026-11-12T12:00:00.000Z',
+					libraryId: foreignAccount.id,
 					readingProgress: 0,
 					status: 'inbox',
-					favorite: false
+					favorite: false,
+					representationId: contentId
 				},
 				{ id: documentId }
 			)

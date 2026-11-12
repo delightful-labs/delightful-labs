@@ -113,36 +113,22 @@ export const app = s.defineApp(
 			{
 				libraryId: s.uuid(),
 				url: s.string().optional(),
-				savedAt: s.string(),
 				readingProgress: s.float(),
 				resumePosition: s.json(positionSchema.omit({ progress: true })).optional(),
 				status: s.enum(...documentStatusValues),
 				favorite: s.boolean(),
-				trashedAt: s.string().optional(),
 				previousStatus: s.enum(...documentReadingStatusValues).optional(),
-				articleAttachmentId: s.uuid().optional()
-			},
-			{
-				library: s.rel('libraries', 'libraryId'),
-				articleAttachment: s.rel('articleAttachments', 'articleAttachmentId')
-			}
-		),
-		articleAttachments: s.table(
-			{
-				libraryId: s.uuid(),
-				documentId: s.uuid(),
-				title: s.string(),
+				title: s.string().optional(),
 				author: s.string().optional(),
 				publishedAt: s.string().optional(),
 				siteName: s.string().optional(),
 				language: s.string().optional(),
-				finalUrl: s.string(),
+				finalUrl: s.string().optional(),
 				canonicalUrl: s.string().optional(),
-				representationId: s.uuid()
+				representationId: s.uuid().optional()
 			},
 			{
 				library: s.rel('libraries', 'libraryId'),
-				document: s.rel('libraryDocuments', 'documentId'),
 				representation: s.rel('documents', 'representationId')
 			}
 		),
