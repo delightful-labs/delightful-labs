@@ -1,3 +1,4 @@
+import { fixtureDocument, fixtureAttachment } from '../../capture/fixtures.test-support.js'
 import { Transaction } from 'jazz-tools'
 import { expect, it, vi } from 'vitest'
 import { createActor, toPromise, waitFor } from 'xstate'
@@ -9,7 +10,7 @@ import { createArticleAttachmentDomain } from './article-domains.js'
 import { createOrganizationDomain } from './organization-domain.js'
 import { createImagePublicationDomain } from './image-domains.js'
 import type { PreparedSave } from '../../contracts/storage.js'
-import type { Article, ArticleDraft } from '../../contracts/articles.js'
+import type { CaptureDocument, ArticleDraft } from '../../contracts/articles.js'
 import type { OrganizationDraft } from './organize.js'
 import type { ArticleImage, ReadyImageWrite } from '../../images/schema.js'
 function fixture() {
@@ -53,39 +54,14 @@ function fixture() {
 	}
 	return { order, receipt, leaf, run, commit, rollback, resource }
 }
-function content(articleLinked: boolean, hasSource = articleLinked): PreparedSave {
+function content(_linked: boolean, hasSource = true): PreparedSave {
 	return {
-		intent: { id: 'operation', libraryId: 'library', payloadHash: 'hash', createdAt: '2026-11-06' },
-		asset: {
-			id: 'asset',
-			libraryId: 'library',
-			operationId: 'operation',
-			mediaType: 'text/plain',
-			payload: new Uint8Array([1])
-		},
-		snapshot: {
-			id: 'snapshot',
-			libraryId: 'library',
-			documentId: 'document',
-			text: 'authored',
-			formatVersion: '1'
-		},
-		document: {
-			id: 'document',
-			libraryId: 'library',
-			operationId: 'operation',
-			snapshotId: 'snapshot',
-			assetId: 'asset',
-			title: 'Title',
-			originalSavedAt: '2026-11-06'
-		},
-		...(articleLinked ? { articleId: 'article' } : {}),
+		documentId: 'article',
+		intent: { id: 'operation', libraryId: 'library', payloadHash: 'hash' },
+		attachment: fixtureAttachment(),
 		...(hasSource
 			? {
 					source: {
-						id: 'document',
-						libraryId: 'library',
-						documentId: 'document',
 						submittedUrl: 'https://example.com/',
 						finalUrl: 'https://example.com/',
 						provenance: 'test'
@@ -94,19 +70,22 @@ function content(articleLinked: boolean, hasSource = articleLinked): PreparedSav
 			: {})
 	}
 }
-function article(operationId: string | null = null): Article {
-	return {
+function article(operationId: string | null = null): CaptureDocument {
+	return fixtureDocument({
+		readingProgress: 0,
+		resumePosition: null,
+		favorite: false,
+		status: 'inbox',
 		id: 'article',
 		libraryId: 'library',
-		url: 'https://example.com/',
-		originalSavedAt: '2026-11-06',
-		contentId: null,
+		sourceUrl: 'https://example.com/',
+		createdAt: new Date('2026-11-06'),
+		attachment: null,
 		operationId,
 		failure: null
-	}
+	})
 }
 it.each([
-	{ linked: false, exists: false, expected: ['intent'] },
 	{ linked: true, exists: false, expected: ['intent', 'create'] },
 	{ linked: true, exists: true, expected: ['intent', 'bind'] }
 ])(
@@ -138,38 +117,30 @@ it.each([
 		expect(f.commit).toHaveBeenCalledOnce()
 	}
 )
-it.each([
-	{ linked: false, source: false, expected: ['content'] },
-	{ linked: false, source: true, expected: ['content', 'source'] },
-	{ linked: true, source: true, expected: ['content', 'attach', 'source'] }
-])(
-	'publishes content, attachment and provenance in the selected order: $expected',
-	async ({ linked, source, expected }) => {
-		const f = fixture(),
-			draft = content(linked, source)
-		await f.run(
-			(spawn, input) =>
-				spawn(
-					createContentPublicationDomain({
-						read: async () => ({
-							draft,
-							operationId: 'operation',
-							intent: draft.intent,
-							article: linked ? article('operation') : null
-						}),
-						publishContent: f.leaf('content'),
-						attachContent: f.leaf('attach'),
-						publishSource: f.leaf('source'),
-						receipt: () => f.receipt
+it('publishes Article content before attaching it in the same selected transaction', async () => {
+	const f = fixture(),
+		draft = content(true)
+	await f.run(
+		(spawn, input) =>
+			spawn(
+				createContentPublicationDomain({
+					read: async () => ({
+						draft,
+						operationId: 'operation',
+						intent: draft.intent,
+						article: article('operation')
 					}),
-					{ input }
-				),
-			draft
-		)
-		expect(f.order).toEqual(expected)
-		expect(f.receipt.global).not.toHaveBeenCalled()
-	}
-)
+					publishContent: f.leaf('content'),
+					attachContent: f.leaf('attach'),
+					receipt: () => f.receipt
+				}),
+				{ input }
+			),
+		draft
+	)
+	expect(f.order).toEqual(['content', 'attach'])
+	expect(f.receipt.global).not.toHaveBeenCalled()
+})
 it('blocks an existing intent on read completion before issuing any mutations', async () => {
 	const f = fixture(),
 		draft = content(true)
@@ -212,7 +183,6 @@ it('blocks mismatched publication facts on read completion before issuing any mu
 					}),
 					publishContent: f.leaf('content'),
 					attachContent: f.leaf('attach'),
-					publishSource: f.leaf('source'),
 					receipt: () => f.receipt
 				}),
 				{ input }
@@ -224,7 +194,7 @@ it('blocks mismatched publication facts on read completion before issuing any mu
 	expect(f.commit).not.toHaveBeenCalled()
 	expect(f.rollback).toHaveBeenCalledOnce()
 })
-it.each(['content', 'attach', 'source'] as const)(
+it.each(['content', 'attach'] as const)(
 	'rolls back a failed %s action without running later actions or completing the child',
 	async (failure) => {
 		const f = fixture(),
@@ -246,14 +216,13 @@ it.each(['content', 'attach', 'source'] as const)(
 						}),
 						publishContent: mutation('content'),
 						attachContent: mutation('attach'),
-						publishSource: mutation('source'),
 						receipt
 					}),
 					{ input }
 				),
 			draft
 		)
-		const sequence = ['content', 'attach', 'source']
+		const sequence = ['content', 'attach']
 		expect(f.order).toEqual(sequence.slice(0, sequence.indexOf(failure) + 1))
 		expect(receipt).not.toHaveBeenCalled()
 		expect(f.commit).not.toHaveBeenCalled()
@@ -299,7 +268,6 @@ it('returns a thrown native mutation to DLF without issuing attachment or proven
 						throw new Error('native staging failed')
 					},
 					attachContent: f.leaf('attach'),
-					publishSource: f.leaf('source'),
 					receipt: () => f.receipt
 				}),
 				{ input }
@@ -311,39 +279,27 @@ it('returns a thrown native mutation to DLF without issuing attachment or proven
 	expect(f.commit).not.toHaveBeenCalled()
 	expect(f.rollback).toHaveBeenCalledOnce()
 })
-for (const parent of ['article', 'document'] as const) {
-	for (const kind of ['scalar', 'tag'] as const) {
-		it(`selects exactly the ${kind} ${parent} organization write`, async () => {
-			const f = fixture()
-			const draft: OrganizationDraft =
-				kind === 'tag'
-					? { id: 'article', field: 'tag', value: 'Work', assigned: true, operations: [] }
-					: { id: 'article', field: 'favorite', value: true, operations: [] }
-			await f.run(
-				(spawn, input) =>
-					spawn(
-						createOrganizationDomain({
-							read: async () => ({
-								draft,
-								operationId: 'operation',
-								article: parent === 'article' ? {} : null,
-								document: parent === 'document' ? {} : null,
-								parents: ['observed']
-							}),
-							insertArticle: f.leaf('scalar-article'),
-							insertDocument: f.leaf('scalar-document'),
-							insertTagArticle: f.leaf('tag-article'),
-							insertTagDocument: f.leaf('tag-document'),
-							receipt: () => f.receipt
-						}),
-						{ input }
-					),
-				draft
-			)
-			expect(f.order).toEqual([`${kind}-${parent}`])
-		})
-	}
-}
+it.each(['scalar', 'tag'])('selects the %s mutation on the Document parent', async (kind) => {
+	const f = fixture(),
+		draft: OrganizationDraft =
+			kind === 'tag'
+				? { id: 'article', field: 'tag', value: 'Work', assigned: true, operations: [] }
+				: { id: 'article', field: 'favorite', value: true, operations: [] }
+	await f.run(
+		(spawn, input) =>
+			spawn(
+				createOrganizationDomain({
+					read: async () => ({ draft, operationId: 'operation', document: {}, parents: [] }),
+					insertOrganization: f.leaf('scalar'),
+					insertTag: f.leaf('tag'),
+					receipt: () => f.receipt
+				}),
+				{ input }
+			),
+		draft
+	)
+	expect(f.order).toEqual([kind])
+})
 it('blocks a missing organization parent before issuing any mutation', async () => {
 	const f = fixture(),
 		draft: OrganizationDraft = { id: 'article', field: 'favorite', value: true, operations: [] }
@@ -354,14 +310,12 @@ it('blocks a missing organization parent before issuing any mutation', async () 
 					read: async () => ({
 						draft,
 						operationId: 'operation',
-						article: null,
 						document: null,
 						parents: []
 					}),
-					insertArticle: f.leaf('article'),
-					insertDocument: f.leaf('document'),
-					insertTagArticle: f.leaf('tag-article'),
-					insertTagDocument: f.leaf('tag-document'),
+
+					insertOrganization: f.leaf('scalar'),
+					insertTag: f.leaf('tag'),
 					receipt: () => f.receipt
 				}),
 				{ input }
@@ -377,7 +331,7 @@ it('uses the prepared image facts and stages intent, bytes and publication in or
 	const image: ArticleImage = {
 		id: 'image',
 		libraryId: 'library',
-		documentId: 'document',
+		articleId: 'document',
 		sourceUrl: 'https://example.com/image.png',
 		status: 'pending',
 		assetId: null,

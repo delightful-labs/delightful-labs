@@ -75,10 +75,7 @@ export function testLibraryCapability(
 		spawnSave: (spawn: SaveSpawner, request: SaveArticleRequest) => spawn(save, { input: request }),
 		read: {
 			isCurrent: () => true,
-			document: async () => null,
-			snapshot: async () => null,
-			asset: async () => null,
-			source: async () => null
+			document: async () => null
 		},
 		subscribe: () => () => {},
 		worker: (report) => ({

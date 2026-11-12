@@ -6,7 +6,7 @@
 	import ThemeSettings from './ThemeSettings.svelte'
 	import FontSettings from './FontSettings.svelte'
 	import ReadingProgress from './ReadingProgress.svelte'
-	import type { ReaderChange, ReaderPreferences } from '../../reader/schema.js'
+	import type { ReaderPreferenceChange, ReaderPreferences } from '../../reader/schema.js'
 	let {
 		oncontents,
 		headings,
@@ -21,10 +21,10 @@
 		oncontents: () => void
 		headings: ReaderHeading[]
 		preferences: ReaderPreferences
-		progress: number | undefined
+		progress: number
 		sourceUrl: string | undefined
 		enabled: boolean
-		onchange: (change: ReaderChange) => void
+		onchange: (change: ReaderPreferenceChange) => void
 		onfocus: () => void
 		focusId: string
 	} = $props()

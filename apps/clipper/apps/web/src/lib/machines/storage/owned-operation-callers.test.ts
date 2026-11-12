@@ -1,3 +1,4 @@
+import { fixtureDocument, fixtureAttachment } from '../../capture/fixtures.test-support.js'
 import { createActor, createAsyncLogic, setup, toPromise, types } from 'xstate'
 import { expect, it, vi } from 'vitest'
 import type {
@@ -66,7 +67,7 @@ function request(): SaveRequest {
 		text: 'Prepared content',
 		bytes: new Uint8Array([1]),
 		mediaType: 'text/plain'
-	}
+	} satisfies SaveRequest
 }
 
 it('passes the prepared identity and payload to both actual intent/publication children in order', async () => {
@@ -120,15 +121,19 @@ it.each(['ensure', 'attach', 'content'] as const)(
 	async (selected) => {
 		const content = request()
 		const draft: ArticleDraft = {
-			article: {
+			article: fixtureDocument({
+				readingProgress: 0,
+				resumePosition: null,
+				favorite: false,
+				status: 'inbox',
 				id: 'article',
 				libraryId: 'library',
-				url: 'https://example.com/',
-				originalSavedAt: '2026-11-04',
-				contentId: null,
+				sourceUrl: 'https://example.com/',
+				createdAt: new Date('2026-11-04'),
+				attachment: null,
 				operationId: null,
 				failure: null
-			},
+			}),
 			target: 'content',
 			...(selected === 'content' ? { content } : {})
 		}
@@ -151,23 +156,13 @@ it.each(['ensure', 'attach', 'content'] as const)(
 				prepare: async () => draft,
 				read: async () => null,
 				document: async () =>
-					selected === 'attach'
-						? {
-								id: 'content',
-								libraryId: 'library',
-								operationId: 'original',
-								snapshotId: 'snapshot',
-								assetId: 'asset',
-								title: 'Title',
-								originalSavedAt: '2026-11-04'
-							}
-						: null,
+					selected === 'attach' ? fixtureAttachment({ id: 'content', title: 'Title' }) : null,
 				intent: async () => false,
 				ensure: (spawn, input) => spawn(ensure.logic, { input }),
 				attach: (spawn, input) => spawn(attach.logic, { input }),
 				content: (spawn, input) => spawn(save.logic, { input })
 			}),
-			{ input: { url: draft.article.url } }
+			{ input: { url: draft.article.sourceUrl ?? 'https://example.com/' } }
 		).start()
 		const result = await toPromise(actor)
 		expect(ensure.inputs.length + attach.inputs.length + save.inputs.length).toBe(1)

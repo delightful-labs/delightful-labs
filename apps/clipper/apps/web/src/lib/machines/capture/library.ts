@@ -1,3 +1,4 @@
+import { documentReadingProgress } from '../../reader/schema.js'
 import type { EventPayload } from '../events.js'
 import { types, createCallbackLogic, setup, matchesState, type SnapshotFrom } from 'xstate'
 import { imageQueueMachine } from '../../images/queue-machine.js'
@@ -88,7 +89,7 @@ function hasWatchableReceipts(result: ArticleSaveResult) {
 function shouldReopenReader(context: Context, rows: LibraryArticle[]) {
 	if (!context.readerId) return false
 	if (context.reader?.kind === 'available') return false
-	return rows.some((row) => row.id === context.readerId && !!row.contentId)
+	return rows.some((row) => row.id === context.readerId && !!row.readable)
 }
 function isValidSourceUrl(url: string) {
 	try {
@@ -105,9 +106,9 @@ type Meta = {
 	priority?: number
 	message?: (c: Context) => WorkflowMessage
 }
-function organizationStatuses(context: Context, articleId: string) {
+function organizationStatuses(context: Context, documentId: string) {
 	return Object.entries(context.organizationOperations)
-		.filter(([, id]) => id === articleId)
+		.filter(([, id]) => id === documentId)
 		.map(([operationId]) => context.sync[operationId])
 }
 const actors = {
@@ -236,14 +237,14 @@ export const libraryMachine = setup({
 							([id, message]) =>
 								!(
 									message.variant === 'error' &&
-									event.rows.some((r) => r.id === id && r.contentId && !r.failure)
+									event.rows.some((r) => r.id === id && r.readable && !r.failure)
 								)
 						)
 					),
 					listFailed: false,
 					captureReady:
 						context.captureReady ||
-						event.rows.some((r) => r.id === context.captureId && !!r.contentId)
+						event.rows.some((r) => r.id === context.captureId && !!r.readable)
 				}
 			}
 		}
@@ -324,7 +325,18 @@ export const libraryMachine = setup({
 						matchesState({ running: { imageLifecycle: 'active' } }, args.value)
 					) {
 						enq.sendTo('readerExperience', event.event)
-						enq.sendTo('images', event.event)
+						if (event.event.type === 'ATTACH_SURFACE') {
+							if (
+								context.reader?.kind === 'available' &&
+								context.reader.document.id === event.event.documentId
+							)
+								enq.sendTo('images', {
+									type: 'ATTACH_ARTICLE',
+									articleId: context.reader.attachment.id,
+									sources: event.event.sources
+								})
+						} else if (event.event.type !== 'ATTACH' && event.event.type !== 'DOCUMENTS')
+							enq.sendTo('images', event.event)
 						return {}
 					}
 					if (
@@ -1293,9 +1305,7 @@ export function selectLibraryCaptureView(snapshot: LibrarySnapshot | undefined) 
 	const c = snapshot?.context
 	const meta = visible && snapshot ? Object.values(snapshot.getMeta()) : []
 	const captured =
-		visible && c?.captureId
-			? c.rows.find((row) => row.id === c.captureId || row.contentId === c.captureId)
-			: undefined
+		visible && c?.captureId ? c.rows.find((row) => row.id === c.captureId) : undefined
 	return {
 		restoreCaptureId: captured?.trashed ? captured.id : undefined,
 		canOrganize:
@@ -1329,9 +1339,9 @@ function selectRows(
 	const view = {
 		rows: filtered.map((row) => ({
 			...row,
-			readingProgress: row.contentId ? progress[row.contentId] : undefined
+			readingProgress: documentReadingProgress(row, progress)
 		})),
-		readable: Object.fromEntries(c.rows.map((row) => [row.id, !!row.contentId]))
+		readable: Object.fromEntries(c.rows.map((row) => [row.id, !!row.readable]))
 	}
 	rowViews.set(c.rows, { inputs, view })
 	return view
@@ -1350,9 +1360,7 @@ export function selectLibraryView(
 	const forwardedState = meta.find((state) => state?.message)
 	const search = selectSearchView(visible ? snapshot.children.search?.getSnapshot() : undefined)
 	const resultIds = search.query === c?.query ? search.ids : undefined
-	const captured = visible
-		? c.rows.find((row) => row.id === c.captureId || row.contentId === c.captureId)
-		: undefined
+	const captured = visible ? c.rows.find((row) => row.id === c.captureId) : undefined
 
 	const readerExperience = selectLibraryReaderExperience(snapshot)
 	const { rows, readable } = visible

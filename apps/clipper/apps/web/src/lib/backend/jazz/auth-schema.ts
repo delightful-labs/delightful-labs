@@ -87,7 +87,7 @@ export const schema = {
 }
 
 type AppSchema = s.Schema<typeof schema>
-// Never deployed on its own: the app that spreads `schema` ships the migrations.
+// Never deployed on its own: the application owns the complete current schema.
 export const app: s.App<AppSchema> = s.defineApp(schema, { migrations: 'none' })
 export const wasmSchema = app.wasmSchema
 

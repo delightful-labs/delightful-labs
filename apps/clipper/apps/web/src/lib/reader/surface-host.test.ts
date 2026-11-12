@@ -27,7 +27,7 @@ it.each([false, true])(
 		data.port1.onmessage = ({ data }) => replies.push(data)
 		const surface = serveReaderSurface(data.port2, dom)
 		try {
-			data.port1.postMessage({ type: 'VIEWPORT_OPEN', attachmentId: crypto.randomUUID() })
+			data.port1.postMessage({ type: 'VIEWPORT_OPEN', surfaceId: crypto.randomUUID() })
 			if (fail) {
 				await vi.waitFor(() =>
 					expect(replies.filter((reply) => reply.type === 'VIEWPORT_FAILED')).toHaveLength(1)

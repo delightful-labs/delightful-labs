@@ -1,3 +1,4 @@
+import { readingProgressSchema, documentReadingProgress } from '../../reader/schema.js'
 import { selectAtprotoView } from '../../machines/runtime/atproto.js'
 import type { LibraryArticle } from '../../contracts/articles.js'
 import type { SnapshotFrom } from 'xstate'
@@ -27,31 +28,34 @@ function projectRuntimePayload(snapshot: SnapshotFrom<typeof workerHostMachine>)
 	const context = library?.context
 	const tagArticle = context?.rows.find((row) => row.id === snapshot.context.tagArticleId)
 	const content = context?.reader
+	const currentDocument = content?.kind === 'available' ? content.document : undefined
+	const currentProgress = currentDocument
+		? documentReadingProgress(currentDocument, view.readerExperience.progress)
+		: undefined
 	const reader =
 		content?.kind === 'available'
 			? {
 					kind: content.kind,
-					document: { title: content.document.title, snapshotId: content.document.snapshotId },
+					progress: readingProgressSchema.parse(currentProgress),
+					document: {
+						id: content.document.id,
+						title: content.attachment.title
+					},
 					text: content.text,
 					asset: content.asset
 				}
 			: content
-	const article = context?.rows.find(
-		(row) => row.id === context.readerId || row.contentId === context.readerId
-	)
+	const article = context?.rows.find((row) => row.id === context.readerId)
 	let sourceUrl: string | undefined
 	try {
 		if (content?.kind === 'available' && content.source)
-			sourceUrl = normalizedSource(content.source.finalUrl)
+			sourceUrl = normalizedSource(content.source.resolvedUrl)
 	} catch {
 		/* rejected sources do not become links */
 	}
 	const { ids: _ids, ...search } = view.search
 	const { positions: _positions, progress: _progress, ...experience } = view.readerExperience
-	const progress =
-		reader?.kind === 'available'
-			? view.readerExperience.progress[reader.document.snapshotId]
-			: undefined
+
 	return {
 		scope: snapshot.context.scope,
 		account: selectApplicationView(application, true),
@@ -71,9 +75,7 @@ function projectRuntimePayload(snapshot: SnapshotFrom<typeof workerHostMachine>)
 						),
 						search,
 						readerExperience: {
-							...experience,
-							progress:
-								reader?.kind === 'available' ? { [reader.document.snapshotId]: progress } : {}
+							...experience
 						}
 					},
 					filters: {
@@ -84,6 +86,8 @@ function projectRuntimePayload(snapshot: SnapshotFrom<typeof workerHostMachine>)
 					},
 					canAdd: library?.can({ type: 'ADD', url: '' }) === true,
 					reader,
+					// Progress changes independently of the immutable reader payload revision.
+					readerProgress: currentProgress,
 					readerRevision: readerRevision(content),
 					tagArticle: tagArticle ? rowView(tagArticle) : undefined,
 					article: article

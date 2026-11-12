@@ -1,10 +1,10 @@
-export type DraftStores = { notes: IDBObjectStore; legacy: IDBObjectStore }
+export type DraftStores = { notes: IDBObjectStore }
 
 export function openDraftDatabase(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const request = indexedDB.open('delightful-clipper-note-drafts-v1', 2)
+		const request = indexedDB.open('delightful-clipper-note-drafts', 1)
 		request.onupgradeneeded = () => {
-			for (const name of ['drafts', 'noteDrafts']) {
+			for (const name of ['noteDrafts']) {
 				if (request.result.objectStoreNames.contains(name)) continue
 				const store = request.result.createObjectStore(name, { keyPath: 'key' })
 				store.createIndex('target', 'target')
@@ -26,18 +26,15 @@ export async function draftTransaction<T>(
 	const db = await openDraftDatabase()
 	try {
 		return await new Promise<T>((resolve, reject) => {
-			const tx = db.transaction(['noteDrafts', 'drafts'], mode, { durability: 'strict' })
+			const tx = db.transaction(['noteDrafts'], mode, { durability: 'strict' })
 			let value: T
 			tx.oncomplete = () => resolve(value)
 			tx.onerror = () => reject(new Error('Note draft transaction failed'))
 			tx.onabort = () => reject(new Error('Note draft transaction aborted'))
 			try {
-				operation(
-					{ notes: tx.objectStore('noteDrafts'), legacy: tx.objectStore('drafts') },
-					(result) => {
-						value = result
-					}
-				)
+				operation({ notes: tx.objectStore('noteDrafts') }, (result) => {
+					value = result
+				})
 			} catch {
 				tx.abort()
 				reject(new Error('Invalid note draft data'))

@@ -4,7 +4,7 @@ import type { SearchDocument } from './schema.js'
 export type { SearchDocument } from './schema.js'
 export const searchOptions = {
 	fields: ['title', 'url', 'text', 'tags'],
-	storeFields: ['originalSavedAt'],
+	storeFields: ['createdAt'],
 	processTerm: (term: string) => caseFold(term.normalize('NFC')),
 	searchOptions: {
 		combineWith: 'AND' as const,
@@ -28,7 +28,7 @@ export function searchIndex(index: MiniSearch<SearchDocument>, query: string): s
 		.sort(
 			(a, b) =>
 				b.score - a.score ||
-				String(b.originalSavedAt).localeCompare(String(a.originalSavedAt)) ||
+				String(b.createdAt).localeCompare(String(a.createdAt)) ||
 				String(a.id).localeCompare(String(b.id))
 		)
 		.map((result) => String(result.id))

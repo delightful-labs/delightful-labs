@@ -1,16 +1,22 @@
-# Document and attachment model — approved design, implementation pending
+# Document and attachment model — implementation and qualification
 
 The [accepted model](data-model.md#accepted-document-model-2026-11-12) supersedes
-historical entity descriptions below. This is a specification checkpoint; the
-in-progress runtime conversion is not complete.
+historical entity descriptions below. The runtime conversion is implemented and qualified on the user-requested main checkout.
+Historical delivery evidence below is separate.
 
-- [ ] Implement Document-owned saved-item state and native Jazz attachment relationships.
-- [ ] Keep Article metadata/content on Article and use reusable library-scoped Site/favicon relationships.
-- [ ] Preserve sourceUrl on Document; use resolvedUrl/canonicalUrl capture evidence on attachments.
-- [ ] Use Date for ReadingPosition.interactedAt with explicit serialization boundaries.
-- [ ] Initialize required progress to 0 in every creation transaction and preserve it through attachment/retry.
-- [ ] Qualify identical library/reader progress and concurrent offline furthest-progress reconciliation.
-- [ ] Use a fresh development schema; remove historical migrations/snapshots without legacy conversion or silent startup erasure.
+- [x] Implement Document-owned saved-item state and native Jazz attachment relationships.
+- [x] Keep Article metadata/content on Article and use reusable library-scoped Site/favicon relationships.
+- [x] Preserve sourceUrl on Document; use resolvedUrl/canonicalUrl capture evidence on attachments.
+- [x] Use Date for ReadingPosition.interactedAt with explicit serialization boundaries.
+- [x] Initialize required progress to 0 in every creation transaction and preserve it through attachment/retry.
+- [x] Qualify identical library/reader progress and concurrent offline furthest-progress reconciliation.
+- [x] Use a fresh development schema; remove historical migrations/snapshots without legacy conversion or silent startup erasure.
+
+Final validation on Node 24.22.2 / pnpm 10.28.0: strict web/extension types, lint,
+formatting, vendor integrity, 891 unit/native tests, 61 web browser cases, 8 production
+offline cases, 32 worker cases, 2 sample-data cases and 12 packaged-extension cases pass.
+Both production shell builds and the extension build pass. The fresh baseline has no
+legacy migration path or automatic database erasure.
 
 # Offline article images — current batch
 

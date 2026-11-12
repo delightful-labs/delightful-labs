@@ -26,7 +26,7 @@ export type ImageView = {
 type Input = {
 	reportTo: ActorRef<Snapshot<unknown>, ImageViewReport>
 	capability: Pick<ImageCapability, 'isCurrent' | 'subscribeImage' | 'asset'>
-	documentId: string
+	articleId: string
 	sourceUrl: string
 }
 type Context = Input & {
@@ -43,13 +43,13 @@ type Event =
 	| { type: 'URL'; url: string }
 export type ImageViewReport = {
 	type: 'IMAGE_VIEW'
-	documentId: string
+	articleId: string
 	sourceUrl: string
 	view: ImageView
 }
 const observe = createCallbackLogic<Event, Input>(({ input, sendBack }) =>
 	input.capability.subscribeImage(
-		input.documentId,
+		input.articleId,
 		input.sourceUrl,
 		(rows) => sendBack({ type: 'ROWS', rows }),
 		() => sendBack({ type: 'FAILED' })
@@ -155,7 +155,7 @@ const report =
 	({ context }: { context: Context }, enq: EnqueueObject<Event, never>) => {
 		enq.sendTo(context.reportTo, {
 			type: 'IMAGE_VIEW',
-			documentId: context.documentId,
+			articleId: context.articleId,
 			sourceUrl: context.sourceUrl,
 			view: { ...view(context), ...(context.row ? { id: context.row.id } : {}) }
 		} satisfies ImageViewReport)
@@ -301,7 +301,7 @@ export const imageViewMachine = model.createMachine({
 							entry: ({ context }, enq) => {
 								enq.sendTo(context.reportTo, {
 									type: 'IMAGE_VIEW',
-									documentId: context.documentId,
+									articleId: context.articleId,
 									sourceUrl: context.sourceUrl,
 									view: {
 										status: 'ready',

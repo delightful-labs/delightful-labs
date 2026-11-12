@@ -1,3 +1,4 @@
+import type { SaveRequest } from '../../contracts/storage.js'
 import { policySchema } from './schema-permissions.test-support.js'
 import { beforeAll, afterAll, expect, it } from 'vitest'
 import { createActor, toPromise } from 'xstate'
@@ -30,7 +31,7 @@ async function owner(name: string) {
 	)
 	if (result.kind !== 'saved') throw new Error('Expected article')
 	await Promise.all(result.receipts.map((r) => r.global()))
-	return { db, id, records, articleId: result.operationId }
+	return { db, id, records, documentId: result.operationId }
 }
 it('persists desired values in native transactions, preserves other fields, and denies foreign reads/writes and edits to history', async () => {
 	const a = await owner('organization-owner'),
@@ -43,19 +44,20 @@ it('persists desired values in native transactions, preserves other fields, and 
 		if (result.kind !== 'saved') throw new Error('Expected persisted organization')
 		await Promise.all(result.receipts.map((r) => r.global()))
 	}
-	await change({ id: a.articleId, field: 'favorite', value: true })
-	await change({ id: a.articleId, field: 'status', value: 'later' })
-	await change({ id: a.articleId, field: 'status', value: 'archive' })
+	await change({ id: a.documentId, field: 'favorite', value: true })
+	await change({ id: a.documentId, field: 'status', value: 'later' })
+	await change({ id: a.documentId, field: 'status', value: 'archive' })
 	const rows = await a.db.all(app.organizationOperations.where({ libraryId: a.id }))
 	expect(rows).toHaveLength(3)
 	const projected = projectOrganization(
 		[
 			{
-				id: a.articleId,
+				readingProgress: 0,
+				id: a.documentId,
 				title: 'article',
 				url: null,
-				contentId: null,
-				originalSavedAt: '',
+				readable: false,
+				createdAt: '',
 				failure: null
 			}
 		],
@@ -69,8 +71,8 @@ it('persists desired values in native transactions, preserves other fields, and 
 		b.db
 			.insert(app.organizationOperations, {
 				libraryId: a.id,
-				articleId: a.articleId,
-				documentId: null,
+				documentId: a.documentId,
+
 				field: 'favorite',
 				value: 'false',
 				parents: '[]'
@@ -84,8 +86,8 @@ it('persists desired values in native transactions, preserves other fields, and 
 		a.db
 			.insert(app.organizationOperations, {
 				libraryId: a.id,
-				articleId: b.articleId,
-				documentId: null,
+				documentId: b.documentId,
+
 				field: 'status',
 				value: 'later',
 				parents: '[]'
@@ -96,8 +98,8 @@ it('persists desired values in native transactions, preserves other fields, and 
 		a.db
 			.insert(app.organizationOperations, {
 				libraryId: a.id,
-				articleId: a.articleId,
-				documentId: null,
+				documentId: a.documentId,
+
 				field: 'status',
 				value: 'trash',
 				parents: '[]'
@@ -124,11 +126,11 @@ it('organizes a legacy document through its native reference without altering th
 		text: 'Immutable legacy text',
 		bytes: new TextEncoder().encode('Immutable legacy text'),
 		mediaType: 'text/plain'
-	}
+	} satisfies SaveRequest
 	const saved = await toPromise(createActor(a.records.saveMachine, { input }).start())
 	if (saved.kind !== 'saved') throw new Error('Expected legacy document')
 	await Promise.all(saved.receipts.map((r) => r.global()))
-	const before = await a.db.one(app.contentRepresentations.where({ id }))
+	const before = await a.db.one(app.articles.where({ id }))
 	const result = await toPromise(
 		createActor(a.records.articles.organization.machine, {
 			input: { id, field: 'status', value: 'archive' }
@@ -138,11 +140,11 @@ it('organizes a legacy document through its native reference without altering th
 	if (result.kind !== 'saved') throw new Error('Expected organization')
 	await Promise.all(result.receipts.map((r) => r.global()))
 	expect(await a.db.all(app.organizationOperations.where({ libraryId: a.id }))).toEqual([
-		expect.objectContaining({ articleId: null, documentId: id, field: 'status', value: 'archive' })
+		expect.objectContaining({ documentId: id, field: 'status', value: 'archive' })
 	])
-	expect(await a.db.one(app.contentRepresentations.where({ id }))).toEqual(before)
+	expect(await a.db.one(app.articles.where({ id }))).toEqual(before)
 	const row = await a.db.one(app.organizationOperations.where({ libraryId: a.id }))
-	expect(organizationOperationSchema.parse(row)).toMatchObject({ articleId: id, value: 'archive' })
+	expect(organizationOperationSchema.parse(row)).toMatchObject({ documentId: id, value: 'archive' })
 })
 
 it('persists canonical tag memberships and independent Trash, enforcing private immutable history', async () => {
@@ -156,9 +158,9 @@ it('persists canonical tag memberships and independent Trash, enforcing private 
 		if (result.kind !== 'saved') throw new Error('Expected saved change')
 		await Promise.all(result.receipts.map((receipt) => receipt.global()))
 	}
-	await change({ id: a.articleId, field: 'tag', value: 'Straße', assigned: true })
-	await change({ id: a.articleId, field: 'tag', value: 'STRASSE', assigned: false })
-	await change({ id: a.articleId, field: 'trashed', value: true })
+	await change({ id: a.documentId, field: 'tag', value: 'Straße', assigned: true })
+	await change({ id: a.documentId, field: 'tag', value: 'STRASSE', assigned: false })
+	await change({ id: a.documentId, field: 'trashed', value: true })
 	const tags = await a.db.all(app.tagOperations.where({ libraryId: a.id }))
 	expect(tags).toHaveLength(2)
 	expect(new Set(tags.map((tag) => tag.key)).size).toBe(1)
@@ -175,8 +177,8 @@ it('persists canonical tag memberships and independent Trash, enforcing private 
 		b.db
 			.insert(app.tagOperations, {
 				libraryId: b.id,
-				articleId: a.articleId,
-				documentId: null,
+				documentId: a.documentId,
+
 				key: removed.key,
 				name: removed.name,
 				assigned: true,
@@ -184,16 +186,17 @@ it('persists canonical tag memberships and independent Trash, enforcing private 
 			})
 			.wait({ tier: 'global' })
 	).rejects.toThrow(/denied|rejected/i)
-	await change({ id: a.articleId, field: 'trashed', value: false })
+	await change({ id: a.documentId, field: 'trashed', value: false })
 	const rows = await a.db.all(app.organizationOperations.where({ libraryId: a.id }))
 	const projected = projectOrganization(
 		[
 			{
-				id: a.articleId,
+				readingProgress: 0,
+				id: a.documentId,
 				title: 'URL',
 				url: null,
-				contentId: null,
-				originalSavedAt: '',
+				readable: false,
+				createdAt: '',
 				failure: null
 			}
 		],

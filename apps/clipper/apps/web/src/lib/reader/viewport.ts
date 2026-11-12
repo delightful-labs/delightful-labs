@@ -1,12 +1,12 @@
 import type { EventPayload } from '../machines/events.js'
 import { types, createCallbackLogic, setup } from 'xstate'
 
-import type { ReadingPosition } from './schema.js'
-import { positionSchema } from './schema.js'
+import type { ResumePosition, ReadingMeasurement } from './schema.js'
+import { readingMeasurementSchema } from './schema.js'
 import {
 	readingTextIndex,
 	rangeAt,
-	positionAt,
+	measurementAt,
 	quoteMatches,
 	sameReadingLocation
 } from './anchors.js'
@@ -16,8 +16,8 @@ import type { ReaderExperienceEvent } from '../machines/reader/experience.js'
 export type ViewportElements = { root: HTMLElement; scroller: HTMLElement }
 type ViewportReport = Extract<ReaderExperienceEvent, { type: 'MEASURE' | 'VIEWPORT_FAILED' }>
 type Input = ViewportElements & {
-	attachmentId: string
-	position: ReadingPosition | undefined
+	surfaceId: string
+	position: ResumePosition | undefined
 	report?: (event: ViewportReport) => void
 }
 type FrameEvent = { type: 'LAYOUT_FRAME' | 'PAINT_FRAME' | 'MEASURE_FRAME' }
@@ -39,9 +39,10 @@ type Event =
 	| { type: 'OBSERVER_CREATED'; observer: ResizeObserver }
 	| { type: 'ANCHOR_LOCATED'; anchor: DOMRect | undefined }
 	| { type: 'INPUT'; event: globalThis.Event }
-	| { type: 'MEASURED' | 'FINAL_MEASURED'; position: ReadingPosition | undefined }
+	| { type: 'MEASURED' | 'FINAL_MEASURED'; position: ReadingMeasurement | undefined }
 type Size = { width: number; height: number }
 type Context = Input & {
+	measurement: ReadingMeasurement | undefined
 	index: ReadingTextIndex
 	targets: HTMLElement[]
 	sizes: Size[]
@@ -49,9 +50,9 @@ type Context = Input & {
 	observer: ResizeObserver | undefined
 	nextSizes: Size[]
 	anchor: DOMRect | undefined
-	finalPosition: ReadingPosition | undefined
+	finalPosition: ReadingMeasurement | undefined
 }
-export type ViewportResult = { position: ReadingPosition | undefined }
+export type ViewportResult = { position: ReadingMeasurement | undefined }
 
 function sizes(targets: readonly HTMLElement[]) {
 	return targets.map((target) => {
@@ -82,7 +83,7 @@ function measurePosition({ root, scroller, index }: Context) {
 		else high = middle
 	}
 	const end = root.getBoundingClientRect().bottom <= scroller.getBoundingClientRect().bottom + 2
-	return positionAt(index, low, end ? 1 : low / index.points.length)
+	return measurementAt(index, low, end)
 }
 function matchingAnchor({ index, position }: Context) {
 	if (!position || !quoteMatches(index, position)) return undefined
@@ -231,8 +232,8 @@ export const viewportMachine = setup({
 			!!params.anchor?.height,
 		newPosition: ({ context, event }: { context: Context; event: Event }) =>
 			event.type === 'MEASURED' &&
-			positionSchema.safeParse(event.position).success &&
-			!sameReadingLocation(context.position, required(event.position))
+			readingMeasurementSchema.safeParse(event.position).success &&
+			!sameReadingLocation(context.measurement, required(event.position))
 	}
 }).createMachine({
 	id: 'reader-viewport',
@@ -251,7 +252,8 @@ export const viewportMachine = setup({
 			observer: undefined,
 			nextSizes: [],
 			anchor: undefined,
-			finalPosition: undefined
+			finalPosition: undefined,
+			measurement: undefined
 		}
 	},
 	initial: 'owningController',
@@ -393,14 +395,18 @@ export const viewportMachine = setup({
 													const { event } = args
 													let context = args.context
 													let patch = {}
-													patch = { ...patch, position: event.position }
+													patch = {
+														...patch,
+														position: event.position,
+														measurement: event.position
+													}
 													context = { ...args.context, ...patch }
 													enq(
 														args.actions.report,
 														{ ...args, context },
 														{
 															type: 'MEASURE',
-															attachmentId: context.attachmentId,
+															surfaceId: context.surfaceId,
 															position: required(event.position)
 														}
 													)
@@ -477,14 +483,14 @@ export const viewportMachine = setup({
 				src: 'finalMeasurement',
 				input: ({ context }: { context: Context }) => context,
 				onError: (args) => {
-					return { target: 'closed', context: { finalPosition: args.context.position } }
+					return { target: 'closed', context: { finalPosition: args.context.measurement } }
 				}
 			},
 			on: {
 				FINAL_MEASURED: (args) => {
 					return {
 						target: 'closed',
-						context: { finalPosition: args.event.position ?? args.context.position }
+						context: { finalPosition: args.event.position ?? args.context.measurement }
 					}
 				}
 			}
@@ -495,7 +501,7 @@ export const viewportMachine = setup({
 			entry: (args, enq) => {
 				enq(args.actions.report, args, {
 					type: 'VIEWPORT_FAILED',
-					attachmentId: args.context.attachmentId
+					surfaceId: args.context.surfaceId
 				})
 			}
 		}

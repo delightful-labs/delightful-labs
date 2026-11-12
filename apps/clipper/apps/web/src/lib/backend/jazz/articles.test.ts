@@ -39,53 +39,47 @@ const content = {
 	finalUrl: 'https://example.com/article',
 	provenance: '{}'
 }
-it('persists an article with only its URL and metadata, without fake content or a capture record', async () => {
-	const a = await owner('article-url')
-	const result = await toPromise(
-		createActor(a.records.articles.saveMachine, { input: { url } }).start()
-	)
+it('persists a URL-only Document with zero progress and no Article', async () => {
+	const a = await owner('url-only'),
+		result = await toPromise(
+			createActor(a.records.articles.saveMachine, { input: { url } }).start()
+		)
 	expect(result.kind).toBe('saved')
-	if (result.kind !== 'saved') throw new Error('Expected save')
-	await Promise.all(result.receipts.map((r) => r.global()))
 	expect(await a.records.articles.read(result.operationId)).toMatchObject({
-		url,
-		contentId: null,
+		sourceUrl: url,
+		readingProgress: 0,
+		attachment: null,
 		operationId: null,
 		failure: null
 	})
-	expect(await a.db.all(app.contentRepresentations.where({ libraryId: a.id }))).toEqual([])
+	expect(await a.db.all(app.articles.where({ libraryId: a.id }))).toEqual([])
 	expect(await a.db.all(app.storageOperations.where({ libraryId: a.id }))).toEqual([])
 })
-it('the same save operation accepts content and completes the original article without replacing snapshots', async () => {
-	const a = await owner('article-content')
-	const first = await toPromise(
-		createActor(a.records.articles.saveMachine, { input: { url } }).start()
-	)
+it('attaches content to the saved Document while preserving its identity and native state', async () => {
+	const a = await owner('attachment'),
+		first = await toPromise(createActor(a.records.articles.saveMachine, { input: { url } }).start())
+	if (first.kind === 'saved') await Promise.all(first.receipts.map((receipt) => receipt.global()))
 	const before = await a.records.articles.read(first.operationId)
 	const saved = await toPromise(
 		createActor(a.records.articles.saveMachine, { input: { url, content } }).start()
 	)
-	expect(saved.kind).toBe('saved')
-	if (saved.kind !== 'saved') throw new Error('Expected save')
-	await Promise.all(saved.receipts.map((r) => r.global()))
-	expect(saved.ready).toBe(true)
-	expect(saved.operationId).toBe(first.operationId)
-	const row = await a.records.articles.read(saved.operationId)
-	expect(row?.originalSavedAt).toBe(before?.originalSavedAt)
-	expect(row?.contentId).toBe(await articleId(a.id, content.finalUrl))
-	expect(await a.db.one(app.snapshots.where({ id: row!.contentId! }))).toMatchObject({
-		excerpt: content.excerpt,
+	expect(saved).toMatchObject({ kind: 'saved', ready: true, operationId: first.operationId })
+	const after = await a.records.articles.read(first.operationId)
+	expect(after?.id).toBe(before?.id)
+	expect(after?.createdAt).toBeInstanceOf(Date)
+	expect(after?.attachment).toMatchObject({
+		title: content.title,
 		author: content.author,
-		siteName: content.siteName,
-		publishedTime: content.publishedTime,
-		lang: content.lang,
-		dir: content.dir,
-		featuredImageUrl: content.featuredImageUrl
+		publishedAt: content.publishedTime,
+		language: content.lang,
+		html: content.html,
+		text: content.text,
+		site: { name: content.siteName }
 	})
 	expect(await readRecord(a.records.readCapabilities, saved.operationId)).toMatchObject({
 		kind: 'available',
 		text: content.text,
-		source: { submittedUrl: url }
+		source: { resolvedUrl: content.finalUrl }
 	})
 	const repeat = await toPromise(
 		createActor(a.records.articles.saveMachine, {
@@ -93,69 +87,61 @@ it('the same save operation accepts content and completes the original article w
 		}).start()
 	)
 	expect(repeat.kind).toBe('duplicate')
-	expect(await readRecord(a.records.readCapabilities, saved.operationId)).toMatchObject({
-		text: content.text
-	})
+	expect((await a.records.articles.read(first.operationId))?.attachment?.text).toBe(content.text)
 })
-it('saves supplied browser content directly and allows a second URL to reuse the immutable saved content', async () => {
-	const a = await owner('article-supplied')
-	const result = await toPromise(
+it('lets independent Documents reuse an existing Article through a native relationship', async () => {
+	const a = await owner('shared-attachment')
+	const first = await toPromise(
 		createActor(a.records.articles.saveMachine, { input: { url, content } }).start()
 	)
-	expect(result.kind).toBe('saved')
-	if (result.kind !== 'saved') throw new Error('Expected save')
-	await Promise.all(result.receipts.map((r) => r.global()))
-	expect(result.ready).toBe(true)
+	expect(first.kind).toBe('saved')
 	const second = await toPromise(
 		createActor(a.records.articles.saveMachine, { input: { url: content.finalUrl } }).start()
 	)
-	expect(second.kind).toBe('duplicate')
-	expect('ready' in second && second.ready).toBe(true)
-	expect(await a.db.all(app.contentRepresentations.where({ libraryId: a.id }))).toHaveLength(1)
-})
-it('keeps a pending article and blocks replay when an earlier publication intent is stranded', async () => {
-	const a = await owner('article-unknown')
-	const initial = await toPromise(
-		createActor(a.records.articles.saveMachine, { input: { url } }).start()
+	expect(second).toMatchObject({ ready: true })
+	expect(second.operationId).not.toBe(first.operationId)
+	expect((await a.records.articles.read(second.operationId))?.attachment?.id).toBe(
+		(await a.records.articles.read(first.operationId))?.attachment?.id
 	)
+	expect(await a.db.all(app.libraryDocuments.where({ libraryId: a.id }))).toHaveLength(2)
+	expect(await a.db.all(app.articles.where({ libraryId: a.id }))).toHaveLength(1)
+})
+it('keeps a pending Document and refuses blind replay of a stranded storage intent', async () => {
+	const a = await owner('stranded'),
+		first = await toPromise(createActor(a.records.articles.saveMachine, { input: { url } }).start())
 	const target = await articleId(a.id, content.finalUrl)
 	await a.db
-		.insert(
-			app.storageOperations,
-			{ libraryId: a.id, payloadHash: 'stranded', createdAt: new Date().toISOString() },
-			{ id: target }
-		)
+		.insert(app.storageOperations, { libraryId: a.id, payloadHash: 'stranded' }, { id: target })
 		.wait({ tier: 'global' })
-	const result = await toPromise(
-		createActor(a.records.articles.saveMachine, { input: { url, content } }).start()
-	)
-	expect(result.kind).toBe('unknown')
-	expect(await a.records.articles.read(initial.operationId)).toMatchObject({ contentId: null, url })
-	expect(await a.db.all(app.contentRepresentations.where({ libraryId: a.id }))).toEqual([])
-})
-it('denies foreign article access and content references, and prevents completed article replacement', async () => {
-	const a = await owner('article-a'),
-		b = await owner('article-b')
 	const saved = await toPromise(
 		createActor(a.records.articles.saveMachine, { input: { url, content } }).start()
 	)
-	if (saved.kind !== 'saved') throw new Error('Expected save')
-	await Promise.all(saved.receipts.map((r) => r.global()))
-	const row = await a.records.articles.read(saved.operationId)
-	if (!row) throw new Error('Missing article')
-	expect(await b.records.articles.read(row.id)).toBeNull()
-	await expect(
-		a.db.update(app.articles, row.id, { contentId: null }).wait({ tier: 'global' })
-	).rejects.toThrow(/denied|rejected/i)
+	expect(saved.kind).toBe('unknown')
+	expect(await a.records.articles.read(first.operationId)).toMatchObject({
+		sourceUrl: url,
+		attachment: null
+	})
+	expect(await a.db.all(app.articles.where({ libraryId: a.id }))).toEqual([])
+})
+it('does not disclose foreign Documents and refuses cross-library Article relationships', async () => {
+	const a = await owner('private-owner'),
+		b = await owner('private-foreign')
+	const saved = await toPromise(
+		createActor(a.records.articles.saveMachine, { input: { url, content } }).start()
+	)
+	const document = await a.records.articles.read(saved.operationId)
+	if (!document?.attachment) throw new Error('Missing saved attachment')
+	expect(await b.records.articles.read(saved.operationId)).toBeNull()
 	await expect(
 		b.db
-			.insert(app.articles, {
+			.insert(app.libraryDocuments, {
 				libraryId: b.id,
-				url,
-				originalSavedAt: row.originalSavedAt,
-				contentId: row.contentId,
-				operationId: null,
-				failure: null
+				sourceUrl: url,
+				readingProgress: 0,
+				resumePosition: null,
+				status: 'inbox',
+				favorite: false,
+				attachmentId: document.attachment.id
 			})
 			.wait({ tier: 'global' })
 	).rejects.toThrow(/denied|rejected/i)

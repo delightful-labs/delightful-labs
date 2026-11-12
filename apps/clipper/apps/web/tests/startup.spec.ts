@@ -55,10 +55,10 @@ test('populated restart bounds rendering, starts search on demand and reads dire
 	expect(rootStates.some((state) => state.includes('writing.'))).toBe(false)
 	await page.getByRole('button', { name: 'Show articles', exact: true }).click()
 	await expect(rows).toHaveCount(100)
-	await expect(rows.nth(50)).toBeFocused()
+	await expect(rows.nth(50).getByRole('link')).toBeFocused()
 	await page.getByRole('button', { name: 'Show articles', exact: true }).click()
 	await expect(rows).toHaveCount(120)
-	await expect(rows.nth(100)).toBeFocused()
+	await expect(rows.nth(100).getByRole('link')).toBeFocused()
 	await expect(page.getByRole('button', { name: 'Show articles', exact: true })).toHaveCount(0)
 	await openLibrarySearch(page)
 	await page

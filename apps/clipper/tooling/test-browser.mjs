@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 // A createJazz backend belongs to its authority. Each spec owns a different
 // core database, so start and drain its web backend in the same scope too.
 const specs = readdirSync('apps/web/tests')
-	.filter((name) => name.endsWith('.spec.ts') && name !== 'schema-upgrade.spec.ts')
+	.filter((name) => name.endsWith('.spec.ts'))
 	.sort()
 for (const spec of specs) {
 	console.info(`Browser backend scope: ${spec}`)

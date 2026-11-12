@@ -1,7 +1,7 @@
+import { documentReadingStatusSchema } from '../../capture/document-schema.js'
 import { schema as s } from 'jazz-tools'
 import type { RowRefValue } from 'jazz-tools/permissions'
 import { app } from './schema.js'
-import { documentStatusValues } from '../../capture/document-schema.js'
 
 export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	policy.better_auth_user.allowRead.never()
@@ -34,29 +34,21 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	policy.better_auth_atprotoState.allowUpdate.never()
 	policy.better_auth_atprotoState.allowDelete.never()
 
-	const canonical = () =>
-		allOf([{ id: session.user }, { ownerId: session.user }, { bootstrapVersion: '1' }])
 	const owns = (libraryId: string | RowRefValue) =>
 		policy.libraries.exists.where({ id: libraryId, ownerId: session.user })
+	const canonical = () =>
+		allOf([{ id: session.user }, { ownerId: session.user }, { bootstrapVersion: '1' }])
 	policy.libraries.allowRead.where({ ownerId: session.user })
 	policy.libraries.allowInsert.where(canonical)
 	policy.libraries.allowUpdate.whereOld(canonical).whereNew(canonical)
 	policy.libraries.allowDelete.never()
-	type NoteParent = { libraryId: RowRefValue; articleId: RowRefValue; documentId: RowRefValue }
-	const articleNoteParent = (row: NoteParent) =>
+	const documentParent = (row: { libraryId: RowRefValue; documentId: RowRefValue }) =>
 		allOf([
-			{ documentId: null },
-			policy.articles.exists.where({ id: row.articleId, libraryId: row.libraryId })
+			owns(row.libraryId),
+			policy.libraryDocuments.exists.where({ id: row.documentId, libraryId: row.libraryId })
 		])
-	const documentNoteParent = (row: NoteParent) =>
-		allOf([
-			{ articleId: null },
-			policy.contentRepresentations.exists.where({ id: row.documentId, libraryId: row.libraryId })
-		])
-	const ownedNoteParent = (row: NoteParent) =>
-		allOf([owns(row.libraryId), anyOf([articleNoteParent(row), documentNoteParent(row)])])
 	policy.notes.allowRead.where((row) => owns(row.libraryId))
-	policy.notes.allowInsert.where(ownedNoteParent)
+	policy.notes.allowInsert.where(documentParent)
 	policy.notes.allowUpdate.never()
 	policy.notes.allowDelete.never()
 	policy.noteRevisions.allowRead.where((row) => owns(row.libraryId))
@@ -68,15 +60,110 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	)
 	policy.noteRevisions.allowUpdate.never()
 	policy.noteRevisions.allowDelete.never()
-	policy.articleNoteRevisions.allowRead.where((row) => owns(row.libraryId))
-	policy.articleNoteRevisions.allowInsert.never()
-	policy.articleNoteRevisions.allowUpdate.never()
-	policy.articleNoteRevisions.allowDelete.never()
-
-	const imageParent = (row: { libraryId: RowRefValue; documentId: RowRefValue }) =>
+	policy.readerOperations.allowRead.where((row) => owns(row.libraryId))
+	policy.readerOperations.allowInsert.where((row) =>
 		allOf([
 			owns(row.libraryId),
-			policy.contentRepresentations.exists.where({ id: row.documentId, libraryId: row.libraryId })
+			anyOf(['theme', 'font', 'size', 'spacing', 'width'].map((field) => ({ field })))
+		])
+	)
+	policy.readerOperations.allowUpdate.never()
+	policy.readerOperations.allowDelete.never()
+	policy.tagOperations.allowRead.where((row) => owns(row.libraryId))
+	policy.tagOperations.allowInsert.where(documentParent)
+	policy.tagOperations.allowUpdate.never()
+	policy.tagOperations.allowDelete.never()
+	policy.organizationOperations.allowRead.where((row) => owns(row.libraryId))
+	policy.organizationOperations.allowInsert.where((row) =>
+		allOf([
+			documentParent(row),
+			anyOf([
+				allOf([
+					{ field: 'status' },
+					anyOf(documentReadingStatusSchema.options.map((value) => ({ value })))
+				]),
+				allOf([
+					anyOf([{ field: 'favorite' }, { field: 'trashed' }]),
+					anyOf([{ value: 'true' }, { value: 'false' }])
+				])
+			])
+		])
+	)
+	policy.organizationOperations.allowUpdate.never()
+	policy.organizationOperations.allowDelete.never()
+	const documentState = (row: { libraryId: RowRefValue; attachmentId: RowRefValue }) =>
+		allOf([
+			owns(row.libraryId),
+			anyOf([
+				allOf([
+					{ status: 'trashed' },
+					anyOf(documentReadingStatusSchema.options.map((previousStatus) => ({ previousStatus })))
+				]),
+				allOf([
+					anyOf(documentReadingStatusSchema.options.map((status) => ({ status }))),
+					{ previousStatus: null }
+				])
+			]),
+			anyOf([
+				{ attachmentId: null },
+				policy.articles.exists.where({
+					id: row.attachmentId,
+					libraryId: row.libraryId
+				})
+			])
+		])
+	policy.libraryDocuments.allowRead.where((row) => owns(row.libraryId))
+	policy.libraryDocuments.allowInsert.where((row) => documentState(row))
+	policy.libraryDocuments.allowUpdate.whereOld((row) => owns(row.libraryId)).whereNew(documentState)
+	policy.libraryDocuments.allowDelete.never()
+	policy.storageOperations.allowRead.where((row) => owns(row.libraryId))
+	policy.storageOperations.allowInsert.where((row) => owns(row.libraryId))
+	policy.storageOperations.allowUpdate.never()
+	policy.storageOperations.allowDelete.never()
+	policy.assets.allowRead.where((row) => owns(row.libraryId))
+	policy.assets.allowInsert.where((row) =>
+		allOf([
+			owns(row.libraryId),
+			policy.storageOperations.exists.where({ id: row.operationId, libraryId: row.libraryId })
+		])
+	)
+	policy.assets.allowUpdate.never()
+	policy.assets.allowDelete.never()
+	policy.sites.allowRead.where((row) => owns(row.libraryId))
+	const siteScope = (row: { libraryId: RowRefValue; faviconId: RowRefValue }) =>
+		allOf([
+			owns(row.libraryId),
+			anyOf([
+				{ faviconId: null },
+				policy.assets.exists.where({ id: row.faviconId, libraryId: row.libraryId })
+			])
+		])
+	policy.sites.allowInsert.where(siteScope)
+	policy.sites.allowUpdate.whereOld((row) => owns(row.libraryId)).whereNew(siteScope)
+	policy.sites.allowDelete.never()
+	policy.articles.allowRead.where((row) => owns(row.libraryId))
+	policy.articles.allowInsert.where((row) =>
+		allOf([
+			owns(row.libraryId),
+			policy.storageOperations.exists.where({ id: row.operationId, libraryId: row.libraryId }),
+			anyOf([
+				{ siteId: null },
+				policy.sites.exists.where({ id: row.siteId, libraryId: row.libraryId })
+			])
+		])
+	)
+	policy.articles.allowUpdate.never()
+	policy.articles.allowDelete.never()
+	policy.documentCaptures.allowRead.where((row) => owns(row.libraryId))
+	policy.documentCaptures.allowInsert.where((row) => documentParent(row))
+	policy.documentCaptures.allowUpdate
+		.whereOld((row) => owns(row.libraryId))
+		.whereNew((row) => documentParent(row))
+	policy.documentCaptures.allowDelete.never()
+	const imageParent = (row: { libraryId: RowRefValue; articleId: RowRefValue }) =>
+		allOf([
+			owns(row.libraryId),
+			policy.articles.exists.where({ id: row.articleId, libraryId: row.libraryId })
 		])
 	policy.articleImages.allowRead.where((row) => owns(row.libraryId))
 	policy.articleImages.allowInsert.where((row) =>
@@ -99,163 +186,4 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 			])
 		)
 	policy.articleImages.allowDelete.never()
-	policy.readerOperations.allowRead.where((row) => owns(row.libraryId))
-	policy.readerOperations.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			anyOf([
-				allOf([
-					{ documentId: null },
-					anyOf(['theme', 'font', 'size', 'spacing', 'width'].map((field) => ({ field })))
-				]),
-				allOf([
-					{ field: 'position' },
-					policy.contentRepresentations.exists.where({
-						id: row.documentId,
-						libraryId: row.libraryId
-					})
-				])
-			])
-		])
-	)
-	policy.readerOperations.allowUpdate.never()
-	policy.readerOperations.allowDelete.never()
-	policy.tagOperations.allowRead.where((row) => owns(row.libraryId))
-	policy.tagOperations.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			anyOf([
-				allOf([
-					{ documentId: null },
-					policy.articles.exists.where({ id: row.articleId, libraryId: row.libraryId })
-				]),
-				allOf([
-					{ articleId: null },
-					policy.contentRepresentations.exists.where({
-						id: row.documentId,
-						libraryId: row.libraryId
-					})
-				])
-			])
-		])
-	)
-	policy.tagOperations.allowUpdate.never()
-	policy.tagOperations.allowDelete.never()
-	policy.organizationOperations.allowRead.where((row) => owns(row.libraryId))
-	policy.organizationOperations.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			anyOf([
-				allOf([
-					{ documentId: null },
-					policy.articles.exists.where({ id: row.articleId, libraryId: row.libraryId })
-				]),
-				allOf([
-					{ articleId: null },
-					policy.contentRepresentations.exists.where({
-						id: row.documentId,
-						libraryId: row.libraryId
-					})
-				])
-			]),
-			anyOf([
-				allOf([
-					{ field: 'status' },
-					anyOf([{ value: 'inbox' }, { value: 'later' }, { value: 'archive' }])
-				]),
-				allOf([{ field: 'favorite' }, anyOf([{ value: 'true' }, { value: 'false' }])]),
-				allOf([{ field: 'trashed' }, anyOf([{ value: 'true' }, { value: 'false' }])])
-			])
-		])
-	)
-	policy.organizationOperations.allowUpdate.never()
-	policy.organizationOperations.allowDelete.never()
-	policy.articles.allowRead.where((row) => owns(row.libraryId))
-	const articleTarget = (row: { libraryId: RowRefValue; contentId: RowRefValue }) =>
-		allOf([
-			owns(row.libraryId),
-			anyOf([
-				{ contentId: null },
-				policy.contentRepresentations.exists.where({ id: row.contentId, libraryId: row.libraryId })
-			])
-		])
-	policy.articles.allowInsert.where(articleTarget)
-	// Completed article content is fixed; pending articles can record work/failures and complete once.
-	policy.articles.allowUpdate
-		.whereOld((row) => allOf([owns(row.libraryId), { contentId: null }]))
-		.whereNew(articleTarget)
-	policy.articles.allowDelete.never()
-	policy.libraryDocuments.allowRead.where((row) => owns(row.libraryId))
-	policy.libraryDocuments.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			anyOf(documentStatusValues.map((status) => ({ status }))),
-			anyOf([
-				{ contentRepresentationId: null },
-				policy.contentRepresentations.exists.where({
-					id: row.contentRepresentationId,
-					libraryId: row.libraryId
-				})
-			])
-		])
-	)
-	policy.libraryDocuments.allowUpdate.never()
-	policy.libraryDocuments.allowDelete.never()
-	policy.storageOperations.allowRead.where((row) => owns(row.libraryId))
-	policy.storageOperations.allowInsert.where((row) => owns(row.libraryId))
-	policy.storageOperations.allowUpdate.never()
-	policy.storageOperations.allowDelete.never()
-	policy.assets.allowRead.where((row) => owns(row.libraryId))
-	policy.assets.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			policy.storageOperations.exists.where({ id: row.operationId, libraryId: row.libraryId })
-		])
-	)
-	policy.assets.allowUpdate.never()
-	policy.assets.allowDelete.never()
-	policy.snapshots.allowRead.where((row) => owns(row.libraryId))
-	policy.snapshots.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			{ formatVersion: '1' },
-			policy.storageOperations.exists.where({
-				id: row.documentId,
-				libraryId: row.libraryId
-			})
-		])
-	)
-	policy.snapshots.allowUpdate.never()
-	policy.snapshots.allowDelete.never()
-	policy.contentRepresentations.allowRead.where((row) => owns(row.libraryId))
-	policy.contentRepresentations.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			policy.storageOperations.exists.where({
-				id: row.operationId,
-				libraryId: row.libraryId
-			}),
-			policy.snapshots.exists.where({
-				id: row.snapshotId,
-				documentId: row.operationId,
-				libraryId: row.libraryId
-			}),
-			policy.assets.exists.where({
-				id: row.assetId,
-				operationId: row.operationId,
-				libraryId: row.libraryId
-			})
-		])
-	)
-	policy.articleSources.allowRead.where((row) => owns(row.libraryId))
-	policy.articleSources.allowInsert.where((row) =>
-		allOf([
-			owns(row.libraryId),
-			policy.contentRepresentations.exists.where({ id: row.documentId, libraryId: row.libraryId })
-		])
-	)
-	policy.articleSources.allowUpdate.never()
-	policy.articleSources.allowDelete.never()
-	policy.contentRepresentations.allowUpdate.never()
-	policy.contentRepresentations.allowDelete.never()
 })

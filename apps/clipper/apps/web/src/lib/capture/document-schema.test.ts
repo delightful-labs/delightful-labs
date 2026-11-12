@@ -1,63 +1,58 @@
 import { expect, it } from 'vitest'
-import { documentSchema } from './document-schema.js'
-
+import { documentSchema, newDocument } from './document-schema.js'
+import { fixtureAttachment } from './fixtures.test-support.js'
 const id = 'abcdef01-2345-6789-abcd-ef0123456789'
-const document = {
-	id,
-	libraryId: id,
-	url: 'https://example.com/article',
-	readingProgress: 0,
-	resumePosition: null,
-	favorite: false,
-	title: null,
-	author: null,
-	publishedAt: null,
-	siteName: null,
-	language: null,
-	finalUrl: null,
-	canonicalUrl: null,
-	contentRepresentationId: null,
-	status: 'inbox'
-} as const
-
-it('accepts a saved Document with required numeric progress and no attachment', () => {
-	expect(documentSchema.parse(document)).toEqual(document)
-	expect(documentSchema.parse({ ...document, url: null })).toMatchObject({ readingProgress: 0 })
+const document = newDocument(id, id, 'https://example.com/article?q=1#passage')
+it('creates required zero progress and actual relationships without article metadata', () => {
+	expect(document).toMatchObject({
+		readingProgress: 0,
+		resumePosition: null,
+		attachment: null,
+		library: { id }
+	})
+	expect(documentSchema.parse({ ...document, attachment: fixtureAttachment() })).toMatchObject({
+		attachment: { title: 'Saved title' }
+	})
+	for (const field of [
+		'title',
+		'author',
+		'publishedAt',
+		'siteName',
+		'language',
+		'contentRepresentationId',
+		'attachmentId',
+		'savedAt',
+		'trashedAt'
+	])
+		expect(documentSchema.safeParse({ ...document, [field]: 'unexpected' }).success).toBe(false)
 })
-
-it('requires a previous reading status only for trashed Documents', () => {
-	const trashed = {
-		...document,
-		status: 'trashed',
-		previousStatus: 'later'
-	} as const
-	expect(documentSchema.parse(trashed)).toEqual(trashed)
-	expect(documentSchema.safeParse({ ...trashed, previousStatus: undefined }).success).toBe(false)
+it('requires previousStatus exactly in the trashed variant', () => {
+	expect(
+		documentSchema.safeParse({ ...document, status: 'trashed', previousStatus: 'later' }).success
+	).toBe(true)
+	expect(documentSchema.safeParse({ ...document, status: 'trashed' }).success).toBe(false)
+	expect(documentSchema.safeParse({ ...document, previousStatus: 'later' }).success).toBe(false)
+})
+it.each([undefined, null, NaN, Infinity, -Infinity, -0.01, 1.01])(
+	'rejects invalid progress %s without a fallback',
+	(readingProgress) => {
+		expect(documentSchema.safeParse({ ...document, readingProgress }).success).toBe(false)
+	}
+)
+it('requires a Date for the resume interaction time', () => {
+	const resumePosition = {
+		version: 1,
+		offset: 0,
+		quote: 'Read',
+		prefix: '',
+		suffix: '',
+		interactedAt: new Date()
+	}
+	expect(documentSchema.safeParse({ ...document, resumePosition }).success).toBe(true)
 	expect(
 		documentSchema.safeParse({
-			...trashed,
-			trashedAt: '2026-11-12T13:00:00.000Z'
+			...document,
+			resumePosition: { ...resumePosition, interactedAt: resumePosition.interactedAt.toISOString() }
 		}).success
 	).toBe(false)
-})
-
-it('rejects missing or out-of-range progress instead of defaulting it', () => {
-	expect(documentSchema.safeParse({ ...document, readingProgress: undefined }).success).toBe(false)
-	expect(documentSchema.safeParse({ ...document, readingProgress: -0.01 }).success).toBe(false)
-	expect(documentSchema.safeParse({ ...document, readingProgress: 1.01 }).success).toBe(false)
-})
-
-it('validates article metadata and its direct content relationship on the Document', () => {
-	const withArticle = {
-		...document,
-		title: 'An article',
-		siteName: 'Example',
-		language: 'en',
-		finalUrl: 'https://example.com/final',
-		contentRepresentationId: id
-	}
-	expect(documentSchema.parse(withArticle)).toEqual(withArticle)
-	expect(documentSchema.safeParse({ ...withArticle, finalUrl: 'file:///private' }).success).toBe(
-		false
-	)
 })

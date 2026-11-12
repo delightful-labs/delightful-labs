@@ -1,9 +1,14 @@
+import { webUrlSchema } from '../../validation/values.js'
 import { articleMetadataSchema } from '../../capture/metadata.js'
 import type { EventPayload } from '../events.js'
 import { types, setup, createAsyncLogic } from 'xstate'
 import { isPendingArticle } from '../../capture/article-policy.js'
 
-import type { Article, ArticleContent, SaveArticleRequest } from '../../contracts/articles.js'
+import type {
+	CaptureDocument,
+	ArticleContent,
+	SaveArticleRequest
+} from '../../contracts/articles.js'
 import type { QueueCapability } from '../../contracts/article-worker.js'
 import { articleId } from '../../capture/source.js'
 
@@ -17,21 +22,21 @@ const transient = new Set([
 	'rateLimited'
 ])
 type Context = {
-	rows: Article[]
-	current: Article | undefined
+	rows: CaptureDocument[]
+	current: CaptureDocument | undefined
 	destination: string
 	operationId: string
 	content: ArticleContent | undefined
 	seen: Record<string, true>
 	failure: string
 }
-function canProcessArticle(article: Article, seen: Context['seen']) {
-	if (!isPendingArticle(article)) return false
+function canProcessArticle(article: CaptureDocument, seen: Context['seen']) {
+	if (!article.sourceUrl || !isPendingArticle(article)) return false
 	if (seen[article.id]) return false
 	return !article.failure || transient.has(article.failure)
 }
 type Event =
-	| { type: 'ROWS'; rows: Article[] }
+	| { type: 'ROWS'; rows: CaptureDocument[] }
 	| { type: 'STOP' | 'WAKE' }
 	| { type: 'CANCEL' | 'RETRY'; id: string }
 function required<T>(v: T | undefined): T {
@@ -43,7 +48,11 @@ export function createArticleQueueMachine(cap: QueueCapability) {
 	const actors = {
 		resolve: createAsyncLogic({
 			run: ({ input, signal }: { input: Context; signal: AbortSignal }) =>
-				cap.resolve(required(input.current).url, required(input.current).id, signal)
+				cap.resolve(
+					webUrlSchema.parse(required(input.current).sourceUrl),
+					required(input.current).id,
+					signal
+				)
 		}),
 		identify: createAsyncLogic({
 			run: ({ input }: { input: string }) => articleId(cap.libraryId, input)
@@ -57,7 +66,11 @@ export function createArticleQueueMachine(cap: QueueCapability) {
 		}),
 		extract: createAsyncLogic({
 			run: ({ input, signal }: { input: Context; signal: AbortSignal }) =>
-				cap.extract(required(input.current).url, required(input.current).id, signal)
+				cap.extract(
+					webUrlSchema.parse(required(input.current).sourceUrl),
+					required(input.current).id,
+					signal
+				)
 		}),
 		save: createAsyncLogic({ run: ({ input }: { input: SaveArticleRequest }) => cap.save(input) }),
 		fail: createAsyncLogic({
@@ -168,7 +181,7 @@ export function createArticleQueueMachine(cap: QueueCapability) {
 							const current = [...context.rows]
 								.sort(
 									(a, b) =>
-										a.originalSavedAt.localeCompare(b.originalSavedAt) || a.id.localeCompare(b.id)
+										a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)
 								)
 								.find((article) => canProcessArticle(article, context.seen))
 							return {
@@ -322,6 +335,7 @@ export function createArticleQueueMachine(cap: QueueCapability) {
 									text: event.output.text,
 									html: event.output.html,
 									finalUrl: event.output.finalUrl,
+									canonicalUrl: event.output.canonicalUrl ?? null,
 									provenance: event.output.provenance
 								}
 							}
@@ -362,7 +376,7 @@ export function createArticleQueueMachine(cap: QueueCapability) {
 					id: 'save',
 					src: 'save',
 					input: ({ context }) => ({
-						url: required(context.current).url,
+						url: webUrlSchema.parse(required(context.current).sourceUrl),
 						content: required(context.content)
 					}),
 					onDone: (args) => {
@@ -385,8 +399,8 @@ export function createArticleQueueMachine(cap: QueueCapability) {
 					id: 'save',
 					src: 'save',
 					input: ({ context }) => ({
-						url: required(context.current).url,
-						contentId: context.operationId
+						url: webUrlSchema.parse(required(context.current).sourceUrl),
+						operationId: context.operationId
 					}),
 					onDone: (args) => {
 						const { event } = args

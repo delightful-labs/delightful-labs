@@ -6,11 +6,12 @@ import type { SearchWorkerOutput, SearchWorkerInput } from './protocol.js'
 import type { LibraryArticle } from '../contracts/articles.js'
 const id = crypto.randomUUID()
 const row: LibraryArticle = {
+	readingProgress: 0,
 	id,
 	title: 'Library article',
 	url: 'https://example.com',
-	contentId: null,
-	originalSavedAt: '2026-01-01',
+	readable: false,
+	createdAt: '2026-01-01',
 	failure: null
 }
 const machine = createSearchMachine()
@@ -26,7 +27,7 @@ function fixture() {
 			url: row.url ?? '',
 			text: 'Saved text',
 			tags: (row.tags ?? []).map((tag) => tag.name).join(' '),
-			originalSavedAt: row.originalSavedAt
+			createdAt: row.createdAt
 		}))
 	)
 	const cap: SearchCapability = {
@@ -153,7 +154,7 @@ it('requests cancellation and drains an old bound read before acknowledging shut
 			url: row.url!,
 			text: 'Late private content',
 			tags: (row.tags ?? []).map((tag) => tag.name).join(' '),
-			originalSavedAt: row.originalSavedAt
+			createdAt: row.createdAt
 		}
 	])
 	await toPromise(actor)

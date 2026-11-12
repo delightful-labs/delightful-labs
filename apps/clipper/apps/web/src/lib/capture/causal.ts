@@ -15,43 +15,26 @@ export function causalHeads<T extends { id: string; parents: string[] }>(rows: T
 	const superseded = new Set(rows.flatMap((row) => row.parents))
 	return rows.filter((row) => !superseded.has(row.id)).sort((a, b) => a.id.localeCompare(b.id))
 }
-export function hasSingleParent(row: { articleId: string | null; documentId: string | null }) {
-	return (row.articleId === null) !== (row.documentId === null)
-}
-export function createArticleTargetLookup(
-	articles: readonly { id: string; contentId: string | null }[]
-) {
-	const aliases = new Map<string, string[]>()
-	for (const article of articles) {
-		if (!article.contentId) continue
-		const ids = aliases.get(article.contentId) ?? []
-		ids.push(article.id)
-		aliases.set(article.contentId, ids)
-	}
-	return (id: string, contentId: string | null) =>
-		new Set(contentId ? [id, contentId, ...(aliases.get(contentId) ?? [])] : [id])
+export function createArticleTargetLookup(_documents: readonly { id: string }[]) {
+	return (id: string) => new Set([id])
 }
 export type ArticleTargetLookup = ReturnType<typeof createArticleTargetLookup>
-export function articleTargets(
-	id: string,
-	contentId: string | null,
-	articles: readonly { id: string; contentId: string | null }[]
-) {
-	return createArticleTargetLookup(articles)(id, contentId)
+export function articleTargets(id: string, documents: readonly { id: string }[]) {
+	return createArticleTargetLookup(documents)(id)
 }
-/** Index once per observed snapshot; only histories for the row's native aliases are merged. */
-export function indexCausalHistory<T extends { id: string; articleId: string; parents: string[] }>(
+/** Index once per observation; each Document retains its own causal property history. */
+export function indexCausalHistory<T extends { id: string; documentId: string; parents: string[] }>(
 	rows: T[],
 	property: (row: T) => string
 ) {
 	const parents = new Map<string, Map<string, T[]>>()
 	for (const row of rows) {
-		const groups = parents.get(row.articleId) ?? new Map<string, T[]>()
+		const groups = parents.get(row.documentId) ?? new Map<string, T[]>()
 		const key = property(row)
 		const operations = groups.get(key) ?? []
 		operations.push(row)
 		groups.set(key, operations)
-		parents.set(row.articleId, groups)
+		parents.set(row.documentId, groups)
 	}
 	return (targets: ReadonlySet<string>) => {
 		const groups = new Map<string, T[]>()

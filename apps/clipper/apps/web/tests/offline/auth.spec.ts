@@ -127,7 +127,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 			await expect
 				.poll(() =>
 					authority.backend.db
-						.all(app.articles.where({ libraryId: accountId! }))
+						.all(app.libraryDocuments.where({ libraryId: accountId! }))
 						.then((rows) => rows.map((row) => row.id))
 				)
 				.toContain(id)
@@ -177,8 +177,8 @@ for (const mode of ['linked', 'existing', 'expired'])
 			await expect
 				.poll(() =>
 					authority.backend.db
-						.one(app.articles.where({ id: id! }))
-						.then((row) => Boolean(row?.contentId))
+						.one(app.libraryDocuments.where({ id: id! }))
+						.then((row) => Boolean(row?.attachmentId))
 				)
 				.toBe(true)
 

@@ -2,7 +2,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createActor, toPromise, waitFor, SimulatedClock } from 'xstate'
 import { createWorkspaceCreationTransaction } from 'delightful-local-first/workspace/creation/workflow'
 import { readerExperienceMachine, selectReaderExperience } from '../machines/reader/experience.js'
-import type { ReaderChange, ReaderOperation, ReadingPosition } from './schema.js'
+import type {
+	ReaderChange,
+	ReaderOperation,
+	ReadingPosition,
+	ReadingMeasurement
+} from './schema.js'
 import { readerOperationSchema } from './schema.js'
 import type { SyncReceipt } from '../contracts/storage.js'
 import type { ReaderCapability } from '../contracts/reader.js'
@@ -22,20 +27,29 @@ const position = (offset = 10): ReadingPosition => ({
 	prefix: '',
 	suffix: '',
 	progress: offset / 100,
-	interactedAt: new Date().toISOString()
+	interactedAt: new Date()
 })
+function measurement(position: ReadingPosition): ReadingMeasurement {
+	const { progress, ...locator } = position
+	return { ...locator, extent: 100, atEnd: progress === 1 }
+}
 function serveViewportPeer(
 	port: MessagePort,
 	command: (type: string, settle: (position: ReadingPosition) => void) => void
 ) {
-	let attachmentId: string
+	let surfaceId: string
 	port.onmessage = ({ data }) => {
 		if (data.type === 'VIEWPORT_OPEN') {
-			attachmentId = data.attachmentId
-			port.postMessage({ type: 'VIEWPORT_OPENED', attachmentId })
+			surfaceId = data.surfaceId
+			port.postMessage({ type: 'VIEWPORT_OPENED', surfaceId })
 		}
 		command(data.type, (position) =>
-			port.postMessage({ type: 'VIEWPORT_SETTLED', attachmentId, outcome: 'closed', position })
+			port.postMessage({
+				type: 'VIEWPORT_SETTLED',
+				surfaceId,
+				outcome: 'closed',
+				position: measurement(position)
+			})
 		)
 	}
 }
@@ -67,6 +81,10 @@ function fixture(local = async () => {}, global = async () => {}, clock?: Simula
 			next([])
 			return dispose
 		},
+		subscribeDocuments: (next) => {
+			next([{ id: documentId, readingProgress: 0, resumePosition: null }])
+			return () => {}
+		},
 		spawnWrite: (spawn, draft, operationId, observed) =>
 			spawn(stage(observed), {
 				input: {
@@ -97,7 +115,7 @@ it.each(['open', 'detach', 'messageerror', 'post', 'peer'] as const)(
 			f = fixture(undefined, undefined, clock)
 		const channel = new MessageChannel(),
 			released = vi.fn()
-		let attachmentId = ''
+		let surfaceId = ''
 		const surface = {
 			viewport: { port: channel.port2 },
 			fullscreen: {
@@ -111,8 +129,8 @@ it.each(['open', 'detach', 'messageerror', 'post', 'peer'] as const)(
 		}
 		channel.port1.onmessage = ({ data }) => {
 			if (data.type === 'VIEWPORT_OPEN') {
-				attachmentId = data.attachmentId
-				if (failure !== 'open') channel.port1.postMessage({ type: 'VIEWPORT_OPENED', attachmentId })
+				surfaceId = data.surfaceId
+				if (failure !== 'open') channel.port1.postMessage({ type: 'VIEWPORT_OPENED', surfaceId })
 			}
 		}
 		const refused =
@@ -123,8 +141,8 @@ it.each(['open', 'detach', 'messageerror', 'post', 'peer'] as const)(
 				: undefined
 		try {
 			f.actor.send({ type: 'ATTACH_SURFACE', surface, documentId, sources: [] })
-			if (failure === 'post') attachmentId = f.actor.getSnapshot().context.attachment!.id
-			else await vi.waitFor(() => expect(attachmentId).not.toBe(''))
+			if (failure === 'post') surfaceId = f.actor.getSnapshot().context.attachment!.id
+			else await vi.waitFor(() => expect(surfaceId).not.toBe(''))
 			if (failure === 'open') clock.increment(5)
 			else if (failure !== 'post') {
 				await vi.waitFor(() =>
@@ -143,7 +161,7 @@ it.each(['open', 'detach', 'messageerror', 'post', 'peer'] as const)(
 				}
 				if (failure === 'messageerror')
 					channel.port2.dispatchEvent(new MessageEvent('messageerror'))
-				if (failure === 'peer') channel.port1.postMessage({ type: 'VIEWPORT_FAILED', attachmentId })
+				if (failure === 'peer') channel.port1.postMessage({ type: 'VIEWPORT_FAILED', surfaceId })
 			}
 			await vi.waitFor(() =>
 				expect(
@@ -165,9 +183,9 @@ it.each(['open', 'detach', 'messageerror', 'post', 'peer'] as const)(
 			channel.port2.addEventListener('message', received)
 			channel.port1.postMessage({
 				type: 'VIEWPORT_SETTLED',
-				attachmentId: crypto.randomUUID(),
+				surfaceId: crypto.randomUUID(),
 				outcome: 'closed',
-				position: position(99)
+				position: measurement(position(99))
 			})
 			await vi.waitFor(() => expect(received).toHaveBeenCalledOnce())
 			expect(released).not.toHaveBeenCalled()
@@ -175,9 +193,9 @@ it.each(['open', 'detach', 'messageerror', 'post', 'peer'] as const)(
 			refused?.mockRestore()
 			channel.port1.postMessage({
 				type: 'VIEWPORT_SETTLED',
-				attachmentId,
+				surfaceId,
 				outcome: 'closed',
-				position: position(99)
+				position: measurement(position(99))
 			})
 			await toPromise(f.actor)
 			expect(released).toHaveBeenCalledOnce()
@@ -209,11 +227,11 @@ it('retains the last confirmed position write through overdue detach and discard
 		lifecycle: { accepted: vi.fn(), released }
 	}
 	const measured = position(40)
-	let attachmentId = ''
+	let surfaceId = ''
 	channel.port1.onmessage = ({ data }) => {
 		if (data.type === 'VIEWPORT_OPEN') {
-			attachmentId = data.attachmentId
-			channel.port1.postMessage({ type: 'VIEWPORT_OPENED', attachmentId })
+			surfaceId = data.surfaceId
+			channel.port1.postMessage({ type: 'VIEWPORT_OPENED', surfaceId })
 		}
 	}
 	try {
@@ -223,7 +241,7 @@ it('retains the last confirmed position write through overdue detach and discard
 				f.actor.getSnapshot().children.viewport?.getSnapshot().matches({ remote: 'active' })
 			).toBe(true)
 		)
-		channel.port1.postMessage({ type: 'MEASURE', attachmentId, position: measured })
+		channel.port1.postMessage({ type: 'MEASURE', surfaceId, position: measurement(measured) })
 		await vi.waitFor(() => expect(f.actor.getSnapshot().context.queue).toHaveLength(1))
 		clock.increment(1000)
 		await vi.waitFor(() => expect(f.writes).toHaveLength(1))
@@ -232,9 +250,9 @@ it('retains the last confirmed position write through overdue detach and discard
 		f.actor.send({ type: 'SHUTDOWN' })
 		channel.port1.postMessage({
 			type: 'VIEWPORT_SETTLED',
-			attachmentId,
+			surfaceId,
 			outcome: 'closed',
-			position: position(99)
+			position: measurement(position(99))
 		})
 		await vi.waitFor(() =>
 			expect(f.actor.getSnapshot().matches({ active: { viewport: 'detached' } })).toBe(true)
@@ -392,23 +410,18 @@ it('restores once, ignores late remote positions, preserves the current anchor o
 		dom = viewportDOM()
 	const first = dom.position(10),
 		remote = dom.position(70)
-	const row = (value: ReadingPosition): ReaderOperation =>
-		readerOperationSchema.parse({
-			id: crypto.randomUUID(),
-			libraryId,
-			documentId,
-			field: 'position',
-			value: JSON.stringify(value),
-			parents: '[]'
-		})
-	actor.send({ type: 'ROWS', rows: [row(first)] })
+	const row = (value: ReadingPosition) => {
+		const { progress, ...resumePosition } = value
+		return { id: documentId, readingProgress: progress, resumePosition }
+	}
+	actor.send({ type: 'DOCUMENTS', rows: [row(first)] })
 	actor.send({ type: 'ATTACH', documentId, root: dom.root, scroller: dom.scroller })
 	await vi.advanceTimersByTimeAsync(3)
 	expect(dom.scroller.scrollTop).toBe(10)
 	dom.scroll(0)
 	await vi.advanceTimersByTimeAsync(1)
 	expect(writes).toEqual([])
-	actor.send({ type: 'ROWS', rows: [row(remote)] })
+	actor.send({ type: 'DOCUMENTS', rows: [row(remote)] })
 	expect(dom.scroller.scrollTop).toBe(0)
 	dom.interact()
 	dom.scroll(30)

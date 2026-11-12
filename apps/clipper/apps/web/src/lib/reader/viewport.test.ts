@@ -110,7 +110,7 @@ function owner(elements: ViewportElements, position: ReadingPosition | undefined
 					invoke: {
 						id: 'viewport',
 						src: 'viewport',
-						input: { ...elements, attachmentId: 'current', position },
+						input: { ...elements, surfaceId: 'current', position },
 						onDone: (args, enq) => {
 							enq(({ event }) => {
 								outputs.push(event.output)
@@ -192,8 +192,8 @@ it('coalesces native scrolls into one frame and ignores controls inside the DOM'
 	expect(reports).toEqual([
 		expect.objectContaining({
 			type: 'MEASURE',
-			attachmentId: 'current',
-			position: expect.objectContaining({ offset: 30, progress: 0.3 })
+			surfaceId: 'current',
+			position: expect.objectContaining({ offset: 30, extent: 100, atEnd: false })
 		})
 	])
 	actor.stop()
@@ -237,7 +237,7 @@ it('samples the DOM synchronously on departure and releases pending observation'
 	await vi.advanceTimersByTimeAsync(1)
 	dom.scroll(60)
 	actor.send({ type: 'DETACH' })
-	expect(outputs[0]?.position).toMatchObject({ offset: 60, progress: 0.6 })
+	expect(outputs[0]?.position).toMatchObject({ offset: 60, extent: 100, atEnd: false })
 	expect(TestResizeObserver.instances[0]?.disconnect).toHaveBeenCalledOnce()
 	actor.stop()
 })
@@ -266,7 +266,7 @@ it('reports live DOM measurement errors to its owner and disposes resources', as
 	dom.interact()
 	dom.scroll(30)
 	await vi.advanceTimersByTimeAsync(1)
-	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', attachmentId: 'current' }])
+	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', surfaceId: 'current' }])
 	expect(TestResizeObserver.instances[0]?.disconnect).toHaveBeenCalledOnce()
 	actor.stop()
 })
@@ -276,7 +276,7 @@ it('handles frame acquisition and observer startup failures through the owner', 
 		throw new Error('Frame unavailable')
 	})
 	const first = owner(dom)
-	expect(first.reports).toEqual([{ type: 'VIEWPORT_FAILED', attachmentId: 'current' }])
+	expect(first.reports).toEqual([{ type: 'VIEWPORT_FAILED', surfaceId: 'current' }])
 	first.actor.stop()
 	vi.stubGlobal(
 		'ResizeObserver',
@@ -287,7 +287,7 @@ it('handles frame acquisition and observer startup failures through the owner', 
 		}
 	)
 	const second = owner(dom)
-	expect(second.reports).toEqual([{ type: 'VIEWPORT_FAILED', attachmentId: 'current' }])
+	expect(second.reports).toEqual([{ type: 'VIEWPORT_FAILED', surfaceId: 'current' }])
 	expect(TestResizeObserver.instances.at(-1)?.disconnect).toHaveBeenCalledOnce()
 	second.actor.stop()
 })
@@ -304,7 +304,7 @@ it('releases the controller if observer construction fails before registration',
 		}
 	)
 	const { actor, reports } = owner(dom)
-	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', attachmentId: 'current' }])
+	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', surfaceId: 'current' }])
 	expect(abort).toHaveBeenCalledOnce()
 	expect(requestAnimationFrame).not.toHaveBeenCalled()
 	actor.stop()
@@ -318,7 +318,7 @@ it('releases partial observations and registered listeners when listener registr
 		add(name, listener, options)
 	})
 	const { actor, reports } = owner(dom)
-	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', attachmentId: 'current' }])
+	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', surfaceId: 'current' }])
 	expect(abort).toHaveBeenCalledOnce()
 	expect(TestResizeObserver.instances[0]?.disconnect).toHaveBeenCalledOnce()
 	dom.rootBounds.mockClear()
@@ -337,7 +337,7 @@ it('handles resize measurement failure through state transitions and releases bo
 		throw new Error('Geometry unavailable')
 	})
 	dom.resize(700)
-	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', attachmentId: 'current' }])
+	expect(reports).toEqual([{ type: 'VIEWPORT_FAILED', surfaceId: 'current' }])
 	expect(abort).toHaveBeenCalledOnce()
 	expect(TestResizeObserver.instances[0]?.disconnect).toHaveBeenCalledOnce()
 	actor.stop()

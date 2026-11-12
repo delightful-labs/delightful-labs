@@ -1,16 +1,16 @@
 # URL-first articles and background content processing
 
-**Accepted model update (2026-11-12; implementation pending):** [Document model](data-model.md#accepted-document-model-2026-11-12) supersedes earlier entity terminology below. Document owns an optional saved URL, Jazz `$createdAt` metadata, required progress initially 0, resume location, organization, captured article metadata and an optional pointer to immutable content. Trash requires previousStatus for restore; no separate trash timestamp is stored. Existing native schema, shared-content/legacy-item conversion, progress reconciliation and migration qualification remain open; historical delivery evidence below does not establish this model implemented. PDF/EPUB support stays deferred.
+**Document model implementation (2026-11-12):** The [accepted model](data-model.md#accepted-document-model-2026-11-12) is authoritative. Document owns sourceUrl, required progress initially 0, resume location, organization and an actual Jazz attachment relationship. Article owns metadata, HTML/text and capture URL evidence, and joins to reusable Site/favicon records. Jazz supplies creation metadata. Trash retains previousStatus without another timestamp. Development data is disposable; historical schema snapshots, migrations and legacy conversion are removed. PDF/EPUB ingestion stays deferred.
 
-The accepted interaction is simple: Add Link saves an article object containing the submitted URL immediately. The same save operation optionally accepts content, so a future browser clipper can supply extracted content without a second intake API. There is no separate intake graph or custom IndexedDB journal.
+The accepted interaction is simple: Add Link saves a Document containing the submitted sourceUrl immediately. The same save operation optionally accepts content, so a future browser clipper can supply extracted content without a second intake API. There is no separate intake graph or custom IndexedDB journal.
 
 ## Data and publication
 
-Native Jazz `articles` rows contain libraryId, URL, originalSavedAt and optional contentId, operationId and failure. A URL-only save has no fabricated snapshot, storage intent or content receipt. It is locally saved only after its native local receipt; remote acceptance remains separate.
+Native Jazz `libraryDocuments` rows store saved-item state and join to Library and an optional Article attachment. A URL-only save explicitly initializes progress to 0 with no fabricated content, storage intent or content receipt. Capture operation identity and failure live in a separate Document-associated processing row. Local persistence and remote acceptance remain separate.
 
-Readable content uses the existing immutable documents/snapshots/assets/source graph. Article identity follows the submitted URL; verified final-destination identity determines content reuse. Completing or retrying an article preserves its ID and original save time. Existing readable content is reused rather than overwritten. Legacy document-only readers remain supported.
+Article owns immutable HTML/text, parser metadata and optional CaptureSource evidence. It joins to a reusable library-scoped Site with an optional Asset favicon. Document identity follows the submitted URL with meaningful query/fragment differences preserved. Verified resolved-content identity can reuse one attachment across distinct Documents without combining their notes, tags or reading progress. Completion and retry preserve Document identity and its existing state. No legacy document reader or snapshot graph remains.
 
-Content publication binds the article to its native storage operation in the same transaction that inserts the intent. Publication atomically attaches immutable content. A bound operation without published content is uncertain and must not be blindly replayed. Owner policies reject foreign references and updates to completed content pointers.
+Content publication binds the Document's capture operation in the same transaction that inserts the intent, then atomically publishes Article/Site/image rows and the attachment relationship. A bound operation without published content is uncertain and must not be blindly replayed. Owner policies reject foreign relationships and replacement of completed attachments.
 
 ## State and resource ownership
 
@@ -18,9 +18,9 @@ The layout owns the foreground article-save actor and the background worker reso
 
 A separate XState machine runs inside a dedicated module Web Worker. It observes article objects without content and processes one at a time: resolve, verify identity, check existing content/intent, extract, validate, and invoke the common save operation. Browser-supplied content uses that same operation directly. JSON parsing and processing orchestration run in the worker.
 
-A narrow main-thread host owns the trusted Jazz session, authenticated network request leaves and native transaction actors. Bearers and account handles never cross into the worker. Abort cancels network requests. Shutdown drains issued native writes before terminating the worker or releasing the session. Stale account bindings cannot update another library.
+The application worker owns the trusted Jazz session, authenticated network request leaves and native transaction actors. The capture-processing worker receives only its scoped RPC protocol; bearers and account handles stay with the application worker. Abort cancels network requests. Shutdown drains issued native writes before terminating the worker or releasing the session. Stale account bindings cannot update another library.
 
-The main-thread host is itself an XState machine (`createArticleWorkerHostMachine`). Its states are:
+The capture RPC host is itself an XState machine (`createArticleWorkerHostMachine`). Its states are:
 
 ```mermaid
 stateDiagram-v2

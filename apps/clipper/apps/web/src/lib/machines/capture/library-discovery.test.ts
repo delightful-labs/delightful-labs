@@ -27,33 +27,36 @@ const candidate = {
 const tag = { key: tagKey('Reading'), name: 'Reading' }
 const rows: LibraryArticle[] = [
 	{
+		readingProgress: 0,
 		id: a,
 		title: 'First article',
 		url: 'https://example.com/one',
-		contentId: a,
-		originalSavedAt: '2026-01-01',
+		readable: true,
+		createdAt: '2026-01-01',
 		failure: null,
 		status: 'inbox',
 		favorite: true,
 		tags: [tag]
 	},
 	{
+		readingProgress: 0,
 		id: b,
 		title: 'Second article',
 		url: 'https://example.com/two',
-		contentId: b,
-		originalSavedAt: '2026-01-02',
+		readable: true,
+		createdAt: '2026-01-02',
 		failure: null,
 		status: 'later',
 		favorite: false,
 		tags: [tag]
 	},
 	{
+		readingProgress: 0,
 		id: c,
 		title: 'Third article',
 		url: 'https://example.com/three',
-		contentId: c,
-		originalSavedAt: '2026-01-03',
+		readable: true,
+		createdAt: '2026-01-03',
 		failure: null,
 		status: 'later',
 		favorite: true,
@@ -81,7 +84,7 @@ it('combines real indexed text matches with status, Favorites, tag AND filters a
 						url: row.url ?? '',
 						text: text.get(row.id) ?? '',
 						tags: (row.tags ?? []).map((tag) => tag.name).join(' '),
-						originalSavedAt: row.originalSavedAt
+						createdAt: row.createdAt
 					})),
 				observe: (next) => {
 					dirty = next

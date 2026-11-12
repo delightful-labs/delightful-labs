@@ -9,7 +9,7 @@ import type { WorkspaceCreationAttempt } from 'delightful-local-first/workspace/
 const image: ArticleImage = {
 	id: crypto.randomUUID(),
 	libraryId: crypto.randomUUID(),
-	documentId: crypto.randomUUID(),
+	articleId: crypto.randomUUID(),
 	sourceUrl: 'https://example.com/image.png',
 	status: 'pending',
 	assetId: null,

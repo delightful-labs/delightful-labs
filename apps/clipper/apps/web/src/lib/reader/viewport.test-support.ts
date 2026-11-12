@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom'
 import { vi } from 'vitest'
-import { positionAt, readingTextIndex } from './anchors.js'
+import { positionFromMeasurement } from './schema.js'
+import { measurementAt, readingTextIndex } from './anchors.js'
 
 const windows: JSDOM[] = []
 export class TestResizeObserver implements ResizeObserver {
@@ -63,9 +64,9 @@ export function viewportDOM() {
 		exit,
 		setFullscreen,
 		position: (offset: number) => {
-			const position = positionAt(readingTextIndex(root), offset, offset / 100)
+			const position = measurementAt(readingTextIndex(root), offset, false)
 			if (!position) throw new Error('Invalid test position')
-			return position
+			return positionFromMeasurement(position)
 		},
 		interact: () => scroller.dispatchEvent(new dom.window.Event('wheel', { bubbles: true })),
 		scroll: (offset: number) => {

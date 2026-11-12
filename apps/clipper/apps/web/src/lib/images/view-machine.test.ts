@@ -29,7 +29,7 @@ function owner(input: Omit<InputFrom<typeof imageViewMachine>, 'reportTo'>) {
 }
 const row: ArticleImage = {
 	id: crypto.randomUUID(),
-	documentId: crypto.randomUUID(),
+	articleId: crypto.randomUUID(),
 	libraryId: crypto.randomUUID(),
 	sourceUrl: 'https://example.com/photo.png',
 	status: 'pending',
@@ -40,7 +40,7 @@ it('reports pending/failed native rows to its owning actor and disposes its subs
 	let update: ((rows: ArticleImage[]) => void) | undefined
 	const dispose = vi.fn()
 	const { actor, reports } = owner({
-		documentId: row.documentId,
+		articleId: row.articleId,
 		sourceUrl: row.sourceUrl,
 		capability: {
 			isCurrent: () => true,
@@ -70,7 +70,7 @@ it('owns blob URLs, reports decode errors, reloads saved bytes on Retry and igno
 		)
 	)
 	const { actor, reports, child } = owner({
-		documentId: row.documentId,
+		articleId: row.articleId,
 		sourceUrl: row.sourceUrl,
 		capability: {
 			isCurrent: () => true,
@@ -120,7 +120,7 @@ void incompatibleRecipient
 it('refuses a ready row without an asset identity before issuing a native read', () => {
 	const asset = vi.fn(async () => null)
 	const f = owner({
-		documentId: row.documentId,
+		articleId: row.articleId,
 		sourceUrl: row.sourceUrl,
 		capability: {
 			isCurrent: () => true,

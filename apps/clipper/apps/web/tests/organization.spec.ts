@@ -417,5 +417,5 @@ test('a status change that removes the current row focuses the next article', as
 		.getByLabel('Status', { exact: true })
 		.selectOption('later')
 	await expect(page.locator(`[data-article-id="${firstId}"]`)).toHaveCount(0)
-	await expect(page.locator(`[data-article-id="${nextId}"]`)).toBeFocused()
+	await expect(page.locator(`[data-article-id="${nextId}"]`).getByRole('link')).toBeFocused()
 })

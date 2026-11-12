@@ -1,14 +1,9 @@
 import { z } from 'zod'
 import { caseFold } from 'unicode-case-folding'
 import { lowercaseUuidSchema } from '../validation/values.js'
-import {
-	causalParentsSchema,
-	hasSingleParent,
-	createArticleTargetLookup,
-	indexCausalHistory
-} from './causal.js'
+import { causalParentsSchema, createArticleTargetLookup, indexCausalHistory } from './causal.js'
 import type { ArticleTargetLookup } from './causal.js'
-import type { LibraryArticle, Article } from '../contracts/articles.js'
+import type { LibraryArticle, CaptureDocument } from '../contracts/articles.js'
 /** The package's pinned folding table is part of durable key version 1; do not upgrade it silently. */
 export const tagNameSchema = z
 	.string()
@@ -36,26 +31,20 @@ export const tagOperationSchema = z
 	.object({
 		id: lowercaseUuidSchema,
 		libraryId: lowercaseUuidSchema,
-		articleId: lowercaseUuidSchema.nullable(),
-		documentId: lowercaseUuidSchema.nullable(),
+
+		documentId: lowercaseUuidSchema,
 		key: z.string().min(1).max(512),
 		name: tagNameSchema,
 		assigned: z.boolean(),
 		parents: causalParentsSchema
 	})
-	.refine(hasSingleParent)
 	.refine((row) => row.key === tagKey(row.name))
-	.transform(({ documentId, ...row }) => ({
-		...row,
-		articleId: row.articleId ?? documentId!,
-		field: 'tag' as const,
-		value: row.name
-	}))
+	.transform((row) => ({ ...row, field: 'tag' as const, value: row.name }))
 export type TagOperation = z.infer<typeof tagOperationSchema>
 export function projectTags(
 	rows: LibraryArticle[],
 	operations: TagOperation[],
-	articles: Pick<Article, 'id' | 'contentId'>[] = [],
+	articles: Pick<CaptureDocument, 'id'>[] = [],
 	targets: ArticleTargetLookup = createArticleTargetLookup(articles)
 ): LibraryArticle[] {
 	const vocabulary = new Map<string, Tag>()
@@ -66,7 +55,7 @@ export function projectTags(
 	const tagOrder = new Map(tagVocabulary.map((tag, index) => [tag.key, index]))
 	const history = indexCausalHistory(operations, (operation) => operation.key)
 	return rows.map((row) => {
-		const heads = history(targets(row.id, row.contentId))
+		const heads = history(targets(row.id))
 		const tags = [...heads]
 			.flatMap(([key, head]) => {
 				const tag = vocabulary.get(key)

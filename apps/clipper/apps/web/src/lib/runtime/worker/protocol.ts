@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { organizationRequestSchema, libraryViews } from '../../capture/organization.js'
 import { uuidSchema } from '../../validation/values.js'
-import { readerChangeSchema } from '../../reader/schema.js'
+import { readerPreferenceChangeSchema } from '../../reader/schema.js'
 function identified<T extends string>(type: T) {
 	return z.object({ type: z.literal(type), id: uuidSchema })
 }
@@ -25,7 +25,7 @@ export const libraryIntentSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('READER_EVENT'),
 		event: z.discriminatedUnion('type', [
-			z.object({ type: z.literal('CHANGE'), change: readerChangeSchema }),
+			z.object({ type: z.literal('CHANGE'), change: readerPreferenceChangeSchema }),
 			z.object({ type: z.enum(['REFLOW', 'DETACH', 'FOCUS', 'SHOW_CONTROLS']) })
 		])
 	})

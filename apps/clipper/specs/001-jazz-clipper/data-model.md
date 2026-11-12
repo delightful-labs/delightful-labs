@@ -4,7 +4,7 @@
 
 ## Identity and authorization
 
-Every source-of-truth row carries or inherits an enforced `libraryId`/owner relation. The library belongs to one DLF/Jazz account. Every client read/write and native asset relationship must enforce the same owner server-side; UI filters are insufficient. Tags, annotations, snapshots and assets cannot reference another owner's rows. No public grants or collaborative roles are introduced.
+Every source-of-truth row carries or inherits an enforced `libraryId`/owner relation. The library belongs to one DLF/Jazz account. Every client read/write and native asset relationship must enforce the same owner server-side; UI filters are insufficient. Tags, annotations, attachments and assets cannot reference another owner's rows. No public grants or collaborative roles are introduced.
 
 ## Records
 
@@ -12,7 +12,7 @@ Every source-of-truth row carries or inherits an enforced `libraryId`/owner rela
 | --- | --- | --- |
 | Library | ID = authenticated account UUID, immutable owner ID and bootstrap format 1 | One canonical root per account; idempotently ensure only this immutable payload. Empty replicas never trigger another identity or random root ID; mutable data/migrations are separate. |
 | Document | Jazz identity, library, sourceUrl?, readingProgress, resumePosition?, status, favorite, attachment? | Saved-item state; library and attachment are Jazz relationships. Progress is required, initially 0, bounded to 0–1. Jazz owns creation metadata. |
-| Article | title, author?, publishedAt?, language?, site?, source?, html, text | Article attachment with its own content and metadata. Site is a Jazz relationship. |
+| Article | title, excerpt?, author?, publishedAt?, language?, site?, source?, html, text | Article attachment with its own content and metadata. Site is a Jazz relationship. |
 | Site | origin, name?, favicon? | Reused within the owning library by normalized origin. Favicon is an Asset relationship. |
 | SourceIdentity | ID, libraryId, normalized accepted URL key, documentId, evidence kind/time, redirect target? | Preserve raw observed aliases separately. Revalidate shortening destinations. Duplicate reconciling must retain annotations and captures. |
 | Representation | ID, documentId, kind source/reader, normalizationVersion, selectorVersion, textHash, textLengthCodePoints, native sanitized payload, heading/footnote metadata | A successful reader snapshot is fixed in MVP. Source representation may retain selectors/quote/provenance rather than a full duplicate raw page. No historical revision UI required. |
@@ -29,7 +29,7 @@ Every source-of-truth row carries or inherits an enforced `libraryId`/owner rela
 
 ## Accepted Document model (2026-11-12)
 
-This decision supersedes the earlier Article-as-primary-object and independent immutable-Document library-item descriptions. It is a target model; the native schema and migration are not implemented by this specification update.
+This decision supersedes the earlier Article-as-primary-object and independent immutable-Document library-item descriptions. The native schema now implements the Document/Article split using named Jazz joins and a fresh baseline. Browser qualification is tracked in tasks.md; historical entity descriptions above are superseded by this section.
 
 ```ts
 type ReadingStatus = 'inbox' | 'later' | 'archive'
@@ -48,6 +48,7 @@ type Document = {
 
 type Article = {
   title: string
+  excerpt: string | null // Retain the parser description for library previews
   author: string | null
   publishedAt: string | null
   language: string | null
@@ -139,16 +140,16 @@ AT Protocol support is confirmed product intent; the original planning conversat
 
 AT Protocol addresses records with an AT URI containing repository identity, collection and record key. A version-specific strong reference additionally carries a CID; record address and content version are different concepts. See the official [data repository guide](https://atproto.com/guides/data-repos) and [AT URI specification](https://atproto.com/specs/at-uri-scheme). DLF owns shared identity integration and the broader cross-app AT Protocol boundary, starting with identity. Clipper domain IDs must remain independent of DIDs, provider subjects, AT record keys and content-version identifiers. No Lexicon namespace, record-key format, source-of-truth or publication lifecycle is selected here; those choices are not prerequisites for modeling independent local entities. A portable article reference also needs design because a private Jazz article ID alone is not an externally resolvable source reference.
 
-PR #19 now implements independent `notes` and linked `noteRevisions`; `articleNoteRevisions` remains read-only legacy evidence, with an explicit preserving import operation. Recovery storage keeps old article-keyed drafts until an atomic, validated move to a particular note ID succeeds. The note editor must consume those migration capabilities before editing old content. Retaining full-text revision history versus another qualified conflict-safe text model remains an implementation decision to review; AT Protocol integration does not require exporting the internal revision graph. Existing private-library behavior remains intact. Clipper must consume DLF identity capabilities rather than adding its own account-linking system; future shared transport/publication behavior can be designed separately without using the article or current account-provider identity as the note/highlight record identity.
+Notes and linked note revisions have independent identities and explicit Document associations. Recovery drafts are keyed by note identity and removed only after exact durable acknowledgment. Legacy article-keyed revision import and draft conversion are removed with the disposable-data baseline. Retaining full-text revision history versus another qualified conflict-safe text model remains an implementation decision to review; AT Protocol integration does not require exporting the internal revision graph. Clipper consumes DLF identity capabilities rather than adding an account-linking system.
 
 ## Device-local records (not synced authority)
 
-The accepted target creates a Document immediately for Add Link and optionally attaches supplied Article content through the same operation. Current native `articles` and immutable `contentRepresentations` tables implement an older naming/ownership split; they are not the target logical entities. Snapshots/assets remain content storage records. A dedicated worker processes missing-content articles serially. No separate intake graph or IndexedDB journal is selected. See [durable-capture-design.md](durable-capture-design.md). Pre-session external intake remains a distinct future boundary.
+Add Link immediately creates a Document and optionally attaches supplied Article content through the same operation. Native `libraryDocuments` joins to `articles`; Article stores HTML/text and joins to reusable `sites`. Capture processing state is separate from saved-item state. The old snapshot, representation and article-source tables are removed. A dedicated worker processes missing-content Documents serially. No separate intake graph or IndexedDB journal is selected. See [durable-capture-design.md](durable-capture-design.md). Pre-session external intake remains a distinct future boundary.
 
 - Availability ledger keyed by account/representation/asset: native row availability and local write settlement; derive offline-complete only when required native text/byte values are locally available.
 - Chromium source references: at most eight small Chrome-storage records containing version/ID, tab/document, URL and ready/issued phase, with account ID on issued markers. They hold no article HTML or credentials and are not a second article database. The trusted offscreen runtime waits for identity, serializes saves and never replays issued references. Pre-session mobile-share handoff remains a separate future qualification; never silently attach old-account work to a new account.
 - Worker search checkpoint: account, schema/index versions, source sequence/hash and serialized index. Discard/rebuild on mismatch; maintain separate default/Trash scopes without losing retained text.
-- Note drafts use independent note identity, local edit sequence, draft text, base revision IDs and exact durable acknowledgment. Parent association comes from the note entity. The old article-keyed store is retained until validated atomic recovery to an explicit note ID completes. Never clear on an unconfirmed persistence result.
+- Note drafts use independent note identity, local edit sequence, draft text, base revision IDs and exact durable acknowledgment. Parent association comes from the note entity. Never clear on an unconfirmed persistence result.
 - Same-profile web capture uses Web Locks; Chromium extension launch/save queues and offscreen lifetime are implemented. Future asset coordination still needs qualification. A local lock/lease is not a global lock, and does not authorize replay of an uncertain native operation. No separate durable checkpoint store is selected for PWA capture.
 
 ## State and durability rules

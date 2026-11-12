@@ -1,11 +1,12 @@
 import { expect, it } from 'vitest'
 import { articleId, normalizedSource, extractedCandidate } from './source.js'
-it('normalizes only syntax and representation fragments, preserving meaningful differences', async () => {
+it('normalizes syntax while preserving meaningful URL queries and fragments', async () => {
 	const library = crypto.randomUUID()
 	expect(await articleId(library, 'HTTPS://EXAMPLE.com:443/a?x=1&y=2#first')).toBe(
-		await articleId(library, 'https://example.com/a?x=1&y=2#second')
+		await articleId(library, 'https://example.com/a?x=1&y=2#first')
 	)
 	for (const different of [
+		'https://example.com/a?x=1&y=2#second',
 		'http://example.com/a?x=1&y=2',
 		'https://example.com/a/?x=1&y=2',
 		'https://www.example.com/a?x=1&y=2',
@@ -32,6 +33,7 @@ it('bounds preview content and retains canonical evidence without changing ident
 	const result = extractedCandidate(data, 'request', 'https://short.example/')
 	expect(result.finalUrl).toBe(data.finalUrl)
 	expect(result.provenance).toContain(data.canonicalCandidate)
+	expect(result.canonicalUrl).toBe(data.canonicalCandidate)
 	expect(() =>
 		extractedCandidate({ ...data, operationId: 'stale' }, 'request', 'https://short.example/')
 	).toThrow()

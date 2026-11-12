@@ -10,7 +10,7 @@ const documents: SearchDocument[] = [
 		url: 'https://example.com/one',
 		text: 'An orchard with pears and apples.',
 		tags: '',
-		originalSavedAt: '2026-01-01'
+		createdAt: '2026-01-01'
 	},
 	{
 		id: crypto.randomUUID(),
@@ -18,7 +18,7 @@ const documents: SearchDocument[] = [
 		url: 'https://example.com/two',
 		text: 'Quiet reading in an orchard.',
 		tags: '',
-		originalSavedAt: '2026-01-02'
+		createdAt: '2026-01-02'
 	},
 	{
 		id: crypto.randomUUID(),
@@ -26,7 +26,7 @@ const documents: SearchDocument[] = [
 		url: 'https://example.com/needle',
 		text: 'Only apples.',
 		tags: '',
-		originalSavedAt: '2026-01-03'
+		createdAt: '2026-01-03'
 	}
 ]
 it('requires every keyword, boosts titles, searches URLs/body, and keeps short terms exact', async () => {

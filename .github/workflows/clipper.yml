@@ -75,7 +75,7 @@ jobs:
   web-browser:
     needs: plan
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.clipper == 'true') }}
-    name: Web and schema browser suites
+    name: Web browser suite
     runs-on: ubuntu-24.04
     container:
       # Match the frozen Playwright version; browser libraries and binaries are preinstalled.
@@ -102,7 +102,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm test:e2e
-      - run: pnpm test:schema
 
   worker-offline:
     needs: plan

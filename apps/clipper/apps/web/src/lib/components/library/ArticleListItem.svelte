@@ -28,7 +28,7 @@
 	} = $props()
 </script>
 
-<li {id} tabindex="-1" data-article-id={row.id}>
+<li {id} data-article-id={row.id}>
 	<div class="article-header">
 		<Heading id={`${id}-title`} level="h3" size="xl">
 			{#if readable}<a href={articleHref(row.id)}>{row.title}</a>{:else}{row.title}{/if}

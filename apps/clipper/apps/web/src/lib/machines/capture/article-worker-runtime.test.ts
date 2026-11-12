@@ -1,18 +1,23 @@
+import { fixtureDocument } from '../../capture/fixtures.test-support.js'
 import { it, expect, vi } from 'vitest'
 import { createActor } from 'xstate'
 import type { QueueCapability } from '../../contracts/article-worker.js'
-import type { Article } from '../../contracts/articles.js'
+import type { CaptureDocument } from '../../contracts/articles.js'
 import { createArticleWorkerRuntimeMachine } from './article-worker-runtime.js'
 import type { SharedControl } from './article-worker-runtime.js'
-const row: Article = {
+const row: CaptureDocument = fixtureDocument({
+	readingProgress: 0,
+	resumePosition: null,
+	favorite: false,
+	status: 'inbox',
 	id: 'article',
 	libraryId: 'library',
-	url: 'https://example.com/',
-	originalSavedAt: '2026-11-03T00:00:00.000Z',
-	contentId: null,
+	sourceUrl: 'https://example.com/',
+	createdAt: new Date('2026-11-03T00:00:00.000Z'),
+	attachment: null,
 	operationId: null,
 	failure: null
-}
+})
 function fixture(
 	bus = new Set<(message: SharedControl) => void>(),
 	overrides: Partial<QueueCapability> = {}

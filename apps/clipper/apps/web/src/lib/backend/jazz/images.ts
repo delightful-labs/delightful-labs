@@ -49,7 +49,7 @@ export function createImageRecords(
 					insertIntent: (resource, { draft, hash }) => {
 						resource.tx.insert(
 							app.storageOperations,
-							{ libraryId, payloadHash: hash, createdAt: new Date().toISOString() },
+							{ libraryId, payloadHash: hash },
 							{ id: draft.image.id }
 						)
 					},
@@ -152,8 +152,8 @@ export function createImageRecords(
 			spawnReady,
 			spawnFailure,
 			subscribe: (next, error) => subscribe(app.articleImages.where({ libraryId }), next, error),
-			subscribeImage: (documentId, sourceUrl, next, error) =>
-				subscribe(app.articleImages.where({ libraryId, documentId, sourceUrl }), next, error),
+			subscribeImage: (articleId, sourceUrl, next, error) =>
+				subscribe(app.articleImages.where({ libraryId, articleId, sourceUrl }), next, error),
 			asset: async (id: string, _signal: AbortSignal) =>
 				db.one(app.assets.where({ id, libraryId }), {
 					tier: ReadTier.LocalFirst,

@@ -10,11 +10,11 @@ export async function inspect(urls: string[]) {
 			return a
 				? {
 						id: a.id,
-						url: a.url,
-						contentId: a.contentId,
+						sourceUrl: a.sourceUrl,
+						attachment: a.attachment,
 						operationId: a.operationId,
 						failure: a.failure,
-						originalSavedAt: a.originalSavedAt
+						createdAt: a.createdAt
 					}
 				: null
 		})

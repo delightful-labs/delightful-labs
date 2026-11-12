@@ -244,7 +244,7 @@ test('keeps a text anchor through typography, viewport resizing, navigation and 
 	await controls(page)
 	await page.getByRole('link', { name: 'Open library', exact: true }).click()
 	const row = page.locator(`[data-article-id="${id}"]`)
-	await expect(row.getByRole('progressbar')).toHaveAttribute('value', String(furthest))
+	await expect(row.getByText(`${Math.round(furthest * 100)}% read`, { exact: true })).toBeVisible()
 	await row.getByRole('link').click()
 	await expect
 		.poll(async () => Number(await visibleParagraph(page)))
@@ -295,7 +295,7 @@ test('retains offline reading settings and location through a complete browser r
 		const paragraph = await readMiddle(page)
 		await controls(page)
 		await page.getByRole('link', { name: 'Open library', exact: true }).click()
-		await expect(page.locator(`[data-article-id="${id}"]`).getByRole('progressbar')).toBeVisible()
+		await expect(page.locator(`[data-article-id="${id}"]`).getByText(/^\d+% read$/)).toBeVisible()
 		await context.close()
 		context = await chromium.launchPersistentContext(directory, { headless: true })
 		const reopened = await context.newPage()
@@ -320,35 +320,35 @@ test('retains offline reading settings and location through a complete browser r
 test('shows live progress before a debounced save and keeps the furthest progress while scrolling back', async ({
 	page
 }) => {
-	await seed(page)
-	await page.clock.install()
+	const id = await seed(page)
+	// Complete the initial native layout/paint before the first reading gesture.
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+			)
+	)
 	const main = page.getByRole('main')
+	const indicator = page.getByText(/^\d+% read$/)
+	const percent = async () => Number((await indicator.innerText()).replace('% read', '').trim())
 	await main.hover({ position: { x: 2, y: 100 } })
 	await page.mouse.wheel(0, 6000)
 	await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBeGreaterThan(2000)
-	await page.clock.runFor(100)
-	// Viewport measurement crosses a MessagePort to the worker and back. Advancing
-	// the page clock does not wait for the worker's live progress projection.
-	await expect
-		.poll(async () =>
-			Number(await page.locator('.reader-workspace progress').getAttribute('value'))
-		)
-		.toBeGreaterThan(0)
-	const progress = Number(await page.locator('.reader-workspace progress').getAttribute('value'))
+	// Observe the real worker and native storage clocks throughout this check.
+	await expect.poll(percent).toBeGreaterThan(0)
+	const progress = await percent()
 	expect(progress).toBeGreaterThan(0)
-	expect((await state(page)).progress).toEqual({})
+	expect((await state(page)).progress).toEqual({ [id]: 0 })
 	const paragraph = Number(await visibleParagraph(page))
 	await page.mouse.wheel(0, -3000)
-	await page.clock.runFor(100)
 	await expect.poll(() => visibleParagraph(page)).not.toBe(String(paragraph))
 	expect(Number(await visibleParagraph(page))).toBeLessThan(paragraph)
-	await expect(page.locator('.reader-workspace progress')).toHaveAttribute(
-		'value',
-		String(progress)
-	)
-	await page.clock.runFor(1100)
+	await expect(indicator).toHaveText(`${progress}% read`)
 	await expect
-		.poll(async () => Math.max(...Object.values((await state(page)).progress)))
+		.poll(async () => {
+			const observed = (await state(page)).progress[id]
+			return observed === undefined ? undefined : Math.round(observed * 100)
+		})
 		.toBe(progress)
 })
 test('updates progress for a short article when a reading gesture cannot scroll it', async ({
@@ -368,7 +368,7 @@ test('updates progress for a short article when a reading gesture cannot scroll 
 	await main.hover({ position: { x: 2, y: 100 } })
 	await page.mouse.wheel(0, 200)
 	await expect.poll(async () => Math.max(0, ...Object.values((await state(page)).progress))).toBe(1)
-	await expect(page.locator('.reader-workspace progress')).toHaveAttribute('value', '1')
+	await expect(page.getByText('100% read', { exact: true })).toBeVisible()
 })
 
 test('reader drawer replaces the top toolbar with persistent controls and independent scrolling', async ({

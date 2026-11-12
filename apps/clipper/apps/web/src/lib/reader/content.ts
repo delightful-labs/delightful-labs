@@ -73,7 +73,7 @@ export function savedContent(
 					if (!usesHttpProtocol(url) || hasCredentials(url)) continue
 					link.setAttribute('href', url.href)
 					link.setAttribute('rel', 'noreferrer')
-					// Article navigation uses the browser, including modifier keys, rather than app routing.
+					// CaptureDocument navigation uses the browser, including modifier keys, rather than app routing.
 					link.setAttribute('data-sveltekit-reload', '')
 				} catch {
 					/* Keep invalid links as readable text. */

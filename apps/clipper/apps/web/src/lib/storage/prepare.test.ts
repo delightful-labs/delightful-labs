@@ -1,21 +1,29 @@
+import type { SaveRequest } from '../contracts/storage.js'
 import { expect, it } from 'vitest'
-import { BYTE_LIMIT, TEXT_LIMIT, prepareSave } from './prepare.js'
+import { prepareSave, BYTE_LIMIT, TEXT_LIMIT } from './prepare.js'
 const libraryId = crypto.randomUUID()
-const request = () => ({
-	operationId: crypto.randomUUID(),
-	title: 'Title',
-	text: 'café 🦊',
-	bytes: new Uint8Array([1, 2, 3]),
-	mediaType: 'application/octet-stream'
-})
-it('keeps native bytes intact and gives identical intent the same reconciliation fingerprint', async () => {
-	const input = request()
-	const first = await prepareSave(libraryId, input)
-	const second = await prepareSave(libraryId, input)
-	expect(first.asset.payload).toEqual(input.bytes)
+const request = () =>
+	({
+		operationId: crypto.randomUUID(),
+		title: 'Title',
+		text: 'café 🦊',
+		bytes: new TextEncoder().encode('<p>café 🦊</p>'),
+		mediaType: 'text/html'
+	}) satisfies SaveRequest
+it('prepares Article content and fingerprints the exact payload for uncertain-write reconciliation', async () => {
+	const input = request(),
+		first = await prepareSave(libraryId, input),
+		second = await prepareSave(libraryId, input)
+	expect(first.attachment).toMatchObject({
+		title: input.title,
+		html: '<p>café 🦊</p>',
+		text: input.text,
+		site: null,
+		source: null
+	})
 	expect(first.intent.payloadHash).toBe(second.intent.payloadHash)
 	input.bytes[0] = 9
-	expect(first.asset.payload[0]).toBe(1)
+	expect(first.attachment.html).toBe('<p>café 🦊</p>')
 	expect((await prepareSave(libraryId, input)).intent.payloadHash).not.toBe(
 		first.intent.payloadHash
 	)
@@ -23,7 +31,37 @@ it('keeps native bytes intact and gives identical intent the same reconciliation
 		first.intent.payloadHash
 	)
 })
-it('rejects oversized text and bytes before any persistence', async () => {
+it('keeps supplied URL separate from redirect and canonical evidence and scopes Site to the resolved origin', async () => {
+	const input = {
+		...request(),
+		author: 'Ada',
+		publishedTime: '2026-11-12',
+		lang: 'en',
+		siteName: 'News',
+		source: {
+			submittedUrl: 'https://short.example/story?q=1#passage',
+			finalUrl: 'https://news.example.com/story',
+			canonicalUrl: 'https://publisher.example/article',
+			provenance: '{}'
+		}
+	}
+	const first = await prepareSave(libraryId, input),
+		second = await prepareSave(libraryId, {
+			...input,
+			operationId: crypto.randomUUID(),
+			source: { ...input.source, finalUrl: 'https://news.example.com/other' }
+		})
+	expect(first.attachment).toMatchObject({
+		author: 'Ada',
+		publishedAt: input.publishedTime,
+		language: 'en',
+		source: { resolvedUrl: input.source.finalUrl, canonicalUrl: input.source.canonicalUrl },
+		site: { origin: 'https://news.example.com', name: 'News', favicon: null }
+	})
+	expect(first.attachment.site?.id).toBe(second.attachment.site?.id)
+	expect(first.source?.submittedUrl).toBe(input.source.submittedUrl)
+})
+it('rejects oversized inputs before persistence', async () => {
 	await expect(
 		prepareSave(libraryId, { ...request(), bytes: new Uint8Array(BYTE_LIMIT + 1) })
 	).rejects.toThrow()
@@ -31,56 +69,19 @@ it('rejects oversized text and bytes before any persistence', async () => {
 		prepareSave(libraryId, { ...request(), text: 'é'.repeat(TEXT_LIMIT) })
 	).rejects.toThrow()
 })
-
-it('keeps the full metadata in snapshots and fingerprints it independently of body content', async () => {
-	const input = {
-		...request(),
-		excerpt: 'Unshortened description café 🦊. '.repeat(200),
-		author: 'Ada Example',
-		siteName: 'Example Journal',
-		publishedTime: '2026-10-02T12:30:00+02:00',
-		lang: 'ar',
-		dir: 'rtl',
-		featuredImageUrl: 'https://example.com/cover.png'
-	}
-	const saved = await prepareSave(libraryId, input)
-	for (const [key, value] of Object.entries(input))
-		if (
-			[
-				'excerpt',
-				'author',
-				'siteName',
-				'publishedTime',
-				'lang',
-				'dir',
-				'featuredImageUrl'
-			].includes(key)
-		)
-			expect(saved.snapshot).toHaveProperty(key, value)
-	for (const field of ['excerpt', 'author', 'siteName', 'publishedTime', 'lang', 'dir']) {
-		expect(
-			(await prepareSave(libraryId, { ...input, [field]: 'changed' })).intent.payloadHash
-		).not.toBe(saved.intent.payloadHash)
-	}
-})
-
-it('queues the featured image even when absent from the body and deduplicates matching inline images', async () => {
+it('queues featured images once even when repeated in the body', async () => {
 	const featuredImageUrl = 'https://example.com/cover.png'
-	for (const html of [
-		'<p>No inline image</p>',
-		`<img data-clipper-image="${encodeURIComponent(featuredImageUrl)}">`
-	]) {
-		const saved = await prepareSave(libraryId, {
-			...request(),
-			mediaType: 'text/html',
-			bytes: new TextEncoder().encode(html),
-			featuredImageUrl
-		})
-		expect(saved.images).toHaveLength(1)
-		expect(saved.images?.[0]).toMatchObject({
-			sourceUrl: featuredImageUrl,
-			status: 'pending',
-			assetId: null
-		})
-	}
+	const saved = await prepareSave(libraryId, {
+		...request(),
+		bytes: new TextEncoder().encode(
+			`<img data-clipper-image="${encodeURIComponent(featuredImageUrl)}">`
+		),
+		featuredImageUrl
+	})
+	expect(saved.images).toHaveLength(1)
+	expect(saved.images?.[0]).toMatchObject({
+		sourceUrl: featuredImageUrl,
+		status: 'pending',
+		assetId: null
+	})
 })

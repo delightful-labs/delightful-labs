@@ -3,50 +3,29 @@ import { types, createActor, createCallbackLogic, setup, toPromise, createAsyncL
 
 import type { NoteDraftRecord } from './schema.js'
 import { openDraftDatabase } from './draft-database.js'
-import {
-	canRecoverDraft,
-	canReplaceRecoveredDraft,
-	isStoredDraft,
-	matchesStoredDraft,
-	matchesStoredLegacyDraft
-} from './draft-recovery.js'
-import type { prepareDraftRecovery } from './draft-recovery.js'
+import { isStoredDraft, matchesStoredDraft } from './draft-recovery.js'
 import { required } from '../machines/storage/domain-transaction.js'
 
 export type DraftEntry = { key: string; target: string; record: NoteDraftRecord }
-type Recovery = ReturnType<typeof prepareDraftRecovery>
-type Input =
-	| { kind: 'recover'; entry: DraftEntry; sourceKey: string; recovery: Recovery }
-	| { kind: 'remove'; entry: DraftEntry }
-type Command = {
-	type: 'READ_SOURCE' | 'READ_DESTINATION' | 'READ_CURRENT' | 'MOVE' | 'DELETE' | 'ABORT'
-}
+type Input = { kind: 'remove'; entry: DraftEntry }
+type Command = { type: 'READ_CURRENT' | 'DELETE' | 'ABORT' }
 type Event =
 	| { type: 'OPENED' | 'COMPLETED' | 'ABORTED' | 'STORAGE_ERROR' }
-	| { type: 'SOURCE_READ' | 'DESTINATION_READ' | 'CURRENT_READ'; value: unknown }
+	| { type: 'CURRENT_READ'; value: unknown }
 type Context = { input: Input; db: IDBDatabase | undefined }
 
-function recoveryInput(input: Input) {
-	if (input.kind !== 'recover') throw new Error('Missing draft recovery input')
-	return input
-}
 const actors = {
 	open: createAsyncLogic({ run: () => openDraftDatabase() }),
 	storage: createCallbackLogic<Command, { db: IDBDatabase; operation: Input }>(
 		({ input, sendBack, receive }) => {
-			const tx = input.db.transaction(['noteDrafts', 'drafts'], 'readwrite', {
+			const tx = input.db.transaction(['noteDrafts'], 'readwrite', {
 				durability: 'strict'
 			})
-			const notes = tx.objectStore('noteDrafts'),
-				legacy = tx.objectStore('drafts')
+			const notes = tx.objectStore('noteDrafts')
 			tx.oncomplete = () => sendBack({ type: 'COMPLETED' })
 			tx.onabort = () => sendBack({ type: 'ABORTED' })
 			tx.onerror = () => sendBack({ type: 'STORAGE_ERROR' })
-			function read(
-				store: IDBObjectStore,
-				key: string,
-				type: 'SOURCE_READ' | 'DESTINATION_READ' | 'CURRENT_READ'
-			) {
+			function read(store: IDBObjectStore, key: string, type: 'CURRENT_READ') {
 				const request = store.get(key)
 				request.onsuccess = () => sendBack({ type, value: request.result })
 			}
@@ -58,13 +37,7 @@ const actors = {
 				}
 			}
 			const commands: Record<Command['type'], () => void> = {
-				READ_SOURCE: () => read(legacy, recoveryInput(input.operation).sourceKey, 'SOURCE_READ'),
-				READ_DESTINATION: () => read(notes, input.operation.entry.key, 'DESTINATION_READ'),
 				READ_CURRENT: () => read(notes, input.operation.entry.key, 'CURRENT_READ'),
-				MOVE: () => {
-					notes.put(input.operation.entry)
-					legacy.delete(recoveryInput(input.operation).sourceKey)
-				},
 				DELETE: () => {
 					notes.delete(input.operation.entry.key)
 				},
@@ -93,8 +66,6 @@ export const draftMutationMachine = setup({
 			COMPLETED: types<EventPayload<Event, 'COMPLETED'>>(),
 			ABORTED: types<EventPayload<Event, 'ABORTED'>>(),
 			STORAGE_ERROR: types<EventPayload<Event, 'STORAGE_ERROR'>>(),
-			SOURCE_READ: types<EventPayload<Event, 'SOURCE_READ'>>(),
-			DESTINATION_READ: types<EventPayload<Event, 'DESTINATION_READ'>>(),
 			CURRENT_READ: types<EventPayload<Event, 'CURRENT_READ'>>()
 		},
 		input: types<Input>(),
@@ -107,15 +78,6 @@ export const draftMutationMachine = setup({
 	},
 	actors,
 	guards: {
-		recoveryRequested: ({ context }: { context: Context }) => context.input.kind === 'recover',
-		recoveryAssociated: ({ context }: { context: Context }) => {
-			const { recovery } = recoveryInput(context.input)
-			return canRecoverDraft(recovery.source, recovery.note, recovery.libraryId, recovery.aliases)
-		},
-		sourceUnchanged: ({ context }: { context: Context }, params: { value: unknown }) =>
-			matchesStoredLegacyDraft(params.value, recoveryInput(context.input).recovery.source),
-		destinationCompatible: ({ context }: { context: Context }, params: { value: unknown }) =>
-			canReplaceRecoveredDraft(params.value, context.input.entry.record),
 		currentMissing: (
 			_: { context: Context; value: import('xstate').StateValue },
 			params: { value: unknown }
@@ -139,17 +101,8 @@ export const draftMutationMachine = setup({
 }).createMachine({
 	id: 'draft-mutation',
 	context: ({ input }) => ({ input, db: undefined }),
-	initial: 'selectingOperation',
+	initial: 'opening',
 	states: {
-		selectingOperation: {
-			type: 'choice',
-			choice: (args) => {
-				if (args.guards.recoveryRequested(args) && !args.guards.recoveryAssociated(args)) {
-					return { target: 'failed' }
-				}
-				return { target: 'opening' }
-			}
-		},
 		opening: {
 			invoke: {
 				id: 'open',
@@ -180,45 +133,7 @@ export const draftMutationMachine = setup({
 			},
 			initial: 'starting',
 			states: {
-				starting: {
-					on: {
-						OPENED: (args) => {
-							if (args.guards.recoveryRequested(args)) {
-								return { target: 'readingSource' }
-							}
-							return { target: 'readingCurrent' }
-						}
-					}
-				},
-				readingSource: {
-					entry: (args, enq) => {
-						enq.sendTo('storage', { type: 'READ_SOURCE' })
-					},
-					on: {
-						SOURCE_READ: (args) => {
-							const { event } = args
-							if (args.guards.sourceUnchanged(args, event)) {
-								return { target: 'readingDestination' }
-							}
-							return { target: 'aborting' }
-						}
-					}
-				},
-				readingDestination: {
-					entry: (args, enq) => {
-						enq.sendTo('storage', { type: 'READ_DESTINATION' })
-					},
-					on: {
-						DESTINATION_READ: (args, enq) => {
-							const { event } = args
-							if (args.guards.destinationCompatible(args, event)) {
-								enq.sendTo('storage', { type: 'MOVE' })
-								return { target: 'waitingCompletion' }
-							}
-							return { target: 'aborting' }
-						}
-					}
-				},
+				starting: { on: { OPENED: { target: 'readingCurrent' } } },
 				readingCurrent: {
 					entry: (args, enq) => {
 						enq.sendTo('storage', { type: 'READ_CURRENT' })

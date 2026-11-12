@@ -4,7 +4,7 @@ import type { EventPayload } from '../events.js'
 import { types, setup, createAsyncLogic, matchesState } from 'xstate'
 
 import type {
-	Article,
+	CaptureDocument,
 	ArticleDraft,
 	ArticleSaveCapability,
 	ArticleSaveResult,
@@ -19,7 +19,7 @@ function required<T>(v: T | undefined): T {
 type Context = {
 	request: SaveArticleRequest | undefined
 	draft: ArticleDraft | undefined
-	existing: Article | null
+	existing: CaptureDocument | null
 	result: ArticleSaveResult | undefined
 }
 export function createSaveArticleMachine(cap: ArticleSaveCapability) {
@@ -170,7 +170,7 @@ export function createSaveArticleMachine(cap: ArticleSaveCapability) {
 																				...d.content,
 																				source: {
 																					...required(d.content.source),
-																					submittedUrl: existing.url
+																					submittedUrl: required(d.content.source).submittedUrl
 																				}
 																			}
 																		}
@@ -201,7 +201,7 @@ export function createSaveArticleMachine(cap: ArticleSaveCapability) {
 									if (args.guards.closing(args)) {
 										return { target: '#save-article.interrupted' }
 									}
-									if (args.context.existing?.contentId) {
+									if (args.context.existing?.attachment) {
 										return { target: '#save-article.duplicate' }
 									}
 									return { target: 'checkingDocument' }
@@ -444,7 +444,7 @@ export function createSaveArticleMachine(cap: ArticleSaveCapability) {
 							result: {
 								kind: 'duplicate',
 								operationId: required(context.draft).article.id,
-								ready: !!context.existing?.contentId,
+								ready: !!context.existing?.attachment,
 								receipts: []
 							},
 							request: undefined,

@@ -31,7 +31,7 @@ type Context = {
 	capture: Capture | undefined
 	source: Source | undefined
 	content: ArticleContent | undefined
-	articleId: string | undefined
+	documentId: string | undefined
 	message: WorkflowMessage | undefined
 }
 const replySchema = z.object({ capture: captureSchema, source: sourceSchema.optional() })
@@ -154,7 +154,7 @@ export function createClipMachine() {
 			source: undefined,
 			content: undefined,
 			message: undefined,
-			articleId: undefined
+			documentId: undefined
 		}),
 		states: {
 			running: {
@@ -321,7 +321,7 @@ export function createClipMachine() {
 									return {
 										target: 'clearing',
 										context: {
-											articleId: event.snapshot.context.captureId,
+											documentId: event.snapshot.context.captureId,
 											message: selectLibraryView(event.snapshot).captureMessage
 										}
 									}
@@ -367,7 +367,7 @@ export function createClipMachine() {
 					SHUTDOWN: { target: 'closed' },
 					LIBRARY: (args) => {
 						const { event } = args
-						if (!(args.context.articleId === event.snapshot.context.captureId)) return
+						if (!(args.context.documentId === event.snapshot.context.captureId)) return
 						return { context: { message: selectLibraryView(event.snapshot).captureMessage } }
 					}
 				},

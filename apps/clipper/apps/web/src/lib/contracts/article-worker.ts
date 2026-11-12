@@ -1,11 +1,11 @@
-import type { Article, ArticleSaveResult, SaveArticleRequest } from './articles.js'
+import type { CaptureDocument, ArticleSaveResult, SaveArticleRequest } from './articles.js'
 import type { WorkflowMessage } from './feedback.js'
 export type SavedReply = { kind: ArticleSaveResult['kind']; operationId: string; ready: boolean }
 export type WorkerCall =
 	| { type: 'CALL'; id: string; method: 'resolve' | 'extract'; url: string; requestId: string }
 	| { type: 'CALL'; id: string; method: 'document' | 'intent'; operationId: string }
 	| { type: 'CALL'; id: string; method: 'save'; request: SaveArticleRequest }
-	| { type: 'CALL'; id: string; method: 'fail'; articleId: string; code: string }
+	| { type: 'CALL'; id: string; method: 'fail'; documentId: string; code: string }
 export type RpcReply =
 	| { method: 'resolve' | 'extract'; bytes: Uint8Array; status: number }
 	| { method: 'document' | 'intent'; exists: boolean }
@@ -13,7 +13,7 @@ export type RpcReply =
 	| { method: 'fail' }
 export type WorkerInput =
 	| { type: 'INIT'; libraryId: string; debug: boolean }
-	| { type: 'ROWS'; rows: Article[] }
+	| { type: 'ROWS'; rows: CaptureDocument[] }
 	| { type: 'REPLY'; id: string; reply: RpcReply }
 	| { type: 'ERROR'; id: string; code: string }
 	| { type: 'STOP' | 'WAKE' }

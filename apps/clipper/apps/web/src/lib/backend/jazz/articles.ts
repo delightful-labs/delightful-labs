@@ -1,3 +1,4 @@
+import { documentValues } from './document-values.js'
 import { createOrganizationRecords } from './organization.js'
 import {
 	createArticleEnsureDomain,
@@ -14,11 +15,14 @@ import { ReadTier } from 'jazz-tools'
 import type { Db } from 'jazz-tools'
 
 import { createSaveArticleMachine } from '../../machines/storage/save-article.js'
-import { EXCERPT_SOURCE_LIMIT, makeExcerpt } from '../../capture/excerpt.js'
-import { articleRecord, prepareArticle, uuid } from '../../capture/articles.js'
-import type { Article, ArticleDraft, LibraryArticle } from '../../contracts/articles.js'
+import { articleSchema } from '../../capture/article-schema.js'
+import { articlesQuery } from './queries.js'
+import { prepareArticle, uuid } from '../../capture/articles.js'
+import { captureDocumentRecord } from './document-record.js'
+import type { CaptureDocument, ArticleDraft, LibraryArticle } from '../../contracts/articles.js'
 
 import { app } from './schema.js'
+import { documentsQuery } from './queries.js'
 /** Reads stay bound to this DB/library; owning actors gate admission and late-result consumption.
  * Native write admission and commit scope protection live in transactionLifecycle. */
 export function createArticleRecords(
@@ -28,18 +32,18 @@ export function createArticleRecords(
 	content: import('../../contracts/articles.js').ContentOperation
 ) {
 	const read = async (id: string) => {
-		const row = await db.one(app.articles.where({ id: uuid(id), libraryId }), {
+		const row = await db.one(documentsQuery.where({ id: uuid(id), libraryId }), {
 			tier: ReadTier.LocalFirst
 		})
 
-		return row ? articleRecord(row, libraryId) : null
+		return row ? captureDocumentRecord(row, libraryId) : null
 	}
 	const document = async (id: string) => {
-		const row = await db.one(app.contentRepresentations.where({ id: uuid(id), libraryId }), {
+		const row = await db.one(articlesQuery.where({ id: uuid(id), libraryId }), {
 			tier: ReadTier.LocalFirst
 		})
 
-		return row
+		return row ? articleSchema.parse(row) : null
 	}
 	const intent = async (id: string) => {
 		const row = await db.one(app.storageOperations.where({ id: uuid(id), libraryId }), {
@@ -50,10 +54,13 @@ export function createArticleRecords(
 	}
 	const lifecycle = transactionLifecycle(db, isCurrent)
 	const readArticle = async (resource: TransactionResource, draft: ArticleDraft) => {
-		const article = await resource.tx.one(app.articles.where({ id: draft.article.id, libraryId }), {
-			tier: ReadTier.LocalFirst
-		})
-		return { draft, article }
+		const article = await resource.tx.one(
+			documentsQuery.where({ id: draft.article.id, libraryId }),
+			{
+				tier: ReadTier.LocalFirst
+			}
+		)
+		return { draft, article: article ? captureDocumentRecord(article, libraryId) : null }
 	}
 	const ensure = createDomainTransaction<ArticleDraft>(
 		(spawn, input) =>
@@ -61,8 +68,14 @@ export function createArticleRecords(
 				createArticleEnsureDomain({
 					read: readArticle,
 					insertArticle: (resource, { draft }) => {
-						const { id, ...row } = articleRecord(draft.article, libraryId)
-						resource.tx.insert(app.articles, row, { id })
+						const id = draft.article.id
+						const row = documentValues(draft.article)
+						resource.tx.insert(app.libraryDocuments, row, { id })
+						resource.tx.insert(
+							app.documentCaptures,
+							{ libraryId, documentId: id, operationId: null, failure: null },
+							{ id }
+						)
 					},
 					receipt: transactionReceipt
 				}),
@@ -77,22 +90,23 @@ export function createArticleRecords(
 					read: async (resource, draft) => {
 						const facts = await readArticle(resource, draft)
 						const document = await resource.tx.one(
-							app.contentRepresentations.where({ id: draft.target, libraryId }),
+							app.articles.where({ id: draft.target, libraryId }),
 							{ tier: ReadTier.LocalFirst }
 						)
 						return { ...facts, available: document !== null }
 					},
 					attachContent: (resource, { draft }) => {
-						resource.tx.update(app.articles, draft.article.id, {
-							contentId: draft.target,
-							failure: null
+						resource.tx.update(app.libraryDocuments, draft.article.id, {
+							attachmentId: draft.target
 						})
 					},
 					createArticle: (resource, { draft }) => {
-						const { id, ...row } = articleRecord(draft.article, libraryId)
+						const id = draft.article.id
+						const row = documentValues(draft.article)
+						resource.tx.insert(app.libraryDocuments, { ...row, attachmentId: draft.target }, { id })
 						resource.tx.insert(
-							app.articles,
-							{ ...row, contentId: draft.target, failure: null },
+							app.documentCaptures,
+							{ libraryId, documentId: id, operationId: null, failure: null },
 							{ id }
 						)
 					},
@@ -108,15 +122,15 @@ export function createArticleRecords(
 				createArticleFailureDomain({
 					read: async (resource, draft) => {
 						const article = await resource.tx.one(
-							app.articles.where({ id: uuid(draft.id), libraryId }),
+							documentsQuery.where({ id: uuid(draft.id), libraryId }),
 							{ tier: ReadTier.LocalFirst }
 						)
-						return { draft, article }
+						return { draft, article: article ? captureDocumentRecord(article, libraryId) : null }
 					},
 					recordFailure: (resource, { draft }) => {
 						if (draft.code !== null && draft.code.length > 100)
 							throw new Error('Invalid article failure')
-						resource.tx.update(app.articles, draft.id, { failure: draft.code })
+						resource.tx.update(app.documentCaptures, draft.id, { failure: draft.code })
 					},
 					receipt: transactionReceipt
 				}),
@@ -132,50 +146,9 @@ export function createArticleRecords(
 		isCurrent,
 		articles: (next, error) =>
 			db.subscribe(
-				app.articles.where({ libraryId }),
+				documentsQuery.where({ libraryId }),
 				{
-					onUpdate: (rows) => next(rows.map((row) => articleRecord(row, libraryId))),
-					onError: error
-				},
-				{ tier: ReadTier.LocalFirst }
-			),
-		excerpts: (next, error) =>
-			db.subscribe(
-				app.snapshots.where({ libraryId }).select('id', 'excerpt'),
-				{
-					onUpdate: (rows) =>
-						next(
-							rows.map((row) => ({
-								id: row.id,
-								text: '',
-								excerpt: row.excerpt == null ? null : makeExcerpt(row.excerpt)
-							}))
-						),
-					onError: error
-				},
-				{ tier: ReadTier.LocalFirst }
-			),
-		legacyPreviews: (next, error) =>
-			db.subscribe(
-				app.snapshots.where({ libraryId, excerpt: null }).select('id', 'text'),
-				{
-					onUpdate: (rows) =>
-						next(
-							rows.map((row) => ({
-								id: row.id,
-								text: row.text.slice(0, EXCERPT_SOURCE_LIMIT),
-								excerpt: null
-							}))
-						),
-					onError: error
-				},
-				{ tier: ReadTier.LocalFirst }
-			),
-		documents: (next, error) =>
-			db.subscribe(
-				app.contentRepresentations.where({ libraryId }),
-				{
-					onUpdate: next,
+					onUpdate: (rows) => next(rows.map((row) => captureDocumentRecord(row, libraryId))),
 					onError: error
 				},
 				{ tier: ReadTier.LocalFirst }
@@ -199,12 +172,12 @@ export function createArticleRecords(
 			attach: (spawn, input) => spawn(attach, { input }),
 			content
 		}),
-		subscribePending: (next: (rows: Article[]) => void, error: () => void) =>
+		subscribePending: (next: (rows: CaptureDocument[]) => void, error: () => void) =>
 			db.subscribe(
-				app.articles.where({ libraryId, contentId: null }),
+				documentsQuery.where({ libraryId, attachmentId: null }),
 				{
 					onUpdate: (rows) => {
-						next(rows.map((row) => articleRecord(row, libraryId)))
+						next(rows.map((row) => captureDocumentRecord(row, libraryId)))
 					},
 					onError: error
 				},

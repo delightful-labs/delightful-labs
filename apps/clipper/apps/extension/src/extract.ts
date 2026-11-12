@@ -1,3 +1,4 @@
+import { webUrlSchema } from '../../web/src/lib/validation/values.js'
 import { Readability } from '@mozilla/readability'
 import { featuredImageUrl } from '../../web/src/lib/capture/metadata.js'
 import JSDOMParser from '@mozilla/readability/JSDOMParser.js'
@@ -43,6 +44,20 @@ export function extractRenderedSource(value: unknown) {
 		}
 	}
 	const featuredImage = featuredImageUrl(document.getElementsByTagName('meta'), source.base)
+	const canonical = [...document.getElementsByTagName('link')]
+		.find((link) =>
+			(link.getAttribute('rel') ?? '').toLowerCase().split(/\s+/).includes('canonical')
+		)
+		?.getAttribute('href')
+	let canonicalUrl: string | null = null
+	if (canonical) {
+		try {
+			const parsed = webUrlSchema.max(8192).safeParse(new URL(canonical, source.base).href)
+			if (parsed.success) canonicalUrl = parsed.data
+		} catch {
+			/* Invalid publisher declarations are not capture evidence. */
+		}
+	}
 	const article = new Readability(document, { maxElemsToParse: 50000 }).parse()
 	if (!article?.content) throw new Error('captureFailed')
 	const result = new CaptureParser().parse(`<html><body>${article.content}</body></html>`)
@@ -86,6 +101,7 @@ export function extractRenderedSource(value: unknown) {
 		featuredImageUrl: featuredImage,
 		html,
 		finalUrl: source.url,
+		canonicalUrl,
 		provenance: JSON.stringify({
 			type: 'browser-rendered',
 			observedUrl: source.url,

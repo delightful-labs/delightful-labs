@@ -1,10 +1,12 @@
+import { newDocumentValues } from './document-values.js'
+import { captureDocumentRecord, documentRecord } from './document-record.js'
 import { createImageRecords } from './images.js'
 import { createNoteRecords } from './notes.js'
 import {
 	createContentIntentDomain,
 	createContentPublicationDomain
 } from '../../machines/storage/content-domains.js'
-import { createDomainTransaction, required } from '../../machines/storage/domain-transaction.js'
+import { createDomainTransaction } from '../../machines/storage/domain-transaction.js'
 import type { ContentFacts } from '../../capture/content-policy.js'
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
 import type { TransactionResource } from './transaction.js'
@@ -15,6 +17,7 @@ import type { PreparedSave } from '../../contracts/storage.js'
 import { createSaveRecordMachine } from '../../machines/storage/save.js'
 import { prepareSave } from '../../storage/prepare.js'
 import { app } from './schema.js'
+import { documentsQuery } from './queries.js'
 import { insertPreparedContent } from './content.js'
 import { createReaderRecords } from './reader.js'
 import { createFakeDataRecords } from './fake-data.js'
@@ -39,12 +42,18 @@ export function createLibraryRecords(
 			app.storageOperations.where({ id: operationId, libraryId }),
 			{ tier: ReadTier.LocalFirst }
 		)
-		const article = draft.articleId
-			? await resource.tx.one(app.articles.where({ id: draft.articleId, libraryId }), {
-					tier: ReadTier.LocalFirst
-				})
-			: null
-		return { draft, operationId, intent, article }
+		const article = await resource.tx.one(
+			documentsQuery.where({ id: draft.documentId, libraryId }),
+			{
+				tier: ReadTier.LocalFirst
+			}
+		)
+		return {
+			draft,
+			operationId,
+			intent,
+			article: article ? captureDocumentRecord(article, libraryId) : null
+		}
 	}
 	const lifecycle = transactionLifecycle(db, isCurrent)
 	const intent = createDomainTransaction<PreparedSave>(
@@ -57,23 +66,26 @@ export function createLibraryRecords(
 						resource.tx.insert(app.storageOperations, intent, { id })
 					},
 					bindArticle: (resource, { draft }) => {
-						resource.tx.update(app.articles, required(draft.articleId), {
+						resource.tx.update(app.documentCaptures, draft.documentId, {
 							operationId: draft.intent.id,
 							failure: null
 						})
 					},
 					createArticle: (resource, { draft }) => {
 						resource.tx.insert(
-							app.articles,
+							app.libraryDocuments,
+							newDocumentValues(draft.documentId, libraryId, draft.source?.submittedUrl ?? null),
+							{ id: draft.documentId }
+						)
+						resource.tx.insert(
+							app.documentCaptures,
 							{
 								libraryId,
-								url: required(draft.source).submittedUrl,
-								originalSavedAt: draft.intent.createdAt,
-								contentId: null,
+								documentId: draft.documentId,
 								operationId: draft.intent.id,
 								failure: null
 							},
-							{ id: required(draft.articleId) }
+							{ id: draft.documentId }
 						)
 					},
 					receipt: transactionReceipt
@@ -89,14 +101,10 @@ export function createLibraryRecords(
 					read: readLocal,
 					publishContent: (resource, { draft }) => insertPreparedContent(resource.tx, draft),
 					attachContent: (resource, { draft }) => {
-						resource.tx.update(app.articles, required(draft.articleId), {
-							contentId: draft.document.id,
-							failure: null
+						resource.tx.update(app.libraryDocuments, draft.documentId, {
+							attachmentId: draft.attachment.id
 						})
-					},
-					publishSource: (resource, { draft }) => {
-						const { id, ...source } = required(draft.source)
-						resource.tx.insert(app.articleSources, source, { id })
+						resource.tx.update(app.documentCaptures, draft.documentId, { failure: null })
 					},
 					receipt: transactionReceipt
 				}),
@@ -116,50 +124,14 @@ export function createLibraryRecords(
 		readCapabilities: {
 			isCurrent,
 			observeConnection,
-			document: async (id) => {
-				const article = await db.one(app.articles.where({ id, libraryId }), {
-					tier: ReadTier.LocalFirst
-				})
-				const row = await db.one(
-					app.contentRepresentations.where({ id: article?.contentId ?? id, libraryId }),
-					{
-						tier: ReadTier.LocalFirst,
-						firstLoadRemoteWaitMs: 5_000
-					}
-				)
-
-				return row && article ? { ...row, id: article.id } : row
-			},
-			snapshot: async (id) => {
-				const row = await db.one(app.snapshots.where({ id, libraryId }), {
-					tier: ReadTier.LocalFirst,
-					firstLoadRemoteWaitMs: 5_000
-				})
-
-				return row
-			},
-			asset: async (id) => {
-				const row = await db.one(app.assets.where({ id, libraryId }), {
-					tier: ReadTier.LocalFirst,
-					firstLoadRemoteWaitMs: 5_000
-				})
-
-				return row
-			},
-			source: async (id, signal) => {
+			document: async (id, signal) => {
 				signal.throwIfAborted()
-				const article = await db.one(app.articles.where({ id, libraryId }), {
-					tier: ReadTier.LocalFirst
+				const row = await db.one(documentsQuery.where({ id, libraryId }), {
+					tier: ReadTier.LocalFirst,
+					firstLoadRemoteWaitMs: 5000
 				})
-				const target = article?.contentId ?? id
-				const row = await db.one(app.articleSources.where({ id: target, libraryId }), {
-					tier: ReadTier.LocalFirst
-				})
-
 				signal.throwIfAborted()
-				return row && article && row.documentId === target
-					? { ...row, id: article.id, documentId: article.id, submittedUrl: article.url }
-					: row
+				return row ? documentRecord(row, libraryId) : null
 			}
 		} satisfies ReadCapabilities
 	}
@@ -174,27 +146,23 @@ export function createLibraryRecords(
 			signal: AbortSignal
 		): Promise<SearchDocument[]> => {
 			signal.throwIfAborted()
-			const [documents, snapshots] = await Promise.allSettled([
-				db.all(app.contentRepresentations.where({ libraryId }), { tier: ReadTier.LocalFirst }),
-				db.all(app.snapshots.where({ libraryId }), { tier: ReadTier.LocalFirst })
-			])
+			const documents = await db.all(documentsQuery.where({ libraryId }), {
+				tier: ReadTier.LocalFirst
+			})
 			signal.throwIfAborted()
-			if (documents.status === 'rejected') throw documents.reason
-			if (snapshots.status === 'rejected') throw snapshots.reason
-			const docs = new Map(documents.value.map((document) => [document.id, document]))
-			const texts = new Map(snapshots.value.map((snapshot) => [snapshot.id, snapshot.text]))
+			const byId = new Map(documents.map((row) => [row.id, documentRecord(row, libraryId)]))
 			return rows.map((row) => ({
 				id: row.id,
 				title: row.title,
 				url: row.url ?? '',
-				text: texts.get(docs.get(row.contentId ?? row.id)?.snapshotId ?? '') ?? '',
+				text: byId.get(row.id)?.attachment?.text ?? '',
 				tags: (row.tags ?? []).map((tag) => tag.name).join(' '),
-				originalSavedAt: row.originalSavedAt
+				createdAt: row.createdAt
 			}))
 		},
 		observeSearch: (dirty: () => void, error: () => void) =>
 			db.subscribe(
-				app.snapshots.where({ libraryId }),
+				app.articles.where({ libraryId }),
 				{ onUpdate: dirty, onError: error },
 				{ tier: ReadTier.LocalFirst }
 			),
@@ -203,7 +171,7 @@ export function createLibraryRecords(
 		),
 		isCurrent,
 		hasDocument: async (id: string) => {
-			const row = await db.one(app.contentRepresentations.where({ id, libraryId }), {
+			const row = await db.one(app.articles.where({ id, libraryId }), {
 				tier: ReadTier.LocalFirst,
 				firstLoadRemoteWaitMs: 5_000
 			})
@@ -217,21 +185,7 @@ export function createLibraryRecords(
 			})
 
 			return row !== null
-		},
-		subscribe: (
-			next: (rows: import('../../contracts/storage.js').DocumentHeader[]) => void,
-			error: () => void
-		) =>
-			db.subscribe(
-				app.contentRepresentations.where({ libraryId }),
-				{
-					onUpdate: (rows) => {
-						next(rows)
-					},
-					onError: error
-				},
-				{ tier: ReadTier.LocalFirst }
-			)
+		}
 	}
 }
 

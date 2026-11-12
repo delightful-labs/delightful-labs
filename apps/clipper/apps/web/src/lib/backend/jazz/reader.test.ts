@@ -69,11 +69,18 @@ it('persists independent reading fields and causally ordered positions with priv
 		prefix: 'Read',
 		suffix: ' content',
 		progress: 0.5,
-		interactedAt: new Date().toISOString()
+		interactedAt: new Date()
 	}
 	await change(a, { documentId: a.documentId, field: 'position', value: pos })
 	const rows = await a.db.all(app.readerOperations.where({ libraryId: a.id }))
-	const state = projectReaderState(readerHistorySchema.parse(rows))
+	const state = projectReaderState(
+		readerHistorySchema.parse(rows),
+		await a.db.all(
+			app.libraryDocuments
+				.where({ libraryId: a.id })
+				.select('id', 'readingProgress', 'resumePosition')
+		)
+	)
 	expect(state.preferences).toMatchObject({ theme: 'light', size: 24 })
 	expect(state.positions[a.documentId]).toEqual(pos)
 	expect(rows.find((row) => row.field === 'theme' && row.value === '"light"')?.parents).toBe(
@@ -90,7 +97,7 @@ it('persists independent reading fields and causally ordered positions with priv
 		b.db
 			.insert(app.readerOperations, {
 				libraryId: b.id,
-				documentId: a.documentId,
+
 				field: 'position',
 				value: JSON.stringify(pos),
 				parents: '[]'
@@ -101,7 +108,7 @@ it('persists independent reading fields and causally ordered positions with priv
 		b.db
 			.insert(app.readerOperations, {
 				libraryId: a.id,
-				documentId: null,
+
 				field: 'theme',
 				value: '"dark"',
 				parents: '[]'
@@ -129,7 +136,7 @@ it('blocks missing reading parents and rejects invalid commands before staging a
 							prefix: '',
 							suffix: '',
 							progress: 0,
-							interactedAt: new Date().toISOString()
+							interactedAt: new Date()
 						}
 					}
 				}
@@ -149,7 +156,7 @@ it('rejects an invalid observed batch without publishing partial reading state',
 	await a.db
 		.insert(app.readerOperations, {
 			libraryId: a.id,
-			documentId: null,
+
 			field: 'size',
 			value: '"invalid"',
 			parents: '[]'

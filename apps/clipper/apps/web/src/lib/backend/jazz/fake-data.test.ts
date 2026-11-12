@@ -34,17 +34,20 @@ function seed(
 it('seeds complete private native records and independent metadata once, including readers', async () => {
 	const { db, id } = await owner('fake-complete')
 	expect(await toPromise(seed(db, id))).toBe('seeded')
-	const articles = await db.all(app.articles.where({ libraryId: id }))
+	const articles = await db.all(app.libraryDocuments.where({ libraryId: id }))
 	expect(articles).toHaveLength(24)
-	expect(await db.all(app.contentRepresentations.where({ libraryId: id }))).toHaveLength(24)
+	expect(await db.all(app.articles.where({ libraryId: id }))).toHaveLength(24)
 	expect(await db.all(app.tagOperations.where({ libraryId: id }))).toHaveLength(24)
 	expect(await db.all(app.organizationOperations.where({ libraryId: id }))).toHaveLength(72)
 	const first = articles[0]
 	if (!first) throw new Error('Missing seeded article')
 	const records = createLibraryRecords(db, id, () => true)
-	expect((await records.readCapabilities.document(first.id))?.title).toBeTruthy()
+	expect(
+		(await records.readCapabilities.document(first.id, new AbortController().signal))?.attachment
+			?.title
+	).toBeTruthy()
 	expect(await toPromise(seed(db, id))).toBe('skipped')
-	expect(await db.all(app.articles.where({ libraryId: id }))).toHaveLength(24)
+	expect(await db.all(app.libraryDocuments.where({ libraryId: id }))).toHaveLength(24)
 })
 it('does no reads or writes when disabled or scope has expired', async () => {
 	const { db, id } = await owner('fake-disabled')
@@ -64,21 +67,21 @@ it('preserves existing native URL-only data', async () => {
 		}).start()
 	)
 	expect(await toPromise(seed(db, id))).toBe('skipped')
-	expect(await db.all(app.articles.where({ libraryId: id }))).toHaveLength(1)
+	expect(await db.all(app.libraryDocuments.where({ libraryId: id }))).toHaveLength(1)
 })
 it('rechecks under the serializable transaction so racing seeders do not duplicate or overwrite', async () => {
 	const { db, id } = await owner('fake-race')
 	const results = await Promise.all([toPromise(seed(db, id)), toPromise(seed(db, id))])
 	expect(results).toContain('seeded')
+	expect(await db.all(app.libraryDocuments.where({ libraryId: id }))).toHaveLength(24)
 	expect(await db.all(app.articles.where({ libraryId: id }))).toHaveLength(24)
-	expect(await db.all(app.contentRepresentations.where({ libraryId: id }))).toHaveLength(24)
 })
 it('does not seed or disclose another account library', async () => {
 	const a = await owner('fake-private'),
 		b = await owner('fake-stranger')
 	expect(await toPromise(seed(a.db, a.id))).toBe('seeded')
 	expect(await toPromise(seed(b.db, a.id))).toBe('skipped')
-	expect(await b.db.all(app.articles.where({ libraryId: a.id }))).toHaveLength(0)
+	expect(await b.db.all(app.libraryDocuments.where({ libraryId: a.id }))).toHaveLength(0)
 })
 it('drains an issued serializable settlement on shutdown without replaying it', async () => {
 	const { db, id } = await owner('fake-drain')
@@ -106,5 +109,5 @@ it('drains an issued serializable settlement on shutdown without replaying it', 
 	expect(actor.getSnapshot().status).toBe('active')
 	released.resolve()
 	expect(await toPromise(actor)).toBe('closed')
-	expect(await db.all(app.articles.where({ libraryId: id }))).toHaveLength(24)
+	expect(await db.all(app.libraryDocuments.where({ libraryId: id }))).toHaveLength(24)
 })

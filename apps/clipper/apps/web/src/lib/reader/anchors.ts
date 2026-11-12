@@ -1,4 +1,4 @@
-import type { ReadingPosition } from './schema.js'
+import type { ResumePosition, ReadingMeasurement } from './schema.js'
 type Point = { node: Text; offset: number; length: number }
 /** Version 1: Unicode code points with whitespace runs collapsed; original DOM nodes are unchanged. */
 function isTextNode(node: Node): node is Text {
@@ -33,7 +33,7 @@ export function readingTextIndex(root: HTMLElement) {
 	return { characters, points }
 }
 export type ReadingTextIndex = ReturnType<typeof readingTextIndex>
-export function quoteMatches(index: ReadingTextIndex, position: ReadingPosition) {
+export function quoteMatches(index: ReadingTextIndex, position: ResumePosition) {
 	const { characters } = index,
 		{ offset, quote, prefix, suffix } = position
 	const end = offset + Array.from(quote).length
@@ -51,12 +51,12 @@ export function rangeAt(index: ReadingTextIndex, offset: number) {
 	range.setEnd(point.node, point.offset + point.length)
 	return range
 }
-export function positionAt(
+export function measurementAt(
 	index: ReadingTextIndex,
 	offset: number,
-	progress: number,
-	interactedAt = new Date().toISOString()
-): ReadingPosition | undefined {
+	atEnd: boolean,
+	interactedAt = new Date()
+): ReadingMeasurement | undefined {
 	if (!index.points[offset]) return undefined
 	const end = Math.min(index.characters.length, offset + 80)
 	return {
@@ -65,10 +65,14 @@ export function positionAt(
 		quote: index.characters.slice(offset, end).join(''),
 		prefix: index.characters.slice(Math.max(0, offset - 24), offset).join(''),
 		suffix: index.characters.slice(end, end + 24).join(''),
-		progress: Math.min(1, Math.max(0, progress)),
-		interactedAt
+		interactedAt,
+		extent: index.points.length,
+		atEnd
 	}
 }
-export function sameReadingLocation(a: ReadingPosition | undefined, b: ReadingPosition) {
-	return a?.offset === b.offset && a.quote === b.quote && a.progress === b.progress
+
+export function sameReadingLocation(a: ReadingMeasurement | undefined, b: ReadingMeasurement) {
+	return (
+		a?.offset === b.offset && a.quote === b.quote && a.extent === b.extent && a.atEnd === b.atEnd
+	)
 }

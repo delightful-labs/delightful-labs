@@ -23,19 +23,45 @@ export async function seedReader(url: string, paragraphCount = 70, codeHtml = ''
 	await Promise.all(result.receipts.map((receipt) => receipt.global()))
 	return result.operationId
 }
-export async function readingState() {
+
+/** Observe the independent test replica continuously, with the test page owning cleanup. */
+let reading: ReturnType<typeof observeReading> | undefined
+function observeReading() {
 	const records = currentLibraryRecords()
-	let dispose: (() => void) | undefined
-	try {
-		const rows = await new Promise<import('../src/lib/reader/schema.js').ReaderOperation[]>(
-			(resolve, reject) => {
-				dispose = records.reader.capability.subscribe(resolve, () =>
-					reject(new Error('Reading fixture unavailable'))
-				)
-			}
-		)
-		return projectReaderState(rows)
-	} finally {
-		dispose?.()
+	const ready = Promise.withResolvers<void>()
+	let rows: import('../src/lib/reader/schema.js').ReaderOperation[] | undefined
+	let documents: import('../src/lib/reader/schema.js').ReaderDocumentState[] | undefined
+	let failed = false
+	const updated = () => {
+		if (rows && documents) ready.resolve()
 	}
+	const unavailable = () => {
+		failed = true
+		ready.reject(new Error('Reading fixture unavailable'))
+	}
+	const releases = [
+		records.reader.capability.subscribe((next) => {
+			rows = next
+			updated()
+		}, unavailable),
+		records.reader.capability.subscribeDocuments((next) => {
+			documents = next
+			updated()
+		}, unavailable)
+	]
+	window.addEventListener(
+		'pagehide',
+		() => {
+			for (const release of releases) release()
+		},
+		{ once: true }
+	)
+	return ready.promise.then(() => () => {
+		if (failed || !rows || !documents || !records.isCurrent())
+			throw new Error('Reading fixture unavailable')
+		return projectReaderState(rows, documents)
+	})
+}
+export async function readingState() {
+	return (await (reading ??= observeReading()))()
 }

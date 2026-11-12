@@ -58,9 +58,11 @@ function show(
 	message: WorkflowMessage,
 	revision: number,
 	reset: boolean,
-	articleId?: string
+	documentId?: string
 ) {
-	const href = articleId ? new URL(`articles/${articleId}`, __CLIPPER_WEB__).href : __CLIPPER_WEB__
+	const href = documentId
+		? new URL(`articles/${documentId}`, __CLIPPER_WEB__).href
+		: __CLIPPER_WEB__
 	return chrome.scripting.executeScript({
 		target: { tabId: capture.tabId, documentIds: [capture.documentId] },
 		func: renderBar,
@@ -71,7 +73,7 @@ function show(
 				reset,
 				...message,
 				href,
-				open: action('open', articleId ? 'article' : 'library'),
+				open: action('open', documentId ? 'article' : 'library'),
 				close: t('actions.close')
 			}
 		]
@@ -82,7 +84,7 @@ const notifications = createNotificationMachine({
 	page: runtimePage,
 	read,
 	show: (display) =>
-		show(display.capture, display.message, display.revision, false, display.articleId)
+		show(display.capture, display.message, display.revision, false, display.documentId)
 })
 chrome.runtime.onMessage.addListener((message: unknown, sender, reply) => {
 	if (connectMessageSchema.safeParse(message).success) {

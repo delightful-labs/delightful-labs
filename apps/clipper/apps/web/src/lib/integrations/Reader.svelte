@@ -31,7 +31,7 @@
 		if (reader?.kind !== 'available') return
 		headings = readerHeadings(node)
 		const scroller = node.closest('main')
-		if (scroller) detachSurface = actor.attach({ root: node, scroller }, reader.document.snapshotId)
+		if (scroller) detachSurface = actor.attach({ root: node, scroller }, reader.document.id)
 	}
 	function release() {
 		detachSurface?.()
@@ -79,7 +79,7 @@
 		text={reader.text}
 		sourceUrl={originalUrl}
 		preferences={reading.preferences}
-		progress={reading.progress[reader.document.snapshotId] ?? 0}
+		progress={reader.progress}
 		focused={reading.focused}
 		enabled={reading.enabled}
 		canOrganize={view.canOrganize}

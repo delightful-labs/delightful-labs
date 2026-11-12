@@ -7,7 +7,7 @@ it.each(['open', 'detach'] as const)(
 	async (stage) => {
 		const channel = new MessageChannel(),
 			clock = new SimulatedClock(),
-			attachmentId = crypto.randomUUID()
+			surfaceId = crypto.randomUUID()
 		let time = 0
 		channel.port1.start()
 		const actor = createActor(surfaceViewportMachine, {
@@ -15,7 +15,7 @@ it.each(['open', 'detach'] as const)(
 			input: {
 				port: channel.port2,
 				position: undefined,
-				attachmentId,
+				surfaceId,
 				replyTimeoutMs: 5,
 				now: () => time
 			}
@@ -24,7 +24,7 @@ it.each(['open', 'detach'] as const)(
 			const delivered = new Promise<void>((resolve) =>
 				channel.port2.addEventListener('message', () => resolve(), { once: true })
 			)
-			channel.port1.postMessage({ type, attachmentId, outcome: 'closed' })
+			channel.port1.postMessage({ type, surfaceId, outcome: 'closed' })
 			await delivered
 		}
 		try {
