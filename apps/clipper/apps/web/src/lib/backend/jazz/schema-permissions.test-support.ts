@@ -18,13 +18,15 @@ export function permissionsForSchema(schema: { wasmSchema: object }) {
 		}
 		return value
 	}
-	const historicalPermissions: Record<string, unknown> = {}
-	for (const [table, policy] of Object.entries(permissions)) {
-		const targetTable =
-			historicalName === 'documents' && table === 'contentRepresentations' ? 'documents' : table
-		if (tables.has(targetTable)) historicalPermissions[targetTable] = renameReferences(policy)
-	}
-	return historicalPermissions as typeof permissions
+	return Object.fromEntries(
+		Object.entries(permissions).flatMap(([table, policy]) => {
+			const targetTable =
+				historicalName === 'documents' && table === 'contentRepresentations' ? 'documents' : table
+			return tables.has(targetTable)
+				? [[targetTable, JSON.parse(JSON.stringify(renameReferences(policy)))]]
+				: []
+		})
+	)
 }
 
 /** The SDK policy fixture deploys one schema without its migration graph. Give
