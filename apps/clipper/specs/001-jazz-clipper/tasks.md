@@ -1,3 +1,17 @@
+# Document and attachment model — approved design, implementation pending
+
+The [accepted model](data-model.md#accepted-document-model-2026-11-12) supersedes
+historical entity descriptions below. This is a specification checkpoint; the
+in-progress runtime conversion is not complete.
+
+- [ ] Implement Document-owned saved-item state and native Jazz attachment relationships.
+- [ ] Keep Article metadata/content on Article and use reusable library-scoped Site/favicon relationships.
+- [ ] Preserve sourceUrl on Document; use resolvedUrl/canonicalUrl capture evidence on attachments.
+- [ ] Use Date for ReadingPosition.interactedAt with explicit serialization boundaries.
+- [ ] Initialize required progress to 0 in every creation transaction and preserve it through attachment/retry.
+- [ ] Qualify identical library/reader progress and concurrent offline furthest-progress reconciliation.
+- [ ] Use a fresh development schema; remove historical migrations/snapshots without legacy conversion or silent startup erasure.
+
 # Offline article images — current batch
 
 - [x] Start `feat/offline-article-images` from merged main `89ad4e7`; inspect native storage, gateway, extraction and DUI before implementation.

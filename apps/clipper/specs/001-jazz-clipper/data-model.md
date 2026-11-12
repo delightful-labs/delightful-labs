@@ -11,12 +11,14 @@ Every source-of-truth row carries or inherits an enforced `libraryId`/owner rela
 | Record | Important fields | Relationships / invariants |
 | --- | --- | --- |
 | Library | ID = authenticated account UUID, immutable owner ID and bootstrap format 1 | One canonical root per account; idempotently ensure only this immutable payload. Empty replicas never trigger another identity or random root ID; mutable data/migrations are separate. |
-| Document | ID, libraryId, optional url, readingProgress, resumePosition?, status, favorite, captured article metadata?, contentRepresentationId? | User-owned library item. Jazz `$createdAt` supplies its creation time. Progress is required, initially 0, bounded to 0–1. Captured article metadata and its optional immutable content representation live directly on the Document. Saved URL is optional for direct file uploads. |
+| Document | Jazz identity, library, sourceUrl?, readingProgress, resumePosition?, status, favorite, attachment? | Saved-item state; library and attachment are Jazz relationships. Progress is required, initially 0, bounded to 0–1. Jazz owns creation metadata. |
+| Article | title, author?, publishedAt?, language?, site?, source?, html, text | Article attachment with its own content and metadata. Site is a Jazz relationship. |
+| Site | origin, name?, favicon? | Reused within the owning library by normalized origin. Favicon is an Asset relationship. |
 | SourceIdentity | ID, libraryId, normalized accepted URL key, documentId, evidence kind/time, redirect target? | Preserve raw observed aliases separately. Revalidate shortening destinations. Duplicate reconciling must retain annotations and captures. |
 | Representation | ID, documentId, kind source/reader, normalizationVersion, selectorVersion, textHash, textLengthCodePoints, native sanitized payload, heading/footnote metadata | A successful reader snapshot is fixed in MVP. Source representation may retain selectors/quote/provenance rather than a full duplicate raw page. No historical revision UI required. |
 | Asset | ID, documentId, sourceURL, mediaType, byteCount, width/height?, content fingerprint when needed, native byte payload, processingVersion | Content-addressed only within owner scope; reference tracking prevents deleting bytes needed by another retained record. |
 | Highlight (annotation) | ID, libraryId, documentId, originalQuote, createdAt, deletedAt?, defaultColor? | Independent entity with its own stable identity and explicit Document association. One color in MVP, optional metadata supports future colors. One logical annotation can have multiple rendered spans and representations. Overlaps never merge. No resize command. |
-| Anchor | ID, annotationId, contentRepresentationId, selectors, normalizationVersion, status resolved/ambiguous/unresolved, derivedFrom? | W3C-compatible quote exact/prefix/suffix and code-point start/end; optional internal DOM path. Original selectors immutable. Deriving a reader anchor does not overwrite source evidence. No candidate repair workflow. |
+| Anchor | ID, annotationId, attachment relationship, selectors, normalizationVersion, status resolved/ambiguous/unresolved, derivedFrom? | W3C-compatible quote exact/prefix/suffix and code-point start/end; optional internal DOM path. Original selectors immutable. Deriving a reader anchor does not overwrite source evidence. No candidate repair workflow. |
 | Note | ID, libraryId, documentId, optional highlight link, content, editedAt, deletedAt? | Independent entity with its own stable identity. Document association is a relationship rather than the note's identity. One active editable note per parent remains a cardinality rule; concurrent creation needs separate reconciliation. Plain text, linkification at view. Retain conflicting text until reconciled rather than last-write overwrite loss. |
 | NoteRevision | ID, libraryId, noteId, text, causal parent revision IDs, editedAt | Current immutable full-text conflict storage. Content belongs to an independently identified note; revision IDs and timestamps cannot replace the note's identity. Concurrent heads are retained until explicitly reconciled. |
 | Tag | ID, libraryId, displayName, normalizedKey, deletedAt? | Trim outer whitespace; case-insensitive identity. Proposed Unicode NFC + locale-independent fold/version; implementation must qualify non-ASCII collisions before schema lock. Rename collision fails clearly rather than silently merge. |
@@ -32,47 +34,90 @@ This decision supersedes the earlier Article-as-primary-object and independent i
 ```ts
 type ReadingStatus = 'inbox' | 'later' | 'archive'
 
-type DocumentStatus =
-  | { status: ReadingStatus }
-  | {
-      status: 'trashed'
-      previousStatus: ReadingStatus
-    }
-
-type Document = DocumentStatus & {
-  id: string
-  libraryId: string
-  url: string | null
+type Document = {
+  library: Library // Jazz relationship
+  sourceUrl: string | null // Original URL supplied when saving
   readingProgress: number // Required, initially 0, bounded to 0–1
-  resumePosition: ReadingPosition | null // User-owned; initially null
+  resumePosition: ReadingPosition | null
   favorite: boolean
-  title: string | null
+  attachment: Article | PDF | EPUB | null // Jazz relationship; PDF/EPUB deferred
+} & (
+  | { status: ReadingStatus }
+  | { status: 'trashed'; previousStatus: ReadingStatus }
+)
+
+type Article = {
+  title: string
   author: string | null
   publishedAt: string | null
-  siteName: string | null
   language: string | null
-  finalUrl: string | null
-  canonicalUrl: string | null // Only when verified
-  contentRepresentationId: string | null
+  site: Site | null // Jazz relationship
+  source: CaptureSource | null
+  html: string // Sanitized captured HTML
+  text: string // Extracted readable text
+}
+
+type Site = {
+  origin: string // Normalized origin; subdomains remain separate
+  name: string | null
+  favicon: Asset | null // Jazz relationship
+}
+
+type CaptureSource = {
+  resolvedUrl: string // URL that returned the captured content after redirects
+  canonicalUrl: string | null // Accepted publisher declaration
+}
+
+type ReadingPosition = {
+  version: 1
+  offset: number
+  quote: string
+  prefix: string
+  suffix: string
+  interactedAt: Date
 }
 ```
 
-`contentRepresentationId`, when present, points directly to the immutable captured content bundle. Its UUID is distinct from the user-owned Document ID because they identify different records. PDF/EPUB locator design and ingestion remain outside MVP.
+**User-confirmed correction (2026-11-12):** Restore the original Document/Article
+separation. Document contains saved-item state and an actual attachment relationship;
+article metadata belongs to Article. Article does not extend Document. There is no
+application-facing attachmentId, representationId or contentRepresentationId, and no
+redundant `kind: 'article'`. Jazz owns record identity and creation metadata. Backing
+foreign-key columns required by Jazz belong to persistence wiring; callers consume
+relationships through joined records. Site and favicon are reusable relationships
+within the owning library, with cross-library references prohibited.
+
+**Approved URL semantics:** Document.sourceUrl preserves the originally supplied URL,
+including meaningful query parameters and fragments. Capturing, redirecting or observing
+a canonical declaration does not overwrite it. Each attachment can carry CaptureSource,
+so these fields also apply to future PDFs and EPUBs. CaptureSource is a shared field
+shape, not a requirement for another table. Uploads can have no web source. resolvedUrl
+replaces the ambiguous finalUrl name. canonicalUrl is a publisher declaration that can
+inform duplicate detection; it is not record identity and cannot automatically merge
+Documents or annotations. Site follows the captured/resolved origin, not a cross-domain
+canonical hint. Replacing an attachment may change its capture evidence while retaining
+the Document's identity and reading state. PDF/EPUB ingestion remains deferred.
+
+ReadingPosition.interactedAt is a Date in the domain model. Serialization boundaries
+must explicitly encode/decode it when their transport does not preserve Dates.
 
 Saving creates the Document with progress 0 in the same owned transaction; all capture entry points must satisfy this invariant. Jazz `$createdAt` records when the Document was created. Content attachment, failure, retry and re-clipping preserve Document identity and existing progress. Required progress propagates to reader/library render contracts without optional fields or consumer `?? 0` defaults. A missing value on a known Document is an invariant failure, not a display fallback. Resume location may move backward while furthest progress remains unchanged.
 
 A trashed Document requires previousStatus. Non-trashed variants omit it; restore returns to previousStatus and removes the Trash-only field. This union replaces separate logical Trash/status flags while keeping the user's previous reading status recoverable.
 
-Notes and highlights associate with the Document; anchors reference the attachment representation. The library lists Documents only, not independent attachment/content rows. Multiple formats of a book are separate Documents under this single-attachment decision. Source-identity deduplication must preserve user records and annotations; exact conversion of existing shared-content relationships remains a migration design gate.
+Notes and highlights associate with the Document; anchors reference the attachment representation. The library lists Documents only, not independent attachment/content rows. Multiple formats of a book are separate Documents under this single-attachment decision. Source-identity deduplication must preserve user records and annotations. Legacy record conversion is not required for the disposable development baseline.
 
-Migration must preserve existing progress from reader history, resume evidence, identities/links, organization and annotations; initialize genuinely unread items to 0; and account for legacy document-only items. A schema default of 0 alone is insufficient for already-read items. Jazz `$createdAt` records the creation time of each new Document row. Qualify native migration, permissions, concurrent offline progress reconciliation and restart/reconnect behavior before claiming this target implemented. No schema migration, ownership relaxation or data reset is authorized by this documentation change.
+Development data is disposable. The user authorized a fresh current-schema baseline,
+removal of historical migrations/snapshots and no legacy conversion. Reset incompatible
+development databases explicitly; normal startup must not silently erase data. Runtime
+conversion and concurrent offline progress qualification remain unfinished.
 
 ### Reading-progress cleanup plan (implementation deferred)
 
 The Document model above replaces the current scattered progress handling. This is a specification for subsequent implementation, not a request to restore the discarded progress patch.
 
 - **Single state owner:** the worker-owned reader experience machine owns live progress updates and persistence. The persisted Document is the authoritative user record. Retained reader observations may support reconciliation, but must not become a second independently mutable progress authority.
-- **Initialize at creation:** all Document creation paths write required progress 0 in the creating transaction. Migration supplies preserved historical progress for existing records. Article/attachment constructors, collection projections and UI components must not synthesize initial values.
+- **Initialize at creation:** all Document creation paths write required progress 0 in the creating transaction. Article/attachment constructors, collection projections and UI components must not synthesize initial values.
 - **Canonical rules:** keep the bounded progress schema, measurement-to-progress calculation and furthest-progress reconciliation rules in the reader domain. Compose related Zod schemas from that canonical schema. A scrolling measurement and a final detach measurement use the same pure update calculation; their admission, validation, queueing, drain and write settlement remain explicit in the owning statechart. Removing duplicated calculation must not conceal workflow selection inside a helper.
 - **Measurement boundary:** the UI viewport adapter measures DOM geometry and reports a location. The worker owns domain progress calculation and mutation decisions. Resume position remains Document-owned, representation-specific and initially absent; it is not replaced by a numeric percentage.
 - **One stable key:** use Document ID for reading-state ownership and progress updates. Attachment/representation IDs identify content and locators, not substitute user-state owners. Remove the current implicit dependence on article content ID, document ID and snapshot ID being interchangeable.
@@ -80,7 +125,7 @@ The Document model above replaces the current scattered progress handling. This 
 - **Remove consumer policy:** eliminate repeated `?? 0` fallbacks, undefined guards, optional progress props, placeholder row values and progress augmentation in unrelated collection/search/organization layers. `Reader`, `ReaderView`, `ReaderToolbar`, list items and the progress component only pass/render required values. Percentage formatting/localized labels remain presentation. Unknown/unavailable Documents stay explicit unavailable states; missing progress on a known Document is an invariant failure.
 - **Simplify existing code together:** review `reader/schema.ts`, `reader/anchors.ts`, `reader/viewport.ts`, `machines/reader/experience.ts`, `machines/capture/library.ts`, `capture/library-articles.ts`, `contracts/articles.ts`, `runtime/worker/views.ts`, `integrations/Reader.svelte` and reader/list components as one affected flow. Remove redundant progress maps/projections once the Document-backed replacement is qualified; retain observation history needed to preserve offline conflict semantics.
 
-Acceptance must cover required progress at every creation boundary (including URL-only saves), preservation during attachment/retry, migration of already-read and unread records, identical library/reader progress, scrolling backward, final-position flush, stale account/attachment events, and permission failures. Prove furthest-progress reconciliation across concurrent offline devices; a local `Math.max` followed by an ordinary field write is not sufficient evidence. Retain local/remote/unknown-write settlement and full browser restart/offline/reconnect qualification. No PDF/EPUB reader or general content-refresh work is added to this cleanup.
+Acceptance must cover required progress at every creation boundary (including URL-only saves), preservation during attachment/retry, identical library/reader progress, scrolling backward, final-position flush, stale account/attachment events, and permission failures. Prove furthest-progress reconciliation across concurrent offline devices; a local `Math.max` followed by an ordinary field write is not sufficient evidence. Retain local/remote/unknown-write settlement and full browser restart/offline/reconnect qualification. No PDF/EPUB reader or general content-refresh work is added to this cleanup.
 
 ## AT Protocol identity boundary
 
