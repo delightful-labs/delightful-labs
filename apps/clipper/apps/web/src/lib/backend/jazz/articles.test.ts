@@ -53,7 +53,7 @@ it('persists an article with only its URL and metadata, without fake content or 
 		operationId: null,
 		failure: null
 	})
-	expect(await a.db.all(app.documents.where({ libraryId: a.id }))).toEqual([])
+	expect(await a.db.all(app.contentRepresentations.where({ libraryId: a.id }))).toEqual([])
 	expect(await a.db.all(app.storageOperations.where({ libraryId: a.id }))).toEqual([])
 })
 it('the same save operation accepts content and completes the original article without replacing snapshots', async () => {
@@ -111,7 +111,7 @@ it('saves supplied browser content directly and allows a second URL to reuse the
 	)
 	expect(second.kind).toBe('duplicate')
 	expect('ready' in second && second.ready).toBe(true)
-	expect(await a.db.all(app.documents.where({ libraryId: a.id }))).toHaveLength(1)
+	expect(await a.db.all(app.contentRepresentations.where({ libraryId: a.id }))).toHaveLength(1)
 })
 it('keeps a pending article and blocks replay when an earlier publication intent is stranded', async () => {
 	const a = await owner('article-unknown')
@@ -131,7 +131,7 @@ it('keeps a pending article and blocks replay when an earlier publication intent
 	)
 	expect(result.kind).toBe('unknown')
 	expect(await a.records.articles.read(initial.operationId)).toMatchObject({ contentId: null, url })
-	expect(await a.db.all(app.documents.where({ libraryId: a.id }))).toEqual([])
+	expect(await a.db.all(app.contentRepresentations.where({ libraryId: a.id }))).toEqual([])
 })
 it('denies foreign article access and content references, and prevents completed article replacement', async () => {
 	const a = await owner('article-a'),

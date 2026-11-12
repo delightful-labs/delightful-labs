@@ -16,6 +16,7 @@ import type { ReaderChange, ReaderOperation, ReadingPosition } from '../../reade
 import {
 	canQueueReaderChange,
 	mergeReadingProgress,
+	reconcilePositionProgress,
 	projectReaderState,
 	readerChangeKey
 } from '../../reader/schema.js'
@@ -812,13 +813,12 @@ export const readerExperienceMachine = model.createMachine({
 											context: (({ context, event }) => {
 												const documentId = required(context.attachment).documentId
 												const position = required(event.output.position)
-												const progress = mergeReadingProgress(context.progress, {
-													[documentId]: position.progress
-												})
+												const { progress, position: reconciledPosition } =
+													reconcilePositionProgress(context.progress, documentId, position)
 												const change: ReaderChange = {
 													documentId,
 													field: 'position',
-													value: { ...position, progress: required(progress[documentId]) }
+													value: reconciledPosition
 												}
 												return {
 													progress,
@@ -903,26 +903,19 @@ export const readerExperienceMachine = model.createMachine({
 												)
 											)
 												return
-											let context = args.context
-											let patch = {}
-											patch = {
-												...patch,
-												progress: mergeReadingProgress(context.progress, {
-													[required(context.attachment).documentId]: event.position.progress
-												})
-											}
-											context = { ...args.context, ...patch }
+											const documentId = required(args.context.attachment).documentId
+											const { progress, position } = reconcilePositionProgress(
+												args.context.progress,
+												documentId,
+												event.position
+											)
+											const patch = { progress }
 											enq.raise({
 												type: 'CHANGE',
 												change: {
 													field: 'position',
-													documentId: required(context.attachment).documentId,
-													value: {
-														...event.position,
-														progress: required(
-															context.progress[required(context.attachment).documentId]
-														)
-													}
+													documentId,
+													value: position
 												}
 											})
 											return { context: patch }

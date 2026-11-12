@@ -76,7 +76,7 @@ it('declares images with immutable text, saves native bytes independently, and e
 	const a = await owner('images-owner'),
 		b = await owner('images-foreign')
 	expect(a.image).toMatchObject({ status: 'pending', assetId: null })
-	expect(await a.db.one(app.documents.where({ id: a.documentId }))).not.toBeNull()
+	expect(await a.db.one(app.contentRepresentations.where({ id: a.documentId }))).not.toBeNull()
 	expect(await b.db.all(app.articleImages.where({ libraryId: a.id }))).toEqual([])
 	const failed = await write(a, { kind: 'failed', image: a.image, retryable: true })
 	expect(failed.settlement.kind).toBe('locallyPersisted')

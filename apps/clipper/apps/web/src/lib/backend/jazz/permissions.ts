@@ -1,6 +1,7 @@
 import { schema as s } from 'jazz-tools'
 import type { RowRefValue } from 'jazz-tools/permissions'
 import { app } from './schema.js'
+import { documentStatusValues } from '../../capture/document-schema.js'
 
 export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	policy.better_auth_user.allowRead.never()
@@ -50,7 +51,7 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	const documentNoteParent = (row: NoteParent) =>
 		allOf([
 			{ articleId: null },
-			policy.documents.exists.where({ id: row.documentId, libraryId: row.libraryId })
+			policy.contentRepresentations.exists.where({ id: row.documentId, libraryId: row.libraryId })
 		])
 	const ownedNoteParent = (row: NoteParent) =>
 		allOf([owns(row.libraryId), anyOf([articleNoteParent(row), documentNoteParent(row)])])
@@ -75,7 +76,7 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	const imageParent = (row: { libraryId: RowRefValue; documentId: RowRefValue }) =>
 		allOf([
 			owns(row.libraryId),
-			policy.documents.exists.where({ id: row.documentId, libraryId: row.libraryId })
+			policy.contentRepresentations.exists.where({ id: row.documentId, libraryId: row.libraryId })
 		])
 	policy.articleImages.allowRead.where((row) => owns(row.libraryId))
 	policy.articleImages.allowInsert.where((row) =>
@@ -109,7 +110,10 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 				]),
 				allOf([
 					{ field: 'position' },
-					policy.documents.exists.where({ id: row.documentId, libraryId: row.libraryId })
+					policy.contentRepresentations.exists.where({
+						id: row.documentId,
+						libraryId: row.libraryId
+					})
 				])
 			])
 		])
@@ -127,7 +131,10 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 				]),
 				allOf([
 					{ articleId: null },
-					policy.documents.exists.where({ id: row.documentId, libraryId: row.libraryId })
+					policy.contentRepresentations.exists.where({
+						id: row.documentId,
+						libraryId: row.libraryId
+					})
 				])
 			])
 		])
@@ -145,7 +152,10 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 				]),
 				allOf([
 					{ articleId: null },
-					policy.documents.exists.where({ id: row.documentId, libraryId: row.libraryId })
+					policy.contentRepresentations.exists.where({
+						id: row.documentId,
+						libraryId: row.libraryId
+					})
 				])
 			]),
 			anyOf([
@@ -166,7 +176,7 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 			owns(row.libraryId),
 			anyOf([
 				{ contentId: null },
-				policy.documents.exists.where({ id: row.contentId, libraryId: row.libraryId })
+				policy.contentRepresentations.exists.where({ id: row.contentId, libraryId: row.libraryId })
 			])
 		])
 	policy.articles.allowInsert.where(articleTarget)
@@ -175,6 +185,22 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 		.whereOld((row) => allOf([owns(row.libraryId), { contentId: null }]))
 		.whereNew(articleTarget)
 	policy.articles.allowDelete.never()
+	policy.libraryDocuments.allowRead.where((row) => owns(row.libraryId))
+	policy.libraryDocuments.allowInsert.where((row) =>
+		allOf([
+			owns(row.libraryId),
+			anyOf(documentStatusValues.map((status) => ({ status }))),
+			anyOf([
+				{ contentRepresentationId: null },
+				policy.contentRepresentations.exists.where({
+					id: row.contentRepresentationId,
+					libraryId: row.libraryId
+				})
+			])
+		])
+	)
+	policy.libraryDocuments.allowUpdate.never()
+	policy.libraryDocuments.allowDelete.never()
 	policy.storageOperations.allowRead.where((row) => owns(row.libraryId))
 	policy.storageOperations.allowInsert.where((row) => owns(row.libraryId))
 	policy.storageOperations.allowUpdate.never()
@@ -201,8 +227,8 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	)
 	policy.snapshots.allowUpdate.never()
 	policy.snapshots.allowDelete.never()
-	policy.documents.allowRead.where((row) => owns(row.libraryId))
-	policy.documents.allowInsert.where((row) =>
+	policy.contentRepresentations.allowRead.where((row) => owns(row.libraryId))
+	policy.contentRepresentations.allowInsert.where((row) =>
 		allOf([
 			owns(row.libraryId),
 			policy.storageOperations.exists.where({
@@ -225,11 +251,11 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	policy.articleSources.allowInsert.where((row) =>
 		allOf([
 			owns(row.libraryId),
-			policy.documents.exists.where({ id: row.documentId, libraryId: row.libraryId })
+			policy.contentRepresentations.exists.where({ id: row.documentId, libraryId: row.libraryId })
 		])
 	)
 	policy.articleSources.allowUpdate.never()
 	policy.articleSources.allowDelete.never()
-	policy.documents.allowUpdate.never()
-	policy.documents.allowDelete.never()
+	policy.contentRepresentations.allowUpdate.never()
+	policy.contentRepresentations.allowDelete.never()
 })

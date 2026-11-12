@@ -114,7 +114,9 @@ it('publishes text and native byte payload only after local persistence', async 
 	expect(read.asset.bytes.every((byte, index) => byte === input.bytes[index])).toBe(true)
 	const repeat = await toPromise(createActor(store.saveMachine, { input }).start())
 	expect(repeat.kind).toBe('blocked')
-	expect(await db.all(app.documents.where({ operationId: input.operationId }))).toHaveLength(1)
+	expect(
+		await db.all(app.contentRepresentations.where({ operationId: input.operationId }))
+	).toHaveLength(1)
 })
 it('denies foreign reads, forged parents, immutable changes and partial publication', async () => {
 	const a = await owner('records-a'),
@@ -124,7 +126,7 @@ it('denies foreign reads, forged parents, immutable changes and partial publicat
 	if (saved.kind !== 'saved') throw new Error('Expected local save')
 	await Promise.all(saved.receipts.map((receipt) => receipt.global()))
 	const foreignRows = await Promise.all([
-		b.db.one(app.documents.where({ id: input.operationId })),
+		b.db.one(app.contentRepresentations.where({ id: input.operationId })),
 		b.db.one(app.snapshots.where({ id: input.operationId })),
 		b.db.one(app.assets.where({ id: input.operationId })),
 		b.db.one(app.storageOperations.where({ id: input.operationId }))
@@ -133,10 +135,12 @@ it('denies foreign reads, forged parents, immutable changes and partial publicat
 	expect(await b.db.all(app.assets.where({ id: input.operationId }))).toEqual([])
 	const deny = /denied|rejected/i
 	await expect(
-		a.db.update(app.documents, input.operationId, { title: 'Overwrite' }).wait({ tier: 'global' })
+		a.db
+			.update(app.contentRepresentations, input.operationId, { title: 'Overwrite' })
+			.wait({ tier: 'global' })
 	).rejects.toThrow(deny)
 	await expect(
-		a.db.delete(app.documents, input.operationId).wait({ tier: 'global' })
+		a.db.delete(app.contentRepresentations, input.operationId).wait({ tier: 'global' })
 	).rejects.toThrow(deny)
 	await expect(
 		b.db
@@ -182,13 +186,17 @@ it('reports authority rejection through sync while preserving the immutable save
 	const saved = await toPromise(createActor(store.saveMachine, { input }).start())
 	if (saved.kind !== 'saved') throw new Error('Expected local save')
 	await Promise.all(saved.receipts.map((receipt) => receipt.global()))
-	const write = db.update(app.documents, input.operationId, { title: 'Forbidden replacement' })
+	const write = db.update(app.contentRepresentations, input.operationId, {
+		title: 'Forbidden replacement'
+	})
 	const actor = createActor(storageSyncMachine, {
 		input: [{ global: () => write.wait({ tier: 'global' }) }]
 	}).start()
 	await toPromise(actor)
 	expect(actor.getSnapshot().value).toBe('rejected')
-	expect((await db.one(app.documents.where({ id: input.operationId })))?.title).toBe(input.title)
+	expect((await db.one(app.contentRepresentations.where({ id: input.operationId })))?.title).toBe(
+		input.title
+	)
 })
 
 it('rejects an invalid native publication atomically and keeps only its operation journal', async () => {
@@ -203,11 +211,11 @@ it('rejects an invalid native publication atomically and keeps only its operatio
 	const { id: documentId, ...document } = draft.document
 	tx.insert(app.assets, asset, { id: assetId })
 	tx.insert(app.snapshots, { ...snapshot, documentId: crypto.randomUUID() }, { id: snapshotId })
-	tx.insert(app.documents, document, { id: documentId })
+	tx.insert(app.contentRepresentations, document, { id: documentId })
 	await expect(tx.commit().wait({ tier: 'global' })).rejects.toThrow(/denied|rejected/i)
 	expect(await db.one(app.assets.where({ id: assetId }))).toBeNull()
 	expect(await db.one(app.snapshots.where({ id: snapshotId }))).toBeNull()
-	expect(await db.one(app.documents.where({ id: documentId }))).toBeNull()
+	expect(await db.one(app.contentRepresentations.where({ id: documentId }))).toBeNull()
 	expect(await db.one(app.storageOperations.where({ id: operationId }))).not.toBeNull()
 	expect((await toPromise(createActor(store.saveMachine, { input }).start())).kind).toBe('blocked')
 })

@@ -1,8 +1,10 @@
 import { expect, it } from 'vitest'
 import {
+	advanceReadingProgress,
 	defaultPreferences,
 	isValidReaderChange,
 	projectReaderState,
+	reconcilePositionProgress,
 	readerOperationSchema
 } from './schema.js'
 const libraryId = crypto.randomUUID(),
@@ -23,7 +25,7 @@ function operation(
 	})
 }
 const position = (offset: number, progress: number, interactedAt = '2026-11-05T12:00:00.000Z') => ({
-	version: 1,
+	version: 1 as const,
 	offset,
 	quote: 'Reading',
 	prefix: '',
@@ -65,6 +67,15 @@ it('lets last location move back while furthest progress remains, with causal pr
 	const state = projectReaderState([back, first])
 	expect(state.positions[documentId]?.offset).toBe(10)
 	expect(state.progress[documentId]).toBe(0.8)
+})
+it('uses one bounded furthest-progress update for live and final position measurements', () => {
+	const current = { [documentId]: 0.8, [libraryId]: 0.3 }
+	const observed = position(10, 0.2)
+	const reconciled = reconcilePositionProgress(current, documentId, observed)
+	expect(reconciled.progress).toEqual(current)
+	expect(reconciled.position).toEqual({ ...observed, progress: 0.8 })
+	expect(advanceReadingProgress(0.2, 0.5)).toBe(0.5)
+	expect(() => advanceReadingProgress(0.2, 1.01)).toThrow()
 })
 it('uses interaction time then operation ID for available concurrent positions and isolates representations', () => {
 	const early = operation('position', position(10, 0.2)),

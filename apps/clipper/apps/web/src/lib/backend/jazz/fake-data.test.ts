@@ -36,7 +36,7 @@ it('seeds complete private native records and independent metadata once, includi
 	expect(await toPromise(seed(db, id))).toBe('seeded')
 	const articles = await db.all(app.articles.where({ libraryId: id }))
 	expect(articles).toHaveLength(24)
-	expect(await db.all(app.documents.where({ libraryId: id }))).toHaveLength(24)
+	expect(await db.all(app.contentRepresentations.where({ libraryId: id }))).toHaveLength(24)
 	expect(await db.all(app.tagOperations.where({ libraryId: id }))).toHaveLength(24)
 	expect(await db.all(app.organizationOperations.where({ libraryId: id }))).toHaveLength(72)
 	const first = articles[0]
@@ -71,7 +71,7 @@ it('rechecks under the serializable transaction so racing seeders do not duplica
 	const results = await Promise.all([toPromise(seed(db, id)), toPromise(seed(db, id))])
 	expect(results).toContain('seeded')
 	expect(await db.all(app.articles.where({ libraryId: id }))).toHaveLength(24)
-	expect(await db.all(app.documents.where({ libraryId: id }))).toHaveLength(24)
+	expect(await db.all(app.contentRepresentations.where({ libraryId: id }))).toHaveLength(24)
 })
 it('does not seed or disclose another account library', async () => {
 	const a = await owner('fake-private'),

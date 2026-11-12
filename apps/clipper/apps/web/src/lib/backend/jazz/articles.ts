@@ -35,7 +35,7 @@ export function createArticleRecords(
 		return row ? articleRecord(row, libraryId) : null
 	}
 	const document = async (id: string) => {
-		const row = await db.one(app.documents.where({ id: uuid(id), libraryId }), {
+		const row = await db.one(app.contentRepresentations.where({ id: uuid(id), libraryId }), {
 			tier: ReadTier.LocalFirst
 		})
 
@@ -77,7 +77,7 @@ export function createArticleRecords(
 					read: async (resource, draft) => {
 						const facts = await readArticle(resource, draft)
 						const document = await resource.tx.one(
-							app.documents.where({ id: draft.target, libraryId }),
+							app.contentRepresentations.where({ id: draft.target, libraryId }),
 							{ tier: ReadTier.LocalFirst }
 						)
 						return { ...facts, available: document !== null }
@@ -173,7 +173,7 @@ export function createArticleRecords(
 			),
 		documents: (next, error) =>
 			db.subscribe(
-				app.documents.where({ libraryId }),
+				app.contentRepresentations.where({ libraryId }),
 				{
 					onUpdate: next,
 					onError: error

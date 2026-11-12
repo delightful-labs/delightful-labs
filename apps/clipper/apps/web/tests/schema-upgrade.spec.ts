@@ -23,7 +23,8 @@ import { app as preOrganizationApp } from './fixtures/schema-history/preorganiza
 import organizationMigration from './fixtures/schema-history/migrations/20261105T033336-library-organization-80988faa7219-5315ce57b805.js'
 import migration from './fixtures/schema-history/migrations/20261103T231346-url-first-articles-9251313c0afe-80988faa7219.js'
 const appId = '2db98ae3-fcf1-41e8-b7d3-9818496bde60'
-const baseURL = 'http://127.0.0.1:5180'
+const baseURL = `http://127.0.0.1:${process.env.CLIPPER_SCHEMA_PORT ?? '5180'}`
+const jazzPort = Number(process.env.CLIPPER_SCHEMA_JAZZ_PORT ?? '5181')
 const legacyPermissions = permissionsForSchema(legacyApp)
 async function savedArticle(page: Page, url: string) {
 	return page.evaluate(async (url) => {
@@ -63,7 +64,7 @@ for (const browser of [chromium, firefox]) {
 					startLocalJazzServer({
 						appId,
 						host: '127.0.0.1',
-						port: 5181,
+						port: jazzPort,
 						dataDir: join(directory, 'authority')
 					}))
 				let context = await test.step('Open legacy browser profile', () =>

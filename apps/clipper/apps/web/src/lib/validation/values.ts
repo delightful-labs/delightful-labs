@@ -5,6 +5,10 @@ export const uuidSchema = z
 	.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
 export const lowercaseUuidSchema = uuidSchema.refine((value) => value === value.toLowerCase())
 export const recordSchema = z.record(z.string(), z.unknown())
+export const webUrlSchema = z.url().refine((value) => {
+	const url = new URL(value)
+	return usesHttpProtocol(url) && !hasCredentials(url)
+})
 const encoder = new TextEncoder()
 function hasNonblankText(value: string) {
 	return !!value.trim()

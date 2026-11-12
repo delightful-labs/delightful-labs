@@ -31,6 +31,10 @@ import { app as beforeAuth } from '../../../../tests/fixtures/schema-history/pre
 import authMigration from './migrations/20261109T125137-better-auth-native-bb82b0448a9f-7c74c142a5dc.js'
 import { app as beforeMetadata } from '../../../../tests/fixtures/schema-history/premetadata-schema.test-support.js'
 import metadataMigration from './migrations/20261110T161543-article-metadata-5e70efdb5795-8a4e11c993e0.js'
+import documentMigration from './migrations/20261112T001319-document-attachments-8a4e11c993e0-147cca2a3088.js'
+import savedAtMigration from './migrations/20261112T011128-remove-saved-at-147cca2a3088-f51d40bd10a8.js'
+import cleanDocumentMigration from './migrations/20261112T012648-collapse-article-data-onto-document-f51d40bd10a8-f3a133184527.js'
+import renameContentMigration from './migrations/20261112T020739-clarify-content-representation-link-f3a133184527-3b875a72f847.js'
 import { app as beforeExcerpts } from '../../../../tests/fixtures/schema-history/preexcerpt-schema.test-support.js'
 import excerptMigration from './migrations/20261110T152256-article-excerpts-7c74c142a5dc-5e70efdb5795.js'
 import { legacyApp } from '../../../../tests/fixtures/schema-history/legacy-schema.test-support.js'
@@ -66,6 +70,34 @@ const {
 } = await import(pathToFileURL(join(sdkRoot, 'runtime/client-migrations.js')).href)
 const deployedEdges = new Map<string, MigrationEdge[]>()
 const guestPorts = new Map<string, number>()
+const beforeDocumentsSchema: typeof app.wasmSchema = JSON.parse(
+	await readFile(
+		new URL('./migrations/snapshots/20261110T161543-8a4e11c993e0.json', import.meta.url),
+		'utf8'
+	)
+)
+const beforeDocumentsApp = { wasmSchema: beforeDocumentsSchema }
+const beforeSavedAtSchema: typeof app.wasmSchema = JSON.parse(
+	await readFile(
+		new URL('./migrations/snapshots/20261112T001319-147cca2a3088.json', import.meta.url),
+		'utf8'
+	)
+)
+const beforeSavedAtApp = { wasmSchema: beforeSavedAtSchema }
+const beforeCleanSchema: typeof app.wasmSchema = JSON.parse(
+	await readFile(
+		new URL('./migrations/snapshots/20261112T011128-f51d40bd10a8.json', import.meta.url),
+		'utf8'
+	)
+)
+const beforeCleanApp = { wasmSchema: beforeCleanSchema }
+const beforeRenameSchema: typeof app.wasmSchema = JSON.parse(
+	await readFile(
+		new URL('./migrations/snapshots/20261112T012648-f3a133184527.json', import.meta.url),
+		'utf8'
+	)
+)
+const beforeRenameApp = { wasmSchema: beforeRenameSchema }
 // Alpha.60 uses a different structural schema hash. Preserve the historical
 // witnesses and lenses, resolving their endpoints to the same full fixture
 // schemas compiled by the current SDK. This does not claim a cross-SDK upgrade.
@@ -81,7 +113,11 @@ const historicalSchemas: Record<string, { wasmSchema: typeof app.wasmSchema }> =
 	'current-auth': beforeExcerpts,
 	'7c74c142a5dc': beforeExcerpts,
 	'5e70efdb5795': beforeMetadata,
-	'8a4e11c993e0': app
+	'8a4e11c993e0': beforeDocumentsApp,
+	'147cca2a3088': beforeSavedAtApp,
+	f51d40bd10a8: beforeCleanApp,
+	f3a133184527: beforeRenameApp,
+	'3b875a72f847': app
 }
 async function deploy(input: Parameters<typeof deployCore>[0]) {
 	if (!input.migration) return deployCore(input)
@@ -95,16 +131,50 @@ async function deploy(input: Parameters<typeof deployCore>[0]) {
 			? [
 					{ schema: beforeExcerpts, migration: authMigration },
 					{ schema: beforeMetadata, migration: excerptMigration },
-					{ schema: app, migration: metadataMigration }
+					{ schema: beforeDocumentsApp, migration: metadataMigration },
+					{ schema: beforeSavedAtApp, migration: documentMigration },
+					{ schema: beforeCleanApp, migration: savedAtMigration },
+					{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+					{ schema: app, migration: renameContentMigration }
 				]
 			: to === beforeExcerpts
 				? [
 						{ schema: beforeMetadata, migration: excerptMigration },
-						{ schema: app, migration: metadataMigration }
+						{ schema: beforeDocumentsApp, migration: metadataMigration },
+						{ schema: beforeSavedAtApp, migration: documentMigration },
+						{ schema: beforeCleanApp, migration: savedAtMigration },
+						{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+						{ schema: app, migration: renameContentMigration }
 					]
 				: to === beforeMetadata
-					? [{ schema: app, migration: metadataMigration }]
-					: []
+					? [
+							{ schema: beforeDocumentsApp, migration: metadataMigration },
+							{ schema: beforeSavedAtApp, migration: documentMigration },
+							{ schema: beforeCleanApp, migration: savedAtMigration },
+							{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+							{ schema: app, migration: renameContentMigration }
+						]
+					: to === beforeDocumentsApp
+						? [
+								{ schema: beforeSavedAtApp, migration: documentMigration },
+								{ schema: beforeCleanApp, migration: savedAtMigration },
+								{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+								{ schema: app, migration: renameContentMigration }
+							]
+						: to === beforeSavedAtApp
+							? [
+									{ schema: beforeCleanApp, migration: savedAtMigration },
+									{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+									{ schema: app, migration: renameContentMigration }
+								]
+							: to === beforeCleanApp
+								? [
+										{ schema: beforeRenameApp, migration: cleanDocumentMigration },
+										{ schema: app, migration: renameContentMigration }
+									]
+								: to === beforeRenameApp
+									? [{ schema: app, migration: renameContentMigration }]
+									: []
 	const result = await deployCore({
 		...input,
 		schemas: [from, to, ...remaining.map((step) => step.schema)],
@@ -357,6 +427,7 @@ it('upgrades a persisted pre-article library without resetting its root or reada
 			ownerId: owner,
 			bootstrapVersion: '1'
 		})
+		expect(await current.all(app.libraryDocuments.where({ libraryId: owner }))).toEqual([])
 		const records = createLibraryRecords(current, owner, () => true)
 		expect(await current.one(app.snapshots.where({ id: documentId }))).toMatchObject({
 			text: 'Legacy text',

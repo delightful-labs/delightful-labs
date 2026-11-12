@@ -8,6 +8,6 @@ export function insertPreparedContent(tx: Pick<Transaction, 'insert'>, draft: Pr
 	const { id: snapshotId, ...snapshot } = draft.snapshot
 	tx.insert(app.snapshots, snapshot, { id: snapshotId })
 	const { id, ...document } = draft.document
-	tx.insert(app.documents, document, { id })
+	tx.insert(app.contentRepresentations, document, { id })
 	for (const { id, ...image } of draft.images ?? []) tx.insert(app.articleImages, image, { id })
 }

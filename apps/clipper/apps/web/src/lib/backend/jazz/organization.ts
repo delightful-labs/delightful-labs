@@ -51,9 +51,12 @@ export function createOrganizationRecords(
 		const article = await resource.tx.one(app.articles.where({ id: request.id, libraryId }), {
 			tier: ReadTier.LocalFirst
 		})
-		const document = await resource.tx.one(app.documents.where({ id: request.id, libraryId }), {
-			tier: ReadTier.LocalFirst
-		})
+		const document = await resource.tx.one(
+			app.contentRepresentations.where({ id: request.id, libraryId }),
+			{
+				tier: ReadTier.LocalFirst
+			}
+		)
 		const aliases = await resource.tx.all(
 			app.articles.where({
 				libraryId,

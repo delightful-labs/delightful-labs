@@ -1,4 +1,8 @@
 import { appMigrations, type DeployOptions } from 'jazz-tools/testing'
+import beforeDocumentsSchema from '../src/lib/backend/jazz/migrations/snapshots/20261110T161543-8a4e11c993e0.json' with { type: 'json' }
+import beforeSavedAtSchema from '../src/lib/backend/jazz/migrations/snapshots/20261112T001319-147cca2a3088.json' with { type: 'json' }
+import beforeCleanSchema from '../src/lib/backend/jazz/migrations/snapshots/20261112T011128-f51d40bd10a8.json' with { type: 'json' }
+import beforeRenameSchema from '../src/lib/backend/jazz/migrations/snapshots/20261112T012648-f3a133184527.json' with { type: 'json' }
 import { legacyApp } from './fixtures/schema-history/legacy-schema.test-support.js'
 import { app as organization } from './fixtures/schema-history/preorganization-schema.test-support.js'
 import { app as discovery } from './fixtures/schema-history/prediscovery-schema.test-support.js'
@@ -7,6 +11,10 @@ import { app as images } from './fixtures/schema-history/preimages-schema.test-s
 import { app as notes } from './fixtures/schema-history/prenotes-schema.test-support.js'
 import { app as entities } from './fixtures/schema-history/prenote-entities-schema.test-support.js'
 import { app } from '../src/lib/backend/jazz/schema.js'
+import documentMigration from '../src/lib/backend/jazz/migrations/20261112T001319-document-attachments-8a4e11c993e0-147cca2a3088.js'
+import savedAtMigration from '../src/lib/backend/jazz/migrations/20261112T011128-remove-saved-at-147cca2a3088-f51d40bd10a8.js'
+import cleanDocumentMigration from '../src/lib/backend/jazz/migrations/20261112T012648-collapse-article-data-onto-document-f51d40bd10a8-f3a133184527.js'
+import renameContentMigration from '../src/lib/backend/jazz/migrations/20261112T020739-clarify-content-representation-link-f3a133184527-3b875a72f847.js'
 import { app as beforeMetadata } from './fixtures/schema-history/premetadata-schema.test-support.js'
 import metadataMigration from '../src/lib/backend/jazz/migrations/20261110T161543-article-metadata-5e70efdb5795-8a4e11c993e0.js'
 import { app as beforeExcerpts } from './fixtures/schema-history/preexcerpt-schema.test-support.js'
@@ -33,7 +41,23 @@ const steps = [
 	{ to: beforeAuth, migration: entityMigration },
 	{ to: beforeExcerpts, migration: authMigration },
 	{ to: beforeMetadata, migration: excerptMigration },
-	{ to: app, migration: metadataMigration }
+	{
+		to: { wasmSchema: JSON.parse(JSON.stringify(beforeDocumentsSchema)) },
+		migration: metadataMigration
+	},
+	{
+		to: { wasmSchema: JSON.parse(JSON.stringify(beforeSavedAtSchema)) },
+		migration: documentMigration
+	},
+	{
+		to: { wasmSchema: JSON.parse(JSON.stringify(beforeCleanSchema)) },
+		migration: savedAtMigration
+	},
+	{
+		to: { wasmSchema: JSON.parse(JSON.stringify(beforeRenameSchema)) },
+		migration: cleanDocumentMigration
+	},
+	{ to: app, migration: renameContentMigration }
 ]
 export const browserMigrations = await appMigrations(legacyApp, ...steps)
 export const fixtureSchemas = [legacyApp, ...steps.map((step) => step.to)]
