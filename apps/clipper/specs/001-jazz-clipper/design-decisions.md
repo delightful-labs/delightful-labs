@@ -116,7 +116,15 @@ Extraction and display share a DOMPurify factory and namespace-specific attribut
 
 ## URL-first article saving
 
-The accepted 2026-11-12 model saves a user-owned Document immediately with its optional URL and required readingProgress of 0. Jazz `$createdAt` supplies its creation time without duplicating it as a domain field. Article metadata and its optional immutable content reference are stored directly on the Document; there is no separate one-to-one attachment row. Retry preserves Document identity. Trash stores the previous status needed for restoration and no extra timestamp. A dedicated worker processes missing-content Documents serially; no separate intake graph or custom IndexedDB journal is selected. The earlier native Article/immutable Document split is implementation history, not the target model. See [data-model.md](data-model.md#accepted-document-model-2026-11-12) for the agreed types, Trash union and migration gates; [durable-capture-design.md](durable-capture-design.md) retains historical publication evidence.
+The accepted 2026-11-12 model saves a user-owned Document with sourceUrl, required
+readingProgress of 0, resume position, favorite/status and an actual Jazz attachment
+relationship. Article owns article metadata and content, with a reusable Site relationship.
+Attachments carry optional CaptureSource (resolvedUrl and canonicalUrl); publisher URL
+hints do not replace saved source evidence or record identity. ReadingPosition.interactedAt
+is a Date. Jazz supplies creation metadata. Trash retains previousStatus. Disposable
+development data permits a fresh baseline without historical schema migrations or legacy
+conversion. See [data-model.md](data-model.md#accepted-document-model-2026-11-12) for the
+current shapes and qualification requirements. The runtime conversion remains unfinished.
 
 
 ## Direct browser clipping and current batch boundary
