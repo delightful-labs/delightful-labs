@@ -5,7 +5,7 @@ import { lowercaseUuidSchema, webUrlSchema } from '../validation/values.js'
 export const documentReadingStatusValues = ['inbox', 'later', 'archive'] as const
 export const documentStatusValues = [...documentReadingStatusValues, 'trashed'] as const
 export const documentReadingStatusSchema = z.enum(documentReadingStatusValues)
-const documentFields = {
+const documentFieldsSchema = z.object({
 	id: lowercaseUuidSchema,
 	libraryId: lowercaseUuidSchema,
 	url: webUrlSchema.nullable(),
@@ -14,14 +14,13 @@ const documentFields = {
 	resumePosition: positionSchema.omit({ progress: true }).nullable(),
 	favorite: z.boolean(),
 	articleAttachmentId: lowercaseUuidSchema.nullable()
-}
+})
 
-const activeDocumentSchema = z
-	.object({ ...documentFields, status: documentReadingStatusSchema })
+const activeDocumentSchema = documentFieldsSchema
+	.extend({ status: documentReadingStatusSchema })
 	.strict()
-const trashedDocumentSchema = z
-	.object({
-		...documentFields,
+const trashedDocumentSchema = documentFieldsSchema
+	.extend({
 		status: z.literal('trashed'),
 		trashedAt: z.iso.datetime(),
 		previousStatus: documentReadingStatusSchema
