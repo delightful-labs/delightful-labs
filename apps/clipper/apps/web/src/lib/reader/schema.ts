@@ -18,13 +18,17 @@ export const defaultPreferences: ReaderPreferences = {
 	spacing: 1.6,
 	width: 65
 }
+export const readingProgressSchema = z.number().min(0).max(1)
+export function advanceReadingProgress(current: number, observed: number) {
+	return Math.max(readingProgressSchema.parse(current), readingProgressSchema.parse(observed))
+}
 export const positionSchema = z.object({
 	version: z.literal(1),
 	offset: z.number().int().min(0).max(10_000_000),
 	quote: z.string().min(1).max(160),
 	prefix: z.string().max(48),
 	suffix: z.string().max(48),
-	progress: z.number().min(0).max(1),
+	progress: readingProgressSchema,
 	interactedAt: z.iso.datetime()
 })
 export type ReadingPosition = z.infer<typeof positionSchema>
@@ -91,9 +95,27 @@ export function mergeReadingProgress(
 	observed: Record<string, number>
 ) {
 	const progress = { ...current }
-	for (const [id, value] of Object.entries(observed))
-		progress[id] = Math.max(progress[id] ?? 0, value)
+	for (const [id, value] of Object.entries(observed)) {
+		progress[id] =
+			progress[id] === undefined
+				? readingProgressSchema.parse(value)
+				: advanceReadingProgress(progress[id], value)
+	}
 	return progress
+}
+export function reconcilePositionProgress(
+	current: Record<string, number>,
+	documentId: string,
+	position: ReadingPosition
+) {
+	const progress = mergeReadingProgress(current, { [documentId]: position.progress })
+	return {
+		progress,
+		position: {
+			...position,
+			progress: readingProgressSchema.parse(progress[documentId])
+		}
+	}
 }
 export function projectReaderState(operations: readonly ReaderOperation[]) {
 	const preferences = { ...defaultPreferences }
@@ -124,7 +146,10 @@ export function projectReaderState(operations: readonly ReaderOperation[]) {
 		)
 		const position = heads.at(-1)?.value
 		if (position) positions[id] = position
-		progress[id] = rows.reduce((maximum, row) => Math.max(maximum, row.value.progress), 0)
+		progress[id] = rows.reduce(
+			(maximum, row) => advanceReadingProgress(maximum, row.value.progress),
+			0
+		)
 	}
 	return { preferences, positions, progress }
 }

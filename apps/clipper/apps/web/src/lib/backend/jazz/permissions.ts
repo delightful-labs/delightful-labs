@@ -1,6 +1,7 @@
 import { schema as s } from 'jazz-tools'
 import type { RowRefValue } from 'jazz-tools/permissions'
 import { app } from './schema.js'
+import { documentStatusValues } from '../../capture/document-schema.js'
 
 export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	policy.better_auth_user.allowRead.never()
@@ -175,6 +176,31 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 		.whereOld((row) => allOf([owns(row.libraryId), { contentId: null }]))
 		.whereNew(articleTarget)
 	policy.articles.allowDelete.never()
+	policy.libraryDocuments.allowRead.where((row) => owns(row.libraryId))
+	policy.libraryDocuments.allowInsert.where((row) =>
+		allOf([owns(row.libraryId), anyOf(documentStatusValues.map((status) => ({ status })))])
+	)
+	policy.libraryDocuments.allowUpdate.never()
+	policy.libraryDocuments.allowDelete.never()
+	const articleAttachmentOwner = (row: {
+		libraryId: RowRefValue
+		documentId: RowRefValue
+		id: RowRefValue
+		representationId: RowRefValue
+	}) =>
+		allOf([
+			owns(row.libraryId),
+			policy.libraryDocuments.exists.where({
+				id: row.documentId,
+				libraryId: row.libraryId,
+				articleAttachmentId: row.id
+			}),
+			policy.documents.exists.where({ id: row.representationId, libraryId: row.libraryId })
+		])
+	policy.articleAttachments.allowRead.where((row) => owns(row.libraryId))
+	policy.articleAttachments.allowInsert.where(articleAttachmentOwner)
+	policy.articleAttachments.allowUpdate.never()
+	policy.articleAttachments.allowDelete.never()
 	policy.storageOperations.allowRead.where((row) => owns(row.libraryId))
 	policy.storageOperations.allowInsert.where((row) => owns(row.libraryId))
 	policy.storageOperations.allowUpdate.never()

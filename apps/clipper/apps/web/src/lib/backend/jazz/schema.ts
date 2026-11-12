@@ -1,6 +1,8 @@
 import { schema as s } from 'jazz-tools'
 import { migrations } from './migrations/index.js'
 import { schema as authSchema } from './auth-schema.js'
+import { positionSchema } from '../../reader/schema.js'
+import { documentReadingStatusValues, documentStatusValues } from '../../capture/document-schema.js'
 
 export const app = s.defineApp(
 	{
@@ -105,6 +107,44 @@ export const app = s.defineApp(
 				failure: s.string().optional()
 			},
 			{ library: s.rel('libraries', 'libraryId'), content: s.rel('documents', 'contentId') }
+		),
+		// The legacy `documents` table stores immutable content bundles; this table owns saved-library state.
+		libraryDocuments: s.table(
+			{
+				libraryId: s.uuid(),
+				url: s.string().optional(),
+				savedAt: s.string(),
+				readingProgress: s.float(),
+				resumePosition: s.json(positionSchema.omit({ progress: true })).optional(),
+				status: s.enum(...documentStatusValues),
+				favorite: s.boolean(),
+				trashedAt: s.string().optional(),
+				previousStatus: s.enum(...documentReadingStatusValues).optional(),
+				articleAttachmentId: s.uuid().optional()
+			},
+			{
+				library: s.rel('libraries', 'libraryId'),
+				articleAttachment: s.rel('articleAttachments', 'articleAttachmentId')
+			}
+		),
+		articleAttachments: s.table(
+			{
+				libraryId: s.uuid(),
+				documentId: s.uuid(),
+				title: s.string(),
+				author: s.string().optional(),
+				publishedAt: s.string().optional(),
+				siteName: s.string().optional(),
+				language: s.string().optional(),
+				finalUrl: s.string(),
+				canonicalUrl: s.string().optional(),
+				representationId: s.uuid()
+			},
+			{
+				library: s.rel('libraries', 'libraryId'),
+				document: s.rel('libraryDocuments', 'documentId'),
+				representation: s.rel('documents', 'representationId')
+			}
 		),
 		articleSources: s.table(
 			{

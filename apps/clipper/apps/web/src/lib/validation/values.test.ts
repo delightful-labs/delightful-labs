@@ -5,7 +5,8 @@ import {
 	nonblankStringSchema,
 	utf8StringSchema,
 	usesHttpProtocol,
-	hasCredentials
+	hasCredentials,
+	webUrlSchema
 } from './values.js'
 it('keeps case-insensitive operation IDs separate from lowercase stored IDs', () => {
 	const lower = 'abcdef01-2345-6789-abcd-ef0123456789'
@@ -29,4 +30,7 @@ it('checks URL protocol and credentials independently', () => {
 	expect(usesHttpProtocol(new URL('javascript:alert(1)'))).toBe(false)
 	expect(hasCredentials(new URL('https://user:pass@example.com'))).toBe(true)
 	expect(hasCredentials(new URL('https://example.com'))).toBe(false)
+	expect(webUrlSchema.safeParse('https://example.com/path').success).toBe(true)
+	expect(webUrlSchema.safeParse('file:///private').success).toBe(false)
+	expect(webUrlSchema.safeParse('https://user:pass@example.com').success).toBe(false)
 })
