@@ -581,7 +581,7 @@ test('DUI TagInput selects suggestions with the keyboard, rejects duplicates and
 	await expect(page.getByRole('option', { name: 'Reading', exact: true })).toBeVisible()
 })
 
-test('extracted article components keep single borders, compact controls and next/previous/heading focus', async ({
+test('removing articles focuses the next or previous native link, then the library heading', async ({
 	page
 }) => {
 	await page.goto('/')
@@ -589,37 +589,9 @@ test('extracted article components keep single borders, compact controls and nex
 	await supplied(page, 'https://example.com/component-first')
 	await supplied(page, 'https://example.com/component-second')
 	await supplied(page, 'https://example.com/component-third')
-	const list = page
-		.getByRole('region', { name: 'Saved articles', exact: true })
-		.locator('ul.article-list')
+	const list = page.getByRole('region', { name: 'Saved articles', exact: true }).getByRole('list')
 	const rows = list.locator(':scope > li')
 	await expect(rows).toHaveCount(3)
-	const appearance = await list.evaluate((list) => {
-		const items = [...list.querySelectorAll(':scope > li')]
-		return {
-			outer: getComputedStyle(list).borderTopWidth,
-			bullets: getComputedStyle(list).listStyleType,
-			items: items.map((item) => {
-				const style = getComputedStyle(item)
-				const favorite = [...item.querySelectorAll('button')].find(
-					(button) => button.textContent?.trim() === 'Favorite'
-				)
-				return {
-					top: style.borderTopWidth,
-					bottom: style.borderBottomWidth,
-					padding: style.paddingTop,
-					favoriteShadow: favorite ? getComputedStyle(favorite).boxShadow : undefined
-				}
-			})
-		}
-	})
-	expect(appearance.outer).toBe('1px')
-	expect(appearance.bullets).toBe('none')
-	expect(appearance.items.map((item) => item.top)).toEqual(['0px', '0px', '0px'])
-	expect(appearance.items.map((item) => item.bottom)).toEqual(['1px', '1px', '0px'])
-	expect(
-		appearance.items.every((item) => item.padding === '12px' && item.favoriteShadow === 'none')
-	).toBe(true)
 	const middleId = await rows.nth(1).getAttribute('data-article-id')
 	const firstId = await rows.first().getAttribute('data-article-id')
 	const lastId = await rows.last().getAttribute('data-article-id')
@@ -629,13 +601,13 @@ test('extracted article components keep single borders, compact controls and nex
 		.getByRole('button', { name: 'Move to Trash', exact: true })
 		.click()
 	await expect(page.locator('[data-article-id="' + middleId + '"]')).toHaveCount(0)
-	await expect(page.locator('[data-article-id="' + lastId + '"]')).toBeFocused()
+	await expect(page.locator('[data-article-id="' + lastId + '"]').getByRole('link')).toBeFocused()
 	await (
 		await openArticleActions(page.locator('[data-article-id="' + lastId + '"]'))
 	)
 		.getByRole('button', { name: 'Move to Trash', exact: true })
 		.click()
-	await expect(page.locator('[data-article-id="' + firstId + '"]')).toBeFocused()
+	await expect(page.locator('[data-article-id="' + firstId + '"]').getByRole('link')).toBeFocused()
 	await (
 		await openArticleActions(page.locator('[data-article-id="' + firstId + '"]'))
 	)

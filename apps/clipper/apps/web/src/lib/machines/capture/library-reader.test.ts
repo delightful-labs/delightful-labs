@@ -43,6 +43,10 @@ it('keeps the main library alive until its reader write drains and rejects new r
 					next([])
 					return dispose
 				},
+				subscribeDocuments: (next) => {
+					next([])
+					return () => {}
+				},
 				spawnWrite: (spawn, draft, operationId) =>
 					spawn(stage, {
 						input: {

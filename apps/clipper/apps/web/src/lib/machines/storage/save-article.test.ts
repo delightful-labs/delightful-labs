@@ -1,3 +1,4 @@
+import { fixtureDocument, fixtureAttachment } from '../../capture/fixtures.test-support.js'
 import { expect, it, vi } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { createWorkspaceCreationTransaction } from 'delightful-local-first/workspace/creation/workflow'
@@ -6,15 +7,19 @@ import { createSaveRecordMachine } from './save.js'
 import type { ArticleDraft } from '../../contracts/articles.js'
 import type { PreparedSave, SyncReceipt } from '../../contracts/storage.js'
 const draft: ArticleDraft = {
-	article: {
+	article: fixtureDocument({
+		readingProgress: 0,
+		resumePosition: null,
+		favorite: false,
+		status: 'inbox',
 		id: 'article',
 		libraryId: 'library',
-		url: 'https://example.com/',
-		originalSavedAt: '2026-11-04',
-		contentId: null,
+		sourceUrl: 'https://example.com/',
+		createdAt: new Date('2026-11-04'),
+		attachment: null,
 		operationId: null,
 		failure: null
-	},
+	}),
 	target: 'content'
 }
 function transaction<Draft>(blocked = false) {
@@ -51,15 +56,7 @@ function fixture(phase: 'prepare' | 'read' | 'document' | 'intent' | 'reread', c
 	const document = vi.fn(async () => {
 		await pause('document')
 		return phase === 'document'
-			? {
-					id: 'content',
-					libraryId: 'library',
-					operationId: 'operation',
-					snapshotId: 'snapshot',
-					assetId: 'asset',
-					title: 'Old account content',
-					originalSavedAt: '2026-11-04'
-				}
+			? fixtureAttachment({ id: 'content', title: 'Old account content' })
 			: null
 	})
 	const intent = vi.fn(async () => {
@@ -87,7 +84,7 @@ function fixture(phase: 'prepare' | 'read' | 'document' | 'intent' | 'reread', c
 			attach: (spawn, input) => spawn(stage, { input }),
 			content: (spawn, input) => spawn(content, { input })
 		}),
-		{ input: { url: draft.article.url } }
+		{ input: { url: draft.article.sourceUrl ?? 'https://example.com/' } }
 	).start()
 	return {
 		actor,
@@ -218,23 +215,13 @@ it.each([
 				prepare: async () => draft,
 				read: async () => null,
 				document: async () =>
-					phase === 'attach'
-						? {
-								id: 'content',
-								libraryId: 'library',
-								operationId: 'operation',
-								snapshotId: 'snapshot',
-								assetId: 'asset',
-								title: 'Existing',
-								originalSavedAt: '2026-11-04'
-							}
-						: null,
+					phase === 'attach' ? fixtureAttachment({ id: 'content', title: 'Existing' }) : null,
 				intent: async () => false,
 				ensure: (spawn, input) => spawn(stage, { input }),
 				attach: (spawn, input) => spawn(stage, { input }),
 				content: (spawn, input) => spawn(content, { input })
 			}),
-			{ input: { url: draft.article.url } }
+			{ input: { url: draft.article.sourceUrl ?? 'https://example.com/' } }
 		).start()
 		await vi.waitFor(() => expect(persistLocal).toHaveBeenCalledOnce())
 		actor.send({ type: 'SHUTDOWN' })

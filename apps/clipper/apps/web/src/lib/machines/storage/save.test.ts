@@ -1,3 +1,4 @@
+import type { SaveRequest } from '../../contracts/storage.js'
 import { expect, it, vi } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { createWorkspaceCreationTransaction } from 'delightful-local-first/workspace/creation/workflow'
@@ -62,8 +63,8 @@ it.each(['open', 'commit', 'local', 'uncertain', 'account'] as const)(
 			title: 'Title',
 			text: 'retained caller text',
 			bytes: new Uint8Array([1]),
-			mediaType: 'application/octet-stream'
-		}
+			mediaType: 'text/plain'
+		} satisfies SaveRequest
 		const draft = await prepareSave(crypto.randomUUID(), request)
 		const actor = createActor(
 			createSaveRecordMachine({
@@ -131,7 +132,7 @@ it('retains issued native intent custody when the save parent is forcibly stoppe
 		text: 'Text',
 		bytes: new Uint8Array([1]),
 		mediaType: 'text/plain'
-	}
+	} satisfies SaveRequest
 	const prepared = await prepareSave(crypto.randomUUID(), input)
 	const publish = vi.fn(() => {
 		throw new Error('Publication must not start after forced stop')
@@ -167,7 +168,7 @@ it.each(['before', 'resolve', 'reject'] as const)(
 			text: 'Old account content',
 			mediaType: 'text/plain',
 			bytes: new Uint8Array([1])
-		}
+		} satisfies SaveRequest
 		const draft = await prepareSave(crypto.randomUUID(), request)
 		let current = mode !== 'before'
 		const gate = Promise.withResolvers<void>(),
@@ -243,7 +244,7 @@ it.each(['resolve', 'reject'] as const)(
 			text: 'Text',
 			bytes: new Uint8Array([1]),
 			mediaType: 'text/plain'
-		}
+		} satisfies SaveRequest
 		const prepare = vi.fn(() => gate.promise)
 		const actor = createActor(
 			createSaveRecordMachine({
@@ -299,7 +300,7 @@ it.each(['blocked', 'failed', 'saved'] as const)(
 			text: 'Text',
 			bytes: new Uint8Array([1]),
 			mediaType: 'text/plain'
-		}
+		} satisfies SaveRequest
 		const actor = createActor(
 			createSaveRecordMachine({
 				isCurrent: () => true,

@@ -3,7 +3,7 @@ import { browserCoreSecret } from './apps/web/tests/browser-core.js'
 
 export default defineConfig({
 	testDir: './apps/web/tests',
-	testIgnore: ['**/offline/**', '**/fake-data/**', '**/worker/**', '**/schema-upgrade.spec.ts'],
+	testIgnore: ['**/offline/**', '**/fake-data/**', '**/worker/**'],
 	fullyParallel: false,
 	workers: 1,
 	timeout: 45000,

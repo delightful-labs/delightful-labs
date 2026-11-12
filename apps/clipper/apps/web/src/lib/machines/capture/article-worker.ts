@@ -98,7 +98,7 @@ function capability(libraryId: string): QueueCapability {
 			return r.result
 		},
 		fail: async (id, code) => {
-			await call({ type: 'CALL', method: 'fail', articleId: id, code })
+			await call({ type: 'CALL', method: 'fail', documentId: id, code })
 		},
 		report: post
 	}

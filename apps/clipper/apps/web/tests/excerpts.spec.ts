@@ -73,6 +73,7 @@ for (const width of [1440, 390]) {
 			await route.fulfill({
 				json: {
 					...base,
+					canonicalCandidate: 'https://publisher.example/preferred',
 					candidate: {
 						title: 'Excerpt fixture',
 						...metadata,
@@ -96,17 +97,39 @@ for (const width of [1440, 390]) {
 		const id = await row.getAttribute('data-article-id')
 		if (!id) throw new Error('Missing article ID')
 		await expect
-			.poll(() => audit.db.one(app.snapshots.where({ id })))
-			.toMatchObject({ excerpt, ...metadata })
+			.poll(() =>
+				audit.db.one(app.libraryDocuments.where({ id }).include({ attachment: { site: true } }))
+			)
+			.toMatchObject({
+				attachment: {
+					excerpt,
+					source: {
+						resolvedUrl: 'https://example.com/excerpt',
+						canonicalUrl: 'https://publisher.example/preferred'
+					},
+					author: metadata.author,
+					publishedAt: metadata.publishedTime,
+					language: metadata.lang,
+					site: { name: metadata.siteName }
+				}
+			})
+		const savedDocument = await audit.db.one(
+			app.libraryDocuments.where({ id }).include({ attachment: true })
+		)
+		const attachmentId = savedDocument?.attachment?.id
+		if (!attachmentId) throw new Error('Missing Article attachment')
 		await expect
 			.poll(() =>
 				audit.db.one(
-					app.articleImages.where({ documentId: id, sourceUrl: metadata.featuredImageUrl })
+					app.articleImages.where({
+						articleId: attachmentId,
+						sourceUrl: metadata.featuredImageUrl
+					})
 				)
 			)
 			.toMatchObject({ status: 'ready' })
 		const image = await audit.db.one(
-			app.articleImages.where({ documentId: id, sourceUrl: metadata.featuredImageUrl })
+			app.articleImages.where({ articleId: attachmentId, sourceUrl: metadata.featuredImageUrl })
 		)
 		expect(
 			(await audit.db.one(app.assets.where({ id: image!.assetId! })))?.payload.byteLength
@@ -129,6 +152,16 @@ for (const width of [1440, 390]) {
 		await expect(preview).toHaveText(text)
 		expect(extractions).toBe(1)
 		expect(imageFetches).toBe(1)
-		expect(await audit.db.one(app.snapshots.where({ id }))).toMatchObject({ excerpt, ...metadata })
+		expect(
+			await audit.db.one(app.libraryDocuments.where({ id }).include({ attachment: { site: true } }))
+		).toMatchObject({
+			attachment: {
+				excerpt,
+				author: metadata.author,
+				publishedAt: metadata.publishedTime,
+				language: metadata.lang,
+				site: { name: metadata.siteName }
+			}
+		})
 	})
 }

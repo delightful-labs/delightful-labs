@@ -18,7 +18,7 @@ export type ImageCapability = {
 	hasIntent: (id: string, signal: AbortSignal) => Promise<boolean>
 	subscribe: (next: (rows: ArticleImage[]) => void, error: () => void) => () => void
 	subscribeImage: (
-		documentId: string,
+		articleId: string,
 		sourceUrl: string,
 		next: (rows: ArticleImage[]) => void,
 		error: () => void

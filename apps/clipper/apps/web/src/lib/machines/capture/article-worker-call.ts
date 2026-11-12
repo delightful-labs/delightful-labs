@@ -454,7 +454,7 @@ export function createArticleWorkerCallMachine(cap: CallCapability) {
 									const call = required(context.call)
 									if (call.type !== 'RETRY' && call.method !== 'fail')
 										throw new Error('Invalid failure call')
-									const id = call.type === 'RETRY' ? call.id : call.articleId
+									const id = call.type === 'RETRY' ? call.id : call.documentId
 									const ref = cap.failure(enq.spawn, {
 										attempt: {
 											operationId: context.failureOperationId,

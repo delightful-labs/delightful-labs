@@ -6,18 +6,19 @@ import type { LibraryArticle } from '../contracts/articles.js'
 const article = crypto.randomUUID(),
 	libraryId = crypto.randomUUID()
 const row: LibraryArticle = {
+	readingProgress: 0,
 	id: article,
 	title: 'Saved',
 	url: 'https://example.com',
-	contentId: null,
-	originalSavedAt: '2026-01-01',
+	readable: false,
+	createdAt: '2026-01-01',
 	failure: null
 }
 function tag(name: string, assigned = true, parents: string[] = []): TagOperation {
 	return {
 		id: crypto.randomUUID(),
 		libraryId,
-		articleId: article,
+		documentId: article,
 		field: 'tag',
 		value: name,
 		name,
@@ -50,18 +51,16 @@ it('merges concurrent spellings into one vocabulary and keeps independent tag me
 })
 it('validates tag identity, desired membership and exactly one native parent', () => {
 	const a = tag('Reading')
-	const raw = { ...a, articleId: article, documentId: null, parents: '[]' }
+	const raw = { ...a, documentId: article, parents: '[]' }
 	expect(tagOperationSchema.safeParse(raw).success).toBe(true)
 	expect(tagOperationSchema.safeParse({ ...raw, key: 'wrong' }).success).toBe(false)
-	expect(tagOperationSchema.safeParse({ ...raw, documentId: crypto.randomUUID() }).success).toBe(
-		false
-	)
+	expect(tagOperationSchema.safeParse({ ...raw, documentId: null }).success).toBe(false)
 })
 it('Trash is independent and restores previous organization without content replacement', () => {
 	const status = {
 		id: crypto.randomUUID(),
 		libraryId,
-		articleId: article,
+		documentId: article,
 		field: 'status' as const,
 		value: 'later',
 		parents: []
@@ -78,7 +77,7 @@ it('Trash is independent and restores previous organization without content repl
 		status: 'later',
 		favorite: true,
 		trashed: false,
-		contentId: null
+		readable: false
 	})
 })
 
@@ -89,42 +88,13 @@ it('shares draft comparison and durable key folding without validating incomplet
 	expect(tagComparisonKey('a'.repeat(65))).toBe('a'.repeat(65))
 	expect(tagNameSchema.safeParse('a'.repeat(65)).success).toBe(false)
 })
-it('merges alias histories without leaking unrelated tags or changing causal dominance', () => {
-	const contentId = crypto.randomUUID(),
-		aliasId = crypto.randomUUID(),
-		otherId = crypto.randomUUID()
-	const first = { ...row, contentId },
-		other = { ...row, id: otherId, contentId: null }
-	const articles = [
-		{ id: first.id, contentId },
-		{ id: aliasId, contentId }
-	]
-	const assigned = { ...tag('Reading'), articleId: contentId }
-	const removed = { ...tag('READING', false, [assigned.id]), articleId: aliasId }
-	const retained = { ...tag('Work'), articleId: aliasId }
-	const unrelated = { ...tag('Other'), articleId: otherId }
-	const rows = projectTags([first, other], [assigned, removed, retained, unrelated], articles)
+it('keeps tag histories on their owning Document without attachment aliases', () => {
+	const other = { ...row, id: crypto.randomUUID() },
+		assigned = tag('Reading'),
+		removed = tag('READING', false, [assigned.id]),
+		retained = tag('Work'),
+		unrelated = { ...tag('Other'), documentId: other.id }
+	const rows = projectTags([row, other], [assigned, removed, retained, unrelated])
 	expect(rows[0]?.tags?.map((tag) => tag.key)).toEqual([tagKey('Work')])
 	expect(rows[1]?.tags?.map((tag) => tag.key)).toEqual([tagKey('Other')])
-	expect(rows[0]?.tagVocabulary?.map((tag) => tag.key)).toEqual(
-		[tagKey('Other'), tagKey('Reading'), tagKey('Work')].sort()
-	)
-	const status = {
-		id: crypto.randomUUID(),
-		libraryId,
-		articleId: contentId,
-		field: 'status' as const,
-		value: 'later',
-		parents: []
-	}
-	const newer = {
-		...status,
-		id: crypto.randomUUID(),
-		articleId: aliasId,
-		value: 'archive',
-		parents: [status.id]
-	}
-	expect(
-		projectOrganization([first, other], [status, newer], articles).map((row) => row.status)
-	).toEqual(['archive', 'inbox'])
 })

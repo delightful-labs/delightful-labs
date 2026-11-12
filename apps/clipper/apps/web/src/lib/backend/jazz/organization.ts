@@ -1,3 +1,4 @@
+import { documentRecord } from './document-record.js'
 import { z } from 'zod'
 import { tagOperationSchema, tagRequestSchema, tagKey } from '../../capture/tags.js'
 import type { TagOperation } from '../../capture/tags.js'
@@ -9,7 +10,6 @@ import type { Db } from 'jazz-tools'
 import {
 	organizationOperationSchema,
 	organizationHeads,
-	organizationTargets,
 	organizationRequestSchema
 } from '../../capture/organization.js'
 import type { OrganizationOperation } from '../../capture/organization.js'
@@ -20,6 +20,7 @@ import {
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
 import type { TransactionResource } from './transaction.js'
 import { app } from './schema.js'
+import { documentsQuery } from './queries.js'
 const tagHistorySchema = z.array(tagOperationSchema)
 const organizationHistorySchema = z.array(organizationOperationSchema)
 /** Data projection only: observed spelling is reused without renaming the shared tag. */
@@ -48,72 +49,71 @@ export function createOrganizationRecords(
 	): Promise<OrganizationFacts> => {
 		const request = organizationRequestSchema.parse(input)
 		const draft = { ...request, operations: input.operations }
-		const article = await resource.tx.one(app.articles.where({ id: request.id, libraryId }), {
+		const document = await resource.tx.one(documentsQuery.where({ id: request.id, libraryId }), {
 			tier: ReadTier.LocalFirst
 		})
-		const document = await resource.tx.one(
-			app.contentRepresentations.where({ id: request.id, libraryId }),
-			{
-				tier: ReadTier.LocalFirst
-			}
-		)
-		const aliases = await resource.tx.all(
-			app.articles.where({
-				libraryId,
-				contentId: article?.contentId ?? document?.id ?? request.id
-			}),
-			{ tier: ReadTier.LocalFirst }
-		)
-		const targets = organizationTargets(
-			request.id,
-			article?.contentId ?? document?.id ?? null,
-			aliases
-		)
 		const parents = organizationHeads(
-			draft.operations.filter((row) => targets.has(row.articleId))
+			draft.operations.filter((row) => row.documentId === request.id)
 		).map((row) => row.id)
-		return { draft, operationId, article, document, parents }
+		return { draft, operationId, document, parents }
 	}
-	const insertTag =
-		(reference: 'articleId' | 'documentId') =>
-		(resource: TransactionResource, facts: OrganizationFacts) => {
-			resource.tx.insert(
-				app.tagOperations,
-				{
-					articleId: null,
-					documentId: null,
-					[reference]: facts.draft.id,
-					...tagAssignmentValues(facts.draft, libraryId, facts.parents)
-				},
-				{ id: facts.operationId }
+
+	const insertTag = (resource: TransactionResource, facts: OrganizationFacts) => {
+		resource.tx.insert(
+			app.tagOperations,
+			{
+				documentId: facts.draft.id,
+				...tagAssignmentValues(facts.draft, libraryId, facts.parents)
+			},
+			{ id: facts.operationId }
+		)
+	}
+	const insertOrganization = (resource: TransactionResource, facts: OrganizationFacts) => {
+		const document = documentRecord(facts.document, libraryId)
+		const change = facts.draft
+		if (change.field === 'favorite')
+			resource.tx.update(app.libraryDocuments, document.id, { favorite: change.value })
+		else if (change.field === 'status')
+			resource.tx.update(
+				app.libraryDocuments,
+				document.id,
+				document.status === 'trashed' ? { previousStatus: change.value } : { status: change.value }
 			)
-		}
-	const insertOrganization =
-		(reference: 'articleId' | 'documentId') =>
-		(resource: TransactionResource, facts: OrganizationFacts) => {
-			resource.tx.insert(
-				app.organizationOperations,
-				{
-					libraryId,
-					field: facts.draft.field,
-					value: String(facts.draft.value),
-					parents: JSON.stringify(facts.parents),
-					articleId: null,
-					documentId: null,
-					[reference]: facts.draft.id
-				},
-				{ id: facts.operationId }
+		else if (change.field === 'trashed')
+			resource.tx.update(
+				app.libraryDocuments,
+				document.id,
+				change.value
+					? {
+							status: 'trashed',
+							previousStatus:
+								document.status === 'trashed' ? document.previousStatus : document.status
+						}
+					: {
+							status: document.status === 'trashed' ? document.previousStatus : document.status,
+							previousStatus: null
+						}
 			)
-		}
+		resource.tx.insert(
+			app.organizationOperations,
+			{
+				libraryId,
+				field: facts.draft.field,
+				value: String(facts.draft.value),
+				parents: JSON.stringify(facts.parents),
+
+				documentId: facts.draft.id
+			},
+			{ id: facts.operationId }
+		)
+	}
 	const stage = createDomainTransaction<OrganizationDraft>(
 		(spawn, input) =>
 			spawn(
 				createOrganizationDomain({
 					read: readLocal,
-					insertArticle: insertOrganization('articleId'),
-					insertDocument: insertOrganization('documentId'),
-					insertTagArticle: insertTag('articleId'),
-					insertTagDocument: insertTag('documentId'),
+					insertOrganization,
+					insertTag,
 					receipt: transactionReceipt
 				}),
 				{ input }

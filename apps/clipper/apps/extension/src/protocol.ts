@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { normalizedSource } from '../../web/src/lib/capture/source.js'
-import { extractedContentSchema } from '../../web/src/lib/contracts/capture-response.js'
+import { articleContentSchema } from '../../web/src/lib/contracts/articles.js'
 export const sourceUrlSchema = z
 	.string()
 	.max(8192)
@@ -37,10 +37,7 @@ export const sourceSchema = z.strictObject({
 		.refine((value) => new TextEncoder().encode(value).length <= 2 * 1024 * 1024)
 })
 export type Source = z.infer<typeof sourceSchema>
-export const contentSchema = extractedContentSchema.extend({
-	finalUrl: sourceUrlSchema,
-	provenance: z.string().max(32768)
-})
+export const contentSchema = articleContentSchema.extend({ finalUrl: sourceUrlSchema })
 export const extractionReplySchema = z.union([
 	z.strictObject({ content: contentSchema }),
 	z.strictObject({ error: z.literal('captureFailed') })
@@ -94,7 +91,7 @@ export const progressSchema = z.strictObject({
 	capture: captureSchema,
 	revision: z.number().int().nonnegative(),
 	message: z.strictObject({ text: z.string().max(4096), variant: z.enum(['info', 'error']) }),
-	articleId: z.uuid().optional()
+	documentId: z.uuid().optional()
 })
 export function backgroundSender(sender: chrome.runtime.MessageSender, id: string, page: string) {
 	return sender.id === id && !sender.tab && (!sender.url || sender.url === page)

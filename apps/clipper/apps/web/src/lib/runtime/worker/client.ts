@@ -1,3 +1,4 @@
+import { readingProgressSchema } from '../../reader/schema.js'
 import { REALM_CLOSE_POLICY } from './close-policy.js'
 import type { WorkerCloseIssue } from './close-policy.js'
 import type { SimulatedClock } from 'xstate'
@@ -312,9 +313,13 @@ export function openApplicationClient(input: Input) {
 			return {
 				client,
 				update: (next: LibraryRender) => {
+					const reader = next.readerRevision === view.readerRevision ? view.reader : next.reader
 					view = {
 						...next,
-						reader: next.readerRevision === view.readerRevision ? view.reader : next.reader
+						reader:
+							reader?.kind === 'available'
+								? { ...reader, progress: readingProgressSchema.parse(next.readerProgress) }
+								: reader
 					}
 					render()
 				}

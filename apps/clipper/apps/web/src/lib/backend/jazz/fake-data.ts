@@ -1,3 +1,4 @@
+import { documentValues } from './document-values.js'
 import { retainDetachedTransaction } from './transaction.js'
 import { ReadTier } from 'jazz-tools'
 import type { Db } from 'jazz-tools'
@@ -14,8 +15,8 @@ export function createFakeDataRecords(db: FakeDataDb, libraryId: string, isCurre
 	async function presence(reader: Pick<Db, 'one' | 'all'>, tier?: ReadTier): Promise<SeedRows> {
 		const options = tier === undefined ? undefined : { tier }
 		const [articles, documents, intents, root] = await Promise.all([
+			reader.all(app.libraryDocuments.where({ libraryId }).limit(1), options),
 			reader.all(app.articles.where({ libraryId }).limit(1), options),
-			reader.all(app.contentRepresentations.where({ libraryId }).limit(1), options),
 			reader.all(app.storageOperations.where({ libraryId }).limit(1), options),
 			reader.one(app.libraries.where({ id: libraryId }), options)
 		])
@@ -44,12 +45,14 @@ export function createFakeDataRecords(db: FakeDataDb, libraryId: string, isCurre
 					const { id: operationId, ...intent } = item.content.intent
 					tx.insert(app.storageOperations, intent, { id: operationId })
 					insertPreparedContent(tx, item.content)
-					const { id, ...article } = item.article
-					tx.insert(app.articles, article, { id })
-					const source = item.content.source
-					if (!source) throw new Error('Missing sample source')
-					const { id: sourceId, ...values } = source
-					tx.insert(app.articleSources, values, { id: sourceId })
+					const id = item.article.id
+					const article = documentValues(item.article)
+					tx.insert(app.libraryDocuments, article, { id })
+					tx.insert(
+						app.documentCaptures,
+						{ libraryId, documentId: id, operationId: item.content.intent.id, failure: null },
+						{ id }
+					)
 					for (const { id: propertyId, ...property } of item.properties)
 						tx.insert(app.organizationOperations, property, { id: propertyId })
 					const { id: tagId, ...tag } = item.tag

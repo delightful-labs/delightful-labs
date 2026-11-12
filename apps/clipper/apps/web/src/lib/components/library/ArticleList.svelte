@@ -36,7 +36,7 @@
 		const first = rows[pendingIndex]
 		if (!first) return
 		pendingIndex = undefined
-		void tick().then(() => document.getElementById(listId + '-' + first.id)?.focus())
+		void tick().then(() => rowControl(first.id)?.focus())
 	})
 	$effect(() => {
 		void resetKey
@@ -48,14 +48,21 @@
 		const pending = removedAction
 		if (!pending || rows.some((row) => row.id === pending.id)) return
 		if (!pending.trigger.isConnected && document.activeElement === document.body) {
-			const next = pending.candidates
-				.map((id) => document.getElementById(listId + '-' + id))
-				.find((element) => element !== null)
+			const next = pending.candidates.map(rowControl).find((element) => element !== undefined)
 			if (next) next.focus()
 			else onemptyfocus()
 		}
 		removedAction = undefined
 	})
+
+	function rowControl(id: string) {
+		const row = document.getElementById(listId + '-' + id)
+		return (
+			row?.querySelector<HTMLAnchorElement>('a[href]') ??
+			row?.querySelector<HTMLButtonElement>('button:not(:disabled)') ??
+			undefined
+		)
+	}
 
 	function showNext() {
 		pendingIndex = rows.length

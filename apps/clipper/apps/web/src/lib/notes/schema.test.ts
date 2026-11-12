@@ -87,20 +87,16 @@ it('rejects delayed or mismatched acknowledgments without clearing a newer draft
 
 it('validates a note entity independently of its article and its revision IDs', () => {
 	const id = crypto.randomUUID(),
-		articleId = crypto.randomUUID()
-	expect(
-		noteSchema.parse({ id, libraryId: target.libraryId, articleId, documentId: null }).id
-	).toBe(id)
-	expect(
-		noteSchema.safeParse({ id, libraryId: target.libraryId, articleId: null, documentId: null })
-			.success
-	).toBe(false)
+		documentId = crypto.randomUUID()
+	expect(noteSchema.parse({ id, libraryId: target.libraryId, documentId }).id).toBe(id)
+	expect(noteSchema.safeParse({ id, libraryId: target.libraryId, documentId: null }).success).toBe(
+		false
+	)
 	expect(
 		noteSchema.safeParse({
 			id,
 			libraryId: target.libraryId,
-			articleId,
-			documentId: crypto.randomUUID()
+			documentId: 'bad-id'
 		}).success
 	).toBe(false)
 })

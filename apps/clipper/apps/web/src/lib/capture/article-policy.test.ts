@@ -1,5 +1,6 @@
+import { fixtureDocument, fixtureAttachment } from './fixtures.test-support.js'
 import { expect, it } from 'vitest'
-import type { Article } from '../contracts/articles.js'
+import type { CaptureDocument } from '../contracts/articles.js'
 import type { PreparedSave } from '../contracts/storage.js'
 import {
 	canAttachArticleContent,
@@ -7,23 +8,24 @@ import {
 	canPublishArticleContent,
 	isPendingArticle
 } from './article-policy.js'
-const pending: Article = {
+const pending: CaptureDocument = fixtureDocument({
+	readingProgress: 0,
+	resumePosition: null,
+	favorite: false,
+	status: 'inbox',
 	id: 'article',
 	libraryId: 'library',
-	url: 'https://example.com/',
-	originalSavedAt: '2026-11-04',
-	contentId: null,
+	sourceUrl: 'https://example.com/',
+	createdAt: new Date('2026-11-04'),
+	attachment: null,
 	operationId: null,
 	failure: null
-}
-const target: Pick<PreparedSave, 'articleId' | 'source'> = {
-	articleId: pending.id,
+})
+const target: Pick<PreparedSave, 'documentId' | 'source'> = {
+	documentId: pending.id,
 	source: {
-		id: 'source',
-		libraryId: 'library',
-		documentId: 'content',
-		finalUrl: pending.url,
-		submittedUrl: pending.url,
+		finalUrl: pending.sourceUrl ?? 'https://example.com/',
+		submittedUrl: pending.sourceUrl ?? 'https://example.com/',
 		provenance: '{}'
 	}
 }
@@ -32,9 +34,9 @@ it.each([
 	{ article: pending, bind: true, publish: false },
 	{ article: { ...pending, operationId: 'operation' }, bind: false, publish: true },
 	{ article: { ...pending, operationId: 'other' }, bind: false, publish: false },
-	{ article: { ...pending, url: 'https://other.example/' }, bind: false, publish: false },
+	{ article: { ...pending, sourceUrl: 'https://other.example/' }, bind: false, publish: false },
 	{
-		article: { ...pending, contentId: 'content', operationId: 'operation' },
+		article: { ...pending, attachment: fixtureAttachment(), operationId: 'operation' },
 		bind: false,
 		publish: false
 	}
@@ -42,24 +44,22 @@ it.each([
 	expect(canBindArticleIntent(article, target)).toBe(bind)
 	expect(canPublishArticleContent(article, target, 'operation')).toBe(publish)
 })
-it('allows standalone content but requires source metadata for an article target', () => {
-	expect(canBindArticleIntent(null, {})).toBe(true)
-	expect(canPublishArticleContent(null, {}, 'operation')).toBe(true)
-	expect(canBindArticleIntent(null, { articleId: pending.id })).toBe(false)
+it('allows a direct save without a source only when its Document also has no web source', () => {
+	const target = { documentId: pending.id }
+	expect(canBindArticleIntent(null, target)).toBe(true)
+	expect(canBindArticleIntent(pending, target)).toBe(false)
+	const direct = fixtureDocument({ id: pending.id, sourceUrl: null })
+	expect(canBindArticleIntent(direct, target)).toBe(true)
 	expect(
-		canPublishArticleContent(
-			{ ...pending, operationId: 'operation' },
-			{ articleId: pending.id },
-			'operation'
-		)
-	).toBe(false)
+		canPublishArticleContent({ ...direct, operationId: 'operation' }, target, 'operation')
+	).toBe(true)
 })
 it('requires available content and preserves completed articles during attachment', () => {
 	expect(canAttachArticleContent(null, true)).toBe(true)
 	expect(canAttachArticleContent(pending, true)).toBe(true)
 	expect(canAttachArticleContent(pending, false)).toBe(false)
 	expect(canAttachArticleContent(null, false)).toBe(false)
-	expect(canAttachArticleContent({ ...pending, contentId: 'content' }, true)).toBe(false)
+	expect(canAttachArticleContent({ ...pending, attachment: fixtureAttachment() }, true)).toBe(false)
 	expect(isPendingArticle(null)).toBe(false)
 	expect(isPendingArticle(undefined)).toBe(false)
 })

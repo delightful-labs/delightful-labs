@@ -1,21 +1,28 @@
+import { fixtureDocument } from '../../capture/fixtures.test-support.js'
+import { newDocument } from '../../capture/document-schema.js'
+import { captureDocumentSchema } from '../../capture/capture-document-schema.js'
 import { t } from '../../localization/index.js'
 import { expect, it, vi } from 'vitest'
 import { createActor, waitFor, toPromise } from 'xstate'
 import { createArticleQueueMachine } from './article-queue.js'
-import type { Article } from '../../contracts/articles.js'
+import type { CaptureDocument } from '../../contracts/articles.js'
 import type { QueueCapability } from '../../contracts/article-worker.js'
 const libraryId = crypto.randomUUID()
-function row(url: string, overrides: Partial<Article> = {}): Article {
-	return {
-		id: crypto.randomUUID(),
-		libraryId,
-		url,
-		originalSavedAt: '2026-11-03T12:00:00.000Z',
-		contentId: null,
-		operationId: null,
-		failure: null,
-		...overrides
-	}
+function row(url: string, overrides: Partial<CaptureDocument> = {}): CaptureDocument {
+	return captureDocumentSchema.parse(
+		fixtureDocument({
+			...newDocument(crypto.randomUUID(), libraryId, url),
+			readingProgress: 0,
+			id: crypto.randomUUID(),
+			libraryId,
+			sourceUrl: url,
+			createdAt: new Date('2026-11-03T12:00:00.000Z'),
+			attachment: null,
+			operationId: null,
+			failure: null,
+			...overrides
+		})
+	)
 }
 function cap(overrides: Partial<QueueCapability> = {}): QueueCapability {
 	return {
@@ -92,8 +99,8 @@ it.each([
 		).start()
 		// Deliberately reverse subscription order; persistence metadata determines processing order.
 		const rows = [
-			row('https://example.com/two', { id: secondId, originalSavedAt: secondTime }),
-			row('https://example.com/one', { id: firstId, originalSavedAt: firstTime })
+			row('https://example.com/two', { id: secondId, createdAt: new Date(secondTime) }),
+			row('https://example.com/one', { id: firstId, createdAt: new Date(firstTime) })
 		]
 		actor.send({ type: 'ROWS', rows })
 		await waitFor(actor, (s) => s.matches('extracting'))

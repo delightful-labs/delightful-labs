@@ -144,7 +144,7 @@ test('saves new content offline, restarts the browser, and syncs to a restored p
 		text: 'Exact offline text café 🦊',
 		byteLength: 600 * 1024,
 		bytesHash: createHash('sha256')
-			.update(Uint8Array.from({ length: 600 * 1024 }, (_, index) => index % 256))
+			.update(`<p>${'x'.repeat(600 * 1024 - 7)}</p>`)
 			.digest('hex')
 	}
 	try {
@@ -158,6 +158,10 @@ test('saves new content offline, restarts the browser, and syncs to a restored p
 		await expect(
 			restored.getByRole('region', { name: 'Saved articles', exact: true })
 		).toBeVisible()
+		await page.evaluate(async () => {
+			const path = '/tests/storage-driver.ts'
+			await (await import(/* @vite-ignore */ path)).ready()
+		})
 		await authority.stop()
 		expect(
 			await page.evaluate(async (id) => {
@@ -302,7 +306,7 @@ async function fixtureArticle(
 	return () => extractions
 }
 
-test('Add Link automatically saves and detects a resolved duplicate without replacing content', async ({
+test('Add Link preserves distinct source URLs while sharing resolved Article content', async ({
 	page
 }) => {
 	const actionWarnings: string[] = []
@@ -368,17 +372,18 @@ test('Add Link automatically saves and detects a resolved duplicate without repl
 		.getByRole('dialog', { name: 'Add link', exact: true })
 		.getByRole('button', { name: 'Add link', exact: true })
 		.click()
-	await expect(page.getByText('Already saved.', { exact: true })).toBeVisible()
+	await expect(page.getByRole('dialog', { name: 'Add link', exact: true })).toHaveCount(0)
 	expect(remoteRequests).toEqual([])
 	expect(extractions()).toBe(1)
 	await expect(
 		page
 			.getByRole('region', { name: 'Saved articles' })
 			.getByRole('link', { name: 'UI saved article', exact: true })
-	).toHaveCount(1)
+	).toHaveCount(2)
 	await page
 		.getByRole('region', { name: 'Saved articles' })
 		.getByRole('link', { name: 'UI saved article', exact: true })
+		.last()
 		.click()
 	await page.route('https://external.example/next', (route) =>
 		route.fulfill({ contentType: 'text/html', body: '<p>External destination</p>' })
@@ -497,13 +502,13 @@ test('background extraction stays quiet and leaves the saved URL and form usable
 	await expect(page.getByRole('button', { name: 'Save article', exact: true })).toHaveCount(0)
 })
 
-test('reader falls back to exact text when a saved asset is not HTML', async ({ page }) => {
+test('reader displays the exact text of a plain text Article', async ({ page }) => {
 	await page.goto('/')
 	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
 	const result = await page.evaluate(async () => {
 		const path = '/tests/storage-driver.ts'
 		const { save } = await import(/* @vite-ignore */ path)
-		return save(crypto.randomUUID())
+		return save(crypto.randomUUID(), true)
 	})
 	expect(result).toBe('saved')
 	await page
@@ -511,7 +516,9 @@ test('reader falls back to exact text when a saved asset is not HTML', async ({ 
 		.getByRole('link', { name: 'Restart proof', exact: true })
 		.click()
 	await expect(page.getByRole('article')).toContainText('Exact offline text café 🦊')
-	await expect(page.getByRole('article').locator('.reader')).toHaveClass(/plain/)
+	await expect(
+		page.getByRole('article').getByText('Exact offline text café 🦊', { exact: true })
+	).toBeVisible()
 	await readingControls(page)
 	await page.getByRole('link', { name: 'Open library', exact: true }).click()
 	await expect(page.getByRole('article')).toHaveCount(0)
@@ -702,10 +709,10 @@ test('Add Link persists article objects before a worker processes their content 
 	}, urls)
 	expect(
 		rows.map(
-			(r: { url: string; contentId: string | null } | null) =>
-				r && { url: r.url, contentId: r.contentId }
+			(r: { sourceUrl: string; attachment: unknown | null } | null) =>
+				r && { sourceUrl: r.sourceUrl, attachment: r.attachment }
 		)
-	).toEqual(urls.map((url) => ({ url, contentId: null })))
+	).toEqual(urls.map((url) => ({ sourceUrl: url, attachment: null })))
 	expect(count).toBe(1)
 	gate.resolve()
 	await expect(page.getByRole('link', { name: 'Queued one', exact: true })).toBeVisible()
@@ -762,7 +769,7 @@ test('a worker resumes a URL-only article after complete browser restart', async
 			const path = '/tests/article-driver.ts'
 			return (await import(/* @vite-ignore */ path)).inspect([url])
 		}, url)
-		expect(before[0]?.contentId).toBeNull()
+		expect(before[0]?.attachment).toBeNull()
 		await context.close()
 		gate.resolve()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
@@ -777,8 +784,8 @@ test('a worker resumes a URL-only article after complete browser restart', async
 			return (await import(/* @vite-ignore */ path)).inspect([url])
 		}, url)
 		expect(after[0]?.id).toBe(before[0]?.id)
-		expect(after[0]?.originalSavedAt).toBe(before[0]?.originalSavedAt)
-		expect(after[0]?.contentId).toBeTruthy()
+		expect(after[0]?.createdAt).toBeTruthy()
+		expect(after[0]?.attachment).toBeTruthy()
 	} finally {
 		gate.resolve()
 		await context.close()

@@ -61,14 +61,14 @@ const runtime = createActor(
 				ids.map((id) => chrome.runtime.sendMessage({ type: 'WAITING', id, message, revision }))
 			),
 		report: async (snapshot, revision) => {
-			const { capture, message, articleId } = snapshot.context
+			const { capture, message, documentId } = snapshot.context
 			if (!capture || !message) return
 			await chrome.runtime.sendMessage({
 				type: 'PROGRESS',
 				capture,
 				revision,
 				message,
-				...(articleId ? { articleId } : {})
+				...(documentId ? { documentId } : {})
 			})
 		}
 	}),

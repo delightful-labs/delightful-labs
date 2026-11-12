@@ -1,5 +1,7 @@
+import { z } from 'zod'
+import { assetSchema } from '../capture/article-schema.js'
+import { lowercaseUuidSchema } from '../validation/values.js'
 import type { ActorRef, Snapshot } from 'xstate'
-import type { ArticleMetadata } from '../capture/metadata.js'
 import type {
 	WorkspaceCreationAttempt,
 	WorkspaceCreationResult
@@ -7,55 +9,22 @@ import type {
 
 export type { SaveRequest } from '../storage/policy.js'
 import type { SaveRequest, SourceMetadata } from '../storage/policy.js'
-export type ArticleSource = SourceMetadata & {
-	documentId: string
-	id: string
-	libraryId: string
-}
 export type SyncReport = { type: 'SYNC'; id: string; status: 'accepted' | 'rejected' }
 export type ReceiptWatch = { type: 'WATCH'; id: string; receipts: SyncReceipt[] }
 export type SyncReceipt = { global: () => Promise<void> }
-export type StoredAsset = {
-	id: string
-	libraryId: string
-	operationId: string
-	mediaType: string
-	payload: Uint8Array
-}
-type StoredArticleMetadata = {
-	[K in keyof ArticleMetadata]?: Exclude<ArticleMetadata[K], undefined>
-}
-export type TextSnapshot = StoredArticleMetadata & {
-	id: string
-	libraryId: string
-	documentId: string
-	text: string
-	formatVersion: string
-}
-export type DocumentHeader = {
-	id: string
-	libraryId: string
-	operationId: string
-	snapshotId: string
-	assetId: string
-	title: string
-	originalSavedAt: string
-}
-export type SnapshotPreview = Pick<TextSnapshot, 'id' | 'text' | 'excerpt'>
-export type StorageIntent = {
-	id: string
-	libraryId: string
-	payloadHash: string
-	createdAt: string
-}
+export type StoredAsset = z.infer<typeof assetSchema>
+export const storageIntentSchema = z.object({
+	id: lowercaseUuidSchema,
+	libraryId: lowercaseUuidSchema,
+	payloadHash: z.string()
+})
+export type StorageIntent = z.infer<typeof storageIntentSchema>
 export type PreparedSave = {
-	images?: import('../images/schema.js').ArticleImage[]
-	articleId?: string
-	source?: ArticleSource
+	documentId: string
+	source?: SourceMetadata
 	intent: StorageIntent
-	asset: StoredAsset
-	snapshot: TextSnapshot
-	document: DocumentHeader
+	attachment: import('../capture/article-schema.js').Article
+	images?: import('../images/schema.js').ArticleImage[]
 }
 export type SaveResult =
 	| { kind: 'saved'; operationId: string; receipts: SyncReceipt[] }
@@ -83,10 +52,11 @@ export type ReadResult =
 	| { kind: 'missing' | 'unavailable' | 'corrupt' }
 	| {
 			kind: 'available'
-			document: DocumentHeader
+			document: import('../capture/document-schema.js').Document
+			attachment: import('../capture/article-schema.js').Article
 			text: string
 			asset: AssetResult
-			source?: ArticleSource
+			source: import('../capture/article-schema.js').CaptureSource | null
 	  }
 export type ReadOutcome = { kind: ReadResult['kind'] }
 export type ReadReport = { type: 'READ_RESULT'; generation: number; result: ReadResult }
@@ -103,8 +73,8 @@ export type ReadCapabilities = {
 	observeConnection?:
 		| ((next: (state: import('jazz-tools').LinkStatus['state']) => void) => () => void)
 		| undefined
-	document: (id: string, signal: AbortSignal) => Promise<DocumentHeader | null>
-	snapshot: (id: string, signal: AbortSignal) => Promise<TextSnapshot | null>
-	asset: (id: string, signal: AbortSignal) => Promise<StoredAsset | null>
-	source: (id: string, signal: AbortSignal) => Promise<ArticleSource | null>
+	document: (
+		id: string,
+		signal: AbortSignal
+	) => Promise<import('../capture/document-schema.js').Document | null>
 }

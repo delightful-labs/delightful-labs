@@ -270,9 +270,9 @@ test('production shell and DLF account restart with web and Jazz servers stopped
 		await page.mouse.wheel(0, 3000)
 		await expect
 			.poll(async () =>
-				Number(await page.locator('.reader-workspace progress').getAttribute('value'))
+				Number((await page.getByText(/^\d+% read$/).innerText()).replace('% read', '').trim())
 			)
-			.toBeGreaterThan(0.05)
+			.toBeGreaterThan(5)
 		const readingParagraph = await visibleReadingParagraph(page)
 		expect(readingParagraph).toBeTruthy()
 		// Leaving flushes the debounced position; live progress is not a persistence receipt.
@@ -433,17 +433,42 @@ test('production shell and DLF account restart with web and Jazz servers stopped
 		await expect(restored.getByRole('article')).toContainText('Exact offline shell text café 🦊')
 		const documentId = readerPath!.split('/').pop()!
 		await expect
-			.poll(() => authority.backend.db.one(app.snapshots.where({ id: documentId })))
-			.toMatchObject(savedMetadata)
+			.poll(() =>
+				authority.backend.db.one(
+					app.libraryDocuments.where({ id: documentId }).include({ attachment: { site: true } })
+				)
+			)
+			.toMatchObject({
+				readingProgress: expect.any(Number),
+				resumePosition: { interactedAt: expect.any(Date) },
+				attachment: {
+					excerpt: savedMetadata.excerpt,
+					author: savedMetadata.author,
+					publishedAt: savedMetadata.publishedTime,
+					language: savedMetadata.lang,
+					site: { name: savedMetadata.siteName }
+				}
+			})
+		const savedDocument = await authority.backend.db.one(
+			app.libraryDocuments.where({ id: documentId }).include({ attachment: true })
+		)
+		const attachmentId = savedDocument?.attachment?.id
+		if (!attachmentId) throw new Error('Missing Article attachment')
 		await expect
 			.poll(() =>
 				authority.backend.db.one(
-					app.articleImages.where({ documentId, sourceUrl: savedMetadata.featuredImageUrl })
+					app.articleImages.where({
+						articleId: attachmentId,
+						sourceUrl: savedMetadata.featuredImageUrl
+					})
 				)
 			)
 			.toMatchObject({ status: 'ready' })
 		const cover = await authority.backend.db.one(
-			app.articleImages.where({ documentId, sourceUrl: savedMetadata.featuredImageUrl })
+			app.articleImages.where({
+				articleId: attachmentId,
+				sourceUrl: savedMetadata.featuredImageUrl
+			})
 		)
 		expect(
 			(await authority.backend.db.one(app.assets.where({ id: cover!.assetId! })))?.payload

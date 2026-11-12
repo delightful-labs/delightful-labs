@@ -1,31 +1,48 @@
 import { expect, it } from 'vitest'
-import { articleRecord } from './articles.js'
-const id = 'abcdef01-2345-6789-abcd-ef0123456789'
-const article = {
-	id,
-	libraryId: 'library',
-	url: 'https://example.com/#fragment',
-	originalSavedAt: '2026-11-04',
-	contentId: null,
-	operationId: null,
-	failure: null
-}
-it('validates native article shape without changing stored URL or time representation', () => {
-	expect(articleRecord(article, 'library')).toEqual(article)
+import { articleSchema } from './article-schema.js'
+import { fixtureAttachment } from './fixtures.test-support.js'
+it('owns Article metadata, content and capture evidence independently of Document state', () => {
+	const article = fixtureAttachment({
+		author: 'Ada',
+		publishedAt: '2026-11-12',
+		language: 'en',
+		source: {
+			resolvedUrl: 'https://example.com/resolved',
+			canonicalUrl: 'https://publisher.example/canonical'
+		}
+	})
+	expect(articleSchema.parse(article)).toEqual(article)
+	expect(article).not.toHaveProperty('status')
+	expect(article).not.toHaveProperty('readingProgress')
+	expect(article).not.toHaveProperty('kind')
 })
-it.each([
-	null,
-	[],
-	{ ...article, id: id.toUpperCase() },
-	{ ...article, operationId: id.toUpperCase() },
-	{ ...article, originalSavedAt: 'not a date' },
-	{ ...article, failure: 'a'.repeat(101) }
-])('rejects malformed native articles through the existing record error', (value) => {
-	expect(() => articleRecord(value, 'library')).toThrow('invalidRecord')
-})
-it('retains ownership and URL policy checks outside structural parsing', () => {
-	expect(() => articleRecord(article, 'other-library')).toThrow('invalidRecord')
-	expect(() => articleRecord({ ...article, url: 'file:///private' }, 'library')).toThrow(
-		'invalidUrl'
-	)
+it('validates reusable Site and favicon relationships', () => {
+	const id = crypto.randomUUID()
+	const article = fixtureAttachment({
+		site: {
+			id,
+			origin: 'https://news.example.com',
+			name: 'News',
+			favicon: {
+				id,
+				libraryId: id,
+				operationId: id,
+				mediaType: 'image/png',
+				payload: new Uint8Array([1])
+			}
+		}
+	})
+	expect(articleSchema.parse(article)).toEqual(article)
+	expect(
+		articleSchema.safeParse({
+			...article,
+			site: { ...article.site, origin: 'https://news.example.com/path' }
+		}).success
+	).toBe(false)
+	expect(
+		articleSchema.safeParse({
+			...article,
+			source: { resolvedUrl: 'file:///private', canonicalUrl: null }
+		}).success
+	).toBe(false)
 })

@@ -1,6 +1,6 @@
 import { types, createCallbackLogic, setup, matchesState } from 'xstate'
 import { z } from 'zod'
-import { positionSchema } from './schema.js'
+import { readingMeasurementSchema } from './schema.js'
 import { viewportMachine } from './viewport.js'
 import type { SurfaceViewportInput } from './surface.js'
 import type { ViewportResult } from './viewport.js'
@@ -10,15 +10,15 @@ import {
 	withinResourceDeadline
 } from '../contracts/resource-waits.js'
 
-const attachment = z.object({ attachmentId: z.string().uuid() })
+const attachment = z.object({ surfaceId: z.string().uuid() })
 export const viewportReplySchema = z.discriminatedUnion('type', [
-	attachment.extend({ type: z.literal('MEASURE'), position: positionSchema }),
+	attachment.extend({ type: z.literal('MEASURE'), position: readingMeasurementSchema }),
 	attachment.extend({ type: z.literal('VIEWPORT_OPENED') }),
 	attachment.extend({ type: z.literal('VIEWPORT_FAILED') }),
 	attachment.extend({
 		type: z.literal('VIEWPORT_SETTLED'),
 		outcome: z.enum(['closed', 'failed']),
-		position: positionSchema.optional()
+		position: readingMeasurementSchema.optional()
 	})
 ])
 export type ViewportReply = z.infer<typeof viewportReplySchema>
@@ -54,7 +54,7 @@ const transport = createCallbackLogic<{ type: 'DETACH' | 'REFLOW' }, SurfaceView
 			if (event.type === 'DETACH') startedAt = now()
 			post(event)
 		})
-		post({ type: 'VIEWPORT_OPEN', attachmentId: input.attachmentId, position: input.position })
+		post({ type: 'VIEWPORT_OPEN', surfaceId: input.surfaceId, position: input.position })
 		return () => {
 			port.removeEventListener('message', report)
 			port.removeEventListener('messageerror', failed)
@@ -68,8 +68,8 @@ export const surfaceViewportMachine = setup({
 		output: types<Result>(),
 		events: {
 			MEASURE: types<Extract<Reply, { type: 'MEASURE' }> & { elapsedMs?: number }>(),
-			VIEWPORT_OPENED: types<{ attachmentId: string; elapsedMs: number }>(),
-			VIEWPORT_FAILED: types<{ attachmentId: string }>(),
+			VIEWPORT_OPENED: types<{ surfaceId: string; elapsedMs: number }>(),
+			VIEWPORT_FAILED: types<{ surfaceId: string }>(),
 			VIEWPORT_SETTLED: types<
 				Extract<Reply, { type: 'VIEWPORT_SETTLED' }> & { elapsedMs: number }
 			>(),
@@ -86,8 +86,8 @@ export const surfaceViewportMachine = setup({
 	delays: { reply: ({ context }) => context.input.replyTimeoutMs ?? READER_REPLY_TIMEOUT_MS },
 	guards: {
 		native: ({ context }) => 'native' in context.input,
-		matching: ({ context }, event: { attachmentId: string }) =>
-			event.attachmentId === context.input.attachmentId,
+		matching: ({ context }, event: { surfaceId: string }) =>
+			event.surfaceId === context.input.surfaceId,
 		withinDeadline: ({ context }, event: { elapsedMs: number }) =>
 			withinResourceDeadline(
 				event.elapsedMs,
@@ -106,7 +106,7 @@ export const surfaceViewportMachine = setup({
 					| {
 							send: (event: {
 								type: 'VIEWPORT_FAILED'
-								attachmentId: string
+								surfaceId: string
 								reason: 'failed' | 'overdue'
 							}) => void
 					  }
@@ -116,7 +116,7 @@ export const surfaceViewportMachine = setup({
 		) => {
 			parent?.send({
 				type: 'VIEWPORT_FAILED',
-				attachmentId: context.input.attachmentId,
+				surfaceId: context.input.surfaceId,
 				reason: params.reason
 			})
 		}
@@ -139,7 +139,7 @@ export const surfaceViewportMachine = setup({
 					if (!('native' in context.input)) throw new Error('Reader elements unavailable')
 					return {
 						...context.input.native,
-						attachmentId: context.input.attachmentId,
+						surfaceId: context.input.surfaceId,
 						position: context.input.position
 					}
 				},

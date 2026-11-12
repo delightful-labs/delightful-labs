@@ -37,7 +37,7 @@ it('keeps only bounded HTTP markers and deterministic per-snapshot image declara
 	const a = await prepareImages(crypto.randomUUID(), crypto.randomUUID(), html)
 	expect(a).toHaveLength(1)
 	expect(a[0]?.status).toBe('pending')
-	expect((await prepareImages(a[0]!.libraryId, a[0]!.documentId, html))[0]?.id).toBe(a[0]?.id)
+	expect((await prepareImages(a[0]!.libraryId, a[0]!.articleId, html))[0]?.id).toBe(a[0]?.id)
 	expect(
 		processedImageSchema.safeParse({
 			bytes: new Uint8Array(2 * 1024 * 1024 + 1),

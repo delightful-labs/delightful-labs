@@ -5,7 +5,7 @@
 	import type { ImageView } from '../../images/view-machine.js'
 	import type { AssetResult } from '../../contracts/storage.js'
 	import type { WorkflowMessage } from '../../contracts/feedback.js'
-	import type { ReaderPreferences, ReaderChange } from '../../reader/schema.js'
+	import type { ReaderPreferences, ReaderPreferenceChange } from '../../reader/schema.js'
 	import type { ReaderHeading, ReaderFootnote } from '../../reader/structure.js'
 	import { t } from '../../localization/index.js'
 	import SavedContent from '../../integrations/SavedContent.svelte'
@@ -52,7 +52,7 @@
 		text: string
 		sourceUrl: string | undefined
 		preferences: ReaderPreferences
-		progress: number | undefined
+		progress: number
 		focused: boolean
 		enabled: boolean
 		canOrganize: boolean
@@ -63,7 +63,7 @@
 		footnoteId: string
 		message: WorkflowMessage | undefined
 		readingMessage: WorkflowMessage | undefined
-		onchange: (change: ReaderChange) => void
+		onchange: (change: ReaderPreferenceChange) => void
 		onfocus: () => void
 		onshowcontrols: () => void
 		onreflow: () => void

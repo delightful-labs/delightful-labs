@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { uuidSchema } from '../validation/values.js'
-import { normalizedSource, articleId } from '../capture/source.js'
+import { normalizedSource, articleId as imageId } from '../capture/source.js'
 export const IMAGE_INPUT_LIMIT = 4 * 1024 * 1024
 export const IMAGE_OUTPUT_LIMIT = 2 * 1024 * 1024
 export const IMAGE_EDGE = 2048
@@ -19,7 +19,7 @@ export const imageUrlSchema = z
 export const imageRowSchema = z.object({
 	id: uuidSchema,
 	libraryId: uuidSchema,
-	documentId: uuidSchema,
+	articleId: uuidSchema,
 	sourceUrl: imageUrlSchema,
 	status: z.enum(['pending', 'ready', 'failed']),
 	assetId: uuidSchema.nullable(),
@@ -66,7 +66,7 @@ export function imageSources(html: string) {
 }
 export async function prepareImages(
 	libraryId: string,
-	documentId: string,
+	articleId: string,
 	html: string,
 	featuredImageUrl?: string | null
 ): Promise<ArticleImage[]> {
@@ -74,9 +74,9 @@ export async function prepareImages(
 	for (const url of imageSources(html)) sources.add(url)
 	return Promise.all(
 		[...sources].slice(0, 250).map(async (sourceUrl) => ({
-			id: await articleId(documentId, sourceUrl),
+			id: await imageId(articleId, sourceUrl),
 			libraryId,
-			documentId,
+			articleId,
 			sourceUrl,
 			status: 'pending',
 			assetId: null,
@@ -90,7 +90,7 @@ export function canAcquireImage(row: ArticleImage) {
 export function canWriteImage(row: ArticleImage | null, draft: ImageWrite, intent: unknown) {
 	return (
 		!!row &&
-		row.documentId === draft.image.documentId &&
+		row.articleId === draft.image.articleId &&
 		row.sourceUrl === draft.image.sourceUrl &&
 		row.status !== 'ready' &&
 		!intent

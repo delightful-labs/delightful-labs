@@ -93,10 +93,7 @@ function capability(id: string): LibraryCapability {
 		},
 		read: {
 			isCurrent: () => true,
-			document: async () => null,
-			snapshot: async () => null,
-			asset: async () => null,
-			source: async () => null
+			document: async () => null
 		},
 		subscribe: () => () => {},
 		worker: (report) => ({

@@ -45,7 +45,7 @@ it('compiles the actual native policies and reopens locally durable notes withou
 		)
 		if (article.kind !== 'saved') throw new Error('Expected local article')
 		const noteId = crypto.randomUUID()
-		const entity = { id: noteId, libraryId: owner, articleId: article.operationId }
+		const entity = { id: noteId, libraryId: owner, documentId: article.operationId }
 		const created = await toPromise(
 			createActor(records.notes.create, { input: noteAttempt(entity) }).start()
 		)
@@ -85,14 +85,13 @@ it('compiles the actual native policies and reopens locally durable notes withou
 		)
 		expect(document.kind).toBe('saved')
 		const documentNoteId = crypto.randomUUID()
-		const documentEntity = { id: documentNoteId, libraryId: owner, articleId: documentId }
+		const documentEntity = { id: documentNoteId, libraryId: owner, documentId: documentId }
 		const createdDocumentNote = await toPromise(
 			createActor(records.notes.create, { input: noteAttempt(documentEntity) }).start()
 		)
 		expect(createdDocumentNote.settlement.kind).toBe('locallyPersisted')
 		expect(await records.notes.read(documentNoteId)).toMatchObject({
 			id: documentNoteId,
-			articleId: null,
 			documentId
 		})
 		const legacyId = crypto.randomUUID()
@@ -122,8 +121,7 @@ it('compiles the actual native policies and reopens locally durable notes withou
 		const reopened = createLibraryRecords(session.getSnapshot().client!.db, owner, () => true)
 		expect(await reopened.notes.read(noteId)).toMatchObject({
 			id: noteId,
-			articleId: article.operationId,
-			documentId: null
+			documentId: article.operationId
 		})
 		expect(await reopened.notes.readRevision(draft)).toEqual(draft)
 		expect(await reopened.notes.readRevision(legacy)).toEqual(legacy)

@@ -14,7 +14,7 @@ export type NotificationDisplay = {
 	capture: Capture
 	message: WorkflowMessage
 	revision: number
-	articleId?: string
+	documentId?: string
 }
 type Input = { message: unknown; sender: chrome.runtime.MessageSender }
 type Context = Input & {
@@ -93,7 +93,7 @@ export function createNotificationMachine(cap: {
 							capture: request.capture,
 							message: request.message,
 							revision: request.revision,
-							...(request.articleId === undefined ? {} : { articleId: request.articleId })
+							...(request.documentId === undefined ? {} : { documentId: request.documentId })
 						}
 					})(args)
 				}

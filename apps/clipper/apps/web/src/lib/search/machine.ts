@@ -45,8 +45,8 @@ function sameSearchRows(a: LibraryArticle[], b: LibraryArticle[]) {
 			other?.id === row.id &&
 			other.title === row.title &&
 			other.url === row.url &&
-			other.contentId === row.contentId &&
-			other.originalSavedAt === row.originalSavedAt &&
+			other.readable === row.readable &&
+			other.createdAt === row.createdAt &&
 			JSON.stringify((other.tags ?? []).map((tag) => tag.name)) ===
 				JSON.stringify((row.tags ?? []).map((tag) => tag.name))
 		)

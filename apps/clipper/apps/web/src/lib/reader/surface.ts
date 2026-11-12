@@ -1,4 +1,4 @@
-import type { ReadingPosition } from './schema.js'
+import type { ResumePosition } from './schema.js'
 import type { ViewportElements } from './viewport.js'
 export type FullscreenSurface = {
 	supported: () => boolean
@@ -13,8 +13,8 @@ export type ReaderSurface = {
 	viewport: { native: ViewportElements } | { port: MessagePort }
 }
 export type SurfaceViewportInput = ReaderSurface['viewport'] & {
-	attachmentId: string
-	position: ReadingPosition | undefined
+	surfaceId: string
+	position: ResumePosition | undefined
 	replyTimeoutMs?: number
 	now?: () => number
 }

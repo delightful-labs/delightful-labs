@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { lowercaseUuidSchema, utf8StringSchema } from '../validation/values.js'
-import { causalHeads, causalParentsSchema, hasSingleParent } from '../capture/causal.js'
+import { causalHeads, causalParentsSchema } from '../capture/causal.js'
 
 const NOTE_TEXT_LIMIT = 262144
 export const noteTextSchema = z
@@ -18,14 +18,14 @@ const revisionIdsSchema = z
 const noteFieldsSchema = z.object({
 	id: lowercaseUuidSchema,
 	libraryId: lowercaseUuidSchema,
-	articleId: lowercaseUuidSchema.nullable(),
-	documentId: lowercaseUuidSchema.nullable()
+
+	documentId: lowercaseUuidSchema
 })
-export const noteSchema = noteFieldsSchema.refine(hasSingleParent)
+export const noteSchema = noteFieldsSchema
 export type Note = z.infer<typeof noteSchema>
 const noteIdentitySchema = noteFieldsSchema.pick({ id: true, libraryId: true })
 export const noteCreateSchema = noteIdentitySchema.extend({
-	articleId: noteFieldsSchema.shape.articleId.unwrap()
+	documentId: noteFieldsSchema.shape.documentId
 })
 export type NoteCreate = z.infer<typeof noteCreateSchema>
 export const noteRevisionSchema = noteIdentitySchema.extend({

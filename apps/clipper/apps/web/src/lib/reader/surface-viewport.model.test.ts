@@ -38,13 +38,13 @@ const sut: TestSut<SnapshotFrom<typeof contract>, EventFrom<typeof contract>> = 
 	create: async () => {
 		const channel = new MessageChannel(),
 			clock = new SimulatedClock(),
-			attachmentId = crypto.randomUUID()
+			surfaceId = crypto.randomUUID()
 		channel.port1.start()
 		const actor = createActor(surfaceViewportMachine, {
 			clock,
 			input: {
 				port: channel.port2,
-				attachmentId,
+				surfaceId,
 				position: undefined,
 				replyTimeoutMs: 5,
 				now: () => clock.now()
@@ -61,7 +61,7 @@ const sut: TestSut<SnapshotFrom<typeof contract>, EventFrom<typeof contract>> = 
 					channel.port1.postMessage({
 						type: 'VIEWPORT_SETTLED',
 						outcome: 'closed',
-						attachmentId: event.type === 'WRONG' ? crypto.randomUUID() : attachmentId
+						surfaceId: event.type === 'WRONG' ? crypto.randomUUID() : surfaceId
 					})
 					await delivered
 				}

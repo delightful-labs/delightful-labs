@@ -4,13 +4,13 @@ import { z } from 'zod'
 import { viewportMachine } from './viewport.js'
 
 import type { ViewportElements } from './viewport.js'
-import { positionSchema } from './schema.js'
+import { resumePositionSchema } from './schema.js'
 import { nativeReaderSurface } from './native-surface.js'
 const command = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('VIEWPORT_OPEN'),
-		attachmentId: z.string().uuid(),
-		position: positionSchema.optional()
+		surfaceId: z.string().uuid(),
+		position: resumePositionSchema.optional()
 	}),
 	z.object({ type: z.enum(['DETACH', 'REFLOW']) }),
 	z.object({ type: z.literal('DISPOSE'), id: z.string().uuid().optional() }),
@@ -56,12 +56,12 @@ export function serveReaderSurface(port: MessagePort, elements: ViewportElements
 				if (released) {
 					const previous = viewport?.getSnapshot()
 					if (previous && previous.status !== 'done') {
-						reportViewport({ type: 'VIEWPORT_FAILED', attachmentId: message.attachmentId })
+						reportViewport({ type: 'VIEWPORT_FAILED', surfaceId: message.surfaceId })
 						return
 					}
 					reportViewport({
 						type: 'VIEWPORT_SETTLED',
-						attachmentId: message.attachmentId,
+						surfaceId: message.surfaceId,
 						outcome: previous && !previous.matches('closed') ? 'failed' : 'closed'
 					})
 					return
@@ -70,7 +70,7 @@ export function serveReaderSurface(port: MessagePort, elements: ViewportElements
 				const actor = createActor(viewportMachine, {
 					input: {
 						...elements,
-						attachmentId: message.attachmentId,
+						surfaceId: message.surfaceId,
 						position: message.position,
 						report: reportViewport
 					}
@@ -82,22 +82,22 @@ export function serveReaderSurface(port: MessagePort, elements: ViewportElements
 						if (snapshot.status === 'done' && snapshot.output)
 							reportViewport({
 								type: 'VIEWPORT_SETTLED',
-								attachmentId: message.attachmentId,
+								surfaceId: message.surfaceId,
 								outcome: snapshot.matches('closed') ? 'closed' : 'failed',
 								position: snapshot.output.position
 							})
-						else reportViewport({ type: 'VIEWPORT_FAILED', attachmentId: message.attachmentId })
+						else reportViewport({ type: 'VIEWPORT_FAILED', surfaceId: message.surfaceId })
 						if (disposeRequest) dispose(disposeRequest.id)
 					},
 					error: () =>
 						reportViewport({
 							type: 'VIEWPORT_FAILED',
-							attachmentId: message.attachmentId
+							surfaceId: message.surfaceId
 						})
 				})
 				actor.start()
 				if (actor.getSnapshot().status === 'active')
-					reportViewport({ type: 'VIEWPORT_OPENED', attachmentId: message.attachmentId })
+					reportViewport({ type: 'VIEWPORT_OPENED', surfaceId: message.surfaceId })
 				break
 			}
 			case 'REFLOW':

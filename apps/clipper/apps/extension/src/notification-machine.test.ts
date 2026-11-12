@@ -22,7 +22,7 @@ const progress = {
 	capture,
 	revision: 5,
 	message: feedback,
-	articleId: crypto.randomUUID()
+	documentId: crypto.randomUUID()
 }
 function fixture(
 	message: unknown,
@@ -67,7 +67,7 @@ it('shows validated progress directly and preserves the article destination and 
 		capture,
 		message: feedback,
 		revision: 5,
-		articleId: progress.articleId
+		documentId: progress.documentId
 	})
 })
 it.each([
@@ -86,7 +86,7 @@ it.each([
 )
 it.each([
 	{ ...waiting, revision: -1 },
-	{ ...progress, articleId: 'invalid' },
+	{ ...progress, documentId: 'invalid' },
 	{ type: 'WAITING', id }
 ])('rejects malformed notification input', async (message) => {
 	const f = fixture(message)

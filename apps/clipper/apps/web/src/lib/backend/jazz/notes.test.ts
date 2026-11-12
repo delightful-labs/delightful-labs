@@ -30,15 +30,15 @@ async function owner(name: string) {
 	if (article.kind !== 'saved') throw new Error('Expected article')
 	await Promise.all(article.receipts.map((receipt) => receipt.global()))
 	const noteId = crypto.randomUUID(),
-		articleId = article.operationId
+		documentId = article.operationId
 	const result = await toPromise(
 		createActor(records.notes.create, {
-			input: noteAttempt({ id: noteId, libraryId, articleId })
+			input: noteAttempt({ id: noteId, libraryId, documentId })
 		}).start()
 	)
 	if (result.settlement.kind !== 'locallyPersisted') throw new Error('Expected note entity')
 	await result.settlement.workspace.global()
-	return { db, libraryId, records, noteId, articleId }
+	return { db, libraryId, records, noteId, documentId }
 }
 function revision(
 	account: Awaited<ReturnType<typeof owner>>,
@@ -64,13 +64,12 @@ async function write(account: Awaited<ReturnType<typeof owner>>, draft: NoteRevi
 it('keeps an independently addressable note and preserves conflicting native text revisions', async () => {
 	const a = await owner('note-entity-owner'),
 		b = await owner('note-entity-other')
-	expect(a.noteId).not.toBe(a.articleId)
+	expect(a.noteId).not.toBe(a.documentId)
 	expect(await a.records.notes.read(a.noteId)).toMatchObject({
 		id: a.noteId,
-		articleId: a.articleId,
-		documentId: null
+		documentId: a.documentId
 	})
-	expect(await a.records.notes.forArticle(a.articleId)).toHaveLength(1)
+	expect(await a.records.notes.forDocument(a.documentId)).toHaveLength(1)
 	const base = revision(a, 'base'),
 		first = revision(a, 'device A', [base.id]),
 		second = revision(a, 'device B', [base.id])
@@ -130,63 +129,25 @@ it('checks note ownership and causal references inside the transaction and prese
 			input: noteAttempt({
 				id: crypto.randomUUID(),
 				libraryId: a.libraryId,
-				articleId: a.articleId
+				documentId: a.documentId
 			})
 		}).start()
 	)
 	expect(duplicate.outcome).toBe('blocked')
-	expect((await a.records.notes.forArticle(a.articleId))[0]?.id).toBe(a.noteId)
-})
-it('retains a legacy document association while article aliases find the same independent entity', async () => {
-	const a = await owner('note-entity-alias'),
-		documentId = crypto.randomUUID()
-	const saved = await toPromise(
-		createActor(a.records.saveMachine, {
-			input: {
-				operationId: documentId,
-				title: 'Legacy',
-				text: 'Readable',
-				bytes: new TextEncoder().encode('Readable'),
-				mediaType: 'text/plain'
-			}
-		}).start()
-	)
-	if (saved.kind !== 'saved') throw new Error('Expected content')
-	await Promise.all(saved.receipts.map((receipt) => receipt.global()))
-	const noteId = crypto.randomUUID()
-	const created = await toPromise(
-		createActor(a.records.notes.create, {
-			input: noteAttempt({ id: noteId, libraryId: a.libraryId, articleId: documentId })
-		}).start()
-	)
-	if (created.settlement.kind !== 'locallyPersisted') throw new Error('Expected legacy note')
-	await created.settlement.workspace.global()
-	await a.db.update(app.articles, a.articleId, { contentId: documentId }).wait({ tier: 'global' })
-	const notes = await a.records.notes.forArticle(a.articleId)
-	expect(notes.map((note) => note.id)).toContain(noteId)
-	expect(await a.records.notes.read(noteId)).toMatchObject({
-		id: noteId,
-		articleId: null,
-		documentId
-	})
-	const recovery = await a.records.notes.recoveryTarget(noteId)
-	expect(recovery?.note.id).toBe(noteId)
-	expect(new Set(recovery?.articleIds)).toEqual(new Set([documentId, a.articleId]))
+	expect((await a.records.notes.forDocument(a.documentId))[0]?.id).toBe(a.noteId)
 })
 it('rejects native note/revision access to foreign or missing parents', async () => {
 	const a = await owner('note-entity-parent'),
 		b = await owner('note-entity-parent-other')
 	for (const fields of [
-		{ libraryId: a.libraryId, articleId: null, documentId: null },
-		{ libraryId: a.libraryId, articleId: a.articleId, documentId: a.articleId },
-		{ libraryId: b.libraryId, articleId: a.articleId, documentId: null },
-		{ libraryId: a.libraryId, articleId: crypto.randomUUID(), documentId: null }
+		{ libraryId: b.libraryId, documentId: a.documentId },
+		{ libraryId: a.libraryId, documentId: crypto.randomUUID() }
 	]) {
 		const db = fields.libraryId === b.libraryId ? b.db : a.db
 		await expect(db.insert(app.notes, fields).wait({ tier: 'global' })).rejects.toThrow()
 	}
 	await expect(
-		a.db.update(app.notes, a.noteId, { articleId: b.articleId }).wait({ tier: 'global' })
+		a.db.update(app.notes, a.noteId, { documentId: b.documentId }).wait({ tier: 'global' })
 	).rejects.toThrow()
 	await expect(a.db.delete(app.notes, a.noteId).wait({ tier: 'global' })).rejects.toThrow()
 })

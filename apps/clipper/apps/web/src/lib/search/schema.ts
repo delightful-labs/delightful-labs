@@ -6,6 +6,6 @@ export const searchDocumentSchema = z.object({
 	url: z.string(),
 	text: z.string(),
 	tags: z.string(),
-	originalSavedAt: z.string()
+	createdAt: z.string()
 })
 export type SearchDocument = z.infer<typeof searchDocumentSchema>

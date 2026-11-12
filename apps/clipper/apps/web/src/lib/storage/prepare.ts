@@ -1,3 +1,5 @@
+import { articleId } from '../capture/source.js'
+import { articleSchema } from '../capture/article-schema.js'
 import { prepareImages } from '../images/schema.js'
 import { captureDetailsSchema } from '../capture/metadata.js'
 import type { PreparedSave, SaveRequest } from '../contracts/storage.js'
@@ -22,10 +24,9 @@ export async function prepareSave(libraryId: string, request: SaveRequest): Prom
 	const hasDetails = Object.values(details).some((value) => value !== undefined)
 	const payload = new Uint8Array(input.bytes)
 	const fingerprintSource = request.source ? { ...request.source } : null
-	const createdAt = new Date().toISOString()
 	const payloadHash = await hash(
 		encoder.encode(
-			// Preserve the legacy metadata key order in durable intent fingerprints.
+			// Include capture evidence and bytes in uncertain-operation reconciliation.
 			JSON.stringify([
 				title,
 				text,
@@ -37,7 +38,34 @@ export async function prepareSave(libraryId: string, request: SaveRequest): Prom
 			])
 		)
 	)
+	const origin = input.source ? new URL(input.source.finalUrl).origin : null
+	const site = origin
+		? {
+				id: await articleId(libraryId, origin),
+				origin,
+				name: details.siteName ?? null,
+				favicon: null
+			}
+		: null
+	const parsedAttachment = articleSchema.safeParse({
+		id: operationId,
+		title,
+		excerpt: input.excerpt ?? null,
+		author: details.author ?? null,
+		publishedAt: details.publishedTime ?? null,
+		language: details.lang ?? null,
+		site,
+		source: input.source
+			? { resolvedUrl: input.source.finalUrl, canonicalUrl: input.source.canonicalUrl ?? null }
+			: null,
+		html:
+			mediaType === 'text/html' ? new TextDecoder('utf-8', { fatal: true }).decode(payload) : '',
+		text
+	})
+	if (!parsedAttachment.success) throw new Error('Invalid bounded storage request')
+	const attachment = parsedAttachment.data
 	return {
+		attachment,
 		images:
 			mediaType === 'text/html'
 				? await prepareImages(
@@ -47,34 +75,8 @@ export async function prepareSave(libraryId: string, request: SaveRequest): Prom
 						input.featuredImageUrl
 					)
 				: [],
-		...(input.articleId ? { articleId: input.articleId } : {}),
-		...(input.source
-			? { source: { id: operationId, documentId: operationId, libraryId, ...input.source } }
-			: {}),
-		intent: { id: operationId, libraryId, payloadHash, createdAt },
-		asset: { id: operationId, libraryId, operationId, mediaType, payload },
-		snapshot: {
-			id: operationId,
-			libraryId,
-			documentId: operationId,
-			text,
-			excerpt,
-			author: details.author ?? null,
-			siteName: details.siteName ?? null,
-			publishedTime: details.publishedTime ?? null,
-			lang: details.lang ?? null,
-			dir: details.dir ?? null,
-			featuredImageUrl: details.featuredImageUrl ?? null,
-			formatVersion: '1'
-		},
-		document: {
-			id: operationId,
-			libraryId,
-			operationId,
-			snapshotId: operationId,
-			assetId: operationId,
-			title,
-			originalSavedAt: createdAt
-		}
+		documentId: input.documentId ?? operationId,
+		...(input.source ? { source: input.source } : {}),
+		intent: { id: operationId, libraryId, payloadHash }
 	}
 }

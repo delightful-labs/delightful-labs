@@ -1,3 +1,4 @@
+import type { SaveRequest } from '../contracts/storage.js'
 import { expect, it } from 'vitest'
 import {
 	BYTE_LIMIT,
@@ -20,12 +21,12 @@ it('preserves inclusive title, media-type, text and HTML bounds', () => {
 })
 it('allows empty stored text but requires nonblank extraction text', () => {
 	const request = {
-		operationId: 'ABCDEF01-2345-6789-ABCD-EF0123456789',
+		operationId: 'abcdef01-2345-6789-abcd-ef0123456789',
 		title: 'Title',
 		text: '',
 		mediaType: 'text/plain',
 		bytes: new Uint8Array()
-	}
+	} satisfies SaveRequest
 	expect(savePayloadSchema.safeParse(request).success).toBe(true)
 	expect(extractedTextSchema.safeParse(request.text).success).toBe(false)
 	expect(extractedTextSchema.safeParse(' \n ').success).toBe(false)
@@ -41,8 +42,8 @@ it('allows empty stored text but requires nonblank extraction text', () => {
 })
 it('keeps source URL/provenance limits in characters and accepts omitted metadata', () => {
 	const source = {
-		finalUrl: 'é'.repeat(8192),
-		submittedUrl: 'a'.repeat(8192),
+		finalUrl: 'https://example.com/' + 'é'.repeat(8192 - 'https://example.com/'.length),
+		submittedUrl: 'https://example.com/' + 'a'.repeat(8192 - 'https://example.com/'.length),
 		provenance: 'a'.repeat(32768)
 	}
 	expect(sourceMetadataSchema.optional().safeParse(undefined).success).toBe(true)
@@ -60,18 +61,18 @@ it('keeps source URL/provenance limits in characters and accepts omitted metadat
 it('validates complete save inputs without trimming or coercing stored values', async () => {
 	const { saveRequestSchema } = await import('./policy.js')
 	const request = {
-		operationId: 'ABCDEF01-2345-6789-ABCD-EF0123456789',
-		articleId: 'article',
+		operationId: 'abcdef01-2345-6789-abcd-ef0123456789',
+		documentId: crypto.randomUUID(),
 		title: ' Title ',
 		text: ' exact text ',
 		bytes: new Uint8Array([1]),
-		mediaType: ' text/plain ',
+		mediaType: 'text/plain',
 		source: {
 			finalUrl: 'https://example.com/',
 			submittedUrl: 'https://short.example/',
 			provenance: '{}'
 		}
-	}
+	} satisfies SaveRequest
 	const parsed = saveRequestSchema.safeParse(request)
 	expect(parsed.success).toBe(true)
 	if (!parsed.success) throw new Error('Expected valid request')
@@ -92,14 +93,14 @@ it('maps schema failures to existing storage errors without exposing validation 
 			submittedUrl: 'https://example.com',
 			provenance: 'private-evidence'.repeat(4000)
 		}
-	}
+	} satisfies SaveRequest
 	await expect(prepareSave('library', request)).rejects.toThrow('Invalid source metadata')
 	await expect(prepareSave('library', { ...request, title: '' })).rejects.toThrow(
 		'Invalid bounded storage request'
 	)
 })
 
-it('preserves the pre-Zod intent fingerprint for valid source metadata', async () => {
+it('fingerprints bounded content deterministically and snapshots source input before awaiting hashing', async () => {
 	const { prepareSave } = await import('./prepare.js')
 	const request = {
 		operationId: 'abcdef01-2345-6789-abcd-ef0123456789',
@@ -112,7 +113,7 @@ it('preserves the pre-Zod intent fingerprint for valid source metadata', async (
 			finalUrl: 'https://example.com/',
 			provenance: '{}'
 		}
-	}
+	} satisfies SaveRequest
 	const pending = prepareSave('library', request)
 	request.source.finalUrl = 'https://changed.example/'
 	const prepared = await pending

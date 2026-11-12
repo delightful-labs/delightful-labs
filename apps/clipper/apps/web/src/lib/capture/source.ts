@@ -4,21 +4,26 @@ import {
 	extractedContentSchema
 } from '../contracts/capture-response.js'
 import { articleMetadataSchema, type ArticleMetadata } from './metadata.js'
-import { usesHttpProtocol, hasCredentials } from '../validation/values.js'
-export function normalizedSource(value: string) {
+import { webUrlSchema, usesHttpProtocol, hasCredentials } from '../validation/values.js'
+export function sourceIdentityUrl(value: string) {
 	if (value.length > 8192) throw new Error('invalidUrl')
 	const url = new URL(value)
 	if (!usesHttpProtocol(url) || hasCredentials(url)) throw new Error('invalidUrl')
+	return url.href
+}
+/** Fetch/representation comparisons ignore fragments; saved Document identity does not. */
+export function normalizedSource(value: string) {
+	const url = new URL(sourceIdentityUrl(value))
 	url.hash = ''
 	return url.href
 }
-/** Same verified destination in the same private library has one immutable identity. */
+/** Conservative syntax normalization; meaningful query and fragment differences retain identity. */
 export async function articleId(libraryId: string, finalUrl: string) {
 	const bytes = new Uint8Array(
 		await crypto.subtle.digest(
 			'SHA-256',
 			new TextEncoder().encode(
-				JSON.stringify(['clipper.article.1', libraryId, normalizedSource(finalUrl)])
+				JSON.stringify(['clipper.article.1', libraryId, sourceIdentityUrl(finalUrl)])
 			)
 		)
 	)
@@ -33,6 +38,7 @@ export type Candidate = ArticleMetadata & {
 	text: string
 	html: string
 	finalUrl: string
+	canonicalUrl?: string | null
 	submittedUrl: string
 	provenance: string
 	imagesMissing: boolean
@@ -69,6 +75,10 @@ export function extractedCandidate(
 		text: candidate.text,
 		html: candidate.html,
 		finalUrl,
+		canonicalUrl: (() => {
+			const parsed = webUrlSchema.safeParse(data.canonicalCandidate)
+			return parsed.success ? parsed.data : null
+		})(),
 		submittedUrl,
 		provenance,
 		imagesMissing:

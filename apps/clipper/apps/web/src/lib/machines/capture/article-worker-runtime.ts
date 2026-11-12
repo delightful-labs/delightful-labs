@@ -1,6 +1,6 @@
 import { createCallbackLogic, setup, types, type ActorFromLogic } from 'xstate'
 import { createArticleQueueMachine } from './article-queue.js'
-import type { Article } from '../../contracts/articles.js'
+import type { CaptureDocument } from '../../contracts/articles.js'
 import type { QueueCapability } from '../../contracts/article-worker.js'
 
 export type WorkerControl = { type: 'WAKE' } | { type: 'RETRY' | 'CANCEL'; id: string }
@@ -9,7 +9,7 @@ export type SharedControl =
 	| { type: 'ACK'; id: string }
 type Command = Extract<SharedControl, { type: 'COMMAND' }>
 export type RuntimeEvent =
-	| { type: 'ROWS'; rows: Article[] }
+	| { type: 'ROWS'; rows: CaptureDocument[] }
 	| { type: 'STOP' }
 	| WorkerControl
 	| { type: 'LOCKED' | 'LOCK_FAILED' }
@@ -32,7 +32,7 @@ export type RuntimeCapability = {
 export function createArticleWorkerRuntimeMachine(cap: RuntimeCapability) {
 	const queue = createArticleQueueMachine(cap.queue)
 	type Context = {
-		rows: Article[]
+		rows: CaptureDocument[]
 		pending: Record<string, Command>
 		queue: ActorFromLogic<typeof queue> | undefined
 	}
@@ -79,7 +79,7 @@ export function createArticleWorkerRuntimeMachine(cap: RuntimeCapability) {
 		schemas: {
 			context: types<Context>(),
 			events: {
-				ROWS: types<{ rows: Article[] }>(),
+				ROWS: types<{ rows: CaptureDocument[] }>(),
 				STOP: types(),
 				WAKE: types(),
 				RETRY: types<{ id: string }>(),

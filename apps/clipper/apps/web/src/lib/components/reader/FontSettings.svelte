@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { InputRange, Select } from 'delightful-ui'
 	import { t } from '../../localization/index.js'
-	import type { ReaderPreferences, ReaderChange } from '../../reader/schema.js'
+	import type { ReaderPreferences, ReaderPreferenceChange } from '../../reader/schema.js'
 	let {
 		value,
 		disabled = false,
@@ -9,7 +9,7 @@
 	}: {
 		value: ReaderPreferences
 		disabled?: boolean
-		onchange: (change: Exclude<ReaderChange, { field: 'position' }>) => void
+		onchange: (change: Exclude<ReaderPreferenceChange, { field: 'position' }>) => void
 	} = $props()
 	const id = $props.id()
 	const number = new Intl.NumberFormat('en', { maximumFractionDigits: 1 })

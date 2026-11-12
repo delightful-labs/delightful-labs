@@ -12,7 +12,12 @@ import {
 } from 'xstate'
 
 import type { ReaderCapability, ReaderStageResult } from '../../contracts/reader.js'
-import type { ReaderChange, ReaderOperation, ReadingPosition } from '../../reader/schema.js'
+import type {
+	ReaderChange,
+	ReaderOperation,
+	ReadingMeasurement,
+	ReaderDocumentState
+} from '../../reader/schema.js'
 import {
 	canQueueReaderChange,
 	mergeReadingProgress,
@@ -20,7 +25,7 @@ import {
 	projectReaderState,
 	readerChangeKey
 } from '../../reader/schema.js'
-import { positionSchema } from '../../reader/schema.js'
+import { readingMeasurementSchema, positionFromMeasurement } from '../../reader/schema.js'
 import type { ViewportElements } from '../../reader/viewport.js'
 import { surfaceViewportMachine as viewportMachine } from '../../reader/surface-viewport.js'
 import type { ReaderSurface, FullscreenSurface } from '../../reader/surface.js'
@@ -39,10 +44,11 @@ type Input = {
 type Attachment = { documentId: string; surface: ReaderSurface }
 type OwnedAttachment = Attachment & { id: string }
 export type ReaderExperienceEvent =
-	| { type: 'MEASURE'; position: ReadingPosition; attachmentId: string }
-	| { type: 'VIEWPORT_FAILED'; attachmentId: string; reason?: 'failed' | 'overdue' }
+	| { type: 'MEASURE'; position: ReadingMeasurement; surfaceId: string }
+	| { type: 'VIEWPORT_FAILED'; surfaceId: string; reason?: 'failed' | 'overdue' }
 	| { type: 'CHANGE'; change: ReaderChange }
 	| { type: 'ROWS'; rows: ReaderOperation[] }
+	| { type: 'DOCUMENTS'; rows: ReaderDocumentState[] }
 	| ({ type: 'ATTACH' } & ViewportElements & { documentId: string })
 	| ({ type: 'ATTACH_SURFACE'; sources: string[] } & Attachment)
 	| {
@@ -59,6 +65,7 @@ export type ReaderExperienceEvent =
 	| SyncReport
 type Context = Input & {
 	rows: ReaderOperation[]
+	documents: ReaderDocumentState[]
 	queue: ReaderChange[]
 	drafts: ReaderChange[]
 	operationId: string
@@ -80,6 +87,15 @@ const observation = createCallbackLogic<ReaderExperienceEvent, ReaderCapability 
 			(rows) => sendBack({ type: 'ROWS', rows }),
 			() => sendBack({ type: 'OBSERVATION_FAILED' })
 		)
+)
+const documentObservation = createCallbackLogic<
+	ReaderExperienceEvent,
+	ReaderCapability | undefined
+>(({ input, sendBack }) =>
+	input?.subscribeDocuments(
+		(rows) => sendBack({ type: 'DOCUMENTS', rows }),
+		() => sendBack({ type: 'OBSERVATION_FAILED' })
+	)
 )
 const fullscreenEntry = createAsyncLogic<void, FullscreenSurface>({
 	run: ({ input }) => input.enter()
@@ -124,8 +140,12 @@ function required<T>(value: T | undefined): T {
 function replaceDesired(queue: ReaderChange[], change: ReaderChange) {
 	return [...queue.filter((item) => readerChangeKey(item) !== readerChangeKey(change)), change]
 }
-function remainingDrafts(drafts: ReaderChange[], rows: ReaderOperation[]) {
-	const state = projectReaderState(rows)
+function remainingDrafts(
+	drafts: ReaderChange[],
+	rows: ReaderOperation[],
+	documents: ReaderDocumentState[]
+) {
+	const state = projectReaderState(rows, documents)
 	return drafts.filter(
 		(change) =>
 			JSON.stringify(
@@ -153,6 +173,7 @@ const model = setup({
 			VIEWPORT_FAILED: types<EventPayload<ReaderExperienceEvent, 'VIEWPORT_FAILED'>>(),
 			CHANGE: types<EventPayload<ReaderExperienceEvent, 'CHANGE'>>(),
 			ROWS: types<EventPayload<ReaderExperienceEvent, 'ROWS'>>(),
+			DOCUMENTS: types<EventPayload<ReaderExperienceEvent, 'DOCUMENTS'>>(),
 			ATTACH: types<EventPayload<ReaderExperienceEvent, 'ATTACH'>>(),
 			ATTACH_SURFACE: types<EventPayload<ReaderExperienceEvent, 'ATTACH_SURFACE'>>(),
 			SHUTDOWN: types<EventPayload<ReaderExperienceEvent, 'SHUTDOWN'>>(),
@@ -171,6 +192,7 @@ const model = setup({
 			attachmentIdentity: types<import('xstate').ActorRefFrom<typeof attachmentIdentity>>(),
 			identity: types<import('xstate').ActorRefFrom<typeof identityLogic>>(),
 			observation: types<import('xstate').ActorRefFrom<typeof observation>>(),
+			documentObservation: types<import('xstate').ActorRefFrom<typeof documentObservation>>(),
 			viewport: types<import('xstate').ActorRefFrom<typeof viewportMachine>>(),
 			receipts: types<import('xstate').ActorRefFrom<typeof syncOwnerMachine>>(),
 			fullscreenEntry: types<import('xstate').ActorRefFrom<typeof fullscreenEntry>>(),
@@ -198,6 +220,8 @@ const model = setup({
 							id: 'reader-experience.active.data.observing',
 							states: {
 								loading: { id: 'reader-experience.active.data.observing.loading' },
+								awaitingDocuments: {},
+								awaitingRows: {},
 								ready: { id: 'reader-experience.active.data.observing.ready' }
 							}
 						},
@@ -298,6 +322,7 @@ const model = setup({
 		attachmentIdentity,
 		identity: identityLogic,
 		observation,
+		documentObservation,
 		viewport: viewportMachine,
 		receipts: syncOwnerMachine,
 		fullscreenEntry,
@@ -314,7 +339,7 @@ const model = setup({
 		fullscreenActive: ({ context }: { context: Context }) => context.display?.active() === true,
 		fullscreenInactive: ({ context }: { context: Context }) => context.display?.active() !== true,
 		currentViewport: ({ context, event }: { context: Context; event: ReaderExperienceEvent }) =>
-			'attachmentId' in event && event.attachmentId === context.attachment?.id,
+			'surfaceId' in event && event.surfaceId === context.attachment?.id,
 		current: ({ context }: { context: Context }) => !!context.capability?.isCurrent(),
 		accepting: ({ value }: { value: import('xstate').StateValue }) =>
 			matchesState({ active: { control: 'accepting' } }, value),
@@ -332,10 +357,23 @@ const model = setup({
 				? {
 						context: {
 							rows: event.rows,
-							drafts: remainingDrafts(context.drafts, event.rows),
+							drafts: remainingDrafts(context.drafts, event.rows, context.documents),
 							progress: mergeReadingProgress(
 								context.progress,
-								projectReaderState(event.rows).progress
+								projectReaderState(event.rows, context.documents).progress
+							)
+						}
+					}
+				: { context: {} },
+		updateDocuments: ({ context, event }: { context: Context; event: ReaderExperienceEvent }) =>
+			event.type === 'DOCUMENTS'
+				? {
+						context: {
+							documents: event.rows,
+							drafts: remainingDrafts(context.drafts, context.rows, event.rows),
+							progress: mergeReadingProgress(
+								context.progress,
+								projectReaderState(context.rows, event.rows).progress
 							)
 						}
 					}
@@ -365,6 +403,7 @@ export const readerExperienceMachine = model.createMachine({
 	context: ({ input }) => ({
 		...input,
 		rows: [],
+		documents: [],
 		queue: [],
 		drafts: [],
 		operationId: '',
@@ -447,13 +486,25 @@ export const readerExperienceMachine = model.createMachine({
 					states: {
 						observing: {
 							initial: 'loading',
-							invoke: {
-								id: 'observation',
-								src: 'observation',
-								input: ({ context }: { context: Context }) => context.capability,
-								onError: { target: 'failed' }
-							},
+							invoke: [
+								{
+									id: 'observation',
+									src: 'observation',
+									input: ({ context }: { context: Context }) => context.capability,
+									onError: { target: 'failed' }
+								},
+								{
+									id: 'documentObservation',
+									src: 'documentObservation',
+									input: ({ context }: { context: Context }) => context.capability,
+									onError: { target: 'failed' }
+								}
+							],
 							on: {
+								DOCUMENTS: (args) => {
+									if (!args.guards.current(args)) return
+									return { context: args.actions.updateDocuments(args).context }
+								},
 								ROWS: (args) => {
 									if (!args.guards.current(args)) return
 									return { context: args.actions.updateRows(args).context }
@@ -464,10 +515,36 @@ export const readerExperienceMachine = model.createMachine({
 							states: {
 								loading: {
 									on: {
-										ROWS: (args) => {
-											if (!args.guards.current(args)) return
-											return { target: 'ready', context: args.actions.updateRows(args).context }
-										}
+										ROWS: (args) =>
+											args.guards.current(args)
+												? {
+														target: 'awaitingDocuments',
+														context: args.actions.updateRows(args).context
+													}
+												: undefined,
+										DOCUMENTS: (args) =>
+											args.guards.current(args)
+												? {
+														target: 'awaitingRows',
+														context: args.actions.updateDocuments(args).context
+													}
+												: undefined
+									}
+								},
+								awaitingDocuments: {
+									on: {
+										DOCUMENTS: (args) =>
+											args.guards.current(args)
+												? { target: 'ready', context: args.actions.updateDocuments(args).context }
+												: undefined
+									}
+								},
+								awaitingRows: {
+									on: {
+										ROWS: (args) =>
+											args.guards.current(args)
+												? { target: 'ready', context: args.actions.updateRows(args).context }
+												: undefined
 									}
 								},
 								ready: {}
@@ -788,10 +865,10 @@ export const readerExperienceMachine = model.createMachine({
 								src: 'viewport',
 								input: ({ context }: { context: Context }) => ({
 									...required(context.attachment).surface.viewport,
-									attachmentId: required(context.attachment).id,
+									surfaceId: required(context.attachment).id,
 									replyTimeoutMs: context.viewportReplyTimeoutMs ?? READER_REPLY_TIMEOUT_MS,
 									now: context.now ?? monotonicNow,
-									position: projectReaderState(context.rows).positions[
+									position: projectReaderState(context.rows, context.documents).positions[
 										required(context.attachment).documentId
 									]
 								}),
@@ -805,14 +882,17 @@ export const readerExperienceMachine = model.createMachine({
 										}
 									if (
 										args.guards.current(args) &&
-										positionSchema.safeParse(event.output.position).success &&
+										args.context.documents.some(
+											(document) => document.id === args.context.attachment?.documentId
+										) &&
+										readingMeasurementSchema.safeParse(event.output.position).success &&
 										!matchesState({ active: { writer: 'uncertain' } }, args.value)
 									) {
 										return {
 											target: 'detached',
 											context: (({ context, event }) => {
 												const documentId = required(context.attachment).documentId
-												const position = required(event.output.position)
+												const position = positionFromMeasurement(required(event.output.position))
 												const { progress, position: reconciledPosition } =
 													reconcilePositionProgress(context.progress, documentId, position)
 												const change: ReaderChange = {
@@ -898,8 +978,11 @@ export const readerExperienceMachine = model.createMachine({
 											if (
 												!(
 													args.guards.currentViewport(args) &&
+													args.context.documents.some(
+														(document) => document.id === args.context.attachment?.documentId
+													) &&
 													args.guards.current(args) &&
-													positionSchema.safeParse(event.position).success
+													readingMeasurementSchema.safeParse(event.position).success
 												)
 											)
 												return
@@ -907,7 +990,7 @@ export const readerExperienceMachine = model.createMachine({
 											const { progress, position } = reconcilePositionProgress(
 												args.context.progress,
 												documentId,
-												event.position
+												positionFromMeasurement(event.position)
 											)
 											const patch = { progress }
 											enq.raise({
@@ -1135,6 +1218,7 @@ export const readerExperienceMachine = model.createMachine({
 				return {
 					context: {
 						rows: [],
+						documents: [],
 						queue: [],
 						drafts: [],
 						attachment: undefined,
@@ -1154,7 +1238,10 @@ function projectReaderExperience(
 	snapshot: SnapshotFrom<typeof readerExperienceMachine> | undefined
 ) {
 	const current = snapshot?.context.capability?.isCurrent() === true
-	const state = projectReaderState(current ? snapshot.context.rows : [])
+	const state = projectReaderState(
+		current ? snapshot.context.rows : [],
+		current ? snapshot.context.documents : []
+	)
 	const preferences = { ...state.preferences }
 	for (const change of current ? snapshot.context.drafts : [])
 		if (change.field !== 'position') Object.assign(preferences, { [change.field]: change.value })

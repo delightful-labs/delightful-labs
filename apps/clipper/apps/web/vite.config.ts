@@ -1,4 +1,3 @@
-import { browserMigrations } from './tooling/browser-migrations.js'
 import { offlineAssets } from './tooling/offline-assets.js'
 import netlifyAdapter from '@sveltejs/adapter-netlify'
 import vercelAdapter from '@sveltejs/adapter-vercel'
@@ -65,7 +64,6 @@ export default defineConfig(({ command, mode }) => {
 			]
 		},
 		plugins: [
-			browserMigrations(process.env.CLIPPER_TEST_MIGRATIONS === 'true'),
 			offlineAssets(),
 			jazzDev(command === 'serve' && (development || process.env.CLIPPER_TEST === 'true')),
 			sveltekit({

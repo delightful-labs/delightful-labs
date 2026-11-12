@@ -1,7 +1,7 @@
 import type { EventPayload } from '../events.js'
 import { types, createCallbackLogic, setup } from 'xstate'
 
-import type { Article } from '../../contracts/articles.js'
+import type { CaptureDocument } from '../../contracts/articles.js'
 import type {
 	QueueControl,
 	QueueReport,
@@ -15,7 +15,7 @@ export type HostResourceEvent =
 	| { type: 'RESOURCE_ERROR' }
 	| { type: 'RESOURCE_CLOSED' }
 	| { type: 'WORKER_MESSAGE'; message: WorkerOutput }
-	| { type: 'PENDING_ROWS'; rows: Article[] }
+	| { type: 'PENDING_ROWS'; rows: CaptureDocument[] }
 	| { type: 'CONNECTIVITY'; online: boolean }
 export type HostResourceCommand =
 	| { type: 'POST'; message: WorkerInput }

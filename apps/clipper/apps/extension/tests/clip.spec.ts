@@ -330,10 +330,25 @@ test('toolbar saves directly, shows a top bar, and syncs rendered content withou
 				reader.getByText('Only present after JavaScript rendering.', { exact: false })
 			).toBeVisible()
 			const documentId = new URL(reader.url()).pathname.split('/').pop()!
-			expect(await audit.db.one(app.snapshots.where({ id: documentId }))).toMatchObject(metadata)
+			const savedDocument = await audit.db.one(
+				app.libraryDocuments.where({ id: documentId }).include({ attachment: { site: true } })
+			)
+			expect(savedDocument).toMatchObject({
+				attachment: {
+					author: metadata.author,
+					publishedAt: metadata.publishedTime,
+					language: metadata.lang,
+					site: { name: metadata.siteName }
+				}
+			})
+			const attachmentId = savedDocument?.attachment?.id
+			if (!attachmentId) throw new Error('Missing Article attachment')
 			expect(
 				await audit.db.one(
-					app.articleImages.where({ documentId, sourceUrl: metadata.featuredImageUrl })
+					app.articleImages.where({
+						articleId: attachmentId,
+						sourceUrl: metadata.featuredImageUrl
+					})
 				)
 			).toMatchObject({ sourceUrl: metadata.featuredImageUrl })
 			await expect(reader.locator('body')).not.toContainText('DO_NOT_CAPTURE_FORM_SECRET')

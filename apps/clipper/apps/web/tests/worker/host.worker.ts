@@ -42,8 +42,7 @@ self.onmessage = async ({ data }) => {
 				app.storageOperations,
 				{
 					libraryId: account.id,
-					payloadHash: 'worker-host-proof',
-					createdAt: new Date().toISOString()
+					payloadHash: 'worker-host-proof'
 				},
 				{ id: documentId }
 			)

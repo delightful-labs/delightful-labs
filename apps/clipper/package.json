@@ -21,7 +21,6 @@
 		"verify": "pnpm verify:vendor && pnpm format:check && pnpm lint && pnpm check && pnpm test:unit && pnpm build",
 		"test:unit": "pnpm --filter @delightful-clipper/web build:parser-worker:dev && vitest run",
 		"test:e2e": "node tooling/test-browser.mjs",
-		"test:schema": "playwright test --config playwright.schema.config.ts",
 		"dev:agent": "pnpm --filter @delightful-clipper/web dev:agent",
 		"test:offline": "node --experimental-strip-types apps/web/tests/offline-build.ts && playwright test --config playwright.offline.config.ts",
 		"build:extension": "pnpm --filter @delightful-clipper/extension build",

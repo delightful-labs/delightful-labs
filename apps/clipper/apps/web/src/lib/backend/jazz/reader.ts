@@ -1,69 +1,81 @@
+import { z } from 'zod'
 import { ReadTier } from 'jazz-tools'
-import type { Db, WriteHandle } from 'jazz-tools'
-import { createWorkspaceCreationTransaction } from 'delightful-local-first/workspace/creation/workflow'
+import type { Db } from 'jazz-tools'
+import { createDomainTransaction } from '../../machines/storage/domain-transaction.js'
+import { createReaderDomain } from '../../machines/storage/reader-domain.js'
 import { causalHeads } from '../../capture/causal.js'
-import { readerChangeSchema, readerHistorySchema, sameReaderField } from '../../reader/schema.js'
+import {
+	readerChangeSchema,
+	readerHistorySchema,
+	sameReaderField,
+	readerDocumentStateSchema,
+	encodeReaderValue
+} from '../../reader/schema.js'
 import type { ReaderChange, ReaderOperation } from '../../reader/schema.js'
-import type { SyncReceipt } from '../../contracts/storage.js'
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
-import type { TransactionResource } from './transaction.js'
 import { app } from './schema.js'
 import type { ReaderCapability, ReaderStageSpawner } from '../../contracts/reader.js'
-export function canWriteReaderChange(
-	rows: { library: unknown; document: unknown },
-	draft: ReaderChange
-) {
-	return !!rows.library && (draft.documentId === null || !!rows.document)
-}
 export function createReaderRecords(
 	db: Pick<Db, 'one' | 'all' | 'beginTransaction' | 'subscribe'>,
 	libraryId: string,
 	isCurrent: () => boolean
 ) {
-	type Resource = TransactionResource
 	const stage = (observed: ReaderOperation[]) =>
-		createWorkspaceCreationTransaction<
-			ReaderChange,
-			Resource,
-			{ library: unknown; document: unknown },
-			SyncReceipt,
-			WriteHandle
-		>({
-			...transactionLifecycle(db, isCurrent),
-			readLocal: async (resource, attempt) => {
-				const change = readerChangeSchema.parse(attempt.draft)
-				const library = await resource.tx.one(app.libraries.where({ id: libraryId }), {
-					tier: ReadTier.LocalFirst
-				})
-				const document = await resource.tx.one(
-					app.contentRepresentations.where({ id: change.documentId ?? libraryId, libraryId }),
-					{ tier: ReadTier.LocalFirst }
-				)
-				return { library, document }
-			},
-			assess: (rows, attempt) =>
-				canWriteReaderChange(rows, attempt.draft)
-					? { outcome: 'eligible' }
-					: { outcome: 'blocked', reason: 'Reading parent unavailable' },
-			stage: (resource, attempt) => {
-				const change = readerChangeSchema.parse(attempt.draft)
-				const parents = causalHeads(observed.filter((row) => sameReaderField(row, change))).map(
-					(row) => row.id
-				)
-				resource.tx.insert(
-					app.readerOperations,
-					{
-						libraryId,
-						documentId: change.documentId,
-						field: change.field,
-						value: JSON.stringify(change.value),
-						parents: JSON.stringify(parents)
-					},
-					{ id: attempt.operationId }
-				)
-				return transactionReceipt(resource)
-			}
-		})
+		createDomainTransaction<ReaderChange>(
+			(spawn, input) =>
+				spawn(
+					createReaderDomain({
+						read: async (resource, input, operationId) => {
+							const draft = readerChangeSchema.parse(input)
+							const [library, document] = await Promise.allSettled([
+								resource.tx.one(app.libraries.where({ id: libraryId }), {
+									tier: ReadTier.LocalFirst
+								}),
+								resource.tx.one(
+									app.libraryDocuments.where({ id: draft.documentId ?? libraryId, libraryId }),
+									{ tier: ReadTier.LocalFirst }
+								)
+							])
+							if (library.status === 'rejected') throw library.reason
+							if (document.status === 'rejected') throw document.reason
+							return {
+								draft,
+								operationId,
+								library: library.value,
+								document: document.value,
+								parents: causalHeads(observed.filter((row) => sameReaderField(row, draft))).map(
+									(row) => row.id
+								)
+							}
+						},
+						updatePosition: (resource, { draft }) => {
+							if (draft.field !== 'position') throw new Error('Invalid position mutation')
+							const { progress, ...resumePosition } = draft.value
+							resource.tx.update(app.libraryDocuments, draft.documentId, {
+								readingProgress: progress,
+								resumePosition
+							})
+						},
+						insertPreference: (resource, { draft, operationId, parents }) => {
+							if (draft.field === 'position') throw new Error('Invalid preference mutation')
+							resource.tx.insert(
+								app.readerOperations,
+								{
+									libraryId,
+									field: draft.field,
+									value: encodeReaderValue(draft),
+									parents: JSON.stringify(parents)
+								},
+								{ id: operationId }
+							)
+						},
+						receipt: transactionReceipt
+					}),
+					{ input }
+				),
+			transactionLifecycle(db, isCurrent)
+		)
+
 	return {
 		stage,
 		capability: {
@@ -85,6 +97,24 @@ export function createReaderRecords(
 					}
 				})
 			},
+			subscribeDocuments: (next, error) =>
+				db.subscribe(
+					app.libraryDocuments
+						.where({ libraryId })
+						.select('id', 'readingProgress', 'resumePosition'),
+					{
+						onUpdate: (rows) => {
+							const parsed = z.array(readerDocumentStateSchema).safeParse(rows)
+							if (!parsed.success) {
+								error()
+								return
+							}
+							next(parsed.data)
+						},
+						onError: error
+					},
+					{ tier: ReadTier.LocalFirst }
+				),
 			subscribe: (next: (rows: ReaderOperation[]) => void, error: () => void) =>
 				db.subscribe(
 					app.readerOperations.where({ libraryId }),

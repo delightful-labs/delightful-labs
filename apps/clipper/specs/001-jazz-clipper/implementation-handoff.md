@@ -1,6 +1,39 @@
 # Article notes — implementation started
 
-**Accepted model update (2026-11-12; implementation pending):** [Document model](data-model.md#accepted-document-model-2026-11-12) is authoritative. Document owns saved-item state, sourceUrl and a Jazz attachment relationship. Article owns its metadata/content and relates to reusable Site/favicon records. Attachments share optional CaptureSource (resolvedUrl, canonicalUrl); URLs are capture evidence, not identity. ReadingPosition.interactedAt is a Date. Progress is required and initialized to 0. Jazz owns creation metadata. Trash retains previousStatus. Development data is disposable; historical schema migrations/snapshots and legacy conversion are unnecessary. The runtime conversion and offline progress qualification remain incomplete; historical delivery evidence does not establish this model implemented. PDF/EPUB ingestion remains deferred.
+**Document model implementation (2026-11-12):** [Document model](data-model.md#accepted-document-model-2026-11-12) is authoritative. Document owns saved-item state, sourceUrl and a Jazz attachment relationship. Article owns its metadata/content and relates to reusable Site/favicon records. Attachments share optional CaptureSource (resolvedUrl, canonicalUrl); URLs are capture evidence, not identity. ReadingPosition.interactedAt is a Date. Progress is required and initialized to 0. Jazz owns creation metadata. Trash retains previousStatus. Development data is disposable; historical schema migrations/snapshots and legacy conversion are unnecessary. The runtime now follows these relationships. Native offline replicas prove furthest-progress reconciliation independently of the latest resume location; qualification is recorded in tasks.md. PDF/EPUB ingestion remains deferred.
+
+## Document model qualification — 2026-11-12
+
+The current runtime follows Document → Article → Site/favicon Jazz relationships.
+Article retains the parser excerpt; notes/tags/reading state remain associated with
+Document identity even when attachments are shared. Reading interaction timestamps
+are Dates with explicit storage/transport serialization. Fresh creation always writes
+progress 0, and attachment/retry preserves existing state.
+
+Two native offline replicas prove that furthest progress and latest resume location
+reconcile independently through shutdown, restart and reconnect. The browser live
+progress test exposed two additional issues: the immutable reader-payload cache was
+suppressing updated progress, and alpha.60's FLOAT merge-set upload path rejected a
+valid fractional value as non-finite. A separately transmitted scalar fixes the view
+cache; private decimal-string observations retain exact numeric progress without
+quantization. No SDK patch, additional dependency or duplicate persisted authority is
+introduced. Native list focus now targets the next article link or action button.
+
+Validation passes on Node 24.22.2 / pnpm 10.28.0: strict types, lint, formatting,
+vendor integrity, 891 unit/native tests, 61 web browser cases, 8 production offline
+cases, 32 worker cases, 2 sample-data cases and 12 packaged-extension cases. The
+production offline suite builds both shell versions and proves full browser-process
+restarts with web/auth/Jazz unavailable, retained local edits and later sync. The
+packaged extension includes direct/offline capture, restart, account isolation and
+rendered metadata/image relationships. Both production shell builds and the extension
+build pass. Monorepo tooling tests (13) and guidance/link checks also pass.
+
+Verification used an independent temporary checkout with its own dependencies and
+generated output. The user's main-checkout server and stored data were preserved.
+Historical schema snapshots, migration modules, import paths and upgrade-only tests
+are removed; this baseline requires an explicitly fresh development database when
+existing data uses an incompatible schema. Normal startup does not erase data.
+
 
 **AT Protocol status (2026-11-10):** [Merged implementation, accepted publication decisions and remaining work](atproto.md). This checkpoint supersedes historical JWT/Neon, alpha.59 and Netlify-only AT Protocol notes below; it does not mark annotation/publication requirements implemented.
 

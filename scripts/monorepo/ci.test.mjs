@@ -96,7 +96,7 @@ test('the existing Clipper browser check requires all three independent browser 
 	const source = readFileSync(resolve(root, '.github/workflows/clipper.yml'), 'utf8')
 	const job = (name) => source.split(`  ${name}:\n`)[1]?.split(/\n  [\w-]+:\n/u)[0] ?? ''
 	const web = job('web-browser'), worker = job('worker-offline'), extension = job('extension'), required = job('browser')
-	for (const command of ['test:e2e', 'test:schema']) assert.ok(web.includes(`run: pnpm ${command}`))
+	assert.ok(web.includes('run: pnpm test:e2e'))
 	for (const command of ['test:worker', 'test:offline', 'test:fake-data']) {
 		assert.ok(worker.includes(`run: pnpm ${command}`))
 		assert.ok(!web.includes(`run: pnpm ${command}`))

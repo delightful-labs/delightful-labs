@@ -1,3 +1,4 @@
+import { newDocumentValues } from './document-values.js'
 import { policySchema } from './schema-permissions.test-support.js'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createActor, toPromise } from 'xstate'
@@ -62,15 +63,8 @@ it.each(['scope', 'shutdown', 'committed', 'uncertain'] as const)(
 					assess: () => ({ outcome: 'eligible' }),
 					stage: (r) => {
 						r.tx.insert(
-							app.articles,
-							{
-								libraryId,
-								url: 'https://example.com/',
-								originalSavedAt: new Date().toISOString(),
-								contentId: null,
-								operationId: null,
-								failure: null
-							},
+							app.libraryDocuments,
+							newDocumentValues(id, libraryId, 'https://example.com/'),
 							{ id }
 						)
 						return transactionReceipt(r)
@@ -99,7 +93,7 @@ it.each(['scope', 'shutdown', 'committed', 'uncertain'] as const)(
 		} else {
 			expect(nativeCommit).not.toHaveBeenCalled()
 			expect(rollback).toHaveBeenCalledOnce()
-			expect(await db.all(app.articles.where({ libraryId }))).toEqual([])
+			expect(await db.all(app.libraryDocuments.where({ libraryId }))).toEqual([])
 		}
 	}
 )

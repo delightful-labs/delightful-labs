@@ -1,6 +1,6 @@
 import type { ActorLogic, ActorInstance, Snapshot } from 'xstate'
 import type { WorkspaceCreationResult } from 'delightful-local-first/workspace/creation/contracts'
-import type { ReaderChange, ReaderOperation } from '../reader/schema.js'
+import type { ReaderChange, ReaderOperation, ReaderDocumentState } from '../reader/schema.js'
 import type { SyncReceipt } from './storage.js'
 export type ReaderStageResult = WorkspaceCreationResult<ReaderChange, SyncReceipt>
 export type ReaderStage<S extends Snapshot<ReaderStageResult> = Snapshot<ReaderStageResult>> =
@@ -24,6 +24,7 @@ export type ReaderStageSpawner = import('../machines/children.js').ChildSpawner
 export type ReaderCapability = {
 	isCurrent: () => boolean
 	subscribe: (next: (rows: ReaderOperation[]) => void, error: () => void) => () => void
+	subscribeDocuments: (next: (rows: ReaderDocumentState[]) => void, error: () => void) => () => void
 	spawnWrite: (
 		spawn: ReaderStageSpawner,
 		change: ReaderChange,

@@ -16,7 +16,7 @@ import type { ImageCapability, ImageStageResult } from '../contracts/images.js'
 import type { ReaderExperienceEvent } from '../machines/reader/experience.js'
 import { imageViewMachine } from './view-machine.js'
 import type { ImageView, ImageViewReport } from './view-machine.js'
-import { canAcquireImage, imageSources } from './schema.js'
+import { canAcquireImage } from './schema.js'
 import type { ArticleImage, ProcessedImage, ReadyImageWrite, FailedImageWrite } from './schema.js'
 import { syncOwnerMachine } from '../machines/storage/sync-owner.js'
 import type { SyncReport } from '../contracts/storage.js'
@@ -26,7 +26,8 @@ type Input = {
 	now?: () => number
 }
 type Event =
-	| ReaderExperienceEvent
+	| Exclude<ReaderExperienceEvent, { type: 'ATTACH' | 'ATTACH_SURFACE' }>
+	| { type: 'ATTACH_ARTICLE'; articleId: string; sources: string[] }
 	| ImageViewReport
 	| SyncReport
 	| { type: 'IMAGE_ROWS'; rows: ArticleImage[] }
@@ -47,7 +48,7 @@ type Context = Input & {
 	selected: ArticleImage | undefined
 	result: ProcessedImage | undefined
 	retryable: boolean
-	documentId: string
+	articleId: string
 	slots: import('xstate').ActorFromLogic<typeof imageViewMachine>[]
 	views: Record<string, ImageView>
 }
@@ -102,8 +103,7 @@ const model = setup({
 			VIEWPORT_FAILED: types<EventPayload<Event, 'VIEWPORT_FAILED'>>(),
 			CHANGE: types<EventPayload<Event, 'CHANGE'>>(),
 			ROWS: types<EventPayload<Event, 'ROWS'>>(),
-			ATTACH: types<EventPayload<Event, 'ATTACH'>>(),
-			ATTACH_SURFACE: types<EventPayload<Event, 'ATTACH_SURFACE'>>(),
+			ATTACH_ARTICLE: types<EventPayload<Event, 'ATTACH_ARTICLE'>>(),
 			SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
 			REFLOW: types<EventPayload<Event, 'REFLOW'>>(),
 			DETACH: types<EventPayload<Event, 'DETACH'>>(),
@@ -207,7 +207,7 @@ const model = setup({
 		currentView: ({ context, event }: { context: Context; event: Event }) =>
 			event.type === 'IMAGE_VIEW' &&
 			context.capability?.isCurrent() === true &&
-			event.documentId === context.documentId,
+			event.articleId === context.articleId,
 		uncertainView: ({ context, event }: { context: Context; event: Event }) =>
 			event.type === 'IMAGE_VIEW' && !!event.view.id && context.uncertain.includes(event.view.id),
 		readyView: ({ event }: { event: Event }) =>
@@ -282,7 +282,7 @@ export const imageQueueMachine = model.createMachine({
 		selected: undefined,
 		result: undefined,
 		retryable: true,
-		documentId: '',
+		articleId: '',
 		slots: [],
 		views: {}
 	}),
@@ -367,43 +367,21 @@ export const imageQueueMachine = model.createMachine({
 						for (const slot of context.slots) slot.send(event)
 					}, args)
 				},
-				ATTACH: (args, enq) => {
-					if (!args.guards.current(args)) return
-					const { context, event } = args
-					for (const slot of context.slots) enq.stop(slot)
-					const urls = imageSources(event.root.innerHTML)
-					return {
-						context: {
-							documentId: event.documentId,
-							views: {},
-							slots: urls.map((sourceUrl) =>
-								enq.spawn('view', {
-									input: {
-										reportTo: args.self,
-										capability: context.capability!,
-										documentId: event.documentId,
-										sourceUrl
-									}
-								})
-							)
-						}
-					}
-				},
-				ATTACH_SURFACE: (args, enq) => {
+				ATTACH_ARTICLE: (args, enq) => {
 					if (!args.guards.current(args)) return
 					const { context, event } = args
 					for (const slot of context.slots) enq.stop(slot)
 					const urls = event.sources
 					return {
 						context: {
-							documentId: event.documentId,
+							articleId: event.articleId,
 							views: {},
 							slots: urls.map((sourceUrl) =>
 								enq.spawn('view', {
 									input: {
 										reportTo: args.self,
 										capability: context.capability!,
-										documentId: event.documentId,
+										articleId: event.articleId,
 										sourceUrl
 									}
 								})
@@ -413,7 +391,7 @@ export const imageQueueMachine = model.createMachine({
 				},
 				DETACH: ({ context }, enq) => {
 					for (const slot of context.slots) enq.stop(slot)
-					return { context: { slots: [], views: {}, documentId: '' } }
+					return { context: { slots: [], views: {}, articleId: '' } }
 				},
 				IMAGE_VIEW: (args) => {
 					const { context, event } = args
@@ -795,7 +773,7 @@ export const imageQueueMachine = model.createMachine({
 					context: {
 						slots: [],
 						views: {},
-						documentId: '',
+						articleId: '',
 						rows: [],
 						capability: undefined,
 						selected: undefined,

@@ -1,14 +1,14 @@
-import type { Article, ArticleDraft } from '../../contracts/articles.js'
+import type { CaptureDocument, ArticleDraft } from '../../contracts/articles.js'
 import { canAttachArticleContent, isPendingArticle } from '../../capture/article-policy.js'
 import { hasExistingArticle } from '../../capture/content-policy.js'
 import type { TransactionResource } from '../../backend/jazz/transaction.js'
 import { types } from 'xstate'
 import { transactionDomainModel, domainContext } from './domain-model.js'
 import type { DomainRead, DomainReceipt } from './domain-model.js'
-export type ArticleEnsureFacts = { draft: ArticleDraft; article: Article | null }
+export type ArticleEnsureFacts = { draft: ArticleDraft; article: CaptureDocument | null }
 export type ArticleAttachmentFacts = ArticleEnsureFacts & { available: boolean }
 export type ArticleFailure = { id: string; code: string | null }
-export type ArticleFailureFacts = { draft: ArticleFailure; article: Article | null }
+export type ArticleFailureFacts = { draft: ArticleFailure; article: CaptureDocument | null }
 type Mutation<Facts> = (resource: TransactionResource, facts: Facts) => void
 
 export function createArticleEnsureDomain(io: {

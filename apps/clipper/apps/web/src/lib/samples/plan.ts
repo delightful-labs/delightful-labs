@@ -1,6 +1,7 @@
+import { newDocument } from '../capture/document-schema.js'
 import { faker } from '@faker-js/faker/locale/en'
 import { articleId } from '../capture/source.js'
-import { articleSchema } from '../capture/article-schema.js'
+import { captureDocumentSchema } from '../capture/capture-document-schema.js'
 import { articleStatuses } from '../capture/organization.js'
 import { tagKey, tagNameSchema } from '../capture/tags.js'
 import { prepareSave } from '../storage/prepare.js'
@@ -20,10 +21,9 @@ export async function prepareFakeData(libraryId: string) {
 				throw new Error('Missing sample identity')
 			const title = faker.lorem.sentence({ min: 4, max: 9 })
 			const text = faker.lorem.paragraphs(5)
-			const savedAt = faker.date.recent({ days: 90 }).toISOString()
 			const content = await prepareSave(libraryId, {
 				operationId,
-				articleId: id,
+				documentId: id,
 				title,
 				text,
 				bytes: new TextEncoder().encode(text),
@@ -34,18 +34,15 @@ export async function prepareFakeData(libraryId: string) {
 					provenance: JSON.stringify({ source: 'fake-data', version: 1 })
 				}
 			})
-			content.intent.createdAt = savedAt
-			content.document.originalSavedAt = savedAt
-			const article = articleSchema.parse({
-				id,
+			const article = captureDocumentSchema.parse({
+				...newDocument(id, libraryId, url),
+				createdAt: new Date(),
 				libraryId,
-				url,
-				originalSavedAt: savedAt,
-				contentId: operationId,
+				attachment: content.attachment,
 				operationId,
 				failure: null
 			})
-			const parent = { libraryId, articleId: id, documentId: null, parents: '[]' }
+			const parent = { libraryId, documentId: id, parents: '[]' }
 			const name = tags[index % tags.length]
 			const status = articleStatuses[index % articleStatuses.length]
 			if (!name || !status) throw new Error('Missing sample classification')

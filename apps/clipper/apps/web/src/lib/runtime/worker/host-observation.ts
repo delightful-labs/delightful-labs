@@ -43,7 +43,7 @@ export function libraryBindingFacts(library: Library) {
 			snapshot.context.capability?.isCurrent() === true,
 		documentId:
 			snapshot.context.reader?.kind === 'available'
-				? snapshot.context.reader.document.snapshotId
+				? snapshot.context.reader.document.id
 				: undefined,
 		tags: Object.fromEntries(snapshot.context.rows.map((row) => [row.id, row.tags]))
 	}

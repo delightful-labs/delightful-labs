@@ -1,7 +1,7 @@
 import { readRecord } from '../src/lib/machines/storage/read.test-support.js'
 import { createActor, toPromise } from 'xstate'
 import { currentLibraryRecords } from './fixture-records.js'
-export async function save(operationId: string) {
+export async function save(operationId: string, plain = false) {
 	const records = currentLibraryRecords()
 	const result = await toPromise(
 		createActor(records.saveMachine, {
@@ -9,8 +9,10 @@ export async function save(operationId: string) {
 				operationId,
 				title: 'Restart proof',
 				text: 'Exact offline text café 🦊',
-				bytes: Uint8Array.from({ length: 600 * 1024 }, (_, index) => index % 256),
-				mediaType: 'application/octet-stream'
+				bytes: new TextEncoder().encode(
+					plain ? 'Exact offline text café 🦊' : `<p>${'x'.repeat(600 * 1024 - 7)}</p>`
+				),
+				mediaType: plain ? 'text/plain' : 'text/html'
 			}
 		}).start()
 	)
@@ -36,4 +38,4 @@ export async function read(id: string) {
 				: null
 	}
 }
-export { requestCapture } from './fixture-records.js'
+export { requestCapture, ready } from './fixture-records.js'

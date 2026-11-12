@@ -1,3 +1,4 @@
+import { fixtureReaderDocument, fixtureAttachment } from '../../capture/fixtures.test-support.js'
 import { controlledSave, testLibraryCapability } from './library.test-support.js'
 import { expect, it, vi } from 'vitest'
 import { createActor, toPromise, waitFor } from 'xstate'
@@ -199,11 +200,12 @@ it('keeps pending article failures on their rows without offering a fake reader'
 		type: 'ROWS',
 		rows: [
 			{
+				readingProgress: 0,
 				id,
 				title: candidate.finalUrl,
 				url: candidate.finalUrl,
-				contentId: null,
-				originalSavedAt: new Date().toISOString(),
+				readable: false,
+				createdAt: new Date().toISOString(),
 				failure: 'captureFailed'
 			}
 		]
@@ -247,11 +249,12 @@ it.each([
 			type: 'ROWS',
 			rows: [
 				{
+					readingProgress: 0,
 					id,
 					title: candidate.title,
 					url: candidate.finalUrl,
-					contentId: id,
-					originalSavedAt: '2026-11-03T12:00:00.000Z',
+					readable: true,
+					createdAt: '2026-11-03T12:00:00.000Z',
 					failure: null
 				}
 			]
@@ -309,16 +312,11 @@ it.each(['write-first', 'worker-first'] as const)(
 )
 it('keeps an issued reader read when unrelated organization rows arrive', async () => {
 	const entered = Promise.withResolvers<void>(),
-		gate = Promise.withResolvers<import('../../contracts/storage.js').DocumentHeader | null>()
-	const document = {
+		gate = Promise.withResolvers<import('../../capture/document-schema.js').Document | null>()
+	const document = fixtureReaderDocument({
 		id,
-		libraryId: 'library',
-		operationId: id,
-		snapshotId: id,
-		assetId: id,
-		title: candidate.title,
-		originalSavedAt: ''
-	}
+		attachment: fixtureAttachment({ id, title: candidate.title, text: candidate.text })
+	})
 	const read = vi.fn(async () => {
 		entered.resolve()
 		return gate.promise
@@ -327,16 +325,7 @@ it('keeps an issued reader read when unrelated organization rows arrive', async 
 		input: testLibraryCapability(candidate, {
 			read: {
 				isCurrent: () => true,
-				document: read,
-				snapshot: async () => ({
-					id,
-					libraryId: 'library',
-					documentId: id,
-					text: candidate.text,
-					formatVersion: '1'
-				}),
-				asset: async () => null,
-				source: async () => null
+				document: read
 			}
 		})
 	}).start()
@@ -349,11 +338,12 @@ it('keeps an issued reader read when unrelated organization rows arrive', async 
 				type: 'ROWS',
 				rows: [
 					{
+						readingProgress: 0,
 						id,
 						title: candidate.title,
 						url: candidate.finalUrl,
-						contentId: id,
-						originalSavedAt: '',
+						readable: true,
+						createdAt: '',
 						failure: null,
 						favorite
 					}
@@ -372,31 +362,17 @@ it('keeps an issued reader read when unrelated organization rows arrive', async 
 	}
 })
 it('still reopens a missing link-only reader when its content arrives', async () => {
-	const document = {
+	const document = fixtureReaderDocument({
 		id,
-		libraryId: 'library',
-		operationId: id,
-		snapshotId: id,
-		assetId: id,
-		title: candidate.title,
-		originalSavedAt: ''
-	}
+		attachment: fixtureAttachment({ id, title: candidate.title, text: candidate.text })
+	})
 	let present = false
 	const read = vi.fn(async () => (present ? document : null))
 	const actor = createActor(libraryMachine, {
 		input: testLibraryCapability(candidate, {
 			read: {
 				isCurrent: () => true,
-				document: read,
-				snapshot: async () => ({
-					id,
-					libraryId: 'library',
-					documentId: id,
-					text: candidate.text,
-					formatVersion: '1'
-				}),
-				asset: async () => null,
-				source: async () => null
+				document: read
 			}
 		})
 	}).start()
@@ -407,11 +383,12 @@ it('still reopens a missing link-only reader when its content arrives', async ()
 		type: 'ROWS',
 		rows: [
 			{
+				readingProgress: 0,
 				id,
 				title: candidate.title,
 				url: candidate.finalUrl,
-				contentId: id,
-				originalSavedAt: '',
+				readable: true,
+				createdAt: '',
 				failure: null
 			}
 		]

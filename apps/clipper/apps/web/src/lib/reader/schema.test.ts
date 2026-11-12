@@ -31,7 +31,7 @@ const position = (offset: number, progress: number, interactedAt = '2026-11-05T1
 	prefix: '',
 	suffix: '',
 	progress,
-	interactedAt
+	interactedAt: new Date(interactedAt)
 })
 it('validates independent preference bounds and representation-scoped positions', () => {
 	expect(isValidReaderChange({ documentId: null, field: 'size', value: 33 })).toBe(false)
@@ -61,12 +61,12 @@ it('keeps defaults and independent fields while resolving causal changes and con
 		projectReaderState(rows).preferences
 	)
 })
-it('lets last location move back while furthest progress remains, with causal precedence over interaction clocks', () => {
-	const first = operation('position', position(50, 0.8)),
-		back = operation('position', position(10, 0.2, '2026-11-04T12:00:00.000Z'), [first.id])
-	const state = projectReaderState([back, first])
+it('projects the Document resume location independently of its furthest progress', () => {
+	const { progress: _progress, ...resumePosition } = position(10, 0.2)
+	const state = projectReaderState([], [{ id: documentId, readingProgress: 0.8, resumePosition }])
 	expect(state.positions[documentId]?.offset).toBe(10)
 	expect(state.progress[documentId]).toBe(0.8)
+	expect(state.positions[documentId]?.interactedAt).toBeInstanceOf(Date)
 })
 it('uses one bounded furthest-progress update for live and final position measurements', () => {
 	const current = { [documentId]: 0.8, [libraryId]: 0.3 }
@@ -77,15 +77,15 @@ it('uses one bounded furthest-progress update for live and final position measur
 	expect(advanceReadingProgress(0.2, 0.5)).toBe(0.5)
 	expect(() => advanceReadingProgress(0.2, 1.01)).toThrow()
 })
-it('uses interaction time then operation ID for available concurrent positions and isolates representations', () => {
-	const early = operation('position', position(10, 0.2)),
-		late = operation('position', position(20, 0.4, '2026-11-05T13:00:00.000Z'))
-	const other = readerOperationSchema.parse({
-		...operation('position', position(90, 0.9)),
-		documentId: crypto.randomUUID(),
-		value: JSON.stringify(position(90, 0.9)),
-		parents: '[]'
-	})
-	expect(projectReaderState([late, early, other]).positions[documentId]?.offset).toBe(20)
-	expect(projectReaderState([late, early, other]).progress[documentId]).toBe(0.4)
+it('never reconstructs Document progress from preference history or another Document', () => {
+	const otherId = crypto.randomUUID()
+	const state = projectReaderState(
+		[operation('theme', 'dark')],
+		[
+			{ id: documentId, readingProgress: 0.4, resumePosition: null },
+			{ id: otherId, readingProgress: 0.9, resumePosition: null }
+		]
+	)
+	expect(state.progress).toEqual({ [documentId]: 0.4, [otherId]: 0.9 })
+	expect(state.positions).toEqual({})
 })

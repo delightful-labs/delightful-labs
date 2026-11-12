@@ -1,34 +1,30 @@
 import { articleMetadataSchema } from './metadata.js'
-import { articleSchema } from './article-schema.js'
+import { newDocument } from './document-schema.js'
 import { lowercaseUuidSchema } from '../validation/values.js'
-import { articleId, normalizedSource } from './source.js'
-import type { Article, ArticleDraft, SaveArticleRequest } from '../contracts/articles.js'
+import { articleId, normalizedSource, sourceIdentityUrl } from './source.js'
+import { saveArticleRequestSchema } from '../contracts/articles.js'
+import type { CaptureDocument, ArticleDraft, SaveArticleRequest } from '../contracts/articles.js'
 export function uuid(value: unknown): string {
 	const parsed = lowercaseUuidSchema.safeParse(value)
 	if (!parsed.success) throw new Error('invalidRecord')
 	return parsed.data
 }
-export function articleRecord(value: unknown, libraryId: string): Article {
-	const parsed = articleSchema.safeParse(value)
-	if (!parsed.success || parsed.data.libraryId !== libraryId) throw new Error('invalidRecord')
-	normalizedSource(parsed.data.url)
-	return parsed.data
-}
 export async function prepareArticle(
 	libraryId: string,
-	request: SaveArticleRequest
+	value: SaveArticleRequest
 ): Promise<ArticleDraft> {
+	const parsed = saveArticleRequestSchema.safeParse(value)
+	if (!parsed.success) throw new Error('invalidInput')
+	const request = parsed.data
 	normalizedSource(request.url)
 	const id = await articleId(libraryId, request.url)
-	const target = request.contentId
-		? uuid(request.contentId)
+	const target = request.operationId
+		? uuid(request.operationId)
 		: await articleId(libraryId, request.content?.finalUrl ?? request.url)
-	const article: Article = {
-		id,
+	const article: CaptureDocument = {
+		...newDocument(id, libraryId, request.url),
 		libraryId,
-		url: request.url,
-		originalSavedAt: new Date().toISOString(),
-		contentId: null,
+		createdAt: new Date(),
 		operationId: null,
 		failure: null
 	}
@@ -38,7 +34,7 @@ export async function prepareArticle(
 		...(request.content
 			? {
 					content: {
-						articleId: id,
+						documentId: id,
 						operationId: target,
 						title: request.content.title,
 						...articleMetadataSchema.parse(request.content),
@@ -47,8 +43,9 @@ export async function prepareArticle(
 						mediaType: 'text/html',
 						source: {
 							submittedUrl: request.url,
-							finalUrl: normalizedSource(request.content.finalUrl),
-							provenance: request.content.provenance
+							finalUrl: sourceIdentityUrl(request.content.finalUrl),
+							provenance: request.content.provenance,
+							canonicalUrl: request.content.canonicalUrl ?? null
 						}
 					}
 				}
