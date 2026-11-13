@@ -1,27 +1,30 @@
 # Svelte and XState simplification tasks
 
-Status: Draft. Implements [the specification](svelte-xstate-simplification.md).
+Status: Research started. Implements [the specification](svelte-xstate-simplification.md).
+Initial findings and proposed pilot: [research record](svelte-xstate-research.md).
 Unchecked items are planned work, not completed validation. Keep implementation
 batches to the shared review limits; no dependency or test approval is implied.
 
 ## A. Establish the design and evidence
 
-- [ ] A1. Recheck installed XState/Svelte versions, source and public declarations.
+- [x] A1. Recheck installed XState/Svelte versions, source and public declarations.
       Record selector initialization, equality, failure/completion, resubscription
       and SSR behavior. Separate verified behavior from remaining questions.
-- [ ] A2. Inventory observation and ownership in `Application.svelte`, `Library`,
+- [x] A2. Inventory observation and ownership in `Application.svelte`, `Library`,
       `AddLink`, `ArticleTags`, reader route, worker client/host and extension UI
       callers. Identify existing keyed lifetimes and public protocol consumers.
-- [ ] A3. Compare installed `useSelector` plus a typed worker source adapter with
+- [x] A3. Compare installed `useSelector` plus a typed worker source adapter with
       a native Svelte adapter. Specify source replacement, initial render, errors,
       cleanup and semantic equality. Show a concrete proposed component API.
-- [ ] A4. Write the lifecycle audit table required by the spec: worker transport,
+- [x] A4. Write the lifecycle audit table required by the spec: worker transport,
       application/library, reader surfaces, SDK acquisition/session, account-store,
       broker, transaction settlement and custody. Trace relevant DLF/Jazz source.
       Mark unsupported claims unresolved instead of repeating historical guidance.
-- [ ] A5. Present the chosen observation design and any lifecycle/policy changes
+- [x] A5. Present the chosen observation design and any lifecycle/policy changes
       for review. If `@xstate/svelte` is chosen, request its explicit dependency
       approval with the existing-package and native-adapter alternatives.
+      User approved adding `@xstate/svelte@6.0.0-beta.0` to Clipper on 2026-11-13.
+      No lifecycle/policy change is part of the selector pilot.
 
 Exit: a reviewable observation contract and ownership map. A selector pilot may
 proceed after its design is accepted without waiting for unrelated lifecycle
@@ -29,16 +32,26 @@ research; no shutdown change proceeds with an unresolved safety justification.
 
 ## B. Qualify one small selector pilot
 
-- [ ] B1. Implement the selected typed observation boundary and migrate `AddLink`
+- [x] B1. Implement the selected typed observation boundary and migrate `AddLink`
       only. Select capture capabilities/messages without changing save behavior,
       form semantics, copy, worker ownership or receipt-based command admission.
-- [ ] B2. Show the concrete implementation and removed boilerplate for review;
+      Added `runtime/worker/view-source.ts` and five selected stores in AddLink.
+      Capability selection now uses the client's current value on first render.
+- [x] B2. Show the concrete implementation and removed boilerplate for review;
       obtain implementation-test approval under the shared testing guide.
-- [ ] B3. Run focused approved checks for initial value, unchanged selection,
+      User authorized tests and a PR on 2026-11-13 after reviewing the pilot.
+- [x] B3. Run focused approved checks for initial value, unchanged selection,
       subscribe/unsubscribe/resubscribe, errors and account replacement. Verify
       comparator fields and that the real client remains alive after UI disposal.
+      Six new selector tests and six existing client tests pass against the real
+      UI client with a fake native Worker. Full web/extension types pass in an
+      isolated checkout after building matching UI/DLF artifacts.
 - [ ] B4. Verify the actual browser capture flow and failure feedback, not only
       the adapter. Record subscription behavior and limitations of the probe.
+      Attempted selected account/capture Playwright cases on isolated ports
+      5198/5199. Environment refused the server listen with EPERM; no browser
+      cases executed. Browser qualification remains open, including discovery
+      duplicate/restore and invalid-source feedback cases.
 
 Exit: accepted pilot with no custom selector framework or lifecycle regression.
 

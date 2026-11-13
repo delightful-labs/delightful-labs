@@ -1,39 +1,50 @@
 <script lang="ts">
-	import { onMount } from 'svelte'
+	import { onDestroy, untrack } from 'svelte'
+	import { useSelector } from '@xstate/svelte'
 	import type { LibraryClient } from '../runtime/worker/client.js'
-	import type { LibraryRender } from '../runtime/worker/views.js'
+	import { libraryViewSource, sameWorkflowMessage } from '../runtime/worker/view-source.js'
 	import { Button, Dialog, FloatingActionButton, InputText, StatusMessage } from 'delightful-ui'
 	import { action, t } from '../localization/index.js'
 
 	let { actor }: { actor: LibraryClient } = $props()
+	// Library keys this form by client: observation and commands share that exact scope.
+	const client = untrack(() => actor)
+	const source = libraryViewSource(client)
 	const dialogId = $props.id()
-	let snapshot = $state<LibraryRender>()
 	let open = $state(false)
 	let url = $state('')
-	const canAdd = $derived(snapshot?.canAdd ?? false)
-	const view = $derived(snapshot?.view ?? actor.getView().view)
+	const canAdd = useSelector(source, (render) => render.canAdd)
+	const canOrganize = useSelector(source, (render) => render.view.canOrganize)
+	const restoreCaptureId = useSelector(source, (render) => render.view.restoreCaptureId)
+	const captureProblem = useSelector(
+		source,
+		(render) => render.view.captureProblemMessage,
+		sameWorkflowMessage
+	)
+	const duplicate = useSelector(
+		source,
+		(render) => render.view.duplicateMessage,
+		sameWorkflowMessage
+	)
 
-	onMount(() => {
-		const subscription = actor.subscribe((next) => (snapshot = next))
-		return () => {
-			subscription.unsubscribe()
-			url = ''
-		}
+	onDestroy(() => {
+		url = ''
 	})
 </script>
 
-{#if view.captureProblemMessage}<StatusMessage {...view.captureProblemMessage} />{/if}
+{#if $captureProblem}<StatusMessage {...$captureProblem} />{/if}
 
-{#if view.duplicateMessage}<StatusMessage {...view.duplicateMessage} />{/if}
+{#if $duplicate}<StatusMessage {...$duplicate} />{/if}
 
-{#if view.restoreCaptureId}
+{#if $restoreCaptureId}
+	{@const id = $restoreCaptureId}
 	<Button
 		appearance="flat"
-		disabled={!view.canOrganize}
+		disabled={!$canOrganize}
 		onclick={() =>
-			actor.send({
+			client.send({
 				type: 'ORGANIZE',
-				request: { id: view.restoreCaptureId!, field: 'trashed', value: false }
+				request: { id, field: 'trashed', value: false }
 			})}>{action('restore', 'article')}</Button
 	>
 {/if}
@@ -44,7 +55,7 @@
 	title={action('add', 'link')}
 	aria-haspopup="dialog"
 	aria-controls={dialogId}
-	disabled={!canAdd}
+	disabled={!$canAdd}
 	onclick={() => (open = true)}><span aria-hidden="true">+</span></FloatingActionButton
 >
 
@@ -52,7 +63,7 @@
 	<form
 		onsubmit={(event) => {
 			event.preventDefault()
-			actor.send({ type: 'ADD', url })
+			client.send({ type: 'ADD', url })
 			open = false
 			url = ''
 		}}
@@ -65,11 +76,11 @@
 			required
 			maxlength={8192}
 			autocomplete="url"
-			disabled={!canAdd}
+			disabled={!$canAdd}
 		/>
 		<div class="dialog-actions">
 			<Button type="button" onclick={() => (open = false)}>{t('actions.close')}</Button>
-			<Button type="submit" disabled={!canAdd}>{action('add', 'link')}</Button>
+			<Button type="submit" disabled={!$canAdd}>{action('add', 'link')}</Button>
 		</div>
 	</form>
 </Dialog>
