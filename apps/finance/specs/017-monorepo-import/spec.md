@@ -1,5 +1,14 @@
 # Finance workspace import
 
+Worker planning follow-up (2026-11-13): the user requested a recorded,
+foundation-first task list with Local First/Clipper reuse. Start at
+[spec 013's worker handoff](../013-local-first-startup/spec.md#application-worker-migration-handoff)
+and its [W01–W21 backlog](../013-local-first-startup/worker-migration-tasks.md).
+This completed import feature remains selected for historical continuity; it
+does not own the new worker backlog. The deferral recorded below describes the
+import closeout, not an instruction to discard the renewed planning request.
+Application-worker implementation and production cutover remain unperformed.
+
 Follow the root migration spec at `../../../../specs/002-monorepo-agent-guidance/spec.md`.
 Import Finance main `230bc7cc38db3745d75b3c6fd40c861855fa0cf1` with history,
 preserve its scoped constitution and product policies, and qualify root installs,
