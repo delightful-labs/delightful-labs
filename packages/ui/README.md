@@ -138,15 +138,20 @@ and scroll/layout policy. Customize control size with `--dui-floating-action-siz
 and content/icon size with `--dui-floating-action-icon-size` (default `--dui-font-size-xxl`). Colors,
 border, shadow, and focus use the existing theme. Neither component owns application workflow state.
 
-## SkipLink and SkipButton
+## SkipControl
 
 ```svelte
-<SkipLink href="#main-content">{skipLabel}</SkipLink>
-<main id="main-content" tabindex="-1">...</main>
+<SkipControl href="#main-content">{skipLabel}</SkipControl>
+<main id="main-content">...</main>
 
-<SkipButton aria-haspopup="dialog" aria-controls={dialogId} onclick={openTools}>
+<SkipControl
+	component={Button}
+	aria-haspopup="dialog"
+	aria-controls={dialogId}
+	onclick={openTools}
+>
 	{toolsLabel}
-</SkipButton>
+</SkipControl>
 ```
 
 These controls stay available to assistive technology and keyboard navigation while visually
@@ -154,12 +159,11 @@ hidden. Focusing a control reveals it at the viewport's logical top/start corner
 hides it again. Place skip controls early in document order so keyboard users encounter them
 before repeated navigation. Their fixed position does not reserve space in the page layout.
 
-`SkipLink` requires `href` and preserves native anchor navigation. Supply an existing fragment
-target; give non-interactive targets `tabindex="-1"` when they should receive focus.
-`SkipButton` defaults to `type="button"` and retains native Enter/Space activation, disabled
-state and explicit form attributes. It can open a caller-owned dialog without changing link
-semantics. Both accept native attributes/events, class/style and child content on the actual
-control. Callers own translated labels, targets, actions, dialog state and focus restoration.
+`SkipControl` defaults to a native anchor and requires `href`. Supply an existing fragment
+target. Pass `component={Button}` for a dialog action; the supplied Svelte component owns its
+native button behavior and defaults. Native attributes, events, class/style and children are
+forwarded to the anchor or supplied component. Callers own translated labels, targets,
+actions, dialog state and focus restoration.
 
 ## NumberKeypad
 

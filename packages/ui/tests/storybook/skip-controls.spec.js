@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 /** @param {import('@playwright/test').Page} page @param {string} story */
 async function open(page, story) {
 	await page.goto(
-		`/iframe.html?id=accessibility-skiplink--${story}&viewMode=story`
+		`/iframe.html?id=accessibility-skipcontrol--${story}&viewMode=story`
 	)
 	await expect(
 		story === 'skip-to-content'
@@ -35,7 +35,7 @@ test('Tab reveals the accessible skip link and leaving focus hides it again', as
 	await expect(link).toBeInViewport()
 })
 
-test('Enter skips navigation, focuses the fragment target and continues inside main content', async ({
+test('Enter skips navigation and continues keyboard navigation inside main content', async ({
 	page
 }) => {
 	await open(page, 'skip-to-content')
@@ -47,7 +47,7 @@ test('Enter skips navigation, focuses the fragment target and continues inside m
 	await expect(link).toBeFocused()
 	await page.keyboard.press('Enter')
 	await expect(page).toHaveURL(/#main-content$/)
-	await expect(page.getByRole('main')).toBeFocused()
+	await expect(link).not.toBeFocused()
 	await expect(link).not.toBeInViewport()
 	await page.keyboard.press('Tab')
 	await expect(

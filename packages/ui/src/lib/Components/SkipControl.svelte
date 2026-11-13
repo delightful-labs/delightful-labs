@@ -1,11 +1,25 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte'
+	import type { Component } from 'svelte'
+	import type {
+		HTMLAnchorAttributes,
+		HTMLButtonAttributes
+	} from 'svelte/elements'
 
-	let { children }: { children: Snippet } = $props()
+	type Props =
+		| (HTMLAnchorAttributes & { component?: undefined; href: string })
+		| (HTMLButtonAttributes & { component: Component<HTMLButtonAttributes> })
+
+	let props: Props = $props()
 </script>
 
 <span class="skip-control">
-	{@render children()}
+	{#if props.component}
+		{@const { component: Control, children, ...attributes } = props}
+		<Control {...attributes}>{@render children?.()}</Control>
+	{:else}
+		{@const { children, ...attributes } = props}
+		<a {...attributes}>{@render children?.()}</a>
+	{/if}
 </span>
 
 <style>

@@ -9,6 +9,7 @@
 		Icon,
 		Navigation,
 		NavigationLink,
+		SkipControl,
 		StatusMessage
 	} from 'delightful-ui'
 	import type { ReaderPreferences } from '../reader/schema.js'
@@ -87,6 +88,8 @@
 	}
 </script>
 
+<SkipControl href="#main-content">{t('navigation.skip_to_main_content')}</SkipControl>
+
 <div class="app-shell" class:focused={readerFocused}>
 	{#if !readerFocused}
 		<div class="account-control">
@@ -149,7 +152,7 @@
 				</div>
 			</Drawer>
 		{/if}
-		<main class="content" inert={modal && !readerFocused}>
+		<main id="main-content" class="content" inert={modal && !readerFocused}>
 			<div class="page-content">
 				{@render runtimeFeedback()}
 				{@render children()}

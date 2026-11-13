@@ -1,10 +1,10 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf'
-	import { Button, Dialog, SkipButton, SkipLink } from '#lib'
+	import { Button, Dialog, SkipControl } from '#lib'
 
 	const { Story } = defineMeta({
-		title: 'Accessibility/SkipLink',
-		component: SkipLink,
+		title: 'Accessibility/SkipControl',
+		component: SkipControl,
 		tags: ['autodocs'],
 		args: { href: '#main-content' }
 	})
@@ -16,11 +16,11 @@
 
 <Story name="Skip to content">
 	{#snippet template(args)}
-		<SkipLink {...args}>Skip to main content</SkipLink>
+		<SkipControl {...args}>Skip to main content</SkipControl>
 		<nav aria-label="Example navigation">
 			<a href="#main-content">Overview</a>
 		</nav>
-		<main id="main-content" tabindex="-1">
+		<main id="main-content">
 			<h1>Main content</h1>
 			<p>
 				Press Tab to reveal the skip link, then Enter to focus this content.
@@ -35,20 +35,21 @@
 
 <Story name="Disabled action">
 	{#snippet template()}
-		<SkipButton disabled>Open tools</SkipButton>
+		<SkipControl component={Button} disabled>Open tools</SkipControl>
 		<Button>Continue</Button>
 	{/snippet}
 </Story>
 
 <Story name="Open dialog">
 	{#snippet template()}
-		<SkipButton
+		<SkipControl
+			component={Button}
 			aria-haspopup="dialog"
 			aria-controls="example-tools"
 			onclick={() => (open = true)}
 		>
 			Open tools
-		</SkipButton>
+		</SkipControl>
 		<p>
 			Press Tab to reveal the tools button. Enter or Space opens the dialog.
 		</p>

@@ -1,14 +1,19 @@
 import { expect, test } from 'vitest'
 import { createRawSnippet } from 'svelte'
 import { render } from 'svelte/server'
-import { SkipButton, SkipLink } from './lib/index.js'
+import { Button, SkipControl } from './lib/index.js'
+
+/** @type {import('svelte').Component<import('svelte/elements').HTMLAnchorAttributes & { href: string }>} */
+const AnchorSkipControl = SkipControl
+/** @type {import('svelte').Component<import('svelte/elements').HTMLButtonAttributes & { component: import('svelte').Component<import('svelte/elements').HTMLButtonAttributes> }>} */
+const ButtonSkipControl = SkipControl
 
 const children = createRawSnippet(() => ({
 	render: () => '<span>Skip to content</span>'
 }))
 
 test('skip link preserves native navigation and caller-owned accessibility attributes', () => {
-	const { body } = render(SkipLink, {
+	const { body } = render(AnchorSkipControl, {
 		props: {
 			href: '#main-content',
 			'aria-label': 'Skip <navigation> & tools',
@@ -28,8 +33,9 @@ test('skip link preserves native navigation and caller-owned accessibility attri
 })
 
 test('skip button defaults to a non-submit button with caller-owned dialog semantics', () => {
-	const { body } = render(SkipButton, {
+	const { body } = render(ButtonSkipControl, {
 		props: {
+			component: Button,
 			'aria-labelledby': 'tools-label',
 			'aria-haspopup': 'dialog',
 			'aria-controls': 'tools',
@@ -48,14 +54,17 @@ test('skip button defaults to a non-submit button with caller-owned dialog seman
 })
 
 test('skip button forwards native disabled state', () => {
-	const { body } = render(SkipButton, { props: { disabled: true, children } })
+	const { body } = render(ButtonSkipControl, {
+		props: { component: Button, disabled: true, children }
+	})
 
 	expect(body).toMatch(/<button\b[^>]*\bdisabled(?:=""|\s|>)/)
 })
 
 test('skip button preserves explicit form submission attributes', () => {
-	const { body } = render(SkipButton, {
+	const { body } = render(ButtonSkipControl, {
 		props: {
+			component: Button,
 			type: 'submit',
 			form: 'tools-form',
 			name: 'action',
