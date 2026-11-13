@@ -253,7 +253,7 @@
 		line-height: 1.25;
 		padding: var(
 			--dui-button-padding,
-			var(--dui-spacing-xs, 0.5rem) var(--dui-spacing-md, 1rem)
+			var(--dui-spacing-xs, 0.5rem)
 		);
 		min-height: var(--dui-button-min-height, 44px);
 		color: var(--_dui-button-color);

@@ -3,7 +3,6 @@
 	import { createAttachmentKey } from 'svelte/attachments'
 	import type { LibraryClient } from '../runtime/worker/client.js'
 	import type { LibraryRender } from '../runtime/worker/views.js'
-	import PageNavigation from '../components/navigation/PageNavigation.svelte'
 	import { Button, StatusMessage } from 'delightful-ui'
 	import LibrarySearch from '../components/library/LibrarySearch.svelte'
 	import LibraryFilters from '../components/library/LibraryFilters.svelte'
@@ -45,7 +44,6 @@
 {#if capture}
 	<section aria-label={t('library.heading')}>
 		<div class="library-header">
-			<PageNavigation />
 			<Heading level="h1" size="xl" tabindex={-1} {...headingAttachment}
 				>{t('library.heading')}</Heading
 			>

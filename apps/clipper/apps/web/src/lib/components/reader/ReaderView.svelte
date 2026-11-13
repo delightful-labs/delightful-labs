@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Button, Drawer, Heading, Icon, StatusMessage } from 'delightful-ui'
 	import { onMount } from 'svelte'
-	import PageNavigation from '../navigation/PageNavigation.svelte'
 	import type { ImageView } from '../../images/view-machine.js'
 	import type { AssetResult } from '../../contracts/storage.js'
 	import type { WorkflowMessage } from '../../contracts/feedback.js'
@@ -149,7 +148,6 @@
 			{#if message}<StatusMessage {...message} />{/if}
 			<article>
 				<div class="reader-heading">
-					{#if !focused}<PageNavigation />{/if}
 					<Heading level="h1" size="xxl">{title}</Heading>
 					<div class="page-control-spacer" aria-hidden="true"></div>
 				</div>
@@ -230,12 +228,10 @@
 <style>
 	.reader-workspace {
 		--dui-drawer-width: clamp(18rem, 30vw, 24rem);
-		--dui-drawer-height: calc(100dvh - 2 * var(--app-padding, 1.5rem));
 		--dui-drawer-padding: 0 0 0 var(--dui-spacing-md);
 		position: relative;
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		min-block-size: 100%;
 		min-inline-size: 0;
 	}
 

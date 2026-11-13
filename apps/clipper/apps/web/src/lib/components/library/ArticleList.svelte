@@ -108,8 +108,7 @@
 <style>
 	.article-list {
 		list-style: none;
-		margin-block: var(--dui-space-md);
 		padding: 0;
-		border: 1px solid var(--dui-color-foreground);
+		margin: 0;
 	}
 </style>

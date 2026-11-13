@@ -72,25 +72,11 @@
 <style>
 	li {
 		margin: 0;
-		padding: var(--dui-spacing-sm);
 		border-block-end: 1px solid var(--dui-color-foreground);
 	}
 
 	li:last-child {
 		border-block-end: 0;
-	}
-
-	.article-header,
-	.article-metadata {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		align-items: start;
-		gap: var(--dui-spacing-sm);
-	}
-
-	.article-header {
-		min-inline-size: 0;
-		overflow-wrap: anywhere;
 	}
 
 	.article-excerpt {
