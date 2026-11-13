@@ -1,5 +1,17 @@
 # Draft backlog: Local-first usability and startup
 
+## Application-worker task entry point
+
+The 2026-11-13 worker migration backlog is
+[worker-migration-tasks.md](worker-migration-tasks.md), **W01–W21**, incorporated
+by [spec.md](spec.md#application-worker-migration-handoff). Its
+[Local First/Clipper reuse specification](worker-foundation-reuse.md) includes
+shared extraction R1–R4 and both-consumer qualification. Read that backlog before
+starting worker work; do not reopen the completed XState conversion/import or
+merge draft PR #67 wholesale. W-series tasks are unstarted. The T-series and
+authorization/evidence paragraphs below retain their historical startup scope,
+not blanket approval for new worker implementation or tests.
+
 **Status**: Implementation and consolidated investigation in progress; plan.md is present.
 The user's latest direction authorizes completing open investigations/tests without further review
 pauses. See [investigation-results.md](investigation-results.md) for the current evidence and decisions.

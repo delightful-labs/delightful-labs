@@ -1,5 +1,13 @@
 # XState v6 and UI/worker ownership specification
 
+Current worker handoff (2026-11-13): start with
+[spec.md](spec.md#application-worker-migration-handoff), the
+[W01–W21 task backlog](worker-migration-tasks.md), and
+[Local First/Clipper reuse](worker-foundation-reuse.md). The connected v6
+conversion is already present in the monorepo. Historical source/artifact and
+v5 status references below are provenance; the new backlog owns remaining
+worker work and native qualification against current workspace packages.
+
 Status: approved; implementation in progress. Source baseline: main `218bd98`.
 This supplements startup planning without changing the active feature, provider
 consent, permissions, localization, visual design or accepted qualification limits.
