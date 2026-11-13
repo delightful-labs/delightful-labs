@@ -379,3 +379,56 @@ Svelte errors or warnings, including the new component test fixture/config.
 Touched-source formatting/lint and diff whitespace checks pass. Existing browser
 listener restrictions and Node 25 versus pinned Node 24 qualification limits
 remain. The earlier adapter test results are historical, not the final design.
+
+## Tag feedback review batch
+
+PR #25 merged at 676e0f209da02297582ddd063b56f9b8a11066d6; comparison with its
+final head reports identical trees. The follow-up branch is
+refactor/clipper-tag-feedback.
+
+Tag validation already has one XState owner: tagFormMachine's invalid state
+supplies the localized optional message. ArticleTags nevertheless used that
+message as a fallback in DUI's synchronous addedMessage callback. That can reuse
+a retained validation error for a different native selection announcement.
+The prepared change removes this fallback and the manual snapshot subscription.
+It reads $client.tagForm directly and binds observations/commands to the same
+scoped client, whose parent Library already has a keyed lifetime.
+
+The XState message still feeds the existing field error directly. DUI's
+stateless localized added/removed/duplicate formatters remain generic native
+widget presentation, not domain outcome selection or durable-save confirmation.
+No new machine, catalog wording, dependency or shared DUI API was introduced.
+The native widget still announces editing immediately; this change does not
+establish that an editing announcement proves worker validation or persistence.
+A different controlled-announcement contract would require a supported DUI API
+and qualification across its consumers rather than another Clipper workaround.
+
+Focus recovery, tag normalization, membership intents and RESET on editing/
+dismissal are retained. Affected validation includes tag-form invalid/RESET,
+subscription initial/update/unmount and account replacement, stale field-error
+isolation from chip announcements, readonly admission, and discovery browser
+cases for validation/edit/Escape, Unicode duplicates and tag removal/filtering.
+The user approved this batch's tests and separate PR after implementation review.
+
+Validation: 12 affected Node tests (tag form, discovery, worker client) and eight
+mounted Svelte tests pass. Three new component tests mount the actual ArticleTags
+and DUI TagInput with a controlled LibraryClient view source. They cover a delayed
+worker reset retaining an old validation error, error clearing, native unsubscribe
+cleanup, Unicode duplicate feedback without a membership write, readonly
+admission and RESET/onclose delivery. A new actor test covers refused selections
+retaining validation/revision and the next admitted selection clearing the error.
+
+The stale-error component test was also run against the original ArticleTags:
+it fails specifically because the status contains Enter tag instead of the selected
+tag announcement. The fixed component was restored afterward. Component setup
+provides only jsdom's missing dialog open/close methods and restores their original
+descriptors; it does not claim native modality, browser focus or popup geometry.
+The existing component configuration now uses the app's already-installed SVG
+plugin and inlines DUI/icon imports so it can mount the real widget, not a mock.
+
+Full coordinator/web/service-worker/extension type checks pass with zero Svelte
+errors/warnings. Touched-source formatting/lint and whitespace checks pass.
+Validation used the isolated checkout with matching UI/DLF artifacts; local Node
+25.2.1 remains different from pinned CI Node 24.22.2. The existing environment
+denies local server listeners, so native discovery browser cases remain for CI
+or a listener-capable environment. No new browser result is claimed for this PR.
