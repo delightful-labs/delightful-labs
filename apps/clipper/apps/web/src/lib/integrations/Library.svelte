@@ -44,7 +44,7 @@
 {#if capture}
 	<section aria-label={t('library.heading')}>
 		<div class="library-header">
-			<Heading level="h1" size="xl" tabindex={-1} {...headingAttachment}
+			<Heading level="h1" size="xl" {...headingAttachment}
 				>{t('library.heading')}</Heading
 			>
 			<LibraryFilterPopovers

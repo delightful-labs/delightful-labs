@@ -1,4 +1,5 @@
 <script lang="ts">
+	import MoreIcon from 'tdesign-icons-svg/src/more.svg?component'
 	import type { Snippet } from 'svelte'
 	import { Button, Icon, Popover } from 'delightful-ui'
 
@@ -48,11 +49,7 @@
 	aria-controls={id}
 	aria-haspopup="dialog"
 >
-	<Icon width="24" height="24">
-		<circle cx="5" cy="12" r="1.5" fill="currentColor" />
-		<circle cx="12" cy="12" r="1.5" fill="currentColor" />
-		<circle cx="19" cy="12" r="1.5" fill="currentColor" />
-	</Icon>
+	<Icon icon={MoreIcon} width="24" height="24" />
 </Button>
 <Popover
 	{id}
@@ -60,7 +57,6 @@
 	role="dialog"
 	aria-label={label}
 	aria-describedby={descriptionId}
-	tabindex={-1}
 	onkeydown={handleKey}
 	ontoggle={focusControl}
 >

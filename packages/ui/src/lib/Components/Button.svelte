@@ -20,6 +20,12 @@
 		...attributes
 	}: Props = $props()
 
+	let element: HTMLButtonElement | undefined
+
+	export function focus(options?: FocusOptions) {
+		element?.focus(options)
+	}
+
 	let ariaDisabled = $derived(
 		attributes['aria-disabled'] === true ||
 			attributes['aria-disabled'] === 'true'
@@ -27,6 +33,7 @@
 </script>
 
 <button
+	bind:this={element}
 	{...attributes}
 	{type}
 	{disabled}
@@ -251,10 +258,7 @@
 		);
 		font-size: var(--dui-button-font-size, inherit);
 		line-height: 1.25;
-		padding: var(
-			--dui-button-padding,
-			var(--dui-spacing-xs, 0.5rem)
-		);
+		padding: var(--dui-button-padding, var(--dui-spacing-xs, 0.5rem));
 		min-height: var(--dui-button-min-height, 44px);
 		color: var(--_dui-button-color);
 		background-color: var(--_dui-button-background);

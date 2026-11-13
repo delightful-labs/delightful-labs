@@ -23,6 +23,17 @@ Different translation architectures/formatters remain explicit boundaries, not
 silent relaxations. No constitution is globally adopted. Amend a common practice
 in its guide and document approved local exceptions in the same review.
 
+## Shared implementation rules
+
+Never hand-write SVGs, SVG paths, or inline SVG markup. Use DUI's `Icon`
+component with premade icon components from the existing icon library
+(`tdesign-icons-svg`). This rule applies across all workspace apps and packages.
+
+When an app needs a capability missing from DUI, propose a supported DUI API
+change instead of adding an app-level workaround. The monorepo allows the shared
+primitive and its consumers to be updated together. Keep reusable behavior in DUI
+and domain behavior in the app.
+
 ## Project context
 
 - Website: [apps/website/AGENTS.md](apps/website/AGENTS.md), owner-controlled

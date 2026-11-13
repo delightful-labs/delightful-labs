@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SearchIcon from 'tdesign-icons-svg/src/search.svg?component'
+	import FilterIcon from 'tdesign-icons-svg/src/filter.svg?component'
 	import type { Snippet } from 'svelte'
 	import { Button, Icon, Popover, ScreenReaderText } from 'delightful-ui'
 
@@ -37,8 +39,7 @@
 
 <div class="filter-actions">
 	<Button id={`${id}-search-trigger`} type="button" popovertarget={`${id}-search`}>
-		<Icon width="24" height="24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></Icon
-		>
+		<Icon icon={SearchIcon} width="24" height="24" />
 		<ScreenReaderText>{searchLabel}</ScreenReaderText>
 	</Button>
 	<Popover
@@ -53,7 +54,7 @@
 		<div class="fields">{@render search()}</div>
 	</Popover>
 	<Button id={`${id}-filters-trigger`} type="button" popovertarget={`${id}-filters`}>
-		<Icon width="24" height="24"><path d="M4 5h16l-6 7v6l-4 2v-8z" /></Icon>
+		<Icon icon={FilterIcon} width="24" height="24" />
 		<ScreenReaderText>{filtersLabel}</ScreenReaderText>
 	</Button>
 	<Popover

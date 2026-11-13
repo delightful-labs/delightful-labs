@@ -45,7 +45,6 @@ export function savedContent(
 				const id = `${namespace}${targets.size}`
 				targets.set(original, id)
 				element.id = id
-				element.setAttribute('tabindex', '-1')
 			} else element.removeAttribute('id')
 		}
 		for (const link of fragment.querySelectorAll('a[href]')) {

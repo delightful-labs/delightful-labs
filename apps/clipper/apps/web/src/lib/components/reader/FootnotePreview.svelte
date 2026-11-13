@@ -14,7 +14,6 @@
 <Popover
 	{id}
 	role="note"
-	tabindex={-1}
 	aria-label={noun('note')}
 	ontoggle={(event) => {
 		if (event.newState === 'open') event.currentTarget.focus()
