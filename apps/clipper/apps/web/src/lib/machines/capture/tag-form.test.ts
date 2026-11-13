@@ -43,3 +43,35 @@ it('rejects multi-change replacement while preserving normalized equivalence', (
 		kind: 'unchanged'
 	})
 })
+
+it('retains validation feedback for refused edits and clears it on the next admitted selection', () => {
+	const submit = vi.fn()
+	const library = createActor(
+		createCallbackLogic<LibraryEvent>(({ receive }) => receive(submit))
+	).start()
+	const actor = createActor(tagFormMachine, { input: { library } }).start()
+	try {
+		actor.send({
+			type: 'SELECT',
+			id: 'article',
+			names: ['a'.repeat(65)],
+			previous: [],
+			enabled: true
+		})
+		const invalid = selectTagFormView(actor.getSnapshot())
+		expect(invalid.message).toEqual({ text: 'Enter tag', variant: 'error' })
+		actor.send({ type: 'SELECT', id: 'article', names: ['Valid'], previous: [], enabled: false })
+		expect(selectTagFormView(actor.getSnapshot())).toEqual(invalid)
+		expect(submit).not.toHaveBeenCalled()
+		actor.send({ type: 'SELECT', id: 'article', names: ['Valid'], previous: [], enabled: true })
+		expect(selectTagFormView(actor.getSnapshot()).message).toBeUndefined()
+		expect(selectTagFormView(actor.getSnapshot()).revision).toBe(invalid.revision + 1)
+		expect(submit).toHaveBeenCalledExactlyOnceWith({
+			type: 'ORGANIZE',
+			request: { id: 'article', field: 'tag', value: 'Valid', assigned: true }
+		})
+	} finally {
+		actor.stop()
+		library.stop()
+	}
+})

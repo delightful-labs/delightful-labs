@@ -79,6 +79,13 @@ Exit: accepted pilot with no custom selector framework or lifecycle regression.
 
 - [ ] C1. Migrate `ArticleTags` in its own review cycle; preserve write feedback,
       dialog dismissal and focus recovery, including an article leaving filters.
+      Implemented: direct $client.tagForm reads and scoped commands;
+      removed the fallback that substituted an XState field error into DUI's
+      native chip announcement. Validation already belongs to the invalid state.
+      User reviewed and approved tests/PR. Twelve Node regressions and eight
+      mounted Svelte tests pass; full web/extension types pass. The stale-error
+      regression fails against the original component. Native browser validation
+      of Escape/focus/filter behavior remains pending, so C1 is not yet qualified.
 - [ ] C2. Migrate `Library` in its own review cycle; preserve search/filter state,
       pagination, row focus after removal and tag-editor continuity.
 - [ ] C3. Migrate reader observation in its own review cycle; preserve document
