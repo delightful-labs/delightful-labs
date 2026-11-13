@@ -11,7 +11,7 @@
 		accountControl
 	}: {
 		drawer: ReturnType<typeof Drawer> | undefined
-		accountControl: Snippet
+		accountControl: Snippet | undefined
 	} = $props()
 	const drawerOpen = $derived(drawer?.isOpen() ?? false)
 	let trigger: ReturnType<typeof Button> | undefined = $state()
@@ -23,7 +23,7 @@
 
 <div class="reader-navigation" data-reader-overlay>
 	<TopNavigation label={t('reader.heading')}>
-		<li>{@render accountControl()}</li>
+		{#if accountControl}<li>{@render accountControl()}</li>{/if}
 		<li>
 			<Button
 				bind:this={trigger}
