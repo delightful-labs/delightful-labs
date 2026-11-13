@@ -432,3 +432,43 @@ Validation used the isolated checkout with matching UI/DLF artifacts; local Node
 25.2.1 remains different from pinned CI Node 24.22.2. The existing environment
 denies local server listeners, so native discovery browser cases remain for CI
 or a listener-capable environment. No new browser result is claimed for this PR.
+
+## Library native-subscription migration
+
+PR #26 merged at beb844218ba4f30925ea762a096f171fae6ae5a5; comparison with its
+final head reports no tree changes. The next branch is
+refactor/clipper-library-subscription.
+
+Library now captures the page's keyed client once and reads its view, filter
+state, pagination and selected tag article through native $client subscriptions.
+Removed the manual onMount subscription, copied snapshot and fallback reads.
+All intent callbacks and child clients use that same captured scope. Since a
+LibraryClient always has an initial view, removed the transient empty render
+gate. This changes first-render timing, not library readiness/admission policy.
+The source diff includes markup outdent from removing that gate; structural
+markup, styles, focus callbacks and worker-owned data/feedback remain intact.
+
+The existing pagination reset key, row-removal focus bookkeeping and dedicated
+tagArticle fallback remain. An article leaving the visible list while its tag
+editor is open still uses the separately published tagArticle. No UI actor,
+new state, message mapping, dependency or generic observation layer was added.
+
+Six new tests mount Library with its real child components and an account
+navigation context fixture. They cover initial projection; query, status,
+favorite and tag-filter intent wiring; projected filter updates/search retry;
+pagination/new-row focus; filtered-out tag-editor continuity/heading focus on
+close; late old-client data/unsubscription; and trash-to-empty-list heading focus.
+These jsdom tests substitute only missing dialog/popover methods. They do not
+qualify native popup visibility, modal focus return or actual worker persistence.
+
+The focused Node capture/discovery/client suites pass 36 tests; the mounted
+suite passes 14, including the six new Library cases. Source formatting, test
+lint and diff whitespace checks pass. The isolated checkout preserves existing
+user services/data; local Node 25.2.1 and native-listener restrictions retain the
+previous qualification limits. Native browser checks remain for CI before C2
+can be marked fully qualified.
+
+Full coordinator/web/service-worker/extension type checks also pass with zero
+Svelte errors or warnings. The only type-check correction during development was
+explicitly narrowing the test's open-dialog query before calling close; no type
+assertions or production API changes were needed.

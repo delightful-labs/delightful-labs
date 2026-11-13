@@ -88,6 +88,11 @@ Exit: accepted pilot with no custom selector framework or lifecycle regression.
       of Escape/focus/filter behavior remains pending, so C1 is not yet qualified.
 - [ ] C2. Migrate `Library` in its own review cycle; preserve search/filter state,
       pagination, row focus after removal and tag-editor continuity.
+      Implemented on refactor/clipper-library-subscription: direct $client reads
+      and scoped intents, with the initial current view rendered immediately.
+      Six mounted integration tests cover filters/search, pagination focus,
+      tag-editor continuity/closure, row-removal focus and replacement cleanup.
+      Native browser qualification remains pending; no domain actor change.
 - [ ] C3. Migrate reader observation in its own review cycle; preserve document
       identity, open/close commands, late-report rejection and content revisions.
 - [ ] C4. Remove superseded active helpers only after locating consumers. Trace
