@@ -1,35 +1,32 @@
 <script lang="ts">
 	import { onDestroy, untrack } from 'svelte'
-	import { useSelector } from '@xstate/svelte'
 	import type { LibraryClient } from '../runtime/worker/client.js'
-	import { libraryViewSource, sameWorkflowMessage } from '../runtime/worker/view-source.js'
 	import { Button, Dialog, FloatingActionButton, InputText, StatusMessage } from 'delightful-ui'
 	import { action, t } from '../localization/index.js'
 
 	let { actor }: { actor: LibraryClient } = $props()
 	// Library keys this form by client: observation and commands share that exact scope.
 	const client = untrack(() => actor)
-	const source = libraryViewSource(client)
 	const dialogId = $props.id()
 	let open = $state(false)
 	let url = $state('')
-	const canAdd = useSelector(source, (render) => render.canAdd)
-	const canOrganize = useSelector(source, (render) => render.view.canOrganize)
-	const restoreCaptureId = useSelector(source, (render) => render.view.restoreCaptureId)
-	const message = useSelector(source, (render) => render.view.captureFeedback, sameWorkflowMessage)
+	const canAdd = $derived($client.canAdd)
+	const canOrganize = $derived($client.view.canOrganize)
+	const restoreCaptureId = $derived($client.view.restoreCaptureId)
+	const message = $derived($client.view.captureFeedback)
 
 	onDestroy(() => {
 		url = ''
 	})
 </script>
 
-{#if $message}<StatusMessage {...$message} />{/if}
+{#if message}<StatusMessage {...message} />{/if}
 
-{#if $restoreCaptureId}
-	{@const id = $restoreCaptureId}
+{#if restoreCaptureId}
+	{@const id = restoreCaptureId}
 	<Button
 		appearance="flat"
-		disabled={!$canOrganize}
+		disabled={!canOrganize}
 		onclick={() =>
 			client.send({
 				type: 'ORGANIZE',
@@ -44,7 +41,7 @@
 	title={action('add', 'link')}
 	aria-haspopup="dialog"
 	aria-controls={dialogId}
-	disabled={!$canAdd}
+	disabled={!canAdd}
 	onclick={() => (open = true)}><span aria-hidden="true">+</span></FloatingActionButton
 >
 
@@ -65,11 +62,11 @@
 			required
 			maxlength={8192}
 			autocomplete="url"
-			disabled={!$canAdd}
+			disabled={!canAdd}
 		/>
 		<div class="dialog-actions">
 			<Button type="button" onclick={() => (open = false)}>{t('actions.close')}</Button>
-			<Button type="submit" disabled={!$canAdd}>{action('add', 'link')}</Button>
+			<Button type="submit" disabled={!canAdd}>{action('add', 'link')}</Button>
 		</div>
 	</form>
 </Dialog>

@@ -1,16 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { useSelector } from '@xstate/svelte'
+import { mount, unmount, flushSync } from 'svelte'
+import NativeView from './fixtures/NativeView.svelte'
 import { selectLibraryView } from '../../machines/capture/library.js'
 import { selectTagFormView } from '../../machines/capture/tag-form.js'
 import type { WorkflowMessage } from '../../contracts/feedback.js'
 import { openApplicationClient, type WorkerReply } from './client.js'
 import { commandSchema } from './protocol.js'
 import type { LibraryRender } from './views.js'
-import { libraryViewSource, sameWorkflowMessage } from './view-source.js'
 
-const cleanups: (() => void)[] = []
-afterEach(() => {
-	for (const cleanup of cleanups.splice(0).reverse()) cleanup()
+const cleanups: (() => void | Promise<void>)[] = []
+afterEach(async () => {
+	for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 	vi.unstubAllGlobals()
 })
 
@@ -70,85 +70,81 @@ function fixture() {
 	})
 	const initial = render()
 	const binding = app.library(initial)
-	return { app, worker, failed, initial, binding, source: libraryViewSource(binding.client) }
+	return { app, worker, failed, initial, binding, client: binding.client }
 }
 
-it('supplies initial capability, suppresses unrelated updates and rereads after resubscription', () => {
+function attach(client: ReturnType<typeof fixture>['client']) {
+	const target = document.createElement('div')
+	document.body.append(target)
+	const component = mount(NativeView, { target, props: { client } })
+	flushSync()
+	let detached = false
+	const detach = async () => {
+		if (detached) return
+		detached = true
+		await unmount(component)
+		target.remove()
+	}
+	cleanups.push(detach)
+	return { target, detach }
+}
+
+it('renders initial values, updates and the current value after remount', async () => {
 	const f = fixture()
-	const selected = useSelector(f.source, (view) => view.canAdd)
-	const values: boolean[] = []
-	const unsubscribe = selected.subscribe((value) => values.push(value))
-	f.binding.update({ ...f.initial, hasMore: true })
-	f.binding.update({ ...f.initial, canAdd: false })
-	expect(values).toEqual([true, false])
-	unsubscribe()
+	const first = attach(f.client)
+	expect(first.target.querySelector('output')?.textContent).toBe('true')
+	f.binding.update({ ...f.initial, hasMore: true, canAdd: false })
+	flushSync()
+	expect(first.target.querySelector('output')?.textContent).toBe('false')
+	await first.detach()
 	f.binding.update(f.initial)
-	expect(values).toEqual([true, false])
-	const unsubscribeAgain = selected.subscribe((value) => values.push(value))
-	expect(values).toEqual([true, false, true])
-	unsubscribeAgain()
+	const second = attach(f.client)
+	expect(second.target.querySelector('output')?.textContent).toBe('true')
+	await second.detach()
 })
 
-it('shares one source subscription and releases it without terminating the worker', () => {
+it('uses one native subscription for multiple field reads and releases it on unmount', async () => {
 	const f = fixture()
-	const subscribe = vi.spyOn(f.source, 'subscribe')
-	const selected = useSelector(f.source, (view) => view.canAdd)
-	const first = selected.subscribe(() => {})
-	const second = selected.subscribe(() => {})
+	const subscribe = vi.spyOn(f.client, 'subscribe')
+	const mounted = attach(f.client)
 	expect(subscribe).toHaveBeenCalledTimes(1)
 	const subscription = subscribe.mock.results[0]?.value
-	if (!subscription) throw new Error('Missing source subscription')
+	if (!subscription) throw new Error('Missing client subscription')
 	const release = vi.spyOn(subscription, 'unsubscribe')
-	first()
-	expect(release).not.toHaveBeenCalled()
-	second()
+	await mounted.detach()
 	expect(release).toHaveBeenCalledTimes(1)
 	expect(f.worker.terminate).not.toHaveBeenCalled()
-	f.binding.client.send({ type: 'ADD', url: 'https://example.invalid/article' })
+	f.client.send({ type: 'ADD', url: 'https://example.invalid/article' })
 	expect(f.worker.postMessage).toHaveBeenLastCalledWith(
 		expect.objectContaining({ type: 'LIBRARY', scope: f.initial.scope }),
 		[]
 	)
 })
 
-it('supports the public observer-object subscription form', () => {
+it('renders receipt-based suppression until the actual client receives its receipt', async () => {
 	const f = fixture()
-	const next = vi.fn()
-	const subscription = f.source.subscribe({ next })
-	expect(next).toHaveBeenCalledExactlyOnceWith(f.initial)
-	subscription.unsubscribe()
-	f.binding.update({ ...f.initial, canAdd: false })
-	expect(next).toHaveBeenCalledTimes(1)
-})
-
-it('retains receipt-based mutation suppression until the actual client receives its receipt', () => {
-	const f = fixture()
-	const values: boolean[] = []
-	const unsubscribe = useSelector(f.source, (view) => view.view.canOrganize).subscribe((value) =>
-		values.push(value)
-	)
-	f.binding.client.send({
+	const mounted = attach(f.client)
+	const value = () => mounted.target.querySelector('output[aria-label="Can organize"]')?.textContent
+	expect(value()).toBe('true')
+	f.client.send({
 		type: 'ORGANIZE',
 		request: { id: crypto.randomUUID(), field: 'trashed', value: false }
 	})
-	expect(values).toEqual([true, false])
+	flushSync()
+	expect(value()).toBe('false')
 	const message = commandSchema.parse(f.worker.postMessage.mock.lastCall?.[0])
 	if (message.type !== 'LIBRARY') throw new Error('Missing library command')
 	f.worker.onmessage?.({
 		data: { type: 'RECEIVED', scope: f.initial.scope, requestId: message.requestId }
 	})
-	expect(values).toEqual([true, false, true])
-	unsubscribe()
+	flushSync()
+	expect(value()).toBe('true')
+	await mounted.detach()
 })
 
-it('compares cloned messages by text and variant, including removal', () => {
+it('renders cloned feedback, changed severity and wording, and removal without a comparator', async () => {
 	const f = fixture()
-	const values: (WorkflowMessage | undefined)[] = []
-	const unsubscribe = useSelector(
-		f.source,
-		(view) => view.view.captureFeedback,
-		sameWorkflowMessage
-	).subscribe((value) => values.push(value))
+	const mounted = attach(f.client)
 	for (const message of [
 		{ text: 'First', variant: 'info' },
 		{ text: 'First', variant: 'info' },
@@ -156,39 +152,28 @@ it('compares cloned messages by text and variant, including removal', () => {
 		{ text: 'Translated', variant: 'error' },
 		undefined
 	] satisfies (WorkflowMessage | undefined)[]) {
+		const previous = mounted.target.querySelector('[role="status"]')
 		f.binding.update({ ...f.initial, view: { ...f.initial.view, captureFeedback: message } })
+		flushSync()
+		const status = mounted.target.querySelector('[role="status"]')
+		expect(status?.textContent).toBe(message?.text)
+		expect(status?.getAttribute('data-variant')).toBe(message?.variant)
+		if (previous && message) expect(status).toBe(previous)
 	}
-	expect(values).toEqual([
-		undefined,
-		{ text: 'First', variant: 'info' },
-		{ text: 'First', variant: 'error' },
-		{ text: 'Translated', variant: 'error' },
-		undefined
-	])
-	unsubscribe()
+	await mounted.detach()
 })
 
-it('isolates replaced A → B → A bindings and leaves shutdown with the application owner', () => {
+it('isolates A → B → A mounts and leaves shutdown with the application owner', async () => {
 	const f = fixture()
-	const old = vi.fn()
-	const unsubscribeOld = useSelector(f.source, (view) => view.canAdd).subscribe(old)
-	unsubscribeOld()
-	const b = f.app.library(render())
-	const unsubscribeB = useSelector(libraryViewSource(b.client), (view) => view.canAdd).subscribe(
-		() => {}
-	)
-	unsubscribeB()
-	const newA = f.app.library(render())
-	const current = vi.fn()
-	const unsubscribeCurrent = useSelector(
-		libraryViewSource(newA.client),
-		(view) => view.canAdd
-	).subscribe(current)
+	const firstA = attach(f.client)
+	await firstA.detach()
+	const b = attach(f.app.library(render()).client)
+	await b.detach()
+	const current = attach(f.app.library(render()).client)
 	f.binding.update({ ...f.initial, canAdd: false })
-	expect(old).toHaveBeenCalledTimes(1)
-	expect(current).toHaveBeenCalledExactlyOnceWith(true)
-	unsubscribeCurrent()
-	expect(f.worker.terminate).not.toHaveBeenCalled()
+	flushSync()
+	expect(current.target.querySelector('output')?.textContent).toBe('true')
+	await current.detach()
 	f.app.close()
 	expect(f.worker.terminate).not.toHaveBeenCalled()
 	f.worker.onmessage?.({ data: { type: 'CLOSED' } })

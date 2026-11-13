@@ -2,6 +2,8 @@
 
 Status: Research started. Implements [the specification](svelte-xstate-simplification.md).
 Initial findings and proposed pilot: [research record](svelte-xstate-research.md).
+Current decision: native Svelte subscriptions to LibraryClient supersede the
+initial useSelector adapter experiment; XState remains the workflow owner.
 Unchecked items are planned work, not completed validation. Keep implementation
 batches to the shared review limits; no dependency or test approval is implied.
 
@@ -24,6 +26,8 @@ batches to the shared review limits; no dependency or test approval is implied.
       for review. If `@xstate/svelte` is chosen, request its explicit dependency
       approval with the existing-package and native-adapter alternatives.
       User approved adding `@xstate/svelte@6.0.0-beta.0` to Clipper on 2026-11-13.
+      Subsequently removed after native-contract reassessment and user approval
+      to adopt direct Svelte subscriptions; Finance's dependency is unaffected.
       No lifecycle/policy change is part of the selector pilot.
 
 Exit: a reviewable observation contract and ownership map. A selector pilot may
@@ -35,8 +39,8 @@ research; no shutdown change proceeds with an unresolved safety justification.
 - [x] B1. Implement the selected typed observation boundary and migrate `AddLink`
       only. Select capture capabilities/messages without changing save behavior,
       form semantics, copy, worker ownership or receipt-based command admission.
-      Added `runtime/worker/view-source.ts`; the feedback follow-up leaves four
-      selected stores in AddLink, including one optional machine-owned message.
+      The initial view-source/useSelector experiment was superseded by direct
+      $client reads and $derived fields, including one machine-owned message.
       Capability selection now uses the client's current value on first render.
 - [x] B2. Show the concrete implementation and removed boilerplate for review;
       obtain implementation-test approval under the shared testing guide.
@@ -47,6 +51,8 @@ research; no shutdown change proceeds with an unresolved safety justification.
       Six new selector tests and six existing client tests pass against the real
       UI client with a fake native Worker. Full web/extension types pass in an
       isolated checkout after building matching UI/DLF artifacts.
+      Final native-subscription coverage replaces the six adapter tests with five
+      mounted Svelte tests; 51 affected Node tests also pass (56 total).
 - [ ] B4. Verify the actual browser capture flow and failure feedback, not only
       the adapter. Record subscription behavior and limitations of the probe.
       Attempted selected account/capture Playwright cases on isolated ports
@@ -61,6 +67,13 @@ research; no shutdown change proceeds with an unresolved safety justification.
       separately scoped; this does not complete the broader feedback audit.
 
 Exit: accepted pilot with no custom selector framework or lifecycle regression.
+
+- [x] B6. Adopt the existing Svelte-compatible LibraryClient contract directly.
+      Remove the adapter, message comparator and unused Clipper binding dependency.
+      Replace adapter tests with mounted Svelte coverage for initial values,
+      unmount/remount, native unsubscribe-object handling, receipt suppression,
+      cloned feedback, replacement bindings and worker lifetime. Include this
+      suite in the standard unit-test command.
 
 ## C. Apply the established observation pattern
 

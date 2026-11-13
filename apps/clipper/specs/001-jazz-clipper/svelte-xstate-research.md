@@ -5,6 +5,10 @@ Date: 2026-11-13. Initial A1–A4 findings for
 research and a proposed pilot contract, not runtime qualification or approval to
 remove a lifecycle boundary.
 
+Current implementation decision: use LibraryClient's existing Svelte-compatible
+subscription directly. The initial adapter/binding pilot below is retained as
+research history and superseded by the reassessment and adoption record.
+
 ## Baseline and evidence limits
 
 PR #24 is merged at `670fb720e15b15a4b308408c92301bd29a943561`.
@@ -281,3 +285,97 @@ duplicate and save errors, invalid URL retry/clear, shutdown withdrawal, paralle
 worker/save failure precedence and the unchanged extension status contract.
 Touched-source formatting and lint pass. The earlier browser-listener and pinned
 Node runtime limitations remain; no new browser qualification is claimed.
+
+## Reassessment: prefer the existing native Svelte store contract
+
+The selector pilot established compatibility, but did not establish that an
+XState-shaped adapter was necessary or the simplest UI boundary. Further review
+found that LibraryClient already satisfies Svelte's documented observable-style
+store contract: subscribe synchronously publishes the current LibraryRender and
+returns an object with unsubscribe(). Svelte explicitly supports this return
+shape; it does not require a function-only disposer for component subscriptions.
+
+Primary references: [Svelte store contract](https://svelte.dev/docs/svelte/stores#Store-contract),
+[external reactivity](https://svelte.dev/docs/svelte/svelte-reactivity#createSubscriber),
+and [XState Svelte selectors](https://stately.ai/docs/xstate/v6/svelte/selectors).
+Installed Svelte src/store/utils.js normalizes object/function unsubscribers;
+src/internal/client/reactivity/store.js manages component subscriptions/cleanup.
+The installed useSelector implementation creates a Svelte readable around its
+source. It supplies useful equality filtering, but that alone does not establish
+a benefit over native component reactivity for this render-data boundary.
+
+Comparison:
+
+| Option | Assessment for the current client |
+| --- | --- |
+| Current libraryViewSource + useSelector | Works and is tested, but adds an observer-object compatibility layer and dependency solely to observe data already consumable by Svelte. |
+| Add getSnapshot and observer overloads to LibraryClient | Removes the separate file but retains the adaptation. This client publishes render DTOs, not machine snapshots; no demonstrated need for actor-facing observation methods here. |
+| Subscribe directly with $client and derive fields with $derived | Preferred next design. Reuses the existing public subscription contract, current-value delivery and native Svelte cleanup. No extra source, selection engine or main-thread domain actor. |
+| Introduce a readable, rune bridge or createSubscriber | Supported options when the producer lacks a compatible contract; currently another layer without a demonstrated need. |
+
+Isolated experiment: changed only the disposable checkout's AddLink component to
+read the existing client through $client. Replaced the four useSelector calls
+with $derived expressions, removed the source adapter and binding imports, and
+kept the same fixed client for commands and observation. Full web svelte-check
+passed with zero errors/warnings. The installed compiler also emitted zero
+warnings, generated native store_get and setup_stores cleanup, and imported no
+XState Svelte binding. No production files or PR implementation were replaced
+by this experiment; the isolated checkout now contains the alternative component.
+
+Recommended revision: retain worker-owned XState machines, typed intent and
+bounded render DTOs; subscribe directly to the scoped client in Svelte. Retain
+machine-owned optional status labels from the feedback cleanup. Remove the
+pilot-only wrapper/binding dependency if no other Clipper consumer needs it.
+Keep XState's Svelte binding for actual component-owned or shared UI actors where
+its API is useful. Do not create another actor to mirror the domain actor.
+
+The key lifetime still matters: account replacement withdraws the old scoped
+client and the existing keyed component remounts. UI subscription disposal must
+not close the application Worker. SSR must not create the worker, and failures
+must still withdraw its view. Initial-value, resubscription, replacement and
+shutdown-ownership tests should be retained/reworked for the direct contract.
+
+Object identity still changes across worker messages. Native $derived primitive
+values suppress downstream updates when unchanged; object-valued messages may
+invalidate even with equal fields. That does not by itself prove extra DOM work
+or a performance regression. Do not claim either approach faster without actual
+component measurements. If needed, optimize ready-view publication/identity at
+the UI boundary after measuring; no global deep comparison or custom transport
+subscription language is justified. Worker emission and clone costs are upstream
+of either frontend observation approach and require separate measurement.
+
+This revises A3's earlier recommendation based on the stronger contract evidence.
+The previous JavaScript/selector tests remain valid evidence for the pilot, not
+proof that its additional layer is preferable. Native DOM/browser behavior and
+the pinned Node runtime remain qualification gates before adopting the alternative.
+
+## Native subscription adoption
+
+The user authorized adoption of the reassessed design. Add Link now reads the
+same fixed scoped client through `$client`, with four `$derived` fields. Removed
+view-source.ts, sameWorkflowMessage and Clipper's @xstate/svelte dependency/importer
+entry. Finance keeps its independently used binding. LibraryClient, worker
+protocols, command admission, keyed account lifetimes and state-owned status
+metadata are unchanged. No replacement observation layer was introduced.
+
+Replaced the six adapter tests with five mounted Svelte tests in
+client-view.svelte.test.ts using the actual client and a fake native Worker.
+The test-only NativeView component uses ordinary `$client`/`$derived` syntax.
+It verifies initial render, updates, unmount/remount, a single subscription for
+multiple field reads, unsubscribe-object cleanup exactly once, receipt-based
+suppression, changed and cloned feedback with stable DOM node identity,
+replacement bindings and separation from application/worker shutdown.
+These are jsdom component tests, not full native-browser or domain-worker proofs.
+
+The component suite has a dedicated config using the already installed Svelte
+Vite plugin and jsdom. The default Node unit config excludes that suite; the
+standard test:unit script runs both suites, avoiding duplicate execution or
+uncompiled .svelte imports. No new test dependency was added.
+
+Validation in the isolated checkout: frozen offline installation and workspace
+links pass; 51 affected Node tests and five mounted Svelte tests pass (56 total).
+Full coordinator, web/service-worker and extension type checks pass with zero
+Svelte errors or warnings, including the new component test fixture/config.
+Touched-source formatting/lint and diff whitespace checks pass. Existing browser
+listener restrictions and Node 25 versus pinned Node 24 qualification limits
+remain. The earlier adapter test results are historical, not the final design.
