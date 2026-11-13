@@ -245,3 +245,39 @@ assertion. B4 remains unchecked. Still run those account cases plus discovery's
 duplicate/restore and invalid-source cases on the pinned runtime in CI or an
 environment that permits local listeners. No offline/crash or broader lifecycle
 qualification is claimed for this observation-only pilot.
+
+## Capture feedback follow-up in PR #25
+
+The user requested machine-owned status labels and one optional message per
+display region. Add Link previously selected and rendered duplicate and error
+messages separately, while the detailed extension status reconstructed precedence
+across multiple metadata channels.
+
+Capture states now share the `capture` channel. Each state owns its existing
+localized `meta.name`, severity and whether that label is displayed in Add Link
+(`meta.display`). Duplicate, invalid URL, failed, uncertain and rejected states
+declare display eligibility. Idle, saving, local success, synced, canceled and
+background processing remain quiet in the web region. Existing transitions own
+which state is active; no new workflow or mirrored lifecycle flags were added.
+
+The worker failure state declares detailed-status priority 1; explicit save
+errors declare priority 2, preserving the previous extension precedence. The
+background state forwards its child's ready-to-render message. One projector
+reads these declarations using the existing stateFeedback primitive; it does not
+infer labels from failure codes, receipt flags or unrelated workflow channels.
+The web receives `captureFeedback`, the extension retains `captureMessage`, and
+the narrow capture selector exposes `message`. Removed the old duplicate/error
+message DTO fields. Add Link now has four selected stores and one conditional
+StatusMessage render, with no local message selection or translation.
+
+This change deliberately covers the capture display region. Tag-input native
+announcements, list/empty feedback, reader loading and other independent workflow
+regions remain separate follow-up work; no global status bus or one-message-for-
+the-whole-app policy was introduced. Existing catalog wording is unchanged.
+
+Follow-up checks: 57 tests pass across capture, discovery, worker view/client and
+extension clip-machine suites. Assertions cover quiet progress/success, visible
+duplicate and save errors, invalid URL retry/clear, shutdown withdrawal, parallel
+worker/save failure precedence and the unchanged extension status contract.
+Touched-source formatting and lint pass. The earlier browser-listener and pinned
+Node runtime limitations remain; no new browser qualification is claimed.

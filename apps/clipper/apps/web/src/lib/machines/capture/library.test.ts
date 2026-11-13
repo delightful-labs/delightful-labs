@@ -2,7 +2,7 @@ import { fixtureReaderDocument, fixtureAttachment } from '../../capture/fixtures
 import { controlledSave, testLibraryCapability } from './library.test-support.js'
 import { expect, it, vi } from 'vitest'
 import { createActor, toPromise, waitFor } from 'xstate'
-import { libraryMachine, selectLibraryView } from './library.js'
+import { libraryMachine, selectLibraryView, selectLibraryCaptureView } from './library.js'
 import type { ArticleSaveResult, SaveArticleRequest } from '../../contracts/articles.js'
 const id = crypto.randomUUID()
 const candidate = {
@@ -191,6 +191,10 @@ it('keeps global rejection separate from local article and content saves', async
 	remote.reject(new Error('Denied'))
 	await waitFor(actor, (s) => s.context.sync[id] === 'rejected')
 	expect(selectLibraryView(actor.getSnapshot()).captureMessage?.variant).toBe('error')
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toEqual({
+		text: 'The server rejected this save. Local content may remain available; it is not confirmed on other devices.',
+		variant: 'error'
+	})
 	actor.send({ type: 'SHUTDOWN' })
 	await toPromise(actor)
 })
@@ -407,8 +411,10 @@ it('uses readable state names for capture outcomes and passes through worker fee
 		text: 'Saving on this device…',
 		variant: 'info'
 	})
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toBeUndefined()
 	gate.resolve({ kind: 'saved', operationId: id, ready: false, receipts: [] })
 	await waitFor(actor, (s) => s.matches({ running: { capture: { saved: 'local' } } }))
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toBeUndefined()
 	expect(
 		Object.values(actor.getSnapshot().getMeta()).some(
 			(meta) => meta?.name === selectLibraryView(actor.getSnapshot()).captureMessage?.text
@@ -417,10 +423,12 @@ it('uses readable state names for capture outcomes and passes through worker fee
 	actor.send({ type: 'SYNC', id, status: 'accepted' })
 	expect(actor.getSnapshot().matches({ running: { capture: { saved: 'synced' } } })).toBe(true)
 	expect(selectLibraryView(actor.getSnapshot()).captureMessage?.text).toBe('Article synced.')
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toBeUndefined()
 	const message = { text: 'Worker-owned status', variant: 'info' as const }
 	actor.send({ type: 'BACKGROUND_STATUS', id, message, cancelable: true })
 	expect(actor.getSnapshot().matches({ running: { capture: { saved: 'background' } } })).toBe(true)
 	expect(selectLibraryView(actor.getSnapshot()).captureMessage).toBe(message)
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toBeUndefined()
 	actor.send({
 		type: 'BACKGROUND_SAVED',
 		result: { kind: 'saved', operationId: id, ready: true, receipts: [] }
@@ -441,9 +449,34 @@ it('keeps the duplicate state label when receipt status changes', async () => {
 	await waitFor(actor, (s) => s.matches({ running: { capture: { saved: 'duplicate' } } }))
 	actor.send({ type: 'SYNC', id, status: 'rejected' })
 	expect(actor.getSnapshot().matches({ running: { capture: { saved: 'duplicate' } } })).toBe(true)
-	expect(selectLibraryView(actor.getSnapshot()).duplicateMessage?.text).toBe('Already saved.')
+	expect(selectLibraryView(actor.getSnapshot()).captureFeedback?.text).toBe('Already saved.')
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toEqual({
+		text: 'Already saved.',
+		variant: 'info'
+	})
 	expect(selectLibraryView(actor.getSnapshot()).captureMessage?.text).toBe('Already saved.')
 	actor.send({ type: 'SHUTDOWN' })
+	await toPromise(actor)
+})
+
+it('replaces the displayed validation label on valid retry and withdraws feedback on shutdown', async () => {
+	const gate = Promise.withResolvers<ArticleSaveResult>()
+	const { actor } = fixture(() => gate.promise)
+	actor.send({ type: 'ADD', url: 'javascript:alert(1)' })
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toEqual({
+		text: 'Enter a valid public HTTP or HTTPS URL.',
+		variant: 'error'
+	})
+	actor.send({ type: 'ADD', url: candidate.finalUrl })
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toBeUndefined()
+	gate.resolve({ kind: 'failed', operationId: id })
+	await waitFor(actor, (s) => s.matches({ running: { capture: 'failed' } }))
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toEqual(
+		selectLibraryView(actor.getSnapshot()).captureFeedback
+	)
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message?.variant).toBe('error')
+	actor.send({ type: 'SHUTDOWN' })
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message).toBeUndefined()
 	await toPromise(actor)
 })
 
@@ -467,6 +500,27 @@ it('retains the worker failure name without terminating an issued save or skippi
 	await toPromise(actor)
 })
 
+it('keeps the save error label above a parallel worker failure through state metadata', async () => {
+	const gate = Promise.withResolvers<ArticleSaveResult>()
+	const { actor } = fixture(() => gate.promise)
+	actor.send({ type: 'ADD', url: candidate.finalUrl })
+	actor.send({ type: 'BACKGROUND_ERROR' })
+	actor.send({ type: 'BACKGROUND_CLOSED' })
+	gate.resolve({ kind: 'failed', operationId: id })
+	await waitFor(actor, (s) => s.matches({ running: { capture: 'failed' } }))
+	expect(actor.getSnapshot().matches({ running: { workerLifecycle: { failed: 'closed' } } })).toBe(
+		true
+	)
+	expect(selectLibraryView(actor.getSnapshot()).captureMessage).toEqual(
+		selectLibraryCaptureView(actor.getSnapshot()).message
+	)
+	expect(selectLibraryCaptureView(actor.getSnapshot()).message?.text).toBe(
+		'The article could not be saved on this device. Check available storage before trying again.'
+	)
+	actor.send({ type: 'SHUTDOWN' })
+	await toPromise(actor)
+})
+
 it('replaces a worker failure name when the in-flight URL save succeeds', async () => {
 	const gate = Promise.withResolvers<ArticleSaveResult>()
 	const { actor } = fixture(() => gate.promise)
@@ -485,13 +539,12 @@ it.each(['failed', 'unknown'] as const)(
 	'keeps %s save feedback separate from quiet progress and success',
 	async (kind) => {
 		const { actor } = fixture(async () => ({ kind, operationId: id }))
-		expect(selectLibraryView(actor.getSnapshot()).captureProblemMessage).toBeUndefined()
+		expect(selectLibraryView(actor.getSnapshot()).captureFeedback).toBeUndefined()
 		actor.send({ type: 'ADD', url: candidate.finalUrl })
 		await waitFor(actor, (snapshot) =>
 			snapshot.matches({ running: { capture: kind === 'failed' ? 'failed' : 'uncertain' } })
 		)
-		expect(selectLibraryView(actor.getSnapshot()).captureProblemMessage?.variant).toBe('error')
-		expect(selectLibraryView(actor.getSnapshot()).duplicateMessage).toBeUndefined()
+		expect(selectLibraryView(actor.getSnapshot()).captureFeedback?.variant).toBe('error')
 		actor.send({ type: 'SHUTDOWN' })
 		await toPromise(actor)
 	}

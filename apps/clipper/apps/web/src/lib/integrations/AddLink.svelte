@@ -16,25 +16,14 @@
 	const canAdd = useSelector(source, (render) => render.canAdd)
 	const canOrganize = useSelector(source, (render) => render.view.canOrganize)
 	const restoreCaptureId = useSelector(source, (render) => render.view.restoreCaptureId)
-	const captureProblem = useSelector(
-		source,
-		(render) => render.view.captureProblemMessage,
-		sameWorkflowMessage
-	)
-	const duplicate = useSelector(
-		source,
-		(render) => render.view.duplicateMessage,
-		sameWorkflowMessage
-	)
+	const message = useSelector(source, (render) => render.view.captureFeedback, sameWorkflowMessage)
 
 	onDestroy(() => {
 		url = ''
 	})
 </script>
 
-{#if $captureProblem}<StatusMessage {...$captureProblem} />{/if}
-
-{#if $duplicate}<StatusMessage {...$duplicate} />{/if}
+{#if $message}<StatusMessage {...$message} />{/if}
 
 {#if $restoreCaptureId}
 	{@const id = $restoreCaptureId}

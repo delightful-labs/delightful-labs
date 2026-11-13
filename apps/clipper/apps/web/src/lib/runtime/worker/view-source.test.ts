@@ -146,7 +146,7 @@ it('compares cloned messages by text and variant, including removal', () => {
 	const values: (WorkflowMessage | undefined)[] = []
 	const unsubscribe = useSelector(
 		f.source,
-		(view) => view.view.captureProblemMessage,
+		(view) => view.view.captureFeedback,
 		sameWorkflowMessage
 	).subscribe((value) => values.push(value))
 	for (const message of [
@@ -156,7 +156,7 @@ it('compares cloned messages by text and variant, including removal', () => {
 		{ text: 'Translated', variant: 'error' },
 		undefined
 	] satisfies (WorkflowMessage | undefined)[]) {
-		f.binding.update({ ...f.initial, view: { ...f.initial.view, captureProblemMessage: message } })
+		f.binding.update({ ...f.initial, view: { ...f.initial.view, captureFeedback: message } })
 	}
 	expect(values).toEqual([
 		undefined,

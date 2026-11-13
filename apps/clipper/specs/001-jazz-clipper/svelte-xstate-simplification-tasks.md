@@ -35,7 +35,8 @@ research; no shutdown change proceeds with an unresolved safety justification.
 - [x] B1. Implement the selected typed observation boundary and migrate `AddLink`
       only. Select capture capabilities/messages without changing save behavior,
       form semantics, copy, worker ownership or receipt-based command admission.
-      Added `runtime/worker/view-source.ts` and five selected stores in AddLink.
+      Added `runtime/worker/view-source.ts`; the feedback follow-up leaves four
+      selected stores in AddLink, including one optional machine-owned message.
       Capability selection now uses the client's current value on first render.
 - [x] B2. Show the concrete implementation and removed boilerplate for review;
       obtain implementation-test approval under the shared testing guide.
@@ -52,6 +53,12 @@ research; no shutdown change proceeds with an unresolved safety justification.
       5198/5199. Environment refused the server listen with EPERM; no browser
       cases executed. Browser qualification remains open, including discovery
       duplicate/restore and invalid-source feedback cases.
+- [x] B5. Consolidate Add Link status display in the owning capture states.
+      Capture state metadata declares text, severity, display eligibility and
+      status priority. Remove separate frontend duplicate/error messages and
+      cross-channel selector fallbacks. Preserve the extension's detailed status
+      and quiet web progress/success behavior. Other workflow regions remain
+      separately scoped; this does not complete the broader feedback audit.
 
 Exit: accepted pilot with no custom selector framework or lifecycle regression.
 
