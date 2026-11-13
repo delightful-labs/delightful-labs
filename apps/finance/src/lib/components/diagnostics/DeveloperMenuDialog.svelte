@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button, Dialog, SkipButton } from 'delightful-ui'
+	import { Button, Dialog, SkipControl } from 'delightful-ui'
 	import type { Snippet } from 'svelte'
 	import { m } from '#lib/paraglide/messages.js'
 
@@ -22,9 +22,14 @@
 	const dialogId = $props.id()
 </script>
 
-<SkipButton aria-haspopup="dialog" aria-controls={dialogId} onclick={() => (open = true)}>
+<SkipControl
+	component={Button}
+	aria-haspopup="dialog"
+	aria-controls={dialogId}
+	onclick={() => (open = true)}
+>
 	{m['developer.menu']()}
-</SkipButton>
+</SkipControl>
 
 <Dialog id={dialogId} heading={m['developer.menu']()} bind:open closedby="any">
 	<dl>

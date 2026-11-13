@@ -24,6 +24,9 @@
 		"move_to_subject": "Move to {{subject}}",
 		"remove_name": "Remove {{name}}"
 	},
+	"navigation": {
+		"skip_to_main_content": "Skip to main content"
+	},
 	"nouns": {
 		"account_one": "account",
 		"account_other": "accounts",

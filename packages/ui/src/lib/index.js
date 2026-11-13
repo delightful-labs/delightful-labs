@@ -25,8 +25,7 @@ import PaginationItem from './Components/PaginationItem.svelte'
 import TopNavigation from './Components/TopNavigation.svelte'
 import Drawer from './Components/Drawer.svelte'
 import ScreenReaderText from './Components/ScreenReaderText.svelte'
-import SkipLink from './Components/SkipLink.svelte'
-import SkipButton from './Components/SkipButton.svelte'
+import SkipControl from './Components/SkipControl.svelte'
 import InputText from './Components/Inputs/InputText.svelte'
 import FieldFeedback from './Components/Inputs/FieldFeedback.svelte'
 import InputRange from './Components/Inputs/InputRange.svelte'
@@ -88,8 +87,7 @@ export {
 	TopNavigation,
 	Drawer,
 	ScreenReaderText,
-	SkipLink,
-	SkipButton
+	SkipControl
 }
 
 export const INPUT_TYPES = Object.freeze({

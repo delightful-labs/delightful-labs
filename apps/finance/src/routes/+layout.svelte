@@ -31,6 +31,8 @@
 	import { goto } from '$app/navigation'
 	import { queryLinksKey, type QueryLinkContext } from '#lib/filters/query-links.js'
 	import { browser } from '$app/env'
+	import { SkipControl } from 'delightful-ui'
+	import { m } from '#lib/paraglide/messages.js'
 	import { workspaceRoute } from '#lib/domain/workspace-routes.js'
 	import { financeFiltersKey, type FinanceFilters } from '#lib/filters/finance-filters.js'
 	import {
@@ -129,6 +131,8 @@
 	onDestroy(() => actor.send({ type: 'SHUTDOWN' }))
 </script>
 
+<SkipControl href="#main-content">{m['navigation.skip_to_main_content']()}</SkipControl>
+
 <DeveloperMenu appId={applicationId} serverUrl={jazzConfig.serverUrl} />
 
 <DemoViewport enabled={PUBLIC_SIMPLEFIN_DEMO === 'true'} />
@@ -157,7 +161,7 @@
 {#if !jazzSession || startupState.current.hasTag('startup-error')}
 	<PwaUpdateIntegration />
 {/if}
-<main>
+<main id="main-content">
 	{#if startupState.current.hasTag('startup-error')}
 		<SessionStartup waitingForOtherVersion={startupAvailability !== undefined} />
 	{:else if jazzSession}

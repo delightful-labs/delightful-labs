@@ -1,4 +1,29 @@
-# Shared skip controls — reviewed, verified in connected Chrome
+# Shared skip controls
+
+## Current workspace contract
+
+Use DUI's single top-level `SkipControl` component. Its default native anchor links
+with `href="#main-content"` to Finance's main landmark. The localized label is
+`navigation.skip_to_main_content`.
+
+DeveloperMenuDialog passes DUI's `Button` through `component={Button}`. This renders
+a native button with `aria-haspopup="dialog"`, `aria-controls` and the caller's
+`onclick` handler. Finance owns the developer label, debug gating, dialog ID, open
+state, inspectors and sample-transaction content. There is no separate SkipLink,
+SkipButton or private presentation frame in the current API.
+
+Both controls reveal on keyboard focus. The main-content link comes first in tab
+order, followed by the developer trigger. Native fragment navigation continues
+keyboard navigation inside main content; Enter/Space activate the dialog button,
+and dismissal restores its focus. Shared SSR/Storybook tests cover the native
+contracts; Finance's pagination integration covers both controls in tab order and
+the developer dialog's existing behavior.
+
+## Historical extraction record
+
+The record below describes the earlier vendored integration and its verification
+limits at that time. The current workspace contract above supersedes its API and
+dependency instructions.
 
 Replace DeveloperMenuDialog's native trigger and local focus-reveal CSS with DUI's SkipButton.
 The shared library also exports SkipLink for native fragment navigation. Both share a private
