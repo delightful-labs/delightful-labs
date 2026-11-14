@@ -1,5 +1,5 @@
 import { openArticleActions } from './article-actions.js'
-import { readRecoveryPhrase, restoreAccount } from './account-ui.js'
+import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from './account-ui.js'
 import { readingControls } from './reader-ui.js'
 import { closeLibraryPopovers, openLibrarySearch, openLibraryFilters } from './library-popovers.js'
 import { test, expect, chromium } from '@playwright/test'
@@ -48,7 +48,7 @@ test('creates Unicode-equivalent tags once, changes membership and combines tag/
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/tag-first'),
 		second = await supplied(page, 'https://example.com/tag-second')
 	let dialog = await tags(page, first.row)
@@ -102,7 +102,7 @@ test('Trash controls preserve content/organization and duplicate Add Link offers
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const url = 'https://example.com/trash-duplicate',
 		item = await supplied(page, url)
 	await (
@@ -159,7 +159,7 @@ test('real browser worker searches saved body and URL offline, scopes Trash, and
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/search-needle'),
 		second = await supplied(page, 'https://example.com/search-other')
 	const search = (
@@ -222,7 +222,7 @@ test('merges offline independent tag changes across restored clients and preserv
 	browser
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const url = 'https://example.com/tags-two-clients',
 		item = await supplied(page, url)
 	await (
@@ -303,7 +303,7 @@ test('persists tags and Trash across a complete offline browser restart and rest
 	try {
 		let page = await context.newPage()
 		await page.goto('/')
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		const url = 'https://example.com/tags-offline-restart',
 			item = await supplied(page, url)
 		await addTag(page, item.row, 'Offline')
@@ -352,7 +352,7 @@ test('reindexes a snapshot arriving from another restored client without restart
 	browser
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const recovery = await phrase(page)
 	await openLibrarySearch(page)
 	const search = page.getByRole('searchbox', { name: 'Search articles', exact: true })
@@ -366,7 +366,7 @@ test('reindexes a snapshot arriving from another restored client without restart
 		const other = await otherContext.newPage()
 		await other.goto('http://127.0.0.1:5180')
 		await restoreAccount(other, recovery)
-		await expect(other.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(other)
 		const saved = await supplied(other, 'https://example.com/arriving')
 		await expect(page.locator(`[data-article-id="${saved.id}"]`)).toBeVisible()
 		await expect(search).toHaveValue('arriving')
@@ -393,7 +393,7 @@ test('search input combines title, URL and body keywords with status, favorites,
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/ui-needle')
 	const second = await supplied(page, 'https://example.com/ui-other')
 	await (
@@ -520,7 +520,7 @@ test('tag validation uses the shared generic field error and clears it on edit a
 			warnings.push(message.text())
 	})
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const item = await supplied(page, 'https://example.com/tag-validation')
 	const dialog = await tags(page, item.row)
 	const input = dialog.locator('input[type="text"]')
@@ -550,7 +550,7 @@ test('DUI TagInput selects suggestions with the keyboard, rejects duplicates and
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/dui-first')
 	const second = await supplied(page, 'https://example.com/dui-second')
 	await addTag(page, first.row, 'Reading')
@@ -585,7 +585,7 @@ test('removing articles focuses the next or previous native link, then the libra
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	await supplied(page, 'https://example.com/component-first')
 	await supplied(page, 'https://example.com/component-second')
 	await supplied(page, 'https://example.com/component-third')
@@ -621,7 +621,7 @@ test('Add Link exposes invalid-source feedback without showing processing or suc
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const dialog = await openAddLink(page)
 	await dialog.getByLabel('Article URL', { exact: true }).fill('ftp://example.com/')
 	await dialog.getByRole('button', { name: 'Add link', exact: true }).click()
@@ -644,7 +644,7 @@ test('DUI shares Unicode comparison for duplicate feedback and suggestion filter
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/canonical-first')
 	const second = await supplied(page, 'https://example.com/canonical-second')
 	await addTag(page, first.row, 'Straße')

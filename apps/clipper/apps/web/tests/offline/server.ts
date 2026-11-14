@@ -66,7 +66,9 @@ export function staticShellServer(initialRoot: string) {
 			root,
 			'.' +
 				decodeURIComponent(
-					url.pathname === '/' || isArticlePath(url.pathname) ? '/index.html' : url.pathname
+					url.pathname === '/' || url.pathname === '/account' || isArticlePath(url.pathname)
+						? '/index.html'
+						: url.pathname
 				)
 		)
 		if (!path.startsWith(root + sep)) {

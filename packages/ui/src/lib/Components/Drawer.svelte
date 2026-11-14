@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, type Snippet } from 'svelte'
+	import { tick, untrack, type Snippet } from 'svelte'
 	import type { HTMLAttributes } from 'svelte/elements'
 	import Button from './Button.svelte'
 	import CloseIcon from 'tdesign-icons-svg/src/close.svg?component'
@@ -15,6 +15,7 @@
 		showCloseButton?: boolean
 		side?: 'left' | 'right'
 		open?: boolean
+		onopenchange?: (open: boolean) => void
 		children?: Snippet
 	}
 
@@ -25,6 +26,7 @@
 	let wasOpen = false
 
 	let {
+		id = generatedId,
 		heading,
 		headingLevel = 'h2',
 		headingHidden = false,
@@ -33,12 +35,25 @@
 		closeControl,
 		side = 'left',
 		open = $bindable(false),
+		onopenchange,
 		children,
 		class: className,
 		...attributes
 	}: Props = $props()
 
-	function closeDrawer() {
+	export function getId(): string {
+		return id ?? generatedId
+	}
+
+	export function isOpen(): boolean {
+		return open
+	}
+
+	export function toggle() {
+		open = !open
+	}
+
+	export function close() {
 		open = false
 	}
 
@@ -54,6 +69,10 @@
 					if (!open && trigger.isConnected) trigger.focus()
 				})
 			}
+		}
+		if (open !== wasOpen) {
+			const nextOpen = open
+			untrack(() => onopenchange?.(nextOpen))
 		}
 		wasOpen = open
 	})
@@ -77,6 +96,7 @@
 
 <aside
 	{...attributes}
+	id={getId()}
 	bind:this={inlinePanel}
 	class={['inline-drawer', className]}
 	inert={!open}
@@ -97,9 +117,9 @@
 		{#if showCloseButton}
 			<div class="drawer-close" class:default-close={!closeControl}>
 				{#if closeControl}
-					{@render closeControl(closeDrawer, closeLabel)}
+					{@render closeControl(close, closeLabel)}
 				{:else}
-					<Button type="button" appearance="flat" onclick={closeDrawer}>
+					<Button type="button" appearance="flat" onclick={close}>
 						<CloseIcon
 							aria-hidden="true"
 							focusable="false"

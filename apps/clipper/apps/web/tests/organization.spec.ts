@@ -1,5 +1,5 @@
 import { openArticleActions } from './article-actions.js'
-import { readRecoveryPhrase, restoreAccount } from './account-ui.js'
+import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from './account-ui.js'
 import { readingControls } from './reader-ui.js'
 import { closeLibraryPopovers, openLibraryFilters } from './library-popovers.js'
 import { openAddLink } from './add-link.js'
@@ -45,7 +45,7 @@ test('changes all statuses, keeps favorites independent, combines filters, and p
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const first = await supplied(page, 'organize-first'),
 		second = await supplied(page, 'organize-second')
 	await expect(first.getByLabel('Status', { exact: true })).toHaveValue('inbox')
@@ -118,7 +118,7 @@ test('synchronizes independent desired values in both directions between restore
 	browser
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const row = await supplied(page, 'organize-sync')
 	const id = await row.getAttribute('data-article-id')
 	const phrase = await readRecoveryPhrase(page)
@@ -174,7 +174,7 @@ test('persists offline edits across complete browser restart and synchronizes on
 	try {
 		const page = await context.newPage()
 		await page.goto(base)
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		const row = await supplied(page, 'organize-restart')
 		const id = await row.getAttribute('data-article-id')
 		const phrase = await readRecoveryPhrase(page)
@@ -244,7 +244,7 @@ test('organizes a link-only article and retains its values when supplied content
 		route.fulfill({ status: 503, json: { code: 'gatewayUnavailable' } })
 	)
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const url = 'https://example.com/organize-pending'
 	await openAddLink(page)
 	await page.getByLabel('Article URL', { exact: true }).fill(url)
@@ -402,7 +402,7 @@ for (const width of [1440, 390]) {
 
 test('a status change that removes the current row focuses the next article', async ({ page }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	await supplied(page, 'status-focus-first')
 	await supplied(page, 'status-focus-second')
 	await openLibraryFilters(page)

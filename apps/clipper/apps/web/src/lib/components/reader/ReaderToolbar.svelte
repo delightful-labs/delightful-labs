@@ -15,8 +15,7 @@
 		sourceUrl,
 		enabled,
 		onchange,
-		onfocus,
-		focusId
+		onfocus
 	}: {
 		oncontents: () => void
 		headings: ReaderHeading[]
@@ -26,8 +25,12 @@
 		enabled: boolean
 		onchange: (change: ReaderPreferenceChange) => void
 		onfocus: () => void
-		focusId: string
 	} = $props()
+	let focusButton: ReturnType<typeof Button> | undefined = $state()
+
+	export function focusControl() {
+		focusButton?.focus({ preventScroll: true })
+	}
 </script>
 
 <div class="reader-settings">
@@ -35,7 +38,7 @@
 		<Heading level="h2" size="lg">{t('reader.controls')}</Heading>
 		<div class="control-spacer" aria-hidden="true"></div>
 	</div>
-	<Button id={focusId} onclick={onfocus}>{t('reader.focus_mode')}</Button>
+	<Button bind:this={focusButton} onclick={onfocus}>{t('reader.focus_mode')}</Button>
 	<a href="/">{action('open', 'library')}</a>
 	{#if sourceUrl}<a href={sourceUrl} rel="noreferrer">{action('open', 'original')}</a>{/if}
 	<ReadingProgress value={progress} />

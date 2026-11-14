@@ -158,6 +158,9 @@ importers:
       svelte:
         specifier: 5.57.2
         version: 5.57.2(@typescript-eslint/types@8.71.2)
+      tdesign-icons-svg:
+        specifier: 0.4.8
+        version: 0.4.8
       unicode-case-folding:
         specifier: 1.1.2
         version: 1.1.2
