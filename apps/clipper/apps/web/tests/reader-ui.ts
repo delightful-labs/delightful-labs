@@ -40,12 +40,18 @@ export async function visibleReadingParagraph(page: Page) {
 	return page.getByRole('main').evaluate((main) => {
 		const top = main.getBoundingClientRect().top,
 			overlay = main.querySelector('[data-reader-overlay]')?.getBoundingClientRect().bottom ?? top
+		const visibleTop = Math.max(top, overlay)
+		const bottom = main.getBoundingClientRect().bottom
 		return Array.from(main.querySelectorAll('article p'))
-			.find(
-				(p) =>
-					p.getBoundingClientRect().bottom > Math.max(top, overlay) &&
-					/Paragraph \d+/.test(p.textContent ?? '')
-			)
+			.find((paragraph) => {
+				if (!/Paragraph \d+/.test(paragraph.textContent ?? '')) return false
+				// A paragraph's line box can peek below an overlay while all its text is clipped.
+				const range = document.createRange()
+				range.selectNodeContents(paragraph)
+				return Array.from(range.getClientRects()).some(
+					(rect) => rect.bottom > visibleTop && rect.top < bottom
+				)
+			})
 			?.textContent?.match(/Paragraph (\d+)/)?.[1]
 	})
 }

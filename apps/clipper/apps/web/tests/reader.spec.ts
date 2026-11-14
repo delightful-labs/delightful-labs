@@ -293,13 +293,24 @@ test('retains offline reading settings and location through a complete browser r
 		await dialog.getByRole('radio', { name: 'Dark', exact: true }).check()
 		await closeReadingControls(page)
 		const paragraph = await readMiddle(page)
+		console.info(JSON.stringify({ readerCheckpoint: 'before drawer', paragraph }))
 		await controls(page)
+		console.info(
+			JSON.stringify({ readerCheckpoint: 'after drawer', paragraph: await visibleParagraph(page) })
+		)
 		await page.getByRole('link', { name: 'Open library', exact: true }).click()
 		await expect(page.locator(`[data-article-id="${id}"]`).getByText(/^\d+% read$/)).toBeVisible()
 		await context.close()
 		context = await chromium.launchPersistentContext(directory, { headless: true })
 		const reopened = await context.newPage()
 		await reopened.goto('http://127.0.0.1:5180/articles/' + id)
+		await expect(reopened.getByRole('article')).toBeVisible()
+		console.info(
+			JSON.stringify({
+				readerCheckpoint: 'after restart',
+				paragraph: await visibleParagraph(reopened)
+			})
+		)
 		await expect.poll(() => visibleParagraph(reopened)).toBe(paragraph)
 		const again = await controls(reopened)
 		await expect(again.getByRole('radio', { name: 'Dark', exact: true })).toBeChecked()

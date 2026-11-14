@@ -20,6 +20,11 @@ import { readingControls } from '../reader-ui.js'
 // storage/authentication, built worker/UI and persistent browser profile.
 for (const mode of ['linked', 'existing', 'expired'])
 	test(`native ${mode} account survives two full offline browser restarts and reconnects`, async () => {
+		const started = performance.now()
+		const checkpoint = (stage: string) =>
+			console.info(
+				JSON.stringify({ mode, stage, elapsedMs: Math.round(performance.now() - started) })
+			)
 		const directory = await mkdtemp(join(tmpdir(), 'clipper-auth-offline-'))
 		let profile = join(directory, 'profile')
 		const origin = 'http://127.0.0.1:5190'
@@ -60,6 +65,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 				timeout: 30000
 			})
 			await expectLibrarySynced(page)
+			checkpoint('local library ready')
 			await expect
 				.poll(() => page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state))
 				.toBe('activated')
@@ -122,6 +128,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 			).toBe(user.id)
 			await page.reload()
 			await expectSignedInAccount(page)
+			checkpoint('signed in')
 			await expect(page.locator(`[data-article-id="${id}"]`)).toBeVisible()
 			const cookies = await context.cookies(origin)
 			const request = new Request(origin + '/api/auth/get-session', {
@@ -227,6 +234,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await coldBrowser.close()
 			}
 
+			checkpoint('cold authenticated reader verified')
 			if (mode === 'expired') {
 				const sessions = await authority.backend.db.all(
 					app.better_auth_session.where({ userId: user.id })
@@ -257,6 +265,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 				const settingsResponse = await page.reload()
 				expect(settingsResponse?.fromServiceWorker()).toBe(true)
 				await expectSignedInAccount(page)
+				checkpoint('offline account ready ' + restart)
 				if (restart === 0) {
 					await (
 						await openArticleActions(saved)
@@ -282,6 +291,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await readingControls(page)
 				await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
+				checkpoint('offline reader verified ' + restart)
 				if (restart === 0) await context.close()
 			}
 			authority = await start()
@@ -312,7 +322,9 @@ for (const mode of ['linked', 'existing', 'expired'])
 						.then((rows) => rows.length)
 				)
 				.toBeGreaterThan(0)
+			checkpoint('reconnected and reconciled')
 			if (mode === 'linked') {
+				checkpoint('signing out')
 				await test.step('sign out through the real auth handler', async () => {
 					const previous = signOutResponses.length
 					await openAccountSettings(page)
@@ -320,6 +332,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 						.getByRole('button', { name: 'Sign out', exact: true })
 						.click({ timeout: 10000 })
 					await expect.poll(() => signOutResponses.slice(previous)).toEqual([200])
+					checkpoint('provider signed out')
 				})
 				await expect(
 					page.getByRole('button', { name: 'Sign in with AT Protocol', exact: true })
@@ -353,9 +366,13 @@ for (const mode of ['linked', 'existing', 'expired'])
 				).toHaveCount(0)
 			}
 		} finally {
+			checkpoint('closing browser')
 			await context.close()
+			checkpoint('stopping UI server')
 			await ui.stop()
+			checkpoint('stopping authority')
 			if (authorityUp) await authority.stop()
+			checkpoint('cleanup settled')
 			await rm(directory, { recursive: true, force: true })
 		}
 	})
