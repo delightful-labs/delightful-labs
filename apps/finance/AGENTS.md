@@ -25,3 +25,8 @@ feature for financial, organization/access, provider-secret and persistence rule
 - The [v6 migration design](specs/013-local-first-startup/xstate-v6-migration.md)
   and active feature own current runtime qualification. Historical alpha.59/v5
   research is not current SDK/API syntax. Read exact installed docs before changes.
+- For application-worker work, start with [spec 013's handoff](specs/013-local-first-startup/spec.md#application-worker-migration-handoff),
+  its [W01–W21 backlog](specs/013-local-first-startup/worker-migration-tasks.md),
+  and [Local First/Clipper reuse and extraction](specs/013-local-first-startup/worker-foundation-reuse.md).
+  The selected import feature is historical; these records own the remaining
+  worker plan. Preserve one SDK owner and qualify shared extractions in both apps.

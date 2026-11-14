@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config'
 export default defineConfig({
 	test: {
+		exclude: ['**/*.svelte.test.ts'],
 		include: [
 			'apps/web/src/lib/**/*.test.ts',
 			'apps/web/tooling/**/*.test.ts',

@@ -105,6 +105,7 @@ type Meta = {
 	variant?: WorkflowMessage['variant']
 	priority?: number
 	message?: (c: Context) => WorkflowMessage
+	display?: true
 }
 function organizationStatuses(context: Context, documentId: string) {
 	return Object.entries(context.organizationOperations)
@@ -898,7 +899,12 @@ export const libraryMachine = setup({
 							}
 						},
 						failed: {
-							meta: { name: t('capture.status.failed'), variant: 'error', priority: 1 },
+							meta: {
+								name: t('capture.status.failed'),
+								variant: 'error',
+								channel: 'capture',
+								priority: 1
+							},
 							initial: 'active',
 							states: {
 								active: {
@@ -988,7 +994,8 @@ export const libraryMachine = setup({
 						saving: {
 							meta: {
 								name: t('capture.status.saving'),
-								variant: 'info'
+								variant: 'info',
+								channel: 'capture'
 							},
 							initial: 'active',
 							entry: (args, enq) => {
@@ -1106,24 +1113,34 @@ export const libraryMachine = setup({
 										return { target: 'local' }
 									}
 								},
-								local: { meta: { name: t('capture.status.saved'), variant: 'info' } },
+								local: {
+									meta: { name: t('capture.status.saved'), variant: 'info', channel: 'capture' }
+								},
 								duplicate: {
 									meta: {
 										name: t('capture.status.duplicate'),
 										variant: 'info',
-										channel: 'duplicate'
+										channel: 'capture',
+										display: true
 									}
 								},
-								synced: { meta: { name: t('capture.status.synced'), variant: 'info' } },
+								synced: {
+									meta: { name: t('capture.status.synced'), variant: 'info', channel: 'capture' }
+								},
 								rejected: {
 									meta: {
 										name: t('capture.status.rejected'),
 										variant: 'error',
-										channel: 'capture-problem'
+										channel: 'capture',
+										priority: 2,
+										display: true
 									}
 								},
 								background: {
-									meta: { message: (context) => required(context.background[context.captureId]) }
+									meta: {
+										channel: 'capture',
+										message: (context) => required(context.background[context.captureId])
+									}
 								}
 							}
 						},
@@ -1131,27 +1148,34 @@ export const libraryMachine = setup({
 							meta: {
 								name: t('capture.errors.invalid_url'),
 								variant: 'error',
-								channel: 'capture-problem'
+								channel: 'capture',
+								priority: 2,
+								display: true
 							}
 						},
 						failed: {
 							meta: {
 								name: t('capture.status.save_failed'),
 								variant: 'error',
-								channel: 'capture-problem'
+								channel: 'capture',
+								priority: 2,
+								display: true
 							}
 						},
 						uncertain: {
 							meta: {
 								name: t('capture.status.unknown'),
 								variant: 'error',
-								channel: 'capture-problem'
+								channel: 'capture',
+								priority: 2,
+								display: true
 							}
 						},
 						canceled: {
 							meta: {
 								name: t('capture.status.canceled'),
-								variant: 'info'
+								variant: 'info',
+								channel: 'capture'
 							}
 						}
 					}
@@ -1279,6 +1303,20 @@ function visibleLibrary(snapshot: LibrarySnapshot | undefined) {
 		snapshot.context.capability?.isCurrent() === true
 	)
 }
+/** State metadata owns both the detailed status and whether Add Link displays it. */
+function selectCaptureFeedback(snapshot: LibrarySnapshot | undefined) {
+	const states = visibleLibrary(snapshot) && snapshot ? Object.values(snapshot.getMeta()) : []
+	const forwarded = states.find((state) => state?.channel === 'capture' && state.message)
+	return {
+		status:
+			stateFeedback(states, 'capture') ??
+			(snapshot ? forwarded?.message?.(snapshot.context) : undefined),
+		message: stateFeedback(
+			states.filter((state) => state?.display),
+			'capture'
+		)
+	}
+}
 export function selectLibraryReaderExperience(snapshot: LibrarySnapshot | undefined) {
 	return selectReaderExperience(
 		visibleLibrary(snapshot) ? snapshot?.children.readerExperience?.getSnapshot() : undefined
@@ -1303,7 +1341,6 @@ export function selectLibraryReaderView(snapshot: LibrarySnapshot | undefined) {
 export function selectLibraryCaptureView(snapshot: LibrarySnapshot | undefined) {
 	const visible = visibleLibrary(snapshot)
 	const c = snapshot?.context
-	const meta = visible && snapshot ? Object.values(snapshot.getMeta()) : []
 	const captured =
 		visible && c?.captureId ? c.rows.find((row) => row.id === c.captureId) : undefined
 	return {
@@ -1312,8 +1349,7 @@ export function selectLibraryCaptureView(snapshot: LibrarySnapshot | undefined) 
 			visible &&
 			!!c?.capability?.spawnOrganization &&
 			!snapshot?.matches({ running: { organization: 'writing' } }),
-		duplicateMessage: stateFeedback(meta, 'duplicate'),
-		captureProblemMessage: stateFeedback(meta, 'capture-problem')
+		message: selectCaptureFeedback(snapshot).message
 	}
 }
 type RowView = { rows: LibraryArticle[]; readable: Record<string, boolean> }
@@ -1357,7 +1393,7 @@ export function selectLibraryView(
 		snapshot.status === 'active' &&
 		!!c.capability?.isCurrent()
 	const meta = visible ? Object.values(snapshot.getMeta()) : []
-	const forwardedState = meta.find((state) => state?.message)
+	const capture = selectCaptureFeedback(snapshot)
 	const search = selectSearchView(visible ? snapshot.children.search?.getSnapshot() : undefined)
 	const resultIds = search.query === c?.query ? search.ids : undefined
 	const captured = visible ? c.rows.find((row) => row.id === c.captureId) : undefined
@@ -1379,13 +1415,8 @@ export function selectLibraryView(
 			visible &&
 			!!c.capability?.spawnOrganization &&
 			!snapshot.matches({ running: { organization: 'writing' } }),
-		duplicateMessage: stateFeedback(meta, 'duplicate'),
-		captureProblemMessage: stateFeedback(meta, 'capture-problem'),
-		captureMessage:
-			stateFeedback(meta, 'capture-problem') ??
-			stateFeedback(meta) ??
-			stateFeedback(meta, 'duplicate') ??
-			(c ? forwardedState?.message?.(c) : undefined),
+		captureFeedback: capture.message,
+		captureMessage: capture.status,
 		readerMessage: !snapshot
 			? ({ text: t('reader.loading'), variant: 'info' } satisfies WorkflowMessage)
 			: visible

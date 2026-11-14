@@ -11,6 +11,56 @@ technical planning and implementation review remain outstanding
 service workers, known safe changes, remaining investigations, and conflicting project guidance.
 Ask product questions one at a time. Implement lower-risk local usability improvements first.
 
+## Application-worker migration handoff
+
+Updated 2026-11-13: the user requested a foundation-first migration task list,
+research against current monorepo code, and explicit Local First/Clipper reuse.
+The complete recorded backlog is
+[worker-migration-tasks.md](worker-migration-tasks.md), tasks **W01–W21**.
+It is the task source of truth for the application-worker migration; the earlier
+T-series in [tasks.md](tasks.md) remains startup/investigation history and work.
+No W-series implementation or acceptance is complete yet.
+
+| Order | Tasks | Outcome before dependent work |
+| --- | --- | --- |
+| Resource foundations | W01–W06 | Inventory/baseline, production worker import proof, reviewed native custody, shared storage/broker integration, and one qualified persistent SDK/session owner. |
+| Application/UI contracts | W07–W11 | Bounded commands/views, shutdown/replacement, worker-owned queries, form/feedback transport, and private native/file/secret capabilities. |
+| Shared application flows | W12–W15 | Worker-owned session/workspace/access and shell balances, then complete read-only and financial-write vertical slices. |
+| Feature migration | W16–W19 | Ledger/settings/transfers, images/attachments, explicit provider operations, and backup/restore/workspace administration with existing behavior preserved. |
+| Acceptance and activation | W20–W21 | Actual production/browser/offline/crash/performance qualification, full route parity, authorized cutover and removal of superseded owners. |
+
+The [reuse/extraction specification](worker-foundation-reuse.md) is part of this
+handoff. Reuse Local First's existing session, recovery, workspace, operation,
+transaction, worker-channel/drain, observation, form and backup workflows.
+Extract Clipper's reusable native close control (R1), scoped storage/Jazz broker
+adapters (R2), account-write custody mechanisms (R3) and disposable worker-job
+lifecycle (R4) into Local First, updating Clipper to consume the shared versions
+before Finance adoption. Keep domain schemas, permissions, financial/provider
+rules, article/reader behavior and app localization conventions with their apps.
+
+Read [worker-migration-research.md](worker-migration-research.md) for concrete
+source findings at verified monorepo `main` commit `eb0f615f`. Read
+[xstate-v6-migration.md](xstate-v6-migration.md) for the ownership contract and
+the [PR #67 salvage review](../../../../specs/002-monorepo-agent-guidance/finance-worker-pr67-review.md)
+for keep/adapt/leave decisions. Current code, dependency qualification and this
+backlog supersede historical artifact/version and migration-status assumptions.
+The renewed task planning does not authorize merging the old branch or certify
+its code for reuse.
+
+The main thread retains UI and narrow Window-only native capabilities. Domain
+ownership moves to workers, with one SDK/session owner per application tree.
+Foundation changes can land inactive; incomplete flows stay in an isolated
+preview until full parity. Never replace existing routes with a partial shell,
+add a second Window SDK for old consumers, or treat actor-stop custody as proof
+of safety after whole-worker termination. Native leases must outlive possible
+host writes. Preserve unknown outcomes, local-first durability, money semantics,
+explicit provider consent and existing archive compatibility.
+
+This records scope and execution order, not blanket implementation/test/release
+approval. Apply current repository and task-specific review gates. Update the
+W-series checklist and evidence after each accepted slice; do not infer completed
+work from historical test counts or planning documents.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Use available finances immediately (Priority: P1)
@@ -193,7 +243,8 @@ opened; separately exercise a partial download and unavailable attachment.
   The provenance mechanism, concurrent creation protocol, and recovery details require investigation
   and design review; this decision does not approve a specific bootstrap algorithm or automatic repair.
 - Existing native service-worker support and update consent remain the starting point. No Workbox
-  migration, database replacement, speculative background bank sync, or worker migration is assumed.
+  migration, database replacement, or speculative background bank sync is assumed. Application-worker
+  migration is tracked separately by the W01–W21 handoff above and must preserve these guarantees.
 - [research.md](research.md) captures technical evidence; [tasks.md](tasks.md) is a provisional backlog,
   not an execution-ready replacement for a reviewed technical plan.
 

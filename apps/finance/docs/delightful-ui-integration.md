@@ -344,6 +344,7 @@ their own descriptions, posting dates, currencies, and query-preserving links.
 
 The vendored snapshot is `vendor/delightful-ui-0.0.25-without-linked-list-row.tgz`.
 It includes the LinkedListRow removal and Text word-wrapping change while retaining
-RadioGroup, RadioItem, SwipeActions, SkipLink, and SkipButton from DUI main. The superseded radio-items
+RadioGroup, RadioItem, SwipeActions, SkipLink, and SkipButton from its historical DUI snapshot.
+The current workspace integration uses the public SkipControl export instead. The superseded radio-items
 archive is removed; the package version remains 0.0.25 and no registry release is
 required.

@@ -23,15 +23,15 @@ extraction are not planned tasks. Keep them in Finance and reconsider only when 
 a concrete need. The earlier app-specific candidate the user chose to skip remains excluded.
 This completion does not close unrelated historical review or accessibility-verification work.
 
-## SkipLink and SkipButton — reviewed, verified in connected Chrome
+## SkipControl
 
 This is a new extraction requested after the earlier batch closed. Share Finance's
 keyboard-revealed developer trigger presentation without transferring its diagnostics behavior.
-Provide separate native anchor and button components, consistent with the floating actions.
-SkipLink requires a caller-owned href; SkipButton defaults to type="button". Both receive
-caller-translated children and forward native attributes, events, class and style to the control.
+SkipControl defaults to a native anchor with a caller-owned href. For actions, pass a Svelte
+component such as `component={Button}`; that component owns native button behavior. The control
+receives caller-translated children and forwards native attributes, events, class and style.
 
-A private frame stays fixed at the logical top/start corner, clips its contents while unfocused,
+The top-level component stays fixed at the logical top/start corner, clips its contents while unfocused,
 and reveals them on focus-within. It uses existing spacing/background tokens with fallbacks.
 No hidden/inert state removes the control from keyboard navigation or assistive technology.
 Callers own document order, fragment targets, dialog state and focus restoration.

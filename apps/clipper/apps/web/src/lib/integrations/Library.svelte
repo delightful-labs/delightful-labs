@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte'
+	import { untrack } from 'svelte'
 	import { createAttachmentKey } from 'svelte/attachments'
 	import type { LibraryClient } from '../runtime/worker/client.js'
-	import type { LibraryRender } from '../runtime/worker/views.js'
 	import { Button, StatusMessage } from 'delightful-ui'
 	import LibrarySearch from '../components/library/LibrarySearch.svelte'
 	import LibraryFilters from '../components/library/LibraryFilters.svelte'
@@ -18,7 +17,8 @@
 		actor: LibraryClient
 		gatewayEnabled?: boolean
 	} = $props()
-	let snapshot = $state<LibraryRender>()
+	// The page keys Library by client; reads and intents share that exact scope.
+	const client = untrack(() => actor)
 	let heading = $state<HTMLHeadingElement>()
 	const headingAttachment = {
 		[createAttachmentKey()]: (element: Element) => {
@@ -31,94 +31,86 @@
 	let tagTrigger: HTMLElement | undefined
 	let tagArticleId = $state<string>()
 	let tagsOpen = $state(false)
-	const capture = $derived(snapshot?.filters)
-	const view = $derived(snapshot?.view ?? actor.getView().view)
-
-	onMount(() => {
-		snapshot = actor.getView()
-		const subscription = actor.subscribe((next) => (snapshot = next))
-		return () => subscription.unsubscribe()
-	})
+	const filterState = $derived($client.filters)
+	const view = $derived($client.view)
 </script>
 
-{#if capture}
-	<section aria-label={t('library.heading')}>
-		<div class="library-header">
-			<Heading level="h1" size="xl" {...headingAttachment}
-				>{t('library.heading')}</Heading
-			>
-			<LibraryFilterPopovers
-				searchLabel={action('search', 'article', 2)}
-				onsearch={() => actor.send({ type: 'SEARCH_OPEN' })}
-				filtersLabel={action('filter', 'article', 2)}
-			>
-				{#snippet search()}
-					<LibrarySearch
-						query={capture.query}
-						enabled={view.search.enabled}
-						onquery={(query) => actor.send({ type: 'QUERY', query })}
-					/>
-				{/snippet}
-				{#snippet filters()}
-					<LibraryFilters
-						view={capture.view}
-						favorites={capture.favorites}
-						tags={view.tags}
-						selectedTags={capture.selectedTags}
-						onfilter={(view, favorites) => actor.send({ type: 'FILTER', view, favorites })}
-						ontagfilter={(keys) => actor.send({ type: 'TAG_FILTER', keys })}
-					/>
-				{/snippet}
-			</LibraryFilterPopovers>
-		</div>
-		{#if view.search.message}<StatusMessage {...view.search.message} />{/if}
-		{#if view.search.canRetry}<Button
-				type="button"
-				onclick={() => actor.send({ type: 'RETRY_SEARCH' })}>{t('actions.retry')}</Button
-			>{/if}
-		{#if view.organizationMessage}<StatusMessage {...view.organizationMessage} />{/if}
-		{#if view.listMessage}<StatusMessage {...view.listMessage} />{/if}
-		{#if view.emptyMessage}<p>{view.emptyMessage.text}</p>{/if}
-		<ArticleList
-			rows={view.rows}
-			hasMore={snapshot?.hasMore ?? false}
-			onmore={() => actor.more()}
-			resetKey={JSON.stringify([
-				capture.query,
-				capture.view,
-				capture.favorites,
-				capture.selectedTags
-			])}
-			readable={view.readable}
-			enabled={view.canOrganize}
-			onorganize={(request) => actor.send({ type: 'ORGANIZE', request })}
-			onretry={(id) => actor.send({ type: 'RETRY', id })}
-			ontags={(row, trigger) => {
-				tagTrigger = trigger
-				tagArticleId = row.id
-				actor.editTags(row.id)
-				tagsOpen = true
-			}}
-			onemptyfocus={() => heading?.focus()}
-		/>
-	</section>
-	<div class="capture-control">
-		{#key actor}<AddLink {actor} />{/key}
+<section aria-label={t('library.heading')}>
+	<div class="library-header">
+		<Heading level="h1" size="xl" tabindex={-1} {...headingAttachment}
+			>{t('library.heading')}</Heading
+		>
+		<LibraryFilterPopovers
+			searchLabel={action('search', 'article', 2)}
+			onsearch={() => client.send({ type: 'SEARCH_OPEN' })}
+			filtersLabel={action('filter', 'article', 2)}
+		>
+			{#snippet search()}
+				<LibrarySearch
+					query={filterState.query}
+					enabled={view.search.enabled}
+					onquery={(query) => client.send({ type: 'QUERY', query })}
+				/>
+			{/snippet}
+			{#snippet filters()}
+				<LibraryFilters
+					view={filterState.view}
+					favorites={filterState.favorites}
+					tags={view.tags}
+					selectedTags={filterState.selectedTags}
+					onfilter={(view, favorites) => client.send({ type: 'FILTER', view, favorites })}
+					ontagfilter={(keys) => client.send({ type: 'TAG_FILTER', keys })}
+				/>
+			{/snippet}
+		</LibraryFilterPopovers>
 	</div>
-	<ArticleTags
-		{actor}
-		row={snapshot?.tagArticle && snapshot.tagArticle.id === tagArticleId
-			? snapshot.tagArticle
-			: view.rows.find((row) => row.id === tagArticleId)}
-		tags={view.tags}
+	{#if view.search.message}<StatusMessage {...view.search.message} />{/if}
+	{#if view.search.canRetry}<Button
+			type="button"
+			onclick={() => client.send({ type: 'RETRY_SEARCH' })}>{t('actions.retry')}</Button
+		>{/if}
+	{#if view.organizationMessage}<StatusMessage {...view.organizationMessage} />{/if}
+	{#if view.listMessage}<StatusMessage {...view.listMessage} />{/if}
+	{#if view.emptyMessage}<p>{view.emptyMessage.text}</p>{/if}
+	<ArticleList
+		rows={view.rows}
+		hasMore={$client.hasMore}
+		onmore={() => client.more()}
+		resetKey={JSON.stringify([
+			filterState.query,
+			filterState.view,
+			filterState.favorites,
+			filterState.selectedTags
+		])}
+		readable={view.readable}
 		enabled={view.canOrganize}
-		bind:open={tagsOpen}
-		onclose={() => {
-			actor.editTags(undefined)
-			if (!tagTrigger?.isConnected) heading?.focus()
+		onorganize={(request) => client.send({ type: 'ORGANIZE', request })}
+		onretry={(id) => client.send({ type: 'RETRY', id })}
+		ontags={(row, trigger) => {
+			tagTrigger = trigger
+			tagArticleId = row.id
+			client.editTags(row.id)
+			tagsOpen = true
 		}}
+		onemptyfocus={() => heading?.focus()}
 	/>
-{/if}
+</section>
+<div class="capture-control">
+	{#key client}<AddLink actor={client} />{/key}
+</div>
+<ArticleTags
+	actor={client}
+	row={$client.tagArticle && $client.tagArticle.id === tagArticleId
+		? $client.tagArticle
+		: view.rows.find((row) => row.id === tagArticleId)}
+	tags={view.tags}
+	enabled={view.canOrganize}
+	bind:open={tagsOpen}
+	onclose={() => {
+		client.editTags(undefined)
+		if (!tagTrigger?.isConnected) heading?.focus()
+	}}
+/>
 
 <style>
 	.library-header {

@@ -1,5 +1,12 @@
 # Local-first startup: first delivery plan
 
+For application-worker migration, use the
+[current spec handoff](spec.md#application-worker-migration-handoff),
+[ordered W01–W21 backlog](worker-migration-tasks.md), and
+[shared reuse/extraction specification](worker-foundation-reuse.md).
+The delivery plan below retains its original startup-slice baseline and evidence;
+it is not the new worker execution sequence.
+
 Status: T004 approved; T005 reviewed; focused unit checks, type checks, and the offline owner browser workflow passed.
 Base: `feature/local-first-startup-pr26`, stacked on PR #26.
 

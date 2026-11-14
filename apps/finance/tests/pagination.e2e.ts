@@ -86,6 +86,8 @@ test('global keyboard developer menu saves both sample kinds and retains progres
 		page.getByRole('main').getByRole('heading', { name: 'Accounts', exact: true })
 	).toBeVisible()
 	await page.keyboard.press('Tab')
+	await expect(page.getByRole('link', { name: 'Skip to main content', exact: true })).toBeFocused()
+	await page.keyboard.press('Tab')
 	const trigger = page.getByRole('button', { name: 'Developer menu', exact: true })
 	await expect(trigger).toBeFocused()
 	const box = await trigger.boundingBox()

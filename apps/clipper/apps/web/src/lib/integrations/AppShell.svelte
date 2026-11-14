@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { WorkflowMessage } from '../contracts/feedback.js'
 	import type { Snippet } from 'svelte'
+	import { SkipControl } from 'delightful-ui'
+	import { t } from '../localization/index.js'
 	import type { ReaderPreferences } from '../reader/schema.js'
 	import { setAccountSettings } from '../runtime/account-settings.js'
 	import { useWorkerLibrary } from '../runtime/worker/context.js'
@@ -49,8 +51,10 @@
 	})
 </script>
 
+<SkipControl href="#main-content">{t('navigation.skip_to_main_content')}</SkipControl>
+
 <div class="app-shell">
-	<main class="content">
+	<main id="main-content" class="content">
 		{@render runtimeFeedback()}
 		{@render children()}
 	</main>
