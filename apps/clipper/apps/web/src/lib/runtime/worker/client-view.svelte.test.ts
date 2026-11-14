@@ -194,6 +194,14 @@ it('hands pending annotations from scoped transport receipts to worker durabilit
 		}
 	}
 	f.binding.update(initial)
+	for (const command of [
+		{ type: 'OPEN', documentId: crypto.randomUUID(), text: 'Read only.' },
+		{ type: 'CLOSE' }
+	] satisfies import('../../annotations/schema.js').AnnotationCommand[]) {
+		f.client.send({ type: 'ANNOTATION', command })
+		expect(f.client.getView().view.annotations.pending).toBe(false)
+		expect(f.client.getView().view.annotations.message?.text).toBe('Previously synced')
+	}
 	f.client.send({
 		type: 'ANNOTATION',
 		command: {

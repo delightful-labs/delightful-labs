@@ -188,7 +188,10 @@ const clientMachine = setup({
 								(message.type === 'TAG_FORM' && message.event.type === 'SELECT')
 							return {
 								annotationPending:
-									message.type === 'LIBRARY' && message.event.type === 'ANNOTATION'
+									message.type === 'LIBRARY' &&
+									message.event.type === 'ANNOTATION' &&
+									message.event.command.type !== 'OPEN' &&
+									message.event.command.type !== 'CLOSE'
 										? [
 												...context.annotationPending,
 												{ id: message.requestId, scope: message.scope }
