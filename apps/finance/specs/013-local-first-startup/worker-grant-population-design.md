@@ -4,8 +4,11 @@ Status: the user selected approach A and approved F4c1's concrete implementation
 and tests on 2026-11-14. The shared native keeper extraction is qualified; the
 aggregate callback bridge/population remains next. Continue on
 [draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37).
-Remote `main` was refreshed on 2026-11-14 and remains `434a06ee`; the qualified
-F4b branch checkpoint is `868e1e32`.
+F4c1 was qualified against main `434a06ee` after F4b checkpoint `868e1e32`.
+PR #37 subsequently merges main `fca60ca0` on 2026-11-14; the
+[grant-owner handoff](worker-grant-owner-design.md) records the formatting-only
+conflict resolution and scoped merge checks. Earlier results keep their original
+baseline.
 
 The [single-grant design](worker-grant-owner-design.md) remains authoritative for
 F4a/F4b. This record makes the next callback ownership decision explicit before
