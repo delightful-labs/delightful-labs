@@ -6,7 +6,7 @@
 	import type { LibraryIntent } from '../../../lib/runtime/worker/protocol.js'
 	import { Button, Heading, StatusMessage } from 'delightful-ui'
 	import { t } from '../../../lib/localization/index.js'
-	import PageFrame from '../../../lib/integrations/PageFrame.svelte'
+	import AccountDrawer from '../../../lib/integrations/AccountDrawer.svelte'
 	import ReaderFootnotes from '../../../lib/integrations/ReaderFootnotes.svelte'
 	import ReaderSettingsDrawer from '../../../lib/components/reader/ReaderSettingsDrawer.svelte'
 	import ReaderActions from '../../../lib/components/reader/ReaderActions.svelte'
@@ -103,14 +103,17 @@
 			}
 		})
 	})
+	let accountDrawer: ReturnType<typeof AccountDrawer> | undefined = $state()
+	const accountControl = $derived(accountDrawer?.getControl())
 </script>
 
 <svelte:head
 	><title>{reader?.kind === 'available' ? reader.document.title : t('reader.heading')}</title
 	></svelte:head
 >
-<PageFrame focused={reading?.focused ?? false} showControl={false}>
-	{#snippet children(accountControl)}
+<div class="page-workspace">
+	<AccountDrawer bind:this={accountDrawer} open={false} focused={reading?.focused ?? false} />
+	<div class="page-content" inert={accountDrawer?.isModal() ?? false}>
 		{#if runtime.actor}
 			{#key runtime.actor}{#key page.params.id}
 					{#if reader?.kind === 'available' && view && reading}
@@ -136,7 +139,9 @@
 									<div class="reader-body" inert={settingsDrawer?.isModal() ?? false}>
 										{#if reading.message}<StatusMessage {...reading.message} />{/if}
 										<article>
-											<Heading level="h1" size="xxl">{reader.document.title}</Heading>
+											<header class="article-header">
+												<Heading level="h1" size="xxl" align="center">{reader.document.title}</Heading>
+											</header>
 											{#if article?.trashed}<ReaderActions
 													trashed={article?.trashed === true}
 													archived={article?.status === 'archive'}
@@ -196,10 +201,29 @@
 						/>{/if}
 				{/key}{/key}
 		{/if}
-	{/snippet}
-</PageFrame>
+	</div>
+</div>
 
 <style>
+	.page-workspace {
+		position: relative;
+		display: flex;
+		min-inline-size: 0;
+	}
+	.page-content {
+		flex: 1 1 0%;
+		min-inline-size: 0;
+	}
+	@media (max-width: 48rem) {
+		.page-workspace {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.page-content {
+			grid-area: 1 / 1;
+		}
+	}
+
 	footer {
 		display: flex;
 		justify-content: center;
