@@ -62,6 +62,9 @@ qualifies truthful SDK callback interruption and canonical request-byte contract
 after the user's separate implementation/test approval on 2026-11-14. Its linked
 record owns exact checks and results. The population/inbox and actual SDK
 integration are still pending, and W05 remains incomplete.
+The qualified checkpoint is uploaded at `dce092be` in
+[draft PR #39](https://github.com/delightful-labs/delightful-labs/pull/39);
+continue the bounded population/bridge on that PR.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
 [ownership specification](xstate-v6-migration.md), and

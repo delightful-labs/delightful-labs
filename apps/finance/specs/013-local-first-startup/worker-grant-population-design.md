@@ -6,6 +6,9 @@ aggregate callback bridge/population remains next.
 [PR #37](https://github.com/delightful-labs/delightful-labs/pull/37) is merged at
 main `4301afde` on 2026-11-14. Continue on
 `feat/finance-worker-grant-population`, based on that merge.
+The separately approved F4c2 checkpoint is uploaded in
+[draft PR #39](https://github.com/delightful-labs/delightful-labs/pull/39) at
+`dce092be`. Continue population/bridge work on that PR; W05 remains incomplete.
 F4c1 was qualified against main `434a06ee` after F4b checkpoint `868e1e32`.
 PR #37 subsequently merges main `fca60ca0` on 2026-11-14; the
 [grant-owner handoff](worker-grant-owner-design.md) records the formatting-only
