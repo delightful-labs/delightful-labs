@@ -12,6 +12,7 @@ export default defineConfig({
 	testIgnore: [
 		'**/pwa.e2e.ts',
 		'**/pwa-cold-start.e2e.ts',
+		'**/worker-bundle.e2e.ts',
 		'**/startup-stalled-remote.e2e.ts',
 		'**/debugging.e2e.ts',
 		'**/fake-data.e2e.ts'

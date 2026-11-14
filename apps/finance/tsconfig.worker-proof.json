@@ -1,0 +1,9 @@
+{
+	"extends": "./tsconfig.worker-host.json",
+	"include": [
+		"src/lib/runtime/worker/application.worker.ts",
+		"tooling/worker-proof-driver.ts",
+		"tooling/jazz-wasm.ts",
+		"vite.worker-proof.config.ts"
+	]
+}
