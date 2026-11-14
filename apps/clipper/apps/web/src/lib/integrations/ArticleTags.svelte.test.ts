@@ -58,6 +58,7 @@ function fixture(options: { error?: string; selected?: string; enabled?: boolean
 		view: selectLibraryView(undefined),
 		filters: { query: '', view: 'all', favorites: false, selectedTags: [] },
 		canAdd: true,
+		readerId: '',
 		reader: undefined,
 		readerProgress: undefined,
 		readerRevision: '',

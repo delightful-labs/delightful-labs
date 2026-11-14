@@ -3,7 +3,6 @@
 	import { useWorkerLibrary } from '../../../lib/runtime/worker/context.js'
 	import { untrack, tick } from 'svelte'
 	import type { LibraryClient } from '../../../lib/runtime/worker/client.js'
-	import type { LibraryRender } from '../../../lib/runtime/worker/views.js'
 	import type { LibraryIntent } from '../../../lib/runtime/worker/protocol.js'
 	import { Button, Heading, StatusMessage } from 'delightful-ui'
 	import { t } from '../../../lib/localization/index.js'
@@ -21,25 +20,29 @@
 	} from '../../../lib/reader/structure.js'
 	import ReaderTopNavigation from '../../../lib/components/reader/ReaderTopNavigation.svelte'
 
-	let snapshot = $state<LibraryRender>()
-	let detachSurface: (() => void) | undefined
+	// Observe only after OPEN for the exact client and URL in this reused route.
+	let binding = $state.raw<{ owner: LibraryClient; id: string }>()
+	let surface: { owner: LibraryClient; detach: () => void } | undefined
 	let headings = $state<ReaderHeading[]>([])
 	let footnote = $state<ReaderFootnote>()
 	const runtime = useWorkerLibrary()
 	const actor = $derived(runtime.actor)
 	const id = $derived(page.params.id ?? '')
+	const client = $derived(
+		binding && binding.owner === actor && binding.id === id ? binding.owner : undefined
+	)
 	const footnoteId = $props.id()
 	let accountDrawer: ReturnType<typeof AccountDrawer> | undefined = $state()
 	const accountControl = $derived(accountDrawer?.getControl())
 	let settingsDrawer: ReturnType<typeof ReaderSettingsDrawer> | undefined = $state()
 	let navigation: ReturnType<typeof ReaderTopNavigation> | undefined = $state()
-	const view = $derived(snapshot?.view ?? actor?.getView().view)
+	const view = $derived($client?.view)
 	const reading = $derived(view?.readerExperience)
-	const reader = $derived(snapshot?.reader)
-	const article = $derived(snapshot?.article)
-	const originalUrl = $derived(snapshot?.sourceUrl)
+	const reader = $derived($client?.readerId === id ? $client?.reader : undefined)
+	const article = $derived($client?.article)
+	const originalUrl = $derived($client?.sourceUrl)
 	function send(event: Extract<LibraryIntent, { type: 'READER_EVENT' }>['event']) {
-		actor?.send({ type: 'READER_EVENT', event })
+		client?.send({ type: 'READER_EVENT', event })
 	}
 
 	let showControls: ReturnType<typeof Button> | undefined = $state()
@@ -60,29 +63,34 @@
 	})
 
 	function archiveArticle() {
-		actor?.send({
+		client?.send({
 			type: 'ORGANIZE',
 			request: { id: article?.id ?? id, field: 'status', value: 'archive' }
 		})
 	}
 
 	function restoreArticle() {
-		actor?.send({
+		client?.send({
 			type: 'ORGANIZE',
 			request: { id: article?.id ?? id, field: 'trashed', value: false }
 		})
 	}
 
 	function ready(node: HTMLElement) {
-		if (reader?.kind !== 'available') return
+		if (reader?.kind !== 'available' || !client) return
 		headings = readerHeadings(node)
 		const scroller = node.closest('main')
-		if (scroller) detachSurface = actor?.attach({ root: node, scroller }, reader.document.id)
+		if (scroller)
+			surface = {
+				owner: client,
+				detach: client.attach({ root: node, scroller }, reader.document.id)
+			}
 	}
-	function release(owner: LibraryClient | undefined = actor) {
-		detachSurface?.()
-		detachSurface = undefined
-		owner?.send({ type: 'READER_EVENT', event: { type: 'DETACH' } })
+	function release() {
+		const previous = surface
+		surface = undefined
+		previous?.detach()
+		previous?.owner.send({ type: 'READER_EVENT', event: { type: 'DETACH' } })
 		headings = []
 		footnote = undefined
 	}
@@ -100,17 +108,15 @@
 	}
 	$effect(() => {
 		const owner = actor
-		const documentId = id
+		const routeId = id
 		if (!owner) return
 		return untrack(() => {
-			const subscription = owner.subscribe((value) => (snapshot = value))
-			owner.send({ type: 'OPEN', id: documentId })
-			snapshot = owner.getView()
+			owner.send({ type: 'OPEN', id: routeId })
+			binding = { owner, id: routeId }
 			return () => {
-				release(owner)
-				subscription.unsubscribe()
+				release()
 				owner.send({ type: 'CLOSE_READER' })
-				snapshot = undefined
+				binding = undefined
 			}
 		})
 	})
@@ -158,8 +164,8 @@
 										<SavedContent
 											asset={reader.asset}
 											imageViews={view.imageViews}
-											onretryimage={(id) => actor?.send({ type: 'RETRY_IMAGE', id })}
-											onimageerror={(id, url) => actor?.send({ type: 'IMAGE_ERROR', id, url })}
+											onretryimage={(id) => client?.send({ type: 'RETRY_IMAGE', id })}
+											onimageerror={(id, url) => client?.send({ type: 'IMAGE_ERROR', id, url })}
 											text={reader.text}
 											sourceUrl={originalUrl}
 											onready={ready}
@@ -201,7 +207,9 @@
 								document.getElementById(footnoteId)?.hidePopover()
 							}}
 						/>
-					{:else if view?.readerMessage}<StatusMessage {...view.readerMessage} />{/if}
+					{:else if $client?.readerId === id && view?.readerMessage}<StatusMessage
+							{...view.readerMessage}
+						/>{/if}
 				{/key}{/key}
 		{/if}
 	</div>
