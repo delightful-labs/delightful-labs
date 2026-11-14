@@ -6,22 +6,16 @@ import vercelAdapter from '@sveltejs/adapter-vercel'
 import { jazzDev } from './tooling/jazz-dev.js'
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
 import svg from '@poppanator/sveltekit-svg'
-import { dirname, join } from 'node:path'
-import { jazzWasmEntry } from './tooling/jazz-wasm.js'
+import { workerRuntimeBuildConfig } from './tooling/jazz-wasm.js'
 import { workerAssetsManifest } from './tooling/worker-assets-manifest.js'
 
 export default defineConfig({
+	...workerRuntimeBuildConfig(),
 	// A different page origin has different browser storage. Never silently change ports.
 	server: { host: '0.0.0.0', port: 5173, strictPort: true },
 	ssr: {
 		noExternal: ['jazz-tools'],
 		external: ['jazz-tools/backend', 'jazz-napi', '@vercel/functions', '@vercel/sandbox', 'ws']
-	},
-	resolve: {
-		alias: [
-			{ find: /^jazz-wasm$/, replacement: jazzWasmEntry },
-			{ find: /^#jazz-wasm-binary/, replacement: join(dirname(jazzWasmEntry), 'jazz_wasm_bg.wasm') }
-		]
 	},
 	// Vendored DUI updates must be loaded from the current package, not a cached bundle.
 	optimizeDeps: {

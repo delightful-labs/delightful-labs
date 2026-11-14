@@ -37,7 +37,7 @@ test.afterAll(async () => {
 })
 async function seed(page: Page, url = 'https://example.com/reader-experience') {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const id = await page.evaluate(async (url) => {
 		const path = '/tests/reader-driver.ts'
 		return (await import(/* @vite-ignore */ path)).seedReader(url)
@@ -72,7 +72,7 @@ async function phrase(page: Page) {
 
 async function codeReader(page: Page) {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await page.evaluate(async () => {
 		const path = '/tests/reader-driver.ts'
 		return (await import(/* @vite-ignore */ path)).seedReader(
@@ -293,13 +293,24 @@ test('retains offline reading settings and location through a complete browser r
 		await dialog.getByRole('radio', { name: 'Dark', exact: true }).check()
 		await closeReadingControls(page)
 		const paragraph = await readMiddle(page)
+		console.info(JSON.stringify({ readerCheckpoint: 'before drawer', paragraph }))
 		await controls(page)
+		console.info(
+			JSON.stringify({ readerCheckpoint: 'after drawer', paragraph: await visibleParagraph(page) })
+		)
 		await page.getByRole('link', { name: 'Open library', exact: true }).click()
 		await expect(page.locator(`[data-article-id="${id}"]`).getByText(/^\d+% read$/)).toBeVisible()
 		await context.close()
 		context = await chromium.launchPersistentContext(directory, { headless: true })
 		const reopened = await context.newPage()
 		await reopened.goto('http://127.0.0.1:5180/articles/' + id)
+		await expect(reopened.getByRole('article')).toBeVisible()
+		console.info(
+			JSON.stringify({
+				readerCheckpoint: 'after restart',
+				paragraph: await visibleParagraph(reopened)
+			})
+		)
 		await expect.poll(() => visibleParagraph(reopened)).toBe(paragraph)
 		const again = await controls(reopened)
 		await expect(again.getByRole('radio', { name: 'Dark', exact: true })).toBeChecked()
@@ -356,7 +367,7 @@ test('updates progress for a short article when a reading gesture cannot scroll 
 }) => {
 	await page.setViewportSize({ width: 1600, height: 1400 })
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const id = await page.evaluate(async () => {
 		const path = '/tests/reader-driver.ts'
 		return (await import(/* @vite-ignore */ path)).seedReader('https://example.com/short-reader', 1)

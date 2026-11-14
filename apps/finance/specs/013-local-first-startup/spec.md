@@ -19,11 +19,22 @@ The complete recorded backlog is
 [worker-migration-tasks.md](worker-migration-tasks.md), tasks **W01–W21**.
 It is the task source of truth for the application-worker migration; the earlier
 T-series in [tasks.md](tasks.md) remains startup/investigation history and work.
-No W-series implementation or acceptance is complete yet.
+W01's [ownership/parity inventory](worker-ownership-inventory.md) and
+[baseline evidence](worker-baseline.md) are complete at `670fb720` (2026-11-13).
+W02's [inactive build-only proof](worker-bundle-design.md) is complete after
+implementation/test approval: type/build checks, 35 focused unit tests and 19
+production browser cases pass. The user selected an IndexedDB AccountStore in
+Local First on 2026-11-13; W03's [revised design](worker-native-custody-design.md)
+replaces permanent Window account-storage/lock custody with native IDB
+transactions. The user explicitly excluded migration/old-version compatibility
+code, completing W03. W04's shared store is [qualified](worker-account-store-verification.md):
+1,111 unit tests and 60 native cases across three engines pass, including packed
+public export and cold browser-process reopen checks. W05 app adoption and
+W06–W21 remain unstarted. The application is still Window-owned.
 
 | Order | Tasks | Outcome before dependent work |
 | --- | --- | --- |
-| Resource foundations | W01–W06 | Inventory/baseline, production worker import proof, reviewed native custody, shared storage/broker integration, and one qualified persistent SDK/session owner. |
+| Resource foundations | W01–W06 | Inventory/baseline, production worker import proof, reviewed IndexedDB transaction ownership, shared AccountStore/broker integration, and one qualified persistent SDK/session owner. |
 | Application/UI contracts | W07–W11 | Bounded commands/views, shutdown/replacement, worker-owned queries, form/feedback transport, and private native/file/secret capabilities. |
 | Shared application flows | W12–W15 | Worker-owned session/workspace/access and shell balances, then complete read-only and financial-write vertical slices. |
 | Feature migration | W16–W19 | Ledger/settings/transfers, images/attachments, explicit provider operations, and backup/restore/workspace administration with existing behavior preserved. |
@@ -32,11 +43,13 @@ No W-series implementation or acceptance is complete yet.
 The [reuse/extraction specification](worker-foundation-reuse.md) is part of this
 handoff. Reuse Local First's existing session, recovery, workspace, operation,
 transaction, worker-channel/drain, observation, form and backup workflows.
-Extract Clipper's reusable native close control (R1), scoped storage/Jazz broker
-adapters (R2), account-write custody mechanisms (R3) and disposable worker-job
-lifecycle (R4) into Local First, updating Clipper to consume the shared versions
-before Finance adoption. Keep domain schemas, permissions, financial/provider
-rules, article/reader behavior and app localization conventions with their apps.
+Add the reusable IndexedDB AccountStore to Local First. Extract Clipper's native
+close control (R1), broker/generation adapter (remaining R2), applicable receipt
+mechanisms (R3) and disposable worker-job lifecycle (R4), qualifying shared
+consumers. Retire the permanent account-storage RPC rather than extract it as the
+new storage path. No legacy import, fallback, dual writes, source cleanup or
+old-version compatibility code is planned, per the user's explicit instruction. Keep domain schemas, permissions, financial/provider rules, article/reader
+behavior and app localization conventions with their apps.
 
 Read [worker-migration-research.md](worker-migration-research.md) for concrete
 source findings at verified monorepo `main` commit `eb0f615f`. Read
@@ -52,9 +65,11 @@ ownership moves to workers, with one SDK/session owner per application tree.
 Foundation changes can land inactive; incomplete flows stay in an isolated
 preview until full parity. Never replace existing routes with a partial shell,
 add a second Window SDK for old consumers, or treat actor-stop custody as proof
-of safety after whole-worker termination. Native leases must outlive possible
-host writes. Preserve unknown outcomes, local-first durability, money semantics,
-explicit provider consent and existing archive compatibility.
+of safety after whole-worker termination. Native IDB transaction evidence owns
+account-update settlement; any
+remaining Window effects retain actual native close/release requirements.
+Preserve unknown outcomes, local-first durability, money semantics, explicit
+provider consent and existing archive compatibility.
 
 This records scope and execution order, not blanket implementation/test/release
 approval. Apply current repository and task-specific review gates. Update the

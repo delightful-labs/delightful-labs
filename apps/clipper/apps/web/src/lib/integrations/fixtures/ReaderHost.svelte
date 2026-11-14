@@ -1,9 +1,32 @@
 <script lang="ts">
-	import Reader from '../Reader.svelte'
+	import { setContext } from 'svelte'
+	import ReaderPage from '../../../routes/articles/[id=article]/+page.svelte'
 	import type { LibraryClient } from '../../runtime/worker/client.js'
-	import { setAccountNavigation } from '../../runtime/navigation.js'
-	let { client, id }: { client: LibraryClient; id: string } = $props()
-	setAccountNavigation({ open: false })
+	import { workerLibraryContextKey } from '../../runtime/worker/context.js'
+	import { setAccountSettings } from '../../runtime/account-settings.js'
+	import { page } from './page.svelte.js'
+	let { client, id }: { client: LibraryClient | undefined; id: string } = $props()
+	setContext(workerLibraryContextKey, {
+		get actor() {
+			return client
+		}
+	})
+	setAccountSettings({
+		get controls() {
+			return controls
+		},
+		connectionMessage: undefined,
+		accountMessage: undefined
+	})
+	$effect.pre(() => {
+		page.params.id = id
+		page.url = new URL('/articles/' + id, 'https://example.invalid/')
+	})
+	export function navigate(owner: LibraryClient | undefined, articleId: string) {
+		client = owner
+		id = articleId
+	}
 </script>
 
-<main><Reader actor={client} {id} /></main>
+{#snippet controls()}<span>Account fixture</span>{/snippet}
+<main><ReaderPage /></main>

@@ -29,6 +29,7 @@
 		"microlighter": "2.2.0",
 		"minisearch": "7.2.0",
 		"svelte": "5.57.2",
+		"tdesign-icons-svg": "0.4.8",
 		"unicode-case-folding": "1.1.2",
 		"ws": "8.22.1",
 		"xstate": "6.0.0-beta.1",

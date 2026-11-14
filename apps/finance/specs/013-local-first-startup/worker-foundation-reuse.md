@@ -6,6 +6,19 @@ dependency details in the [ordered migration tasks](worker-migration-tasks.md).
 This document specifies extraction work; no application/library implementation
 has been moved or tested in this research change.
 
+## Selected storage architecture (2026-11-13)
+
+The user selected an IndexedDB AccountStore accessed directly in the application
+worker. The [W03 design](worker-native-custody-design.md) supersedes the earlier
+permanent localStorage/Window lease approach. Add the missing adapter and native
+transaction ownership in Local First; reuse its existing IDB/custody patterns.
+The user explicitly excluded migration and old-version compatibility code.
+Build no import, legacy fallback, dual writes, source cleanup or coordination.
+App/profile key configuration stays app-owned. R1 and the broker part of R2 remain applicable;
+the permanent account-storage RPC and remote-lock keeper are not mandatory
+extractions. Reuse their relevant receipt/failure scenarios rather than copy an
+obsolete storage architecture.
+
 ## Reuse existing Local First APIs directly
 
 The library at `packages/local-first` already supplies substantial foundations.
@@ -49,59 +62,62 @@ foreign-scope/version rejection, extra-port disposal, failed native close,
 duplicate close and late-receipt behavior. Do not equate disposing a control
 listener with native host closure.
 
-### R2. Scoped account-storage and Jazz broker transports
+### R2. Jazz broker transport; retire account-storage RPC
 
 Sources:
 [`scoped-storage-channel.ts`](../../../clipper/apps/web/src/lib/runtime/worker/scoped-storage-channel.ts)
-and [`broker-channel.ts`](../../../clipper/apps/web/src/lib/runtime/worker/broker-channel.ts),
-which already compose Local First's worker-channel machine and R1.
+and [`broker-channel.ts`](../../../clipper/apps/web/src/lib/runtime/worker/broker-channel.ts)
+compose Local First's worker-channel machine and R1.
 
-Move the fixed-key storage primitive/client and the SDK-specific
-`browserWorkerHost` broker/generation adapter to Local First. Keep a small,
-explicit browser-host integration and a Jazz-specific backend integration rather
-than a universal RPC framework. Consumers supply admitted bindings: current and
-permitted legacy keys, broker URL/name/generation namespace and native factories.
-The app must not provide arbitrary storage authority through a UI request.
+Extract the SDK-specific `browserWorkerHost` broker/generation adapter into Local
+First. Its native SharedWorker construction and generation primitives are distinct
+from the account-selection store. Keep the explicit browser-host and Jazz
+integration boundaries; consumers supply admitted URL/name/generation bindings.
+Do not silently migrate SDK generation keys to IndexedDB as part of AccountStore.
 
-Before sharing, reconcile differing admission guarantees: Finance currently binds
-the broker to an exact URL/base name and storage to specific primary/legacy keys;
-Clipper's broker checks same origin and Jazz-prefixed generation keys more broadly.
-The shared API must preserve Finance's narrower capability binding, not weaken
-it to the least restrictive source. Preserve close-before-bind revocation, FIFO
-effect admission, no replay of uncertain generation writes, disposal of every
-unaccepted transferred port and independent data/control lifetimes.
+Finance currently admits an exact broker URL/base name and generation key;
+Clipper admits same-origin URLs and Jazz-prefixed keys more broadly. Preserve
+Finance's narrower capability binding. Keep FIFO effect admission, no replay of
+uncertain generation writes, disposal of unaccepted transferred ports and
+independent data/control lifetimes. Adopt the shared broker in Clipper, then
+Finance; qualify both consumers and remove replaced implementations.
 
-Adopt these exports in Clipper first, then connect Finance's existing account
-selection/legacy charts through thin app-specific bindings. Remove superseded
-transport implementations after both consumers qualify.
+Do not extract the fixed-key account-storage RPC as the permanent shared store.
+The selected shared AccountStore directly uses IndexedDB in the worker. Do not
+extract a temporary import/compatibility subset: that work is explicitly out of
+scope. The new store never reads legacy account-selection records.
 
-### R3. Account-update custody and native lease integration
+### R3. Reuse receipt custody; add the IndexedDB AccountStore
 
 Sources:
 [`account-write-custody.ts`](../../../clipper/apps/web/src/lib/runtime/worker/account-write-custody.ts)
 and [`scoped-account-store.ts`](../../../clipper/apps/web/src/lib/runtime/worker/scoped-account-store.ts).
-The ledger records the original native write receipt before issuing it; a
-detached keeper can outlive a stopped/erroring actor and waits for settlement
-or host closure before releasing native custody. These mechanisms are not
-Clipper domain behavior and should live in Local First when shared.
+The receipt-before-issue ledger, total stop/error handoff and reentrant-disposal
+scenarios remain useful. Compare them with Local First's existing transaction
+custody before extracting another keeper. Extract only a concrete missing
+reusable receipt mechanism; no account payload or transform belongs in detached
+custody or public snapshots.
 
-Extract the narrow receipt ledger/keeper and SDK AccountStore composition after
-reviewing the crash-safe custody design in W03. Keep Finance's primary/earlier-key
-selection, cleanup rules and financial operation policy in Finance. Do not make
-Clipper's account key derivation (including `:clipper`) a library default.
+Do not port the worker-held Web Lock or Window-write pipeline into the new IDB
+adapter. Same-realm keepers cannot survive complete worker loss; native IDB
+transaction commit/abort and atomic reopen are the selected safety boundary.
+The new store must retain original native receipts through owner stop/error,
+refuse admission on close, acknowledge only transaction completion, and preserve
+unknown results without replay. See the [W03 contract](worker-native-custody-design.md).
 
-Important limit: `scopedAccountLock` acquires `navigator.locks` in the worker and
-the keepers live in that same realm. Its actor-stop/error tests do not establish
-survival of complete worker termination while Window still has queued writes.
-R3 must compose with W04's native lease/admission solution; copying it unchanged
-does not complete crash safety. Native lease identity and safe-close requirements
-belong in the shared primitive so both consumers can benefit from the correction.
+Do not port Finance's primary/earlier-key import or cleanup. SDK selection
+semantics remain SDK-owned within the new store. Clipper supplies its web and
+extension/offscreen bindings;
+`:clipper` and Finance's `dev` do not become library defaults. The shared adapter
+must serve both apps through supported public exports, without copying the
+complete Clipper owner or workspace/restore journal.
 
-Move applicable stopped-owner, reentrant disposal, dropped-acknowledgement,
-late-close, bounded-admission and release-receipt regression scenarios with the
-shared code. Keep/add app-level namespace, identity and domain regressions in
-each app. Whole-realm termination and competing-tab qualification remain separate
-native acceptance requirements.
+Move/adapt applicable stopped-owner, reentrant disposal, bounded-admission,
+unknown-result and late-settlement scenarios with the shared mechanism. Add
+native IDB abort-after-request-success, concurrency, termination and cold-reopen
+coverage; old remote-lock tests cannot substitute for it. Keep app-level identity,
+namespace and domain regressions in their respective apps. No legacy migration
+regressions or mixed-version compatibility machinery are planned.
 
 ### R4. Disposable browser-worker job
 
@@ -166,12 +182,14 @@ inspectable job context. Worker-side provider request decoding is still required
 
 1. **Inventory and contracts (W01/W03):** confirm existing public APIs, pick the
    smallest missing shared contract and define exact app capabilities.
-2. **R1 then R2 (W05):** library owns native close/storage/broker adapters;
-   update and qualify Clipper before Finance adoption. W02's inactive production
-   import probe can proceed independently.
-3. **R3 with W04/W05:** implement native crash-safe lease/admission at its shared
-   owner and adapt both apps; preserve app-specific account selection. Do not
-   activate Finance's SDK before this gate and W06 persistence qualification.
+2. **IndexedDB foundation (W04):** library owns the transactional AccountStore,
+   native receipts and bounded close. Reuse existing custody/IDB contracts;
+   qualify the public adapter before app adoption.
+3. **R1/R2 and adoption (W05):** extract remaining broker/close adapters and
+   qualify Clipper then Finance with app-specific IDB bindings. No migration
+   or old-version compatibility work is included. Retire account-storage RPC/remote locks after
+   qualification. R3 contributes applicable receipt mechanisms/scenarios, not a
+   required copy of its keeper. Activation still waits for W06.
 4. **R4 before W17/W18:** extract the disposable lifecycle and update Clipper;
    Finance adopts it per finite domain job. This is independent of R3's design.
 5. **W09/W10:** put reusable non-Svelte query/form boundary mechanisms in Local

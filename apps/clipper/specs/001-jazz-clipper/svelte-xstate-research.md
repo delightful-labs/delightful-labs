@@ -473,55 +473,59 @@ Svelte errors or warnings. The only type-check correction during development was
 explicitly narrowing the test's open-dialog query before calling close; no type
 assertions or production API changes were needed.
 
-## Reader native-subscription migration
+## Reader route native-subscription migration
 
-PR #27 merged at 02f886bec99721b5be06f76b3c85a7fbed6ec9d9; comparison with its
-final head reports no tree changes. The next branch is
-refactor/clipper-reader-subscription. The user's continuing cleanup instruction
-retains the implementation/testing/PR authorization for this bounded batch.
+PR #21 merged at ea460e9d999de55f9cc215f8a17bf20d85089aa4 after its native
+qualification passed. It moved reader composition into the SvelteKit route and
+removed integrations/Reader.svelte. PR #28 now applies the observation cleanup
+to that route and keeps the merged layout, drawer, focus and scrolling fixes.
+The user's conflict-resolution request retains the implementation/testing/PR
+update authorization for this bounded adaptation.
 
-Reader now captures the route-keyed client and article ID once, observes the
-existing LibraryClient contract through $client and derives render fields. The
-manual snapshot, subscribe/unsubscribe and fallback getView reads are removed.
-onMount still sends OPEN and owns release-before-CLOSE_READER; these are reader
-host effects, separate from Svelte's subscription cleanup. Surface detachers,
-footnotes and headings remain component-owned DOM concerns. Worker loading,
-reader generation, late-result rejection and persistence are unchanged.
+The reused route observes a single LibraryClient through native $client reads.
+An effect captures the current worker client and route ID, sends OPEN, and records
+that exact UI binding. Its cleanup releases the surface, sends CLOSE_READER to
+the captured owner and clears the binding. The derived client is immediately
+unavailable when either identity changes. This replaces the manual snapshot,
+subscribe/unsubscribe and getView fallback without copying worker workflow state.
+The binding records that OPEN was sent; the worker retains command admission,
+loading, reader generation, late-result rejection and persistence ownership.
 
-The render DTO now exposes the existing library context readerId. Reader renders
-content and reader feedback only when that article ID matches its route. A prior route's cached
-content cannot be attached just because native subscriptions expose an initial
-view immediately. This compares article identity, not content document identity:
-several articles can resolve to one saved document, and a direct read need not
-have an article in the currently published list. The surface still attaches with
-reader.document.id, while organization falls back to the captured route ID.
-A small UI mount guard defers content creation until onMount has sent OPEN.
-This preserves the old surface ordering even when the initial view already has
-matching content; native subscriptions alone create that child surface before
-the parent onMount callback. The guard observes component mounting only. No
-worker loading/operation state is mirrored and no selector wrapper was added.
+The render DTO exposes the existing library context readerId. Reader content and
+feedback are rendered only when it matches the route. A cached prior route's
+content cannot attach during initial observation. This uses the route ID rather
+than the reader payload's document ID; direct reads also work without a visible
+list row. Surface attachment continues to use reader.document.id, and organization
+falls back to the route ID. Native observation begins only after OPEN has been
+sent for that exact client/URL, preserving the original surface ordering.
 
-Six tests mount Reader with its real ReaderView, SavedContent and DUI children.
-They cover OPEN/subscription count, worker messages, direct reads, route
-correlation, correct surface document identity, archive/preference intents,
-progress/preference updates preserving saved DOM and selection, release before
-content replacement, unavailable teardown and release before CLOSE_READER.
-Old-client publications after unmount cannot update the new account's reader;
-native store cleanup releases the observation without stopping the application.
-The fixture supplies account navigation context and a main scroller. Narrow
-jsdom media-query/dialog/popover substitutes do not establish native viewport,
-modal/popover, browser navigation or final-position persistence guarantees.
+Each DOM surface retains its actual client owner with its native detacher.
+Content replacement, route changes and account replacement release that lease
+and send DETACH to the client that attached it. Repeated DOM/effect cleanup does
+not detach a new client's surface. Footnotes and headings remain UI concerns.
+No selector wrapper, new dependency, UI copy or worker shutdown change is added.
 
-The 76 affected Node tests and all 20 mounted Svelte tests pass. The Node suites
-cover the library, reader drain, experience, viewport/surface and worker client.
-Validation uses the isolated checkout with its own matching artifacts. Local
-Node remains 25.2.1 instead of pinned 24.22.2. The established listener restriction
-leaves native browser/offline qualification for CI or a capable environment; C3
-remains unchecked. No new dependencies, product copy or worker shutdown change.
+Eight tests mount the actual reader route with its real children. Six retain the
+original cases for initial/loading/available projections, route correlation,
+direct reads, correct surface document identity, archive/preference intents,
+DOM/selection continuity, content replacement, unavailable teardown and close
+ordering. Two new cases reuse the same route across clients, unavailable context
+and new bindings, and change route IDs on one client. They verify subscription
+cleanup, stale data/feedback rejection, OPEN-before-attach and exact surface
+ownership. The fixture supplies worker/account contexts and reactive SvelteKit
+page state. Narrow jsdom media-query/dialog/popover substitutes still do not
+establish native viewport, modal/popover or final-position persistence guarantees.
 
-The route-correlation regression fails against the original Reader: it renders
-Previous route and its saved content while OPEN is awaiting the worker update.
-A further mount-order assertion exposed an attach-before-OPEN regression with
-preloaded matching content; the UI mount guard fixes it. Full coordinator, web,
-service-worker and extension type checks pass with zero Svelte errors/warnings.
-Touched-source formatting, test lint and whitespace checks pass.
+All 25 mounted Svelte tests pass. The 76 affected Node tests cover the library,
+reader drain, experience, viewport/surface and worker client. Checks use the
+isolated checkout and matching rebuilt UI/DLF artifacts after a frozen offline
+install. Local Node remains 25.2.1 rather than pinned CI Node 24.22.2. Local native
+listeners and Chromium launch are denied, so native qualification runs on CI.
+C3 remains unchecked until that evidence is recorded for this adaptation.
+
+The reused-route account replacement regression fails against the pre-migration
+route because the incoming client receives DETACH around OPEN while old DOM is
+being released. The scoped surface owner fixes that cross-client cleanup. The
+restored route passes all eight cases. Full coordinator, web, service-worker and
+extension type checks pass with zero Svelte errors/warnings. Touched source
+formatting, lint, peer-link and whitespace checks pass.

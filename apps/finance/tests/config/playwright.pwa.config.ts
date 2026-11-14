@@ -5,7 +5,7 @@ export default defineConfig({
 	...base,
 	fullyParallel: false,
 	testIgnore: [],
-	testMatch: ['pwa.e2e.ts', 'pwa-cold-start.e2e.ts'],
+	testMatch: ['pwa.e2e.ts', 'pwa-cold-start.e2e.ts', 'worker-bundle.e2e.ts'],
 	workers: 1,
 	timeout: 60_000,
 	expect: { timeout: 15_000 },

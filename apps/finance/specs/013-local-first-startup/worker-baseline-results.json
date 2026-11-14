@@ -1,0 +1,165 @@
+{
+	"sourceCommit": "670fb720e15b15a4b308408c92301bd29a943561",
+	"date": "2026-11-13",
+	"environment": {
+		"node": "24.22.2",
+		"pnpm": "10.28.0",
+		"os": "Darwin 25.6.0",
+		"architecture": "arm64",
+		"browser": "Chromium",
+		"browserPackage": "Playwright 1.64.0",
+		"performanceSamples": 1
+	},
+	"checks": [
+		{
+			"name": "workspace-links",
+			"command": ["pnpm", "monorepo:check-links"],
+			"exitCode": 0,
+			"elapsedSeconds": 0.14
+		},
+		{
+			"name": "finance-check",
+			"command": ["pnpm", "finance:check"],
+			"exitCode": 0,
+			"elapsedSeconds": 20.09
+		},
+		{
+			"name": "test-types",
+			"command": ["pnpm", "--filter", "delightful-finances", "check:tests"],
+			"exitCode": 0,
+			"elapsedSeconds": 3.99
+		},
+		{
+			"name": "finance-build",
+			"command": ["pnpm", "finance:build"],
+			"exitCode": 0,
+			"elapsedSeconds": 8.57
+		},
+		{
+			"name": "finance-unit",
+			"command": ["pnpm", "finance:test"],
+			"exitCode": 0,
+			"elapsedSeconds": 28.97
+		},
+		{
+			"name": "pwa-browser",
+			"command": ["pnpm", "--filter", "delightful-finances", "test:pwa"],
+			"exitCode": 130,
+			"elapsedSeconds": 169.57
+		},
+		{
+			"name": "pwa-same-origin-build",
+			"command": ["pnpm", "finance:build"],
+			"exitCode": 0,
+			"elapsedSeconds": 6.74
+		},
+		{
+			"name": "pwa-smoke",
+			"command": [
+				"pnpm",
+				"--filter",
+				"delightful-finances",
+				"exec",
+				"playwright",
+				"test",
+				"--config",
+				"tests/config/playwright.pwa.config.ts",
+				"--grep",
+				"precaches emitted worker Wasm",
+				"--max-failures",
+				"1"
+			],
+			"exitCode": 0,
+			"elapsedSeconds": 2.92
+		},
+		{
+			"name": "pwa-baseline",
+			"command": [
+				"pnpm",
+				"--filter",
+				"delightful-finances",
+				"exec",
+				"playwright",
+				"test",
+				"--config",
+				"tests/config/playwright.pwa.config.ts",
+				"--workers",
+				"1",
+				"--max-failures",
+				"1"
+			],
+			"exitCode": 0,
+			"elapsedSeconds": 38.63
+		},
+		{
+			"name": "backup-none-baseline",
+			"command": [
+				"pnpm",
+				"--filter",
+				"delightful-finances",
+				"exec",
+				"playwright",
+				"test",
+				"--config",
+				"tests/config/playwright.workspace.config.ts",
+				"--grep",
+				"downloads and independently reopens a Finance none backup without changing source",
+				"--workers",
+				"1",
+				"--max-failures",
+				"1"
+			],
+			"exitCode": 0,
+			"elapsedSeconds": 13.45
+		}
+	],
+	"unit": {
+		"filesPassed": 142,
+		"testsPassed": 1940
+	},
+	"productionPwa": {
+		"passed": 16,
+		"failed": 0,
+		"reproduction": "same-origin ephemeral Jazz, existing production PWA config"
+	},
+	"backupRestore": {
+		"passed": 1,
+		"failed": 0,
+		"transactions": 521,
+		"protection": "none",
+		"measurements": [
+			{
+				"name": "finance-backup-measurement",
+				"measurement": {
+					"protection": "none",
+					"records": 536,
+					"attachmentBytes": 8,
+					"fileBytes": 1051291,
+					"totalExportAndOpenMs": 1088,
+					"longestMainThreadTaskMs": 74
+				}
+			},
+			{
+				"name": "finance-restore-measurement",
+				"measurement": {
+					"protection": "none",
+					"transactions": 521,
+					"totalRestoreMs": 1549
+				}
+			}
+		]
+	},
+	"rejectedSetup": {
+		"check": "pwa-browser",
+		"cause": "Build-only environment pointed at absent loopback backend; corrected to existing CI same-origin ephemeral configuration before smoke and full suite.",
+		"failed": 10,
+		"interrupted": 1,
+		"notRun": 5,
+		"exitCode": 130,
+		"countsAreNotProductRegressionEvidence": true
+	},
+	"observations": [
+		"Backup/dev fixture emitted an HTTP 401 backend-user response and ignored-event diagnostics; assertions passed. This is not a warning-free runtime claim.",
+		"One desktop dev-server data sample; not worker CPU/memory profiling, broad feature/browser qualification, or a production startup budget."
+	]
+}

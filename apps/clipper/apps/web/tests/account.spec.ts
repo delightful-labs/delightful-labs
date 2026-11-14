@@ -1,5 +1,6 @@
 import { openArticleActions } from './article-actions.js'
 import {
+	expectLibrarySynced,
 	openAccountSettings,
 	openAllArticles,
 	readRecoveryPhrase,
@@ -55,7 +56,7 @@ test('starts locally without signup, reloads and restores the same account into 
 	})
 	await expect(page.getByRole('button', { name: 'Create account', exact: true })).toHaveCount(0)
 	await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	await page.reload()
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await expect(page.getByText('Private library synced.', { exact: true })).toHaveCount(0)
@@ -108,7 +109,7 @@ test('retains the account and library after closing every page and browser proce
 	try {
 		const page = await context.newPage()
 		await page.goto('http://127.0.0.1:5180')
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		await authority.stop()
 		await context.close()
 		// Persistent-context close exits its browser process, including its workers.
@@ -150,7 +151,7 @@ test('saves new content offline, restarts the browser, and syncs to a restored p
 	try {
 		const page = await context.newPage()
 		await page.goto('http://127.0.0.1:5180')
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		const phrase = await readRecoveryPhrase(page)
 		const restored = await independent.newPage()
 		await restored.goto('http://127.0.0.1:5180')
@@ -212,7 +213,7 @@ test('authenticates capture requests with the existing account and rejects missi
 	request
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const missing = await request.post('/api/capture/resolve')
 	expect(missing.status()).toBe(401)
 	expect(await missing.json()).toEqual({ code: 'sessionUnavailable', retryable: false })
@@ -412,7 +413,7 @@ test('UI Add Link saves automatically with the authority offline, survives a ful
 		const page = await context.newPage()
 		await fixtureArticle(page, () => authority.stop())
 		await page.goto('http://127.0.0.1:5180')
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		const phrase = await readRecoveryPhrase(page)
 		const restored = await independent.newPage()
 		await restored.goto('http://127.0.0.1:5180')
@@ -504,7 +505,7 @@ test('background extraction stays quiet and leaves the saved URL and form usable
 
 test('reader displays the exact text of a plain text Article', async ({ page }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const result = await page.evaluate(async () => {
 		const path = '/tests/storage-driver.ts'
 		const { save } = await import(/* @vite-ignore */ path)
@@ -731,7 +732,7 @@ test('the article save operation accepts supplied content without fetching the U
 		await route.abort()
 	})
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const result = await page.evaluate(async () => {
 		const path = '/tests/article-driver.ts'
 		return (await import(/* @vite-ignore */ path)).supplied('https://example.com/supplied')
@@ -756,7 +757,7 @@ test('a worker resumes a URL-only article after complete browser restart', async
 			await route.abort().catch(() => {})
 		})
 		await page.goto('http://127.0.0.1:5180')
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		await openAddLink(page)
 		await page.getByLabel('Article URL', { exact: true }).fill(url)
 		await page
@@ -853,7 +854,7 @@ test('moves account controls to their own page with shared sidebar links and ret
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expectLibrarySynced(page)
 	const drawer = page.locator('aside')
 	await expect(drawer.locator('input, textarea, form')).toHaveCount(0)
 	await expect(drawer.getByRole('link', { name: 'All articles', exact: true })).toHaveAttribute(
@@ -892,12 +893,16 @@ test('mobile account navigation closes the drawer and restores keyboard focus on
 	await expect(drawer).toHaveAttribute('aria-hidden', 'true')
 	await page.getByRole('button', { name: 'Show account', exact: true }).click()
 	await expect(drawer).toHaveAttribute('aria-hidden', 'false')
-	await expect(page.locator('main')).toHaveAttribute('inert', '')
+	await expect(
+		page.getByRole('region', { name: 'Saved articles', includeHidden: true }).locator('..')
+	).toHaveAttribute('inert', '')
 	await drawer.getByRole('link', { name: 'account', exact: true }).focus()
 	await page.keyboard.press('Escape')
 	await expect(drawer).toHaveAttribute('aria-hidden', 'true')
 	await expect(page.getByRole('button', { name: 'Show account', exact: true })).toBeFocused()
-	await expect(page.locator('main')).not.toHaveAttribute('inert', '')
+	await expect(
+		page.getByRole('region', { name: 'Saved articles' }).locator('..')
+	).not.toHaveAttribute('inert', '')
 	await openAccountSettings(page)
 	await expect(drawer).toHaveAttribute('aria-hidden', 'true')
 	await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
@@ -933,7 +938,7 @@ test('Add link is available only on the landing page, including after reader rel
 	page
 }) => {
 	await page.goto('/')
-	await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await expect(page.getByRole('button', { name: 'Add link', exact: true })).toBeVisible()
 	await page.evaluate(async () => {
 		const path = '/tests/article-driver.ts'

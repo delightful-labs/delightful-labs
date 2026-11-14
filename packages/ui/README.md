@@ -85,25 +85,29 @@ The compact app typography scale uses `--dui-font-size-xs` (0.75rem), `--dui-fon
 <Button text={cancelLabel} />
 ```
 
-Labels are caller-provided strings or child snippets. Button no longer accepts locale objects or reads UIProvider; absent content has no generic English fallback. Provide an accessible label for every button. To use an SVG icon, place its path inside `Icon`; icons are decorative by default and hidden from assistive technology. If the SVG itself conveys meaning, provide `label` for an `aria-label`, `title` for a native SVG `<title>`, or `aria-labelledby` referencing visible text. For an icon-only button, label the button with its action and leave the icon decorative.
+Labels are caller-provided strings or child snippets. Button no longer accepts locale objects or reads UIProvider; absent content has no generic English fallback. Provide an accessible label for every button. Use premade icons from `tdesign-icons-svg` through `Icon`'s `icon` prop. Icons are decorative by default; label an icon-only button with its action.
 
 ```svelte
-<Button>
-	<Icon style="width: 1em; height: 1em; vertical-align: -0.125em;">
-		<path d="M5 12h14M13 6l6 6-6 6" />
-	</Icon>
-	Continue
+<script lang="ts">
+	import ArrowRightIcon from 'tdesign-icons-svg/src/arrow-right.svg?component'
+</script>
+
+<Button aria-label={continueLabel}>
+	<Icon icon={ArrowRightIcon} width="24" height="24" />
 </Button>
 ```
 
-Use a 24×24 viewBox unless the source SVG specifies otherwise. The consuming app supplies the SVG paths; `Icon` provides shared SVG defaults and accessibility behavior.
+Button exposes `focus(options?: FocusOptions)` through `bind:this`. It forwards to the mounted native button and safely does nothing before mounting or after destruction. Native disabled-button focus behavior is preserved. Keep component references local instead of finding buttons by ID; IDs still serve accessibility relationships such as `aria-controls`.
 
 ```svelte
-<Icon label="Warning">
-	<path d="M12 3 2 21h20L12 3Z" />
-	<path d="M12 9v4m0 4h.01" />
-</Icon>
+<script lang="ts">
+	let button: ReturnType<typeof Button> | undefined = $state()
+</script>
+
+<Button bind:this={button}>{saveLabel}</Button>
 ```
+
+Call `button?.focus({ preventScroll: true })` from an event handler or an effect after the button mounts.
 
 Field labels render exactly as supplied. Native `required` validation remains; supply your own translated visible marker in the label when needed. Shared `--dui-color-error` adapts invalid styling to the explicit light/dark themes.
 
@@ -671,6 +675,10 @@ Pass `steps` and `currentStep`; plain `step.label` remains the default visible l
 ```
 
 ## Drawer
+
+Drawer also exposes reactive `isOpen()`, `toggle()`, and `close()` methods through its component reference. Without an `open` binding, Drawer owns its open state. Existing `open` / `bind:open` callers remain supported. `onopenchange(open)` reports actual open-state changes before the DOM update, including method calls, Escape dismissal, and bound updates; it does not report an initially closed drawer. Keep layout notifications in this callback rather than duplicating the open state in the caller.
+
+Drawer owns a stable generated panel ID by default and preserves an explicit `id` prop when supplied. Bind a component reference with `bind:this` and use `drawer?.getId()` for a trigger's `aria-controls`. The method returns the current panel ID, including a reactive explicit override; callers do not need to generate and pass a separate ID.
 
 Use `closeControl(close, label)` to replace the default close button. Render an accessibly named native control and invoke the supplied callback; `label` is the translated `closeLabel`. Drawer retains panel visibility, scoped Escape and focus restoration. `showCloseButton={false}` hides the custom control too. Default close-button sizing applies only to the default button, leaving custom markup locally styleable.
 
