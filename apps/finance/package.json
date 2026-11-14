@@ -13,6 +13,8 @@
 		"pretest:unit": "pnpm paraglide",
 		"pretest:e2e": "pnpm paraglide",
 		"build": "vite build",
+		"build:worker-proof": "vite build --config vite.worker-proof.config.ts",
+		"check:worker-proof": "tsc --project tsconfig.worker-proof.json --noEmit",
 		"preview": "vite preview",
 		"prepare": "pnpm paraglide && FINANCE_PREVIEW=true svelte-kit sync",
 		"check": "FINANCE_PREVIEW=true svelte-kit sync && FINANCE_PREVIEW=true svelte-check --tsconfig ./tsconfig.json && tsc --project src/service-worker/tsconfig.json --noEmit",

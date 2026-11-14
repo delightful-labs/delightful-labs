@@ -63,6 +63,7 @@ console.log(`Development projects: ${canonical.length} unique scenarios`)
 const isolatedSuites = {
 	'pwa.e2e.ts': 'pwa',
 	'pwa-cold-start.e2e.ts': 'pwa',
+	'worker-bundle.e2e.ts': 'pwa',
 	'startup-stalled-remote.e2e.ts': 'startup',
 	'debugging.e2e.ts': 'debug',
 	'fake-data.e2e.ts': 'fake-data'

@@ -46,7 +46,7 @@ declaration overrides and broad actor casts are outside this migration.
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Window UI tree                      | DUI interaction, dialogs/input, focus, navigation, browser history, file picking, camera/canvas surfaces, WebAuthn/user verification, PWA registration/update UI. Keep browser capabilities behind owned host adapters. |
 | Application worker                  | One SDK/session owner; workspace access, initialization and domain query ownership; account/transaction/import/write coordination; operation identity, eligibility, settlement, draining and projected views.           |
-| Window storage/broker host          | Required localStorage primitives and SharedWorker opening for the exact patched Jazz runtime. It does not become a second independent Jazz/domain owner.                                                                |
+| Window storage/broker host          | SharedWorker/broker primitives only. The user selected a worker-accessible IndexedDB AccountStore and excluded legacy migration/compatibility work; W03 owns the transaction contract. No second SDK/domain owner.                                                                |
 | Existing disposable provider worker | HTTP/decode/validation for one explicitly requested SimpleFIN operation. Keep it until consolidation into the domain worker is separately justified and qualified. It does not own Jazz or passkeys.                    |
 
 ```mermaid

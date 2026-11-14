@@ -145,6 +145,7 @@ jobs:
       - run: pnpm --filter delightful-local-first check:consumer
       - run: pnpm --filter delightful-local-first build-storybook
       - run: pnpm --filter delightful-local-first check:native-backup
+      - run: pnpm --filter delightful-local-first test:account-store
       - run: pnpm --filter delightful-local-first exec tsc --project fixtures/private-creation/tsconfig.json
       - run: pnpm --filter delightful-local-first exec vitest run --config fixtures/private-creation/vitest.config.ts
       - run: pnpm --filter delightful-local-first check:backup-restore

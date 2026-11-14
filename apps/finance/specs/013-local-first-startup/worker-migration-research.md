@@ -22,6 +22,18 @@ identifies existing library APIs to consume and four concrete native foundations
 to extract from Clipper into Local First. Shared extraction and Clipper adoption
 precede Finance integration; domain policies remain app-owned.
 
+## Subsequent storage decision (2026-11-13)
+
+The user selected a custom IndexedDB AccountStore in Local First, accessed by
+the worker. The [W03 design](worker-native-custody-design.md) and current backlog
+supersede this source review's assumption that permanent Window account storage
+requires a new native lease service. The split-lifetime finding below explains
+the old design's risk; direct IDB transactions remove that steady-state boundary.
+The user explicitly excluded legacy identity migration, source cleanup,
+fallback/dual writes and old-version/rollback compatibility code.
+R1 and broker/generation extraction remain applicable; permanent storage RPC and
+remote-lock custody are no longer required extractions.
+
 ## Findings that determine dependency order
 
 ### 1. Current startup and domain ownership are still in Window
