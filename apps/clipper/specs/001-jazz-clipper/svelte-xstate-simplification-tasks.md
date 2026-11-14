@@ -7,8 +7,8 @@ initial useSelector adapter experiment; XState remains the workflow owner.
 The user authorized all remaining implementation and tests in PR #31 together
 on 2026-11-14, including multiple components/routes for one review. No dependency
 or copy changes are implied. [Completion evidence and decisions](svelte-xstate-completion.md)
-reconcile the historical pending notes below; final native checks remain open
-until the expanded PR qualification passes.
+reconcile the historical research below. All checklist items are qualified;
+completion evidence is recorded in Clipper CI run 43555941668.
 
 ## A. Establish the design and evidence
 
@@ -56,12 +56,11 @@ research; no shutdown change proceeds with an unresolved safety justification.
       isolated checkout after building matching UI/DLF artifacts.
       Final native-subscription coverage replaces the six adapter tests with five
       mounted Svelte tests; 51 affected Node tests also pass (56 total).
-- [ ] B4. Verify the actual browser capture flow and failure feedback, not only
+- [x] B4. Verify the actual browser capture flow and failure feedback, not only
       the adapter. Record subscription behavior and limitations of the probe.
-      Attempted selected account/capture Playwright cases on isolated ports
-      5198/5199. Environment refused the server listen with EPERM; no browser
-      cases executed. Browser qualification remains open, including discovery
-      duplicate/restore and invalid-source feedback cases.
+      Qualified in PR #31 native account/discovery suites: offline capture and
+      restart, duplicate/Restore and invalid-source feedback. Earlier local
+      listeners on 5198/5199 were refused with EPERM; CI supplies native evidence.
 - [x] B5. Consolidate Add Link status display in the owning capture states.
       Capture state metadata declares text, severity, display eligibility and
       status priority. Remove separate frontend duplicate/error messages and
@@ -80,22 +79,24 @@ Exit: accepted pilot with no custom selector framework or lifecycle regression.
 
 ## C. Apply the established observation pattern
 
-- [ ] C1. Migrate `ArticleTags` in its own review cycle; preserve write feedback,
+- [x] C1. Migrate `ArticleTags` in its own review cycle; preserve write feedback,
       dialog dismissal and focus recovery, including an article leaving filters.
       Implemented: direct $client.tagForm reads and scoped commands;
       removed the fallback that substituted an XState field error into DUI's
       native chip announcement. Validation already belongs to the invalid state.
       User reviewed and approved tests/PR. Twelve Node regressions and eight
       mounted Svelte tests pass; full web/extension types pass. The stale-error
-      regression fails against the original component. Native browser validation
-      of Escape/focus/filter behavior remains pending, so C1 is not yet qualified.
-- [ ] C2. Migrate `Library` in its own review cycle; preserve search/filter state,
+      regression fails against the original component. Native Escape, focus,
+      keyboard chips and filter-removal behavior pass in PR #31 discovery tests.
+- [x] C2. Migrate `Library` in its own review cycle; preserve search/filter state,
       pagination, row focus after removal and tag-editor continuity.
       Implemented on refactor/clipper-library-subscription: direct $client reads
       and scoped intents, with the initial current view rendered immediately.
       Six mounted integration tests cover filters/search, pagination focus,
       tag-editor continuity/closure, row-removal focus and replacement cleanup.
-      Native browser qualification remains pending; no domain actor change.
+      Native combined filters/search, removal focus and tag-editor behavior pass
+      in PR #31, including new real pagination focus/search continuity coverage.
+      No domain actor change.
 - [x] C3. Migrate reader observation in its own review cycle; preserve document
       identity, open/close commands, late-report rejection and content revisions.
       Implemented in the reader route after #21 moved composition there. Native
@@ -127,10 +128,10 @@ each batch before running them.
 - [x] D3. Implement the bounded change with standard invocation/cancellation/
       cleanup where sufficient. Preserve a minimal closing workflow only where
       asynchronous settlement is actually required.
-- [ ] D4. After review/test approval, qualify cancellation during acquisition,
+- [x] D4. After review/test approval, qualify cancellation during acquisition,
       issued writes, close failures, overdue close and late completion as relevant.
       Include actual SDK/worker behavior, not just mock acknowledgments.
-- [ ] D5. Qualify abrupt termination separately from graceful closure: the same
+- [x] D5. Qualify abrupt termination separately from graceful closure: the same
       offline library reopens, acknowledged durable edits remain, unknown outcomes
       reconcile without automatic mutation replay. Report unproven guarantees.
 
@@ -166,10 +167,10 @@ incidentally. Each change gets appropriate reviewed validation.
 
 ## F. Close the work with an honest qualification record
 
-- [ ] F1. Run approved scoped formatting, lint and type checks, then affected
+- [x] F1. Run approved scoped formatting, lint and type checks, then affected
       integration/browser/offline checks. Include extension callers if shared
       host/client protocols changed. Use isolated fixtures and preserve user data.
-- [ ] F2. Record exact package versions, decisions, removed duplication, test
+- [x] F2. Record exact package versions, decisions, removed duplication, test
       evidence, remaining custom lifecycle boundaries and unresolved limitations.
 - [x] F3. Update active integration guidance to describe the qualified pattern.
       Keep the migration feature selector unchanged unless explicitly reassigned.
@@ -185,5 +186,9 @@ not reset DOM/selection. E6 uses createContext and removes nested drawer access.
 D1–D3 simplify only offline-shell observer cleanup; D2 needs no policy exception.
 The worker/SDK/transaction closure audit retains ownership where native evidence
 does not justify removal. See the completion review for exact source/evidence.
-B4/C1/C2/D4/D5/F1/F2 remain unchecked only until the final expanded CI results are
-recorded; their implementation/tests and qualification map are present.
+B4/C1/C2/D4/D5/F1/F2 are qualified by expanded Clipper CI run 43555941668 on
+4ad5351804b43680535d69c097efb3b03a065c33: all 897 Node tests and 30 mounted
+component tests, types/build, web, worker, production offline, sample-data and
+packaged-extension suites pass. Ordinary observer cleanup was simplified;
+retained persistence/session boundaries and unproven power-loss guarantees are
+explicit dispositions, not pending checklist implementation.

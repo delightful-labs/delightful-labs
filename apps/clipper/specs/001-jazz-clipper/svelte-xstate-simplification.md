@@ -1,8 +1,11 @@
 # Svelte and XState integration simplification
 
-Status: Draft for review, 2026-11-13. This authorizes no implementation,
-dependency installation, policy exception or release. Tasks are tracked in
-[the companion checklist](svelte-xstate-simplification-tasks.md).
+Status: Implemented and qualified in PR #31. See the
+[completion review](svelte-xstate-completion.md) for final decisions, ownership,
+source/native evidence and limits, and the
+[completed checklist](svelte-xstate-simplification-tasks.md). The initial research
+and alternatives below are retained as design history. This document supplies no
+additional dependency, policy-exception or release authorization.
 
 ## Problem and intended result
 

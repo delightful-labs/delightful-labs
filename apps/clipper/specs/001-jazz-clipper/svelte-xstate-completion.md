@@ -149,4 +149,13 @@ full local unit run had 837 passing tests but native server fixtures failed to
 bind with EPERM (and their dependent timeouts); it is not a passing full run.
 Do not retry restricted listeners or weaken those tests. The complete unit,
 web/worker/offline/sample-data and packaged-extension suites run on PR #31 CI.
-Final run links and outcomes will be recorded here and in the PR after completion.
+[Expanded Clipper qualification](https://github.com/delightful-labs/delightful-labs/actions/runs/43555941668)
+passes on `4ad5351804b43680535d69c097efb3b03a065c33`: 897 Node tests, 30 mounted
+component tests, full types/build, native web/pagination, worker, production
+offline, sample-data and packaged-extension suites. All associated Foundation,
+Finance and PR-title checks also pass. The production offline case explicitly
+terminates the actual application worker, exits the browser process and reopens
+from service-worker cached assets with servers stopped and HTTP cache cleared;
+all previous data, position, settings, image, search and reconciliation checks
+remain. All B–F tasks are closed with the dispositions above. This final
+qualification-record update changes documentation only.
