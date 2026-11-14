@@ -86,6 +86,7 @@ it('namespaces footnotes and backlinks, removes unresolved fragments and avoids 
 		`#${ids[1]}`,
 		`#${ids[0]}`
 	])
+	expect(fragment.querySelector('[id]')?.getAttribute('tabindex')).toBe('-1')
 })
 it('falls back to text for unavailable, unrelated, malformed, oversized or empty HTML assets', () => {
 	const doc = document()

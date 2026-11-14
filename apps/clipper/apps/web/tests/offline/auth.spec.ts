@@ -1,5 +1,10 @@
 import { openArticleActions } from '../article-actions.js'
-import { openAccountSettings, openAllArticles, expectSignedInAccount } from '../account-ui.js'
+import {
+	expectLibrarySynced,
+	openAccountSettings,
+	openAllArticles,
+	expectSignedInAccount
+} from '../account-ui.js'
 import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
 import { chromium, expect, test } from '@playwright/test'
@@ -53,7 +58,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 			await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible({
 				timeout: 30000
 			})
-			await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+			await expectLibrarySynced(page)
 			await expect
 				.poll(() => page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state))
 				.toBe('activated')

@@ -1,10 +1,26 @@
 import { expect, type Page } from '@playwright/test'
 
 async function followSidebarLink(page: Page, name: string) {
-	const toggle = page.locator('.account-toggle')
+	const toggle = page.getByRole('button', { name: /^(Show|Close) account$/ })
 	await expect(toggle).toBeVisible()
 	if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
-	await page.getByRole('link', { name, exact: true }).click()
+	await page
+		.getByRole('complementary', { name: 'account', exact: true })
+		.getByRole('link', { name, exact: true })
+		.click()
+}
+
+export async function expectLibrarySynced(page: Page) {
+	const toggle = page.getByRole('button', { name: /^(Show|Close) account$/ })
+	await expect(toggle).toBeVisible()
+	const wasClosed = (await toggle.getAttribute('aria-expanded')) === 'false'
+	if (wasClosed) await toggle.click()
+	await expect(
+		page
+			.getByRole('complementary', { name: 'account', exact: true })
+			.getByText('Private library synced.', { exact: true })
+	).toBeVisible()
+	if (wasClosed) await toggle.click()
 }
 
 export async function openAccountSettings(page: Page) {

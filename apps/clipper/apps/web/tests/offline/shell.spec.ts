@@ -1,5 +1,5 @@
 import { openArticleActions } from '../article-actions.js'
-import { readRecoveryPhrase, restoreAccount } from '../account-ui.js'
+import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from '../account-ui.js'
 import { closeLibraryPopovers, openLibrarySearch, openLibraryFilters } from '../library-popovers.js'
 import { openAddLink } from '../add-link.js'
 import { readingControls, closeReadingControls, visibleReadingParagraph } from '../reader-ui.js'
@@ -148,7 +148,7 @@ test('production shell and DLF account restart with web and Jazz servers stopped
 		await page.goto('http://127.0.0.1:5190')
 		await ready(page)
 		const preparedMs = Math.round(performance.now() - started)
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		const wasmRequests = ui.requests.filter((request) => request.path.endsWith('.wasm'))
 		expect(wasmRequests).toHaveLength(1)
 		console.info(
@@ -612,7 +612,7 @@ test('first-install failure admits the DLF account path and retry prepares offli
 				exact: true
 			})
 		).toBeVisible({ timeout: 45000 })
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		expect((await page.evaluate(() => caches.keys())).some((name) => name.startsWith(prefix))).toBe(
 			false
 		)
@@ -622,7 +622,7 @@ test('first-install failure admits the DLF account path and retry prepares offli
 			.getByRole('button', { name: 'Retry', exact: true })
 			.click()
 		await ready(page)
-		await expect(page.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(page)
 		await expect(page.getByRole('button', { name: 'Create account', exact: true })).toHaveCount(0)
 	} finally {
 		ui.failWorker(false)

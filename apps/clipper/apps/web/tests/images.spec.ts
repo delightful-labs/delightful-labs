@@ -1,4 +1,4 @@
-import { readRecoveryPhrase, restoreAccount } from './account-ui.js'
+import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from './account-ui.js'
 import { readingControls } from './reader-ui.js'
 import { openAddLink } from './add-link.js'
 import type { ArticleImage } from '../src/lib/images/schema.js'
@@ -302,7 +302,7 @@ test('persists processed native images across restart without Jazz and synchroni
 		const restored = await independent.newPage()
 		await restored.goto('http://127.0.0.1:5180/')
 		await restoreAccount(restored, phrase)
-		await expect(restored.getByText('Private library synced.', { exact: true })).toBeVisible()
+		await expectLibrarySynced(restored)
 		await restored.getByRole('link', { name: 'Offline image fixture', exact: true }).click()
 		await imageLoaded(restored, 'Saved image 1', 24)
 		await authority.stop()

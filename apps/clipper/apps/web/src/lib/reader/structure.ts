@@ -7,6 +7,7 @@ export function readerHeadings(root: HTMLElement): ReaderHeading[] {
 			const text = element.textContent?.trim()
 			if (!text) return []
 			if (!element.id) element.id = `reader-heading-${crypto.randomUUID()}-${index}`
+			element.setAttribute('tabindex', '-1')
 			return [{ id: element.id, text, level: Number(element.tagName.slice(1)) }]
 		}
 	)

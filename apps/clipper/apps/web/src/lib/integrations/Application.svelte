@@ -39,6 +39,7 @@
 	let client: ReturnType<typeof openApplicationClient> | undefined
 	let bound: ReturnType<ReturnType<typeof openApplicationClient>['library']> | undefined
 	let failed = $state(false)
+	const needsRuntimeFeedback = $derived(failed || view?.requiresReload || view?.canRetry)
 	setContext(workerLibraryContextKey, {
 		get actor() {
 			return library
@@ -100,7 +101,7 @@
 		>{/if}
 {/snippet}
 {#snippet runtimeFeedback()}
-	{#if failed || view?.requiresReload || view?.canRetry}
+	{#if needsRuntimeFeedback}
 		<div class="runtime-feedback">
 			{#if view?.message.text}<StatusMessage {...view.message} />{/if}
 			{@render retryControls()}
@@ -168,7 +169,7 @@
 		controls,
 		children,
 		view?.connectionMessage,
-		view?.message,
+		needsRuntimeFeedback ? undefined : view?.message,
 		runtimeFeedback
 	)}{:else}{@render controls()}{@render children()}{/if}
 
