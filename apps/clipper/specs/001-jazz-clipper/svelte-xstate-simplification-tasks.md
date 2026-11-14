@@ -93,7 +93,7 @@ Exit: accepted pilot with no custom selector framework or lifecycle regression.
       Six mounted integration tests cover filters/search, pagination focus,
       tag-editor continuity/closure, row-removal focus and replacement cleanup.
       Native browser qualification remains pending; no domain actor change.
-- [ ] C3. Migrate reader observation in its own review cycle; preserve document
+- [x] C3. Migrate reader observation in its own review cycle; preserve document
       identity, open/close commands, late-report rejection and content revisions.
       Implemented in the reader route after #21 moved composition there. Native
       $client reads replace manual snapshots/subscriptions. A scoped UI binding
@@ -101,10 +101,15 @@ Exit: accepted pilot with no custom selector framework or lifecycle regression.
       Eight mounted route tests cover initial/loading/available data, direct reads,
       DOM/selection continuity, content replacement, feedback, in-place route and
       client replacement, unavailable context and exact surface cleanup ownership.
-      Native browser qualification for this adaptation remains pending.
-- [ ] C4. Remove superseded active helpers only after locating consumers. Trace
-      older `Account.svelte`/library context separately; do not delete fixtures or
-      compatibility paths merely because the active layout does not import them.
+      Qualified in merged PR #28: all native Clipper CI jobs passed, including
+      web, worker, production offline and packaged-extension flows (run
+      43546948705). Local mounted cases remain separate from native evidence.
+- [x] C4. Remove superseded active helpers only after locating consumers.
+      Removed the unused Window-owned `Account.svelte` and `library-context.ts`
+      after repository source, fixture, configuration and export searches found
+      no consumers. The layout now names its worker-backed `Application` clearly.
+      Worker/extension application machines, selectors and historical evidence
+      remain; those have real consumers and separate resource ownership.
 
 Exit: each migrated component has one clear observation lifetime; no stale data
 or application restart on route changes. Review and approve affected checks for

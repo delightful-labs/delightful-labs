@@ -529,3 +529,33 @@ being released. The scoped surface owner fixes that cross-client cleanup. The
 restored route passes all eight cases. Full coordinator, web, service-worker and
 extension type checks pass with zero Svelte errors/warnings. Touched source
 formatting, lint, peer-link and whitespace checks pass.
+
+## Retire the superseded Window account integration (C4)
+
+PR #28 merged at `f3cc946a3e6bbd89dd367191c0ccec3fb859ca15` with all checks
+passing. Its [Clipper qualification run](https://github.com/delightful-labs/delightful-labs/actions/runs/43546948705)
+completed the web, worker, production offline, sample-data and packaged-extension
+suites on pinned CI Node 24.22.2. This closes the pending native reader evidence
+above; jsdom results alone still do not prove native behavior.
+
+The remaining older `integrations/Account.svelte` created the application actor
+on Window, subscribed manually and provided `runtime/library-context.ts`. A full
+repository search of source, tests, fixtures, config, package exports and dynamic
+import patterns found no consumer of that component. Its context had only that
+provider and no `useLibrary` consumer. The private web package exports neither.
+The active layout already imported `integrations/Application.svelte`; renaming
+its local `Account` alias to `Application` makes the actual boundary explicit.
+
+Remove only the unused component and context. The active application opens its
+worker client from `onMount`; `worker/host-machine.ts` owns the application
+readiness machine, and `host-observation.ts` observes its library/recovery bindings.
+The extension runtime and sign-in machine also consume these application APIs.
+Those machines, selectors, native cleanup, fixtures and tests remain required.
+The historical extension-startup review remains a record of the older design.
+This cleanup adds no workflow, lifecycle policy, dependency or user-facing copy.
+
+Local validation: complete Clipper coordinator, web, service-worker and extension
+type checks pass with zero Svelte errors/warnings. Touched Svelte formatting,
+lint and whitespace checks pass. No new behavior tests are added for removal of
+unreachable code. Existing CI qualifications cover the active worker application;
+local validation used Node 25.2.1, while CI uses pinned Node 24.22.2.
