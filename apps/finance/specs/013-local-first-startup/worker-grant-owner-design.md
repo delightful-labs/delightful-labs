@@ -6,6 +6,12 @@ are recorded below.
 F1/F2's earlier results remain qualified historical checkpoints, not test results
 for this refactoring. W05/W06 and production activation remain incomplete.
 
+The checkpoint is uploaded in
+[PR #35](https://github.com/delightful-labs/delightful-labs/pull/35). Its branch
+now includes main `d279e7ef` (runtime-client direction and Clipper Svelte/lifecycle
+updates). Results below retain their actual `ea460e9d` source baseline; draft
+status distinguishes this saved checkpoint from refreshed integration acceptance.
+
 ## Ownership and the concrete missing contract
 
 The SDK's existing `browserWorkerHost` callbacks remain unchanged. A single

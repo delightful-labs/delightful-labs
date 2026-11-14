@@ -28,6 +28,13 @@ qualification. Actual SDK/native-capability integration and app storage adoption
 remain pending. The [SDK binding decision](worker-sdk-binding-decision.md) selects
 separate exact grants through existing callbacks, with no new Jazz patch.
 W06–W21 implementation remains unstarted.
+The qualified R1/R2 and F1–F3 checkpoint is uploaded in
+[PR #35](https://github.com/delightful-labs/delightful-labs/pull/35). Its branch
+was subsequently refreshed to main `d279e7ef`, preserving the merged runtime-client
+direction and Clipper Svelte/lifecycle changes. The local qualification counts
+above and in the detailed records retain their `ea460e9d` baseline. PR #35 stays
+draft pending refreshed integration checks; this refresh does not imply new
+runtime activation or completion of W05/W06.
 Detailed implementation designs remain subject to their review gates.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
