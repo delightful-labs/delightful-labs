@@ -26,7 +26,7 @@ export async function expectLibrarySynced(page: Page) {
 export async function openAccountSettings(page: Page) {
 	if (new URL(page.url()).pathname !== '/account') await followSidebarLink(page, 'account')
 	await expect(
-		page.getByRole('main').getByRole('heading', { name: 'account', exact: true })
+		page.getByRole('main').getByRole('heading', { name: 'account', level: 1, exact: true })
 	).toBeVisible()
 }
 

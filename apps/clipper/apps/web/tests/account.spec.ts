@@ -938,7 +938,7 @@ test('Add link is available only on the landing page, including after reader rel
 	page
 }) => {
 	await page.goto('/')
-	await expectLibrarySynced(page)
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await expect(page.getByRole('button', { name: 'Add link', exact: true })).toBeVisible()
 	await page.evaluate(async () => {
 		const path = '/tests/article-driver.ts'

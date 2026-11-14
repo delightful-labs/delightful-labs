@@ -1,10 +1,5 @@
 import { openArticleActions } from '../article-actions.js'
-import {
-	expectLibrarySynced,
-	openAccountSettings,
-	openAllArticles,
-	expectSignedInAccount
-} from '../account-ui.js'
+import { expectLibrarySynced, openAccountSettings, expectSignedInAccount } from '../account-ui.js'
 import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
 import { chromium, expect, test } from '@playwright/test'
@@ -255,8 +250,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await openAccountSettings(page)
 				const settingsResponse = await page.reload()
 				expect(settingsResponse?.fromServiceWorker()).toBe(true)
-				await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
-				await openAllArticles(page)
+				await expectSignedInAccount(page)
 				if (restart === 0) {
 					await (
 						await openArticleActions(saved)
