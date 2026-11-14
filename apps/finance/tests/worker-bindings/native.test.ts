@@ -99,6 +99,31 @@ function retainOnFailure() {
 
 for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
 	describe(engine, () => {
+		it('decodes actual worker grant transfers, keeps refusal distinct from uncertainty and preserves both port paths', async () => {
+			retainOnFailure()
+			const browser = await browserType.launch({ headless: true })
+			try {
+				const context = await browser.newContext(),
+					page = await boot(context)
+				const result = await page.evaluate(() =>
+					window.financeBindingFixture.qualifyGrantProtocol()
+				)
+				for (const [report, frameType] of [
+					[result.acquisition, 'ACQUIRE_GRANT'],
+					[result.refused, 'GRANT_REFUSED'],
+					[result.uncertain, 'GRANT_UNCERTAIN'],
+					[result.ready, 'GRANT_READY']
+				] satisfies [typeof result.ready, string][])
+					expect(report).toMatchObject({
+						type: 'RESULT',
+						value: { kind: 'valid', frameType, ...result.identity }
+					})
+				expect(result.invalid).toMatchObject({ type: 'RESULT', value: { kind: 'invalid' } })
+				expect(result.echoes).toEqual(['data', 'control'])
+			} finally {
+				await browser.close()
+			}
+		})
 		it('serializes canonical worker bindings, isolates profiles and closes the original store', async () => {
 			retainOnFailure()
 			const browser = await browserType.launch({ headless: true })

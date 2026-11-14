@@ -1,28 +1,27 @@
 # Worker-owned Jazz grant lifecycle
 
-Current slice: F3 exposes the shared broker channel for ordinary child ownership.
-The user approved its implementation tests on 2026-11-14; qualification results
-are recorded below.
-F1/F2's earlier results remain qualified historical checkpoints, not test results
-for this refactoring. W05/W06 and production activation remain incomplete.
+Current slice: F4a defines the private grant binding/acquisition contract before
+the grant-owner machines use it. The user approved its concrete implementation
+and tests on 2026-11-14; the qualification below passes. F1–F3 and the close
+correction retain their own historical evidence. W05/W06 and production activation
+remain incomplete; the single-grant owning chart is next.
 
-The checkpoint is uploaded in
-[PR #35](https://github.com/delightful-labs/delightful-labs/pull/35). Its branch
-now includes main `d279e7ef` (runtime-client direction and Clipper Svelte/lifecycle
-updates). Results below retain their actual `ea460e9d` source baseline. All
-hosted Foundation, Finance and Clipper workflows passed at checkpoint `bde9b78d`;
-subsequent review changes require fresh checks on their uploaded head.
+The user merged [PR #35](https://github.com/delightful-labs/delightful-labs/pull/35)
+on 2026-11-14 at main `434a06ee`. The follow-up branch
+`feat/finance-worker-grant-owner` is fast-forwarded to that merge, including PR
+#34's Markdown-only CI/build selection. F3 results below retain their actual
+`ea460e9d` source baseline; the close correction records its own refreshed evidence.
 
 PR review identified hidden native disposal/acknowledgement failures in the
 shared close adapter. The [close correction](../../../../packages/local-first/docs/worker-host-close.md#pr-35-review-correction-explicit-native-failure-facts)
-is addressed on PR #35's integration branch before grant-owner work continues.
+was addressed in merged PR #35 before grant-owner work continued.
 The user approved the concrete implementation and its tests on 2026-11-14.
 Its own qualification passes 1,170 library tests (87 focused), all public package
 consumers, 2,006 Finance unit/12 native-browser cases and Clipper's 872 unit,
 30 component, 32 worker, 12 extension and eight production-offline cases. The
 linked correction record preserves the new model-oracle failure/replay and
 sandbox startup failures. F3's historical qualification below remains separate.
-The grant-owner follow-up branch must include this correction before new work.
+The grant-owner follow-up includes this correction.
 
 ## Ownership and the concrete missing contract
 
@@ -67,6 +66,112 @@ classification, request deadlines, malformed/late port custody, host-close
 correlation and blocked/overdue lifetime. An invoked child's ordinary completion
 contains a genuine host-close receipt. Forced parent stop is not graceful close;
 the application owner must keep the child invoked until that receipt arrives.
+
+## F4a: private grant binding and acquisition contract
+
+This first ownership prerequisite defines facts and validation only. It does
+not introduce a second owner, callback registry, Window workflow or native I/O.
+The existing generation/broker adapters consume the same extracted binding
+schemas, preserving their exact-key/full-name/same-origin admission and error
+messages. Their exported types remain available from `broker-host.ts`.
+
+`runtime/worker/grant-binding.ts` owns the generation/broker descriptor union,
+canonical same-origin HTTP(S) URL validation and copied native bindings. Its
+`financeGrantKey` calculation encodes the runtime generation plus exact descriptor
+as a JSON tuple, so separators inside SDK-supplied names/keys cannot alias another
+grant. The future owner must validate/canonicalize before calling this key
+calculation. No private SDK namespace or generation algorithm is reconstructed.
+
+`runtime/worker/grant-protocol.ts` defines a separate private version-1 protocol.
+Every frame includes UUID `runtimeId`, `grantId` and `acquisitionId`. The grant ID
+is the native channel scope; the actual close request ID is independently supplied
+by the worker owner when invoking the existing shared channel. This keeps an
+acquisition report distinct from a successful host-close receipt.
+
+| Frame             | Native observation and required resources                                                              | Owning-chart consequence in the next slice                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `ACQUIRE_GRANT`   | Exact generation or broker descriptor; no transferred ports.                                           | Admit once under the runtime's bounded population and retain the acquisition identity.                                        |
+| `GRANT_READY`     | Exactly two distinct declared data/control ports, transferred in that order.                           | Consume only the matching acquisition; invoke the shared channel, or close a genuine late grant if its SDK work was canceled. |
+| `GRANT_REFUSED`   | No grant was allocated/retained; no transferred ports. Bounded rejected/overloaded/unavailable reason. | Settle not-issued, retain the failed grant identity and fault new native admission where required.                            |
+| `GRANT_UNCERTAIN` | Allocation/cleanup cannot be established; no transferred ports. No raw exception.                      | Fault admission and retain original acquisition/late-result custody; do not select clean closure or retry.                    |
+
+The decoders validate strict frame shape and exact transferred-resource identity.
+Origin admission/canonicalization uses `financeGrantDescriptor` with the trusted
+runtime origin before the worker posts a request; the Window native binding
+rechecks the same admission before constructing the selected grant.
+They do not correlate against the current actor, dispose ports, interpret
+readiness or select a lifecycle outcome. The owning chart uses the pure
+`sameFinanceGrantIdentity` predicate for runtime/grant/acquisition correlation.
+Native listeners must close rejected transferred resources before discarding an
+invalid/foreign frame. A failed decoder is not cleanup evidence. A valid late
+pair stays with its original acquisition owner until genuine channel closure.
+
+The protocol declares the planned limits of 32 retained grants, eight total
+outstanding SDK callbacks and 1 MiB of encoded pending request payloads. Aggregate
+admission is not implemented/enforced by these constants or schema validation;
+the population machine must apply all three before requesting native effects.
+
+The inactive production worker import proof retains the descriptor/key functions
+and both decoders; its graph guard now requires both new implementation modules.
+Normal startup still acquires no grant or worker SDK. The
+existing shared channel continues to own actual broker operations, call FIFO,
+request deadlines, resource custody and close failure/receipt handling.
+
+Static checks pass on main `434a06ee` plus this F4a implementation: Finance app/
+service-worker checks with zero errors/warnings, strict host and worker-proof
+types, the production worker proof, changed-file Prettier,
+workspace guidance/peer links and diff whitespace. The worker graph resolves
+587 modules, emits 14 JS chunks and one 8,800,443-byte Wasm binary, and renders
+both new contract modules with nonzero implementations. These are import/type
+checks, not behavior or custody qualification. Logs remain in
+`/private/tmp/finance-worker-w05-f4a-*.log`.
+
+After the user's concrete implementation/test approval, qualification passes
+against main `434a06ee` plus this F4a change:
+
+- All 2,047 Finance unit tests in 147 files, including 39 new binding/protocol
+  cases and two new actual-build omission cases (14 worker proof cases total).
+- All 129 focused host cases in eight files. The new contract coverage includes
+  canonical URL/key separation, runtime and separator isolation, caller mutation,
+  exact field boundaries, strict variants/fields/versions/IDs, all correlation
+  components, missing/extra/swapped/undeclared/aliased/fake port pairs,
+  resource-bearing failures and zero port effects from pure decoding. Existing
+  separate-grant native receiver tests pass through the extracted binding rules.
+- All 15 production-built native cases across Chromium, Firefox and WebKit.
+  Each engine now decodes actual request/refusal/uncertain/ready frames in a real
+  worker, rejects a failure carrying an unexpected port, and echoes distinct
+  data/control paths through the transferred pair. The prior root/child broker
+  cases and concurrent/cold IndexedDB cases remain, including retained edits
+  through two complete offline browser-process restarts.
+- Strict host/test and native-fixture types pass. Finance app/service-worker and
+  worker-proof checks, the production worker proof, formatting, workspace
+  guidance/peer links and whitespace checks also pass.
+
+Reproducible commands from Finance: `pnpm test:worker-host`,
+`pnpm test:unit --run`, `pnpm test:worker-bindings`, `pnpm check`,
+`pnpm check:tests`, `pnpm check:worker-proof`, `pnpm build:worker-proof` and
+`pnpm exec tsc --project tsconfig.worker-host.json --noEmit`. The unit/native suites
+use the permitted disposable listeners and isolated browser profiles; their
+qualified runs pass on the first attempt. Logs are
+`/private/tmp/finance-worker-w05-f4a-*.log`, with final focused results in
+`focused-final.log`. No production implementation changed after review.
+
+This qualifies binding extraction and frame/resource decoding. The browser probe
+is fixture code, not the production grant-acquisition transport or owner. Aggregate
+limits, retained late-acquisition cleanup, actual SDK callbacks and full grant/
+session shutdown still require their own implementation and acceptance evidence.
+
+Continue in dependency order:
+
+1. Single-grant acquisition/channel chart: explicit refusal, uncertainty,
+   cancellation/deadline and late-grant close; invoke the existing shared channel.
+2. Bounded dynamic population and SDK callback command bridge: duplicate joins,
+   global call/byte budgets, generation failure faulting and retained identities.
+3. Private Window acquisition transport and native custody: allocate one selected
+   grant, validate/transfer exact resources and report native failure facts. Keep
+   duplicate/lifecycle policy in the worker charts.
+4. Compose the single SDK/store/session lifetime and qualify actual SDK callbacks
+   under W05/W06 before any production UI/runtime activation.
 
 ## Subsequent population and session composition
 
@@ -121,10 +226,13 @@ only after SDK release; W08 later joins the full financial resource tree.
 | Closed           | All required acquisitions are settled and every acquired grant has an accepted close receipt.                                                       |
 | Blocked/overdue  | Report incomplete closure honestly and retain observation of outstanding original receipts. Never manufacture success from a timeout or child stop. |
 
-The SDK catches some generation-read failures and may fall back to generation
-zero. A failed generation grant must therefore fault native admission at its
+Rechecked the installed alpha.60 native-runtime implementation for F4a:
+`readWorkerGeneration` catches generation-read errors and returns zero, and
+`advanceWorkerGeneration` can return `failedGeneration + 1` after a failed write.
+A failed generation read or write must therefore fault native admission at its
 owner as well as reject that promise. A subsequent SDK `open` cannot bypass the
-failure by creating another grant. This requires an actual SDK acceptance case.
+failure by creating another grant. Both fallbacks require actual SDK acceptance
+cases; neither authorizes a new SDK patch or copied namespace algorithm.
 
 Window performs bounded wire validation, exact native grant construction and
 synchronous disposal. Routing, duplicate acquisition, policy, failure selection,

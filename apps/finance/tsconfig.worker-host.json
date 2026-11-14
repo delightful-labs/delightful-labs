@@ -12,6 +12,10 @@
 	},
 	"include": [
 		"src/lib/runtime/worker/host-protocol.ts",
+		"src/lib/runtime/worker/grant-binding.ts",
+		"src/lib/runtime/worker/grant-protocol.ts",
+		"src/lib/runtime/worker/grant-binding.test.ts",
+		"src/lib/runtime/worker/grant-protocol.test.ts",
 		"src/lib/runtime/worker/account-store.test.ts",
 		"src/lib/runtime/worker/broker-host.test.ts",
 		"src/lib/runtime/worker/host-drain.ts",

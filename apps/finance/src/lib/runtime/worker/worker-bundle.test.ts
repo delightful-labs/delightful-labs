@@ -93,6 +93,47 @@ it.each([
 	20_000
 )
 
+it.each([
+	{
+		missing: 'grant-binding.ts',
+		imports: ['grant-binding.js', 'grant-protocol.js'],
+		factories: [
+			'financeGrantDescriptor',
+			'financeGrantKey',
+			'decodeFinanceGrantRequest',
+			'decodeFinanceGrantReply'
+		]
+	},
+	{
+		missing: 'grant-protocol.ts',
+		imports: ['grant-protocol.js'],
+		factories: ['decodeFinanceGrantRequest', 'decodeFinanceGrantReply']
+	}
+])(
+	'refuses a worker that omits the private $missing contract',
+	async ({ missing, imports, factories }) => {
+		const remove: Plugin = {
+			name: 'worker-proof-missing-grant-contract',
+			enforce: 'pre',
+			transform(code, id) {
+				if (!id.endsWith('/runtime/worker/application.worker.ts')) return
+				return code
+					.split('\n')
+					.filter(
+						(line) =>
+							!imports.some((module) => line.includes(`from './${module}'`)) &&
+							!factories.some((factory) => line.trim() === `${factory},`)
+					)
+					.join('\n')
+			}
+		}
+		await expect(bundle(remove)).rejects.toThrow(
+			`Worker proof omitted implementation: src/lib/runtime/worker/${missing}`
+		)
+	},
+	20_000
+)
+
 it.each(['serveFinanceGenerationGrant', 'serveFinanceBrokerGrant'])(
 	'refuses a proof that omits the real Window adapter %s',
 	async (factory) => {

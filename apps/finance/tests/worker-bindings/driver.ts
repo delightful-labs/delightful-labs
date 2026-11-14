@@ -102,6 +102,89 @@ const fixture = {
 		})
 	},
 	request,
+	async qualifyGrantProtocol() {
+		const name = 'grant-protocol'
+		await fixture.create(name)
+		const data = new MessageChannel(),
+			control = new MessageChannel(),
+			orphan = new MessageChannel()
+		const identity = {
+			runtimeId: crypto.randomUUID(),
+			grantId: crypto.randomUUID(),
+			acquisitionId: crypto.randomUUID()
+		}
+		const envelope = { version: 1, ...identity }
+		try {
+			const acquisition = await request(name, {
+				type: 'GRANT_FRAME',
+				direction: 'request',
+				frame: {
+					...envelope,
+					type: 'ACQUIRE_GRANT',
+					descriptor: {
+						kind: 'generation',
+						key: 'jazz:shared-worker-generation:jazz-runtime:native-protocol'
+					}
+				}
+			})
+			const refused = await request(name, {
+				type: 'GRANT_FRAME',
+				direction: 'reply',
+				frame: { ...envelope, type: 'GRANT_REFUSED', reason: 'rejected' }
+			})
+			const uncertain = await request(name, {
+				type: 'GRANT_FRAME',
+				direction: 'reply',
+				frame: { ...envelope, type: 'GRANT_UNCERTAIN', reason: 'unavailable' }
+			})
+			const invalid = await request(
+				name,
+				{
+					type: 'GRANT_FRAME',
+					direction: 'reply',
+					frame: { ...envelope, type: 'GRANT_UNCERTAIN', reason: 'unavailable' }
+				},
+				[orphan.port1]
+			)
+			const ready = await request(
+				name,
+				{
+					type: 'GRANT_FRAME',
+					direction: 'reply',
+					frame: {
+						...envelope,
+						type: 'GRANT_READY',
+						dataPort: data.port1,
+						controlPort: control.port1
+					}
+				},
+				[data.port1, control.port1]
+			)
+			const dataEcho = new Promise<unknown>((resolve) => {
+				data.port2.onmessage = ({ data }) => resolve(data)
+			})
+			const controlEcho = new Promise<unknown>((resolve) => {
+				control.port2.onmessage = ({ data }) => resolve(data)
+			})
+			data.port2.postMessage('data probe')
+			control.port2.postMessage('control probe')
+			return {
+				identity,
+				acquisition,
+				refused,
+				uncertain,
+				invalid,
+				ready,
+				echoes: await Promise.all([dataEcho, controlEcho])
+			}
+		} finally {
+			fixture.destroy(name)
+			for (const pair of [data, control, orphan]) {
+				pair.port1.close()
+				pair.port2.close()
+			}
+		}
+	},
 	async bindGeneration(name: string, ownership: 'root' | 'child' = 'root') {
 		const data = new MessageChannel(),
 			control = new MessageChannel()
