@@ -321,7 +321,20 @@ undefined. Its separate trace/context/screenshot/results archive is retained at
 cause or a claimed production repair; fresh F4b head checks must resolve before
 this ongoing draft is merge-ready.
 
+The subsequent fresh F4b head `868e1e32` passes all hosted workflows:
+[Finance qualification](https://github.com/delightful-labs/delightful-labs/actions/runs/43618181259),
+[Foundation checks](https://github.com/delightful-labs/delightful-labs/actions/runs/43618181210),
+[Clipper qualification](https://github.com/delightful-labs/delightful-labs/actions/runs/43618181268)
+and PR-title checks. This includes application-2; it does not establish a cause
+or repair for the earlier failures. The tracking PR remains draft because the
+population, native acquisition transport and SDK/session work are incomplete.
+
 ## Subsequent population and session composition
+
+The [callback custody decision](worker-grant-population-design.md) records the
+2026-11-14 code research, two supported implementation approaches and the
+remaining ownership/API detail before F4c. It is a proposal for discussion,
+not an approved extraction or implemented population.
 
 The following design prepares the next implementation. F3 does not yet add this
 population, private grant-acquisition transport or SDK session.

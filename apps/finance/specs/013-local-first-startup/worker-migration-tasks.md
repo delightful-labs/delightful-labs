@@ -234,6 +234,12 @@ No XState reconversion, library reimport or new Jazz patch is assumed necessary.
   Pure transition-value checks fix the `can()` issue found by that coverage.
   The aggregate population and actual acquisition transport remain pending,
   and production startup remains unchanged.
+  The [F4c callback custody decision](worker-grant-population-design.md) records
+  the next code-research finding: callbacks waiting for acquisition need explicit
+  stop/error settlement, and unaccepted opened ports need native custody through
+  delivery. Reusing/exposing the channel's existing keeper in Local First versus
+  adding a Finance-specific SDK bridge keeper is awaiting discussion. No F4c
+  implementation/test approval or completed population is claimed.
   Clipper's still-Window-owned hidden capture SDK and its IDB adoption are
   deferred together. No temporary UI-only-thread exception was approved.
   Source inspection confirmed the extension sign-in worker and hidden offscreen
