@@ -222,7 +222,12 @@ async function clip(context: BrowserContext, id: string, source: Page) {
 	const pages = context.pages().length
 	await invokeToolbar(context, id, source)
 	// Native authorization may wait up to 15 seconds for the cold offscreen owner.
-	await expect(source.locator('delightful-clipper-bar')).toBeVisible({ timeout: 20000 })
+	try {
+		await expect(source.locator('delightful-clipper-bar')).toBeVisible({ timeout: 20000 })
+	} catch (error) {
+		console.info('Extension toolbar state evidence', JSON.stringify(machineEvidence.get(context)))
+		throw error
+	}
 	expect(context.pages()).toHaveLength(pages)
 }
 

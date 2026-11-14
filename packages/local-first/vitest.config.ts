@@ -22,6 +22,7 @@ export default defineConfig({
 		include: [
 			'fixtures/test-app/restore-plan.test.ts',
 			'src/lib/machines/**/*.test.ts',
+			'src/lib/worker/**/*.test.ts',
 			'src/lib/presentation/**/*.test.ts',
 			'src/lib/localization/**/*.test.ts',
 			'src/lib/diagnostics/**/*.test.ts',

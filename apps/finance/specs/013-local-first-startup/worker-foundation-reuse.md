@@ -81,9 +81,13 @@ from the account-selection store. Keep the explicit browser-host and Jazz
 integration boundaries; consumers supply admitted URL/name/generation bindings.
 Do not silently migrate SDK generation keys to IndexedDB as part of AccountStore.
 
-Finance currently admits an exact broker URL/base name and generation key;
-Clipper admits same-origin URLs and Jazz-prefixed keys more broadly. Preserve
-Finance's narrower capability binding. Keep FIFO effect admission, no replay of
+Finance's new native adapters admit an exact URL/full-name broker grant and a
+separate exact-key generation grant through existing SDK callbacks, without a
+new Jazz patch. Their native qualification is recorded in the
+[SDK binding decision](worker-sdk-binding-decision.md); actual SDK/session
+integration remains pending. Clipper admits same-origin URLs and Jazz-prefixed
+keys more broadly. Preserve Finance's narrower capability binding. Keep FIFO
+effect admission, no replay of
 uncertain generation writes, disposal of unaccepted transferred ports and
 independent data/control lifetimes. Adopt the shared broker in Clipper, then
 Finance; qualify both consumers and remove replaced implementations.
@@ -192,7 +196,11 @@ inspectable job context. Worker-side provider request decoding is still required
    native receipts and bounded close. Reuse existing custody/IDB contracts;
    qualify the public adapter before app adoption.
 3. **R1/R2 and adoption (W05):** extract remaining broker/close adapters and
-   qualify Clipper then Finance with app-specific IDB bindings. No migration
+   qualify Clipper's shared broker, then Finance's broker/IDB bindings. The user
+   approved Finance-first sequencing on 2026-11-13: Clipper's remaining account
+   store and hidden capture-runtime conversion is a separate follow-up, not a
+   Finance prerequisite. Keep its current account-storage path until that work.
+   No migration
    or old-version compatibility work is included. Retire account-storage RPC/remote locks after
    qualification. R3 contributes applicable receipt mechanisms/scenarios, not a
    required copy of its keeper. Activation still waits for W06.

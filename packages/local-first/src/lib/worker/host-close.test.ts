@@ -1,11 +1,12 @@
 import { setImmediate } from 'node:timers'
 import { afterEach, expect, it, vi } from 'vitest'
-import { serveHostClose, workerHostControl, type HostControlReport } from './host-close-channel.js'
+import { serveHostClose, workerHostControl, type HostControlReport } from './host-close.js'
 
 const releases = new Set<() => void>()
 afterEach(() => {
 	for (const release of releases) release()
 	releases.clear()
+	vi.restoreAllMocks()
 })
 function fixture(closeHost: () => void = vi.fn()) {
 	const data = new MessageChannel(),
@@ -70,14 +71,29 @@ it('rejects foreign scopes, versions, extra fields and transferred resources bef
 	extra.port2.close()
 })
 
-it('does not manufacture a receipt when native data-host disposal fails', async () => {
-	const closeHost = vi.fn(() => {
+it('reports correlated disposal failure without success and retains control for a later genuine close', async () => {
+	const closeHost = vi.fn().mockImplementationOnce(() => {
 		throw new Error('native close failed')
 	})
 	const f = fixture(closeHost)
 	f.client.post({ scope: f.scope, requestId: f.requestId })
-	await vi.waitFor(() => expect(closeHost).toHaveBeenCalledOnce())
-	expect(f.reports).toEqual([])
+	await vi.waitFor(() =>
+		expect(f.reports).toEqual([
+			{
+				type: 'HOST_CLOSE_FAILED',
+				failure: { scope: f.scope, requestId: f.requestId, stage: 'dispose' }
+			}
+		])
+	)
+	expect(closeHost).toHaveBeenCalledOnce()
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() =>
+		expect(f.reports[1]).toEqual({
+			type: 'HOST_CLOSED',
+			receipt: { scope: f.scope, requestId: f.requestId }
+		})
+	)
+	expect(closeHost).toHaveBeenCalledTimes(2)
 })
 
 it('control transport errors retain the listener for a later genuine scoped receipt', async () => {
@@ -146,4 +162,87 @@ it('rejects invalid outbound correlation before posting and disposal emits no re
 	await new Promise<void>((resolve) => setImmediate(resolve))
 	expect(f.reports).toEqual([])
 	expect(f.closeHost).not.toHaveBeenCalled()
+})
+
+it('duplicate valid close commands preserve their receipts and leave disposal with the native owner', async () => {
+	const f = fixture()
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() => expect(f.reports).toHaveLength(2))
+	expect(f.closeHost).toHaveBeenCalledTimes(2)
+	expect(f.reports).toEqual([
+		{ type: 'HOST_CLOSED', receipt: { scope: f.scope, requestId: f.requestId } },
+		{ type: 'HOST_CLOSED', receipt: { scope: f.scope, requestId: f.requestId } }
+	])
+})
+
+it('a failed native receipt post grants no closure and retains independent control for a later command', async () => {
+	const f = fixture()
+	vi.spyOn(f.control.port1, 'postMessage').mockImplementationOnce(() => {
+		throw new Error('Native receipt post failed')
+	})
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() =>
+		expect(f.reports).toEqual([
+			{
+				type: 'HOST_CLOSE_FAILED',
+				failure: { scope: f.scope, requestId: f.requestId, stage: 'acknowledge' }
+			}
+		])
+	)
+	expect(f.closeHost).toHaveBeenCalledOnce()
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() =>
+		expect(f.reports).toEqual([
+			{
+				type: 'HOST_CLOSE_FAILED',
+				failure: { scope: f.scope, requestId: f.requestId, stage: 'acknowledge' }
+			},
+			{ type: 'HOST_CLOSED', receipt: { scope: f.scope, requestId: f.requestId } }
+		])
+	)
+	expect(f.closeHost).toHaveBeenCalledTimes(2)
+})
+
+it('does not retry or infer closure when both success and failure reports cannot be posted', async () => {
+	const f = fixture()
+	const posting = vi.spyOn(f.control.port1, 'postMessage').mockImplementation(() => {
+		throw new Error('Control port unavailable')
+	})
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() => expect(posting).toHaveBeenCalledTimes(2))
+	expect(posting.mock.calls.map(([message]) => message)).toEqual([
+		{ ...envelope(f.scope, f.requestId), type: 'HOST_CLOSED' },
+		{ ...envelope(f.scope, f.requestId), type: 'HOST_CLOSE_FAILED', stage: 'acknowledge' }
+	])
+	expect(f.closeHost).toHaveBeenCalledOnce()
+	expect(f.reports).toEqual([])
+	posting.mockRestore()
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() => expect(f.reports[0]?.type).toBe('HOST_CLOSED'))
+})
+
+it('rejects malformed or resource-bearing failure packets and ignores a foreign failure scope', async () => {
+	const f = fixture(),
+		extra = new MessageChannel(),
+		closed = vi.fn()
+	extra.port2.addEventListener('close', closed)
+	const failure = { ...envelope(f.scope, f.requestId), type: 'HOST_CLOSE_FAILED', stage: 'dispose' }
+	for (const malformed of [
+		{ ...failure, stage: 'retry' },
+		{ ...failure, version: 2 },
+		{ ...failure, detail: 'unexpected private exception' }
+	])
+		f.control.port1.postMessage(malformed)
+	f.control.port1.postMessage({ ...failure, port: extra.port1 }, [extra.port1])
+	f.control.port1.postMessage({ ...failure, scope: crypto.randomUUID() })
+	// A success on the same port orders all preceding packets before this observation.
+	f.control.port1.postMessage({ ...envelope(f.scope, f.requestId), type: 'HOST_CLOSED' })
+	await vi.waitFor(() => expect(f.reports).toHaveLength(5))
+	expect(f.reports).toEqual([
+		...Array.from({ length: 4 }, () => ({ type: 'CLOSE_FAILED', scope: f.scope })),
+		{ type: 'HOST_CLOSED', receipt: { scope: f.scope, requestId: f.requestId } }
+	])
+	await vi.waitFor(() => expect(closed).toHaveBeenCalledOnce())
+	extra.port2.close()
 })

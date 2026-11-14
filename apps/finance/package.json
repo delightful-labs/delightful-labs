@@ -24,6 +24,7 @@
 		"test:unit": "vitest",
 		"test:worker-state": "pnpm --filter @delightful-finances/worker-state-tests test",
 		"test:worker-host": "vitest run --config vitest.worker-host.config.ts",
+		"test:worker-bindings": "pnpm check:tests && vitest run --config vitest.worker-bindings.config.ts",
 		"test": "pnpm test:unit --run && pnpm test:e2e",
 		"test:e2e": "playwright test",
 		"test:pwa": "playwright test --config tests/config/playwright.pwa.config.ts",

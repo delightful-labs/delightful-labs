@@ -7,6 +7,8 @@ export default defineConfig({
 	test: {
 		include: [
 			'src/lib/runtime/worker/host-protocol.test.ts',
+			'src/lib/runtime/worker/account-store.test.ts',
+			'src/lib/runtime/worker/broker-host.test.ts',
 			'src/lib/runtime/worker/host-channel.test.ts',
 			'src/lib/runtime/worker/host-drain.test.ts',
 			'src/lib/runtime/worker/host-legacy.test.ts'

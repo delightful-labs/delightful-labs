@@ -12,6 +12,8 @@ const require = createRequire(import.meta.url)
 const versionSchema = z.object({ version: z.string() })
 const graphSchema = z.object({ entry: z.string() })
 const applicationEntry = 'src/lib/runtime/worker/application.worker.ts'
+const windowBindingEntry = resolve(root, 'src/lib/runtime/worker/broker-host.ts')
+const windowBindingExports = ['serveFinanceGenerationGrant', 'serveFinanceBrokerGrant']
 const publicEntries = [
 	'jazz-tools/client',
 	'jazz-tools/local-first',
@@ -19,7 +21,9 @@ const publicEntries = [
 	'delightful-local-first/backend/jazz/startup',
 	'delightful-local-first/session/workflow',
 	'delightful-local-first/worker/channel/workflow',
-	'delightful-local-first/worker/effect-drain/workflow'
+	'delightful-local-first/worker/effect-drain/workflow',
+	'delightful-local-first/backend/jazz/account-store/indexeddb',
+	'delightful-local-first/backend/jazz/worker-broker'
 ]
 const requiredImplementations = [
 	'/jazz-tools/dist/session/create-jazz-session.js',
@@ -28,7 +32,11 @@ const requiredImplementations = [
 	'/delightful-local-first/dist/backend/jazz/startup.js',
 	'/delightful-local-first/dist/machines/identity/session-acquisition.js',
 	'/delightful-local-first/dist/machines/lifecycle/worker-channel.js',
-	'/delightful-local-first/dist/machines/lifecycle/worker-effect-drain.js'
+	'/delightful-local-first/dist/machines/lifecycle/worker-effect-drain.js',
+	'/delightful-local-first/dist/backend/jazz/indexeddb-account-store.js',
+	'/delightful-local-first/dist/machines/identity/indexeddb-account-store.js',
+	'/delightful-local-first/dist/storage/indexeddb-account-store-native.js',
+	'/delightful-local-first/dist/backend/jazz/worker-broker.js'
 ]
 const portable = (id: string) => (isAbsolute(id) ? relative(root, id).replaceAll('\\', '/') : id)
 const clean = (id: string) => id.split('?')[0] ?? id
@@ -98,6 +106,17 @@ function artifactReport(): Plugin {
 		generateBundle: {
 			order: 'post',
 			handler(_options, bundle) {
+				const windowBindingPresent = Object.values(bundle).some(
+					(output) =>
+						output.type === 'chunk' &&
+						Object.entries(output.modules).some(
+							([id, module]) =>
+								clean(id) === windowBindingEntry &&
+								module.renderedLength > 0 &&
+								windowBindingExports.every((name) => module.renderedExports.includes(name))
+						)
+				)
+				if (!windowBindingPresent) this.error('Worker proof omitted Finance Window broker binding')
 				const files = Object.values(bundle)
 					.map((output) => output.fileName)
 					.sort()
@@ -136,6 +155,8 @@ function artifactReport(): Plugin {
 					source: JSON.stringify(
 						{
 							scope: 'build-only; no runtime activation',
+							windowBinding: portable(windowBindingEntry),
+							windowBindingExports,
 							packages,
 							publicEntries: publicEntries.map((entry) => ({
 								entry,

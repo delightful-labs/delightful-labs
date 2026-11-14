@@ -226,9 +226,12 @@ the current review gate. Qualify its public packed consumer and real workers,
 then adopt it in Clipper/Finance through separate bounded review cycles. W04
 qualification must not wait for production UI cutover.
 
-W05 implements app bindings, extracts the still-required broker/close
-mechanisms, and removes superseded account storage/lock transports after both
-consumers qualify. It contains no migration work. W06 then qualifies the
+W05 implements Finance bindings and extracts the still-required broker/close
+mechanisms, qualifying the shared broker in Clipper before Finance. The user
+approved deferring Clipper's account-store/hidden capture-runtime conversion to
+a separate follow-up on 2026-11-13. It does not gate Finance W05/W06. Retain its
+current account-storage path; remove replaced Finance transports after Finance
+qualification. W05 contains no migration work. W06 then qualifies the
 single persistent worker SDK owner. W08 still owns full financial-runtime
 shutdown joins. No production activation is implied by these foundations.
 
@@ -295,5 +298,6 @@ implementation/test approval, all 1,111 unit tests and 60 native browser cases
 passed; see the [complete verification record](worker-account-store-verification.md).
 It records the real stored-undefined bug and cursor fix, exact native scenarios,
 packed export checks, failed setup/oracle attempts and limits. W04 is complete
-as the shared foundation; actual Finance/Clipper adoption remains W05. The current
-Window-owned application is still active.
+as the shared foundation. Finance adoption remains W05; Clipper's store/runtime
+conversion is a separately deferred follow-up under the user's Finance-first
+decision. The current Window-owned Finance application is still active.

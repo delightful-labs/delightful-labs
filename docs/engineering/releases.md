@@ -5,8 +5,8 @@ Scope is optional; `!` marks a breaking change. This is a workspace-wide user
 instruction, not a UI/Clipper-only convention. The global title workflow reads
 JSON event data and never interpolates a title into shell source.
 
-Work on feature branches targeting destination master. Never push directly to
-master. Commits, merges, publication, production deployment, repository settings,
+Work on feature branches targeting destination main. Never push directly to
+main. Commits, merges, publication, production deployment, repository settings,
 branch protection, source cutover and destructive data operations require the
 applicable user authorization. Existing scoped authorization persists; do not
 request it again merely because files moved. New repositories are public unless

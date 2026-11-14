@@ -4,3 +4,7 @@ export function openWorkerImportProof() {
 		type: 'module'
 	})
 }
+export {
+	serveFinanceGenerationGrant,
+	serveFinanceBrokerGrant
+} from '../src/lib/runtime/worker/broker-host.js'
