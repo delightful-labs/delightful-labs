@@ -251,5 +251,6 @@ Current bounds are 100 visible highlights and 20 document notes per reader query
 Local creation admits one note per parent. Simultaneous independent offline
 creations are retained as separate notes; this slice does not implement a user
 reconciliation workflow or claim a global uniqueness guarantee. Native history is
-available through Jazz but has no new history UI. Highlight Restore is a current
-reader-session action; reload does not retain a separate undo journal.
+available through Jazz but has no new history UI. Following the reader demo, the
+user requested that removing a highlight show no Restore option. The reader no
+longer exposes that action; Jazz's native soft-delete/restore capability remains.

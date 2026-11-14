@@ -5,7 +5,7 @@
 The user authorized a working implementation with best judgment after the
 [model review](annotation-model-review.md). Saved readers now support native
 passage selection, highlights, document notes, highlight-attached notes, autosave,
-note deletion and same-identity highlight removal/restoration. Jazz owns text
+note deletion and highlight removal without a visible Restore option. Jazz owns text
 merging, accepted history, ranges and soft deletion. The worker owns annotation
 eligibility, transactions, observation, hashing, queues and settlement. DUI exposes
 an optional native textarea element binding for Jazz's cursor-preserving adapter.

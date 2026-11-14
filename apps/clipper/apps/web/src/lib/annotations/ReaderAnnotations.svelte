@@ -83,12 +83,6 @@
 				disabled={!annotations.enabled}
 				onclick={() => send({ type: 'ADD_NOTE', documentId })}>{action('add', 'note')}</Button
 			>{/if}
-		{#if annotations.undoId}<Button
-				disabled={!annotations.enabled}
-				onclick={() =>
-					send({ type: 'RESTORE_HIGHLIGHT', documentId, id: annotations.undoId ?? '' })}
-				>{action('restore', 'highlight')}</Button
-			>{/if}
 	</div>
 	{#if annotations.message}<StatusMessage {...annotations.message} />{/if}
 	{#each annotations.notes as note (note.id)}

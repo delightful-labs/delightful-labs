@@ -38,7 +38,7 @@ async function seed(page: Page) {
 	await expect(page.getByRole('button', { name: 'Add note', exact: true })).toBeEnabled()
 }
 
-test('creates a Unicode highlight, autosaves a native note and restores both after reload and removal', async ({
+test('saves a Unicode highlight and note across reload, then removes without offering restore', async ({
 	page
 }) => {
 	await seed(page)
@@ -78,16 +78,24 @@ test('creates a Unicode highlight, autosaves a native note and restores both aft
 	await expect
 		.poll(() => page.evaluate(() => CSS.highlights.get('clipper-annotations')?.size ?? 0))
 		.toBe(1)
-	await group.getByRole('button', { name: 'Remove highlight', exact: true }).click()
-	await expect(page.getByRole('blockquote')).toHaveCount(0)
-	await page.getByRole('button', { name: 'Restore highlight', exact: true }).click()
-	await expect(page.getByRole('blockquote')).toHaveText(quote)
-	await expect(group.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
-		'Remember the café and 🦊 passage.'
-	)
 	await group.getByRole('button', { name: 'Remove note', exact: true }).click()
 	await expect(group.getByRole('textbox')).toHaveCount(0)
 	await expect(page.getByRole('blockquote')).toHaveText(quote)
+	await group.getByRole('button', { name: 'Add note', exact: true }).click()
+	await note.fill('Another attached note.')
+	await expect(page.getByText('note synced', { exact: true })).toBeVisible()
+	await group.getByRole('button', { name: 'Remove highlight', exact: true }).click()
+	await expect(group).toHaveCount(0)
+	await expect(page.getByRole('textbox', { name: 'note', exact: true })).toHaveCount(0)
+	await expect(page.getByRole('button', { name: 'Restore highlight', exact: true })).toHaveCount(0)
+	await expect(page.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
+		'aria-busy',
+		'false'
+	)
+	await page.reload()
+	await expect(page.getByRole('button', { name: 'Add note', exact: true })).toBeEnabled()
+	await expect(group).toHaveCount(0)
+	await expect(page.getByRole('button', { name: 'Restore highlight', exact: true })).toHaveCount(0)
 })
 
 test('autosaves a document note through the native text adapter without a selection', async ({
