@@ -196,6 +196,10 @@ test(
 			return row?.id
 		})
 		if (!id) throw new Error('Edited transaction was not saved')
+		await page.goto(`/expenses/${id}`)
+		await expect(
+			page.getByRole('img', { name: 'Preview of receipt.png', exact: true })
+		).toBeVisible()
 		await expect.poll(async () => (await images(page, id)).length).toBe(1)
 		const [image] = await images(page, id)
 		if (!image) throw new Error('Missing saved image')
