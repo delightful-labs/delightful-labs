@@ -1,10 +1,16 @@
 # Worker-owned Jazz grant lifecycle
 
-Current slice: F4a defines the private grant binding/acquisition contract before
-the grant-owner machines use it. The user approved its concrete implementation
-and tests on 2026-11-14; the qualification below passes. F1–F3 and the close
-correction retain their own historical evidence. W05/W06 and production activation
-remain incomplete; the single-grant owning chart is next.
+Current slice: F4b adds one grant's owning chart after F4a's qualified binding/
+acquisition contract. The user approved its concrete implementation/tests on
+2026-11-14; qualification below passes. F1–F3 and the close correction retain
+their own historical evidence. The aggregate population/callback bridge and
+actual native acquisition transport remain next; W05/W06 and production
+activation remain incomplete.
+
+The user requested an ongoing tracking PR and continued work on its same branch:
+[draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37),
+`feat/finance-worker-grant-owner`. The qualified F4a checkpoint is uploaded at
+`95eebd7d`. Continue this PR rather than opening a separate PR for each slice.
 
 The user merged [PR #35](https://github.com/delightful-labs/delightful-labs/pull/35)
 on 2026-11-14 at main `434a06ee`. The follow-up branch
@@ -172,6 +178,148 @@ Continue in dependency order:
    duplicate/lifecycle policy in the worker charts.
 4. Compose the single SDK/store/session lifetime and qualify actual SDK callbacks
    under W05/W06 before any production UI/runtime activation.
+
+## F4b: one retained grant owner
+
+This implementation continues the same PR #37 branch after explicit concrete
+implementation/test approval. Its qualification is against main `434a06ee`,
+uploaded F4a checkpoint `95eebd7d` and this F4b change. F4a's earlier counts retain
+their original scope.
+
+The worker population will create this child only after aggregate admission.
+Its immutable input supplies the validated acquisition frame, separate close
+request UUID, trusted origin, explicit acquisition/request/close timeout budgets,
+one native post capability and a typed parent report recipient. Input preparation
+copies/canonicalizes data before effects. The post capability performs one
+selected synchronous post; it must not await acquisition or start another actor.
+Native replies arrive later as typed `GRANT_REPLY` events from the population's
+private transport owner.
+
+| Owner state                      | Selected work and obligations                                                                                                                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Acquiring / waiting              | Invoke one post leaf; retain its original identity and deadline. The population keeps SDK calls queued until availability is reported.                                                                |
+| Acquiring / retiring             | Explicit retirement refuses use but keeps the original acquisition observable. It neither aborts nor repeats the native post.                                                                         |
+| Acquiring / uncertain or overdue | Report the observed issue; retain the original request. A later pair can only enter channel closing, never resume SDK work. The original deadline survives retirement/uncertainty.                    |
+| Bound / accepting                | Invoke the shared broker channel and announce availability; admit only operations matching this exact descriptor. The shared channel owns request FIFO, bounds, settlement and transferred SDK ports. |
+| Bound / closing or overdue       | Select channel close once through its existing idempotent command. Retain the child and independent control listener until a genuine matching receipt. Native failure/overdue are facts, not closure. |
+| Bound / blocked                  | Report unavailable cleanup honestly. Do not send commands to a failed/completed child or manufacture a receipt.                                                                                       |
+| Closed                           | Output either a genuine matching channel receipt, or a definitive not-issued acquisition result. These are distinct required-field variants.                                                          |
+
+The child reports `GRANT_ACQUIRED` before `GRANT_AVAILABLE`: the first is the
+private resource-custody handoff, including the exact pair; the second permits
+dispatching queued SDK calls.
+A late acquired pair reports the handoff but never availability. The future
+transport/population must retain every pair until the child accepts custody,
+handle child startup/error/stop and retain failed grant identities until runtime
+shutdown. They must not forward a resource into an already completed actor.
+
+Foreign or duplicate replies are returned to the parent as
+`GRANT_REPLY_REJECTED`, including the original private reply. The child never
+closes a pair it did not accept or drops an unaccepted late result inside an
+observer callback. The parent transport owner remains responsible for rejected
+resource disposition and for contradictory replies after definitive refusal.
+This explicit handoff is part of the later population implementation, not a
+claim that F4b provides a complete native transport.
+
+`REQUEST` while acquisition/retirement is not usable receives a conservative
+not-issued refusal. The child does not duplicate the population's pending-call
+queue or aggregate byte/call limits. Parent-owned SDK callbacks receive actual
+channel settlement; generation-read/write failures must fault aggregate admission
+before the SDK fallback can open another grant.
+
+The channel's observer callbacks only forward typed facts into this chart.
+Its existing native-close failure protocol is reused without inspecting private
+channel state. Named guards check exact acquisition/close identities, descriptor
+admission and the public child liveness needed before forwarding a command.
+Unexpected child/observer errors reach the owning parent boundary; stopped/error
+actors never count as successful resource release.
+
+Approved qualification passes:
+
+- All 2,082 Finance unit tests in 148 files, including 34 new owner cases and
+  15 real worker-build proof cases. Focused host coverage passes 163 cases in
+  nine files. These include post-not-issued/throw, synchronous/late replies,
+  retirement, original deadlines, foreign/duplicate/aliased pairs, no availability
+  after timeout/retirement, exact operation admission and the actual shared
+  channel, native close failure/overdue, unknown writes, observer errors, parent
+  stop and repeated effect-free `can()` checks.
+- All 18 worker-state tests in four files pass. The independent grant obligation
+  ledger runs 400 generated sequences (seed `20261114`, up to 24 commands), with
+  complete contract-model event/state/transition coverage and temporal witnesses
+  for both late-grant closure without availability and ordinary available-grant
+  retirement/closure. The real SUT uses native MessagePorts and the actual
+  invoked shared channel. Native acknowledgements are generated only after the
+  fixture host receives a close command. This is bounded sampled evidence, not
+  exhaustive native scheduling proof.
+- All 21 production-built native cases across Chromium, Firefox and WebKit.
+  Existing root/child consumers are retained; each engine now also uses the
+  actual grant-owner chart for exact generation/broker operations and accepted
+  SharedWorker-port retention after grant closure. A separate retired-before-
+  reply case proves one post, no availability/native storage operations and
+  completion only through the real host receipt. Concurrent/cold IDB coverage
+  remains, including retained edits through two browser-process restarts.
+- Strict host/test, native-fixture, generated-model and worker-proof types,
+  app/service-worker checks (zero errors/warnings), the production worker proof,
+  changed-file formatting, guidance/peer links and whitespace checks pass.
+
+The new `can()` regression found a production defect before qualification:
+transition calculations read state through `self.getSnapshot().matches`, but
+`can()` supplies a reduced self snapshot without that method. The chart now uses
+the supplied transition `value` with published `matchesState`, and supplied
+`children` for its public child-liveness guard. It adds no lifecycle mirror flags
+or XState patch. All state/IO and generated/native checks above pass with the fix.
+
+Initial unit harness failures were separate: parent context froze the mutable
+input source intended for the capture test, and the stop test incorrectly assumed
+observer completion would never run. The fixture now reads its external caller
+configuration through a pure input capability, and the stop test explicitly
+requires stopped status and undefined output rather than treating observer
+completion as release. The model's coverage assertion is wrapped in a Vitest
+assertion to honor `requireAssertions`, while retaining full coverage thresholds.
+
+The omission fixtures now remove the new owner import when it transitively
+retains the contracts/shared broker, with a separate owner-omission case. The
+older broker fixture also runs before TypeScript transformation so its requested
+source removal actually happens. The original module-missing assertions remain;
+the initial fixture failures and final 15-case pass are preserved.
+
+Reproducible commands from Finance: `pnpm test:worker-host`, `pnpm test:unit --run`,
+`pnpm test:worker-state`, `pnpm --filter @delightful-finances/worker-state-tests check`,
+`pnpm test:worker-bindings`, `pnpm check`, `pnpm check:tests`, `pnpm check:worker-proof`,
+`pnpm build:worker-proof` and the strict host `tsc` command. Logs remain in
+`/private/tmp/finance-worker-w05-f4b-*.log`; qualified results are `full-unit.log`,
+`can-fix-focused.log`, `qualified-model.log` and `native.log`. The full unit/native
+runs use permitted disposable listeners/profiles and pass on their first runs.
+The population's actual custody handoff, aggregate budgets and SDK fallback/
+shutdown acceptance remain later slices. The native facade is fixture code.
+
+## PR #37 hosted checkpoint diagnostics
+
+At uploaded F4a head `95eebd7d`, hosted Foundation and Clipper workflows pass.
+Finance's types/unit/build, worker state, native bindings, production PWA and all
+other browser/feature jobs pass except `Browser (application-2)` in
+[run 43607997446](https://github.com/delightful-labs/delightful-labs/actions/runs/43607997446).
+That shard passed 91 cases and failed the unchanged imported-expense offline
+edit case at `transaction-edit.e2e.ts:240`: Save Transaction remained enabled.
+The preserved screenshot says “Could not save Transaction.” The trace records
+transaction persistence/submission error states; it does not retain an underlying
+SDK exception that establishes a cause. No transaction workflow was changed.
+
+The full CI artifact is retained locally at
+`/private/tmp/finance-worker-pr37-application-2-failure.zip` and its extracted
+directory of the same name, including trace, screenshot, context and results.
+After inspecting these and the existing test/source, one focused reproduction
+passes unchanged on the isolated in-memory server at port 5188 (4.8 seconds;
+11 seconds including server startup). Its log is
+`/private/tmp/finance-worker-pr37-transaction-edit-focused.log`. The requested
+hosted rerun passed the original transaction-edit case, but application-2 again
+passed 91/92: this time the unchanged image-editor case failed at
+`transaction-image-editor.e2e.ts:202`, expecting `receipt.png` and receiving
+undefined. Its separate trace/context/screenshot/results archive is retained at
+`/private/tmp/finance-worker-pr37-image-editor-retry-failure.zip` (artifact
+`14120111518`). No further retry was requested. Neither failure has an established
+cause or a claimed production repair; fresh F4b head checks must resolve before
+this ongoing draft is merge-ready.
 
 ## Subsequent population and session composition
 

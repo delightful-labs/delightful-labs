@@ -40,6 +40,15 @@ acquisition contract now passes approved qualification: 2,047 Finance unit tests
 129 focused host cases, 14 real-build proof cases and 15 native cases across
 three engines, including actual transferred data/control paths. It starts no
 production grant acquisition or worker SDK; the owning charts remain next.
+The user requested an ongoing tracking PR: [draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37)
+contains that tested checkpoint at `95eebd7d`. F4b's single-grant chart now passes
+approved qualification on the same branch: 2,082 unit tests, 163 focused host
+cases, 18 generated-worker-state cases and 21 native cases across three engines.
+The grant-owner record preserves the `can()` defect found/fixed during testing,
+harness/omission-fixture corrections and the two separate hosted UI failures.
+The original transaction-edit case passed the inspected focused run and hosted
+rerun, which instead failed the existing image-editor filename case; no further
+retry or established cause is claimed. F4a counts retain their original scope.
 Detailed implementation designs remain subject to their review gates.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
@@ -215,6 +224,16 @@ No XState reconversion, library reimport or new Jazz patch is assumed necessary.
   acquisition transport, then retained SDK/session composition. Aggregate limits
   are declared, not yet enforced. See the same grant-owner record for the
   concrete frame semantics and qualification boundary.
+  F4b now implements one retained grant's acquisition/channel chart on
+  PR #37's branch. It posts once, retains late acquisition across retirement/
+  uncertainty/deadline, invokes the shared channel, reports explicit custody/
+  availability/rejected replies and requires actual close/non-allocation output.
+  After 2026-11-14 concrete implementation/test approval, all 2,082 Finance unit
+  tests, 163 focused host cases, 18 worker-state tests (including 400 generated
+  grant sequences), 15 real-build proof cases and 21 native browser cases pass.
+  Pure transition-value checks fix the `can()` issue found by that coverage.
+  The aggregate population and actual acquisition transport remain pending,
+  and production startup remains unchanged.
   Clipper's still-Window-owned hidden capture SDK and its IDB adoption are
   deferred together. No temporary UI-only-thread exception was approved.
   Source inspection confirmed the extension sign-in worker and hidden offscreen

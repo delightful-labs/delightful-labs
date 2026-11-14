@@ -268,7 +268,11 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
 			}
 		})
 
-		it.each<{ ownership: 'root' | 'child' }>([{ ownership: 'root' }, { ownership: 'child' }])(
+		it.each<{ ownership: 'root' | 'child' | 'grant' }>([
+			{ ownership: 'root' },
+			{ ownership: 'child' },
+			{ ownership: 'grant' }
+		])(
 			'isolates $ownership-owned generation and broker grants and retains the accepted SharedWorker port after independent closure',
 			async ({ ownership }) => {
 				retainOnFailure()
@@ -379,5 +383,33 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
 				}
 			}
 		)
+		it('a grant arriving after retirement closes through its real host without becoming available', async () => {
+			retainOnFailure()
+			const browser = await browserType.launch({ headless: true })
+			try {
+				const context = await browser.newContext(),
+					page = await boot(context)
+				await page.evaluate(() => window.financeBindingFixture.create('late-grant'))
+				const grant = await page.evaluate(() =>
+					window.financeBindingFixture.bindGeneration('late-grant', 'retiring-grant')
+				)
+				expect(await send(page, 'late-grant', { type: 'BROKER_CLOSE' })).toMatchObject({
+					type: 'RESULT',
+					value: { scope: grant.scope, requestId: grant.requestId }
+				})
+				expect(await send(page, 'late-grant', { type: 'GRANT_REPORTS' })).toMatchObject({
+					type: 'RESULT',
+					value: { reports: ['GRANT_ACQUIRED'], posts: 1 }
+				})
+				expect(
+					await send(page, 'late-grant', { type: 'BROKER_READ', key: grant.key })
+				).toMatchObject({ type: 'ERROR', outcome: 'not-issued' })
+				expect(await page.evaluate(() => window.financeBindingFixture.stats('late-grant'))).toEqual(
+					{ opens: [], reads: [], writes: [] }
+				)
+			} finally {
+				await browser.close()
+			}
+		})
 	})
 }

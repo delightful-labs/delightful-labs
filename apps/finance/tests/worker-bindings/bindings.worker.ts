@@ -4,6 +4,8 @@ import {
 } from '../../src/lib/runtime/worker/account-store.js'
 import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
 import { createOwnedBrokerFixture } from './owned-broker.js'
+import { createGrantOwnerFixture } from './grant-owner-client.js'
+import type { FinanceGrantDescriptor } from '../../src/lib/runtime/worker/grant-binding.js'
 import {
 	decodeFinanceGrantRequest,
 	decodeFinanceGrantReply
@@ -20,8 +22,10 @@ export type Operation =
 			data: MessagePort
 			control: MessagePort
 			scope: string
-			ownership: 'root' | 'child'
+			ownership: 'root' | 'child' | 'grant' | 'retiring-grant'
+			descriptor: FinanceGrantDescriptor
 	  }
+	| { type: 'GRANT_REPORTS' }
 	| { type: 'BROKER_READ'; key: string }
 	| { type: 'BROKER_WRITE'; key: string; value: string }
 	| { type: 'BROKER_OPEN'; url: string; name: string }
@@ -35,11 +39,14 @@ export type Reply =
 const stores = new Map<string, ReturnType<typeof createFinanceAccountStore>>()
 let broker: ReturnType<typeof brokerHostClient> | undefined
 let accepted: MessagePort | undefined
+const grantReports: string[] = []
+let grantPosts = 0
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Fixture resource missing')
 	return value
 }
 async function execute(operation: Operation, ports: readonly MessagePort[]): Promise<unknown> {
+	if (operation.type === 'GRANT_REPORTS') return { reports: [...grantReports], posts: grantPosts }
 	if (operation.type === 'GRANT_FRAME') {
 		const decoded =
 			operation.direction === 'request'
@@ -89,12 +96,24 @@ async function execute(operation: Operation, ports: readonly MessagePort[]): Pro
 	if (operation.type === 'BROKER_INIT') {
 		if (broker) throw new Error('Fixture broker already open')
 		broker =
-			operation.ownership === 'child'
-				? createOwnedBrokerFixture(operation.data, operation.control, operation.scope)
-				: brokerHostClient(operation.data, operation.control, operation.scope, {
-						onOverdue: () => {},
-						onBlocked: () => {}
-					})
+			operation.ownership === 'grant' || operation.ownership === 'retiring-grant'
+				? createGrantOwnerFixture(
+						operation.data,
+						operation.control,
+						operation.scope,
+						operation.descriptor,
+						operation.ownership === 'retiring-grant',
+						(report) => grantReports.push(report.type),
+						() => {
+							grantPosts++
+						}
+					)
+				: operation.ownership === 'child'
+					? createOwnedBrokerFixture(operation.data, operation.control, operation.scope)
+					: brokerHostClient(operation.data, operation.control, operation.scope, {
+							onOverdue: () => {},
+							onBlocked: () => {}
+						})
 		return broker.host.identity
 	}
 	if (operation.type === 'BROKER_READ') return required(broker).readGeneration(operation.key)

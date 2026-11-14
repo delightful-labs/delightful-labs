@@ -5,6 +5,9 @@ import {
 	serveFinanceGenerationGrant
 } from '../../src/lib/runtime/worker/broker-host.js'
 import type { Operation, Reply } from './bindings.worker.js'
+import type { FinanceGrantDescriptor } from '../../src/lib/runtime/worker/grant-binding.js'
+
+type Ownership = 'root' | 'child' | 'grant' | 'retiring-grant'
 
 type Result = Exclude<Reply, { type: 'READY' }>
 const workers = new Map<string, Worker>()
@@ -44,7 +47,8 @@ async function attachHost(
 	data: MessageChannel,
 	control: MessageChannel,
 	scope: string,
-	ownership: 'root' | 'child',
+	ownership: Ownership,
+	descriptor: FinanceGrantDescriptor,
 	host: {
 		release: () => void
 		opens: { url: string; name: string }[]
@@ -55,7 +59,7 @@ async function attachHost(
 	hosts.set(name, host)
 	const initialized = await request(
 		name,
-		{ type: 'BROKER_INIT', data: data.port2, control: control.port2, scope, ownership },
+		{ type: 'BROKER_INIT', data: data.port2, control: control.port2, scope, ownership, descriptor },
 		[data.port2, control.port2]
 	)
 	const identity = initialized.type === 'RESULT' ? initialized.value : undefined
@@ -185,7 +189,7 @@ const fixture = {
 			}
 		}
 	},
-	async bindGeneration(name: string, ownership: 'root' | 'child' = 'root') {
+	async bindGeneration(name: string, ownership: Ownership = 'root') {
 		const data = new MessageChannel(),
 			control = new MessageChannel()
 		const scope = crypto.randomUUID()
@@ -211,15 +215,23 @@ const fixture = {
 				}
 			}
 		)
-		const identity = await attachHost(name, data, control, scope, ownership, {
-			release,
-			opens,
-			reads,
-			writes
-		})
+		const identity = await attachHost(
+			name,
+			data,
+			control,
+			scope,
+			ownership,
+			{ kind: 'generation', key },
+			{
+				release,
+				opens,
+				reads,
+				writes
+			}
+		)
 		return { ...identity, key }
 	},
-	async bindBroker(name: string, ownership: 'root' | 'child' = 'root') {
+	async bindBroker(name: string, ownership: Ownership = 'root') {
 		const data = new MessageChannel(),
 			control = new MessageChannel()
 		const scope = crypto.randomUUID()
@@ -240,12 +252,20 @@ const fixture = {
 				}
 			}
 		)
-		const identity = await attachHost(name, data, control, scope, ownership, {
-			release,
-			opens,
-			reads,
-			writes
-		})
+		const identity = await attachHost(
+			name,
+			data,
+			control,
+			scope,
+			ownership,
+			{ kind: 'broker', url, name: workerName },
+			{
+				release,
+				opens,
+				reads,
+				writes
+			}
+		)
 		return { ...identity, url, name: workerName }
 	},
 	stats(name: string) {
