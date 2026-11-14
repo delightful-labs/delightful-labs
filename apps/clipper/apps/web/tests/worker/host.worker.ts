@@ -37,6 +37,20 @@ self.onmessage = async ({ data }) => {
 			const before = await client.db.one(app.libraries.where({ id: account.id }), {
 				tier: 'local-first'
 			})
+			if (typeof data.inspectOperationId === 'string') {
+				const retained = await client.db.one(
+					app.storageOperations.where({ id: data.inspectOperationId }),
+					{ tier: 'local-first' }
+				)
+				self.postMessage({
+					type: 'READY',
+					accountId: account.id,
+					existing: !!before,
+					retained: retained?.payloadHash === 'worker-host-proof'
+				})
+				if (data.holdUntilTerminated === true) await new Promise<void>(() => {})
+				return
+			}
 			const documentId = crypto.randomUUID()
 			const write = client.db.insert(
 				app.storageOperations,
@@ -83,6 +97,8 @@ self.onmessage = async ({ data }) => {
 				sharedWorker: typeof SharedWorker,
 				operationId: documentId
 			})
+			// Test-only pause after local receipts: native termination must skip orderly close.
+			if (data.holdUntilTerminated === true) await new Promise<void>(() => {})
 		} finally {
 			await session.close()
 		}

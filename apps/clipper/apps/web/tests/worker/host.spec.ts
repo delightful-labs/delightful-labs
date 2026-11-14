@@ -180,3 +180,46 @@ test('worker refuses stale library intent before issuing a save', async ({ page 
 	})
 	expect(result).toEqual({ valid: true, stale: false })
 })
+
+test('reopens locally durable data after native Worker termination without a graceful-close receipt', async ({
+	page
+}) => {
+	await page.goto('/')
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
+	const first = await page.evaluate(async () => {
+		const path = '/tests/worker/host-driver.ts'
+		return (await import(/* @vite-ignore */ path)).qualifyHost(true)
+	})
+	const durable = z
+		.object({
+			operationId: z.string().uuid(),
+			sameAccount: z.literal(true),
+			written: z.literal(true),
+			domainSaved: z.literal(true),
+			cleanlyClosed: z.literal(false)
+		})
+		.parse(first)
+	await page.context().setOffline(true)
+	try {
+		const reopened = await page.evaluate(async (id) => {
+			const path = '/tests/worker/host-driver.ts'
+			return (await import(/* @vite-ignore */ path)).qualifyHost(true, id)
+		}, durable.operationId)
+		expect(reopened).toMatchObject({
+			sameAccount: true,
+			existing: true,
+			retained: true,
+			cleanlyClosed: false
+		})
+		expect(
+			await page.evaluate(async (id) => {
+				const path = '/tests/worker/host-driver.ts'
+				return (await import(/* @vite-ignore */ path)).workerIntentExists(id)
+			}, durable.operationId)
+		).toBe(true)
+	} finally {
+		await page.context().setOffline(false)
+	}
+	await page.reload()
+	await expect(page.getByRole('link', { name: 'Worker proof', exact: true })).toHaveCount(1)
+})

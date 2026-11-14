@@ -15,7 +15,7 @@ function serveNativeBroker(data: MessagePort, control: MessagePort, scope: strin
 		open: (url, name) => new SharedWorker(url, { type: 'module', name })
 	})
 }
-export async function qualifyHost() {
+export async function qualifyHost(abrupt = false, inspectOperationId?: string) {
 	const { currentLibraryRecords } = await import('../fixture-records.js')
 	const expected = currentLibraryRecords().articles.libraryId
 	const key = accountStorageKey(PUBLIC_JAZZ_SERVER_URL)
@@ -37,11 +37,16 @@ export async function qualifyHost() {
 							'Worker host refused: ' + data.message + '; SharedWorker=' + data.sharedWorker
 						)
 					)
-				if (data.type === 'READY') result = { ...data, sameAccount: data.accountId === expected }
+				if (data.type === 'READY') {
+					result = { ...data, sameAccount: data.accountId === expected, cleanlyClosed: false }
+					if (abrupt) resolve(result)
+				}
 				if (data.type === 'CLOSED') resolve(result)
 			}
 			worker.postMessage(
 				{
+					holdUntilTerminated: abrupt,
+					inspectOperationId,
 					port: channel.port2,
 					broker: broker.port2,
 					brokerControl: brokerControl.port2,
@@ -53,9 +58,9 @@ export async function qualifyHost() {
 			)
 		})
 	} finally {
+		worker.terminate()
 		stopBroker()
 		stop()
-		worker.terminate()
 	}
 }
 

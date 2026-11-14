@@ -1,11 +1,14 @@
 # Svelte and XState simplification tasks
 
-Status: Research started. Implements [the specification](svelte-xstate-simplification.md).
+Status: Completion review on PR #31. Implements [the specification](svelte-xstate-simplification.md).
 Initial findings and proposed pilot: [research record](svelte-xstate-research.md).
 Current decision: native Svelte subscriptions to LibraryClient supersede the
 initial useSelector adapter experiment; XState remains the workflow owner.
-Unchecked items are planned work, not completed validation. Keep implementation
-batches to the shared review limits; no dependency or test approval is implied.
+The user authorized all remaining implementation and tests in PR #31 together
+on 2026-11-14, including multiple components/routes for one review. No dependency
+or copy changes are implied. [Completion evidence and decisions](svelte-xstate-completion.md)
+reconcile the historical pending notes below; final native checks remain open
+until the expanded PR qualification passes.
 
 ## A. Establish the design and evidence
 
@@ -117,11 +120,11 @@ each batch before running them.
 
 ## D. Simplify lifecycle only where the audit supports it
 
-- [ ] D1. Select one evidence-backed simplification from A4. Show the operation,
+- [x] D1. Select one evidence-backed simplification from A4. Show the operation,
       owner, states, native cancellation contract and before/after failure cases.
-- [ ] D2. Amend any conflicting active guidance with explicit approval before
+- [x] D2. Amend any conflicting active guidance with explicit approval before
       changing the dependent implementation. Retain historical evidence.
-- [ ] D3. Implement the bounded change with standard invocation/cancellation/
+- [x] D3. Implement the bounded change with standard invocation/cancellation/
       cleanup where sufficient. Preserve a minimal closing workflow only where
       asynchronous settlement is actually required.
 - [ ] D4. After review/test approval, qualify cancellation during acquisition,
@@ -136,24 +139,25 @@ boundary is necessary is a valid result; this phase has no removal quota.
 
 ## E. Follow through on Svelte composition
 
-- [ ] E1. Propose reader responsibility boundaries for observation, surface DOM,
+- [x] E1. Propose reader responsibility boundaries for observation, surface DOM,
       footnotes, settings and route identity; preserve snippet composition.
-- [ ] E2. Extract one responsibility per review cycle. Keep route composition
+- [x] E2. Extract one responsibility per review cycle. Keep route composition
       visible and avoid a controller or prop object that conceals the same work.
-- [ ] E3. Replace duplicate media-query subscription plumbing with `MediaQuery`;
+- [x] E3. Replace duplicate media-query subscription plumbing with `MediaQuery`;
       preserve breakpoint-dependent opening behavior and hydration assumptions.
       AccountDrawer now uses Svelte MediaQuery and one effect for viewport defaults
       after the DUI reference binds. Untracked drawer reads preserve manual
       closure. Five mounted drawer cases and the full 27-case component suite
       pass; native resize/focus/inertness coverage is added to the account suite.
-      ReaderSettingsDrawer remains a separate component/review cycle; E3 stays
-      open until both implementations and native coverage are qualified.
-- [ ] E4. Evaluate attachments for saved-content/surface lifetime. Keep unrelated
+      The expanded PR also migrates ReaderSettingsDrawer, keeps disclosure across
+      resizing and replaces getDrawer traversal with DUI bind:open. Both native
+      drawer suites and mounted route cases qualify the combined review.
+- [x] E4. Evaluate attachments for saved-content/surface lifetime. Keep unrelated
       image/progress updates from replacing article DOM; preserve syntax/image
       cleanup and final reader-position reporting.
-- [ ] E5. Consolidate repeated account/page frame layout through snippets and
+- [x] E5. Consolidate repeated account/page frame layout through snippets and
       supported DUI APIs. Propose shared drawer improvements in DUI if needed.
-- [ ] E6. Adopt typed context where it improves integration scoping; reduce
+- [x] E6. Adopt typed context where it improves integration scoping; reduce
       imperative component traversal while retaining narrow focus operations.
 
 Exit: changes preserve native keyboard/forms/navigation, focus, modal inertness
@@ -167,5 +171,19 @@ incidentally. Each change gets appropriate reviewed validation.
       host/client protocols changed. Use isolated fixtures and preserve user data.
 - [ ] F2. Record exact package versions, decisions, removed duplication, test
       evidence, remaining custom lifecycle boundaries and unresolved limitations.
-- [ ] F3. Update active integration guidance to describe the qualified pattern.
+- [x] F3. Update active integration guidance to describe the qualified pattern.
       Keep the migration feature selector unchanged unless explicitly reassigned.
+
+
+## Combined completion review
+
+The earlier one-component review milestones are historical; the user requested
+all remaining work and tests together on PR #31. E1/E2 extract footnote ownership
+and PageFrame composition. E4 deliberately retains the bounded saved-content
+action after evaluating attachments; new mounted tests prove image changes do
+not reset DOM/selection. E6 uses createContext and removes nested drawer access.
+D1–D3 simplify only offline-shell observer cleanup; D2 needs no policy exception.
+The worker/SDK/transaction closure audit retains ownership where native evidence
+does not justify removal. See the completion review for exact source/evidence.
+B4/C1/C2/D4/D5/F1/F2 remain unchecked only until the final expanded CI results are
+recorded; their implementation/tests and qualification map are present.
