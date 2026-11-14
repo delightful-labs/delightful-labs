@@ -9,8 +9,20 @@ for this refactoring. W05/W06 and production activation remain incomplete.
 The checkpoint is uploaded in
 [PR #35](https://github.com/delightful-labs/delightful-labs/pull/35). Its branch
 now includes main `d279e7ef` (runtime-client direction and Clipper Svelte/lifecycle
-updates). Results below retain their actual `ea460e9d` source baseline; draft
-status distinguishes this saved checkpoint from refreshed integration acceptance.
+updates). Results below retain their actual `ea460e9d` source baseline. All
+hosted Foundation, Finance and Clipper workflows passed at checkpoint `bde9b78d`;
+subsequent review changes require fresh checks on their uploaded head.
+
+PR review identified hidden native disposal/acknowledgement failures in the
+shared close adapter. The [close correction](../../../../packages/local-first/docs/worker-host-close.md#pr-35-review-correction-explicit-native-failure-facts)
+is addressed on PR #35's integration branch before grant-owner work continues.
+The user approved the concrete implementation and its tests on 2026-11-14.
+Its own qualification passes 1,170 library tests (87 focused), all public package
+consumers, 2,006 Finance unit/12 native-browser cases and Clipper's 872 unit,
+30 component, 32 worker, 12 extension and eight production-offline cases. The
+linked correction record preserves the new model-oracle failure/replay and
+sandbox startup failures. F3's historical qualification below remains separate.
+The grant-owner follow-up branch must include this correction before new work.
 
 ## Ownership and the concrete missing contract
 

@@ -6,7 +6,8 @@ import type {
 	WorkerChannelCall,
 	WorkerChannelInput,
 	WorkerChannelResult,
-	WorkerHostClosed
+	WorkerHostClosed,
+	WorkerHostCloseFailure
 } from '../../contracts/worker-channel.js'
 import { serveHostClose, workerHostControl } from '../../worker/host-close.js'
 import {
@@ -212,6 +213,7 @@ export type BrokerHostOptions = {
 	closeTimeoutMs?: number
 	onOverdue: () => void
 	onBlocked: () => void
+	onCloseFailure?: (failure: WorkerHostCloseFailure) => void
 }
 /** Structural DTO contracts only; the broker wire schemas remain private. */
 export type BrokerHostOperation = Payload
@@ -325,7 +327,8 @@ export function brokerHostChannelInput(
 			if (reply.type === 'OPENED') reply.port.close()
 		},
 		onOverdue: options.onOverdue,
-		onBlocked: options.onBlocked
+		onBlocked: options.onBlocked,
+		...(options.onCloseFailure ? { onCloseFailure: options.onCloseFailure } : {})
 	}
 }
 

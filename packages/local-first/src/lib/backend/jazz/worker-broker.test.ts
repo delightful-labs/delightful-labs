@@ -61,7 +61,8 @@ function fixture(manual = false) {
 		})
 	}
 	const onOverdue = vi.fn(),
-		onBlocked = vi.fn()
+		onBlocked = vi.fn(),
+		onCloseFailure = vi.fn()
 	const release = manual
 		? serveHostClose(control.port1, scope, () => {
 				data.port1.onmessage = null
@@ -73,7 +74,8 @@ function fixture(manual = false) {
 		requestTimeoutMs: 5,
 		closeTimeoutMs: 10,
 		onOverdue,
-		onBlocked
+		onBlocked,
+		onCloseFailure
 	})
 	cleanup.add(() => {
 		client.dispose()
@@ -81,8 +83,33 @@ function fixture(manual = false) {
 		data.port1.close()
 		control.port1.close()
 	})
-	return { data, control, scope, clock, native, client, onOverdue, onBlocked }
+	return { data, control, scope, clock, native, client, onOverdue, onBlocked, onCloseFailure }
 }
+
+it('the root facade reports native close failure without resolving closure or restarting its deadline', async () => {
+	const f = fixture()
+	vi.spyOn(f.control.port1, 'postMessage').mockImplementationOnce(() => {
+		throw new Error('Native success receipt unavailable')
+	})
+	let completed = false
+	const closed = f.client.close().then((receipt) => {
+		completed = true
+		return receipt
+	})
+	await vi.waitFor(() =>
+		expect(f.onCloseFailure).toHaveBeenCalledExactlyOnceWith({
+			...f.client.host.identity,
+			stage: 'acknowledge'
+		})
+	)
+	expect(completed).toBe(false)
+	f.clock.increment(10)
+	expect(f.onOverdue).toHaveBeenCalledOnce()
+	expect(completed).toBe(false)
+	f.control.port1.postMessage({ version: 1, type: 'HOST_CLOSED', ...f.client.host.identity })
+	expect(await closed).toEqual(f.client.host.identity)
+	expect(f.onBlocked).not.toHaveBeenCalled()
+})
 
 it('preserves exact SDK URL/name and raw generation values, and transfers port ownership to the SDK', async () => {
 	const f = fixture()

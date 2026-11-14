@@ -6,7 +6,8 @@ import type {
 	WorkerChannelCall,
 	WorkerChannelInput,
 	WorkerChannelResult,
-	WorkerHostClosed
+	WorkerHostClosed,
+	WorkerHostCloseFailure
 } from '../../contracts/worker-channel.js'
 import type { WorkerRequestIdentity, WorkerRequestResult } from '../../contracts/worker-request.js'
 import { createWorkerRequest } from './worker-request.js'
@@ -168,6 +169,7 @@ function createChannelController<Request, Response>() {
 			slots: Slot[]
 			fault: Fault | undefined
 			receipt: WorkerHostClosed | undefined
+			closeFailure: WorkerHostCloseFailure | undefined
 		}
 	}
 	return setup({
@@ -184,6 +186,7 @@ function createChannelController<Request, Response>() {
 				}>(),
 				TRANSPORT_FAILED: types<{ scope: string; reason: Fault }>(),
 				HOST_CLOSED: types<{ receipt: WorkerHostClosed }>(),
+				HOST_CLOSE_FAILED: types<{ failure: WorkerHostCloseFailure }>(),
 				CLOSE_FAILED: types<{ scope: string }>(),
 				REQUEST_DONE: types<Omit<Report, 'type'>>()
 			},
@@ -209,7 +212,10 @@ function createChannelController<Request, Response>() {
 				)
 			},
 			matchingScope: ({ context }: { context: Context }, scope: string) =>
-				context.record.scope === scope
+				context.record.scope === scope,
+			matchingCloseIdentity: ({ context }: { context: Context }, identity: WorkerHostClosed) =>
+				identity.scope === context.record.closeIdentity.scope &&
+				identity.requestId === context.record.closeIdentity.requestId
 		}
 	}).createMachine({
 		id: 'worker-channel-controller',
@@ -224,7 +230,8 @@ function createChannelController<Request, Response>() {
 				sequence: 0,
 				slots: [],
 				fault: undefined,
-				receipt: undefined
+				receipt: undefined,
+				closeFailure: undefined
 			}
 		}),
 		initial: 'checking',
@@ -430,6 +437,9 @@ function createChannelController<Request, Response>() {
 						}
 					},
 					closing: {
+						timeout: 'closeDeadline',
+						onTimeout: ({ self }) =>
+							self.getSnapshot().matches('operating.closing.overdue') ? {} : { target: '.overdue' },
 						entry: ({ context }, enq) => {
 							for (const slot of context.record.slots)
 								enq.sendTo(slot.child, {
@@ -451,22 +461,30 @@ function createChannelController<Request, Response>() {
 						},
 						initial: 'waiting',
 						on: {
-							HOST_CLOSED: ({ context, event }) => {
-								if (
-									event.receipt.scope !== context.record.scope ||
-									event.receipt.requestId !== context.record.closeIdentity.requestId
-								)
-									return
+							HOST_CLOSED: (args) => {
+								if (!args.guards.matchingCloseIdentity(args, args.event.receipt)) return
 								return {
 									target: 'settling',
-									context: { record: { ...context.record, receipt: event.receipt } }
+									context: { record: { ...args.context.record, receipt: args.event.receipt } }
+								}
+							},
+							HOST_CLOSE_FAILED: (args, enq) => {
+								if (!args.guards.matchingCloseIdentity(args, args.event.failure)) return
+								if (args.context.record.closeFailure !== undefined) return {}
+								const report = required(args.context.record.configuration).onCloseFailure
+								if (report) enq(report, args.event.failure)
+								const context = {
+									record: { ...args.context.record, closeFailure: args.event.failure }
+								}
+								if (args.self.getSnapshot().matches('operating.closing.overdue')) return { context }
+								return {
+									target: '.nativeFailed',
+									context
 								}
 							}
 						},
 						states: {
 							waiting: {
-								timeout: 'closeDeadline',
-								onTimeout: { target: 'overdue' },
 								on: {
 									CLOSE_FAILED: (args) =>
 										args.guards.matchingScope(args, args.event.scope)
@@ -474,6 +492,7 @@ function createChannelController<Request, Response>() {
 											: undefined
 								}
 							},
+							nativeFailed: {},
 							overdue: {
 								entry: ({ context }, enq) =>
 									enq(

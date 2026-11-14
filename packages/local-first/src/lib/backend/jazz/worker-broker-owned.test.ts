@@ -87,8 +87,9 @@ function fixture(manual = false, start = true) {
 	const original = { ...identity }
 	const clock = new SimulatedClock()
 	const onOverdue = vi.fn(),
-		onBlocked = vi.fn()
-	const options = { requestTimeoutMs: 5, closeTimeoutMs: 10, onOverdue, onBlocked }
+		onBlocked = vi.fn(),
+		onCloseFailure = vi.fn()
+	const options = { requestTimeoutMs: 5, closeTimeoutMs: 10, onOverdue, onBlocked, onCloseFailure }
 	const input = brokerHostChannelInput(data.port2, control.port2, identity, options)
 	const native = {
 		admitOpen: (candidate: string, candidateName: string) =>
@@ -144,6 +145,7 @@ function fixture(manual = false, start = true) {
 		clock,
 		onOverdue,
 		onBlocked,
+		onCloseFailure,
 		parent,
 		closed: closed.promise,
 		outputs,
@@ -156,6 +158,30 @@ function fixture(manual = false, start = true) {
 function wire(identity: WorkerRequestIdentity) {
 	return { version: 1, ...identity }
 }
+
+it('the child-owned channel forwards native failure to its owner and completes only on a genuine receipt', async () => {
+	const f = fixture(true)
+	f.parent.send({ type: 'CLOSE' })
+	await vi.waitFor(() => expect(f.controls).toHaveLength(1))
+	f.clock.increment(4)
+	f.control.port1.postMessage({
+		version: 1,
+		type: 'HOST_CLOSE_FAILED',
+		...f.original,
+		stage: 'dispose'
+	})
+	await vi.waitFor(() =>
+		expect(f.onCloseFailure).toHaveBeenCalledExactlyOnceWith({ ...f.original, stage: 'dispose' })
+	)
+	expect(f.outputs).toEqual([])
+	f.clock.increment(6)
+	expect(f.onOverdue).toHaveBeenCalledOnce()
+	expect(f.outputs).toEqual([])
+	f.acknowledge()
+	expect(await f.closed).toEqual(f.original)
+	expect(f.controls).toHaveLength(1)
+	expect(f.onBlocked).not.toHaveBeenCalled()
+})
 
 it('constructs logic, native input and a call without randomness, listeners, starts or posts', () => {
 	const data = ports(),
