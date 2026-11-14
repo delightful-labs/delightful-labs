@@ -25,9 +25,16 @@ The built-in selector maps changed paths to existing suites and transitive
 consumers. UI selects all projects. Local First selects itself, Finance and
 Clipper. Website/Finance-only changes stay scoped. Clipper web and extension are
 verified together because current source and native fixtures cross that boundary.
+Changes consisting entirely of `.md` files (case insensitive) skip project suites
+and guidance/tooling checks. Mixed changes keep the existing conservative routing.
 Root/unknown/config/guidance uncertainty and manual/missing-history events select
-all. Renames/deletions include both old and new paths. The guidance/discovery and
-selector checks run on every change.
+all. Renames/deletions include both old and new paths. Selection and PR-title
+checks still run so required checks resolve without workflow-level path filters.
+
+Vercel projects use the shared ignored-build script to cancel Markdown-only
+builds before installation. It compares the current commit with Vercel's previous
+deployment SHA; missing/invalid history continues the build. This also covers
+Markdown-only pushes after merge. Vercel may record a canceled deployment.
 
 Workflows keep their triggers and existing job names. Job conditions skip
 unaffected suites; they do not silently reduce an affected suite. A failed plan
