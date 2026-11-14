@@ -73,6 +73,7 @@ function fixture(title = 'First article') {
 		},
 		filters: { query: 'initial', view: 'all', favorites: false, selectedTags: [] },
 		canAdd: true,
+		readerId: '',
 		reader: undefined,
 		readerProgress: undefined,
 		readerRevision: '',

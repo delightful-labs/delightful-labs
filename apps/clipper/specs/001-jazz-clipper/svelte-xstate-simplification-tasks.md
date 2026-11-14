@@ -95,6 +95,13 @@ Exit: accepted pilot with no custom selector framework or lifecycle regression.
       Native browser qualification remains pending; no domain actor change.
 - [ ] C3. Migrate reader observation in its own review cycle; preserve document
       identity, open/close commands, late-report rejection and content revisions.
+      Implemented on refactor/clipper-reader-subscription: native $client reads,
+      bound route/client commands and worker-projected readerId correlation.
+      A UI mount guard preserves OPEN-before-surface ordering for initial content.
+      Six mounted tests cover initial/loading/available views, stale route data,
+      direct reads without a list row, DOM/selection continuity, replacement,
+      unavailable feedback and scoped teardown. Native browser qualification
+      remains pending, including final position persistence and navigation.
 - [ ] C4. Remove superseded active helpers only after locating consumers. Trace
       older `Account.svelte`/library context separately; do not delete fixtures or
       compatibility paths merely because the active layout does not import them.

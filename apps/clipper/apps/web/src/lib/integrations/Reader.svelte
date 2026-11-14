@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte'
+	import { onMount, untrack } from 'svelte'
 	import type { LibraryClient } from '../runtime/worker/client.js'
-	import type { LibraryRender } from '../runtime/worker/views.js'
 	import type { LibraryIntent } from '../runtime/worker/protocol.js'
 	import { StatusMessage } from 'delightful-ui'
 	import { t } from '../localization/index.js'
@@ -13,25 +12,28 @@
 		type ReaderFootnote
 	} from '../reader/structure.js'
 	let { actor, id }: { actor: LibraryClient; id: string } = $props()
-	let snapshot = $state<LibraryRender>()
+	const client = untrack(() => actor)
+	const articleId = untrack(() => id)
+	// Create the DOM surface only after onMount has sent OPEN.
+	let mounted = $state(false)
 	let detachSurface: (() => void) | undefined
 	let headings = $state<ReaderHeading[]>([])
 	let footnote = $state<ReaderFootnote>()
 	const footnoteId = $props.id()
-	const view = $derived(snapshot?.view ?? actor.getView().view)
+	const view = $derived($client.view)
 	const reading = $derived(view.readerExperience)
-	const reader = $derived(snapshot?.reader)
-	const article = $derived(snapshot?.article)
-	const originalUrl = $derived(snapshot?.sourceUrl)
+	const reader = $derived(mounted && $client.readerId === articleId ? $client.reader : undefined)
+	const article = $derived($client.article)
+	const originalUrl = $derived($client.sourceUrl)
 	function send(event: Extract<LibraryIntent, { type: 'READER_EVENT' }>['event']) {
-		actor.send({ type: 'READER_EVENT', event })
+		client.send({ type: 'READER_EVENT', event })
 	}
 
 	function ready(node: HTMLElement) {
 		if (reader?.kind !== 'available') return
 		headings = readerHeadings(node)
 		const scroller = node.closest('main')
-		if (scroller) detachSurface = actor.attach({ root: node, scroller }, reader.document.id)
+		if (scroller) detachSurface = client.attach({ root: node, scroller }, reader.document.id)
 	}
 	function release() {
 		detachSurface?.()
@@ -53,14 +55,11 @@
 		footnote = undefined
 	}
 	onMount(() => {
-		const subscription = actor.subscribe((value) => (snapshot = value))
-		actor.send({ type: 'OPEN', id })
-		snapshot = actor.getView()
+		client.send({ type: 'OPEN', id: articleId })
+		mounted = true
 		return () => {
 			release()
-			subscription.unsubscribe()
-			actor.send({ type: 'CLOSE_READER' })
-			snapshot = undefined
+			client.send({ type: 'CLOSE_READER' })
 		}
 	})
 </script>
@@ -74,8 +73,8 @@
 		title={reader.document.title}
 		asset={reader.asset}
 		imageViews={view.imageViews}
-		onretryimage={(id) => actor.send({ type: 'RETRY_IMAGE', id })}
-		onimageerror={(id, url) => actor.send({ type: 'IMAGE_ERROR', id, url })}
+		onretryimage={(id) => client.send({ type: 'RETRY_IMAGE', id })}
+		onimageerror={(id, url) => client.send({ type: 'IMAGE_ERROR', id, url })}
 		text={reader.text}
 		sourceUrl={originalUrl}
 		preferences={reading.preferences}
@@ -95,14 +94,14 @@
 		onshowcontrols={() => send({ type: 'SHOW_CONTROLS' })}
 		onreflow={() => send({ type: 'REFLOW' })}
 		onarchive={() =>
-			actor.send({
+			client.send({
 				type: 'ORGANIZE',
-				request: { id: article?.id ?? id, field: 'status', value: 'archive' }
+				request: { id: article?.id ?? articleId, field: 'status', value: 'archive' }
 			})}
 		onrestore={() =>
-			actor.send({
+			client.send({
 				type: 'ORGANIZE',
-				request: { id: article?.id ?? id, field: 'trashed', value: false }
+				request: { id: article?.id ?? articleId, field: 'trashed', value: false }
 			})}
 		onready={ready}
 		onrelease={release}
@@ -113,4 +112,6 @@
 			document.getElementById(footnoteId)?.hidePopover()
 		}}
 	/>
-{:else if view.readerMessage}<StatusMessage {...view.readerMessage} />{/if}
+{:else if $client.readerId === articleId && view.readerMessage}<StatusMessage
+		{...view.readerMessage}
+	/>{/if}
