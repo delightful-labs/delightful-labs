@@ -24,6 +24,7 @@ jobs:
       local_first: ${{ steps.selection.outputs.local_first }}
       finance: ${{ steps.selection.outputs.finance }}
       clipper: ${{ steps.selection.outputs.clipper }}
+      markdown_only: ${{ steps.selection.outputs.markdown_only }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -35,9 +36,11 @@ jobs:
       - id: selection
         run: node scripts/monorepo/ci.mjs
         working-directory: .
-      - run: node scripts/monorepo/check-guidance.mjs
+      - if: steps.selection.outputs.markdown_only != 'true'
+        run: node scripts/monorepo/check-guidance.mjs
         working-directory: .
-      - run: node --test scripts/monorepo/ci.test.mjs scripts/monorepo/guidance.test.mjs
+      - if: steps.selection.outputs.markdown_only != 'true'
+        run: node --test scripts/monorepo/ci.test.mjs scripts/monorepo/guidance.test.mjs
         working-directory: .
 
   verify:

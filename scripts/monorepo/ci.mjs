@@ -4,7 +4,12 @@ import { pathToFileURL } from 'node:url'
 
 export const projects = ['website', 'ui', 'local_first', 'finance', 'clipper']
 
+export function markdownOnly(paths) {
+	return paths.length > 0 && paths.every((path) => /\.md$/iu.test(path) && !path.includes('\\') && !path.split('/').includes('..'))
+}
+
 export function selectChecks(paths, forceAll = false) {
+	if (!forceAll && markdownOnly(paths)) return Object.fromEntries(projects.map((name) => [name, false]))
 	const selected = new Set()
 	for (const path of paths) {
 		if (path.startsWith('apps/website/')) selected.add('website')
@@ -62,6 +67,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 	} else {
 		const plan = planForEvent(process.env.GITHUB_EVENT_NAME, event, process.cwd())
 		console.info(JSON.stringify(plan, null, 2))
-		if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(plan.checks).map(([key, value]) => `${key}=${value}\n`).join(''))
+		if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries({ ...plan.checks, markdown_only: markdownOnly(plan.paths) && Object.values(plan.checks).every((selected) => !selected) }).map(([key, value]) => `${key}=${value}\n`).join(''))
 	}
 }
