@@ -98,6 +98,7 @@
 <style>
 	:global(.reader-drawer) {
 		--dui-drawer-width: clamp(18rem, 30vw, 24rem);
+		--dui-drawer-height: 100dvh;
 		--dui-drawer-padding: 0 0 0 var(--dui-spacing-md);
 	}
 

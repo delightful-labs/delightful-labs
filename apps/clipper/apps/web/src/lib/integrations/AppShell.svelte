@@ -74,4 +74,7 @@
 		height: 100%;
 		overflow: auto;
 	}
+	.content:has(:global(.reader-workspace)) {
+		overflow-anchor: none;
+	}
 </style>

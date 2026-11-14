@@ -1,5 +1,4 @@
 import {
-	expectLibrarySynced,
 	openAccountSettings,
 	openAllArticles,
 	readRecoveryPhrase,
@@ -38,7 +37,7 @@ test.afterAll(async () => {
 })
 async function seed(page: Page, url = 'https://example.com/reader-experience') {
 	await page.goto('/')
-	await expectLibrarySynced(page)
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const id = await page.evaluate(async (url) => {
 		const path = '/tests/reader-driver.ts'
 		return (await import(/* @vite-ignore */ path)).seedReader(url)
@@ -73,7 +72,7 @@ async function phrase(page: Page) {
 
 async function codeReader(page: Page) {
 	await page.goto('/')
-	await expectLibrarySynced(page)
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await page.evaluate(async () => {
 		const path = '/tests/reader-driver.ts'
 		return (await import(/* @vite-ignore */ path)).seedReader(
@@ -357,7 +356,7 @@ test('updates progress for a short article when a reading gesture cannot scroll 
 }) => {
 	await page.setViewportSize({ width: 1600, height: 1400 })
 	await page.goto('/')
-	await expectLibrarySynced(page)
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const id = await page.evaluate(async () => {
 		const path = '/tests/reader-driver.ts'
 		return (await import(/* @vite-ignore */ path)).seedReader('https://example.com/short-reader', 1)

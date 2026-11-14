@@ -27,6 +27,7 @@ for (const mode of ['linked', 'existing', 'expired'])
 		const ui = staticShellServer(
 			fileURLToPath(new URL('../../.offline-test-builds/a/', import.meta.url))
 		)
+		const signOutResponses: number[] = []
 		let auth: ReturnType<typeof createAuthServer>
 		const start = async () => {
 			const authority = await startJazzAuthority({
@@ -39,7 +40,12 @@ for (const mode of ['linked', 'existing', 'expired'])
 				}
 			})
 			auth = createAuthServer({ db: () => authority.backend.db, schema: app }, { origin, secret })
-			ui.useAuth((request) => handleConfiguredAuth(auth, request, { origin, secret }))
+			ui.useAuth(async (request) => {
+				const response = await handleConfiguredAuth(auth, request, { origin, secret })
+				if (new URL(request.url).pathname === '/api/auth/sign-out')
+					signOutResponses.push(response.status)
+				return response
+			})
 			await ui.useJazz(authority.backend)
 			return authority
 		}
@@ -307,13 +313,14 @@ for (const mode of ['linked', 'existing', 'expired'])
 				)
 				.toBeGreaterThan(0)
 			if (mode === 'linked') {
-				const signingOut = page.waitForResponse(
-					(response) => new URL(response.url()).pathname === '/api/auth/sign-out'
-				)
-				await openAccountSettings(page)
-				await page.getByRole('button', { name: 'Sign out', exact: true }).click()
-				const signOutResponse = await signingOut
-				expect(signOutResponse.status(), await signOutResponse.text()).toBe(200)
+				await test.step('sign out through the real auth handler', async () => {
+					const previous = signOutResponses.length
+					await openAccountSettings(page)
+					await page
+						.getByRole('button', { name: 'Sign out', exact: true })
+						.click({ timeout: 10000 })
+					await expect.poll(() => signOutResponses.slice(previous)).toEqual([200])
+				})
 				await expect(
 					page.getByRole('button', { name: 'Sign in with AT Protocol', exact: true })
 				).toBeVisible({ timeout: 30000 })
