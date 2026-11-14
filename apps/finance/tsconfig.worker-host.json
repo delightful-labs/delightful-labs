@@ -12,6 +12,8 @@
 	},
 	"include": [
 		"src/lib/runtime/worker/host-protocol.ts",
+		"src/lib/runtime/worker/account-store.test.ts",
+		"src/lib/runtime/worker/broker-host.test.ts",
 		"src/lib/runtime/worker/host-drain.ts",
 		"src/lib/runtime/worker/host-drain.test.ts",
 		"src/lib/runtime/worker/host-legacy.test.ts",

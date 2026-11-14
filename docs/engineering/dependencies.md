@@ -15,6 +15,9 @@ owned classes/inheritance. Keep required variant-specific fields explicit. Exist
 Spec Kit tooling remains tooling; this rule does not authorize a mass rewrite.
 Pin/review beta APIs and use installed documentation. Do not patch XState or its
 public declarations. Existing qualified SDK/auth patches retain their ownership.
+Prepare a solution using supported APIs without new dependency patches first.
+Discuss a patch only after identifying a concrete limitation of that solution;
+simpler application coordination alone does not make a patch the default.
 
 Consume UI and Local First through supported public workspace exports. UI owns
 generic presentation; Local First owns reusable identity/workspace/operation

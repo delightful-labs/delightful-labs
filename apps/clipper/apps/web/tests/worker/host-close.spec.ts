@@ -10,7 +10,8 @@ test('native Window closure excludes later writes and releases malformed transfe
 	})
 	expect(result).toEqual({
 		matchingReceipt: true,
-		closeCalls: 1,
+		matchingFailure: true,
+		closeCalls: 2,
 		orphanReleases: 1,
 		failures: 1,
 		firstWriteObserved: true,

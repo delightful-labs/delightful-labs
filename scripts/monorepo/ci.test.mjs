@@ -16,7 +16,7 @@ test('CI selects transitive consumers and unions changed application scopes', ()
 	for (const app of ['web', 'extension']) assert.deepEqual(selected([`apps/clipper/apps/${app}/src/app.ts`]), ['clipper'])
 	assert.deepEqual(selected(['packages/local-first/src/index.ts']), ['local_first', 'finance', 'clipper'])
 	assert.deepEqual(selected(['apps/website/a', 'apps/finance/b']), ['website', 'finance'])
-	for (const path of ['packages/ui/src/button.svelte', 'pnpm-lock.yaml', 'AGENTS.md', '.github/workflows/ci.yml', 'new-project/a', 'apps/finance/../website/a', 'apps/finance/a\\b']) assert.deepEqual(selected([path]), projects)
+	for (const path of ['packages/ui/src/button.svelte', 'pnpm-lock.yaml', '.github/workflows/ci.yml', 'new-project/a', 'apps/finance/../website/a', 'apps/finance/a\\b']) assert.deepEqual(selected([path]), projects)
 	assert.deepEqual(selected([]), [])
 })
 
@@ -111,4 +111,60 @@ test('the existing Clipper browser check requires all three independent browser 
 	assert.match(required, /WORKER_RESULT: \$\{\{ needs.worker-offline.result \}\}/u)
 	assert.ok(required.includes('test "$WORKER_RESULT" = success'))
 	assert.ok(required.includes('test "$EXTENSION_RESULT" = success'))
+})
+
+
+test('Markdown-only changes skip suites; mixed, forced and suspicious paths retain conservative routing', () => {
+	assert.deepEqual(selected(['AGENTS.md', 'apps/finance/README.md', 'packages/ui/Guide.MD']), [])
+	assert.deepEqual(selected(['apps/finance/README.md', 'apps/finance/src/app.ts']), ['finance'])
+	assert.deepEqual(selected(['README.md', 'apps/finance/src/app.ts']), projects)
+	assert.deepEqual(Object.values(selectChecks(['README.md'], true)), projects.map(() => true))
+	for (const path of ['apps/finance/../README.md', 'apps/finance/a\\b.md', 'README.mdx']) assert.deepEqual(selected([path]), projects)
+})
+
+test('real Git Markdown PRs, deletions, renames and Vercel builds use the complete comparison', (t) => {
+	const cwd = mkdtempSync(resolve(tmpdir(), 'delightful-markdown-'))
+	t.after(() => rmSync(cwd, { recursive: true, force: true }))
+	const git = (...args) => execFileSync('git', ['-c', 'user.name=CI Test', '-c', 'user.email=ci@example.invalid', '-c', 'commit.gpgSign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+	const commit = () => { git('add', '-A'); git('commit', '-m', 'fixture'); return git('rev-parse', 'HEAD') }
+	const event = (base, head) => ({ pull_request: { base: { sha: base }, head: { sha: head } } })
+	const ignore = (base, head, workdir = cwd) => spawnSync(process.execPath, [resolve(root, 'scripts/monorepo/vercel-ignore.mjs')], {
+		cwd: workdir, encoding: 'utf8', env: { ...process.env, VERCEL_GIT_PREVIOUS_SHA: base, VERCEL_GIT_COMMIT_SHA: head },
+	})
+	git('init', '--quiet')
+	writeFileSync(resolve(cwd, 'README.md'), 'original')
+	const base = commit()
+	renameSync(resolve(cwd, 'README.md'), resolve(cwd, 'Guide.MD'))
+	const docs = commit()
+	assert.deepEqual(Object.values(planForEvent('pull_request', event(base, docs), cwd).checks), projects.map(() => false))
+	assert.equal(ignore(base, docs).status, 0)
+	mkdirSync(resolve(cwd, 'apps/website'), { recursive: true })
+	assert.equal(ignore(base, docs, resolve(cwd, 'apps/website')).status, 0)
+	const eventPath = resolve(cwd, 'event.json'), output = resolve(cwd, 'output')
+	writeFileSync(eventPath, JSON.stringify(event(base, docs)))
+	const plan = spawnSync(process.execPath, [resolve(root, 'scripts/monorepo/ci.mjs')], { cwd, encoding: 'utf8', env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output } })
+	assert.equal(plan.status, 0, plan.stderr)
+	assert.match(readFileSync(output, 'utf8'), /markdown_only=true/u)
+	rmSync(eventPath)
+	rmSync(output)
+	renameSync(resolve(cwd, 'Guide.MD'), resolve(cwd, 'app.js'))
+	const code = commit()
+	assert.deepEqual(Object.values(planForEvent('pull_request', event(docs, code), cwd).checks), projects.map(() => true))
+	assert.equal(ignore(docs, code).status, 1)
+	writeFileSync(resolve(cwd, 'notes.md'), 'documentation after code')
+	const laterDocs = commit()
+	assert.equal(ignore(docs, laterDocs).status, 1)
+	assert.equal(ignore(code, laterDocs).status, 0)
+	rmSync(resolve(cwd, 'notes.md'))
+	const deleted = commit()
+	assert.equal(ignore(laterDocs, deleted).status, 0)
+	assert.equal(ignore(deleted, deleted).status, 1)
+	for (const missing of ['', '0'.repeat(40), 'a'.repeat(40), '--help']) assert.equal(ignore(missing, deleted).status, 1)
+})
+
+test('every hosted Vercel project resolves the shared ignore script from its app root', () => {
+	for (const app of ['apps/website', 'apps/finance', 'apps/clipper/apps/web', 'packages/ui']) {
+		const config = JSON.parse(readFileSync(resolve(root, app, 'vercel.json'), 'utf8'))
+		assert.equal(resolve(root, app, config.ignoreCommand.replace(/^node /u, '')), resolve(root, 'scripts/monorepo/vercel-ignore.mjs'))
+	}
 })

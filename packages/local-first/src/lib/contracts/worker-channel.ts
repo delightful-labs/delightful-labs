@@ -11,6 +11,9 @@ export type WorkerChannelPostReceipt =
 	| { kind: 'posted' }
 	| { kind: 'not-issued'; reason: 'unavailable' }
 export type WorkerHostClosed = Readonly<{ scope: string; requestId: string }>
+/** Observed native failure for one close request; never a closure receipt. */
+export type WorkerHostCloseFailure = WorkerHostClosed &
+	Readonly<{ stage: 'dispose' | 'acknowledge' }>
 export type WorkerChannelData<Response> =
 	| { type: 'REPLY'; reply: WorkerRequestReply<Response> }
 	| {
@@ -20,6 +23,7 @@ export type WorkerChannelData<Response> =
 	  }
 export type WorkerChannelControl =
 	| { type: 'HOST_CLOSED'; receipt: WorkerHostClosed }
+	| { type: 'HOST_CLOSE_FAILED'; failure: WorkerHostCloseFailure }
 	| { type: 'CLOSE_FAILED'; scope: string }
 export type WorkerChannelResult<Response> =
 	| WorkerRequestResult<Response>
@@ -56,4 +60,6 @@ export type WorkerChannelInput<Request, Response> = Readonly<{
 	discard: (response: Response) => void
 	onOverdue: (identity: WorkerHostClosed) => void
 	onBlocked: (scope: string) => void
+	/** Immediate correlated native fact, selected by the owning chart. */
+	onCloseFailure?: (failure: WorkerHostCloseFailure) => void
 }>

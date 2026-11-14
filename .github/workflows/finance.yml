@@ -282,6 +282,7 @@ jobs:
         run: pnpm build
         env:
           FINANCE_PREVIEW: 'true'
+      - run: pnpm test:worker-bindings
       - run: pnpm exec playwright test --config=tests/config/playwright.pwa.config.ts --workers=1 --forbid-only
 
       - name: Retain PWA diagnostics and durations
@@ -289,5 +290,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: pwa-results
-          path: apps/finance/test-results/
+          path: |
+            apps/finance/test-results/
+            apps/finance/.svelte-kit/finance-binding-native-*/
+          include-hidden-files: true
           retention-days: 3

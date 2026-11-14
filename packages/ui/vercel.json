@@ -1,5 +1,6 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"ignoreCommand": "node ../../scripts/monorepo/vercel-ignore.mjs",
 	"framework": null,
 	"buildCommand": "pnpm build-storybook",
 	"outputDirectory": "storybook-static",

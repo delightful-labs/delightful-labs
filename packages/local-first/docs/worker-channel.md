@@ -1,8 +1,9 @@
 # Bounded worker channel ownership
 
-The user authorized continued implementation and testing while away, overriding
-the repository's per-unit implementation/test review gate for this work. The
-consumer pins and closure design in `worker-request.md` remain authoritative.
+The user authorized the original channel implementation and tests while away.
+The PR #35 native-failure correction received separate concrete implementation
+and test approval on 2026-11-14; see its [review and evidence](worker-host-close.md#pr-35-review-correction-explicit-native-failure-facts).
+The consumer pins and closure design in `worker-request.md` remain authoritative.
 
 The parent invokes one channel per immutable host scope. Its private controller
 invokes native data and independent control listeners. It admits up to eight
@@ -26,6 +27,8 @@ stateDiagram-v2
     state closing {
         [*] --> waiting
         waiting --> overdue: Close deadline or post/control failure
+        waiting --> nativeFailed: Correlated native failure / notify owner once
+        nativeFailed --> overdue: Original close deadline
     }
     closing --> settling: Exact scope and close-request receipt
     settling --> closed: All request observers settled
@@ -33,8 +36,12 @@ stateDiagram-v2
 ```
 
 Closing refuses new work, fails pending observers conservatively and posts one
-host-close request. It never replays requests. A close deadline or failure reports
-overdue, retains the independent listener and does not produce channel output.
+host-close request. It never replays requests. A close deadline or generic
+post/control failure reports overdue. A correlated `HOST_CLOSE_FAILED` retains
+the first native disposal/acknowledgement fact and notifies optional
+`onCloseFailure` once. It enters `closing.nativeFailed` while preserving the
+original close deadline, or stays overdue if that deadline already passed.
+Neither failure path releases the independent listener or produces channel output.
 Only the exact original scope and close ID can produce a closure receipt. The
 original unknown-write result is unchanged by a later receipt. Parent account
 operations may use that real receipt to release retained lock custody. Stopping
@@ -50,7 +57,7 @@ blocked so the parent retains custody.
 No account namespace or storage schema changes. No consumer adopts this chart
 until public package checks and real adapter tests pass.
 
-## Qualification
+## Original channel qualification
 
 - 28 targeted channel tests pass. They cover eight concurrent requests, overload,
   duplicate IDs, out-of-order and early replies, wrong response kinds, stale and

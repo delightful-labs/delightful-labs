@@ -3,6 +3,7 @@ import {
 	workerHostControl
 } from '../../src/lib/runtime/worker/host-close-channel.js'
 import type { HostCloseIdentity } from '../../src/lib/runtime/worker/host-close-channel.js'
+import type { HostCloseFailure } from 'delightful-local-first/worker/host-close'
 
 async function bounded<Value>(promise: Promise<Value>) {
 	let timer: ReturnType<typeof setTimeout> | undefined
@@ -27,6 +28,7 @@ export async function qualifyNativeHostClose() {
 	const written = Promise.withResolvers<void>(),
 		orphanReleased = Promise.withResolvers<void>()
 	const receipt = Promise.withResolvers<HostCloseIdentity>()
+	const nativeFailure = Promise.withResolvers<HostCloseFailure>()
 	let writes = 0,
 		writesAtClosure = 0,
 		closeCalls = 0,
@@ -52,6 +54,7 @@ export async function qualifyNativeHostClose() {
 	})
 	const releaseHost = serveHostClose(control.port1, scope, () => {
 		closeCalls++
+		if (closeCalls === 1) throw new Error('Native disposal failed')
 		writesAtClosure = writes
 		data.port1.onmessage = null
 		data.port1.close()
@@ -59,6 +62,7 @@ export async function qualifyNativeHostClose() {
 	const client = workerHostControl(control.port2, scope)
 	const releaseClient = client.listen((report) => {
 		if (report.type === 'CLOSE_FAILED') failures++
+		else if (report.type === 'HOST_CLOSE_FAILED') nativeFailure.resolve(report.failure)
 		else receipt.resolve(report.receipt)
 	})
 	try {
@@ -71,11 +75,15 @@ export async function qualifyNativeHostClose() {
 		await bounded(written.promise)
 		control.port2.dispatchEvent(new MessageEvent('messageerror'))
 		client.post({ scope, requestId })
+		const failed = await bounded(nativeFailure.promise)
+		client.post({ scope, requestId })
 		const closed = await bounded(receipt.promise)
 		data.port2.postMessage('MUST_NOT_WRITE_AFTER_RECEIPT')
 		await new Promise((resolve) => setTimeout(resolve, 50))
 		return {
 			matchingReceipt: closed.scope === scope && closed.requestId === requestId,
+			matchingFailure:
+				failed.scope === scope && failed.requestId === requestId && failed.stage === 'dispose',
 			closeCalls,
 			orphanReleases,
 			failures,

@@ -9,7 +9,8 @@ import type {
 	WorkerChannelControl,
 	WorkerChannelData,
 	WorkerChannelInput,
-	WorkerChannelResult
+	WorkerChannelResult,
+	WorkerHostCloseFailure
 } from '../../contracts/worker-channel.js'
 import type { WorkerRequestIdentity } from '../../contracts/worker-request.js'
 import { createWorkerChannel } from './worker-channel.js'
@@ -336,6 +337,118 @@ it('control listener registration precedes a close receipt delivered during post
 	expect(f.actor.getSnapshot().status).toBe('done')
 })
 
+it.each(['dispose', 'acknowledge'] satisfies WorkerHostCloseFailure['stage'][])(
+	'reports %s failure once, keeps the original deadline and requires a genuine late receipt',
+	(stage) => {
+		const onCloseFailure = vi.fn()
+		const f = fixture({ onCloseFailure })
+		f.actor.start()
+		const issued = f.begin('issued-write')
+		f.actor.send({ type: 'CLOSE' })
+		f.clock.increment(4)
+		const failure = { scope: 'A-3', requestId: 'close-A-3', stage }
+		f.control({ type: 'HOST_CLOSE_FAILED', failure })
+		expect(onCloseFailure).toHaveBeenCalledExactlyOnceWith(failure)
+		expect(f.actor.getSnapshot().status).toBe('active')
+		expect(f.actor.getSnapshot().output).toBeUndefined()
+		expect(f.controlDisposed).not.toHaveBeenCalled()
+		expect(f.begin('after-failure').settle.mock.calls[0]?.[0]).toMatchObject({
+			kind: 'refused',
+			reason: 'closed'
+		})
+		f.control({ type: 'HOST_CLOSE_FAILED', failure: { ...failure, stage: 'acknowledge' } })
+		f.actor.send({ type: 'CLOSE' })
+		f.clock.increment(5)
+		expect(f.configuration.onOverdue).not.toHaveBeenCalled()
+		f.clock.increment(1)
+		expect(f.configuration.onOverdue).toHaveBeenCalledOnce()
+		expect(onCloseFailure).toHaveBeenCalledOnce()
+		expect(f.configuration.postClose).toHaveBeenCalledOnce()
+		f.ack()
+		expect(f.actor.getSnapshot().output).toEqual({ scope: 'A-3', requestId: 'close-A-3' })
+		expect(issued.settle).toHaveBeenCalledOnce()
+		expect(f.controlDisposed).toHaveBeenCalledOnce()
+		f.clock.increment(100)
+		expect(f.configuration.onOverdue).toHaveBeenCalledOnce()
+	}
+)
+
+it('ignores unsolicited and foreign close failures without poisoning the later selected close', () => {
+	const onCloseFailure = vi.fn(),
+		f = fixture({ onCloseFailure })
+	f.actor.start()
+	const failure = {
+		scope: 'A-3',
+		requestId: 'close-A-3',
+		stage: 'dispose'
+	} satisfies WorkerHostCloseFailure
+	f.control({ type: 'HOST_CLOSE_FAILED', failure })
+	const call = f.begin('still-admitted')
+	f.reply(0)
+	expect(call.settle.mock.calls[0]?.[0]).toMatchObject({ kind: 'succeeded' })
+	expect(f.configuration.postClose).not.toHaveBeenCalled()
+	f.actor.send({ type: 'CLOSE' })
+	f.control({ type: 'HOST_CLOSE_FAILED', failure: { ...failure, scope: 'A-1' } })
+	f.control({ type: 'HOST_CLOSE_FAILED', failure: { ...failure, requestId: 'old-close' } })
+	expect(onCloseFailure).not.toHaveBeenCalled()
+	f.control({ type: 'HOST_CLOSE_FAILED', failure })
+	expect(onCloseFailure).toHaveBeenCalledExactlyOnceWith(failure)
+	f.ack()
+	expect(f.actor.getSnapshot().status).toBe('done')
+	expect(f.configuration.onOverdue).not.toHaveBeenCalled()
+})
+
+it('retains new failure detail after overdue without leaving overdue or notifying twice', () => {
+	const onCloseFailure = vi.fn(),
+		f = fixture({ onCloseFailure })
+	f.actor.start()
+	f.actor.send({ type: 'CLOSE' })
+	f.clock.increment(10)
+	const failure = {
+		scope: 'A-3',
+		requestId: 'close-A-3',
+		stage: 'dispose'
+	} satisfies WorkerHostCloseFailure
+	f.control({ type: 'HOST_CLOSE_FAILED', failure })
+	f.control({ type: 'HOST_CLOSE_FAILED', failure })
+	f.clock.increment(100)
+	expect(onCloseFailure).toHaveBeenCalledExactlyOnceWith(failure)
+	expect(f.configuration.onOverdue).toHaveBeenCalledOnce()
+	expect(f.controlDisposed).not.toHaveBeenCalled()
+	f.ack()
+	expect(f.actor.getSnapshot().status).toBe('done')
+})
+
+it('keeps failure receipt handling when the optional failure observer is absent', () => {
+	const f = fixture()
+	f.actor.start()
+	f.actor.send({ type: 'CLOSE' })
+	f.control({
+		type: 'HOST_CLOSE_FAILED',
+		failure: { scope: 'A-3', requestId: 'close-A-3', stage: 'dispose' }
+	})
+	f.ack()
+	expect(f.actor.getSnapshot().status).toBe('done')
+	expect(f.configuration.onBlocked).not.toHaveBeenCalled()
+})
+
+it('a thrown failure observer reaches the existing error boundary and never acknowledges closure', () => {
+	const f = fixture({
+		onCloseFailure: () => {
+			throw new Error('Owner notification failed')
+		}
+	})
+	f.actor.start()
+	f.actor.send({ type: 'CLOSE' })
+	f.control({
+		type: 'HOST_CLOSE_FAILED',
+		failure: { scope: 'A-3', requestId: 'close-A-3', stage: 'dispose' }
+	})
+	expect(f.configuration.onBlocked).toHaveBeenCalledOnce()
+	expect(f.actor.getSnapshot().output).toBeUndefined()
+	expect(f.controlDisposed).toHaveBeenCalledOnce()
+})
+
 it('listener setup failure closes conservatively and still observes real closure', () => {
 	const f = fixture({
 		listenData: () => {
@@ -531,6 +644,9 @@ type Ledger = {
 	discarded: number
 	closePosts: number
 	acknowledged: boolean
+	closeDue: number | undefined
+	closeFailures: WorkerHostCloseFailure['stage'][]
+	overdue: number
 }
 function describeResult(result: WorkerChannelResult<Response>) {
 	if (result.kind === 'refused') return `${result.requestId}:refused:${result.reason}`
@@ -547,6 +663,7 @@ function closeLedger(record: Ledger, expired?: LedgerCall): Ledger {
 		...record,
 		active: [],
 		closePosts: 1,
+		closeDue: (expired?.due ?? record.now) + 10,
 		outcomes: [
 			...record.outcomes,
 			...ordered.map(
@@ -564,7 +681,11 @@ const contract = setup({
 			ANSWER: types<{ id: string; current: boolean }>(),
 			ELAPSE: types<{ ms: number }>(),
 			CLOSE: types(),
-			ACK: types<{ valid: boolean }>()
+			ACK: types<{ valid: boolean }>(),
+			FAIL_CLOSE: types<{
+				correlation: 'current' | 'foreign-scope' | 'foreign-request'
+				stage: WorkerHostCloseFailure['stage']
+			}>()
 		}
 	}
 }).createMachine({
@@ -576,7 +697,10 @@ const contract = setup({
 			outcomes: [],
 			discarded: 0,
 			closePosts: 0,
-			acknowledged: false
+			acknowledged: false,
+			closeDue: undefined,
+			closeFailures: [],
+			overdue: 0
 		}
 	},
 	initial: 'exercising',
@@ -627,7 +751,18 @@ const contract = setup({
 				ELAPSE: ({ context, event }) => {
 					const r = { ...context.ledger, now: context.ledger.now + event.ms }
 					if (r.acknowledged) return
-					return { context: { ledger: closeLedgerIfExpired(r) } }
+					const ledger = closeLedgerIfExpired(r)
+					return {
+						context: {
+							ledger: {
+								...ledger,
+								overdue:
+									ledger.closeDue !== undefined && ledger.now >= ledger.closeDue
+										? 1
+										: ledger.overdue
+							}
+						}
+					}
 				},
 				CLOSE: ({ context }) =>
 					context.ledger.acknowledged
@@ -636,7 +771,18 @@ const contract = setup({
 				ACK: ({ context, event }) =>
 					event.valid && context.ledger.closePosts
 						? { context: { ledger: { ...context.ledger, acknowledged: true } } }
-						: undefined
+						: undefined,
+				FAIL_CLOSE: ({ context, event }) => {
+					const r = context.ledger
+					if (
+						r.acknowledged ||
+						!r.closePosts ||
+						r.closeFailures.length ||
+						event.correlation !== 'current'
+					)
+						return
+					return { context: { ledger: { ...r, closeFailures: [event.stage] } } }
+				}
 			}
 		}
 	}
@@ -655,10 +801,16 @@ type Observation = {
 	discarded: number
 	closePosts: number
 	acknowledged: boolean
+	closeFailures: WorkerHostCloseFailure['stage'][]
+	overdue: number
 }
 const sut: TestSut<SnapshotFrom<typeof contract>, EventFrom<typeof contract>> = {
 	create() {
-		const f = fixture({ maxInFlight: 2 })
+		const closeFailures: WorkerHostCloseFailure['stage'][] = []
+		const f = fixture({
+			maxInFlight: 2,
+			onCloseFailure: (failure) => closeFailures.push(failure.stage)
+		})
 		f.actor.start()
 		const outcomes: string[] = []
 		return {
@@ -688,6 +840,15 @@ const sut: TestSut<SnapshotFrom<typeof contract>, EventFrom<typeof contract>> = 
 					})
 				} else if (event.type === 'ELAPSE') f.clock.increment(event.ms)
 				else if (event.type === 'CLOSE') f.actor.send({ type: 'CLOSE' })
+				else if (event.type === 'FAIL_CLOSE')
+					f.control({
+						type: 'HOST_CLOSE_FAILED',
+						failure: {
+							scope: event.correlation === 'foreign-scope' ? 'A-1' : 'A-3',
+							requestId: event.correlation === 'foreign-request' ? 'old-close' : 'close-A-3',
+							stage: event.stage
+						}
+					})
 				else
 					f.control({
 						type: 'HOST_CLOSED',
@@ -697,10 +858,12 @@ const sut: TestSut<SnapshotFrom<typeof contract>, EventFrom<typeof contract>> = 
 			read(): Observation {
 				return {
 					issued: f.posted.length,
-					outcomes,
+					outcomes: [...outcomes],
 					discarded: vi.mocked(f.configuration.discard).mock.calls.length,
 					closePosts: vi.mocked(f.configuration.postClose).mock.calls.length,
-					acknowledged: f.actor.getSnapshot().status === 'done'
+					acknowledged: f.actor.getSnapshot().status === 'done',
+					closeFailures: [...closeFailures],
+					overdue: vi.mocked(f.configuration.onOverdue).mock.calls.length
 				}
 			},
 			dispose() {
@@ -714,7 +877,9 @@ const sut: TestSut<SnapshotFrom<typeof contract>, EventFrom<typeof contract>> = 
 		outcomes: context.ledger.outcomes,
 		discarded: context.ledger.discarded,
 		closePosts: context.ledger.closePosts,
-		acknowledged: context.ledger.acknowledged
+		acknowledged: context.ledger.acknowledged,
+		closeFailures: context.ledger.closeFailures,
+		overdue: context.ledger.overdue
 	})
 }
 it('matches generated concurrent admission, replies, deadlines, duplicate close and receipt sequences', async () => {
@@ -725,7 +890,11 @@ it('matches generated concurrent admission, replies, deadlines, duplicate close 
 			ANSWER: fc.record({ id, current: fc.boolean() }),
 			ELAPSE: fc.record({ ms: fc.integer({ min: 0, max: 7 }) }),
 			CLOSE: fc.constant({}),
-			ACK: fc.record({ valid: fc.boolean() })
+			ACK: fc.record({ valid: fc.boolean() }),
+			FAIL_CLOSE: fc.record({
+				correlation: fc.constantFrom('current', 'foreign-scope', 'foreign-request'),
+				stage: fc.constantFrom('dispose', 'acknowledge')
+			})
 		},
 		sut,
 		seed: 20261113,
