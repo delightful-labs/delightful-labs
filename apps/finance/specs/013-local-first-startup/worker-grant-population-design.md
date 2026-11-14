@@ -1,7 +1,9 @@
 # Grant population: callback custody decision
 
-Status: researched proposal, awaiting discussion; no F4c implementation or test
-approval is claimed. Continue on [draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37).
+Status: the user selected approach A and approved F4c1's concrete implementation
+and tests on 2026-11-14. The shared native keeper extraction is qualified; the
+aggregate callback bridge/population remains next. Continue on
+[draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37).
 Remote `main` was refreshed on 2026-11-14 and remains `434a06ee`; the qualified
 F4b branch checkpoint is `868e1e32`.
 
@@ -61,8 +63,9 @@ Neither option below starts an actor inside an SDK promise or patches Jazz.
   already registers native observers before dispatch, retains returned resources
   under private tokens, and delivers or discards them on the chart's command.
   Its callback disposer settles outstanding dispatched observers when stopped.
-  This machinery is private to `createChannelController`; there is no public
-  callback-custody API for calls waiting for grant acquisition.
+  At the researched F4b checkpoint this machinery was private to
+  `createChannelController`. F4c1 now qualifies the extracted keeper and existing
+  channel adoption; actual callback routing before grant acquisition is next.
 - Its [broker adapter](../../../../packages/local-first/src/lib/backend/jazz/worker-broker.ts)
   validates operations through `brokerHostCall` and invokes that same channel.
   Its existing root facade settles SDK promises directly. The population must
@@ -86,7 +89,7 @@ The population chart remains the sole owner of admission, dispatch, fault and
 graceful-close decisions. The primitive retains callbacks/ports, performs selected
 delivery/disposal, and has an explicit stop/error handoff.
 
-This is the recommended direction because the existing channel and the new
+This is the selected direction because the existing channel and the new
 bridge need the same custody guarantees, and the user requested reusable
 mechanisms in Local First. It requires a shared refactor and qualification of the
 existing broker facade, packed public exports and Clipper before adoption.
@@ -106,7 +109,24 @@ or copy the broker's wire decoder, FIFO or close policy.
 
 ## Required detail after choosing
 
-Before implementation, specify the narrow typed API and these boundaries:
+F4c1's [public keeper API and ownership boundary](../../../../packages/local-first/docs/worker-callback-custody.md)
+now specify `register`, `recordStopResult`, `capture`, `deliver`, `discard` and
+`stop`, plus the existing immediate-delivery leaf. The channel delegates native
+bookkeeping to this implementation and selects its stop result in the chart.
+The extracted helper starts no actor, contains no admission/retry/deadline policy,
+and introduces no callback producer inbox. It is a prerequisite, not an
+implemented callback bridge or population. Approved qualification passes 1,192
+library tests (109 focused), four packed consumers, 2,082 Finance units,
+163 focused host cases, 18 worker-state cases, 21 native browser cases and all
+19 production PWA cases, plus Clipper's unit/component/worker/extension/offline
+regressions. The linked keeper record preserves the tests' native-error-path
+fix, initial assertion/environment failures and commands/results.
+The root retains that keeper through child failure. An explicit channel
+`releasing` state joins the genuine host receipt/issued settlements with typed
+native data/custody release facts; failed cleanup blocks completion. This keeps
+the additional release decision in XState rather than hiding it in the helper.
+
+The population/bridge implementation still needs these boundaries:
 
 1. Callback custody exists before forwarding a request, including synchronous
    reports/reentrancy. Overload refusal cannot leave an unresolved promise or

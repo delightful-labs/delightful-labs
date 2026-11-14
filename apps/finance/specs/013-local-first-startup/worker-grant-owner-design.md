@@ -1,11 +1,21 @@
 # Worker-owned Jazz grant lifecycle
 
-Current slice: F4b adds one grant's owning chart after F4a's qualified binding/
+F4b adds one grant's owning chart after F4a's qualified binding/
 acquisition contract. The user approved its concrete implementation/tests on
 2026-11-14; qualification below passes. F1–F3 and the close correction retain
 their own historical evidence. The aggregate population/callback bridge and
 actual native acquisition transport remain next; W05/W06 and production
 activation remain incomplete.
+
+F4c1 subsequently extracts the existing native callback/response keeper into
+Local First, following the user's 2026-11-14 choice and concrete implementation/
+test approval. Its [qualified ownership/API record](../../../../packages/local-first/docs/worker-callback-custody.md)
+passes 1,192 library tests, four packed consumers, 2,082 Finance units, 21 native
+cases, all 19 production PWA cases and Clipper's full applicable regressions.
+The channel now observes an explicit local release result before final output;
+native custody errors report into its chart-driven drain instead of stranding
+callbacks. The actual aggregate population/callback bridge and acquisition
+transport remain pending. F4b evidence below retains its own scope.
 
 The user requested an ongoing tracking PR and continued work on its same branch:
 [draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37),
@@ -332,9 +342,10 @@ population, native acquisition transport and SDK/session work are incomplete.
 ## Subsequent population and session composition
 
 The [callback custody decision](worker-grant-population-design.md) records the
-2026-11-14 code research, two supported implementation approaches and the
-remaining ownership/API detail before F4c. It is a proposal for discussion,
-not an approved extraction or implemented population.
+2026-11-14 code research and the user's selection of the shared Local First
+extraction. F4c1's keeper and existing-channel adoption are qualified after
+implementation/test approval. The aggregate callback bridge/population and native
+acquisition transport remain pending.
 
 The following design prepares the next implementation. F3 does not yet add this
 population, private grant-acquisition transport or SDK session.

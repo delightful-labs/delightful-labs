@@ -6,6 +6,11 @@ import { build } from 'vite'
 
 const consumers = [
 	{
+		name: 'callback-custody',
+		source: 'worker-callback-custody.ts',
+		subpath: 'delightful-local-first/worker/callback-custody'
+	},
+	{
 		name: 'close',
 		source: 'worker-host-close.ts',
 		subpath: 'delightful-local-first/worker/host-close'
@@ -103,7 +108,7 @@ try {
 		})
 	}
 	console.log(
-		'Packed close/root-broker/owned-broker consumers: public types, native effects/receipts and self-contained ES-module workers passed.'
+		'Packed callback-custody/close/root-broker/owned-broker consumers: public types, native effects/receipts and self-contained ES-module workers passed.'
 	)
 } finally {
 	await rm(directory, { recursive: true, force: true })
