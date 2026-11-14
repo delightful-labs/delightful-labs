@@ -29,16 +29,29 @@ replaces permanent Window account-storage/lock custody with native IDB
 transactions. The user explicitly excluded migration/old-version compatibility
 code, completing W03. W04's shared store is [qualified](worker-account-store-verification.md):
 1,111 unit tests and 60 native cases across three engines pass, including packed
-public export and cold browser-process reopen checks. W05 app adoption and
-W06–W21 remain unstarted. The application is still Window-owned.
+public export and cold browser-process reopen checks. W05's shared broker/close
+extraction is qualified with Clipper. Finance's first binding slice passes
+1,984 unit tests, nine native cases across three engines and all 19 production
+PWA/provider-worker cases. The user selected separate exact native grants through
+existing SDK callbacks, with no new Jazz patch; their integration remains pending.
+The separate native grants pass 2,006 unit tests and nine native cases after
+2026-11-14 approval; the earlier combined adapter has been removed.
+The subsequent child-owned channel refactor is also qualified: 1,160 library
+tests, three packed consumers, 2,006 Finance tests, 12 native cases and Clipper
+regressions. The bounded grant population and actual SDK/session integration
+remain pending; see the [grant-owner design](worker-grant-owner-design.md).
+The user approved Finance-first sequencing and deferred Clipper's remaining store/hidden
+capture-runtime conversion to a separate follow-up. See the
+[Finance binding slice](worker-finance-binding.md). W06–W21 remain unstarted.
+The application is still Window-owned.
 
-| Order | Tasks | Outcome before dependent work |
-| --- | --- | --- |
-| Resource foundations | W01–W06 | Inventory/baseline, production worker import proof, reviewed IndexedDB transaction ownership, shared AccountStore/broker integration, and one qualified persistent SDK/session owner. |
-| Application/UI contracts | W07–W11 | Bounded commands/views, shutdown/replacement, worker-owned queries, form/feedback transport, and private native/file/secret capabilities. |
-| Shared application flows | W12–W15 | Worker-owned session/workspace/access and shell balances, then complete read-only and financial-write vertical slices. |
-| Feature migration | W16–W19 | Ledger/settings/transfers, images/attachments, explicit provider operations, and backup/restore/workspace administration with existing behavior preserved. |
-| Acceptance and activation | W20–W21 | Actual production/browser/offline/crash/performance qualification, full route parity, authorized cutover and removal of superseded owners. |
+| Order                     | Tasks   | Outcome before dependent work                                                                                                                                                         |
+| ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resource foundations      | W01–W06 | Inventory/baseline, production worker import proof, reviewed IndexedDB transaction ownership, shared AccountStore/broker integration, and one qualified persistent SDK/session owner. |
+| Application/UI contracts  | W07–W11 | Bounded commands/views, shutdown/replacement, worker-owned queries, form/feedback transport, and private native/file/secret capabilities.                                             |
+| Shared application flows  | W12–W15 | Worker-owned session/workspace/access and shell balances, then complete read-only and financial-write vertical slices.                                                                |
+| Feature migration         | W16–W19 | Ledger/settings/transfers, images/attachments, explicit provider operations, and backup/restore/workspace administration with existing behavior preserved.                            |
+| Acceptance and activation | W20–W21 | Actual production/browser/offline/crash/performance qualification, full route parity, authorized cutover and removal of superseded owners.                                            |
 
 The [reuse/extraction specification](worker-foundation-reuse.md) is part of this
 handoff. Reuse Local First's existing session, recovery, workspace, operation,
@@ -50,6 +63,42 @@ consumers. Retire the permanent account-storage RPC rather than extract it as th
 new storage path. No legacy import, fallback, dual writes, source cleanup or
 old-version compatibility code is planned, per the user's explicit instruction. Keep domain schemas, permissions, financial/provider rules, article/reader
 behavior and app localization conventions with their apps.
+
+### Finance runtime client boundary
+
+The user confirmed this architecture direction on 2026-11-14 following the
+Clipper Svelte/XState cleanup. W07 owns the client contract and W12–W19 own
+feature adoption within this existing worker migration.
+
+Finance integrations consume a typed worker-backed runtime client with bounded
+feature views and scoped commands. XState remains the application/domain
+workflow owner in the worker. UI consumers receive neither raw actor references,
+private child/context paths nor database handles. Pure presentation continues to
+receive bounded data, callbacks and snippets from integrations; component-owned
+UI interaction actors may remain on Window.
+
+View subscriptions follow Svelte's store contract, publishing the current value
+synchronously and releasing observation on unsubscribe. Define replacement and
+failure outcomes explicitly, invalidate old-scope data/capabilities immediately,
+and bind commands/results to identity, organization, attachment generation and
+request identity. UI disposal does not acquire ownership of shared SDK closure
+or settle an issued financial write. Runtime ownership and receipts remain with
+W06/W08. Provider operations retain explicit user consent and passkey checks.
+
+The worker selects serializable message descriptors and capability outcomes;
+Window translates descriptors with Paraglide and formats locale-sensitive values.
+Keep exact minor-unit/currency and date representations. Navigation, focus,
+native form/file input and WebAuthn stay on their designed Window boundaries;
+private transient material uses W11's bounded capability/submission channels.
+Reuse Local First mechanisms and keep Finance's domain protocol app-owned.
+
+The follow-up Svelte cleanup specification is sequenced after Finance's domain
+XState handoff to workers. It should describe client-consuming integrations,
+shell/form snippet composition, native viewport handling and typed UI contexts
+against the implemented client. It must preserve ownership/feedback decisions
+already supplied by that client. This records the direction and sequencing;
+worker implementation, feature parity and activation retain their existing
+W-series acceptance gates.
 
 Read [worker-migration-research.md](worker-migration-research.md) for concrete
 source findings at verified monorepo `main` commit `eb0f615f`. Read

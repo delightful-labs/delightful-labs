@@ -1,5 +1,11 @@
 # Technical Plan: Jazz Clipper and Reader
 
+**Shared workspace research (2026-11-14):** The cross-project
+[shared workspace specification](../../../../specs/003-shared-workspaces/spec.md)
+and [contract research](../../../../specs/003-shared-workspaces/research.md) cover
+Clipper's automatic hidden workspace and shared Local First lifecycle. This is
+design work; it does not mark workspace adoption implemented.
+
 **Document model implementation (2026-11-12):** [Document model](data-model.md#accepted-document-model-2026-11-12) is authoritative. Document owns saved-item state, sourceUrl and a Jazz attachment relationship. Article owns its metadata/content and relates to reusable Site/favicon records. Attachments share optional CaptureSource (resolvedUrl, canonicalUrl); URLs are capture evidence, not identity. ReadingPosition.interactedAt is a Date. Progress is required and initialized to 0. Jazz owns creation metadata. Trash retains previousStatus. Development data is disposable; historical schema migrations/snapshots and legacy conversion are unnecessary. The runtime now follows these relationships. Native offline replicas prove furthest-progress reconciliation independently of the latest resume location; qualification is recorded in tasks.md. PDF/EPUB ingestion remains deferred.
 
 **AT Protocol status (2026-11-10):** [Merged implementation, accepted publication decisions and remaining work](atproto.md). This checkpoint supersedes historical JWT/Neon, alpha.59 and Netlify-only AT Protocol notes below; it does not mark annotation/publication requirements implemented.

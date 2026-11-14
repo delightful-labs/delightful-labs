@@ -1,5 +1,11 @@
 # Implementation Plan: Verified workspace backup and restore
 
+**Shared workspace research (2026-11-14):** See the cross-project
+[shared workspace specification](../../../../specs/003-shared-workspaces/spec.md)
+and [contract research](../../../../specs/003-shared-workspaces/research.md) for
+Clipper/Finance lifecycle reuse and proposed initialization/startup changes.
+These are separate design work, not additional completed backup requirements.
+
 **Branch**: `feat/verified-backup` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
 
 **Status (2026-11-07)**: T004 is closed with accepted performance limitations; further investigation

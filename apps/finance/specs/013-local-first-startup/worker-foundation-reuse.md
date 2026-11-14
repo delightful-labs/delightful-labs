@@ -1,5 +1,11 @@
 # Local First and Clipper reuse for Finance workers
 
+The cross-project [shared workspace specification](../../../../specs/003-shared-workspaces/spec.md)
+and [contract research](../../../../specs/003-shared-workspaces/research.md) own
+the proposed headless Clipper workspace and remaining workspace lifecycle
+extractions. Coordinate shared changes with this worker plan; Finance's domain
+access projection and financial resource drains remain app-owned.
+
 Source review: 2026-11-13, monorepo `main` at `eb0f615f`. This supplements
 [code research](worker-migration-research.md) and changes the ownership and
 dependency details in the [ordered migration tasks](worker-migration-tasks.md).
@@ -27,16 +33,16 @@ another production application-worker runtime to transplant. Its native capture,
 restore and packed-consumer fixtures are useful qualification patterns. Finance
 already consumes the public backup APIs and row-copy observation helpers.
 
-| Existing foundation | Relevant source | Finance migration use |
-| --- | --- | --- |
-| Correlated request, bounded channel and independent effect drain | `src/lib/contracts/worker-{request,channel,effect-drain}.ts`; matching `machines/lifecycle` implementations | Reuse public `worker/*/{contracts,workflow}` exports for native adapters. Keep wire decoding at the native boundary. Do not add another request-map/timeout state machine in Finance. |
-| Session acquisition/startup/readiness | `backend/jazz/{session,startup,session-readiness}.ts`; `machines/identity/session-{acquisition,startup,readiness}.ts` | Retain one session owner across UI attachments, bind it inside the worker, and project observations instead of exporting the owner. |
-| Recovery, restoration and ordered sign-out | `backend/jazz/{recovery-phrase,restoration}.ts`; `machines/identity/{recovery-phrase,restoration,session-recovery,ordered-sign-out}.ts` | Compose existing capabilities rather than copy Clipper's recovery or account host. Keep Window native verification behind scoped adapters. |
-| Workspace selection/creation and domain transactions | `machines/workspaces/{selection,creation-owner,domain-transaction,transaction-custody}.ts`; related contracts | Preserve existing identity/scope/drain/transaction semantics. Reuse `DomainTransactionLifecycle`, custody receipts and operation composition; Finance still owns financial invariants and policy. |
-| Owned operation lifecycle | `contracts/owned-operation.ts`; `machines/lifecycle/owned-operation.ts` | Own finite capability-spawned work and preserve its result, including unknown settlement; do not introduce a second generic supervisor. |
-| Immutable observations | `contracts/observation.ts`, public `data/observations` | Copy SDK-owned live rows before placing them in immutable actor context. These shallow copies do not make arbitrary handles safe wire DTOs. |
-| Scoped forms | `machines/forms/scoped-form.ts`; `integrations/forms/controller.svelte.ts` | Reuse the domain form machine while separating DOM integration and noncloneable feedback labels. Change reusable form contracts at the library source and qualify existing consumers. |
-| Archive/envelope, native export, restore journal and operation ownership | `backup/`; `backend/jazz/backup.ts`; test-app/native-capture fixtures | Retain public formats and existing recovery machinery. Add a cross-realm submission boundary, not a second archive/restore implementation. |
+| Existing foundation                                                      | Relevant source                                                                                                                         | Finance migration use                                                                                                                                                                             |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correlated request, bounded channel and independent effect drain         | `src/lib/contracts/worker-{request,channel,effect-drain}.ts`; matching `machines/lifecycle` implementations                             | Reuse public `worker/*/{contracts,workflow}` exports for native adapters. Keep wire decoding at the native boundary. Do not add another request-map/timeout state machine in Finance.             |
+| Session acquisition/startup/readiness                                    | `backend/jazz/{session,startup,session-readiness}.ts`; `machines/identity/session-{acquisition,startup,readiness}.ts`                   | Retain one session owner across UI attachments, bind it inside the worker, and project observations instead of exporting the owner.                                                               |
+| Recovery, restoration and ordered sign-out                               | `backend/jazz/{recovery-phrase,restoration}.ts`; `machines/identity/{recovery-phrase,restoration,session-recovery,ordered-sign-out}.ts` | Compose existing capabilities rather than copy Clipper's recovery or account host. Keep Window native verification behind scoped adapters.                                                        |
+| Workspace selection/creation and domain transactions                     | `machines/workspaces/{selection,creation-owner,domain-transaction,transaction-custody}.ts`; related contracts                           | Preserve existing identity/scope/drain/transaction semantics. Reuse `DomainTransactionLifecycle`, custody receipts and operation composition; Finance still owns financial invariants and policy. |
+| Owned operation lifecycle                                                | `contracts/owned-operation.ts`; `machines/lifecycle/owned-operation.ts`                                                                 | Own finite capability-spawned work and preserve its result, including unknown settlement; do not introduce a second generic supervisor.                                                           |
+| Immutable observations                                                   | `contracts/observation.ts`, public `data/observations`                                                                                  | Copy SDK-owned live rows before placing them in immutable actor context. These shallow copies do not make arbitrary handles safe wire DTOs.                                                       |
+| Scoped forms                                                             | `machines/forms/scoped-form.ts`; `integrations/forms/controller.svelte.ts`                                                              | Reuse the domain form machine while separating DOM integration and noncloneable feedback labels. Change reusable form contracts at the library source and qualify existing consumers.             |
+| Archive/envelope, native export, restore journal and operation ownership | `backup/`; `backend/jazz/backup.ts`; test-app/native-capture fixtures                                                                   | Retain public formats and existing recovery machinery. Add a cross-realm submission boundary, not a second archive/restore implementation.                                                        |
 
 Paths in this table are relative to
 [`packages/local-first`](../../../../packages/local-first). Exact public exports
@@ -75,9 +81,13 @@ from the account-selection store. Keep the explicit browser-host and Jazz
 integration boundaries; consumers supply admitted URL/name/generation bindings.
 Do not silently migrate SDK generation keys to IndexedDB as part of AccountStore.
 
-Finance currently admits an exact broker URL/base name and generation key;
-Clipper admits same-origin URLs and Jazz-prefixed keys more broadly. Preserve
-Finance's narrower capability binding. Keep FIFO effect admission, no replay of
+Finance's new native adapters admit an exact URL/full-name broker grant and a
+separate exact-key generation grant through existing SDK callbacks, without a
+new Jazz patch. Their native qualification is recorded in the
+[SDK binding decision](worker-sdk-binding-decision.md); actual SDK/session
+integration remains pending. Clipper admits same-origin URLs and Jazz-prefixed
+keys more broadly. Preserve Finance's narrower capability binding. Keep FIFO
+effect admission, no replay of
 uncertain generation writes, disposal of unaccepted transferred ports and
 independent data/control lifetimes. Adopt the shared broker in Clipper, then
 Finance; qualify both consumers and remove replaced implementations.
@@ -186,7 +196,11 @@ inspectable job context. Worker-side provider request decoding is still required
    native receipts and bounded close. Reuse existing custody/IDB contracts;
    qualify the public adapter before app adoption.
 3. **R1/R2 and adoption (W05):** extract remaining broker/close adapters and
-   qualify Clipper then Finance with app-specific IDB bindings. No migration
+   qualify Clipper's shared broker, then Finance's broker/IDB bindings. The user
+   approved Finance-first sequencing on 2026-11-13: Clipper's remaining account
+   store and hidden capture-runtime conversion is a separate follow-up, not a
+   Finance prerequisite. Keep its current account-storage path until that work.
+   No migration
    or old-version compatibility work is included. Retire account-storage RPC/remote locks after
    qualification. R3 contributes applicable receipt mechanisms/scenarios, not a
    required copy of its keeper. Activation still waits for W06.

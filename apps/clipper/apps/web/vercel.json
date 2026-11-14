@@ -1,5 +1,6 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"ignoreCommand": "node ../../../../scripts/monorepo/vercel-ignore.mjs",
 	"framework": "sveltekit",
 	"installCommand": "pnpm install --frozen-lockfile",
 	"buildCommand": "pnpm run build"

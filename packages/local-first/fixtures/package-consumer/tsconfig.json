@@ -34,6 +34,11 @@
 		"./owned-operation.ts",
 		"./worker-request.ts",
 		"./worker-channel.ts",
+		"./worker-callback-custody.ts",
+		"./worker-host-close.ts",
+		"./worker-broker.ts",
+		"./worker-broker-owned.ts",
+		"./worker-host-close-packed.mjs",
 		"./worker-effect-drain.ts",
 		"./ordered-sign-out.ts"
 	],

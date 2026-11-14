@@ -1,5 +1,41 @@
 # Finance v6 conversion and worker migration
 
+## Current W05 checkpoint: grants and child-owned channel qualified
+
+F3 exposes the same shared broker channel as an invokable child with explicit
+native input and validated calls. After the user's 2026-11-14 approval, it passes
+1,160 library tests (16 new child-owned cases), three packed public consumers,
+2,006 Finance unit tests and 12 native cases across three engines. Clipper passes
+869 unit/native tests, 17 component cases, 32 worker/browser cases, 12 packaged
+extension cases and eight production offline cases. The
+[grant-owner design](worker-grant-owner-design.md) records exact evidence, two
+initial browser failures and successful focused/full reruns, and the remaining
+population/session work. Earlier F2/R2 counts below retain their own checkpoint.
+
+PR #29 is merged. The shared broker and close adapters are extracted into Local
+First and qualified through Clipper, including public packed imports, native
+workers/extension and production offline restarts. The user approved continuing
+Finance first and deferring Clipper's account-store/hidden capture-runtime
+conversion; it no longer gates Finance W05/W06.
+
+The [Finance binding slice](worker-finance-binding.md) configures the shared
+IndexedDB store, preserves exact native broker admission and extends the inactive
+import proof. It starts no production SDK/session or storage owner. Actual SDK
+binding/acquisition is W06; full application activation still waits for W21.
+The worktree is refreshed to main `ea460e9d`; earlier transport test counts retain
+their `1b6287d6` baseline. Repeated Clipper types/unit/component/worker/extension/
+offline qualification passes against the new layout/UI source; its component
+coverage now contains 17 cases. After the user's test approval, Finance passes
+1,984 unit tests, 69 focused host cases, nine native binding cases across three
+engines and all 19 production PWA/provider-worker cases, plus types and builds.
+The [SDK binding decision](worker-sdk-binding-decision.md) is resolved: the user
+selected separate exact grants through existing callbacks, with no new Jazz
+patch. After the user's 2026-11-14 test approval, F2 passes 2,006 unit tests,
+90 focused host cases, 12 build-proof cases and nine native cases across three
+engines. Separate grants replace the combined native adapter in source and
+fixtures. The worker-owned grant/session integration remains pending; these
+adapter results do not qualify actual worker-owned SDK/session operation.
+
 ## Current W03 checkpoint: IndexedDB selected
 
 The user selected an IndexedDB-backed AccountStore on 2026-11-13. The
@@ -24,9 +60,10 @@ and packaging/lint/format results. One retained regression exposed corrupt store
 undefined being mistaken for absence; an exact-key cursor read fixes it.
 The native suite is part of library verify and the existing Local First CI job.
 
-W04 is complete as the shared-store/packed-consumer foundation. W05 owns actual
-Finance/Clipper adoption and remaining broker/close extraction; W06 qualifies
-the connected persistent SDK/runtime. Those tasks remain unstarted. No migration
+W04 is complete as the shared-store/packed-consumer foundation. At that checkpoint,
+W05 owned app adoption and remaining broker/close extraction, with W06 to qualify
+the connected persistent SDK/runtime. The current W05 checkpoint above supersedes
+that historical unstarted status and records the Finance-first decision. No migration
 code or production startup hookup was added. The source base remains `670fb720`;
 existing user storage/servers are unchanged. The user authorized a foundation
 PR, with the branch rebased onto refreshed `main` `02f886be` before publication.

@@ -81,6 +81,8 @@ for commands, setup corrections and limits. Only fixture code bytes are
 bootstrapped before going offline; every AccountStore construction/read/write
 runs offline. This is native store qualification, not actual app/PWA asset delivery.
 
-Finance/Clipper adoption, connected SDK startup/replica persistence and removal
-of superseded transports remain W05/W06 work. No migration or startup caller was
-added. Existing user browser storage is not read, changed or deleted by this slice.
+Finance adoption, connected SDK startup/replica persistence and removal of its
+superseded transports remain W05/W06 work. The user deferred Clipper's account
+store/hidden capture-runtime conversion to a separate follow-up. No migration or
+production startup hookup was added. Existing user browser storage is not read,
+changed or deleted by this slice.

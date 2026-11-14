@@ -5,11 +5,17 @@ import { DEFAULT_WORKER_REQUEST_TIMEOUT_MS } from '../../contracts/worker-reques
 import type {
 	WorkerChannelCall,
 	WorkerChannelInput,
-	WorkerChannelResult,
-	WorkerHostClosed
+	WorkerHostClosed,
+	WorkerHostCloseFailure
 } from '../../contracts/worker-channel.js'
 import type { WorkerRequestIdentity, WorkerRequestResult } from '../../contracts/worker-request.js'
 import { createWorkerRequest } from './worker-request.js'
+import {
+	createWorkerCallbackCustody,
+	deliverWorkerCallback,
+	type WorkerCallbackCustody,
+	type WorkerCallbackStopResult
+} from '../../worker/callback-custody.js'
 
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Missing worker channel resource')
@@ -33,27 +39,21 @@ function closureFault(result: WorkerRequestResult<unknown>) {
 		return undefined
 	return result.reason
 }
-/** Observer delivery is a native boundary, not an account workflow. A thrown
- * observer did not accept the transferred resource's custody. */
-function deliver<Request, Response>(
-	call: WorkerChannelCall<Request, Response>,
-	result: WorkerChannelResult<Response>,
-	discard: (response: Response) => void
-) {
-	try {
-		call.settle(result)
-	} catch {
-		if (result.kind === 'succeeded') discard(result.response)
-	}
-}
-
 function createChannelController<Request, Response>() {
-	type Input = WorkerChannelInput<Request, Response>
+	type Input = WorkerChannelInput<Request, Response> & {
+		custody: WorkerCallbackCustody<WorkerRequestIdentity, Response>
+	}
 	type Call = WorkerChannelCall<Request, Response>
 	type Token = object
 	type DataCommand =
 		| { type: 'DISCARD'; token: Token }
-		| { type: 'REGISTER'; identity: WorkerRequestIdentity; call: Call }
+		| { type: 'RELEASE'; identity: WorkerHostClosed }
+		| {
+				type: 'REGISTER'
+				identity: WorkerRequestIdentity
+				call: Call
+				stopped: WorkerCallbackStopResult<Response>
+		  }
 		| {
 				type: 'DELIVER'
 				token: Token | undefined
@@ -78,70 +78,87 @@ function createChannelController<Request, Response>() {
 		// Native resource custody only. The chart selects admission, correlation,
 		// delivery and release. Forced stop disposes everything still unclaimed.
 		let disposed = false
-		const resources = new Map<Token, Response>()
-		const observers = new Map<number, { identity: WorkerRequestIdentity; call: Call }>()
-		function discard(token: Token) {
-			if (!resources.has(token)) return
-			const response = resources.get(token)!
-			resources.delete(token)
-			input.discard(response)
+		const custody = input.custody
+		let dispose: (() => void) | undefined
+		let release:
+			| { type: 'CUSTODY_RELEASED' | 'CUSTODY_RELEASE_FAILED'; identity: WorkerHostClosed }
+			| undefined
+		function releaseNative() {
+			if (release) return release
+			disposed = true
+			const failures: unknown[] = []
+			try {
+				dispose?.()
+			} catch (error) {
+				failures.push(error)
+			}
+			try {
+				custody.stop()
+			} catch (error) {
+				failures.push(error)
+			}
+			release = {
+				type: failures.length ? 'CUSTODY_RELEASE_FAILED' : 'CUSTODY_RELEASED',
+				identity: { scope: input.scope, requestId: input.closeRequestId }
+			}
+			return release
 		}
 		receive((command) => {
-			if (command.type === 'REGISTER') {
-				observers.set(command.identity.sequence, command)
-				return
+			try {
+				if (command.type === 'RELEASE') {
+					if (
+						command.identity.scope !== input.scope ||
+						command.identity.requestId !== input.closeRequestId
+					)
+						return
+					sendBack(releaseNative())
+					return
+				}
+				if (command.type === 'REGISTER') {
+					custody.register({
+						identity: command.identity,
+						settle: command.call.settle,
+						stopped: command.stopped
+					})
+					return
+				}
+				if (command.type === 'DISCARD') {
+					custody.discard(command.token)
+					return
+				}
+				custody.deliver(command.identity, command.result, command.token)
+			} catch {
+				// Keep this native owner alive. The chart must drain requests and
+				// retain independent close control after a custody operation fails.
+				sendBack({ type: 'TRANSPORT_FAILED', scope: input.scope, reason: 'unavailable' })
 			}
-			if (command.type === 'DISCARD') {
-				discard(command.token)
-				return
-			}
-			const observer = observers.get(command.identity.sequence)
-			if (!observer || !sameIdentity(observer.identity, command.identity)) return
-			observers.delete(command.identity.sequence)
-			if (command.token) {
-				if (command.result.kind === 'succeeded') resources.delete(command.token)
-				else discard(command.token)
-			}
-			deliver(observer.call, command.result, input.discard)
 		})
-		let dispose: (() => void) | undefined
 		try {
 			dispose = input.listenData((event) => {
-				if (disposed) {
-					if (event.type === 'REPLY' && event.reply.kind === 'succeeded')
-						input.discard(event.reply.response)
-					return
+				try {
+					if (disposed) {
+						if (event.type === 'REPLY' && event.reply.kind === 'succeeded')
+							custody.capture(event.reply.response)
+						return
+					}
+					if (event.type === 'TRANSPORT_FAILED') {
+						sendBack(event)
+						return
+					}
+					const token =
+						event.reply.kind === 'succeeded' ? custody.capture(event.reply.response) : undefined
+					sendBack({ type: 'RESOURCE_REPLY', reply: event.reply, token })
+				} catch {
+					sendBack({ type: 'TRANSPORT_FAILED', scope: input.scope, reason: 'unavailable' })
 				}
-				if (event.type === 'TRANSPORT_FAILED') {
-					sendBack(event)
-					return
-				}
-				const token = event.reply.kind === 'succeeded' ? {} : undefined
-				if (token && event.reply.kind === 'succeeded') resources.set(token, event.reply.response)
-				sendBack({ type: 'RESOURCE_REPLY', reply: event.reply, token })
 			})
 		} catch {
 			sendBack({ type: 'TRANSPORT_FAILED', scope: input.scope, reason: 'unavailable' })
 		}
 		return () => {
-			disposed = true
-			try {
-				dispose?.()
-			} finally {
-				for (const token of resources.keys()) discard(token)
-				for (const observer of observers.values())
-					deliver(
-						observer.call,
-						{
-							kind: 'failed',
-							identity: observer.identity,
-							reason: 'closed',
-							effectOutcome: observer.call.effect === 'effect' ? 'unknown' : 'not-issued'
-						},
-						input.discard
-					)
-				observers.clear()
-			}
+			if (release) return
+			const outcome = releaseNative()
+			if (outcome.type === 'CUSTODY_RELEASE_FAILED') sendBack(outcome)
 		}
 	})
 	const control = createCallbackLogic<never, Input>(({ input, sendBack }) => {
@@ -168,6 +185,7 @@ function createChannelController<Request, Response>() {
 			slots: Slot[]
 			fault: Fault | undefined
 			receipt: WorkerHostClosed | undefined
+			closeFailure: WorkerHostCloseFailure | undefined
 		}
 	}
 	return setup({
@@ -184,7 +202,10 @@ function createChannelController<Request, Response>() {
 				}>(),
 				TRANSPORT_FAILED: types<{ scope: string; reason: Fault }>(),
 				HOST_CLOSED: types<{ receipt: WorkerHostClosed }>(),
+				HOST_CLOSE_FAILED: types<{ failure: WorkerHostCloseFailure }>(),
 				CLOSE_FAILED: types<{ scope: string }>(),
+				CUSTODY_RELEASED: types<{ identity: WorkerHostClosed }>(),
+				CUSTODY_RELEASE_FAILED: types<{ identity: WorkerHostClosed }>(),
 				REQUEST_DONE: types<Omit<Report, 'type'>>()
 			},
 			children: {
@@ -209,7 +230,10 @@ function createChannelController<Request, Response>() {
 				)
 			},
 			matchingScope: ({ context }: { context: Context }, scope: string) =>
-				context.record.scope === scope
+				context.record.scope === scope,
+			matchingCloseIdentity: ({ context }: { context: Context }, identity: WorkerHostClosed) =>
+				identity.scope === context.record.closeIdentity.scope &&
+				identity.requestId === context.record.closeIdentity.requestId
 		}
 	}).createMachine({
 		id: 'worker-channel-controller',
@@ -224,7 +248,8 @@ function createChannelController<Request, Response>() {
 				sequence: 0,
 				slots: [],
 				fault: undefined,
-				receipt: undefined
+				receipt: undefined,
+				closeFailure: undefined
 			}
 		}),
 		initial: 'checking',
@@ -232,8 +257,8 @@ function createChannelController<Request, Response>() {
 		on: {
 			REQUEST: ({ context, event }, enq) => {
 				enq(
-					deliver<Request, Response>,
-					event.call,
+					deliverWorkerCallback<Response>,
+					event.call.settle,
 					{
 						kind: 'refused',
 						scope: context.record.scope,
@@ -366,8 +391,8 @@ function createChannelController<Request, Response>() {
 									r.sequence >= Number.MAX_SAFE_INTEGER
 								) {
 									enq(
-										deliver<Request, Response>,
-										call,
+										deliverWorkerCallback<Response>,
+										call.settle,
 										{
 											kind: 'refused',
 											scope: r.scope,
@@ -384,7 +409,17 @@ function createChannelController<Request, Response>() {
 									requestId: call.requestId,
 									sequence: r.sequence + 1
 								}
-								enq.sendTo('data', { type: 'REGISTER', identity, call })
+								enq.sendTo('data', {
+									type: 'REGISTER',
+									identity,
+									call,
+									stopped: {
+										kind: 'failed',
+										identity,
+										reason: 'closed',
+										effectOutcome: call.effect === 'effect' ? 'unknown' : 'not-issued'
+									}
+								})
 								const child = enq.spawn('request', {
 									input: {
 										identity,
@@ -430,6 +465,9 @@ function createChannelController<Request, Response>() {
 						}
 					},
 					closing: {
+						timeout: 'closeDeadline',
+						onTimeout: ({ self }) =>
+							self.getSnapshot().matches('operating.closing.overdue') ? {} : { target: '.overdue' },
 						entry: ({ context }, enq) => {
 							for (const slot of context.record.slots)
 								enq.sendTo(slot.child, {
@@ -451,22 +489,30 @@ function createChannelController<Request, Response>() {
 						},
 						initial: 'waiting',
 						on: {
-							HOST_CLOSED: ({ context, event }) => {
-								if (
-									event.receipt.scope !== context.record.scope ||
-									event.receipt.requestId !== context.record.closeIdentity.requestId
-								)
-									return
+							HOST_CLOSED: (args) => {
+								if (!args.guards.matchingCloseIdentity(args, args.event.receipt)) return
 								return {
 									target: 'settling',
-									context: { record: { ...context.record, receipt: event.receipt } }
+									context: { record: { ...args.context.record, receipt: args.event.receipt } }
+								}
+							},
+							HOST_CLOSE_FAILED: (args, enq) => {
+								if (!args.guards.matchingCloseIdentity(args, args.event.failure)) return
+								if (args.context.record.closeFailure !== undefined) return {}
+								const report = required(args.context.record.configuration).onCloseFailure
+								if (report) enq(report, args.event.failure)
+								const context = {
+									record: { ...args.context.record, closeFailure: args.event.failure }
+								}
+								if (args.self.getSnapshot().matches('operating.closing.overdue')) return { context }
+								return {
+									target: '.nativeFailed',
+									context
 								}
 							}
 						},
 						states: {
 							waiting: {
-								timeout: 'closeDeadline',
-								onTimeout: { target: 'overdue' },
 								on: {
 									CLOSE_FAILED: (args) =>
 										args.guards.matchingScope(args, args.event.scope)
@@ -474,6 +520,7 @@ function createChannelController<Request, Response>() {
 											: undefined
 								}
 							},
+							nativeFailed: {},
 							overdue: {
 								entry: ({ context }, enq) =>
 									enq(
@@ -485,9 +532,21 @@ function createChannelController<Request, Response>() {
 					},
 					settling: {
 						always: ({ context }) =>
-							context.record.slots.length === 0
-								? { target: '#worker-channel-controller.closed' }
-								: undefined
+							context.record.slots.length === 0 ? { target: 'releasing' } : undefined
+					},
+					releasing: {
+						entry: ({ context }, enq) =>
+							enq.sendTo('data', { type: 'RELEASE', identity: context.record.closeIdentity }),
+						on: {
+							CUSTODY_RELEASED: (args) =>
+								args.guards.matchingCloseIdentity(args, args.event.identity)
+									? { target: '#worker-channel-controller.closed' }
+									: undefined,
+							CUSTODY_RELEASE_FAILED: (args) =>
+								args.guards.matchingCloseIdentity(args, args.event.identity)
+									? { target: '#worker-channel-controller.blocked' }
+									: undefined
+						}
 					}
 				}
 			},
@@ -504,8 +563,8 @@ function createChannelController<Request, Response>() {
 				on: {
 					REQUEST: ({ context, event }, enq) =>
 						enq(
-							deliver<Request, Response>,
-							event.call,
+							deliverWorkerCallback<Response>,
+							event.call.settle,
 							{
 								kind: 'refused',
 								scope: context.record.scope,
@@ -531,7 +590,13 @@ function createChannelController<Request, Response>() {
  * receipt can complete this owner; timeout/stop are never closure evidence. */
 export function createWorkerChannel<Request, Response>() {
 	type Input = WorkerChannelInput<Request, Response>
-	type Context = { record: { input: Input | undefined; receipt: WorkerHostClosed | undefined } }
+	type Context = {
+		record: {
+			input: Input | undefined
+			custody: WorkerCallbackCustody<WorkerRequestIdentity, Response> | undefined
+			receipt: WorkerHostClosed | undefined
+		}
+	}
 	const controller = createChannelController<Request, Response>()
 	return setup({
 		schemas: {
@@ -544,7 +609,16 @@ export function createWorkerChannel<Request, Response>() {
 		actors: { controller }
 	}).createMachine({
 		id: 'worker-channel',
-		context: ({ input }) => ({ record: { input, receipt: undefined } }),
+		context: ({ input }) => ({
+			record: {
+				input,
+				custody: createWorkerCallbackCustody<WorkerRequestIdentity, Response>({
+					sameIdentity,
+					discard: input.discard
+				}),
+				receipt: undefined
+			}
+		}),
 		initial: 'running',
 		output: ({ context }) => required(context.record.receipt),
 		states: {
@@ -552,7 +626,10 @@ export function createWorkerChannel<Request, Response>() {
 				invoke: {
 					id: 'controller',
 					src: 'controller',
-					input: ({ context }) => required(context.record.input),
+					input: ({ context }) => ({
+						...required(context.record.input),
+						custody: required(context.record.custody)
+					}),
 					onDone: ({ context, event }) => ({
 						target: 'closed',
 						context: { record: { ...context.record, receipt: event.output } }
@@ -573,8 +650,8 @@ export function createWorkerChannel<Request, Response>() {
 					REQUEST: ({ context, event }, enq) => {
 						const input = required(context.record.input)
 						enq(
-							deliver<Request, Response>,
-							event.call,
+							deliverWorkerCallback<Response>,
+							event.call.settle,
 							{
 								kind: 'refused',
 								scope: input.scope,
@@ -589,7 +666,9 @@ export function createWorkerChannel<Request, Response>() {
 			},
 			closed: {
 				type: 'final',
-				entry: ({ context }) => ({ context: { record: { ...context.record, input: undefined } } })
+				entry: ({ context }) => ({
+					context: { record: { ...context.record, input: undefined, custody: undefined } }
+				})
 			}
 		}
 	})

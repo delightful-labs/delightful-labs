@@ -4,6 +4,11 @@ import { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/s
 import { createSessionAcquisitionMachine } from 'delightful-local-first/session/workflow'
 import { createWorkerChannel } from 'delightful-local-first/worker/channel/workflow'
 import { createWorkerEffectDrain } from 'delightful-local-first/worker/effect-drain/workflow'
+import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
+import { createFinanceAccountStore } from './account-store.js'
+import { financeGrantDescriptor, financeGrantKey } from './grant-binding.js'
+import { decodeFinanceGrantRequest, decodeFinanceGrantReply } from './grant-protocol.js'
+import { createFinanceGrantOwner } from '../../machines/runtime/worker-grant-owner.js'
 
 // W02 build-only entry: no production caller, session, actor, port or storage owner.
 // Keeping factory values in this diagnostic catalog prevents an empty-worker proof.
@@ -14,6 +19,13 @@ const factories = {
 	createSessionAcquisitionMachine,
 	createWorkerChannel,
 	createWorkerEffectDrain,
+	brokerHostClient,
+	createFinanceAccountStore,
+	financeGrantDescriptor,
+	financeGrantKey,
+	decodeFinanceGrantRequest,
+	decodeFinanceGrantReply,
+	createFinanceGrantOwner,
 	loadLocalFirstClient: () => import('jazz-tools/local-first')
 }
 
