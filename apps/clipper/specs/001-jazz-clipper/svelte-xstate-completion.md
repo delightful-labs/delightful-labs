@@ -112,27 +112,30 @@ local or remote durability.
 
 ## Abrupt termination and qualification map
 
-The added native Worker test waits for a real local write receipt, holds before
-session.close, then calls Worker.terminate. A fresh worker reads that exact
-operation offline without mutation replay. Reconnection/reload retains one saved
-article. This proves the admitted locally durable case for worker termination;
+The production offline test waits for durable edits and reloads their reader
+position, calls Worker.terminate on the real application worker without sending
+SHUTDOWN, then closes the browser process. It reopens the same profile with web
+and Jazz servers stopped, offline mode enabled and the HTTP cache cleared. The
+service worker supplies real production JS/WASM assets; no fixture overrides a
+native SDK resource. The reader, settings, organization and tags survive, with
+exactly one saved article and later reconciliation to another restored profile. This proves the admitted locally durable case for worker termination;
 it does not promise survival of unacknowledged or OS/power-loss writes.
 
 Full browser-process restart with endpoints unreachable remains covered by
 account and production offline shell suites. Native account-custody tests retain
 unknown-write outcomes and reject a false clean-close acknowledgment; uncertain
-writes are not automatically replayed. The new worker test and browser-process
-restart checks address different native boundaries.
+writes are not automatically replayed. The explicit native termination and subsequent browser-process restart qualify
+both boundaries in the real cached production application.
 
 | Task | Concrete native coverage |
 | --- | --- |
 | B4 | discovery: duplicate Add Link/explicit Restore; invalid-source feedback; account: offline URL capture/restart and quiet background failure |
 | C1 | discovery: validation clears on edit/Escape, keyboard chip selection/removal, article leaving tag filter and focus recovery |
-| C2 | discovery: combined search/filter/tag/status/favorites/Trash, remote reindex, row-removal focus and offline tags/restart; mounted library pagination/editor continuity |
+| C2 | discovery: combined search/filter/tag/status/favorites/Trash, remote reindex, row-removal focus and offline tags/restart; native pagination/search/focus plus mounted editor continuity |
 | E3 | account viewport/manual closure/inertness/Escape; reader drawer resize/Escape/focus; mounted listener disposal/remount |
 | E4 | mounted live image/selection/content replacement; native syntax worker and reader-anchor/navigation tests |
 | D4 | shell cancellation tests, worker host acquisition/close/custody tests, real production offline registration |
-| D5 | new abrupt Worker termination/read-only reopen, account/reader/production offline full-process restart, account-custody unknown outcome tests |
+| D5 | explicit application Worker.terminate followed by production offline full-process restart, account-custody unknown outcome tests |
 
 ## Verification record
 

@@ -15,37 +15,11 @@ function serveNativeBroker(data: MessagePort, control: MessagePort, scope: strin
 		open: (url, name) => new SharedWorker(url, { type: 'module', name })
 	})
 }
-let preparedOfflineWorker: Worker | undefined
-/** Load test code before the network is disabled; no SDK session starts yet. */
-export async function prepareOfflineHost() {
-	if (preparedOfflineWorker) throw new Error('Offline fixture already prepared')
-	const worker = new Worker(new URL('./host.worker.ts', import.meta.url), { type: 'module' })
-	try {
-		await new Promise<void>((resolve, reject) => {
-			worker.onerror = () => reject(new Error('Offline fixture module failed to load'))
-			worker.onmessage = ({ data }: MessageEvent<unknown>) => {
-				if (typeof data === 'object' && data !== null && 'type' in data && data.type === 'LOADED')
-					resolve()
-			}
-		})
-		preparedOfflineWorker = worker
-	} catch (error) {
-		worker.terminate()
-		throw error
-	}
-}
-export function discardOfflineHost() {
-	preparedOfflineWorker?.terminate()
-	preparedOfflineWorker = undefined
-}
-export async function qualifyHost(abrupt = false, inspectOperationId?: string) {
+export async function qualifyHost() {
 	const { currentLibraryRecords } = await import('../fixture-records.js')
 	const expected = currentLibraryRecords().articles.libraryId
 	const key = accountStorageKey(PUBLIC_JAZZ_SERVER_URL)
-	const worker =
-		preparedOfflineWorker ??
-		new Worker(new URL('./host.worker.ts', import.meta.url), { type: 'module' })
-	preparedOfflineWorker = undefined
+	const worker = new Worker(new URL('./host.worker.ts', import.meta.url), { type: 'module' })
 	const channel = new MessageChannel()
 	const broker = new MessageChannel(),
 		brokerControl = new MessageChannel()
@@ -63,16 +37,11 @@ export async function qualifyHost(abrupt = false, inspectOperationId?: string) {
 							'Worker host refused: ' + data.message + '; SharedWorker=' + data.sharedWorker
 						)
 					)
-				if (data.type === 'READY') {
-					result = { ...data, sameAccount: data.accountId === expected, cleanlyClosed: false }
-					if (abrupt) resolve(result)
-				}
+				if (data.type === 'READY') result = { ...data, sameAccount: data.accountId === expected }
 				if (data.type === 'CLOSED') resolve(result)
 			}
 			worker.postMessage(
 				{
-					holdUntilTerminated: abrupt,
-					inspectOperationId,
 					port: channel.port2,
 					broker: broker.port2,
 					brokerControl: brokerControl.port2,
@@ -84,9 +53,9 @@ export async function qualifyHost(abrupt = false, inspectOperationId?: string) {
 			)
 		})
 	} finally {
-		worker.terminate()
 		stopBroker()
 		stop()
+		worker.terminate()
 	}
 }
 
