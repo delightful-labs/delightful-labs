@@ -76,12 +76,18 @@ it.each([
 	async ({ factory, implementation }) => {
 		const remove: Plugin = {
 			name: 'worker-proof-missing-binding-fixture',
+			enforce: 'pre',
 			transform(code, id) {
 				if (!id.endsWith('/runtime/worker/application.worker.ts')) return
 				return code
 					.split('\n')
 					.filter(
-						(line) => !line.includes(`import { ${factory} }`) && line.trim() !== `${factory},`
+						(line) =>
+							!line.includes(`import { ${factory} }`) &&
+							line.trim() !== `${factory},` &&
+							(factory !== 'brokerHostClient' ||
+								(!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
+									line.trim() !== 'createFinanceGrantOwner,'))
 					)
 					.join('\n')
 			}
@@ -92,6 +98,70 @@ it.each([
 	},
 	20_000
 )
+
+it.each([
+	{
+		missing: 'grant-binding.ts',
+		imports: ['grant-binding.js', 'grant-protocol.js'],
+		factories: [
+			'financeGrantDescriptor',
+			'financeGrantKey',
+			'decodeFinanceGrantRequest',
+			'decodeFinanceGrantReply'
+		]
+	},
+	{
+		missing: 'grant-protocol.ts',
+		imports: ['grant-protocol.js'],
+		factories: ['decodeFinanceGrantRequest', 'decodeFinanceGrantReply']
+	}
+])(
+	'refuses a worker that omits the private $missing contract',
+	async ({ missing, imports, factories }) => {
+		const remove: Plugin = {
+			name: 'worker-proof-missing-grant-contract',
+			enforce: 'pre',
+			transform(code, id) {
+				if (!id.endsWith('/runtime/worker/application.worker.ts')) return
+				return code
+					.split('\n')
+					.filter(
+						(line) =>
+							!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
+							line.trim() !== 'createFinanceGrantOwner,' &&
+							!imports.some((module) => line.includes(`from './${module}'`)) &&
+							!factories.some((factory) => line.trim() === `${factory},`)
+					)
+					.join('\n')
+			}
+		}
+		await expect(bundle(remove)).rejects.toThrow(
+			`Worker proof omitted implementation: src/lib/runtime/worker/${missing}`
+		)
+	},
+	20_000
+)
+
+it('refuses a worker that omits the grant-owner implementation', async () => {
+	const remove: Plugin = {
+		name: 'worker-proof-missing-grant-owner',
+		enforce: 'pre',
+		transform(code, id) {
+			if (!id.endsWith('/runtime/worker/application.worker.ts')) return
+			return code
+				.split('\n')
+				.filter(
+					(line) =>
+						!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
+						line.trim() !== 'createFinanceGrantOwner,'
+				)
+				.join('\n')
+		}
+	}
+	await expect(bundle(remove)).rejects.toThrow(
+		'Worker proof omitted implementation: src/lib/machines/runtime/worker-grant-owner.ts'
+	)
+}, 20_000)
 
 it.each(['serveFinanceGenerationGrant', 'serveFinanceBrokerGrant'])(
 	'refuses a proof that omits the real Window adapter %s',

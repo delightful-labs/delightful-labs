@@ -100,6 +100,102 @@ function fixture(overrides: Partial<WorkerChannelInput<Request, Response>> = {})
 	}
 }
 
+it('completes only after the genuine host receipt and local data cleanup', () => {
+	const order: string[] = []
+	const release = vi.fn(() => {
+		order.push('release')
+	})
+	const f = fixture({ listenData: () => release })
+	f.actor.subscribe({
+		complete: () => {
+			order.push('complete')
+		},
+		error: () => {
+			order.push('error')
+		}
+	})
+	f.actor.start()
+	f.actor.send({ type: 'CLOSE' })
+	expect(release).not.toHaveBeenCalled()
+	f.ack()
+	expect(order).toEqual(['release', 'complete'])
+	expect(f.actor.getSnapshot().output).toEqual({ scope: 'A-3', requestId: 'close-A-3' })
+	f.actor.stop()
+	expect(release).toHaveBeenCalledOnce()
+})
+
+it('blocks after a failed local disposer despite a genuine host acknowledgement', () => {
+	const release = vi.fn(() => {
+		throw new Error('native data disposal failed')
+	})
+	const f = fixture({ listenData: () => release }),
+		complete = vi.fn(),
+		failed = vi.fn()
+	f.actor.subscribe({ complete, error: failed })
+	f.actor.start()
+	f.actor.send({ type: 'CLOSE' })
+	f.ack()
+	expect(f.configuration.onBlocked).toHaveBeenCalledOnce()
+	expect(f.actor.getSnapshot().status).toBe('active')
+	expect(f.actor.getSnapshot().output).toBeUndefined()
+	expect(complete).not.toHaveBeenCalled()
+	expect(failed).not.toHaveBeenCalled()
+	f.actor.send({ type: 'CLOSE' })
+	f.ack()
+	expect(f.actor.getSnapshot().output).toBeUndefined()
+	f.actor.stop()
+	expect(release).toHaveBeenCalledOnce()
+	expect(f.actor.getSnapshot().status).toBe('stopped')
+	expect(f.actor.getSnapshot().output).toBeUndefined()
+})
+
+it('settles every issued callback and retains a blocked result after orphan disposal fails', () => {
+	const f = fixture(),
+		bad = response('unaccepted')
+	bad.dispose = vi.fn(() => {
+		throw new Error('native resource disposal failed')
+	})
+	f.actor.start()
+	const first = f.begin('first'),
+		second = f.begin('second', 'query')
+	f.data({
+		type: 'REPLY',
+		reply: {
+			kind: 'succeeded',
+			identity: { scope: 'foreign', requestId: 'foreign', sequence: 1 },
+			response: bad
+		}
+	})
+	expect(first.settle).toHaveBeenCalledOnce()
+	expect(first.settle.mock.calls[0]?.[0]).toMatchObject({
+		kind: 'failed',
+		effectOutcome: 'unknown'
+	})
+	expect(second.settle).toHaveBeenCalledOnce()
+	expect(second.settle.mock.calls[0]?.[0]).toMatchObject({
+		kind: 'failed',
+		effectOutcome: 'not-issued'
+	})
+	expect(f.configuration.onBlocked).not.toHaveBeenCalled()
+	f.ack()
+	expect(f.configuration.onBlocked).toHaveBeenCalledOnce()
+	expect(f.actor.getSnapshot().output).toBeUndefined()
+	expect(f.actor.getSnapshot().status).toBe('active')
+})
+
+it('does not turn a reentrant forced stop during native release into a close output', () => {
+	let stop = () => {}
+	const release = vi.fn(() => stop())
+	const f = fixture({ listenData: () => release })
+	stop = () => f.actor.stop()
+	f.actor.start()
+	f.actor.send({ type: 'CLOSE' })
+	f.ack()
+	expect(f.actor.getSnapshot().status).toBe('stopped')
+	expect(f.actor.getSnapshot().output).toBeUndefined()
+	expect(release).toHaveBeenCalledOnce()
+})
+
 it('admits eight concurrent calls, refuses excess, and routes out-of-order replies once', () => {
 	const f = fixture()
 	f.actor.start()

@@ -373,6 +373,10 @@
 			"types": "./dist/machines/lifecycle/worker-channel.d.ts",
 			"default": "./dist/machines/lifecycle/worker-channel.js"
 		},
+		"./worker/callback-custody": {
+			"types": "./dist/worker/callback-custody.d.ts",
+			"default": "./dist/worker/callback-custody.js"
+		},
 		"./worker/host-close": {
 			"types": "./dist/worker/host-close.d.ts",
 			"default": "./dist/worker/host-close.js"
