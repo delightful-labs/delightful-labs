@@ -199,6 +199,10 @@ test('reopens locally durable data after native Worker termination without a gra
 			cleanlyClosed: z.literal(false)
 		})
 		.parse(first)
+	await page.evaluate(async () => {
+		const path = '/tests/worker/host-driver.ts'
+		await (await import(/* @vite-ignore */ path)).prepareOfflineHost()
+	})
 	await page.context().setOffline(true)
 	try {
 		const reopened = await page.evaluate(async (id) => {
@@ -219,6 +223,11 @@ test('reopens locally durable data after native Worker termination without a gra
 		).toBe(true)
 	} finally {
 		await page.context().setOffline(false)
+		await page.evaluate(async () => {
+			const path = '/tests/worker/host-driver.ts'
+			const driver = await import(/* @vite-ignore */ path)
+			driver.discardOfflineHost()
+		})
 	}
 	await page.reload()
 	await expect(page.getByRole('link', { name: 'Worker proof', exact: true })).toHaveCount(1)

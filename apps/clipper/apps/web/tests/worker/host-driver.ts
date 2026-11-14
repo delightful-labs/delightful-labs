@@ -15,11 +15,37 @@ function serveNativeBroker(data: MessagePort, control: MessagePort, scope: strin
 		open: (url, name) => new SharedWorker(url, { type: 'module', name })
 	})
 }
+let preparedOfflineWorker: Worker | undefined
+/** Load test code before the network is disabled; no SDK session starts yet. */
+export async function prepareOfflineHost() {
+	if (preparedOfflineWorker) throw new Error('Offline fixture already prepared')
+	const worker = new Worker(new URL('./host.worker.ts', import.meta.url), { type: 'module' })
+	try {
+		await new Promise<void>((resolve, reject) => {
+			worker.onerror = () => reject(new Error('Offline fixture module failed to load'))
+			worker.onmessage = ({ data }: MessageEvent<unknown>) => {
+				if (typeof data === 'object' && data !== null && 'type' in data && data.type === 'LOADED')
+					resolve()
+			}
+		})
+		preparedOfflineWorker = worker
+	} catch (error) {
+		worker.terminate()
+		throw error
+	}
+}
+export function discardOfflineHost() {
+	preparedOfflineWorker?.terminate()
+	preparedOfflineWorker = undefined
+}
 export async function qualifyHost(abrupt = false, inspectOperationId?: string) {
 	const { currentLibraryRecords } = await import('../fixture-records.js')
 	const expected = currentLibraryRecords().articles.libraryId
 	const key = accountStorageKey(PUBLIC_JAZZ_SERVER_URL)
-	const worker = new Worker(new URL('./host.worker.ts', import.meta.url), { type: 'module' })
+	const worker =
+		preparedOfflineWorker ??
+		new Worker(new URL('./host.worker.ts', import.meta.url), { type: 'module' })
+	preparedOfflineWorker = undefined
 	const channel = new MessageChannel()
 	const broker = new MessageChannel(),
 		brokerControl = new MessageChannel()

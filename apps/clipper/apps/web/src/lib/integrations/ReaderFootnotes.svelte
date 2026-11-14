@@ -19,7 +19,7 @@
 	}
 	function clear() {
 		note = undefined
-		document.getElementById(id)?.hidePopover()
+		document.getElementById(id)?.hidePopover?.()
 	}
 	function close() {
 		if (note?.trigger.isConnected) note.trigger.focus()

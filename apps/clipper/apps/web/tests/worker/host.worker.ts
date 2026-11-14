@@ -4,6 +4,7 @@ import { createLibraryRecords } from '../../src/lib/backend/jazz/records.js'
 import { brokerHostClient } from '../../src/lib/runtime/worker/broker-channel.js'
 import { diagnosticText } from '../../src/lib/diagnostics/machines.js'
 import { createJazzClient } from 'jazz-tools/client'
+import * as localFirst from 'jazz-tools/local-first'
 import wasmUrl from '#jazz-wasm-binary?url'
 import { app } from '../../src/lib/backend/jazz/schema.js'
 import { createWorkerAccountStore } from '../../src/lib/runtime/worker/account-store.js'
@@ -21,7 +22,7 @@ self.onmessage = async ({ data }) => {
 	try {
 		const key = accountStorageKey(data.serverUrl)
 		const session = await createJazzClient({
-			client: () => import('jazz-tools/local-first'),
+			client: () => Promise.resolve(localFirst),
 			serverUrl: data.serverUrl,
 			env: 'clipper',
 			initial: 'local-first',
@@ -29,9 +30,7 @@ self.onmessage = async ({ data }) => {
 			runtimeSources: { browserWorkerHost: brokerHost, wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION }
 		})
 		try {
-			await session
-				.getSnapshot()
-				.client?.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
+			await session.getSnapshot().client?.db.upgradeToLocalFirst(() => Promise.resolve(localFirst))
 			const { account, client } = session.getSnapshot()
 			if (!account || !client) throw new Error('Worker account unavailable')
 			const before = await client.db.one(app.libraries.where({ id: account.id }), {
@@ -114,3 +113,6 @@ self.onmessage = async ({ data }) => {
 		self.postMessage({ type: 'CLOSED' })
 	}
 }
+
+// All static module dependencies are loaded before the offline test starts a session.
+self.postMessage({ type: 'LOADED' })
