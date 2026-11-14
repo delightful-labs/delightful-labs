@@ -180,3 +180,53 @@ it('isolates A → B → A mounts and leaves shutdown with the application owner
 	f.worker.onmessage?.({ data: { type: 'CLOSED' } })
 	expect(f.worker.terminate).toHaveBeenCalledTimes(1)
 })
+
+it('hands pending annotations from scoped transport receipts to worker durability', () => {
+	const f = fixture()
+	const initial = {
+		...f.initial,
+		view: {
+			...f.initial.view,
+			annotations: {
+				...f.initial.view.annotations,
+				message: { text: 'Previously synced', variant: 'info' } satisfies WorkflowMessage
+			}
+		}
+	}
+	f.binding.update(initial)
+	f.client.send({
+		type: 'ANNOTATION',
+		command: {
+			type: 'EDIT_NOTE',
+			documentId: crypto.randomUUID(),
+			id: crypto.randomUUID(),
+			text: 'New text.',
+			editedFrom: ''
+		}
+	})
+	expect(f.client.getView().view.annotations.pending).toBe(true)
+	expect(f.client.getView().view.annotations.message).toBeUndefined()
+	const other = f.app.library(render())
+	expect(other.client.getView().view.annotations.pending).toBe(false)
+	f.binding.update({
+		...initial,
+		view: {
+			...initial.view,
+			annotations: {
+				...initial.view.annotations,
+				pending: true,
+				message: { text: 'Saving', variant: 'info' }
+			}
+		}
+	})
+	const message = commandSchema.parse(f.worker.postMessage.mock.lastCall?.[0])
+	if (message.type !== 'LIBRARY') throw new Error('Missing annotation command')
+	f.worker.onmessage?.({
+		data: { type: 'RECEIVED', scope: f.initial.scope, requestId: message.requestId }
+	})
+	expect(f.client.getView().view.annotations.pending).toBe(true)
+	expect(f.client.getView().view.annotations.message?.text).toBe('Saving')
+	f.binding.update(initial)
+	expect(f.client.getView().view.annotations.pending).toBe(false)
+	expect(f.client.getView().view.annotations.message?.text).toBe('Previously synced')
+})

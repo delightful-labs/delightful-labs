@@ -196,3 +196,42 @@ it('uses Jazz edit-base merging for stale disjoint edits of the same note', asyn
 	})
 	expect((await a.db.one(app.notes.where({ id })))?.text).toBe('The red dog crossed the field.')
 })
+
+it('does not let an older note receipt report a queued edit as synced', async () => {
+	const a = await owner('annotation-feedback')
+	const gate = Promise.withResolvers<void>()
+	const actor = createActor(annotationsMachine, {
+		input: {
+			capability: {
+				...a.records.annotations,
+				prepare: async (command) => {
+					if (command.type === 'EDIT_NOTE') await gate.promise
+					return a.records.annotations.prepare(command)
+				}
+			}
+		}
+	}).start()
+	try {
+		actor.send({ type: 'OPEN', documentId: a.documentId, text: 'Saved text.' })
+		await expect.poll(() => selectAnnotations(actor.getSnapshot()).enabled).toBe(true)
+		actor.send({ type: 'ADD_NOTE', documentId: a.documentId })
+		await expect.poll(() => selectAnnotations(actor.getSnapshot()).notes.length).toBe(1)
+		const note = selectAnnotations(actor.getSnapshot()).notes[0]
+		if (!note) throw new Error('Missing note')
+		const creation = actor.getSnapshot().context.receiptId
+		actor.send({
+			type: 'EDIT_NOTE',
+			documentId: a.documentId,
+			id: note.id,
+			text: 'New edit.',
+			editedFrom: ''
+		})
+		actor.send({ type: 'SYNC', id: creation, status: 'accepted' })
+		expect(selectAnnotations(actor.getSnapshot()).pending).toBe(true)
+		expect(selectAnnotations(actor.getSnapshot()).message?.text).not.toBe('note synced')
+	} finally {
+		gate.resolve()
+		actor.send({ type: 'SHUTDOWN' })
+		await toPromise(actor)
+	}
+})

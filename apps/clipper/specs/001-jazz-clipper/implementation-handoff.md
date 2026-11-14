@@ -1,5 +1,29 @@
 # Article notes — implementation started
 
+## Annotation save feedback — CI follow-up, 2026-11-14
+
+PR #38's offline annotation case could close the browser after observing the note
+creation's accepted receipt while its first text edit was still pending. A native
+held-prepare regression also reproduced an older receipt overwriting the newer
+edit's Saving feedback. A browser held-delivery regression reproduced the Window
+transport reporting no pending work before the worker received the edit.
+
+The existing Window transport machine now retains annotation request IDs and their
+library scopes from SEND to RECEIVED. Its projection marks those requests pending
+and suppresses stale feedback until delivery; worker-owned durability takes over
+after delivery. The annotation chart invalidates earlier feedback receipts on new
+edits and refuses older confirmations while local writes remain queued or active.
+Native receipt handling and draft cleanup keep their original owners. Offline
+tests wait for local durability before both process stops. No timeout increase,
+retry, platform exclusion, new dependency or persisted data model is introduced.
+
+On the PR merge result, both deterministic regressions failed before the fix and
+pass afterward. Local qualification passes 877 unit/native tests, 31 component
+tests, all four annotation browser cases and all nine production offline cases,
+plus strict web/extension types, lint, formatting and workspace links. Both
+production shell versions were rebuilt. Hosted Linux qualification remains a
+separate result to check after pushing the correction.
+
 ## Saved-reader annotations — 2026-11-14
 
 The user authorized a working implementation with best judgment after the

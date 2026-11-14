@@ -693,6 +693,10 @@ test('native annotations survive two complete offline browser restarts and recon
 		await group.getByRole('button', { name: 'Add note', exact: true }).click()
 		await group.getByRole('textbox', { name: 'note', exact: true }).fill('Original native note.')
 		await expect(page.getByText('note synced', { exact: true })).toBeVisible()
+		await expect(page.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
+			'aria-busy',
+			'false'
+		)
 		const readerUrl = page.url()
 		await clearHttpCache(page)
 		await context.close()
@@ -716,6 +720,10 @@ test('native annotations survive two complete offline browser restarts and recon
 		await expect(
 			offline.getByRole('region', { name: 'highlights', exact: true }).getByRole('status')
 		).toHaveText('Sync pending.')
+		await expect(offline.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
+			'aria-busy',
+			'false'
+		)
 		await context.close()
 
 		context = await chromium.launchPersistentContext(profile, { headless: true })

@@ -156,3 +156,56 @@ test('retains oversized input locally across reload, then saves an explicitly sh
 		'Explicitly shortened recovery.'
 	)
 })
+
+test('marks an edit pending before worker delivery and clears the previous synced message', async ({
+	page
+}) => {
+	await page.addInitScript(() => {
+		const post = Worker.prototype.postMessage
+		let held = true
+		const waiting: (() => void)[] = []
+		window.releaseAnnotationEdit = () => {
+			held = false
+			for (const deliver of waiting.splice(0)) deliver()
+		}
+		Worker.prototype.postMessage = function (
+			this: Worker,
+			message: import('../src/lib/runtime/worker/protocol.js').RuntimeCommand,
+			options: StructuredSerializeOptions | Transferable[] = []
+		) {
+			const deliver = () => Reflect.apply(post, this, [message, options])
+			if (
+				held &&
+				message.type === 'LIBRARY' &&
+				message.event.type === 'ANNOTATION' &&
+				message.event.command.type === 'EDIT_NOTE'
+			)
+				waiting.push(deliver)
+			else deliver()
+		}
+	})
+	await seed(page)
+	await page.getByRole('button', { name: 'Add note', exact: true }).click()
+	await expect(page.getByText('note synced', { exact: true })).toBeVisible()
+	const field = page.getByRole('textbox', { name: 'note', exact: true })
+	await field.fill('An edit waiting for worker delivery.')
+	await expect(page.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
+		'aria-busy',
+		'true'
+	)
+	await expect(page.getByText('note synced', { exact: true })).toHaveCount(0)
+	await page.evaluate(() => window.releaseAnnotationEdit())
+	await expect(page.getByText('note synced', { exact: true })).toBeVisible()
+	await expect(page.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
+		'aria-busy',
+		'false'
+	)
+	await page.reload()
+	await expect(field).toHaveValue('An edit waiting for worker delivery.')
+})
+
+declare global {
+	interface Window {
+		releaseAnnotationEdit: () => void
+	}
+}

@@ -545,8 +545,8 @@ export const annotationsMachine = model.createMachine({
 				feedback: {
 					initial: 'idle',
 					on: {
-						QUEUED: { target: '.saving' },
-						INVALID: { target: '.invalid' },
+						QUEUED: { target: '.saving', context: { receiptId: '' } },
+						INVALID: { target: '.invalid', context: { receiptId: '' } },
 						LOCAL_SAVED: { target: '.local' },
 						WRITE_FAILED: { target: '.failed' },
 						WRITE_UNKNOWN: { target: '.unknown' },
@@ -556,7 +556,8 @@ export const annotationsMachine = model.createMachine({
 							delete draftReceipts[event.id]
 							if (record && event.status === 'accepted')
 								enq.sendTo('recovery', { type: 'FORGET', ...record })
-							if (event.id !== context.receiptId) return { context: { draftReceipts } }
+							if (event.id !== context.receiptId || context.queue.length > 0 || context.prepared)
+								return { context: { draftReceipts } }
 							return {
 								target:
 									event.status === 'accepted'
