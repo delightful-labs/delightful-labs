@@ -55,6 +55,13 @@ The [grant-owner handoff](worker-grant-owner-design.md) records the task-list
 formatting conflict and scoped merge checks; historical counts keep their
 original baseline.
 Detailed implementation designs remain subject to their review gates.
+The user merged PR #37 at main `4301afde` on 2026-11-14. Continue on
+`feat/finance-worker-grant-population` from that merge. Its first bounded slice,
+[F4c2](worker-grant-population-design.md#f4c2-sdk-call-and-interruption-contracts),
+qualifies truthful SDK callback interruption and canonical request-byte contracts
+after the user's separate implementation/test approval on 2026-11-14. Its linked
+record owns exact checks and results. The population/inbox and actual SDK
+integration are still pending, and W05 remains incomplete.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
 [ownership specification](xstate-v6-migration.md), and

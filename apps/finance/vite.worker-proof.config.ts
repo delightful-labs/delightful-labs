@@ -39,7 +39,8 @@ const requiredImplementations = [
 	'/delightful-local-first/dist/backend/jazz/worker-broker.js',
 	'src/lib/runtime/worker/grant-binding.ts',
 	'src/lib/runtime/worker/grant-protocol.ts',
-	'src/lib/machines/runtime/worker-grant-owner.ts'
+	'src/lib/machines/runtime/worker-grant-owner.ts',
+	'src/lib/runtime/worker/sdk-call-binding.ts'
 ]
 const portable = (id: string) => (isAbsolute(id) ? relative(root, id).replaceAll('\\', '/') : id)
 const clean = (id: string) => id.split('?')[0] ?? id

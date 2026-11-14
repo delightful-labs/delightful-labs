@@ -1,24 +1,45 @@
 import type { WorkerChannelResult } from '../contracts/worker-channel.js'
 
-export type WorkerCallbackStopResult<Response> = Exclude<
-	WorkerChannelResult<Response>,
-	{ kind: 'succeeded' }
->
-export type WorkerCallbackRegistration<Identity, Response> = Readonly<{
-	identity: Identity
-	settle: (result: WorkerChannelResult<Response>) => void
-	/** Selected by the owning chart before registration; stop chooses no outcome. */
-	stopped: WorkerCallbackStopResult<Response>
+/** Owner-selected interruption without a fabricated broker wire identity. */
+export type WorkerCallbackInterruption = Readonly<{
+	kind: 'interrupted'
+	reason: 'closed' | 'unavailable'
+	effectOutcome: 'not-issued' | 'unknown'
 }>
-export type WorkerCallbackCustody<Identity, Response> = Readonly<{
-	register: (observer: WorkerCallbackRegistration<Identity, Response>) => void
+export type WorkerCallbackResult<
+	Response,
+	Interruption extends WorkerCallbackInterruption = never
+> = WorkerChannelResult<Response> | Interruption
+export type WorkerCallbackStopResult<
+	Response,
+	Interruption extends WorkerCallbackInterruption = never
+> = Exclude<WorkerCallbackResult<Response, Interruption>, { kind: 'succeeded' }>
+export type WorkerCallbackRegistration<
+	Identity,
+	Response,
+	Interruption extends WorkerCallbackInterruption = never
+> = Readonly<{
+	identity: Identity
+	settle: (result: WorkerCallbackResult<Response, Interruption>) => void
+	/** Selected by the owning chart before registration; stop chooses no outcome. */
+	stopped: WorkerCallbackStopResult<Response, Interruption>
+}>
+export type WorkerCallbackCustody<
+	Identity,
+	Response,
+	Interruption extends WorkerCallbackInterruption = never
+> = Readonly<{
+	register: (observer: WorkerCallbackRegistration<Identity, Response, Interruption>) => void
 	/** Record the chart's conservative stop result before selected dispatch. */
-	recordStopResult: (identity: Identity, result: WorkerCallbackStopResult<Response>) => void
+	recordStopResult: (
+		identity: Identity,
+		result: WorkerCallbackStopResult<Response, Interruption>
+	) => void
 	capture: (response: Response) => object | undefined
 	discard: (token: object) => void
 	deliver: (
 		identity: Identity,
-		result: WorkerChannelResult<Response>,
+		result: WorkerCallbackResult<Response, Interruption>,
 		token: object | undefined
 	) => void
 	/** Disruptive native cleanup only; never an SDK or host-close receipt. */
@@ -27,9 +48,12 @@ export type WorkerCallbackCustody<Identity, Response> = Readonly<{
 
 /** A successful observer return accepts response custody. A throwing observer
  * did not accept it. This leaf neither selects nor changes the supplied result. */
-export function deliverWorkerCallback<Response>(
-	settle: (result: WorkerChannelResult<Response>) => void,
-	result: WorkerChannelResult<Response>,
+export function deliverWorkerCallback<
+	Response,
+	Interruption extends WorkerCallbackInterruption = never
+>(
+	settle: (result: WorkerCallbackResult<Response, Interruption>) => void,
+	result: WorkerCallbackResult<Response, Interruption>,
 	discard: (response: Response) => void
 ) {
 	try {
@@ -43,15 +67,19 @@ export function deliverWorkerCallback<Response>(
  * Call only from selected effects/native callbacks, never guards/calculations.
  * The owning chart bounds registration and chooses correlation, dispatch,
  * settlement and graceful close. This factory starts no actor or listener. */
-export function createWorkerCallbackCustody<Identity, Response>(
+export function createWorkerCallbackCustody<
+	Identity,
+	Response,
+	Interruption extends WorkerCallbackInterruption = never
+>(
 	input: Readonly<{
 		sameIdentity: (left: Identity, right: Identity) => boolean
 		discard: (response: Response) => void
 	}>
-): WorkerCallbackCustody<Identity, Response> {
+): WorkerCallbackCustody<Identity, Response, Interruption> {
 	const { sameIdentity, discard: discardResponse } = input
 	const resources = new Map<object, { response: Response }>()
-	const observers = new Set<WorkerCallbackRegistration<Identity, Response>>()
+	const observers = new Set<WorkerCallbackRegistration<Identity, Response, Interruption>>()
 	let stopped = false
 	let stopFailure: AggregateError | undefined
 
@@ -67,16 +95,20 @@ export function createWorkerCallbackCustody<Identity, Response>(
 		}
 	}
 	return Object.freeze({
-		register(observer: WorkerCallbackRegistration<Identity, Response>) {
+		register(observer: WorkerCallbackRegistration<Identity, Response, Interruption>) {
 			if (stopped) {
-				deliverWorkerCallback(observer.settle, observer.stopped, discardResponse)
+				deliverWorkerCallback<Response, Interruption>(
+					observer.settle,
+					observer.stopped,
+					discardResponse
+				)
 				return
 			}
 			if ([...observers].some((existing) => sameIdentity(existing.identity, observer.identity)))
 				throw new Error('Duplicate worker callback registration')
 			observers.add({ ...observer, stopped: { ...observer.stopped } })
 		},
-		recordStopResult(identity: Identity, result: WorkerCallbackStopResult<Response>) {
+		recordStopResult(identity: Identity, result: WorkerCallbackStopResult<Response, Interruption>) {
 			const observer = [...observers].find((candidate) =>
 				sameIdentity(candidate.identity, identity)
 			)
@@ -94,7 +126,11 @@ export function createWorkerCallbackCustody<Identity, Response>(
 			return token
 		},
 		discard,
-		deliver(identity: Identity, result: WorkerChannelResult<Response>, token: object | undefined) {
+		deliver(
+			identity: Identity,
+			result: WorkerCallbackResult<Response, Interruption>,
+			token: object | undefined
+		) {
 			const observer = [...observers].find((candidate) =>
 				sameIdentity(candidate.identity, identity)
 			)
@@ -114,7 +150,7 @@ export function createWorkerCallbackCustody<Identity, Response>(
 			// Even a failed native disposer cannot strand this callback after its
 			// registration has been detached. Surface failures after delivery.
 			try {
-				deliverWorkerCallback(observer.settle, result, discardResponse)
+				deliverWorkerCallback<Response, Interruption>(observer.settle, result, discardResponse)
 			} catch (error) {
 				if (result.kind === 'succeeded') resources.set(token ?? {}, { response: result.response })
 				failures.push(error)
@@ -144,7 +180,11 @@ export function createWorkerCallbackCustody<Identity, Response>(
 				}
 			} finally {
 				for (const observer of pending)
-					deliverWorkerCallback(observer.settle, observer.stopped, discardResponse)
+					deliverWorkerCallback<Response, Interruption>(
+						observer.settle,
+						observer.stopped,
+						discardResponse
+					)
 			}
 			if (failures.length) {
 				stopFailure = new AggregateError(failures, 'Worker callback resource disposal failed')

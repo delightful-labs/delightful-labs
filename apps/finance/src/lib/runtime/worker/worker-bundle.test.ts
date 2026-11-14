@@ -87,7 +87,9 @@ it.each([
 							line.trim() !== `${factory},` &&
 							(factory !== 'brokerHostClient' ||
 								(!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
-									line.trim() !== 'createFinanceGrantOwner,'))
+									line.trim() !== 'createFinanceGrantOwner,' &&
+									!line.includes("from './sdk-call-binding.js'") &&
+									line.trim() !== 'prepareFinanceSdkCall,'))
 					)
 					.join('\n')
 			}
@@ -129,6 +131,8 @@ it.each([
 						(line) =>
 							!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
 							line.trim() !== 'createFinanceGrantOwner,' &&
+							!line.includes("from './sdk-call-binding.js'") &&
+							line.trim() !== 'prepareFinanceSdkCall,' &&
 							!imports.some((module) => line.includes(`from './${module}'`)) &&
 							!factories.some((factory) => line.trim() === `${factory},`)
 					)
@@ -160,6 +164,27 @@ it('refuses a worker that omits the grant-owner implementation', async () => {
 	}
 	await expect(bundle(remove)).rejects.toThrow(
 		'Worker proof omitted implementation: src/lib/machines/runtime/worker-grant-owner.ts'
+	)
+}, 20_000)
+
+it('refuses a worker that omits SDK call preparation', async () => {
+	const remove: Plugin = {
+		name: 'worker-proof-missing-sdk-call-binding',
+		enforce: 'pre',
+		transform(code, id) {
+			if (!id.endsWith('/runtime/worker/application.worker.ts')) return
+			return code
+				.split('\n')
+				.filter(
+					(line) =>
+						!line.includes("from './sdk-call-binding.js'") &&
+						line.trim() !== 'prepareFinanceSdkCall,'
+				)
+				.join('\n')
+		}
+	}
+	await expect(bundle(remove)).rejects.toThrow(
+		'Worker proof omitted implementation: src/lib/runtime/worker/sdk-call-binding.ts'
 	)
 }, 20_000)
 

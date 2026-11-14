@@ -22,6 +22,14 @@ The user requested an ongoing tracking PR and continued work on its same branch:
 `feat/finance-worker-grant-owner`. The qualified F4a checkpoint is uploaded at
 `95eebd7d`. Continue this PR rather than opening a separate PR for each slice.
 
+The user subsequently merged PR #37 at main `4301afde` on 2026-11-14.
+The follow-up `feat/finance-worker-grant-population` starts from that merge.
+The [F4c2 SDK call/interruption contracts](worker-grant-population-design.md#f4c2-sdk-call-and-interruption-contracts)
+now pass separately approved qualification on that branch. Continue with the
+bounded native callback bridge/population and actual acquisition transport.
+Previous PR/branch instructions above are historical; F4c2's linked record
+preserves its exact scope and results.
+
 On 2026-11-14 this branch merges main `fca60ca0`, including PR #36's Clipper
 reader-header cleanup and the shared-workspace planning/formatting updates.
 The only conflict was Markdown formatting in `worker-migration-tasks.md`; all

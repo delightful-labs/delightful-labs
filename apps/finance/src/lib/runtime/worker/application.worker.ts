@@ -9,6 +9,7 @@ import { createFinanceAccountStore } from './account-store.js'
 import { financeGrantDescriptor, financeGrantKey } from './grant-binding.js'
 import { decodeFinanceGrantRequest, decodeFinanceGrantReply } from './grant-protocol.js'
 import { createFinanceGrantOwner } from '../../machines/runtime/worker-grant-owner.js'
+import { prepareFinanceSdkCall } from './sdk-call-binding.js'
 
 // W02 build-only entry: no production caller, session, actor, port or storage owner.
 // Keeping factory values in this diagnostic catalog prevents an empty-worker proof.
@@ -26,6 +27,7 @@ const factories = {
 	decodeFinanceGrantRequest,
 	decodeFinanceGrantReply,
 	createFinanceGrantOwner,
+	prepareFinanceSdkCall,
 	loadLocalFirstClient: () => import('jazz-tools/local-first')
 }
 
