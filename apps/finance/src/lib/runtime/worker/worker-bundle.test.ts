@@ -33,6 +33,8 @@ function replaceEntry(code: string): Plugin {
 
 const manifestSchema = z.object({
 	scope: z.literal('build-only; no runtime activation'),
+	windowBinding: z.literal('src/lib/runtime/worker/broker-host.ts'),
+	windowBindingExports: z.array(z.string()),
 	publicEntries: z.array(z.object({ entry: z.string() }))
 })
 
@@ -47,11 +49,17 @@ it('bundles real SDK implementations, lazy chunks and a binary Wasm module', asy
 			? manifest.source
 			: new TextDecoder().decode(manifest.source)
 	const decoded: unknown = JSON.parse(source)
+	expect(manifestSchema.parse(decoded).windowBindingExports).toEqual([
+		'serveFinanceGenerationGrant',
+		'serveFinanceBrokerGrant'
+	])
 	expect(manifestSchema.parse(decoded).publicEntries.map((entry) => entry.entry)).toEqual(
 		expect.arrayContaining([
 			'jazz-tools/local-first',
 			'delightful-local-first/backend/jazz/session',
-			'delightful-local-first/worker/channel/workflow'
+			'delightful-local-first/worker/channel/workflow',
+			'delightful-local-first/backend/jazz/account-store/indexeddb',
+			'delightful-local-first/backend/jazz/worker-broker'
 		])
 	)
 	const wasm = result.output.find((output) => output.fileName.endsWith('.wasm'))
@@ -59,6 +67,52 @@ it('bundles real SDK implementations, lazy chunks and a binary Wasm module', asy
 		throw new Error('Missing binary Wasm module')
 	expect([...wasm.source.subarray(0, 4)]).toEqual([0, 97, 115, 109])
 }, 20_000)
+
+it.each([
+	{ factory: 'createFinanceAccountStore', implementation: 'indexeddb-account-store.js' },
+	{ factory: 'brokerHostClient', implementation: 'worker-broker.js' }
+])(
+	'refuses a worker that omits the $factory implementation',
+	async ({ factory, implementation }) => {
+		const remove: Plugin = {
+			name: 'worker-proof-missing-binding-fixture',
+			transform(code, id) {
+				if (!id.endsWith('/runtime/worker/application.worker.ts')) return
+				return code
+					.split('\n')
+					.filter(
+						(line) => !line.includes(`import { ${factory} }`) && line.trim() !== `${factory},`
+					)
+					.join('\n')
+			}
+		}
+		await expect(bundle(remove)).rejects.toThrow(
+			`Worker proof omitted implementation: /delightful-local-first/dist/backend/jazz/${implementation}`
+		)
+	},
+	20_000
+)
+
+it.each(['serveFinanceGenerationGrant', 'serveFinanceBrokerGrant'])(
+	'refuses a proof that omits the real Window adapter %s',
+	async (factory) => {
+		const remove: Plugin = {
+			name: 'worker-proof-missing-window-binding-fixture',
+			enforce: 'pre',
+			transform(code, id) {
+				if (id.endsWith('/tooling/worker-proof-driver.ts'))
+					return code
+						.split('\n')
+						.filter((line) => line.trim().replace(/,$/u, '') !== factory)
+						.join('\n')
+			}
+		}
+		await expect(bundle(undefined, remove)).rejects.toThrow(
+			'Worker proof omitted Finance Window broker binding'
+		)
+	},
+	20_000
+)
 
 it.each([
 	'/worker-proof/Forbidden.svelte.js',

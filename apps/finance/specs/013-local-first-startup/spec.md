@@ -29,8 +29,21 @@ replaces permanent Window account-storage/lock custody with native IDB
 transactions. The user explicitly excluded migration/old-version compatibility
 code, completing W03. W04's shared store is [qualified](worker-account-store-verification.md):
 1,111 unit tests and 60 native cases across three engines pass, including packed
-public export and cold browser-process reopen checks. W05 app adoption and
-W06–W21 remain unstarted. The application is still Window-owned.
+public export and cold browser-process reopen checks. W05's shared broker/close
+extraction is qualified with Clipper. Finance's first binding slice passes
+1,984 unit tests, nine native cases across three engines and all 19 production
+PWA/provider-worker cases. The user selected separate exact native grants through
+existing SDK callbacks, with no new Jazz patch; their integration remains pending.
+The separate native grants pass 2,006 unit tests and nine native cases after
+2026-11-14 approval; the earlier combined adapter has been removed.
+The subsequent child-owned channel refactor is also qualified: 1,160 library
+tests, three packed consumers, 2,006 Finance tests, 12 native cases and Clipper
+regressions. The bounded grant population and actual SDK/session integration
+remain pending; see the [grant-owner design](worker-grant-owner-design.md).
+The user approved Finance-first sequencing and deferred Clipper's remaining store/hidden
+capture-runtime conversion to a separate follow-up. See the
+[Finance binding slice](worker-finance-binding.md). W06–W21 remain unstarted.
+The application is still Window-owned.
 
 | Order | Tasks | Outcome before dependent work |
 | --- | --- | --- |

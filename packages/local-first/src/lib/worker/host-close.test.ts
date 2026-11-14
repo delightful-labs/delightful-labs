@@ -1,6 +1,6 @@
 import { setImmediate } from 'node:timers'
 import { afterEach, expect, it, vi } from 'vitest'
-import { serveHostClose, workerHostControl, type HostControlReport } from './host-close-channel.js'
+import { serveHostClose, workerHostControl, type HostControlReport } from './host-close.js'
 
 const releases = new Set<() => void>()
 afterEach(() => {
@@ -146,4 +146,33 @@ it('rejects invalid outbound correlation before posting and disposal emits no re
 	await new Promise<void>((resolve) => setImmediate(resolve))
 	expect(f.reports).toEqual([])
 	expect(f.closeHost).not.toHaveBeenCalled()
+})
+
+it('duplicate valid close commands preserve their receipts and leave disposal with the native owner', async () => {
+	const f = fixture()
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() => expect(f.reports).toHaveLength(2))
+	expect(f.closeHost).toHaveBeenCalledTimes(2)
+	expect(f.reports).toEqual([
+		{ type: 'HOST_CLOSED', receipt: { scope: f.scope, requestId: f.requestId } },
+		{ type: 'HOST_CLOSED', receipt: { scope: f.scope, requestId: f.requestId } }
+	])
+})
+
+it('a failed native receipt post grants no closure and retains independent control for a later command', async () => {
+	const f = fixture()
+	vi.spyOn(f.control.port1, 'postMessage').mockImplementationOnce(() => {
+		throw new Error('Native receipt post failed')
+	})
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() => expect(f.closeHost).toHaveBeenCalledOnce())
+	expect(f.reports).toEqual([])
+	f.client.post({ scope: f.scope, requestId: f.requestId })
+	await vi.waitFor(() =>
+		expect(f.reports).toEqual([
+			{ type: 'HOST_CLOSED', receipt: { scope: f.scope, requestId: f.requestId } }
+		])
+	)
+	expect(f.closeHost).toHaveBeenCalledTimes(2)
 })

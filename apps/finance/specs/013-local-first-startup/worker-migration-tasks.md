@@ -9,7 +9,25 @@ IndexedDB AccountStore in Local First on 2026-11-13. W03's storage choice is
 resolved; the user explicitly excluded all migration/old-version compatibility
 code. W03 and W04's shared-store foundation are complete. W04 qualification
 passed 1,111 unit tests and 60 native cases across Chromium/Firefox/WebKit.
-W05 owns real app adoption and remains unstarted, as do W06–W21.
+W01–W04 are merged in [PR #29](https://github.com/delightful-labs/delightful-labs/pull/29)
+at main `1b6287d6`. The W05 branch is fast-forwarded to that merge with its local
+implementation preserved; the merge tree is identical to the qualified PR head.
+It was subsequently refreshed to main `ea460e9d` (Clipper layout/UI changes),
+with a frozen install and peer-link check. Earlier qualification counts retain
+their `1b6287d6` baseline. Clipper qualification has also passed against the
+refresh: 869 unit tests, 17 component cases, 32 worker cases, 12 packaged
+extension cases and eight production offline cases. See the transport evidence
+for commands and separate baselines.
+Hosted foundation, Clipper and Finance qualification all passed on that PR.
+Finance's first application-2 run failed the existing image-editor filename
+assertion (`undefined` instead of `receipt.png`). The original three image-editor
+cases passed locally unchanged, and one retry of the failed CI job passed.
+This records a transient failure; it does not establish its cause or a code fix.
+W05's R1/R2 extractions and Finance F1/F2 binding slices passed approved
+qualification. Actual SDK/native-capability integration and app storage adoption
+remain pending. The [SDK binding decision](worker-sdk-binding-decision.md) selects
+separate exact grants through existing callbacks, with no new Jazz patch.
+W06–W21 implementation remains unstarted.
 Detailed implementation designs remain subject to their review gates.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
@@ -121,8 +139,10 @@ No XState reconversion, library reimport or new Jazz patch is assumed necessary.
   undefined bug found/fixed by a cursor read. The new reproducible native command
   runs in library verify and CI. No app startup hookup or migration code was added.
 - [ ] **W05 — Integrate the AccountStore and broker lifecycle.** Depends on
-  W02 and W04. Bind the shared IDB store into Clipper and Finance using stable
-  app/profile configuration and the existing single SDK/session owner. No
+  W02 and W04. Bind the shared IDB store into Finance using stable app/profile
+  configuration and the existing single SDK/session owner. On 2026-11-13 the
+  user approved Finance-first sequencing: Clipper's remaining store/runtime
+  conversion is a separate follow-up, not a prerequisite of W05/W06. No
   localStorage selection import, fallback, dual write, legacy cleanup, migration
   marker or old-version compatibility work is in scope. A missing IDB record
   follows ordinary SDK first-use behavior; native failures remain failures.
@@ -132,6 +152,55 @@ No XState reconversion, library reimport or new Jazz patch is assumed necessary.
   mechanism; do not silently migrate it with account selection. Remove replaced
   permanent account storage/lock channels after qualification. Preserve unknown
   outcomes, actual native drain and SDK transform semantics without replay.
+  First slice: R1's native close transport now has a public Local First
+  `worker/host-close` export; Clipper's former implementation re-exports it.
+  See the [ownership and review boundary](../../../../packages/local-first/docs/worker-host-close.md).
+  R1's approved qualification passed 1,120 library tests, 88 Clipper runtime
+  tests, 32 real worker/browser cases and packed-consumer types/native/build
+  checks. R2 moves the broker transport to `backend/jazz/worker-broker`, with
+  mandatory app-supplied capability admission and a small Clipper policy adapter.
+  See its [contract and review boundary](../../../../packages/local-first/docs/jazz-worker-broker.md).
+  R2's approved qualification passed 1,144 library tests, 869 Clipper unit/native
+  tests plus 14 component cases, all 32 actual worker cases and all 12 packaged
+  extension cases, packed public-consumer types/native/module-worker builds and
+  production app builds. All eight production offline cases also pass, including
+  full stopped-server browser restarts with retained local edits and reconnect.
+  Neither extraction changes app account storage.
+  Continue Finance's exact broker binding and worker-owned store configuration
+  next. The first bounded Finance slice is recorded in
+  [worker-finance-binding.md](worker-finance-binding.md). It remains inactive in
+  normal application startup; W06 owns actual SDK/session qualification. The
+  concrete store factory, exact broker adapter and extended import proof pass
+  app/worker types and builds. After the user's test approval, all 1,984 Finance
+  unit tests, 69 focused host cases and nine native cases across three engines
+  pass, along with all 19 production PWA/provider-worker cases. The native
+  command and failure-artifact retention are wired into the existing PWA CI job.
+  The [SDK binding decision](worker-sdk-binding-decision.md) selects separate
+  grants through the existing callbacks with no new Jazz patch. After the user's
+  2026-11-14 approval, F2 passes 2,006 unit tests, 90 focused host cases, all
+  12 real-build proof cases and nine native cases across three engines. The
+  combined adapter is removed after separate-grant qualification; the fixtures
+  and proof consume the replacement. Callback routing and owned SDK/session
+  integration remain pending. No private SDK algorithm was copied or admission
+  widened to bypass it.
+  F3 now exposes the existing broker channel for child invocation so a grant
+  owner can supervise it without starting roots inside acquisition I/O. This
+  shared API refactor is qualified after 2026-11-14 approval: 1,160 library
+  tests, three packed public consumers, 2,006 Finance tests and 12 native cases,
+  plus all Clipper unit/component/worker/extension/offline regressions. The
+  [grant-owner design](worker-grant-owner-design.md) records concrete APIs,
+  commands/results, two initial browser failures and successful reruns, aggregate
+  bounds, duplicate/late acquisition and SDK-before-grant shutdown. The actual
+  bounded grant population, private acquisition transport and SDK/session
+  integration remain pending; W05 is not complete.
+  Clipper's still-Window-owned hidden capture SDK and its IDB adoption are
+  deferred together. No temporary UI-only-thread exception was approved.
+  Source inspection confirmed the extension sign-in worker and hidden offscreen
+  runtime currently share the native SDK selection. Adopt the shared IDB binding
+  in both together, retaining SDK/session shutdown before store closure. Do not
+  switch only the sign-in worker and leave capture on the old default store.
+  Until that separate follow-up, retain Clipper's existing account-storage path;
+  remove Finance's superseded inactive transport after its replacement qualifies.
 - [ ] **W06 — Qualify a single worker SDK/session owner.** Depends on W05.
   Integrate the current patched SDK with the retained acquisition lifetime and
   Finance configuration. Prove IDB identity/binding reuse after creation, persistent
