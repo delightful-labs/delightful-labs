@@ -327,7 +327,14 @@ for (const mode of ['linked', 'existing', 'expired'])
 				checkpoint('signing out')
 				await test.step('sign out through the real auth handler', async () => {
 					const previous = signOutResponses.length
+					console.info(
+						JSON.stringify({
+							mode,
+							openPopovers: await page.locator('[popover]:popover-open').count()
+						})
+					)
 					await openAccountSettings(page)
+					checkpoint('account navigation ready for sign-out')
 					await page
 						.getByRole('button', { name: 'Sign out', exact: true })
 						.click({ timeout: 10000 })

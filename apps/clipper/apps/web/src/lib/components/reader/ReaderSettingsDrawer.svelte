@@ -32,7 +32,8 @@
 	let drawer: ReturnType<typeof Drawer> | undefined = $state()
 	let toolbar: ReturnType<typeof ReaderToolbar> | undefined = $state()
 	let mobile = $state(false)
-	const modal = $derived(mobile && (drawer?.isOpen() ?? false) && !focused)
+	const drawerOpen = $derived(drawer?.isOpen() ?? false)
+	const modal = $derived(mobile && drawerOpen && !focused)
 
 	export function getDrawer() {
 		return drawer
@@ -59,6 +60,7 @@
 	bind:this={drawer}
 	hidden={focused}
 	class="reader-drawer"
+	style={`--dui-drawer-height: ${drawerOpen ? '100dvh' : '0px'}`}
 	side="right"
 	heading={t('reader.controls')}
 	headingHidden
@@ -98,7 +100,6 @@
 <style>
 	:global(.reader-drawer) {
 		--dui-drawer-width: clamp(18rem, 30vw, 24rem);
-		--dui-drawer-height: 100dvh;
 		--dui-drawer-padding: 0 0 0 var(--dui-spacing-md);
 	}
 

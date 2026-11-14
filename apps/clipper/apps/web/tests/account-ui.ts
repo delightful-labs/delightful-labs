@@ -1,17 +1,26 @@
 import { expect, type Page } from '@playwright/test'
 
 async function followSidebarLink(page: Page, name: string) {
-	const toggle = page.getByRole('button', { name: /^(Show|Close) account$/ })
+	if (await page.locator('[popover]:popover-open').count()) {
+		await page.keyboard.press('Escape')
+		await expect(page.locator('[popover]:popover-open')).toHaveCount(0)
+	}
+	const toggle = page
+		.getByRole('button', { name: /^(Show|Close) account$/ })
+		.and(page.locator('[aria-controls]'))
 	await expect(toggle).toBeVisible()
-	if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
+	if ((await toggle.getAttribute('aria-expanded')) === 'false')
+		await toggle.click({ timeout: 10000 })
 	await page
 		.getByRole('complementary', { name: 'account', exact: true })
 		.getByRole('link', { name, exact: true })
-		.click()
+		.click({ timeout: 10000 })
 }
 
 export async function expectLibrarySynced(page: Page) {
-	const toggle = page.getByRole('button', { name: /^(Show|Close) account$/ })
+	const toggle = page
+		.getByRole('button', { name: /^(Show|Close) account$/ })
+		.and(page.locator('[aria-controls]'))
 	await expect(toggle).toBeVisible()
 	const wasClosed = (await toggle.getAttribute('aria-expanded')) === 'false'
 	if (wasClosed) await toggle.click()
