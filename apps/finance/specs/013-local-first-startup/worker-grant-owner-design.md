@@ -339,6 +339,42 @@ and PR-title checks. This includes application-2; it does not establish a cause
 or repair for the earlier failures. The tracking PR remains draft because the
 population, native acquisition transport and SDK/session work are incomplete.
 
+### F4c1 hosted image-editor readiness correction
+
+At uploaded F4c1 head `ee0dd887`, all other Finance jobs pass, while
+[application-2 job 132560379844](https://github.com/delightful-labs/delightful-labs/actions/runs/43631960581/job/132560379844)
+passes 91/92. The saved-image cancellation case fails at the original line 237.
+Its trace establishes a test-baseline readiness race: the initial included
+attachment has its link/file IDs but undefined filename/MIME type and empty
+bytes. After the editor is opened and canceled, the same link/file IDs have
+`receipt.png`, `image/png` and image bytes. The exact equality assertion compares
+an incomplete baseline against the completed include. The screenshot shows the
+image preview and disabled Save Transaction after cancellation.
+
+The original archive (artifact `14128228773`) is retained at
+`/private/tmp/pr37-image-editor-cancel-failure.zip`; its extracted trace,
+screenshot/context/results are in the adjacent directory of the same name.
+The original job log is `/private/tmp/pr37-image-editor-cancel-job.log`.
+
+The correction changes only the browser fixture: wait for exactly one image with
+the expected filename/MIME type, a positive declared size and every declared byte
+before capturing a saved snapshot. Reuse that exact successful observation.
+Cancel still requires exact identity/metadata/byte equality once completeness is
+established; the test does not poll until equality or increase a timeout. The
+same readiness requirement fixes the first scenario's premature filename/bytes
+read and the post-reload snapshot. The offline replacement wait now positively
+requires the original attachment ID and a defined, changed file ID; undefined
+can no longer satisfy a negative comparison.
+
+Strict browser-test types pass. All three image-editor scenarios pass three
+times with two workers (nine executions, 20.9 seconds), on the isolated in-memory
+app at port 5198. The full matching 92-case application-2 shard also passes with
+two workers (2.4 minutes), on its first run with this correction.
+Logs are `/private/tmp/pr37-image-editor-fix-{types,repeat,application2}.log`.
+This does not establish a cause for the earlier unrelated transaction-save
+failure. The worker/channel implementation and SDK remain unchanged by this
+fixture correction.
+
 ## Subsequent population and session composition
 
 The [callback custody decision](worker-grant-population-design.md) records the

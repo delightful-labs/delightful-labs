@@ -102,11 +102,30 @@ async function images(page: Page, transactionId: string) {
 			fileId: link.fileId,
 			name: link.file?.fileName,
 			type: link.file?.mimeType,
+			size: link.file?.sizeBytes,
 			bytes: [...(link.file?.parts ?? [])]
 				.sort((a, b) => a.partIndex - b.partIndex)
 				.flatMap(({ data }) => [...(data ?? [])])
 		}))
 	}, transactionId)
+}
+async function savedImage(page: Page, transactionId: string) {
+	let image: Awaited<ReturnType<typeof images>>[number] | undefined
+	// A local-first include can expose the link before its file/parts arrive.
+	// Capture the complete snapshot that passed readiness, then compare bytes once.
+	await expect
+		.poll(async () => {
+			const rows = await images(page, transactionId)
+			image = rows[0]
+			return rows.map((row) => ({
+				name: row.name,
+				type: row.type,
+				complete: typeof row.size === 'number' && row.size > 0 && row.bytes.length === row.size
+			}))
+		})
+		.toEqual([{ name: 'receipt.png', type: 'image/png', complete: true }])
+	if (!image) throw new Error('Missing complete saved attachment')
+	return image
 }
 async function information(page: Page) {
 	const button = page.getByRole('button', { name: 'Image details: receipt.png', exact: true })
@@ -133,6 +152,7 @@ async function uploadSaved(page: Page, id: string) {
 	await input.setInputFiles(await receipt(page))
 	await page.getByRole('button', { name: 'Save Transaction', exact: true }).click()
 	await expect(page.getByRole('img', { name: 'Preview of receipt.png', exact: true })).toBeVisible()
+	return savedImage(page, id)
 }
 
 test(
@@ -196,9 +216,7 @@ test(
 			return row?.id
 		})
 		if (!id) throw new Error('Edited transaction was not saved')
-		await expect.poll(async () => (await images(page, id)).length).toBe(1)
-		const [image] = await images(page, id)
-		if (!image) throw new Error('Missing saved image')
+		const image = await savedImage(page, id)
 		expect(image.name).toBe('receipt.png')
 		expect(image.type).toBe('image/png')
 		expect(await page.evaluate(decode, image.bytes)).toEqual(preview)
@@ -210,9 +228,7 @@ test(
 	{ tag: ['@transactions', '@attachments'] },
 	async ({ page }) => {
 		const ledger = await seed(page)
-		await uploadSaved(page, ledger.transactionId)
-		const [original] = await images(page, ledger.transactionId)
-		if (!original) throw new Error('Missing original attachment')
+		const original = await uploadSaved(page, ledger.transactionId)
 		let dialog = await editor(page)
 		const left = dialog.getByRole('button', {
 			name: 'Resize crop from top left corner',
@@ -234,7 +250,7 @@ test(
 		expect(rightAfter.x).toBeCloseTo(rightBefore.x, 1)
 		await left.press('Escape')
 		await expect(dialog).toBeHidden()
-		expect(await images(page, ledger.transactionId)).toEqual([original])
+		expect(await savedImage(page, ledger.transactionId)).toEqual(original)
 		await page.context().setOffline(true)
 		try {
 			dialog = await editor(page)
@@ -247,8 +263,16 @@ test(
 			await dialog.getByRole('button', { name: 'Apply changes', exact: true }).click()
 			await expect(dialog).toBeHidden()
 			await expect
-				.poll(async () => (await images(page, ledger.transactionId))[0]?.fileId)
-				.not.toBe(original.fileId)
+				.poll(async () => {
+					const [image] = await images(page, ledger.transactionId)
+					return Boolean(
+						image &&
+						image.id === original.id &&
+						typeof image.fileId === 'string' &&
+						image.fileId !== original.fileId
+					)
+				})
+				.toBe(true)
 		} finally {
 			await page.context().setOffline(false)
 		}
@@ -256,8 +280,7 @@ test(
 		await expect(
 			page.getByRole('img', { name: 'Preview of receipt.png', exact: true })
 		).toBeVisible()
-		const [current] = await images(page, ledger.transactionId)
-		if (!current) throw new Error('Missing edited attachment')
+		const current = await savedImage(page, ledger.transactionId)
 		expect(current.id).toBe(original.id)
 		expect(current.fileId).not.toBe(original.fileId)
 		expect(await page.evaluate(decode, current.bytes)).toEqual({
