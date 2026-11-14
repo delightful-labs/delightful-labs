@@ -152,6 +152,20 @@ identity and storage. No production UI handoff is implied.
   overload, stale A → B → A results and duplicate handling. Add a UI connection
   that exposes views/commands, not actor or database handles. Preserve exact
   money/date representation. Do not transport arbitrary queries or raw errors.
+  The user confirmed the worker-backed client direction on 2026-11-14; the
+  [client-boundary decision](spec.md#finance-runtime-client-boundary) is part of
+  this task. Expose bounded feature views through the native Svelte store
+  contract: synchronous current value on subscription and explicit unsubscribe.
+  Give runtime failure/unavailability a typed view outcome. Replacement must
+  invalidate old identity/workspace data and command capabilities immediately;
+  generation checks must reject stale A → B → A reports and intents.
+  UI subscription disposal releases observation, while the application owner
+  retains SDK/session lifetime and actual financial-effect settlement. Keep
+  component-owned UI actors separate from this domain-client boundary.
+  Qualify initial subscription to an already-ready runtime, multiple observers,
+  detach/resubscribe, replacement, failure and late commands/results through the
+  actual worker transport. W07 remains incomplete until implementation and these
+  acceptance checks pass.
 - [ ] **W08 — Implement shutdown/replacement and uncertain-outcome ownership.**
   Depends on W06/W07. Model layout detach, runtime close, account/environment
   replacement, host failure and worker crash separately. Retain/reconcile issued
