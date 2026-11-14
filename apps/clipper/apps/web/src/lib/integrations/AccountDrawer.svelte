@@ -17,7 +17,7 @@
 	import { action, noun, t } from '../localization/index.js'
 	import ConnectionStatus from './ConnectionStatus.svelte'
 
-	let { focused = false }: { focused?: boolean } = $props()
+	let { focused = false, open }: { focused?: boolean; open?: boolean } = $props()
 	const settings = getAccountSettings()
 	let drawer: ReturnType<typeof Drawer> | undefined = $state()
 	let trigger: ReturnType<typeof Button> | undefined = $state()
@@ -35,11 +35,11 @@
 	}
 
 	$effect(() => {
-		const compact = mobile
+		const shouldOpen = open ?? !mobile
 		const panel = drawer
-		// Apply viewport defaults after binding, without observing manual toggles.
+		// Apply caller or viewport defaults without observing manual toggles.
 		untrack(() => {
-			if (compact) panel?.close()
+			if (!shouldOpen) panel?.close()
 			else if (!panel?.isOpen()) panel?.toggle()
 		})
 	})
@@ -54,6 +54,7 @@
 			aria-controls={drawer?.getId()}
 			aria-expanded={drawerOpen}
 			onclick={() => drawer?.toggle()}
+			appearance="flat"
 		>
 			<Icon icon={drawerOpen ? CloseIcon : MenuIcon} width="24" height="24" />
 		</Button>
