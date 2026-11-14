@@ -27,7 +27,7 @@
 <div class="reader-navigation" data-reader-overlay>
 	<TopNavigation label={t('reader.heading')}>
 		{#if accountControl}<li>{@render accountControl()}</li>{/if}
-		<li>
+		<li class="settings-item">
 			<Button
 				bind:this={trigger}
 				type="button"
@@ -35,6 +35,7 @@
 				aria-controls={controlsId}
 				aria-expanded={open}
 				onclick={ontoggle}
+				appearance="flat"
 			>
 				<Icon icon={open ? CloseIcon : SettingsIcon} width="24" height="24" />
 			</Button>
@@ -47,5 +48,10 @@
 		position: sticky;
 		inset-block-start: 0;
 		z-index: 3;
+		--dui-button-border-width: 0;
+	}
+
+	.settings-item {
+		margin-inline-start: auto;
 	}
 </style>

@@ -16,7 +16,9 @@ describe('canManageBankCredentials', () => {
 	})
 
 	it('denies a membership from a different organization', () => {
-		expect(canManageBankCredentials(membership('admin', 'other-workspace'), 'workspace')).toBe(false)
+		expect(canManageBankCredentials(membership('admin', 'other-workspace'), 'workspace')).toBe(
+			false
+		)
 	})
 
 	it.each([null, undefined])('denies a missing membership (%s)', (value) => {

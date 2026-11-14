@@ -811,7 +811,6 @@ Production preview build also passed. The vendored shared-library source delta i
 changed session contract/owner/adapter modules). User subsequently authorized committing and
 opening a pull request; production deployment remains outside this action.
 
-
 ### XState v6 compatibility port
 
 Rebased onto Finance `bcb7d51` (#66), preserving its exact XState/Svelte bindings, DUI archive,
