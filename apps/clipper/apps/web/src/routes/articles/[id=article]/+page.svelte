@@ -32,6 +32,9 @@
 	const view = $derived($client?.view)
 	const reading = $derived(view?.readerExperience)
 	const reader = $derived($client?.readerId === id ? $client?.reader : undefined)
+	$effect(() => {
+		if (reader?.kind !== 'available') settingsOpen = false
+	})
 	const article = $derived($client?.article)
 	const originalUrl = $derived($client?.sourceUrl)
 	function send(event: Extract<LibraryIntent, { type: 'READER_EVENT' }>['event']) {
