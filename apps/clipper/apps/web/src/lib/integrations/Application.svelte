@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { onMount, setContext, type Snippet } from 'svelte'
+	import { onMount, type Snippet } from 'svelte'
 	import { Button, StatusMessage, Textarea, InputText } from 'delightful-ui'
 	import RecoveryView from 'delightful-local-first/recovery/view'
 	import type { RecoveryPhraseView } from 'delightful-local-first/recovery/contracts'
 	import { openApplicationClient } from '../runtime/worker/client.js'
 	import type { LibraryClient } from '../runtime/worker/client.js'
 	import type { RuntimeView } from '../runtime/worker/views.js'
-	import { workerLibraryContextKey } from '../runtime/worker/context.js'
+	import { provideWorkerLibrary } from '../runtime/worker/context.js'
 	import type { WorkflowMessage } from '../contracts/feedback.js'
 	import { action, t, recoveryMessages } from '../localization/index.js'
 	let {
@@ -40,7 +40,7 @@
 	let bound: ReturnType<ReturnType<typeof openApplicationClient>['library']> | undefined
 	let failed = $state(false)
 	const needsRuntimeFeedback = $derived(failed || view?.requiresReload || view?.canRetry)
-	setContext(workerLibraryContextKey, {
+	provideWorkerLibrary({
 		get actor() {
 			return library
 		}

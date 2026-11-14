@@ -8,7 +8,7 @@
 	} from '$app/env/public'
 	import 'delightful-ui/theme.css'
 	import AppShell from '../lib/integrations/AppShell.svelte'
-	import Account from '../lib/integrations/Application.svelte'
+	import Application from '../lib/integrations/Application.svelte'
 	import { t } from '../lib/localization/index.js'
 	let { children }: { children: Snippet } = $props()
 	let admitted = $state(false)
@@ -22,14 +22,14 @@
 <svelte:head><title>{t('app.title')}</title></svelte:head>
 {#if !admitted}<div><h1>{t('app.title')}</h1></div>{/if}
 {#if admitted}
-	<Account appId={PUBLIC_JAZZ_APP_ID} {serverUrl} gatewayEnabled={CAPTURE_GATEWAY_ENABLED}>
+	<Application appId={PUBLIC_JAZZ_APP_ID} {serverUrl} gatewayEnabled={CAPTURE_GATEWAY_ENABLED}>
 		{#snippet shell(account, content, connectionMessage, accountMessage, runtimeFeedback)}
 			<AppShell {account} {connectionMessage} {accountMessage} {runtimeFeedback}
 				>{@render content()}</AppShell
 			>
 		{/snippet}
 		{@render children()}
-	</Account>
+	</Application>
 {/if}
 <div data-offline-shell>
 	<OfflineShell

@@ -10,7 +10,7 @@ export default defineConfig({
 		conditions: ['browser'],
 		alias: {
 			'$app/state': fileURLToPath(
-				new URL('./src/lib/integrations/fixtures/page.ts', import.meta.url)
+				new URL('./src/lib/integrations/fixtures/page.svelte.ts', import.meta.url)
 			)
 		}
 	},

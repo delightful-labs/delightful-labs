@@ -85,6 +85,7 @@ function projectRuntimePayload(snapshot: SnapshotFrom<typeof workerHostMachine>)
 						selectedTags: context?.selectedTags ?? []
 					},
 					canAdd: library?.can({ type: 'ADD', url: '' }) === true,
+					readerId: context?.readerId ?? '',
 					reader,
 					// Progress changes independently of the immutable reader payload revision.
 					readerProgress: currentProgress,

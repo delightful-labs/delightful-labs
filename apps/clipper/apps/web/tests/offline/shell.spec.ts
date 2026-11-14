@@ -134,13 +134,27 @@ test.afterAll(async () => {
 	await rm(dataDir, { recursive: true, force: true })
 })
 
-test('production shell and DLF account restart with web and Jazz servers stopped, then sync to a restored profile', async ({
+test('production shell survives abrupt application worker termination and a full offline restart, then syncs to a restored profile', async ({
 	browser
 }) => {
 	const profile = await mkdtemp(join(tmpdir(), 'clipper-full-offline-'))
 	let context = await chromium.launchPersistentContext(profile, { headless: true })
 	const independent = await browser.newContext()
 	try {
+		// Retain only the test's real application worker so termination skips its
+		// SHUTDOWN protocol. Production asset caching remains completely unchanged.
+		await context.addInitScript(() => {
+			const NativeWorker = window.Worker
+			window.Worker = new Proxy(NativeWorker, {
+				construct(target, args) {
+					const worker = Reflect.construct(target, args)
+					if (!(worker instanceof NativeWorker)) throw new Error('Missing native worker')
+					if (String(args[0]).includes('application.worker'))
+						Reflect.set(globalThis, 'offlineApplicationWorker', worker)
+					return worker
+				}
+			})
+		})
 		const page = await context.newPage()
 		await clearHttpCache(page)
 		await fixtureArticle(page, stopAuthority)
@@ -283,6 +297,11 @@ test('production shell and DLF account restart with web and Jazz servers stopped
 		await expect.poll(() => visibleReadingParagraph(page)).toBe(readingParagraph)
 		await page.reload()
 		await expect.poll(() => visibleReadingParagraph(page)).toBe(readingParagraph)
+		await page.evaluate(() => {
+			const worker = Reflect.get(globalThis, 'offlineApplicationWorker')
+			if (!(worker instanceof Worker)) throw new Error('Missing application worker to terminate')
+			worker.terminate()
+		})
 		await context.close()
 		await ui.stop()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
@@ -347,6 +366,7 @@ test('production shell and DLF account restart with web and Jazz servers stopped
 		const offlineRow = reopened
 			.getByRole('region', { name: 'Saved articles' })
 			.locator('[data-article-id]')
+		await expect(offlineRow).toHaveCount(1)
 		await expect(offlineRow.getByLabel('Status', { exact: true })).toHaveValue('archive')
 		await expect(offlineRow.getByRole('paragraph')).toContainText(
 			'Exact offline shell text café 🦊'

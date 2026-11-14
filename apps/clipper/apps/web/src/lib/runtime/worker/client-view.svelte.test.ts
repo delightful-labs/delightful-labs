@@ -24,6 +24,7 @@ function render(scope = crypto.randomUUID()): LibraryRender {
 		view: { ...selectLibraryView(undefined), canOrganize: true },
 		filters: { query: '', view: 'all', favorites: false, selectedTags: [] },
 		canAdd: true,
+		readerId: '',
 		reader: undefined,
 		readerProgress: undefined,
 		readerRevision: '',

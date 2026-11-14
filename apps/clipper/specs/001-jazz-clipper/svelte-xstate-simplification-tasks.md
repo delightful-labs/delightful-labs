@@ -1,11 +1,14 @@
 # Svelte and XState simplification tasks
 
-Status: Research started. Implements [the specification](svelte-xstate-simplification.md).
+Status: Completion review on PR #31. Implements [the specification](svelte-xstate-simplification.md).
 Initial findings and proposed pilot: [research record](svelte-xstate-research.md).
 Current decision: native Svelte subscriptions to LibraryClient supersede the
 initial useSelector adapter experiment; XState remains the workflow owner.
-Unchecked items are planned work, not completed validation. Keep implementation
-batches to the shared review limits; no dependency or test approval is implied.
+The user authorized all remaining implementation and tests in PR #31 together
+on 2026-11-14, including multiple components/routes for one review. No dependency
+or copy changes are implied. [Completion evidence and decisions](svelte-xstate-completion.md)
+reconcile the historical research below. All checklist items are qualified;
+completion evidence is recorded in Clipper CI run 43555941668.
 
 ## A. Establish the design and evidence
 
@@ -53,12 +56,11 @@ research; no shutdown change proceeds with an unresolved safety justification.
       isolated checkout after building matching UI/DLF artifacts.
       Final native-subscription coverage replaces the six adapter tests with five
       mounted Svelte tests; 51 affected Node tests also pass (56 total).
-- [ ] B4. Verify the actual browser capture flow and failure feedback, not only
+- [x] B4. Verify the actual browser capture flow and failure feedback, not only
       the adapter. Record subscription behavior and limitations of the probe.
-      Attempted selected account/capture Playwright cases on isolated ports
-      5198/5199. Environment refused the server listen with EPERM; no browser
-      cases executed. Browser qualification remains open, including discovery
-      duplicate/restore and invalid-source feedback cases.
+      Qualified in PR #31 native account/discovery suites: offline capture and
+      restart, duplicate/Restore and invalid-source feedback. Earlier local
+      listeners on 5198/5199 were refused with EPERM; CI supplies native evidence.
 - [x] B5. Consolidate Add Link status display in the owning capture states.
       Capture state metadata declares text, severity, display eligibility and
       status priority. Remove separate frontend duplicate/error messages and
@@ -77,27 +79,41 @@ Exit: accepted pilot with no custom selector framework or lifecycle regression.
 
 ## C. Apply the established observation pattern
 
-- [ ] C1. Migrate `ArticleTags` in its own review cycle; preserve write feedback,
+- [x] C1. Migrate `ArticleTags` in its own review cycle; preserve write feedback,
       dialog dismissal and focus recovery, including an article leaving filters.
       Implemented: direct $client.tagForm reads and scoped commands;
       removed the fallback that substituted an XState field error into DUI's
       native chip announcement. Validation already belongs to the invalid state.
       User reviewed and approved tests/PR. Twelve Node regressions and eight
       mounted Svelte tests pass; full web/extension types pass. The stale-error
-      regression fails against the original component. Native browser validation
-      of Escape/focus/filter behavior remains pending, so C1 is not yet qualified.
-- [ ] C2. Migrate `Library` in its own review cycle; preserve search/filter state,
+      regression fails against the original component. Native Escape, focus,
+      keyboard chips and filter-removal behavior pass in PR #31 discovery tests.
+- [x] C2. Migrate `Library` in its own review cycle; preserve search/filter state,
       pagination, row focus after removal and tag-editor continuity.
       Implemented on refactor/clipper-library-subscription: direct $client reads
       and scoped intents, with the initial current view rendered immediately.
       Six mounted integration tests cover filters/search, pagination focus,
       tag-editor continuity/closure, row-removal focus and replacement cleanup.
-      Native browser qualification remains pending; no domain actor change.
-- [ ] C3. Migrate reader observation in its own review cycle; preserve document
+      Native combined filters/search, removal focus and tag-editor behavior pass
+      in PR #31, including new real pagination focus/search continuity coverage.
+      No domain actor change.
+- [x] C3. Migrate reader observation in its own review cycle; preserve document
       identity, open/close commands, late-report rejection and content revisions.
-- [ ] C4. Remove superseded active helpers only after locating consumers. Trace
-      older `Account.svelte`/library context separately; do not delete fixtures or
-      compatibility paths merely because the active layout does not import them.
+      Implemented in the reader route after #21 moved composition there. Native
+      $client reads replace manual snapshots/subscriptions. A scoped UI binding
+      preserves OPEN-before-surface ordering; worker readerId correlates the URL.
+      Eight mounted route tests cover initial/loading/available data, direct reads,
+      DOM/selection continuity, content replacement, feedback, in-place route and
+      client replacement, unavailable context and exact surface cleanup ownership.
+      Qualified in merged PR #28: all native Clipper CI jobs passed, including
+      web, worker, production offline and packaged-extension flows (run
+      43546948705). Local mounted cases remain separate from native evidence.
+- [x] C4. Remove superseded active helpers only after locating consumers.
+      Removed the unused Window-owned `Account.svelte` and `library-context.ts`
+      after repository source, fixture, configuration and export searches found
+      no consumers. The layout now names its worker-backed `Application` clearly.
+      Worker/extension application machines, selectors and historical evidence
+      remain; those have real consumers and separate resource ownership.
 
 Exit: each migrated component has one clear observation lifetime; no stale data
 or application restart on route changes. Review and approve affected checks for
@@ -105,17 +121,17 @@ each batch before running them.
 
 ## D. Simplify lifecycle only where the audit supports it
 
-- [ ] D1. Select one evidence-backed simplification from A4. Show the operation,
+- [x] D1. Select one evidence-backed simplification from A4. Show the operation,
       owner, states, native cancellation contract and before/after failure cases.
-- [ ] D2. Amend any conflicting active guidance with explicit approval before
+- [x] D2. Amend any conflicting active guidance with explicit approval before
       changing the dependent implementation. Retain historical evidence.
-- [ ] D3. Implement the bounded change with standard invocation/cancellation/
+- [x] D3. Implement the bounded change with standard invocation/cancellation/
       cleanup where sufficient. Preserve a minimal closing workflow only where
       asynchronous settlement is actually required.
-- [ ] D4. After review/test approval, qualify cancellation during acquisition,
+- [x] D4. After review/test approval, qualify cancellation during acquisition,
       issued writes, close failures, overdue close and late completion as relevant.
       Include actual SDK/worker behavior, not just mock acknowledgments.
-- [ ] D5. Qualify abrupt termination separately from graceful closure: the same
+- [x] D5. Qualify abrupt termination separately from graceful closure: the same
       offline library reopens, acknowledged durable edits remain, unknown outcomes
       reconcile without automatic mutation replay. Report unproven guarantees.
 
@@ -124,18 +140,25 @@ boundary is necessary is a valid result; this phase has no removal quota.
 
 ## E. Follow through on Svelte composition
 
-- [ ] E1. Propose reader responsibility boundaries for observation, surface DOM,
+- [x] E1. Propose reader responsibility boundaries for observation, surface DOM,
       footnotes, settings and route identity; preserve snippet composition.
-- [ ] E2. Extract one responsibility per review cycle. Keep route composition
+- [x] E2. Extract one responsibility per review cycle. Keep route composition
       visible and avoid a controller or prop object that conceals the same work.
-- [ ] E3. Replace duplicate media-query subscription plumbing with `MediaQuery`;
+- [x] E3. Replace duplicate media-query subscription plumbing with `MediaQuery`;
       preserve breakpoint-dependent opening behavior and hydration assumptions.
-- [ ] E4. Evaluate attachments for saved-content/surface lifetime. Keep unrelated
+      AccountDrawer now uses Svelte MediaQuery and one effect for viewport defaults
+      after the DUI reference binds. Untracked drawer reads preserve manual
+      closure. Five mounted drawer cases and the full 27-case component suite
+      pass; native resize/focus/inertness coverage is added to the account suite.
+      The expanded PR also migrates ReaderSettingsDrawer, keeps disclosure across
+      resizing and replaces getDrawer traversal with DUI bind:open. Both native
+      drawer suites and mounted route cases qualify the combined review.
+- [x] E4. Evaluate attachments for saved-content/surface lifetime. Keep unrelated
       image/progress updates from replacing article DOM; preserve syntax/image
       cleanup and final reader-position reporting.
-- [ ] E5. Consolidate repeated account/page frame layout through snippets and
+- [x] E5. Consolidate repeated account/page frame layout through snippets and
       supported DUI APIs. Propose shared drawer improvements in DUI if needed.
-- [ ] E6. Adopt typed context where it improves integration scoping; reduce
+- [x] E6. Adopt typed context where it improves integration scoping; reduce
       imperative component traversal while retaining narrow focus operations.
 
 Exit: changes preserve native keyboard/forms/navigation, focus, modal inertness
@@ -144,10 +167,28 @@ incidentally. Each change gets appropriate reviewed validation.
 
 ## F. Close the work with an honest qualification record
 
-- [ ] F1. Run approved scoped formatting, lint and type checks, then affected
+- [x] F1. Run approved scoped formatting, lint and type checks, then affected
       integration/browser/offline checks. Include extension callers if shared
       host/client protocols changed. Use isolated fixtures and preserve user data.
-- [ ] F2. Record exact package versions, decisions, removed duplication, test
+- [x] F2. Record exact package versions, decisions, removed duplication, test
       evidence, remaining custom lifecycle boundaries and unresolved limitations.
-- [ ] F3. Update active integration guidance to describe the qualified pattern.
+- [x] F3. Update active integration guidance to describe the qualified pattern.
       Keep the migration feature selector unchanged unless explicitly reassigned.
+
+
+## Combined completion review
+
+The earlier one-component review milestones are historical; the user requested
+all remaining work and tests together on PR #31. E1/E2 extract footnote ownership
+and PageFrame composition. E4 deliberately retains the bounded saved-content
+action after evaluating attachments; new mounted tests prove image changes do
+not reset DOM/selection. E6 uses createContext and removes nested drawer access.
+D1–D3 simplify only offline-shell observer cleanup; D2 needs no policy exception.
+The worker/SDK/transaction closure audit retains ownership where native evidence
+does not justify removal. See the completion review for exact source/evidence.
+B4/C1/C2/D4/D5/F1/F2 are qualified by expanded Clipper CI run 43555941668 on
+4ad5351804b43680535d69c097efb3b03a065c33: all 897 Node tests and 30 mounted
+component tests, types/build, web, worker, production offline, sample-data and
+packaged-extension suites pass. Ordinary observer cleanup was simplified;
+retained persistence/session boundaries and unproven power-loss guarantees are
+explicit dispositions, not pending checklist implementation.

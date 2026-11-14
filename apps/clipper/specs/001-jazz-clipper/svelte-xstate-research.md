@@ -472,3 +472,126 @@ Full coordinator/web/service-worker/extension type checks also pass with zero
 Svelte errors or warnings. The only type-check correction during development was
 explicitly narrowing the test's open-dialog query before calling close; no type
 assertions or production API changes were needed.
+
+## Reader route native-subscription migration
+
+PR #21 merged at ea460e9d999de55f9cc215f8a17bf20d85089aa4 after its native
+qualification passed. It moved reader composition into the SvelteKit route and
+removed integrations/Reader.svelte. PR #28 now applies the observation cleanup
+to that route and keeps the merged layout, drawer, focus and scrolling fixes.
+The user's conflict-resolution request retains the implementation/testing/PR
+update authorization for this bounded adaptation.
+
+The reused route observes a single LibraryClient through native $client reads.
+An effect captures the current worker client and route ID, sends OPEN, and records
+that exact UI binding. Its cleanup releases the surface, sends CLOSE_READER to
+the captured owner and clears the binding. The derived client is immediately
+unavailable when either identity changes. This replaces the manual snapshot,
+subscribe/unsubscribe and getView fallback without copying worker workflow state.
+The binding records that OPEN was sent; the worker retains command admission,
+loading, reader generation, late-result rejection and persistence ownership.
+
+The render DTO exposes the existing library context readerId. Reader content and
+feedback are rendered only when it matches the route. A cached prior route's
+content cannot attach during initial observation. This uses the route ID rather
+than the reader payload's document ID; direct reads also work without a visible
+list row. Surface attachment continues to use reader.document.id, and organization
+falls back to the route ID. Native observation begins only after OPEN has been
+sent for that exact client/URL, preserving the original surface ordering.
+
+Each DOM surface retains its actual client owner with its native detacher.
+Content replacement, route changes and account replacement release that lease
+and send DETACH to the client that attached it. Repeated DOM/effect cleanup does
+not detach a new client's surface. Footnotes and headings remain UI concerns.
+No selector wrapper, new dependency, UI copy or worker shutdown change is added.
+
+Eight tests mount the actual reader route with its real children. Six retain the
+original cases for initial/loading/available projections, route correlation,
+direct reads, correct surface document identity, archive/preference intents,
+DOM/selection continuity, content replacement, unavailable teardown and close
+ordering. Two new cases reuse the same route across clients, unavailable context
+and new bindings, and change route IDs on one client. They verify subscription
+cleanup, stale data/feedback rejection, OPEN-before-attach and exact surface
+ownership. The fixture supplies worker/account contexts and reactive SvelteKit
+page state. Narrow jsdom media-query/dialog/popover substitutes still do not
+establish native viewport, modal/popover or final-position persistence guarantees.
+
+All 25 mounted Svelte tests pass. The 76 affected Node tests cover the library,
+reader drain, experience, viewport/surface and worker client. Checks use the
+isolated checkout and matching rebuilt UI/DLF artifacts after a frozen offline
+install. Local Node remains 25.2.1 rather than pinned CI Node 24.22.2. Local native
+listeners and Chromium launch are denied, so native qualification runs on CI.
+C3 remains unchecked until that evidence is recorded for this adaptation.
+
+The reused-route account replacement regression fails against the pre-migration
+route because the incoming client receives DETACH around OPEN while old DOM is
+being released. The scoped surface owner fixes that cross-client cleanup. The
+restored route passes all eight cases. Full coordinator, web, service-worker and
+extension type checks pass with zero Svelte errors/warnings. Touched source
+formatting, lint, peer-link and whitespace checks pass.
+
+## Retire the superseded Window account integration (C4)
+
+PR #28 merged at `f3cc946a3e6bbd89dd367191c0ccec3fb859ca15` with all checks
+passing. Its [Clipper qualification run](https://github.com/delightful-labs/delightful-labs/actions/runs/43546948705)
+completed the web, worker, production offline, sample-data and packaged-extension
+suites on pinned CI Node 24.22.2. This closes the pending native reader evidence
+above; jsdom results alone still do not prove native behavior.
+
+The remaining older `integrations/Account.svelte` created the application actor
+on Window, subscribed manually and provided `runtime/library-context.ts`. A full
+repository search of source, tests, fixtures, config, package exports and dynamic
+import patterns found no consumer of that component. Its context had only that
+provider and no `useLibrary` consumer. The private web package exports neither.
+The active layout already imported `integrations/Application.svelte`; renaming
+its local `Account` alias to `Application` makes the actual boundary explicit.
+
+Remove only the unused component and context. The active application opens its
+worker client from `onMount`; `worker/host-machine.ts` owns the application
+readiness machine, and `host-observation.ts` observes its library/recovery bindings.
+The extension runtime and sign-in machine also consume these application APIs.
+Those machines, selectors, native cleanup, fixtures and tests remain required.
+The historical extension-startup review remains a record of the older design.
+This cleanup adds no workflow, lifecycle policy, dependency or user-facing copy.
+
+Local validation: complete Clipper coordinator, web, service-worker and extension
+type checks pass with zero Svelte errors/warnings. Touched Svelte formatting,
+lint and whitespace checks pass. No new behavior tests are added for removal of
+unreachable code. Existing CI qualifications cover the active worker application;
+local validation used Node 25.2.1, while CI uses pinned Node 24.22.2.
+
+
+## Native account viewport observation (E3, first component)
+
+Merged PR #30 passed every check, including the [Clipper native suites](https://github.com/delightful-labs/delightful-labs/actions/runs/43549364658).
+The next bounded change replaces AccountDrawer's manual matchMedia listener,
+copied mobile flag and onMount cleanup with `MediaQuery` from `svelte/reactivity`.
+Reviewed the pinned Svelte 5.57.2 implementation in `src/reactivity/media-query.js`,
+`reactive-value.js`, `create-subscriber.js`, server export and public declarations,
+plus the [official MediaQuery documentation](https://svelte.dev/docs/svelte/svelte-reactivity#MediaQuery).
+
+The component owns one query for its rendered lifetime. Reading current is
+reactive, and Svelte releases its native listener when observers disappear.
+The query observes the existing 48rem breakpoint; CSS still owns sizing, while
+JavaScript needs the same observation for opening defaults, dismissal and inertness.
+The query's false server fallback matches the old initial flag. Clipper currently
+sets `ssr = false` at its root layout; this does not qualify a future SSR change.
+
+One effect observes only the current breakpoint and bound DUI Drawer reference.
+After binding, mobile closes the panel and desktop opens it if closed. Drawer
+reads/commands run inside untrack, so manual close does not retrigger the default
+and reopen the panel. The existing native escape/focus, modal projection and
+navigation handlers retain their responsibilities. No domain machine, worker
+lifetime, SDK close, UI copy, dependency or DUI API changes are involved.
+
+The five mounted drawer tests preserve initial desktop/mobile defaults, Escape
+focus return and inert projection; new cases cover reentering desktop, manual
+closure, viewport listener release and a fresh remount. All 27 mounted component
+tests pass. A native account-suite case covers actual viewport changes, manual
+desktop closure, mobile inertness and focus recovery on breakpoint closure.
+Local listeners/Chromium were previously denied, so native coverage runs on CI.
+ReaderSettingsDrawer keeps its existing observer for a separate review cycle.
+
+Full Clipper coordinator, web, service-worker and extension type checks pass with
+zero Svelte errors/warnings. Touched source formatting, lint and whitespace checks
+pass. These isolated local checks use Node 25.2.1 rather than pinned CI Node 24.22.2.

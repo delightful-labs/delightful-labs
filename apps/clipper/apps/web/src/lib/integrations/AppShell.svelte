@@ -3,7 +3,6 @@
 	import type { Snippet } from 'svelte'
 	import { SkipControl } from 'delightful-ui'
 	import { t } from '../localization/index.js'
-	import type { ReaderPreferences } from '../reader/schema.js'
 	import { setAccountSettings } from '../runtime/account-settings.js'
 	import { useWorkerLibrary } from '../runtime/worker/context.js'
 	let {
@@ -31,19 +30,8 @@
 		}
 	})
 	const library = useWorkerLibrary()
-	let theme = $state<ReaderPreferences['theme']>('system')
-	$effect(() => {
-		const actor = library.actor
-		if (!actor) {
-			theme = 'system'
-			return
-		}
-		const subscription = actor.subscribe((snapshot) => {
-			const view = snapshot.view.readerExperience
-			theme = view.preferences.theme
-		})
-		return () => subscription.unsubscribe()
-	})
+	const client = $derived(library.actor)
+	const theme = $derived($client?.view.readerExperience.preferences.theme ?? 'system')
 	$effect(() => {
 		if (theme === 'system') document.documentElement.removeAttribute('data-dui-theme')
 		else document.documentElement.setAttribute('data-dui-theme', theme)

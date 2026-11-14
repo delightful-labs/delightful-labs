@@ -47,8 +47,8 @@ it('keeps shell coordination private while actual native registration reports ar
 	expect(selectShellView(actor.getSnapshot()).admitted).toBe(false)
 	nativeReport?.({ type: 'STATUS', status: 'ready' })
 	expect(selectShellView(actor.getSnapshot())).toMatchObject({ status: 'ready', admitted: true })
-	actor.send({ type: 'SHUTDOWN' })
-	expect(actor.getSnapshot().status).toBe('done')
+	actor.stop()
+	expect(actor.getSnapshot().status).toBe('stopped')
 })
 // Type-only negative checks: native reports stay public, self-coordination does not.
 function privateCommands(

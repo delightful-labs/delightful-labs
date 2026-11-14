@@ -3,7 +3,6 @@
 	import { onMount } from 'svelte'
 	import { dev } from '$app/env'
 	import { createActor, type SnapshotFrom } from 'xstate'
-	import { stopAfterShutdown } from 'delightful-local-first/forms/lifecycle'
 	import { Button, StatusMessage } from 'delightful-ui'
 	import {
 		createShellRegistrationMachine,
@@ -40,7 +39,7 @@
 		actor.start()
 		return () => {
 			subscription.unsubscribe()
-			stopAfterShutdown(actor)
+			actor.stop()
 		}
 	})
 </script>

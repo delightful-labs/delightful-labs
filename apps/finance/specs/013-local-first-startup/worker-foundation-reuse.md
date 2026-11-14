@@ -1,5 +1,11 @@
 # Local First and Clipper reuse for Finance workers
 
+The cross-project [shared workspace specification](../../../../specs/003-shared-workspaces/spec.md)
+and [contract research](../../../../specs/003-shared-workspaces/research.md) own
+the proposed headless Clipper workspace and remaining workspace lifecycle
+extractions. Coordinate shared changes with this worker plan; Finance's domain
+access projection and financial resource drains remain app-owned.
+
 Source review: 2026-11-13, monorepo `main` at `eb0f615f`. This supplements
 [code research](worker-migration-research.md) and changes the ownership and
 dependency details in the [ordered migration tasks](worker-migration-tasks.md).

@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { Drawer } from 'delightful-ui'
-	import { onMount } from 'svelte'
+	import { MediaQuery } from 'svelte/reactivity'
 	import type { ReaderPreferences, ReaderPreferenceChange } from '../../reader/schema.js'
 	import type { ReaderHeading } from '../../reader/structure.js'
 	import { t } from '../../localization/index.js'
 	import ReaderToolbar from './ReaderToolbar.svelte'
 
 	let {
+		id,
+		open = $bindable(false),
 		sourceUrl,
 		preferences,
 		progress,
@@ -18,6 +20,8 @@
 		onreflow,
 		onclose
 	}: {
+		id: string
+		open?: boolean
 		sourceUrl: string | undefined
 		preferences: ReaderPreferences
 		progress: number
@@ -29,38 +33,25 @@
 		onreflow: () => void
 		onclose: () => void
 	} = $props()
-	let drawer: ReturnType<typeof Drawer> | undefined = $state()
 	let toolbar: ReturnType<typeof ReaderToolbar> | undefined = $state()
-	let mobile = $state(false)
-	const drawerOpen = $derived(drawer?.isOpen() ?? false)
-	const modal = $derived(mobile && drawerOpen && !focused)
+	const viewport = new MediaQuery('(max-width: 48rem)', false)
+	const mobile = $derived(viewport.current)
+	const modal = $derived(mobile && open && !focused)
 
-	export function getDrawer() {
-		return drawer
-	}
 	export function isModal() {
 		return modal
 	}
 	export function focusControl() {
 		toolbar?.focusControl()
 	}
-
-	onMount(() => {
-		const viewport = window.matchMedia('(max-width: 48rem)')
-		const resize = () => {
-			mobile = viewport.matches
-		}
-		resize()
-		viewport.addEventListener('change', resize)
-		return () => viewport.removeEventListener('change', resize)
-	})
 </script>
 
 <Drawer
-	bind:this={drawer}
+	{id}
+	bind:open
 	hidden={focused}
 	class="reader-drawer"
-	style={`--dui-drawer-height: ${drawerOpen ? '100dvh' : '0px'}`}
+	style={`--dui-drawer-height: ${open ? '100dvh' : '0px'}`}
 	side="right"
 	heading={t('reader.controls')}
 	headingHidden
@@ -74,7 +65,7 @@
 	<ReaderToolbar
 		bind:this={toolbar}
 		oncontents={() => {
-			if (mobile) drawer?.close()
+			if (mobile) open = false
 		}}
 		{sourceUrl}
 		{preferences}
@@ -93,7 +84,7 @@
 		class="settings-dismiss"
 		type="button"
 		aria-label={t('actions.close')}
-		onclick={() => drawer?.close()}
+		onclick={() => (open = false)}
 	></button>
 {/if}
 

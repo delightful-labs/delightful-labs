@@ -64,6 +64,42 @@ new storage path. No legacy import, fallback, dual writes, source cleanup or
 old-version compatibility code is planned, per the user's explicit instruction. Keep domain schemas, permissions, financial/provider rules, article/reader
 behavior and app localization conventions with their apps.
 
+### Finance runtime client boundary
+
+The user confirmed this architecture direction on 2026-11-14 following the
+Clipper Svelte/XState cleanup. W07 owns the client contract and W12–W19 own
+feature adoption within this existing worker migration.
+
+Finance integrations consume a typed worker-backed runtime client with bounded
+feature views and scoped commands. XState remains the application/domain
+workflow owner in the worker. UI consumers receive neither raw actor references,
+private child/context paths nor database handles. Pure presentation continues to
+receive bounded data, callbacks and snippets from integrations; component-owned
+UI interaction actors may remain on Window.
+
+View subscriptions follow Svelte's store contract, publishing the current value
+synchronously and releasing observation on unsubscribe. Define replacement and
+failure outcomes explicitly, invalidate old-scope data/capabilities immediately,
+and bind commands/results to identity, organization, attachment generation and
+request identity. UI disposal does not acquire ownership of shared SDK closure
+or settle an issued financial write. Runtime ownership and receipts remain with
+W06/W08. Provider operations retain explicit user consent and passkey checks.
+
+The worker selects serializable message descriptors and capability outcomes;
+Window translates descriptors with Paraglide and formats locale-sensitive values.
+Keep exact minor-unit/currency and date representations. Navigation, focus,
+native form/file input and WebAuthn stay on their designed Window boundaries;
+private transient material uses W11's bounded capability/submission channels.
+Reuse Local First mechanisms and keep Finance's domain protocol app-owned.
+
+The follow-up Svelte cleanup specification is sequenced after Finance's domain
+XState handoff to workers. It should describe client-consuming integrations,
+shell/form snippet composition, native viewport handling and typed UI contexts
+against the implemented client. It must preserve ownership/feedback decisions
+already supplied by that client. This records the direction and sequencing;
+worker implementation, feature parity and activation retain their existing
+W-series acceptance gates.
+
 Read [worker-migration-research.md](worker-migration-research.md) for concrete
 source findings at verified monorepo `main` commit `eb0f615f`. Read
 [xstate-v6-migration.md](xstate-v6-migration.md) for the ownership contract and
