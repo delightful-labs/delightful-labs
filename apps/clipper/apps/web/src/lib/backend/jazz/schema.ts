@@ -1,4 +1,6 @@
 import { schema as s } from 'jazz-tools'
+import { nativeRangeSchema } from '../../annotations/schema.js'
+import { z } from 'zod'
 import { schema as authSchema } from './auth-schema.js'
 import { captureSourceSchema } from '../../capture/article-schema.js'
 import { readingProgressColumn, resumePositionColumn } from './reading-columns.js'
@@ -13,11 +15,49 @@ export const app = s.defineApp(
 	{
 		...authSchema,
 		notes: s.table(
-			{ libraryId: s.uuid(), documentId: s.uuid() },
+			{
+				libraryId: s.uuid(),
+				documentId: s.uuid().optional(),
+				source: s.string().optional(),
+				highlightId: s.uuid().optional(),
+				text: s.string().merge('text').default('')
+			},
 			{
 				library: s.rel('libraries', 'libraryId'),
-				document: s.rel('libraryDocuments', 'documentId')
+				document: s.rel('libraryDocuments', 'documentId'),
+				highlight: s.rel('highlights', 'highlightId')
 			}
+		),
+		highlights: s.table(
+			{ libraryId: s.uuid(), documentId: s.uuid(), source: s.string() },
+			{
+				library: s.rel('libraries', 'libraryId'),
+				document: s.rel('libraryDocuments', 'documentId'),
+				anchors: s.reverse('highlightAnchors', 'highlight'),
+				notes: s.reverse('notes', 'highlight')
+			}
+		),
+		highlightAnchors: s.table(
+			{
+				highlightId: s.uuid(),
+				kind: s.enum('source', 'reader'),
+				normalizationVersion: s.string(),
+				textHash: s.string(),
+				textLengthCodePoints: s.int().optional(),
+				sourceDate: s.timestamp().optional(),
+				range: s.json(nativeRangeSchema),
+				sourceCodePointPosition: s
+					.json(
+						z
+							.object({
+								start: z.number().int().nonnegative(),
+								end: z.number().int().nonnegative()
+							})
+							.nullable()
+					)
+					.optional()
+			},
+			{ highlight: s.rel('highlights', 'highlightId') }
 		),
 		noteRevisions: s.table(
 			{

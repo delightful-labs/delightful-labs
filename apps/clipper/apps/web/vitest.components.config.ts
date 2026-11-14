@@ -9,6 +9,9 @@ export default defineConfig({
 	resolve: {
 		conditions: ['browser'],
 		alias: {
+			'$app/navigation': fileURLToPath(
+				new URL('./src/lib/integrations/fixtures/navigation.ts', import.meta.url)
+			),
 			'$app/state': fileURLToPath(
 				new URL('./src/lib/integrations/fixtures/page.svelte.ts', import.meta.url)
 			)

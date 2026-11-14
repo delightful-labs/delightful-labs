@@ -1,5 +1,45 @@
 # Article notes — implementation started
 
+## Saved-reader annotations — 2026-11-14
+
+The user authorized a working implementation with best judgment after the
+[model review](annotation-model-review.md). Saved readers now support native
+passage selection, highlights, document notes, highlight-attached notes, autosave,
+note deletion and same-identity highlight removal/restoration. Jazz owns text
+merging, accepted history, ranges and soft deletion. The worker owns annotation
+eligibility, transactions, observation, hashing, queues and settlement. DUI exposes
+an optional native textarea element binding for Jazz's cursor-preserving adapter.
+
+Authored input recovery reuses Clipper's scoped draft store. Oversized input can be
+recovered after reload, explicitly kept, shortened and saved. It is not a second
+accepted-text version graph. The legacy revision APIs remain for compatibility;
+the new reader path does not call them.
+
+This is a local saved-reader slice. Original-page extension annotation, public
+Margin/Clipper records, W3C export, publication scheduling and PDS writes remain
+open. No dependencies or catalog strings were added. No hosted changes were made.
+
+Implementation and checks use the isolated `plan/clipper-annotations` worktree;
+the user's main checkout, servers and library storage are preserved. The model
+review records bounded queries, concurrent-creation limitations and normalization.
+
+Verification on Node 24.22.2 / pnpm 10.28.0: 901 unit/native tests, 30 component
+tests, 3 new annotation browser flows, 9 existing reader browser cases, and 8 native
+worker-host cases passed. The native annotation suite was rerun after qualifying
+CRLF-to-DOM offsets and stale A-to-A observation errors. Both production offline
+shell builds pass. A new production browser case proves highlight/note retention
+across two complete offline process restarts with web/Jazz endpoints stopped,
+an offline note edit, and reconciliation into another profile. Strict web/extension
+types, UI types, lint, formatting, workspace links and whitespace checks pass.
+
+Browser suites that replace their disposable core authority run with fresh Vite
+server lifetimes. Combining those files against one cached backend caused fixture
+authority mismatches; no production retries or increased timeouts were added.
+
+The local demo runs in the named `clipper-annotations` tmux session on port 5188,
+bound to `0.0.0.0`, with existing sample-data support enabled. It uses this
+worktree's native SQLite store and the new origin's browser library namespace.
+
 **Document model implementation (2026-11-12):** [Document model](data-model.md#accepted-document-model-2026-11-12) is authoritative. Document owns saved-item state, sourceUrl and a Jazz attachment relationship. Article owns its metadata/content and relates to reusable Site/favicon records. Attachments share optional CaptureSource (resolvedUrl, canonicalUrl); URLs are capture evidence, not identity. ReadingPosition.interactedAt is a Date. Progress is required and initialized to 0. Jazz owns creation metadata. Trash retains previousStatus. Development data is disposable; historical schema migrations/snapshots and legacy conversion are unnecessary. The runtime now follows these relationships. Native offline replicas prove furthest-progress reconciliation independently of the latest resume location; qualification is recorded in tasks.md. PDF/EPUB ingestion remains deferred.
 
 ## Document model qualification — 2026-11-12

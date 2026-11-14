@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ReaderAnnotations from '../../../lib/annotations/ReaderAnnotations.svelte'
 	import { page } from '$app/state'
 	import { useWorkerLibrary } from '../../../lib/runtime/worker/context.js'
 	import { untrack, tick } from 'svelte'
@@ -18,6 +19,7 @@
 	// Observe only after OPEN for the exact client and URL in this reused route.
 	let binding = $state.raw<{ owner: LibraryClient; id: string }>()
 	let surface: { owner: LibraryClient; detach: () => void } | undefined
+	let annotationRoot = $state.raw<HTMLElement>()
 	let headings = $state<ReaderHeading[]>([])
 	const runtime = useWorkerLibrary()
 	const actor = $derived(runtime.actor)
@@ -74,6 +76,7 @@
 
 	function ready(node: HTMLElement) {
 		if (reader?.kind !== 'available' || !client) return
+		annotationRoot = node
 		headings = readerHeadings(node)
 		const scroller = node.closest('main')
 		if (scroller)
@@ -83,6 +86,7 @@
 			}
 	}
 	function release() {
+		annotationRoot = undefined
 		const previous = surface
 		surface = undefined
 		previous?.detach()
@@ -113,7 +117,7 @@
 	{#snippet children(accountControl)}
 		{#if runtime.actor}
 			{#key runtime.actor}{#key page.params.id}
-					{#if reader?.kind === 'available' && view && reading}
+					{#if reader?.kind === 'available' && view && reading && client}
 						<ReaderFootnotes>
 							{#snippet children(onlink, clearFootnote)}
 								{#if !reading.focused}
@@ -146,6 +150,11 @@
 												/>{/if}
 											{#if view.readerMessage}<StatusMessage {...view.readerMessage} />{/if}
 
+											<ReaderAnnotations
+												{client}
+												documentId={reader.document.id}
+												root={annotationRoot}
+											/>
 											<ReaderView preferences={reading.preferences}>
 												<SavedContent
 													asset={reader.asset}

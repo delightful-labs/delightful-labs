@@ -149,7 +149,10 @@ it('rejects native note/revision access to foreign or missing parents', async ()
 	await expect(
 		a.db.update(app.notes, a.noteId, { documentId: b.documentId }).wait({ tier: 'global' })
 	).rejects.toThrow()
-	await expect(a.db.delete(app.notes, a.noteId).wait({ tier: 'global' })).rejects.toThrow()
+	// Owner soft deletion is now part of the native Note contract.
+	await expect(b.db.delete(app.notes, a.noteId).wait({ tier: 'global' })).rejects.toThrow()
+	await a.db.delete(app.notes, a.noteId).wait({ tier: 'global' })
+	expect(await a.db.one(app.notes.where({ id: a.noteId }))).toBeNull()
 })
 it('rejects invalid stored revision batches without publishing partial state', async () => {
 	const a = await owner('note-entity-invalid'),

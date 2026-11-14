@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { annotationCommandSchema } from '../../annotations/schema.js'
 import { organizationRequestSchema, libraryViews } from '../../capture/organization.js'
 import { uuidSchema } from '../../validation/values.js'
 import { readerPreferenceChangeSchema } from '../../reader/schema.js'
@@ -9,6 +10,7 @@ function simple<T extends string>(type: T) {
 	return z.object({ type: z.literal(type) })
 }
 export const libraryIntentSchema = z.discriminatedUnion('type', [
+	z.object({ type: z.literal('ANNOTATION'), command: annotationCommandSchema }),
 	z.object({ type: z.literal('ADD'), url: z.string().max(8192) }),
 	identified('OPEN'),
 	identified('RETRY'),

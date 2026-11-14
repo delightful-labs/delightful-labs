@@ -8,6 +8,7 @@
 		'value' | 'defaultValue' | 'defaultvalue' | 'children' | 'bind:value'
 	> & {
 		label: string
+		element?: HTMLTextAreaElement | undefined
 		value?: string
 		defaultValue?: string
 	}
@@ -15,6 +16,7 @@
 	const generatedId = $props.id()
 	let {
 		label,
+		element = $bindable(),
 		id,
 		required = false,
 		rows = 4,
@@ -32,6 +34,7 @@
 
 <InputWrapper title={label} key={textareaId}>
 	<textarea
+		bind:this={element}
 		{...attributes}
 		id={textareaId}
 		{required}

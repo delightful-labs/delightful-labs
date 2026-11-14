@@ -48,9 +48,39 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 			policy.libraryDocuments.exists.where({ id: row.documentId, libraryId: row.libraryId })
 		])
 	policy.notes.allowRead.where((row) => owns(row.libraryId))
-	policy.notes.allowInsert.where(documentParent)
-	policy.notes.allowUpdate.never()
-	policy.notes.allowDelete.never()
+	const noteParent = (row: {
+		libraryId: RowRefValue
+		documentId: RowRefValue
+		highlightId: RowRefValue
+	}) =>
+		allOf([
+			owns(row.libraryId),
+			anyOf([
+				allOf([
+					{ highlightId: null },
+					policy.libraryDocuments.exists.where({ id: row.documentId, libraryId: row.libraryId })
+				]),
+				allOf([
+					{ documentId: null },
+					policy.highlights.exists.where({ id: row.highlightId, libraryId: row.libraryId })
+				])
+			])
+		])
+	policy.notes.allowInsert.where(noteParent)
+	policy.notes.allowUpdate.whereOld(noteParent).whereNew(noteParent)
+	policy.notes.allowDelete.where(noteParent)
+	policy.highlights.allowRead.where((row) => owns(row.libraryId))
+	policy.highlights.allowInsert.where(documentParent)
+	policy.highlights.allowUpdate.whereOld(documentParent).whereNew(documentParent)
+	policy.highlights.allowDelete.where(documentParent)
+	policy.highlightAnchors.allowRead.where((row) =>
+		policy.highlights.exists.where({ id: row.highlightId, libraryId: session.user })
+	)
+	policy.highlightAnchors.allowInsert.where((row) =>
+		policy.highlights.exists.where({ id: row.highlightId, libraryId: session.user })
+	)
+	policy.highlightAnchors.allowUpdate.never()
+	policy.highlightAnchors.allowDelete.never()
 	policy.noteRevisions.allowRead.where((row) => owns(row.libraryId))
 	policy.noteRevisions.allowInsert.where((row) =>
 		allOf([
