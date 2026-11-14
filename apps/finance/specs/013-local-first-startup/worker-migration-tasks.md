@@ -59,85 +59,85 @@ No XState reconversion, library reimport or new Jazz patch is assumed necessary.
 ## A. Establish the baseline and prove the resource boundary
 
 - [x] **W01 — Inventory ownership and parity.** Record current SDK/root/subscription
-  owners, intended owners, native capabilities and every reachable feature/route.
-  Include shared shell data, profile, account ordering, banks, transfers,
-  attachments, backup/restore, identity recovery and developer tools. Establish
-  reproducible production-build, browser and performance baselines; reconcile
-  intended main-branch CI selection. Complete when the inventory names an owner,
-  scope, lifetime and acceptance flow for every domain responsibility.
-  Completed 2026-11-13 at `670fb720`: the
-  [inventory](worker-ownership-inventory.md) covers all 18 page files, parent
-  layouts, shared domain/native owners and server endpoints; the
-  [baseline](worker-baseline.md) records frozen install/link/type/build checks,
-  1,940 passing unit tests, 16 passing production PWA cases and the existing
-  521-transaction export/restore/performance case. The
-  [result summary](worker-baseline-results.json) retains exact commands/timings,
-  the rejected initial PWA setup and dev diagnostic limitations. CI PR #23 is
-  merged and the authorized Vercel production-branch corrections are verified.
-  W01 changed no runtime/test implementation; W02 evidence follows below.
+      owners, intended owners, native capabilities and every reachable feature/route.
+      Include shared shell data, profile, account ordering, banks, transfers,
+      attachments, backup/restore, identity recovery and developer tools. Establish
+      reproducible production-build, browser and performance baselines; reconcile
+      intended main-branch CI selection. Complete when the inventory names an owner,
+      scope, lifetime and acceptance flow for every domain responsibility.
+      Completed 2026-11-13 at `670fb720`: the
+      [inventory](worker-ownership-inventory.md) covers all 18 page files, parent
+      layouts, shared domain/native owners and server endpoints; the
+      [baseline](worker-baseline.md) records frozen install/link/type/build checks,
+      1,940 passing unit tests, 16 passing production PWA cases and the existing
+      521-transaction export/restore/performance case. The
+      [result summary](worker-baseline-results.json) retains exact commands/timings,
+      the rejected initial PWA setup and dev diagnostic limitations. CI PR #23 is
+      merged and the authorized Vercel production-branch corrections are verified.
+      W01 changed no runtime/test implementation; W02 evidence follows below.
 - [x] **W02 — Prove a worker-safe production import graph.** Depends on W01.
-  Add an inactive minimal application-worker entry and identify non-Svelte SDK
-  and Local First exports. Build the actual worker with the production toolchain;
-  verify no provider/Svelte UI imports enter it and trace emitted JS/Wasm assets.
-  This probe does not activate the AccountStore or open a second SDK session.
-  The user approved the build-only approach. The
-  [W02 implementation/design record](worker-bundle-design.md) describes the
-  inactive entry, shared production configuration, strict type/build commands,
-  resolved/rendered graph and emitted JS/Wasm evidence. The proof and normal
-  application build/check pass; the probe is absent from normal client output.
-  Completed 2026-11-13 after explicit implementation/test approval: 35 focused
-  unit tests (eight new real-build guard scenarios), all 19 production browser
-  cases (16 existing PWA/offline plus three actual emitted provider-module
-  scenarios), application/service-worker/proof/test types and production build
-  pass. The design record retains exact commands, outputs and limits; no new
-  session, persistent storage owner or production probe activation is included.
+      Add an inactive minimal application-worker entry and identify non-Svelte SDK
+      and Local First exports. Build the actual worker with the production toolchain;
+      verify no provider/Svelte UI imports enter it and trace emitted JS/Wasm assets.
+      This probe does not activate the AccountStore or open a second SDK session.
+      The user approved the build-only approach. The
+      [W02 implementation/design record](worker-bundle-design.md) describes the
+      inactive entry, shared production configuration, strict type/build commands,
+      resolved/rendered graph and emitted JS/Wasm evidence. The proof and normal
+      application build/check pass; the probe is absent from normal client output.
+      Completed 2026-11-13 after explicit implementation/test approval: 35 focused
+      unit tests (eight new real-build guard scenarios), all 19 production browser
+      cases (16 existing PWA/offline plus three actual emitted provider-module
+      scenarios), application/service-worker/proof/test types and production build
+      pass. The design record retains exact commands, outputs and limits; no new
+      session, persistent storage owner or production probe activation is included.
 - [x] **W03 — Design IndexedDB account storage and reconcile salvage.**
-  Depends on W01. The user selected IndexedDB and then explicitly excluded all
-  migration/old-version compatibility code on 2026-11-13. The
-  [revised design](worker-native-custody-design.md) owns transaction/admission/
-  receipt/close behavior and keep/adapt/leave decisions across Finance, Clipper,
-  Local First and PR #67. Build no import, legacy fallback, dual writes, source
-  cleanup, migration markers or old-tab/reload coordination. Existing legacy
-  values are ignored, not actively deleted. This scoped instruction supersedes
-  earlier requirements to preserve localStorage identities or mixed-version
-  account-store compatibility. Ordinary atomicity/failure/close guarantees remain.
+      Depends on W01. The user selected IndexedDB and then explicitly excluded all
+      migration/old-version compatibility code on 2026-11-13. The
+      [revised design](worker-native-custody-design.md) owns transaction/admission/
+      receipt/close behavior and keep/adapt/leave decisions across Finance, Clipper,
+      Local First and PR #67. Build no import, legacy fallback, dual writes, source
+      cleanup, migration markers or old-tab/reload coordination. Existing legacy
+      values are ignored, not actively deleted. This scoped instruction supersedes
+      earlier requirements to preserve localStorage identities or mixed-version
+      account-store compatibility. Ordinary atomicity/failure/close guarantees remain.
 - [x] **W04 — Implement the shared transactional IndexedDB AccountStore.**
-  Depends on W03's reviewed ownership contract. Put the adapter/native resource
-  owner and supported SDK integration in Local First. Perform read, synchronous
-  SDK transform and replacement within one active read/write transaction; only
-  transaction completion acknowledges an update. Request strict durability,
-  bound active/queued work and retain actual completion/abort receipts through
-  cancellation, owner failure, version changes and close. Reuse compatible
-  existing native IDB/custody contracts; do not copy a workspace journal or
-  remote-lock framework. Qualify concurrent real workers/tabs, request success
-  followed by abort, worker termination, interrupted close and cold reopen.
-  Validate packed public consumers and the SDK AccountStore interface. Actual
-  Finance/Clipper adoption is W05; W04 cannot depend on its dependent W05.
-  Completed 2026-11-13 after concrete implementation/test approval: full library/
-  test types, 53 unit files / 1,111 tests, 60 native cases (20 per engine), packed
-  public-consumer types/build, packaging/strict publint and changed-source lint/
-  formatting pass. The [verification record](worker-account-store-verification.md)
-  retains commands, failed setup/oracle attempts, limits and the real stored-
-  undefined bug found/fixed by a cursor read. The new reproducible native command
-  runs in library verify and CI. No app startup hookup or migration code was added.
+      Depends on W03's reviewed ownership contract. Put the adapter/native resource
+      owner and supported SDK integration in Local First. Perform read, synchronous
+      SDK transform and replacement within one active read/write transaction; only
+      transaction completion acknowledges an update. Request strict durability,
+      bound active/queued work and retain actual completion/abort receipts through
+      cancellation, owner failure, version changes and close. Reuse compatible
+      existing native IDB/custody contracts; do not copy a workspace journal or
+      remote-lock framework. Qualify concurrent real workers/tabs, request success
+      followed by abort, worker termination, interrupted close and cold reopen.
+      Validate packed public consumers and the SDK AccountStore interface. Actual
+      Finance/Clipper adoption is W05; W04 cannot depend on its dependent W05.
+      Completed 2026-11-13 after concrete implementation/test approval: full library/
+      test types, 53 unit files / 1,111 tests, 60 native cases (20 per engine), packed
+      public-consumer types/build, packaging/strict publint and changed-source lint/
+      formatting pass. The [verification record](worker-account-store-verification.md)
+      retains commands, failed setup/oracle attempts, limits and the real stored-
+      undefined bug found/fixed by a cursor read. The new reproducible native command
+      runs in library verify and CI. No app startup hookup or migration code was added.
 - [ ] **W05 — Integrate the AccountStore and broker lifecycle.** Depends on
-  W02 and W04. Bind the shared IDB store into Clipper and Finance using stable
-  app/profile configuration and the existing single SDK/session owner. No
-  localStorage selection import, fallback, dual write, legacy cleanup, migration
-  marker or old-version compatibility work is in scope. A missing IDB record
-  follows ordinary SDK first-use behavior; native failures remain failures.
-  Extract Clipper's native close control (R1) and SDK broker/generation adapter
-  (remaining R2) into Local First, qualify Clipper then Finance adoption, and
-  preserve exact capability admission. Generation storage is a separate SDK
-  mechanism; do not silently migrate it with account selection. Remove replaced
-  permanent account storage/lock channels after qualification. Preserve unknown
-  outcomes, actual native drain and SDK transform semantics without replay.
+      W02 and W04. Bind the shared IDB store into Clipper and Finance using stable
+      app/profile configuration and the existing single SDK/session owner. No
+      localStorage selection import, fallback, dual write, legacy cleanup, migration
+      marker or old-version compatibility work is in scope. A missing IDB record
+      follows ordinary SDK first-use behavior; native failures remain failures.
+      Extract Clipper's native close control (R1) and SDK broker/generation adapter
+      (remaining R2) into Local First, qualify Clipper then Finance adoption, and
+      preserve exact capability admission. Generation storage is a separate SDK
+      mechanism; do not silently migrate it with account selection. Remove replaced
+      permanent account storage/lock channels after qualification. Preserve unknown
+      outcomes, actual native drain and SDK transform semantics without replay.
 - [ ] **W06 — Qualify a single worker SDK/session owner.** Depends on W05.
-  Integrate the current patched SDK with the retained acquisition lifetime and
-  Finance configuration. Prove IDB identity/binding reuse after creation, persistent
-  replica access, offline writes, full browser/worker exit and cold reopen,
-  multiple tabs, broker generation failure and native resource release.
-  Do not reset existing storage or claim persistence from matching names alone.
+      Integrate the current patched SDK with the retained acquisition lifetime and
+      Finance configuration. Prove IDB identity/binding reuse after creation, persistent
+      replica access, offline writes, full browser/worker exit and cold reopen,
+      multiple tabs, broker generation failure and native resource release.
+      Do not reset existing storage or claim persistence from matching names alone.
 
 Milestone A: a production-buildable, crash-safe worker runtime that preserves
 identity and storage. No production UI handoff is implied.
@@ -145,47 +145,47 @@ identity and storage. No production UI handoff is implied.
 ## B. Establish the application and UI contracts
 
 - [ ] **W07 — Define runtime connection and bounded views.** Depends on W02/W03;
-  real-runtime qualification depends on W06. Define versioned commands,
-  projections, subscription attach/detach, operation receipts and host capability
-  requests. Bind runtime/attachment generations, identity/workspace scope and
-  request IDs. Bound bytes, collections and pending work; specify cancellation,
-  overload, stale A → B → A results and duplicate handling. Add a UI connection
-  that exposes views/commands, not actor or database handles. Preserve exact
-  money/date representation. Do not transport arbitrary queries or raw errors.
+      real-runtime qualification depends on W06. Define versioned commands,
+      projections, subscription attach/detach, operation receipts and host capability
+      requests. Bind runtime/attachment generations, identity/workspace scope and
+      request IDs. Bound bytes, collections and pending work; specify cancellation,
+      overload, stale A → B → A results and duplicate handling. Add a UI connection
+      that exposes views/commands, not actor or database handles. Preserve exact
+      money/date representation. Do not transport arbitrary queries or raw errors.
 - [ ] **W08 — Implement shutdown/replacement and uncertain-outcome ownership.**
-  Depends on W06/W07. Model layout detach, runtime close, account/environment
-  replacement, host failure and worker crash separately. Retain/reconcile issued
-  effects, invalidate capabilities, drain descendants, clear transients and
-  close actual resources before safe-close acknowledgement. No blind replay.
-  Wire sanitized bounded diagnostics using the existing projection.
+      Depends on W06/W07. Model layout detach, runtime close, account/environment
+      replacement, host failure and worker crash separately. Retain/reconcile issued
+      effects, invalidate capabilities, drain descendants, clear transients and
+      close actual resources before safe-close acknowledgement. No blind replay.
+      Wire sanitized bounded diagnostics using the existing projection.
 - [ ] **W09 — Add worker-owned query observation.** Depends on W06/W07.
-  Implement reusable non-Svelte observation at the Local First Jazz boundary,
-  drawing on Clipper's direct SDK bindings without extracting domain queries.
-  Use non-Svelte SDK subscriptions with owned lifetimes and failure reports;
-  preserve LocalFirst foreground behavior and explicit authority-tier operations.
-  Copy live rows at immutable actor boundaries, bound views, reject stale results
-  and dispose on scope replacement. Expose only reusable mechanisms in Local
-  First; Finance retains queries and permission policy.
+      Implement reusable non-Svelte observation at the Local First Jazz boundary,
+      drawing on Clipper's direct SDK bindings without extracting domain queries.
+      Use non-Svelte SDK subscriptions with owned lifetimes and failure reports;
+      preserve LocalFirst foreground behavior and explicit authority-tier operations.
+      Copy live rows at immutable actor boundaries, bound views, reject stale results
+      and dispose on scope replacement. Expose only reusable mechanisms in Local
+      First; Finance retains queries and permission policy.
 - [ ] **W10 — Split form transport from DOM and localization.** Depends on W07.
-  Evolve Local First's existing workflow/integration boundary rather than add
-  an app-local replacement for its scoped form machine.
-  Keep FormData extraction, native inputs, focus and presentation in Window.
-  Keep validation, eligibility, draft/workflow authority, submissions and result
-  selection in worker actors. Replace callback-bearing feedback labels in wire
-  views with selected serializable descriptors; retain Finance's current wording
-  and reactive locale. Specify draft revisions, out-of-order input, reset,
-  navigation acknowledgement, cancellation and late completion. Qualify shared
-  API changes with existing consumers; don't create another form workflow.
+      Evolve Local First's existing workflow/integration boundary rather than add
+      an app-local replacement for its scoped form machine.
+      Keep FormData extraction, native inputs, focus and presentation in Window.
+      Keep validation, eligibility, draft/workflow authority, submissions and result
+      selection in worker actors. Replace callback-bearing feedback labels in wire
+      views with selected serializable descriptors; retain Finance's current wording
+      and reactive locale. Specify draft revisions, out-of-order input, reset,
+      navigation acknowledgement, cancellation and late completion. Qualify shared
+      API changes with existing consumers; don't create another form workflow.
 - [ ] **W11 — Prove native capability and private submission adapters.** Depends
-  on W07/W08. Specify and prototype navigation/WebAuthn/file/canvas boundaries
-  and a bounded private one-use submission channel for secret/file payloads.
-  Recreate opaque WeakMap-backed handles in their receiving realm. Verify
-  rejected/late/duplicate submissions, scope replacement, cancellation, port
-  loss and cleanup without logging secrets. Qualify clone/transfer behavior and
-  supported processing primitives before dependent feature migration.
-  Separately extract Clipper's generic disposable-worker job (R4) into Local
-  First and update Clipper's image-job caller before Finance's finite-job
-  adoption; this extraction need not wait for all private submission adapters.
+      on W07/W08. Specify and prototype navigation/WebAuthn/file/canvas boundaries
+      and a bounded private one-use submission channel for secret/file payloads.
+      Recreate opaque WeakMap-backed handles in their receiving realm. Verify
+      rejected/late/duplicate submissions, scope replacement, cancellation, port
+      loss and cleanup without logging secrets. Qualify clone/transfer behavior and
+      supported processing primitives before dependent feature migration.
+      Separately extract Clipper's generic disposable-worker job (R4) into Local
+      First and update Clipper's image-job caller before Finance's finite-job
+      adoption; this extraction need not wait for all private submission adapters.
 
 Milestone B: actual SDK-backed observations, cloneable application/form views,
 safe commands and explicit native boundaries. UI does not reconstruct access or
@@ -194,51 +194,51 @@ workflow decisions from worker internals.
 ## C. Move shared application flows, then bounded features
 
 - [ ] **W12 — Move session/workspace/access coordination.** Depends on W08/W09
-  and required W11 capabilities. Move restoration/bootstrap, selected-workspace
-  ownership, membership/grant observation and scoped resource drains. Replace
-  live actor/context bindings with W07 views/commands. Preserve locally known
-  usability, denied/partial knowledge and immediate invalidation on access loss.
+      and required W11 capabilities. Move restoration/bootstrap, selected-workspace
+      ownership, membership/grant observation and scoped resource drains. Replace
+      live actor/context bindings with W07 views/commands. Preserve locally known
+      usability, denied/partial knowledge and immediate invalidation on access loss.
 - [ ] **W13 — Move shell data, balances and preference coordination.** Depends
-  on W12. Replace WorkspaceBootstrap's data/query/aggregation responsibilities
-  with worker projections. Preserve exact balances, workspace navigation and
-  account-order edit/done/move and persisted preference behavior. Keep disclosure,
-  responsive layout, route observation and native storage primitives in Window.
+      on W12. Replace WorkspaceBootstrap's data/query/aggregation responsibilities
+      with worker projections. Preserve exact balances, workspace navigation and
+      account-order edit/done/move and persisted preference behavior. Keep disclosure,
+      responsive layout, route observation and native storage primitives in Window.
 - [ ] **W14 — Prove the first read-only vertical slice.** Depends on W13.
-  Render existing accounts presentation from the worker's list projection in an
-  isolated migration preview. Verify no page SDK/query owner, bounded output,
-  subscription disposal, permission loss and workspace switching.
+      Render existing accounts presentation from the worker's list projection in an
+      isolated migration preview. Verify no page SDK/query owner, bounded output,
+      subscription disposal, permission loss and workspace switching.
 - [ ] **W15 — Prove the first financial-write vertical slice.** Depends on W10,
-  W12 and W14. Move manual transaction creation without attachments first.
-  Exercise validation → authorization → write → local settlement → result →
-  navigation, plus cancellation, access replacement and unknown outcomes.
-  Prove offline save and cold restart; keep transaction resources in one realm.
+      W12 and W14. Move manual transaction creation without attachments first.
+      Exercise validation → authorization → write → local settlement → result →
+      navigation, plus cancellation, access replacement and unknown outcomes.
+      Prove offline save and cold restart; keep transaction resources in one realm.
 - [ ] **W16 — Migrate ordinary domain features in dependency order.** Depends
-  on W15. Split into focused slices: account creation/settings/order/archive and
-  grants; category/tag management; transaction pagination/filtering/details/editing;
-  transfers/linking/unlinking and integrity operations; profile and identity
-  settings. Use W10/W11 where required. Preserve selected-account permissions,
-  transaction-time invariants, money semantics and atomic operations. Verify each
-  route against W01; do not hide unported routes behind a ready startup shell.
+      on W15. Split into focused slices: account creation/settings/order/archive and
+      grants; category/tag management; transaction pagination/filtering/details/editing;
+      transfers/linking/unlinking and integrity operations; profile and identity
+      settings. Use W10/W11 where required. Preserve selected-account permissions,
+      transaction-time invariants, money semantics and atomic operations. Verify each
+      route against W01; do not hide unported routes behind a ready startup shell.
 - [ ] **W17 — Migrate images and attachments.** Depends on W11/W15 and affected
-  W16 flows. Move processing/validation/upload/replacement/removal coordination,
-  retaining required native display/picking surfaces in Window. Verify actual
-  Pica/canvas/bitmap compatibility, transfer ownership, cancellation, resource
-  release, partial attachment failure and profile-avatar flows.
+      W16 flows. Move processing/validation/upload/replacement/removal coordination,
+      retaining required native display/picking surfaces in Window. Verify actual
+      Pica/canvas/bitmap compatibility, transfer ownership, cancellation, resource
+      release, partial attachment failure and profile-avatar flows.
 - [ ] **W18 — Migrate provider setup, discovery, sync and history.** Depends on
-  W11/W12/W15 and needed account flows in W16. Add validated provider-worker
-  request admission and explicit endpoint binding. Preserve one-use setup-token
-  PRF preflight, explicit per-operation passkey verification, encrypted storage,
-  scoped transient secrets, import idempotency, settlement and log retention.
-  Keep the disposable HTTP worker initially. Prove no startup/reconnect/timer
-  transaction fetch or implicit retry; include mixed/partial discovery results.
-  Reuse R4 for finite worker lifecycle only, preserving provider secrets outside
-  inspectable job context and keeping consent/domain decisions in Finance.
+      W11/W12/W15 and needed account flows in W16. Add validated provider-worker
+      request admission and explicit endpoint binding. Preserve one-use setup-token
+      PRF preflight, explicit per-operation passkey verification, encrypted storage,
+      scoped transient secrets, import idempotency, settlement and log retention.
+      Keep the disposable HTTP worker initially. Prove no startup/reconnect/timer
+      transaction fetch or implicit retry; include mixed/partial discovery results.
+      Reuse R4 for finite worker lifecycle only, preserving provider secrets outside
+      inspectable job context and keeping consent/domain decisions in Finance.
 - [ ] **W19 — Migrate backup, restore and workspace administration.** Depends on
-  W11/W12 and relevant file/account flows. Recreate one-use submissions inside
-  worker ownership; move archive read/validation/crypto/planning and persistence
-  there. Preserve legacy fixtures, restore journals, interrupted recovery,
-  workspace creation/rename and identity-merge behavior. Qualify large archives,
-  cancellation, unknown writes and protected file/password cleanup.
+      W11/W12 and relevant file/account flows. Recreate one-use submissions inside
+      worker ownership; move archive read/validation/crypto/planning and persistence
+      there. Preserve legacy fixtures, restore journals, interrupted recovery,
+      workspace creation/rename and identity-merge behavior. Qualify large archives,
+      cancellation, unknown writes and protected file/password cleanup.
 
 Milestone C: every inventory feature has a worker-owned domain path and existing
 UI behavior. These rows can be prepared independently after their prerequisites,
@@ -247,21 +247,21 @@ but remain separate bounded review cycles.
 ## D. Qualify and activate the complete application
 
 - [ ] **W20 — Complete parity, packaging and performance qualification.** Depends
-  on W16–W19. Exercise the actual built application across supported engines,
-  identity/workspace replacement, revocation, multi-tab contention, worker/host
-  failure, offline writes and cold browser restart. Verify nested worker/Wasm
-  precaching, offline deep links and consented PWA updates. Include developer
-  tools and sanitized inspection. Audit Window imports/execution for remaining
-  domain work. Compare startup, large lists, balance updates, import and archive
-  processing to W01, including message/clone cost and responsiveness. Record
-  unsupported paths explicitly; no arbitrary improvement target is invented.
+      on W16–W19. Exercise the actual built application across supported engines,
+      identity/workspace replacement, revocation, multi-tab contention, worker/host
+      failure, offline writes and cold browser restart. Verify nested worker/Wasm
+      precaching, offline deep links and consented PWA updates. Include developer
+      tools and sanitized inspection. Audit Window imports/execution for remaining
+      domain work. Compare startup, large lists, balance updates, import and archive
+      processing to W01, including message/clone cost and responsiveness. Record
+      unsupported paths explicitly; no arbitrary improvement target is invented.
 - [ ] **W21 — Activate, accept and remove obsolete ownership.** Depends on W20
-  and release authorization. Replace the Window SDK provider and old integration
-  paths as one qualified ownership handoff. Preserve origin/configuration and
-  logical IDB identity/data; apply the explicit no-migration scope and verify
-  supported current-version tab coexistence without concurrent SDK owners in a
-  single application tree. Remove superseded paths after acceptance,
-  and update specification/checkpoint/task records to the final implementation.
+      and release authorization. Replace the Window SDK provider and old integration
+      paths as one qualified ownership handoff. Preserve origin/configuration and
+      logical IDB identity/data; apply the explicit no-migration scope and verify
+      supported current-version tab coexistence without concurrent SDK owners in a
+      single application tree. Remove superseded paths after acceptance,
+      and update specification/checkpoint/task records to the final implementation.
 
 ## Rollout constraint
 

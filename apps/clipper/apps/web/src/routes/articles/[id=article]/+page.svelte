@@ -140,7 +140,9 @@
 										{#if reading.message}<StatusMessage {...reading.message} />{/if}
 										<article>
 											<header class="article-header">
-												<Heading level="h1" size="xxl" align="center">{reader.document.title}</Heading>
+												<Heading level="h1" size="xxl" align="center"
+													>{reader.document.title}</Heading
+												>
 											</header>
 											{#if article?.trashed}<ReaderActions
 													trashed={article?.trashed === true}

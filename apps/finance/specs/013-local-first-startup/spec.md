@@ -32,13 +32,13 @@ code, completing W03. W04's shared store is [qualified](worker-account-store-ver
 public export and cold browser-process reopen checks. W05 app adoption and
 W06–W21 remain unstarted. The application is still Window-owned.
 
-| Order | Tasks | Outcome before dependent work |
-| --- | --- | --- |
-| Resource foundations | W01–W06 | Inventory/baseline, production worker import proof, reviewed IndexedDB transaction ownership, shared AccountStore/broker integration, and one qualified persistent SDK/session owner. |
-| Application/UI contracts | W07–W11 | Bounded commands/views, shutdown/replacement, worker-owned queries, form/feedback transport, and private native/file/secret capabilities. |
-| Shared application flows | W12–W15 | Worker-owned session/workspace/access and shell balances, then complete read-only and financial-write vertical slices. |
-| Feature migration | W16–W19 | Ledger/settings/transfers, images/attachments, explicit provider operations, and backup/restore/workspace administration with existing behavior preserved. |
-| Acceptance and activation | W20–W21 | Actual production/browser/offline/crash/performance qualification, full route parity, authorized cutover and removal of superseded owners. |
+| Order                     | Tasks   | Outcome before dependent work                                                                                                                                                         |
+| ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resource foundations      | W01–W06 | Inventory/baseline, production worker import proof, reviewed IndexedDB transaction ownership, shared AccountStore/broker integration, and one qualified persistent SDK/session owner. |
+| Application/UI contracts  | W07–W11 | Bounded commands/views, shutdown/replacement, worker-owned queries, form/feedback transport, and private native/file/secret capabilities.                                             |
+| Shared application flows  | W12–W15 | Worker-owned session/workspace/access and shell balances, then complete read-only and financial-write vertical slices.                                                                |
+| Feature migration         | W16–W19 | Ledger/settings/transfers, images/attachments, explicit provider operations, and backup/restore/workspace administration with existing behavior preserved.                            |
+| Acceptance and activation | W20–W21 | Actual production/browser/offline/crash/performance qualification, full route parity, authorized cutover and removal of superseded owners.                                            |
 
 The [reuse/extraction specification](worker-foundation-reuse.md) is part of this
 handoff. Reuse Local First's existing session, recovery, workspace, operation,

@@ -730,13 +730,13 @@ Reproduction:
 
 Both identities produced the same result:
 
-| Observation | Result |
-| --- | --- |
-| Readable transactions | 3 of 4, as expected |
-| Denied transaction queried by ID | 0 rows, as expected |
-| File metadata | Both probe.bin and denied.bin; denied metadata should be absent |
-| Attachment links | Both links; denied link should be absent |
-| Parts for denied file | 1 row containing [5,6,7,8]; should be absent |
+| Observation                      | Result                                                          |
+| -------------------------------- | --------------------------------------------------------------- |
+| Readable transactions            | 3 of 4, as expected                                             |
+| Denied transaction queried by ID | 0 rows, as expected                                             |
+| File metadata                    | Both probe.bin and denied.bin; denied metadata should be absent |
+| Attachment links                 | Both links; denied link should be absent                        |
+| Parts for denied file            | 1 row containing [5,6,7,8]; should be absent                    |
 
 This is an existing server-policy authorization gap, not merely an overbroad preparation result
 or stale browser replica: the profiles were fresh and the denied transaction itself was correctly
@@ -807,11 +807,11 @@ no CPU/network throttling, disposable in-memory Jazz behind the owned proxy. Thr
 persistent browser profiles each supplied first-visit, warm-reload and cold-offline samples.
 PUBLIC_FAKE_DATA and PUBLIC_DEBUG were false. Numeric samples are in startup-baseline.json.
 
-| Scenario | Observed usable median (range), ms | Document response end median, ms | DOMContentLoaded median, ms | FCP median, ms |
-| --- | --- | --- | --- | --- |
-| First visit, empty workspace Accounts | 3747.6 (3325.4–4233.3) | 8.9 | 57.6 | 64 |
-| Warm saved expense detail reload | 2507.2 (2458.4–2652.6) | 3.1 | 20.7 | 72 |
-| Cold offline saved expense detail | 2780.8 (2231.8–2854.7) | 14.6 | 106.5 | 284 |
+| Scenario                              | Observed usable median (range), ms | Document response end median, ms | DOMContentLoaded median, ms | FCP median, ms |
+| ------------------------------------- | ---------------------------------- | -------------------------------- | --------------------------- | -------------- |
+| First visit, empty workspace Accounts | 3747.6 (3325.4–4233.3)             | 8.9                              | 57.6                        | 64             |
+| Warm saved expense detail reload      | 2507.2 (2458.4–2652.6)             | 3.1                              | 20.7                        | 72             |
+| Cold offline saved expense detail     | 2780.8 (2231.8–2854.7)             | 14.6                             | 106.5                       | 284            |
 
 Method: first visit waits for the canonical workspace Accounts URL and enabled Add Account action.
 Then create one cash account and a saved expense through the existing UI helper; open its detail.
@@ -878,11 +878,11 @@ and an enabled amount input. Unlike the earlier automation-completion timestamps
 inside the page; it still measures DOM state, not first paint or actual input latency. Source
 instrumentation was not required. Results are summarized in startup-cpu-profile.json.
 
-| Scenario | Form DOM enabled, ms | Automation capture, ms | Sampled Wasm self time, ms | Sampled idle, ms |
-| --- | --- | --- | --- | --- |
-| First visit, empty Accounts | Not applicable | 2770.0 | 976.5 | 1169.1 |
-| Warm saved detail | 2161.2 | 2648.0 | 947.4 | 1092.4 |
-| Cold offline saved detail | 2188.9 | 2642.1 | 936.7 | 1093.7 |
+| Scenario                    | Form DOM enabled, ms | Automation capture, ms | Sampled Wasm self time, ms | Sampled idle, ms |
+| --------------------------- | -------------------- | ---------------------- | -------------------------- | ---------------- |
+| First visit, empty Accounts | Not applicable       | 2770.0                 | 976.5                      | 1169.1           |
+| Warm saved detail           | 2161.2               | 2648.0                 | 947.4                      | 1092.4           |
+| Cold offline saved detail   | 2188.9               | 2642.1                 | 936.7                      | 1093.7           |
 
 The earlier automated readings overstate DOM availability by about 450–490 ms in these returning
 samples. They remain upper bounds; do not combine their medians with this single direct observation
@@ -944,7 +944,6 @@ offline-role, cross-browser and extra cold-runtime runs, with the stated Firefox
 cache limitation. The failing broad-preparation diagnostic remains explicitly unresolved rather
 than included in the passing workflow count. Temporary adapters/marks/configs and owned test servers
 were cleaned up. Changes are uncommitted; no deployment occurred.
-
 
 ### T011 controlled cold-query follow-up after T027 (transport control superseded)
 

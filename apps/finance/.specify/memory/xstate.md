@@ -13,7 +13,6 @@ transition, error, transaction, test and shutdown rules now have one shared owne
 
 ## Current v6 migration contract
 
-
 The connected Finance graph targets unpatched `xstate@6.0.0-beta.1` and
 `@xstate/svelte@6.0.0-beta.0`. Historical v5 examples below describe ownership,
 not current authoring syntax. Read the exact installed package's docs and stability
@@ -46,7 +45,6 @@ qualification and the maintained application-worker handoff status.
 
 ## Compose small actors with clear owners
 
-
 Put machine definitions in `src/lib/machines/`. Integration components bind subscriptions and
 platform dependencies, own or attach actors, forward observations, and compose pure presentation.
 Do not replace a large component script with a large controller file.
@@ -71,7 +69,6 @@ unknown remote outcome. Preserve operation identity and recovery facts across in
 do not replay an unknown write or block unrelated local work while seeking remote resolution.
 
 ## State-first UI and form ownership
-
 
 Status-to-message mappings belong with the owning machine, including connection
 status, historical outcomes, import settlement and failure reasons. Publish typed
@@ -108,7 +105,6 @@ explicit approval required by localization.md.
 
 ## Supervise observers and stale notifications
 
-
 Session observers can fail while subscribing or later while reading an SDK snapshot. Handle
 acquisition with `invoke.onError`; bridge later SDK callback failures with a typed event. Exit the
 observer, unsubscribe, and ask the workspace to finish bank cleanup before exposing recovery.
@@ -128,7 +124,6 @@ Fallible integration callbacks such as selecting an organization belong in an in
 error transition, rather than an entry action that can fail the entire workspace.
 
 ## Inspect without changing ownership
-
 
 The completed [orchestration ownership map](../../specs/008-actor-orchestration/architecture.md)
 records the application, bank and independent form roots. Keep diagnostic instrumentation at existing
@@ -151,7 +146,6 @@ does not need syncSnapshot merely to preserve its child's lifetime or render a s
 
 ## Late workspace catalogs after recovery
 
-
 A recovered identity can finish profile initialization before its workspace catalog arrives. A first
 empty local catalog is not a final absence result. If unscoped entry automatically opens the chooser
 for an empty catalog, preserve that entry's route intent so a later sole workspace can canonicalize
@@ -162,7 +156,6 @@ and errors. Test arrival both during and after navigation; do not hide the race 
 force ordinary local navigation to wait for remote freshness.
 
 ## Shared foundation adoption
-
 
 Finance's generic scoped form/readiness/submission/write/controller lifecycle, profile workflow,
 workspace initialization/startup, explicit-creation ownership/journal/recovery and restoration

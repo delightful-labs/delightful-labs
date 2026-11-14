@@ -308,6 +308,7 @@ proofs. Run browser checks with disposable storage after approval; production re
 identified the failure but do not prove the patch correct.
 
 Review checklist:
+
 - [x] Prepare the credential-admission patch and automatic selection machine.
 - [x] Preserve explicit scopes and existing authorization checks.
 - [x] Review implementation before adding/running tests (user approved).
