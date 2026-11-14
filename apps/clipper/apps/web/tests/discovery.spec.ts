@@ -668,3 +668,28 @@ test('DUI shares Unicode comparison for duplicate feedback and suggestion filter
 	await dialog.getByRole('combobox').press('Enter')
 	await expect(dialog.getByRole('button', { name: 'Remove Straße', exact: true })).toBeVisible()
 })
+
+test('native pagination focuses the first newly revealed article and retains search state', async ({
+	page
+}) => {
+	await page.goto('/')
+	await expectLibrarySynced(page)
+	await page.evaluate(async () => {
+		const path = '/tests/article-driver.ts'
+		const driver = await import(/* @vite-ignore */ path)
+		for (let index = 0; index < 51; index++)
+			await driver.supplied('https://example.com/pagination/' + index)
+	})
+	await openLibrarySearch(page)
+	await page.getByRole('searchbox', { name: 'Search articles', exact: true }).fill('pagination')
+	await closeLibraryPopovers(page)
+	const rows = page.locator('[data-article-id]')
+	await expect(rows).toHaveCount(50)
+	await page.getByRole('button', { name: 'Show articles', exact: true }).click()
+	await expect(rows).toHaveCount(51)
+	await expect(rows.nth(50).getByRole('heading').getByRole('link')).toBeFocused()
+	await openLibrarySearch(page)
+	await expect(page.getByRole('searchbox', { name: 'Search articles', exact: true })).toHaveValue(
+		'pagination'
+	)
+})

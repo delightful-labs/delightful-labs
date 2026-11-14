@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import { createActor, SimulatedClock, toPromise, waitFor } from 'xstate'
+import { createActor, SimulatedClock, waitFor } from 'xstate'
 import { createShellRegistrationMachine, selectShellView } from './registration.js'
 import type { ShellEvent, ShellRegistration } from './registration.js'
 import { observeShell } from '../../offline/browser.js'
@@ -37,11 +37,9 @@ it('keeps session admission closed until offline preparation settles, then retai
 	expect(selectShellView(actor.getSnapshot()).message?.text).toBe(
 		'An update is ready. Close all Clipper tabs and reopen to apply it safely.'
 	)
-	actor.send({ type: 'SHUTDOWN' })
-	await toPromise(actor)
+	actor.stop()
 	expect(dispose).toHaveBeenCalledOnce()
-	expect(actor.getSnapshot().context.registration).toBeUndefined()
-	expect(selectShellView(actor.getSnapshot()).message).toBeUndefined()
+	expect(actor.getSnapshot().status).toBe('stopped')
 })
 it('offers the normal DLF session path after unsupported or failed registration', async () => {
 	for (const register of [
@@ -55,7 +53,7 @@ it('offers the normal DLF session path after unsupported or failed registration'
 		).start()
 		await waitFor(actor, (s) => selectShellView(s).admitted)
 		expect(['unsupported', 'failed']).toContain(selectShellView(actor.getSnapshot()).status)
-		actor.send({ type: 'SHUTDOWN' })
+		actor.stop()
 	}
 })
 it('detects a redundant first installer even when its registration slot was cleared', () => {
@@ -93,7 +91,7 @@ it('does not block DLF acquisition forever when first installation stalls', asyn
 	expect(dispose).toHaveBeenCalledOnce()
 	expect(selectShellView(actor.getSnapshot()).message?.variant).toBe('error')
 	expect(selectShellView(actor.getSnapshot()).canRetry).toBe(true)
-	actor.send({ type: 'SHUTDOWN' })
+	actor.stop()
 })
 
 it('gives each retry a fresh deadline without revoking session admission', async () => {
@@ -115,7 +113,7 @@ it('gives each retry a fresh deadline without revoking session admission', async
 	clock.increment(45000)
 	expect(selectShellView(actor.getSnapshot()).status).toBe('failed')
 	expect(register).toHaveBeenCalledTimes(3)
-	actor.send({ type: 'SHUTDOWN' })
+	actor.stop()
 })
 
 it('retains admission and cancels the attempt deadline after initial readiness', async () => {
@@ -141,6 +139,56 @@ it('retains admission and cancels the attempt deadline after initial readiness',
 	expect(selectShellView(actor.getSnapshot()).status).toBe('preparing')
 	expect(selectShellView(actor.getSnapshot()).admitted).toBe(true)
 	expect(dispose).not.toHaveBeenCalled()
-	actor.send({ type: 'SHUTDOWN' })
+	actor.stop()
 	expect(dispose).toHaveBeenCalledOnce()
+})
+
+it('ignores a registration that resolves after its component owner stops', async () => {
+	const pending = Promise.withResolvers<ShellRegistration>()
+	const observe = vi.fn(() => () => {})
+	const actor = createActor(
+		createShellRegistrationMachine({ register: () => pending.promise, observe })
+	).start()
+	actor.stop()
+	pending.resolve(registration())
+	await pending.promise
+	await Promise.resolve()
+	expect(actor.getSnapshot().status).toBe('stopped')
+	expect(observe).not.toHaveBeenCalled()
+})
+
+it('disposes real native registration listeners on stop and rejects later reports', async () => {
+	const worker = Object.assign(new EventTarget(), { state: 'activated' })
+	const native = registration()
+	native.active = worker
+	const removed = vi.spyOn(native, 'removeEventListener')
+	const workerRemoved = vi.spyOn(worker, 'removeEventListener')
+	const clock = new SimulatedClock()
+	const actor = createActor(
+		createShellRegistrationMachine({ register: async () => native, observe: observeShell }),
+		{ clock }
+	).start()
+	await waitFor(actor, (s) => selectShellView(s).status === 'ready')
+	actor.stop()
+	const stopped = actor.getSnapshot()
+	expect(removed).toHaveBeenCalledWith('updatefound', expect.any(Function))
+	expect(workerRemoved).toHaveBeenCalledWith('statechange', expect.any(Function))
+	worker.state = 'redundant'
+	worker.dispatchEvent(new Event('statechange'))
+	native.dispatchEvent(new Event('updatefound'))
+	clock.increment(90000)
+	expect(actor.getSnapshot()).toBe(stopped)
+})
+
+it('ignores registration rejection after stop without admitting another session', async () => {
+	const pending = Promise.withResolvers<ShellRegistration>()
+	const actor = createActor(
+		createShellRegistrationMachine({ register: () => pending.promise, observe: () => () => {} })
+	).start()
+	actor.stop()
+	pending.reject(new Error('Late browser registration failure'))
+	await pending.promise.catch(() => {})
+	await Promise.resolve()
+	expect(actor.getSnapshot().status).toBe('stopped')
+	expect(selectShellView(actor.getSnapshot()).admitted).toBe(false)
 })

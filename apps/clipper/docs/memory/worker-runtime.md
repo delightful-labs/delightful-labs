@@ -120,3 +120,19 @@ disposal. Settings has no window-close callback. Durable trusted-page confirmati
 and the existing application/session/store/broker drain remain worker-owned; a
 shutdown request, timeout or failed worker is not a clean-close receipt. See the
 [repair record](../../../../specs/002-monorepo-agent-guidance/extension-signin-repair.md).
+
+## Native Svelte observation and component cleanup
+
+LibraryClient is already a Svelte store: subscribe emits its current render value
+synchronously and returns an unsubscribe object. Read it with $client/$derived;
+UI unsubscription does not close the shared application. Use the checked worker
+context provider/getter and keep commands bound to the admitted client/route.
+Reader DOM leases retain their attaching owner through final measurement.
+
+The component-owned offline-shell registration observer is qualified for ordinary
+actor.stop() on unmount. Its callback removes native listeners and XState ignores
+late registration results; the browser owns registration beyond the observing
+component. This boundary has no asynchronous settlement protocol. Do not apply
+that stop behavior to the shared application worker, SDK session or issued writes.
+The full decision and native qualification map are in
+[the cleanup review](../../specs/001-jazz-clipper/svelte-xstate-completion.md).

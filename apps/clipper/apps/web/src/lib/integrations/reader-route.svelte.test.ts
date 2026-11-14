@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { flushSync, mount, unmount } from 'svelte'
+import { flushSync, mount, tick, unmount } from 'svelte'
 import ReaderHost from './fixtures/ReaderHost.svelte'
 import type { LibraryClient } from '../runtime/worker/client.js'
 import type { LibraryRender } from '../runtime/worker/views.js'
@@ -159,7 +159,7 @@ it('opens its route, renders worker feedback and attaches the available content 
 	const f = fixture()
 	const mounted = attach(f)
 	expect(f.send).toHaveBeenCalledExactlyOnceWith({ type: 'OPEN', id: f.id })
-	expect(f.subscriptions).toBe(1)
+	expect(f.subscriptions).toBe(2)
 	f.publish({
 		...f.view,
 		readerId: f.id,
@@ -223,13 +223,14 @@ it('preserves saved DOM, selection and its surface lease during progress and pre
 			...f.view.view,
 			readerExperience: {
 				...f.view.view.readerExperience,
-				preferences: { ...f.view.view.readerExperience.preferences, size: 24 }
+				preferences: { ...f.view.view.readerExperience.preferences, size: 24, theme: 'dark' }
 			}
 		}
 	})
 	expect(mounted.target.querySelector('article p')).toBe(paragraph)
 	expect(window.getSelection()?.toString()).toBe('Body')
 	expect(mounted.target.textContent).toContain('75%')
+	expect(document.documentElement.getAttribute('data-dui-theme')).toBe('dark')
 	expect(f.leases).toHaveLength(1)
 	expect(f.order[0]).toBe('OPEN')
 	expect(f.leases[0]?.release).not.toHaveBeenCalled()
@@ -302,12 +303,22 @@ it('rebinds a reused route across accounts and an unavailable client without det
 	const a = fixture()
 	a.publish({ ...a.view, readerId: a.id, reader: content('Account A') })
 	const route = attach(a)
+	const oldToggle = route.target.querySelector('button[aria-label="Reading controls"]')
+	if (!(oldToggle instanceof HTMLButtonElement)) throw new Error('Missing old settings toggle')
+	oldToggle.click()
+	flushSync()
+	expect(oldToggle.getAttribute('aria-expanded')).toBe('true')
 	const b = fixture()
 	b.publish({ ...b.view, readerId: a.id, reader: content('Account B') })
 	route.navigate(b.client, a.id)
 	expect(route.target.querySelector('h1')?.textContent).toBe('Account B')
+	expect(
+		route.target
+			.querySelector('button[aria-label="Reading controls"]')
+			?.getAttribute('aria-expanded')
+	).toBe('false')
 	expect(a.subscriptions).toBe(0)
-	expect(b.subscriptions).toBe(1)
+	expect(b.subscriptions).toBe(2)
 	expect(a.leases[0]?.release).toHaveBeenCalledOnce()
 	expect(a.send).toHaveBeenCalledWith({ type: 'CLOSE_READER' })
 	expect(b.send).toHaveBeenCalledExactlyOnceWith({ type: 'OPEN', id: a.id })
@@ -315,6 +326,7 @@ it('rebinds a reused route across accounts and an unavailable client without det
 	a.publish({ ...a.view, reader: content('Late A content') })
 	expect(route.target.querySelector('h1')?.textContent).toBe('Account B')
 	route.navigate(undefined, a.id)
+	expect(document.documentElement.hasAttribute('data-dui-theme')).toBe(false)
 	expect(route.target.querySelector('article')).toBeNull()
 	expect(b.subscriptions).toBe(0)
 	expect(b.leases[0]?.release).toHaveBeenCalledOnce()
@@ -351,5 +363,37 @@ it('closes and opens route IDs on the same client before admitting the next surf
 	})
 	expect(route.target.querySelector('h1')?.textContent).toBe('Second route')
 	expect(f.leases).toHaveLength(2)
-	expect(f.subscriptions).toBe(1)
+	expect(f.subscriptions).toBe(2)
+})
+
+it('keeps settings open across viewport changes and binds dismissal to the current trigger', async () => {
+	const media = Object.assign(new EventTarget(), { matches: false })
+	vi.stubGlobal('matchMedia', () => media)
+	const f = fixture()
+	f.publish({ ...f.view, readerId: f.id, reader: content() })
+	const route = attach(f)
+	const toggle = route.target.querySelector('button[aria-label="Reading controls"]')
+	if (!(toggle instanceof HTMLButtonElement)) throw new Error('Missing settings toggle')
+	const id = toggle.getAttribute('aria-controls')
+	const panel = id ? document.getElementById(id) : undefined
+	const body = route.target.querySelector('article')?.parentElement
+	if (!panel || !body) throw new Error('Missing reader panel')
+	toggle.click()
+	flushSync()
+	expect(toggle.getAttribute('aria-expanded')).toBe('true')
+	expect(Reflect.get(body, 'inert')).toBe(false)
+	media.matches = true
+	media.dispatchEvent(new Event('change'))
+	flushSync()
+	expect(toggle.getAttribute('aria-expanded')).toBe('true')
+	expect(Reflect.get(body, 'inert')).toBe(true)
+	const font = panel.querySelector('select')
+	if (!font) throw new Error('Missing settings input')
+	font.focus()
+	font.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+	await tick()
+	flushSync()
+	expect(toggle.getAttribute('aria-expanded')).toBe('false')
+	expect(Reflect.get(body, 'inert')).toBe(false)
+	expect(document.activeElement).toBe(toggle)
 })
