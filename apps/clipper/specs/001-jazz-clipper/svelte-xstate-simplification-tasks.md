@@ -142,6 +142,12 @@ boundary is necessary is a valid result; this phase has no removal quota.
       visible and avoid a controller or prop object that conceals the same work.
 - [ ] E3. Replace duplicate media-query subscription plumbing with `MediaQuery`;
       preserve breakpoint-dependent opening behavior and hydration assumptions.
+      AccountDrawer now uses Svelte MediaQuery and one effect for viewport defaults
+      after the DUI reference binds. Untracked drawer reads preserve manual
+      closure. Five mounted drawer cases and the full 27-case component suite
+      pass; native resize/focus/inertness coverage is added to the account suite.
+      ReaderSettingsDrawer remains a separate component/review cycle; E3 stays
+      open until both implementations and native coverage are qualified.
 - [ ] E4. Evaluate attachments for saved-content/surface lifetime. Keep unrelated
       image/progress updates from replacing article DOM; preserve syntax/image
       cleanup and final reader-position reporting.

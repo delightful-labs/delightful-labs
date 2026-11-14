@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte'
+	import { untrack } from 'svelte'
+	import { MediaQuery } from 'svelte/reactivity'
 	import { page } from '$app/state'
 	import {
 		Button,
@@ -20,7 +21,8 @@
 	const settings = getAccountSettings()
 	let drawer: ReturnType<typeof Drawer> | undefined = $state()
 	let trigger: ReturnType<typeof Button> | undefined = $state()
-	let mobile = $state(false)
+	const viewport = new MediaQuery('(max-width: 48rem)', false)
+	const mobile = $derived(viewport.current)
 	const drawerOpen = $derived(drawer?.isOpen() ?? false)
 	const modal = $derived(mobile && drawerOpen && !focused)
 
@@ -32,16 +34,14 @@
 		return modal
 	}
 
-	onMount(() => {
-		const viewport = window.matchMedia('(max-width: 48rem)')
-		const resize = () => {
-			mobile = viewport.matches
-			if (mobile) drawer?.close()
-			else if (!drawer?.isOpen()) drawer?.toggle()
-		}
-		resize()
-		viewport.addEventListener('change', resize)
-		return () => viewport.removeEventListener('change', resize)
+	$effect(() => {
+		const compact = mobile
+		const panel = drawer
+		// Apply viewport defaults after binding, without observing manual toggles.
+		untrack(() => {
+			if (compact) panel?.close()
+			else if (!panel?.isOpen()) panel?.toggle()
+		})
 	})
 </script>
 

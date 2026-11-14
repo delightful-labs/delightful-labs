@@ -883,6 +883,32 @@ test('moves account controls to their own page with shared sidebar links and ret
 	await expect(page.getByRole('button', { name: 'Add link', exact: true })).toBeVisible()
 })
 
+test('account navigation follows viewport changes without overriding manual desktop closure', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1280, height: 844 })
+	await page.goto('/')
+	const library = page.getByRole('region', { name: 'Saved articles', includeHidden: true })
+	await expect(library).toBeVisible()
+	const drawer = page.locator('aside')
+	await expect(drawer).toHaveAttribute('aria-hidden', 'false')
+	await page.getByRole('button', { name: 'Close account', exact: true }).click()
+	await expect(drawer).toHaveAttribute('aria-hidden', 'true')
+	await page.setViewportSize({ width: 1100, height: 844 })
+	await expect(drawer).toHaveAttribute('aria-hidden', 'true')
+	await page.setViewportSize({ width: 390, height: 844 })
+	await expect(drawer).toHaveAttribute('aria-hidden', 'true')
+	await page.getByRole('button', { name: 'Show account', exact: true }).click()
+	await expect(drawer).toHaveAttribute('aria-hidden', 'false')
+	await expect(library.locator('..')).toHaveAttribute('inert', '')
+	await page.setViewportSize({ width: 1280, height: 844 })
+	await expect(library.locator('..')).not.toHaveAttribute('inert', '')
+	await expect(drawer).toHaveAttribute('aria-hidden', 'false')
+	await page.setViewportSize({ width: 390, height: 844 })
+	await expect(drawer).toHaveAttribute('aria-hidden', 'true')
+	await expect(page.getByRole('button', { name: 'Show account', exact: true })).toBeFocused()
+})
+
 test('mobile account navigation closes the drawer and restores keyboard focus on Escape', async ({
 	page
 }) => {

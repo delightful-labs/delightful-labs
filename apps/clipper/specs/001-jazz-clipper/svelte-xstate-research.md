@@ -559,3 +559,39 @@ type checks pass with zero Svelte errors/warnings. Touched Svelte formatting,
 lint and whitespace checks pass. No new behavior tests are added for removal of
 unreachable code. Existing CI qualifications cover the active worker application;
 local validation used Node 25.2.1, while CI uses pinned Node 24.22.2.
+
+
+## Native account viewport observation (E3, first component)
+
+Merged PR #30 passed every check, including the [Clipper native suites](https://github.com/delightful-labs/delightful-labs/actions/runs/43549364658).
+The next bounded change replaces AccountDrawer's manual matchMedia listener,
+copied mobile flag and onMount cleanup with `MediaQuery` from `svelte/reactivity`.
+Reviewed the pinned Svelte 5.57.2 implementation in `src/reactivity/media-query.js`,
+`reactive-value.js`, `create-subscriber.js`, server export and public declarations,
+plus the [official MediaQuery documentation](https://svelte.dev/docs/svelte/svelte-reactivity#MediaQuery).
+
+The component owns one query for its rendered lifetime. Reading current is
+reactive, and Svelte releases its native listener when observers disappear.
+The query observes the existing 48rem breakpoint; CSS still owns sizing, while
+JavaScript needs the same observation for opening defaults, dismissal and inertness.
+The query's false server fallback matches the old initial flag. Clipper currently
+sets `ssr = false` at its root layout; this does not qualify a future SSR change.
+
+One effect observes only the current breakpoint and bound DUI Drawer reference.
+After binding, mobile closes the panel and desktop opens it if closed. Drawer
+reads/commands run inside untrack, so manual close does not retrigger the default
+and reopen the panel. The existing native escape/focus, modal projection and
+navigation handlers retain their responsibilities. No domain machine, worker
+lifetime, SDK close, UI copy, dependency or DUI API changes are involved.
+
+The five mounted drawer tests preserve initial desktop/mobile defaults, Escape
+focus return and inert projection; new cases cover reentering desktop, manual
+closure, viewport listener release and a fresh remount. All 27 mounted component
+tests pass. A native account-suite case covers actual viewport changes, manual
+desktop closure, mobile inertness and focus recovery on breakpoint closure.
+Local listeners/Chromium were previously denied, so native coverage runs on CI.
+ReaderSettingsDrawer keeps its existing observer for a separate review cycle.
+
+Full Clipper coordinator, web, service-worker and extension type checks pass with
+zero Svelte errors/warnings. Touched source formatting, lint and whitespace checks
+pass. These isolated local checks use Node 25.2.1 rather than pinned CI Node 24.22.2.

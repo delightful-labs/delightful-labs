@@ -10,15 +10,21 @@ afterEach(async () => {
 
 function fixture(mobile: boolean) {
 	const media = Object.assign(new EventTarget(), { matches: mobile })
+	const added = vi.spyOn(media, 'addEventListener')
+	const removed = vi.spyOn(media, 'removeEventListener')
 	vi.stubGlobal('matchMedia', () => media)
 	const target = document.createElement('div')
 	document.body.append(target)
 	const component = mount(AccountDrawerHost, { target })
 	flushSync()
-	cleanups.push(async () => {
+	let detached = false
+	const detach = async () => {
+		if (detached) return
+		detached = true
 		await unmount(component)
 		target.remove()
-	})
+	}
+	cleanups.push(detach)
 	const panel = target.querySelector('aside')
 	const trigger = target.querySelector('button[aria-controls]')
 	const content = target.querySelector('section')
@@ -29,6 +35,9 @@ function fixture(mobile: boolean) {
 		panel,
 		trigger,
 		content,
+		added,
+		removed,
+		detach,
 		resize: (mobile: boolean) => {
 			media.matches = mobile
 			media.dispatchEvent(new Event('change'))
@@ -75,4 +84,36 @@ it('changes its default opening with the viewport and keeps a manually opened mo
 	f.resize(false)
 	expect(f.panel.getAttribute('aria-hidden')).toBe('false')
 	expect(Reflect.get(f.content, 'inert')).toBe(false)
+})
+
+it('opens closed mobile navigation when entering desktop and preserves manual desktop closure', () => {
+	const f = fixture(true)
+	f.resize(false)
+	expect(f.panel.getAttribute('aria-hidden')).toBe('false')
+	f.trigger.click()
+	flushSync()
+	expect(f.panel.getAttribute('aria-hidden')).toBe('true')
+	// A notification that stays in the same breakpoint must not override the user.
+	f.resize(false)
+	expect(f.panel.getAttribute('aria-hidden')).toBe('true')
+	f.resize(true)
+	f.resize(false)
+	expect(f.panel.getAttribute('aria-hidden')).toBe('false')
+})
+
+it('releases its viewport listener on unmount and starts a fresh drawer at its current viewport', async () => {
+	const first = fixture(false)
+	const listener = first.added.mock.calls.find(([type]) => type === 'change')?.[1]
+	if (!listener) throw new Error('Missing viewport listener')
+	await first.detach()
+	await tick()
+	expect(
+		first.removed.mock.calls.some(([type, callback]) => type === 'change' && callback === listener)
+	).toBe(true)
+	first.resize(true)
+	expect(first.target.isConnected).toBe(false)
+	const second = fixture(true)
+	expect(second.panel.getAttribute('aria-hidden')).toBe('true')
+	second.resize(false)
+	expect(second.panel.getAttribute('aria-hidden')).toBe('false')
 })
