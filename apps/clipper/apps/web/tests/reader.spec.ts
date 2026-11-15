@@ -376,7 +376,7 @@ test('updates progress for a short article when a reading gesture cannot scroll 
 	await expect(page.getByRole('article')).toBeVisible()
 	const main = page.getByRole('main')
 	expect(await main.evaluate((node) => node.scrollHeight <= node.clientHeight)).toBe(true)
-	await main.hover({ position: { x: 2, y: 100 } })
+	await page.getByRole('article').getByRole('paragraph').filter({ hasText: 'Paragraph 1.' }).hover()
 	await page.mouse.wheel(0, 200)
 	await expect.poll(async () => Math.max(0, ...Object.values((await state(page)).progress))).toBe(1)
 	await expect(page.getByText('100% read', { exact: true })).toBeVisible()

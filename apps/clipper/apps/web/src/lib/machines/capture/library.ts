@@ -1,3 +1,4 @@
+import { annotationsMachine, selectAnnotations } from '../../annotations/machine.js'
 import { documentReadingProgress } from '../../reader/schema.js'
 import type { EventPayload } from '../events.js'
 import { types, createCallbackLogic, setup, matchesState, type SnapshotFrom } from 'xstate'
@@ -113,6 +114,7 @@ function organizationStatuses(context: Context, documentId: string) {
 		.map(([operationId]) => context.sync[operationId])
 }
 const actors = {
+	annotations: annotationsMachine,
 	readerExperience: readerExperienceMachine,
 	images: imageQueueMachine,
 	search: createSearchMachine(),
@@ -155,6 +157,7 @@ export const libraryMachine = setup({
 	schemas: {
 		context: types<Context>(),
 		events: {
+			ANNOTATION: types<EventPayload<Event, 'ANNOTATION'>>(),
 			WRITE_DONE: types<{ actorId: string; output: ArticleSaveResult | FakeDataOutcome }>(),
 			WRITE_ERROR: types<{ actorId: string; error: unknown }>(),
 			RETRY_IMAGE: types<EventPayload<Event, 'RETRY_IMAGE'>>(),
@@ -189,6 +192,7 @@ export const libraryMachine = setup({
 		meta: types<Meta>(),
 		tags: types<string>(),
 		children: {
+			annotations: types<import('xstate').ActorRefFrom<typeof annotationsMachine>>(),
 			readerExperience: types<import('xstate').ActorRefFrom<(typeof actors)['readerExperience']>>(),
 			images: types<import('xstate').ActorRefFrom<(typeof actors)['images']>>(),
 			search: types<import('xstate').ActorRefFrom<(typeof actors)['search']>>(),
@@ -300,6 +304,7 @@ export const libraryMachine = setup({
 				if (
 					!(
 						matchesState({ running: { control: 'closing' } }, args.value) &&
+						matchesState({ running: { annotationLifecycle: 'closed' } }, args.value) &&
 						matchesState({ running: { fakeDataLifecycle: 'closed' } }, args.value) &&
 						(matchesState({ running: { searchLifecycle: 'closed' } }, args.value) ||
 							matchesState({ running: { searchLifecycle: 'unsupported' } }, args.value)) &&
@@ -317,6 +322,24 @@ export const libraryMachine = setup({
 				return { target: 'closed' }
 			},
 			on: {
+				ANNOTATION: (args, enq) => {
+					if (
+						!matchesState(
+							{ running: { control: 'active', annotationLifecycle: 'active' } },
+							args.value
+						) ||
+						!args.context.capability?.isCurrent()
+					)
+						return
+					const command = args.event.command
+					if (
+						command.type !== 'CLOSE' &&
+						(args.context.reader?.kind !== 'available' ||
+							args.context.reader.document.id !== command.documentId)
+					)
+						return
+					enq.sendTo('annotations', command)
+				},
 				READER_EVENT: (args, enq) => {
 					const { context, event } = args
 					if (
@@ -830,6 +853,28 @@ export const libraryMachine = setup({
 						}
 					}
 				},
+				annotationLifecycle: {
+					initial: 'active',
+					invoke: {
+						id: 'annotations',
+						src: 'annotations',
+						input: ({ context }) => ({ capability: context.capability?.annotations }),
+						onSnapshot: {},
+						onDone: { target: '.closed' },
+						onError: { target: '.failed' }
+					},
+					states: {
+						active: {
+							on: {
+								SHUTDOWN: (_args, enq) => {
+									enq.sendTo('annotations', { type: 'SHUTDOWN' })
+								}
+							}
+						},
+						closed: {},
+						failed: {}
+					}
+				},
 				searchLifecycle: {
 					initial: 'admitting',
 					invoke: {
@@ -1326,6 +1371,9 @@ export function selectLibraryReaderView(snapshot: LibrarySnapshot | undefined) {
 	const visible = visibleLibrary(snapshot)
 	return {
 		readerExperience: selectLibraryReaderExperience(snapshot),
+		annotations: selectAnnotations(
+			visible ? snapshot?.children.annotations?.getSnapshot() : undefined
+		),
 		imageViews: visible ? (snapshot?.children.images?.getSnapshot().context.views ?? {}) : {},
 		readerMessage: !snapshot
 			? ({ text: t('reader.loading'), variant: 'info' } satisfies WorkflowMessage)
@@ -1406,6 +1454,9 @@ export function selectLibraryView(
 	return {
 		imageViews: visible ? (snapshot?.children.images?.getSnapshot().context.views ?? {}) : {},
 		readerExperience,
+		annotations: selectAnnotations(
+			visible ? snapshot?.children.annotations?.getSnapshot() : undefined
+		),
 		rows,
 		search,
 		restoreCaptureId: captured?.trashed ? captured.id : undefined,

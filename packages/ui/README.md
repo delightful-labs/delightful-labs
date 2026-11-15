@@ -331,6 +331,8 @@ Options and groups use native markup. Native attributes pass through; `bind:valu
 <Textarea label="Notes" name="notes" defaultValue="First line" rows={4} />
 ```
 
+Optional `bind:element` exposes the native `HTMLTextAreaElement` for editor adapters that own selection and cursor handling.
+
 Native multiline editing, attributes, and callbacks pass through. `bind:value` is optional; `defaultValue` supplies initial/reset text. Styling shares the field/input tokens, with vertical resizing by default through `--dui-textarea-resize`.
 
 ## Checkbox

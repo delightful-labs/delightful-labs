@@ -1,3 +1,4 @@
+import { createNoteDraftStore } from '../../notes/drafts.js'
 import { isOnline } from '../../offline/connectivity.js'
 import { createImageCapability } from '../../images/browser.js'
 import { openSearchWorker } from '../../search/browser.js'
@@ -36,6 +37,14 @@ export function createLibraryCapability(
 	})
 	return {
 		reader: records.reader.capability,
+		annotations: {
+			...records.annotations,
+			recovery: {
+				store: createNoteDraftStore(cacheNamespace, _libraryId),
+				libraryId: _libraryId,
+				writerId: crypto.randomUUID()
+			}
+		},
 		images: createImageCapability(records.images.capability, request),
 		spawnFakeData: (spawn) =>
 			spawn(records.fakeData(import.meta.env.PUBLIC_FAKE_DATA === 'true'), { input: undefined }),

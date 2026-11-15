@@ -1,3 +1,4 @@
+import { createAnnotationRecords } from './annotations.js'
 import { newDocumentValues } from './document-values.js'
 import { captureDocumentRecord, documentRecord } from './document-record.js'
 import { createImageRecords } from './images.js'
@@ -28,7 +29,15 @@ import type { LibraryArticle } from '../../contracts/articles.js'
 /** Reads stay bound to this DB/library; owning actors gate admission and late-result consumption.
  * Native write admission and commit scope protection live in transactionLifecycle. */
 export function createLibraryRecords(
-	db: Pick<Db, 'one' | 'all' | 'beginTransaction' | 'beginSerializableTransaction' | 'subscribe'>,
+	db: Pick<
+		Db,
+		| 'one'
+		| 'all'
+		| 'beginTransaction'
+		| 'beginSerializableTransaction'
+		| 'subscribe'
+		| 'textAnchors'
+	>,
 	libraryId: string,
 	isCurrent: () => boolean,
 	observeConnection?: ReadCapabilities['observeConnection']
@@ -138,6 +147,7 @@ export function createLibraryRecords(
 	return {
 		...records,
 		reader: createReaderRecords(db, libraryId, isCurrent),
+		annotations: createAnnotationRecords(db, libraryId, isCurrent),
 		notes: createNoteRecords(db, libraryId, isCurrent),
 		images: createImageRecords(db, libraryId, isCurrent),
 		fakeData: createFakeDataRecords(db, libraryId, isCurrent),

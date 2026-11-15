@@ -650,3 +650,109 @@ test('first-install failure admits the DLF account path and retry prepares offli
 		await rm(profile, { recursive: true, force: true })
 	}
 })
+
+test('native annotations survive two complete offline browser restarts and reconcile to another profile', async ({
+	browser
+}) => {
+	const profile = await mkdtemp(join(tmpdir(), 'clipper-annotation-offline-'))
+	let context = await chromium.launchPersistentContext(profile, { headless: true })
+	const independent = await browser.newContext()
+	try {
+		const page = await context.newPage()
+		await fixtureArticle(page)
+		await page.goto('http://127.0.0.1:5190')
+		await ready(page)
+		await expectLibrarySynced(page)
+		const phrase = await readRecoveryPhrase(page)
+		await openAddLink(page)
+		await page.getByLabel('Article URL', { exact: true }).fill('https://example.com/offline')
+		await page
+			.getByRole('dialog', { name: 'Add link', exact: true })
+			.getByRole('button', { name: 'Add link', exact: true })
+			.click()
+		await page.getByRole('link', { name: 'Completely offline article', exact: true }).click()
+		const paragraph = page
+			.getByRole('article')
+			.getByRole('paragraph')
+			.filter({ hasText: 'Exact offline shell text café' })
+			.first()
+		const quote = await paragraph.evaluate((node) => {
+			const text = node.firstChild
+			if (!(text instanceof Text)) throw new Error('Expected native text node')
+			const range = document.createRange()
+			range.selectNodeContents(text)
+			const selection = window.getSelection()
+			if (!selection) throw new Error('Selection unavailable')
+			selection.removeAllRanges()
+			selection.addRange(range)
+			return range.toString()
+		})
+		await page.getByRole('button', { name: 'Add highlight', exact: true }).click()
+		await expect(page.getByRole('blockquote')).toHaveText(quote)
+		const group = page.getByRole('group', { name: 'highlight', exact: true })
+		await group.getByRole('button', { name: 'Add note', exact: true }).click()
+		await group.getByRole('textbox', { name: 'note', exact: true }).fill('Original native note.')
+		await expect(page.getByText('note synced', { exact: true })).toBeVisible()
+		await expect(page.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
+			'aria-busy',
+			'false'
+		)
+		const readerUrl = page.url()
+		await clearHttpCache(page)
+		await context.close()
+		await ui.stop()
+		await stopAuthority()
+
+		context = await chromium.launchPersistentContext(profile, { headless: true })
+		await context.setOffline(true)
+		const offline = await context.newPage()
+		await clearHttpCache(offline)
+		const response = await offline.goto(readerUrl)
+		expect(response?.fromServiceWorker()).toBe(true)
+		await expect(offline.getByRole('blockquote')).toHaveText(quote)
+		const offlineGroup = offline.getByRole('group', { name: 'highlight', exact: true })
+		await expect(offlineGroup.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
+			'Original native note.'
+		)
+		await offlineGroup
+			.getByRole('textbox', { name: 'note', exact: true })
+			.fill('An offline café 🦊 edit survives another process restart.')
+		await expect(
+			offline.getByRole('region', { name: 'highlights', exact: true }).getByRole('status')
+		).toHaveText('Sync pending.')
+		await expect(offline.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
+			'aria-busy',
+			'false'
+		)
+		await context.close()
+
+		context = await chromium.launchPersistentContext(profile, { headless: true })
+		await context.setOffline(true)
+		const second = await context.newPage()
+		await clearHttpCache(second)
+		await second.goto(readerUrl)
+		await expect(second.getByRole('blockquote')).toHaveText(quote)
+		await expect(second.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
+			'An offline café 🦊 edit survives another process restart.'
+		)
+		await startAuthority()
+		await ui.start()
+		await context.setOffline(false)
+		await second.reload()
+		const restored = await independent.newPage()
+		await restored.goto('http://127.0.0.1:5190')
+		await ready(restored)
+		await restoreAccount(restored, phrase)
+		await restored.getByRole('link', { name: 'Completely offline article', exact: true }).click()
+		await expect(restored.getByRole('blockquote')).toHaveText(quote)
+		await expect(restored.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
+			'An offline café 🦊 edit survives another process restart.'
+		)
+	} finally {
+		await context.close()
+		await independent.close()
+		await rm(profile, { recursive: true, force: true })
+		await ui.start()
+		await startAuthority()
+	}
+})

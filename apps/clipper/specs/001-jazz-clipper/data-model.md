@@ -1,5 +1,10 @@
 # Clipper logical data model
 
+**Annotation design update:** [The current model review](annotation-model-review.md)
+records user-approved local Highlight/Note shapes, native Jazz text/history/ranges
+and deletion, and the reviewed storage layout. It supersedes older annotation
+proposals below where they differ; application implementation remains unfinished.
+
 **Updated**: 2026-11-12. Logical model for the full accepted product, not a claim that every row below exists. Native schemas and owner policies are implemented in `apps/web/src/lib/backend/jazz`; PR #19 now includes independent note entities, linked revisions and note-keyed recovery drafts. Highlight entities/workflows, the note editor and AT Protocol integration remain unimplemented. See tasks.md and the handoff for other implementation evidence.
 
 ## Identity and authorization
