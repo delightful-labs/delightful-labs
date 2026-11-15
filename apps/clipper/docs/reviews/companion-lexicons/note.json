@@ -1,0 +1,32 @@
+{
+	"lexicon": 1,
+	"id": "com.delightfullabs.clipper.note",
+	"description": "Public Note identity and relationships alongside a Margin annotation.",
+	"defs": {
+		"main": {
+			"type": "record",
+			"key": "tid",
+			"record": {
+				"type": "object",
+				"required": ["subject", "article"],
+				"properties": {
+					"subject": {
+						"type": "ref",
+						"ref": "com.atproto.repo.strongRef",
+						"description": "The matching Margin annotation URI and content CID."
+					},
+					"article": {
+						"type": "string",
+						"format": "uri",
+						"description": "The HTTP(S) article source, matching the referenced Margin target."
+					},
+					"highlight": {
+						"type": "string",
+						"format": "at-uri",
+						"description": "The parent Highlight companion; omitted for a document Note."
+					}
+				}
+			}
+		}
+	}
+}

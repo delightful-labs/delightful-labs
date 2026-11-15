@@ -1,5 +1,82 @@
 # Article notes — implementation started
 
+## Companion Lexicon drafts — 2026-11-14
+
+The next continuation prepares concrete Highlight/Note Lexicon JSON under
+`docs/reviews/companion-lexicons/`, using the approved fields and optional source
+position anchor. Proposed names are `com.delightfullabs.clipper.highlight` and
+`com.delightfullabs.clipper.note`, based on the existing Clipper domain. Namespace
+approval is pending; this does not establish domain authority or publish schemas.
+The drafts retain the earlier proposal's `key: "tid"`; the key restriction,
+generation/reuse and discovery conventions are still review choices.
+
+The installed OAuth dependency tree contains `@atcute/lexicons@2.1.1` and its
+supported canonical record-URI/DID parsers and CID validator. Approval has been
+requested before declaring it directly for companion runtime validation. No
+package/lockfile change or application import has been made for this step.
+Both artifacts parse as JSON; this is a syntax check, not AT Lexicon semantic
+validation, runtime relationship coverage or PDS interoperability qualification.
+The review README records required cross-record/source checks and these limits.
+
+## Margin content mapper — 2026-11-14
+
+After presentation of the concrete record and its variants, the user directed
+continuing. `annotations/margin.ts` implements the approved Margin owned-content
+shape as a Zod union and projects document Notes, bare Highlights and Highlights
+with one attached Note. Cleared note text remains an empty body. The caller
+supplies stable first-publication and optional fixed update timestamps; private
+Jazz identities and organization are excluded. Public text limits are reused
+without truncating native merged values.
+
+Highlight mapping requires an explicitly selected source anchor, correct parent
+relationships, matching normalized-source SHA-256, complete native offsets and
+matching quote/context. It refuses reader-only anchors, missing/contradictory
+evidence and competing attached Notes. The normalized capture text must be
+available; quote-only source ranges need later native resolution qualification.
+This selects no source normalization algorithm. Inputs/timestamps are copied
+before digest completion so later edits cannot alter the selected projection.
+
+This is a pure content mapper with no PDS, persistence, permission or UI effects.
+Its strict schema describes newly constructed owned content, not arbitrary remote
+Margin records. Remote updates still require metadata preservation, conflict
+comparison and conditional writes, including review of dependent facets.
+Original-page capture, companion namespace, private publication models, preview,
+grants, scheduling and reconciliation remain open.
+
+Verification passes 26 selector/mapper/native Jazz tests, including real native
+source anchors and document Notes, reader substitution refusal, competing Notes,
+oversized values and edits during digest completion. Web/service-worker types,
+scoped lint, implementation formatting and whitespace checks pass. This is not
+real Margin/PDS interoperability qualification.
+
+## Annotation interchange primitives — 2026-11-14
+
+PR #38 is merged on `main` at `ba0723b9`. The next focused slice implements the
+previously approved TextQuoteSelector/TextPositionSelector projections and source
+timestamp serialization in `annotations/selectors.ts`. Jazz's native range and
+Date remain the stored values; no new table, publication bookkeeping, namespace,
+dependency or product copy is introduced.
+
+Quotation/context retain their exact text and enforce the approved public byte
+and grapheme bounds without truncation. Position conversion requires the owning
+normalized text, checks bounds and quotation/context agreement, refuses malformed
+Unicode and split surrogate pairs, then counts Unicode code points. A native range
+with no offsets remains quotation-only; partial or contradictory offsets are
+refused. No fuzzy resolution is added. This helper cannot establish source-page
+representation identity: callers must verify it, and saved-reader positions must
+never become source-page positions merely by changing the target URI.
+
+These are interchange primitives, not an export UI or a PDS publisher. The exact
+Margin content record mapping was presented for approval and subsequently
+implemented as recorded above. Companion namespace, private publication shapes,
+scheduling, permissions and reconciliation remain open under the review boundary.
+
+Focused verification passes 14 tests, including a real Jazz-captured range and
+200 generated Unicode position cases. Full web/service-worker types, implementation
+formatting, scoped lint and whitespace checks pass. Specs are excluded by the
+project formatter and retain their existing Markdown layout. No browser or PDS
+interoperability claim follows from this helper qualification.
+
 ## Annotation save feedback — CI follow-up, 2026-11-14
 
 PR #38's offline annotation case could close the browser after observing the note

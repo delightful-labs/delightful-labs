@@ -8,6 +8,14 @@ import { policySchema } from './schema-permissions.test-support.js'
 import { createLibraryRecords } from './records.js'
 import type { AnnotationMutation } from '../../annotations/schema.js'
 import { annotationsMachine, selectAnnotations } from '../../annotations/machine.js'
+import { toTextPositionSelector, toTextQuoteSelector } from '../../annotations/selectors.js'
+import { toMarginDocumentNote, toMarginHighlight } from '../../annotations/margin.js'
+import {
+	annotationNoteRowSchema,
+	highlightRowSchema,
+	nativeRangeSchema,
+	textFingerprint
+} from '../../annotations/schema.js'
 let fixture: PolicyTestApp
 beforeAll(async () => {
 	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
@@ -71,6 +79,13 @@ it('uses native ranges, text/history and same-identity highlight restoration', a
 	const highlightId = created.prepared.id,
 		anchor = await a.db.one(app.highlightAnchors.where({ highlightId }))
 	expect(anchor?.range.matched).toBe(text.slice(2, 18))
+	if (!anchor) throw new Error('Expected native anchor')
+	expect(toTextQuoteSelector(anchor.range).exact).toBe('café 🦊 passage ')
+	expect(toTextPositionSelector(anchor.range, text)).toEqual({
+		type: 'TextPositionSelector',
+		start: 2,
+		end: 17
+	})
 	const note = await mutate(a, { type: 'ADD_NOTE', documentId: a.documentId, highlightId }),
 		id = note.prepared.id
 	expect(note.result.outcome).toBe('succeeded')
@@ -101,6 +116,67 @@ it('uses native ranges, text/history and same-identity highlight restoration', a
 	await mutate(a, { type: 'DELETE_NOTE', documentId: a.documentId, id })
 	expect(await a.db.one(app.notes.where({ id }))).toBeNull()
 	expect(await a.db.one(app.highlights.where({ id: highlightId }))).not.toBeNull()
+})
+it('projects native document notes and verified source anchors while refusing reader substitution', async () => {
+	const a = await owner('annotation-margin'),
+		text = 'A café 🦊 passage worth keeping.',
+		createdAt = new Date('2026-11-14T12:00:00Z')
+	const note = await mutate(a, { type: 'ADD_NOTE', documentId: a.documentId })
+	await mutate(a, {
+		type: 'EDIT_NOTE',
+		documentId: a.documentId,
+		id: note.prepared.id,
+		text: 'A native note',
+		editedFrom: ''
+	})
+	const storedNote = annotationNoteRowSchema.parse(
+		await a.db.one(app.notes.where({ id: note.prepared.id }))
+	)
+	expect(toMarginDocumentNote(storedNote, createdAt)).toEqual({
+		$type: 'at.margin.note',
+		motivation: 'commenting',
+		target: { source: 'https://example.com/annotation-margin' },
+		body: { value: 'A native note', format: 'text/plain' },
+		createdAt: '2026-11-14T12:00:00.000Z'
+	})
+	const created = await mutate(a, {
+		type: 'HIGHLIGHT',
+		documentId: a.documentId,
+		text,
+		start: 2,
+		end: 18
+	})
+	const sourceAnchorId = crypto.randomUUID()
+	await a.db
+		.insert(
+			app.highlightAnchors,
+			{
+				highlightId: created.prepared.id,
+				kind: 'source',
+				normalizationVersion: 'source-fixture-v1',
+				textHash: await textFingerprint(text),
+				range: nativeRangeSchema.parse(a.db.textAnchors().captureRange(text, 2, 18)),
+				sourceDate: createdAt,
+				textLengthCodePoints: Array.from(text).length,
+				sourceCodePointPosition: { start: 2, end: 17 }
+			},
+			{ id: sourceAnchorId }
+		)
+		.wait({ tier: 'global' })
+	const storedHighlight = highlightRowSchema.parse(
+		await a.db.one(
+			app.highlights.where({ id: created.prepared.id }).include({ anchors: true, notes: true })
+		)
+	)
+	await expect(
+		toMarginHighlight(storedHighlight, created.prepared.anchorId, text, createdAt)
+	).rejects.toThrow()
+	const record = await toMarginHighlight(storedHighlight, sourceAnchorId, text, createdAt)
+	expect(record.motivation).toBe('highlighting')
+	expect(record.target.selector?.exact).toBe('café 🦊 passage ')
+	expect(record.target.source).toBe('https://example.com/annotation-margin')
+	expect(record).not.toHaveProperty('id')
+	expect(record).not.toHaveProperty('libraryId')
 })
 it('refuses foreign parents, duplicate notes, oversized edits and edits in Trash', async () => {
 	const a = await owner('annotation-owner'),

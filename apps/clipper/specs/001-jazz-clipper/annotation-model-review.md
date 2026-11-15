@@ -150,7 +150,27 @@ Clipper-controlled sidecar for additional selectors/representation evidence and
 the separately addressable entity relationships. Link companions to the Margin
 record using URI/CID as previously approved. Reuse W3C names and semantics.
 
-The user subsequently approved the public relationship shapes below:
+### Approved Margin content mapping — 2026-11-14
+
+After the concrete public record was presented, the user directed continuing.
+`annotations/margin.ts` implements this reviewed subset of `at.margin.note`:
+`$type`, `motivation`, `target.source`, optional `target.selector`
+(TextQuoteSelector), optional plain-text `body`, `createdAt` and optional
+`modifiedAt`. A bare Highlight requires the selector, omits the body and uses
+`highlighting`. A document Note requires the body, omits the selector and uses
+`commenting`. An attached Note shares its Highlight target, includes the body and
+uses `commenting`. Empty note text remains an empty body, not a deletion.
+
+`createdAt` is the stable first-publication time supplied by the publication owner;
+`modifiedAt` is its fixed issued-update time. No private timestamp store or binding
+model is introduced. The strict owned-content schema must not strip metadata from
+observed remote records. Remote updates, dependent facets, full W3C export and
+publication workflow remain unfinished. Source evidence checks do not qualify
+original-page capture or actual Margin/PDS interoperability.
+
+### Approved companion fields
+
+The user previously approved the public relationship shapes below:
 
 - Common companion base: required `subject` using the standard
   `com.atproto.repo.strongRef` (record URI and content CID), and required `article`
