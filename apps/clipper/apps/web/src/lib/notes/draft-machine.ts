@@ -163,3 +163,13 @@ export const noteDraftMachine = setup({
 		closed: { type: 'final' }
 	}
 })
+
+/** Public observation boundary for the editor's existing local draft owner. */
+export function selectNoteDraftState(
+	snapshot: import('xstate').SnapshotFrom<typeof noteDraftMachine> | undefined
+) {
+	return {
+		pending: !!snapshot && (snapshot.context.queue.length > 0 || !!snapshot.context.issued),
+		failed: snapshot?.matches({ running: { storage: 'failed' } }) === true
+	}
+}

@@ -293,7 +293,9 @@ it('releases and closes the old reader without delivering late data or commands 
 	a.publish({ ...a.view, reader: content('Late old content') })
 	expect(second.target.querySelector('h1')?.textContent).toBe('Account B')
 	expect(a.leases).toHaveLength(1)
-	expect(b.send).toHaveBeenCalledExactlyOnceWith({ type: 'OPEN', id: b.id })
+	expect(b.send.mock.calls.filter(([event]) => event.type === 'OPEN')).toEqual([
+		[{ type: 'OPEN', id: b.id }]
+	])
 	await second.detach()
 	expect(b.subscriptions).toBe(0)
 	expect(b.send).toHaveBeenCalledWith({ type: 'CLOSE_READER' })
@@ -318,10 +320,12 @@ it('rebinds a reused route across accounts and an unavailable client without det
 			?.getAttribute('aria-expanded')
 	).toBe('false')
 	expect(a.subscriptions).toBe(0)
-	expect(b.subscriptions).toBe(2)
+	expect(b.subscriptions).toBe(3)
 	expect(a.leases[0]?.release).toHaveBeenCalledOnce()
 	expect(a.send).toHaveBeenCalledWith({ type: 'CLOSE_READER' })
-	expect(b.send).toHaveBeenCalledExactlyOnceWith({ type: 'OPEN', id: a.id })
+	expect(b.send.mock.calls.filter(([event]) => event.type === 'OPEN')).toEqual([
+		[{ type: 'OPEN', id: a.id }]
+	])
 	expect(b.order[0]).toBe('OPEN')
 	a.publish({ ...a.view, reader: content('Late A content') })
 	expect(route.target.querySelector('h1')?.textContent).toBe('Account B')
@@ -334,7 +338,9 @@ it('rebinds a reused route across accounts and an unavailable client without det
 	fresh.publish({ ...fresh.view, readerId: a.id, reader: content('Fresh A binding') })
 	route.navigate(fresh.client, a.id)
 	expect(route.target.querySelector('h1')?.textContent).toBe('Fresh A binding')
-	expect(fresh.send).toHaveBeenCalledExactlyOnceWith({ type: 'OPEN', id: a.id })
+	expect(fresh.send.mock.calls.filter(([event]) => event.type === 'OPEN')).toEqual([
+		[{ type: 'OPEN', id: a.id }]
+	])
 	expect(fresh.order[0]).toBe('OPEN')
 })
 
@@ -346,7 +352,9 @@ it('closes and opens route IDs on the same client before admitting the next surf
 	route.navigate(f.client, nextId)
 	expect(route.target.querySelector('article')).toBeNull()
 	expect(f.leases[0]?.release).toHaveBeenCalledOnce()
-	expect(f.send).toHaveBeenLastCalledWith({ type: 'OPEN', id: nextId })
+	expect(f.send.mock.calls.filter(([event]) => event.type === 'OPEN').at(-1)).toEqual([
+		{ type: 'OPEN', id: nextId }
+	])
 	expect(f.order.indexOf('CLOSE_READER')).toBeLessThan(f.order.lastIndexOf('OPEN'))
 	f.publish({
 		...f.view,
@@ -363,7 +371,7 @@ it('closes and opens route IDs on the same client before admitting the next surf
 	})
 	expect(route.target.querySelector('h1')?.textContent).toBe('Second route')
 	expect(f.leases).toHaveLength(2)
-	expect(f.subscriptions).toBe(2)
+	expect(f.subscriptions).toBe(3)
 })
 
 it('keeps settings open across viewport changes and binds dismissal to the current trigger', async () => {

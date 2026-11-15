@@ -12,6 +12,7 @@ export type FakeDataRef = ActorInstance<
 >
 export type FakeDataSpawner = import('../machines/children.js').ChildSpawner
 export type LibraryCapability = {
+	annotations?: import('../backend/jazz/annotations.js').AnnotationCapability
 	images?: import('./images.js').ImageCapability
 	reader?: import('./reader.js').ReaderCapability
 	spawnFakeData?: (spawn: FakeDataSpawner) => FakeDataRef
@@ -25,6 +26,7 @@ export type LibraryCapability = {
 	worker: QueueOpen
 }
 export type LibraryEvent =
+	| { type: 'ANNOTATION'; command: import('../annotations/schema.js').AnnotationCommand }
 	| { type: 'RETRY_IMAGE'; id: string }
 	| { type: 'IMAGE_ERROR'; id: string; url: string }
 	| {

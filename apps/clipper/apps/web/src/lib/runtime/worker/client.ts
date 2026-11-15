@@ -140,7 +140,10 @@ const resource = createCallbackLogic<Event, Input>(({ input, receive, sendBack }
 })
 /** UI-native transport lifetime only. It never retries commands or terminates a
  * worker before the domain owner acknowledges that all issued work has drained. */
-type ClientContext = Input & { pending: string[] }
+type ClientContext = Input & {
+	pending: string[]
+	annotationPending: { id: string; scope: string }[]
+}
 const clientMachine = setup({
 	schemas: {
 		context: types<ClientContext>(),
@@ -161,7 +164,7 @@ const clientMachine = setup({
 }).createMachine({
 	id: 'application-ui-port',
 	initial: 'attached',
-	context: ({ input }) => ({ ...input, pending: [] }),
+	context: ({ input }) => ({ ...input, pending: [], annotationPending: [] }),
 	invoke: {
 		id: 'resource',
 		src: 'resource',
@@ -184,6 +187,16 @@ const clientMachine = setup({
 								(message.type === 'LIBRARY' && message.event.type === 'ORGANIZE') ||
 								(message.type === 'TAG_FORM' && message.event.type === 'SELECT')
 							return {
+								annotationPending:
+									message.type === 'LIBRARY' &&
+									message.event.type === 'ANNOTATION' &&
+									message.event.command.type !== 'OPEN' &&
+									message.event.command.type !== 'CLOSE'
+										? [
+												...context.annotationPending,
+												{ id: message.requestId, scope: message.scope }
+											]
+										: context.annotationPending,
 								pending:
 									waiting && 'requestId' in message
 										? [...context.pending, message.requestId]
@@ -194,7 +207,12 @@ const clientMachine = setup({
 				},
 				RECEIVED: (args) => {
 					return {
-						context: { pending: args.context.pending.filter((id) => id !== args.event.requestId) }
+						context: {
+							pending: args.context.pending.filter((id) => id !== args.event.requestId),
+							annotationPending: args.context.annotationPending.filter(
+								(request) => request.id !== args.event.requestId
+							)
+						}
 					}
 				},
 				SHUTDOWN: (args, enq) => {
@@ -260,10 +278,23 @@ export function openApplicationClient(input: Input) {
 			let view = initial
 			const observers = new Set<(view: LibraryRender) => void>()
 			const scope = initial.scope
-			const presentation = () =>
-				actor.getSnapshot().context.pending.length
-					? { ...view, view: { ...view.view, canOrganize: false } }
-					: view
+			const presentation = () => {
+				const context = actor.getSnapshot().context
+				const awaitingAnnotation = context.annotationPending.some(
+					(request) => request.scope === scope
+				)
+				if (!context.pending.length && !awaitingAnnotation) return view
+				return {
+					...view,
+					view: {
+						...view.view,
+						canOrganize: context.pending.length ? false : view.view.canOrganize,
+						annotations: awaitingAnnotation
+							? { ...view.view.annotations, pending: true, message: undefined }
+							: view.view.annotations
+					}
+				}
+			}
 			const render = () => {
 				const current = presentation()
 				for (const observe of observers) observe(current)
