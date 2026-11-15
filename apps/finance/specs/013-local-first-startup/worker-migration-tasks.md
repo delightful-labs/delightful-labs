@@ -70,6 +70,11 @@ approved qualification: 43 direct cases, 400 generated sequences, 2,148 Finance
 units and 24 native cases across three engines. It separates SDK delivery from
 native settlement/reservation release. The bounded native intake and population
 are still unimplemented; W05 remains incomplete.
+PR #39's hosted application-2 failure at `c0606557` remains under
+[offline-edit investigation](worker-pr39-ci-offline-edit.md). The original cases
+and full shard passed locally; test-only diagnostics preserve the nested error
+details missing from CI's original trace. This is not an established application
+fix or a completed hosted merge qualification.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
 [ownership specification](xstate-v6-migration.md), and

@@ -194,68 +194,93 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 	test(
 		`imported ${kind} supports category, tag and note edits offline without changing provenance`,
 		{ tag: ['@transactions', '@transaction-edit', '@description', '@categories', '@tags'] },
-		async ({ page, context }) => {
-			const seed = await seedTransaction(page, kind === 'expense' ? 'imported' : 'imported-income')
-			await page.goto(`/${kind === 'expense' ? 'expenses' : 'income'}/${seed.id}`)
-			const amount = page.getByLabel('Amount', { exact: true })
-			const save = page.getByRole('button', { name: 'Save Transaction', exact: true })
-			await expect(amount).toBeEnabled()
-			await expect(save).toBeDisabled()
-			if (kind === 'income') {
-				const payment = page.getByLabel('Payment method', { exact: true })
-				await expect(payment).toBeVisible()
-				await expect(payment).toHaveValue('')
-			}
-			const memo = page.getByLabel('Memo (additional notes)', { exact: true })
-			await memo.fill('Changed')
-			await expect(save).toBeEnabled()
-			await memo.fill('Original memo')
-			await expect(save).toBeDisabled()
-			const category = page.getByLabel('Category', { exact: true })
-			const replacementId = await category
-				.locator('option')
-				.evaluateAll((options) =>
-					options
-						.find(
-							(option) =>
-								option instanceof HTMLOptionElement &&
-								!option.disabled &&
-								option.value &&
-								option.label !== 'Editable category'
-						)
-						?.getAttribute('value')
+		async ({ page, context }, testInfo) => {
+			// Browser offline mode prevents Vite from forwarding these diagnostics to CI.
+			// Preserve the already-sanitized error details instead of the trace's object preview.
+			const machineFailures: Promise<unknown>[] = []
+			page.on('console', (message) => {
+				if (message.text().startsWith('[state-machine] Machine entered an error state')) {
+					for (const argument of message.args().slice(1)) {
+						machineFailures.push(argument.jsonValue().catch(() => ({ unavailable: true })))
+					}
+				}
+			})
+			try {
+				const seed = await seedTransaction(
+					page,
+					kind === 'expense' ? 'imported' : 'imported-income'
 				)
-			if (!replacementId) throw new Error('Missing alternate category')
-			await context.setOffline(true)
-			await category.selectOption(replacementId)
-			await amount.fill('56.78')
-			await page.getByLabel('Description', { exact: true }).fill('User description')
-			await memo.fill('User notes')
-			const tags = page
-				.getByRole('textbox', { name: 'Tags', exact: true })
-				.or(page.getByRole('combobox', { name: 'Tags', exact: true }))
-			await tags.fill('User tag')
-			await tags.press('Enter')
-			await save.click()
-			await expect(save).toBeDisabled()
-			await expect
-				.poll(() => persisted(page, seed.id))
-				.toMatchObject({
-					amountMinor: 5678,
-					description: 'User description',
-					memo: 'User notes',
-					categoryId: replacementId,
-					source: 'simplefin',
-					externalId: 'imported-edit-test',
-					paymentMethod: null
-				})
-			await expect.poll(async () => (await persisted(page, seed.id)).links.length).toBe(2)
-			await context.setOffline(false)
-			await page.reload()
-			await expect(memo).toHaveValue('User notes')
-			await expect(amount).toHaveValue('56.78')
-			await expect(page.getByRole('button', { name: 'Remove User tag', exact: true })).toBeVisible()
-			await expect(save).toBeDisabled()
+				await page.goto(`/${kind === 'expense' ? 'expenses' : 'income'}/${seed.id}`)
+				const amount = page.getByLabel('Amount', { exact: true })
+				const save = page.getByRole('button', { name: 'Save Transaction', exact: true })
+				await expect(amount).toBeEnabled()
+				await expect(save).toBeDisabled()
+				if (kind === 'income') {
+					const payment = page.getByLabel('Payment method', { exact: true })
+					await expect(payment).toBeVisible()
+					await expect(payment).toHaveValue('')
+				}
+				const memo = page.getByLabel('Memo (additional notes)', { exact: true })
+				await memo.fill('Changed')
+				await expect(save).toBeEnabled()
+				await memo.fill('Original memo')
+				await expect(save).toBeDisabled()
+				const category = page.getByLabel('Category', { exact: true })
+				const replacementId = await category
+					.locator('option')
+					.evaluateAll((options) =>
+						options
+							.find(
+								(option) =>
+									option instanceof HTMLOptionElement &&
+									!option.disabled &&
+									option.value &&
+									option.label !== 'Editable category'
+							)
+							?.getAttribute('value')
+					)
+				if (!replacementId) throw new Error('Missing alternate category')
+				await context.setOffline(true)
+				await category.selectOption(replacementId)
+				await amount.fill('56.78')
+				await page.getByLabel('Description', { exact: true }).fill('User description')
+				await memo.fill('User notes')
+				const tags = page
+					.getByRole('textbox', { name: 'Tags', exact: true })
+					.or(page.getByRole('combobox', { name: 'Tags', exact: true }))
+				await tags.fill('User tag')
+				await tags.press('Enter')
+				await save.click()
+				await expect(page.getByText('Transaction saved.', { exact: true })).toBeVisible()
+				await expect(save).toBeDisabled()
+				await expect
+					.poll(() => persisted(page, seed.id))
+					.toMatchObject({
+						amountMinor: 5678,
+						description: 'User description',
+						memo: 'User notes',
+						categoryId: replacementId,
+						source: 'simplefin',
+						externalId: 'imported-edit-test',
+						paymentMethod: null
+					})
+				await expect.poll(async () => (await persisted(page, seed.id)).links.length).toBe(2)
+				await context.setOffline(false)
+				await page.reload()
+				await expect(memo).toHaveValue('User notes')
+				await expect(amount).toHaveValue('56.78')
+				await expect(
+					page.getByRole('button', { name: 'Remove User tag', exact: true })
+				).toBeVisible()
+				await expect(save).toBeDisabled()
+			} finally {
+				if (machineFailures.length) {
+					await testInfo.attach('offline-edit-machine-failures', {
+						body: JSON.stringify(await Promise.all(machineFailures), null, 2),
+						contentType: 'application/json'
+					})
+				}
+			}
 		}
 	)
 }
