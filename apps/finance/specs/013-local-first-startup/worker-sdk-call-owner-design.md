@@ -171,3 +171,30 @@ explicit callback-event capability without a cast. All behavioral runs passed
 their first executed attempt. Focused native selection passed 3/3; full native
 qualification passed 24/24 without skips. Logs are
 `/private/tmp/finance-worker-f4c3-*.log`. No new counterexample was produced.
+
+### Latest-main refresh
+
+F4c3 is committed at `5b97d953`. Merge `3ef067cc` brings in main `ba0723b9`
+(PR #38's Clipper annotations and additive Textarea element binding) without
+conflicts. Finance/Local First source is unchanged by that merge, and all incoming
+Clipper/UI files match main exactly. Both library packages rebuild successfully,
+including strict Local First package validation and preserved peer links.
+
+Fresh qualification after that merge passes Finance app/service-worker/host/
+native-fixture types, all 2,148 Finance units, all 19 worker-state cases, the real
+worker proof build and all 24 native cases across three engines. UI passes types
+and 131 unit tests in 30 files. Clipper passes coordinator/web/service-worker/
+extension types, 877 units in 135 files and 31 component cases in six files.
+Merge-check logs use `/private/tmp/finance-worker-f4c3-main-*.log`.
+
+Definition serialization was inspected through the installed public diagnostic
+API: 21 code expressions, 15 omitted type-schema/inline-actor values, five runtime
+guard bindings, and no unsupported values. This remains a code-authored factory;
+its JSON representation alone does not preserve the runtime bindings or form a
+native-resource checkpoint. The inspection report is
+`/private/tmp/finance-worker-f4c3-definition-diagnostics.json`.
+
+Continue on PR #39 with the bounded native producer intake, aggregate population
+and acquisition transport. Preserve the callback's fault and two-receipt delivery
+joins, retain reservations until child output, and retain SDK-before-grant close
+ordering. W05 remains incomplete; no production activation is included.
