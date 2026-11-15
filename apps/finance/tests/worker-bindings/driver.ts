@@ -106,6 +106,49 @@ const fixture = {
 		})
 	},
 	request,
+	async qualifySdkCallOwner() {
+		const slot = `sdk-call-${crypto.randomUUID()}`,
+			scope = crypto.randomUUID()
+		const data = new MessageChannel(),
+			control = new MessageChannel()
+		const url = new URL(sharedWorkerUrl, location.href).href
+		const name = `jazz-runtime:callback-fixture:${scope}:generation-2`
+		let opens = 0
+		const release = serveFinanceBrokerGrant(
+			data.port1,
+			control.port1,
+			{ scope, url, name },
+			{
+				origin: location.origin,
+				openBroker: (url, name) => {
+					opens++
+					return new SharedWorker(url, { type: 'module', name })
+				}
+			}
+		)
+		try {
+			await fixture.create(slot)
+			const result = await request(
+				slot,
+				{
+					type: 'CALL_OWNER_QUALIFY',
+					data: data.port2,
+					control: control.port2,
+					scope,
+					descriptor: { kind: 'broker', url, name }
+				},
+				[data.port2, control.port2]
+			)
+			return { result, opens }
+		} finally {
+			fixture.destroy(slot)
+			release()
+			for (const pair of [data, control]) {
+				pair.port1.close()
+				pair.port2.close()
+			}
+		}
+	},
 	async qualifyGrantProtocol() {
 		const name = 'grant-protocol'
 		await fixture.create(name)

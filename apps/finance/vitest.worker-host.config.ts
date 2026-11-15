@@ -7,6 +7,7 @@ export default defineConfig({
 	test: {
 		include: [
 			'src/lib/machines/runtime/worker-grant-owner.test.ts',
+			'src/lib/machines/runtime/worker-sdk-call-owner.test.ts',
 			'src/lib/runtime/worker/grant-binding.test.ts',
 			'src/lib/runtime/worker/sdk-call-binding.test.ts',
 			'src/lib/runtime/worker/grant-protocol.test.ts',

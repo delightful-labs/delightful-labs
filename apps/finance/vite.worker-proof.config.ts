@@ -40,7 +40,8 @@ const requiredImplementations = [
 	'src/lib/runtime/worker/grant-binding.ts',
 	'src/lib/runtime/worker/grant-protocol.ts',
 	'src/lib/machines/runtime/worker-grant-owner.ts',
-	'src/lib/runtime/worker/sdk-call-binding.ts'
+	'src/lib/runtime/worker/sdk-call-binding.ts',
+	'src/lib/machines/runtime/worker-sdk-call-owner.ts'
 ]
 const portable = (id: string) => (isAbsolute(id) ? relative(root, id).replaceAll('\\', '/') : id)
 const clean = (id: string) => id.split('?')[0] ?? id

@@ -65,6 +65,11 @@ integration are still pending, and W05 remains incomplete.
 The qualified checkpoint is uploaded at `dce092be` in
 [draft PR #39](https://github.com/delightful-labs/delightful-labs/pull/39);
 continue the bounded population/bridge on that PR.
+The [F4c3 callback owner](worker-sdk-call-owner-design.md) passes separately
+approved qualification: 43 direct cases, 400 generated sequences, 2,148 Finance
+units and 24 native cases across three engines. It separates SDK delivery from
+native settlement/reservation release. The bounded native intake and population
+are still unimplemented; W05 remains incomplete.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
 [ownership specification](xstate-v6-migration.md), and

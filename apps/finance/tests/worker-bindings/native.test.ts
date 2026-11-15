@@ -99,6 +99,29 @@ function retainOnFailure() {
 
 for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
 	describe(engine, () => {
+		it('joins actual SDK settlement with call delivery and preserves its SharedWorker port after grant closure', async () => {
+			retainOnFailure()
+			const browser = await browserType.launch({ headless: true })
+			try {
+				const page = await boot(await browser.newContext())
+				const report = await page.evaluate(() => window.financeBindingFixture.qualifySdkCallOwner())
+				expect(report.opens).toBe(1)
+				expect(report.result).toMatchObject({
+					type: 'RESULT',
+					value: {
+						heldUntilSdkReceipt: true,
+						settlements: 1,
+						discarded: 0,
+						release: 'definitive-result',
+						matchingClose: true,
+						echo: 'SDK callback port survives grant and keeper closure',
+						windowPresent: false
+					}
+				})
+			} finally {
+				await browser.close()
+			}
+		})
 		it('decodes actual worker grant transfers, keeps refusal distinct from uncertainty and preserves both port paths', async () => {
 			retainOnFailure()
 			const browser = await browserType.launch({ headless: true })

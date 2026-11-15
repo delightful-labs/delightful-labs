@@ -9,6 +9,11 @@ main `4301afde` on 2026-11-14. Continue on
 The separately approved F4c2 checkpoint is uploaded in
 [draft PR #39](https://github.com/delightful-labs/delightful-labs/pull/39) at
 `dce092be`. Continue population/bridge work on that PR; W05 remains incomplete.
+The [F4c3 callback owner](worker-sdk-call-owner-design.md) now passes separately
+approved qualification: 43 direct cases, 400 generated sequences, 2,148 Finance
+units and 24 native cases across three engines. It makes dispatch, population
+fault acknowledgement, actual SDK settlement and reservation release explicit in XState.
+The native intake/population and actual SDK integration remain pending.
 F4c1 was qualified against main `434a06ee` after F4b checkpoint `868e1e32`.
 PR #37 subsequently merges main `fca60ca0` on 2026-11-14; the
 [grant-owner handoff](worker-grant-owner-design.md) records the formatting-only

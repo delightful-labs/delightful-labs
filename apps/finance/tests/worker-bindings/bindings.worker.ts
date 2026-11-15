@@ -5,6 +5,7 @@ import {
 import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
 import { createOwnedBrokerFixture } from './owned-broker.js'
 import { createGrantOwnerFixture } from './grant-owner-client.js'
+import { qualifySdkCallOwner } from './sdk-call-client.js'
 import type { FinanceGrantDescriptor } from '../../src/lib/runtime/worker/grant-binding.js'
 import {
 	decodeFinanceGrantRequest,
@@ -12,6 +13,13 @@ import {
 } from '../../src/lib/runtime/worker/grant-protocol.js'
 
 export type Operation =
+	| {
+			type: 'CALL_OWNER_QUALIFY'
+			data: MessagePort
+			control: MessagePort
+			scope: string
+			descriptor: FinanceGrantDescriptor
+	  }
 	| { type: 'GRANT_FRAME'; direction: 'request' | 'reply'; frame: unknown }
 	| { type: 'STORE_OPEN'; slot: string; configuration: FinanceAccountStoreConfiguration }
 	| { type: 'STORE_READ'; slot: string }
@@ -46,6 +54,13 @@ function required<Value>(value: Value | undefined): Value {
 	return value
 }
 async function execute(operation: Operation, ports: readonly MessagePort[]): Promise<unknown> {
+	if (operation.type === 'CALL_OWNER_QUALIFY')
+		return qualifySdkCallOwner(
+			operation.data,
+			operation.control,
+			operation.scope,
+			operation.descriptor
+		)
 	if (operation.type === 'GRANT_REPORTS') return { reports: [...grantReports], posts: grantPosts }
 	if (operation.type === 'GRANT_FRAME') {
 		const decoded =
