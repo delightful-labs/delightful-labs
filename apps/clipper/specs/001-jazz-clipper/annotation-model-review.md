@@ -1,7 +1,7 @@
 # Annotation model review
 
 Status: approved local annotation shapes now have a working saved-reader
-implementation. Public sidecar schemas and publication remain unfinished. The
+implementation. Public sharing reuses `at.margin.note`; publication remains unfinished. The
 working implementation section below records the user's subsequent authorization,
 the delivered scope and qualification. Earlier review notes retain their original
 design context.
@@ -145,42 +145,40 @@ pending/rejected writes and is not a substitute for recovery of unsaved input.
 
 ## Publication direction
 
-Follow Margin for the shared core and leave `at.margin.note` unchanged. Use a
-Clipper-controlled sidecar for additional selectors/representation evidence and
-the separately addressable entity relationships. Link companions to the Margin
-record using URI/CID as previously approved. Reuse W3C names and semantics.
+Reuse `at.margin.note` directly as the public annotation contract. Shared highlight
+anchoring uses its quotation selector; commentary uses its body; article association
+uses its target source. Different apps can consume the same shared record type.
+Separate private Jazz entities do not require a corresponding public entity type.
 
-The user subsequently approved the public relationship shapes below:
+### Approved Margin content mapping — 2026-11-14
 
-- Common companion base: required `subject` using the standard
-  `com.atproto.repo.strongRef` (record URI and content CID), and required `article`
-  using Clipper's HTTP/HTTPS source URL validator. Article must match the source
-  in the referenced Margin record; it is not another public article record.
-- Highlight companion: the common base plus optional `note`, a record-level AT
-  URI of the current published attached Note's companion.
-- Note companion: the common base plus optional `highlight`, a record-level AT
-  URI of the parent Highlight companion. Article-level Notes omit this link.
-- The AT record URI is each companion's public identity. Add no duplicate ID,
-  private Jazz identities, quotation or commentary. Reciprocal links use stable
-  URIs; subject uses URI/CID to identify the matching common-content version.
+After the concrete public record was presented, the user directed continuing.
+`annotations/margin.ts` implements this reviewed subset of `at.margin.note`:
+`$type`, `motivation`, `target.source`, optional `target.selector`
+(TextQuoteSelector), optional plain-text `body`, `createdAt` and optional
+`modifiedAt`. A bare Highlight requires the selector, omits the body and uses
+`highlighting`. A document Note requires the body, omits the selector and uses
+`commenting`. An attached Note shares its Highlight target, includes the body and
+uses `commenting`. Empty note text remains an empty body, not a deletion.
 
-The user also approved optional `positionAnchor` on the Highlight companion:
+`createdAt` is the stable first-publication time supplied by the publication owner;
+`modifiedAt` is its fixed issued-update time. No private timestamp store or binding
+model is introduced. The strict owned-content schema must not strip metadata from
+observed remote records. Remote updates, dependent facets, full W3C export and
+publication workflow remain unfinished. Source evidence checks do not qualify
+original-page capture or actual Margin/PDS interoperability.
 
-```ts
-const sourcePositionAnchorSchema = z.object({
-  normalizationVersion: textRepresentationSchema.shape.normalizationVersion,
-  textHash: textRepresentationSchema.shape.textHash,
-  selector: textPositionSelectorSchema
-})
-```
+### Companion proposal superseded — 2026-11-16
 
-Its source is the companion's article URI, with quote/context in the referenced
-Margin version. Publish this only from verified source-page evidence using the
-retained source code-point position. Reader offsets remain private to their reader
-representation. This selects the position payload shape, not qualification of
-normalization/hash reproduction by another consumer.
+The user challenged the need for all custom companion additions, after first
+removing `positionAnchor`. The sidecar proposal is removed from the active design:
+there is no extra `subject`, `article`, `note` or `highlight` record/link schema.
+A Highlight with commentary maps to one Margin record; removing its attached Note
+updates that record to a bare Highlight. A document Note uses its own Margin
+record. Private Jazz relationships and native representation validation remain
+internal. The public AT URI supplies the shared annotation identity.
 
-Namespace, keys, scheduling and publication evidence remain unselected.
+Public key allocation, scheduling and private publication evidence remain unselected.
 Existing accepted publication policy
 in [atproto.md](atproto.md) and [design-decisions.md](design-decisions.md) remains
 binding; this review is not publication implementation or interoperability proof.
@@ -199,8 +197,8 @@ binding; this review is not publication implementation or interoperability proof
    rejected/pending-write handling without another version graph.
 4. Model grouped deletion/Undo and restoration-data custody with account scopes,
    settlement and retained public removal duties.
-5. Present each public sidecar type and publication bookkeeping shape for approval
-   before establishing schemas. Finalize immutable issued payload/reconciliation
+5. Present publication bookkeeping shapes for approval before establishing
+   schemas. Finalize immutable issued payload/reconciliation
    evidence and verify exact Jazz acceptance APIs.
 6. Review worker/statechart ownership and implementation before its test stage,
    following current project approval rules. Obtain separate approval for any new

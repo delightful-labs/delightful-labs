@@ -137,8 +137,10 @@ Acceptance must cover required progress at every creation boundary (including UR
 
 Research follow-up (2026-11-07): [AT Protocol highlights and notes research](../../docs/atproto-research.md)
 compares public Lexicons, private Spaces, anchoring, offline reconciliation and DLF/backup ownership.
-It consolidates accepted publication behavior and companion fields, with unapproved mechanics
-kept separate. Jazz upgrade and backend hosting are being handled independently; this research
+It consolidates accepted publication behavior, with unapproved mechanics kept separate.
+The 2026-11-16 review supersedes custom companions with direct `at.margin.note`
+reuse; separate private Jazz identities do not require separate public records.
+Jazz upgrade and backend hosting are being handled independently; this research
 does not authorize implementation or migration.
 
 AT Protocol support is confirmed product intent; the original planning conversation did not carry it into this specification. Notes and highlights therefore need their own records and identities, with explicit Document relationships, regardless of the eventual AT storage/publication choice. The Document must not be the only address through which an annotation can be retrieved. A note attached to a highlight has its own identity, not the highlight's identity.

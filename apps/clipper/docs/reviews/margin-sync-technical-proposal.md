@@ -1,5 +1,13 @@
 # Margin synchronization technical proposal
 
+**Scope correction, 2026-11-16:** public annotations reuse `at.margin.note`
+directly. Companion fields, multiple public records per annotation, extra collection
+grants and companion-specific batching/reconciliation are superseded. The [current
+decision](../../specs/001-jazz-clipper/design-decisions.md#shared-annotation-lexicon-reuse--2026-11-16)
+governs implementation. This historical proposal's private models, executor and
+write API choices must be reviewed against the simpler common-record scope;
+retained acceptance/conflict/unknown-outcome requirements still apply.
+
 **Current checkpoint (2026-11-10):** Jazz alpha.60/Vercel and native identity integration are merged. [Implementation status and open publication work](../../specs/001-jazz-clipper/atproto.md) supersede the upgrade-wait instructions below. The approved publication subset remains accepted; other mechanics remain proposals, with no publication implementation yet.
 
 Prepared 2026-11-07 for one combined review. **Approval update:** the user approved the [companion fields and grouped synchronization approach](../../specs/001-jazz-clipper/design-decisions.md#accepted-companion-fields-and-grouped-synchronization--2026-11-07). Other candidate private shapes and exact processes below remain proposals. The [product checkpoint](../atproto-research.md#accepted-publication-behavior) and [accepted decisions](../../specs/001-jazz-clipper/design-decisions.md#accepted-ongoing-publication-synchronization--2026-11-07) govern the outcome. This document authorizes no implementation, tests, dependencies, migration or deployment. Jazz alpha.60 and the Vercel backend are now adopted; native auth is merged in PR #20. Start from the standard Jazz lifecycle; the detailed executor/storage mechanics below are retained proposals, not the upgrade plan.

@@ -1,5 +1,23 @@
 # MVP design decisions and acceptance details
 
+## Shared annotation Lexicon reuse — 2026-11-16
+
+The user challenged the need for custom sidecars. Reuse `at.margin.note` directly
+for public Highlights, Highlights with commentary and document Notes. A Lexicon
+is a shared record contract; Clipper can produce it without introducing another
+namespace or depending on Margin's application service. The public AT record URI
+identifies the annotation. Private Jazz identities and relationships stay local
+to the domain and its private publication mapping.
+
+This supersedes the earlier companion-field approval and companion-specific
+grouped write/cleanup requirements. The proposed Highlight/Note companion schemas,
+namespace, reciprocal links, duplicate article field and companion-only dependency
+request are removed from active scope. Future public extensions require a concrete
+interoperability need that the shared Lexicon does not express, reviewed before
+establishing a new model. Source acceptance, public consent, metadata preservation,
+conflict pauses, conditional writes and unknown-outcome reconciliation remain
+required; their concrete private models/executor design remain unfinished.
+
 **AT Protocol status (2026-11-10):** [Merged implementation, accepted publication decisions and remaining work](atproto.md). This checkpoint supersedes historical JWT/Neon, alpha.59 and Netlify-only AT Protocol notes below; it does not mark annotation/publication requirements implemented.
 
 **Updated**: 2026-11-05. Accepted interaction decisions and remaining product design. Implemented evidence is tracked in [tasks.md](tasks.md); unbuilt controls below remain requirements, not completion claims. The product spec governs any conflict.
@@ -156,6 +174,13 @@ Use localized `meta.name` and severity on owning states. Explicit states, guards
 The current batch implements a serial library-owned image queue, private native byte assets and inline DUI-based placeholders/Retry. Worker processing accepts PNG/JPEG/WebP/GIF headers within 4 MiB gateway input and 40 MP, scales without upsampling to a 2048 px long edge, and caps outputs at 2 MiB using PNG for PNG sources and WebP 0.82 otherwise. Size failures trigger bounded dimension reduction; GIF becomes a static frame. HTTP Retry-After is respected up to five minutes. Unknown writes remain blocked in the active owner; restart acquisition first checks the persisted native operation identity, and publication checks it again within the transaction. Existing marker-free snapshots are unchanged; authenticated/data/SVG/AVIF sources and the viewer remain outside this batch. See offline-images.md for validation and limitations. No additional package or catalog wording is required; current placeholders reuse DUI LoadingSpinner and approved Get-image, Retry and generic failure/unknown-save templates.
 
 ## Accepted companion fields and grouped synchronization — 2026-11-07
+
+**Superseded by the shared-Lexicon decision of 2026-11-16 above.** This section
+retains historical review context; it does not select current public schemas.
+
+Review update, 2026-11-16: the user removed the later optional `positionAnchor`
+proposal. Public highlight anchoring uses the quotation selector in the shared
+Margin record. Companions carry the identities and relationships described below.
 
 The user approved the candidate fields and grouped synchronization approach in the [Clipper companion proposal](../../docs/reviews/clipper-companion-lexicon-proposal.md): Margin retains shared quotation/commentary; separately addressable highlight and note companions carry required `subject` (Margin URI and CID) and public `article` URI, with optional highlight-to-note `note` and note-to-highlight `highlight` relationships. Private Jazz identities and organizational data remain private. Attached note identity remains independent of highlight identity and revisions.
 

@@ -170,11 +170,11 @@ for exact artifacts and remaining CI status; this is not a complete release clai
   relevant Jazz server acceptance, without a separate confirmation per update.
   Offline publication intent follows the latest saved item before issuance;
   each issued request retains its exact source version and destination.
-- Use the shared `at.margin.note` quotation/commentary representation alongside
-  separately addressable Clipper highlight/note companions. Companions require
-  `subject` (Margin URI/CID) and public `article` URI, with optional reciprocal
-  `note`/`highlight` links. No private Jazz IDs, drafts or organizational tags.
-  Using the shared subset does not require adopting all of Margin's vocabulary.
+- Reuse `at.margin.note` directly for public annotations. A Highlight with
+  commentary is one record; a bare Highlight or document Note is likewise one
+  record. Article association and anchoring use Margin's target/selector. The
+  2026-11-16 review removes the custom companion proposal. Private Jazz identities,
+  drafts and organization stay private. Public AT URIs supply external identity.
 - A deleted attached note leaves the public bare highlight at its existing
   address. A new note on an already-public bare highlight updates that annotation.
 - Trash requests public deletion; restoring a previously published item republishes
@@ -186,20 +186,19 @@ for exact artifacts and remaining CI status; this is not a complete release clai
   paused. External deletion preserves local content and requires explicit
   recreation. Later edits/reconnect/restart do not bypass either pause.
 - Preserve valid foreign non-content metadata without importing it into private
-  organization. Common/companion changes use the approved conditional grouped
-  synchronization approach; companion conflicts pause the whole outgoing group.
-  Retain unknown outcomes and reconcile before retry; no cross-service atomicity
-  or downstream-erasure guarantee.
+  organization. Public updates require conditional writes and retained outcome
+  evidence. Retain unknown outcomes and reconcile before retry; no cross-service
+  atomicity or downstream-erasure guarantee. Companion-specific group mechanics
+  are superseded; exact single-record write/reconciliation design remains open.
 - Note bounds: both 3,000 graphemes and 10,000 UTF-8 bytes. New quotations: both
   1,500 graphemes and 5,000 bytes. Public prefix and suffix: each both 150 graphemes
   and 500 bytes, included in the preview. No silent truncation or migration of
   existing/imported content is authorized.
 
-[Accepted decisions](design-decisions.md#accepted-margin-public-representation--2026-11-07)
-and [companion approval](design-decisions.md#accepted-companion-fields-and-grouped-synchronization--2026-11-07)
-are authoritative. [Technical synchronization](../../docs/reviews/margin-sync-technical-proposal.md)
-and [companion schemas](../../docs/reviews/clipper-companion-lexicon-proposal.md)
-retain proposals beyond their explicitly approved subsets.
+[Current Lexicon decision](design-decisions.md#shared-annotation-lexicon-reuse--2026-11-16)
+supersedes the historical companion approval. The [technical synchronization
+proposal](../../docs/reviews/margin-sync-technical-proposal.md) retains historical
+mechanics; it is not a current implementation contract for removed companions.
 
 ## Work remaining
 
@@ -210,11 +209,11 @@ retain proposals beyond their explicitly approved subsets.
 | Hosted identity check | Returning-device real-provider sign-in, same-identity reader/reloads, backend restart durability and app/provider-session removal pass on preview. Five native lifecycle cases cover renewal, expiry, revocation and simulated provider refresh persistence. Live token rotation, independent authorization-server revocation confirmation and multi-instance refresh remain distinct limits. Temporary preview access/debug configuration is removed. |
 | Reader shutdown follow-up | PR #34 retains private surface custody through library drain; real worker closure and deployed preview sign-out pass. Final CI/review/merge remain required. |
 | Shared DLF adoption | Extract only evidenced reusable provider/server/lifecycle boundaries, review interfaces, then qualify Finance independently with its existing data/backup obligations. No cross-app session/token transfer. |
-| Local annotations | Finish independently identified highlights, article notes, attached notes and anchors; existing draft/revision groundwork is not the completed model or editor. Review native text/history/anchor facilities before custom machinery. |
-| Public vocabulary | Select the real controlled companion namespace; resolve exact payload/projector, public keys/discovery, anchoring/version rules, and oversized retained/imported content. Example `com.example.*` names are not selected production NSIDs. |
+| Local annotations | Saved-reader highlights, document notes and attached notes are implemented in merged PR #38 using native Jazz ranges, text merging and deletion. Concurrent offline note creation reconciliation, bounded-query pagination and original-page annotation remain open. |
+| Public vocabulary | Reuse `at.margin.note`; custom companions and their namespace are removed from scope. Quote/position conversion, source timestamp serialization and the reviewed Margin content mapper are implemented. They enforce public text limits without truncation; Highlight mapping requires verified source capture text and offsets. Public key mapping, source anchoring/version qualification and unsupported retained/imported content handling remain open. |
 | Public authorization | Qualify least-required collection/operation permissions and progressive consent with the existing OAuth integration. Sign-in does not implement publication or prove write permission. |
-| Synchronization design | Review private intent/binding/attempt shapes, server-acceptance evidence, backend writer lifetime/scheduling on Vercel, multi-instance ownership, conflict resolution and companion cleanup. A backend alone is not an always-running scheduler. |
-| Publication implementation | Implement reviewed entities/projector, durable public mapping/attempts, conditional group writes/deletes, reconciliation, conflict/deletion pauses and user controls. No PDS publication code or live Lexicon currently exists. |
+| Synchronization design | Review private publication bookkeeping shapes, server-acceptance evidence, backend writer lifetime/scheduling on Vercel, multi-instance ownership and conflict resolution. A backend alone is not an always-running scheduler. |
+| Publication implementation | Implement the reviewed common-record projector, durable public mapping/outcome evidence, conditional writes/deletes, reconciliation, conflict/deletion pauses and user controls. No PDS publication code currently exists. |
 | Publication qualification | Disposable PDS conditional-write and lost-response cases, unknown-field preservation, complete offline restart/reconnect, deletion/Trash/restore conflicts, and real Margin/second-reader interoperability. No production grants/content needed for initial proof. |
 | Deferred scope | Local-work transfer and real merge, broader recovery/unlinking/provider-loss design, extension AT Protocol provider login, private/encrypted PDS storage, restricted audiences and automatic inbound synchronization. |
 
