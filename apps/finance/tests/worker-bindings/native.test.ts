@@ -11,6 +11,7 @@ import type {} from './driver.js'
 
 let directory = '',
 	origin = ''
+let sdkBrokerPath = ''
 let initialized = false,
 	preserveFailure = false
 let server: ReturnType<typeof createServer> | undefined
@@ -51,6 +52,13 @@ beforeAll(async () => {
 		})
 		response.end(asset?.bytes ?? 'No app, auth or Jazz endpoint exists in this fixture')
 	})
+	const brokers = [...assets.keys()].filter(
+		(path) =>
+			path.startsWith('/_app/immutable/assets/') && /\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
+	)
+	if (brokers.length !== 1 || !brokers[0])
+		throw new Error(`Expected one SDK broker asset, found ${brokers.length}`)
+	sdkBrokerPath = brokers[0]
 	server = listener
 	await new Promise<void>((resolve, reject) => {
 		listener.once('error', reject)
@@ -99,6 +107,91 @@ function retainOnFailure() {
 
 for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
 	describe(engine, () => {
+		it('isolates native Window SDK startup from the worker bridge', async () => {
+			retainOnFailure()
+			const browser = await browserType.launch({ headless: true })
+			try {
+				const page = await boot(await browser.newContext())
+				expect(
+					await page.evaluate(
+						({ scope, url }) => window.financeSdkFixture.windowControl(scope, url),
+						{ scope: crypto.randomUUID(), url: origin + sdkBrokerPath }
+					)
+				).toBe(true)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('uses one real SDK worker session for offline Finance saves through cold browser restarts', async () => {
+			retainOnFailure()
+			const profile = await mkdtemp(join(directory, `sdk-${engine}-`))
+			const ids = {
+				organizationId: crypto.randomUUID(),
+				accountId: crypto.randomUUID(),
+				categoryId: crypto.randomUUID(),
+				transactionId: crypto.randomUUID()
+			}
+			const scope = crypto.randomUUID()
+			let accountId: string | undefined
+			for (let cycle = 0; cycle < 3; cycle++) {
+				const context = await browserType.launchPersistentContext(profile, { headless: true })
+				try {
+					console.log(`SDK ${engine} cold cycle ${cycle + 1}`)
+					const page = await boot(context)
+					const opened = await page.evaluate(
+						({ scope, url }) => window.financeSdkFixture.open(scope, url),
+						{ scope, url: origin + sdkBrokerPath }
+					)
+					if (opened.kind !== 'opened') throw new Error('Expected SDK session')
+					expect(opened).toMatchObject({ localFirst: true, windowPresent: false })
+					if (cycle === 0) accountId = opened.accountId
+					else expect(opened.accountId).toBe(accountId)
+					await context.setOffline(true)
+					const before = await page.evaluate(
+						(organizationId) => window.financeSdkFixture.command({ type: 'READ', organizationId }),
+						ids.organizationId
+					)
+					const native = await page.evaluate(() => window.financeSdkFixture.stats())
+					expect(native.opens).toBeGreaterThan(0)
+					expect(native.reads).toBeGreaterThan(0)
+					expect(before).toEqual({
+						kind: 'rows',
+						rows:
+							cycle === 0
+								? []
+								: [
+										{
+											id: ids.transactionId,
+											amountMinor: cycle === 1 ? 5678 : 9012,
+											memo: 'Stored in the worker'
+										}
+									]
+					})
+					if (cycle === 0)
+						expect(
+							await page.evaluate(
+								(ids) => window.financeSdkFixture.command({ type: 'SEED', ...ids }),
+								ids
+							)
+						).toEqual({ kind: 'saved' })
+					if (cycle < 2)
+						expect(
+							await page.evaluate(
+								({ transactionId, amountMinor }) =>
+									window.financeSdkFixture.command({ type: 'EDIT', transactionId, amountMinor }),
+								{ transactionId: ids.transactionId, amountMinor: cycle === 0 ? 5678 : 9012 }
+							)
+						).toEqual({ kind: 'saved' })
+					expect(await page.evaluate(() => window.financeSdkFixture.close())).toEqual({
+						kind: 'closed',
+						sdkClosed: true,
+						hostClosed: true
+					})
+				} finally {
+					await context.close()
+				}
+			}
+		}, 90_000)
 		it('joins actual SDK settlement with call delivery and preserves its SharedWorker port after grant closure', async () => {
 			retainOnFailure()
 			const browser = await browserType.launch({ headless: true })

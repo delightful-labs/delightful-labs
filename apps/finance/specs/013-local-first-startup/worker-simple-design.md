@@ -1,9 +1,9 @@
 # Simpler Finance worker design
 
-Status: proposal for review, 2026-11-16. The user requested rethinking the
-architecture around Jazz, Svelte, XState and browser workers. Stop extending
-the grant/call-owner architecture while reviewing this replacement. No runtime
-replacement or changed capability policy is approved or implemented by this file.
+Status: the user approved starting this design on 2026-11-16, including the
+session-level bridge proposed for review. The initial real-SDK fixture is now
+implemented; WebKit qualification is blocked as recorded below. Stop extending
+the grant/call-owner architecture. No production runtime cutover is implemented.
 
 ## Start with the actual application
 
@@ -122,4 +122,47 @@ framework. The existing Window application remains active until qualified cutove
   supplies `browserWorkerHost` and dedicated-worker persistence support. Installed
   source was checked for SDK generation fallback and SharedWorker shutdown.
 
-These are source findings and a proposed design, not new runtime qualification.
+## First implementation checkpoint
+
+The existing native-binding fixture now has a small SDK test Worker and Window
+control. They use `createJazzClient`, one shared broker client/host and the
+qualified IndexedDB AccountStore. No new production owner, grant, callback
+machine, SDK patch or library API was added. The actual Finance schema is queried
+and written in the Worker; test seeding is fixture setup, not app bootstrap code.
+
+The worker test saves and edits an expense with browser networking disabled,
+closes the actual SDK/store/broker, terminates the Worker, and restarts the entire
+browser twice using its disposable persistent profile. Both reopens must retain
+the original account and exact edited transaction. Native hook counters require
+real SDK generation reads and SharedWorker construction. The fixture serves only
+static assets: `/jazz` and auth services are unavailable throughout. Static assets
+are loaded before browser-offline mode; this does not qualify PWA asset delivery,
+server authorization, sync, multiple tabs or close during pending startup.
+
+Results at this checkpoint:
+
+- Chromium and Firefox pass all three cold browser cycles.
+- A native Window SDK startup/upgrade control passes in Chromium, Firefox and
+  WebKit. Final selected verification is five passes; the other 25 cases were
+  not selected in that command. Browser-fixture TypeScript passes.
+- WebKit's Worker fails on its first local-first upgrade with
+  `invalid_account_handle`, after `createJazzClient` returned a ready session.
+  Its stack reaches SDK `accountRegistry` through `accountContextScope`,
+  `createAccountDbWithRuntimeSource`, `createRegisteredJazzClient` and the
+  session upgrade. Removing automatic upgrading and testing explicit upgrading
+  alone still fails. An unminified control also fails; normal minification was
+  restored. The cause is unresolved; neither an SDK patch nor an initialization
+  workaround is selected. The failing case remains enabled.
+
+The first fixture build found both the SDK's emitted immutable broker asset and
+its separately bundled constructor branch. Asset selection now requires the
+single immutable SDK broker asset under the configured worker asset path. That
+setup failure ran no SDK case. No runtime namespace algorithm was copied.
+
+Preserved logs use `/private/tmp/finance-simple-sdk-*.log`; original WebKit build/
+profile artifacts remain in `.svelte-kit/finance-binding-native-HwjwkG`,
+`finance-binding-native-gni8pM`, `finance-binding-native-ZO4ABR` and
+`finance-binding-native-ewC0eU`. Do not retry unchanged startup or remove the old
+implementation as if cross-browser replacement were qualified. Discuss the
+worker-only SDK failure before choosing a different initialization approach or
+changing dependencies. The application remains Window-owned.

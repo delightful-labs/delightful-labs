@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import './sdk-session.js'
 import sharedWorkerUrl from './echo.sharedworker.js?sharedworker&url'
 import {
 	serveFinanceBrokerGrant,

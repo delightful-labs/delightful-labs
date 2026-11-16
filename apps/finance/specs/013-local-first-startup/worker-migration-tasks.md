@@ -1,12 +1,14 @@
 # Finance worker migration: foundation-first tasks
 
-Current direction, 2026-11-16: review the
-[simpler native-worker design](worker-simple-design.md). The user requested an
-architectural rethink; do not extend the F4 grant/call population or add its
-inbox while that review is pending. Keep W01–W21's product/parity requirements,
-but replace the implementation sequence with a real SDK vertical slice if the
-session-scoped bridge boundary is accepted. Prior results below retain their
-historical scope; no replacement runtime has been qualified.
+Current direction, 2026-11-16: implement the approved
+[simpler native-worker design](worker-simple-design.md). Do not extend the F4
+grant/call population or add its inbox. Keep W01–W21's product/parity requirements,
+but start with one existing broker connection and a real SDK vertical slice.
+The initial fixture passes Chromium/Firefox saves and two cold browser reopens;
+WebKit fails inside SDK local-first upgrade while the matched Window control
+passes. Resolve that finding before expanding or removing the old implementation.
+Prior results below retain their historical scope; no replacement runtime cutover
+has been qualified.
 
 Status: recorded migration backlog after code research on `main` at `eb0f615f`
 (2026-11-13), incorporated by [spec.md](spec.md#application-worker-migration-handoff).

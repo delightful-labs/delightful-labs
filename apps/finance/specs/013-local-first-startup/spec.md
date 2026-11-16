@@ -13,13 +13,14 @@ Ask product questions one at a time. Implement lower-risk local usability improv
 
 ## Application-worker migration handoff
 
-2026-11-16 direction: the user requested a simpler architecture leaning on
-native Jazz, Svelte, XState and Web Workers. Review the
-[simpler worker proposal](worker-simple-design.md) before extending the existing
-grant/call-owner work. It proposes one session-scoped broker connection using
-existing shared APIs; the change from exact per-binding grants requires review.
+2026-11-16 direction: the user approved starting the simpler architecture leaning
+on native Jazz, Svelte, XState and Web Workers. The
+[simpler worker design](worker-simple-design.md) replaces the grant/call-owner
+direction with one session-scoped broker connection using existing shared APIs.
+Its initial real-SDK proof passes Chromium/Firefox cold data reopens but is
+blocked on WebKit's worker-only SDK account-handle error. No cutover is qualified.
 The historical implementation/qualification below is not approval to continue
-building the superseded layers or evidence that this replacement is qualified.
+building the superseded layers or evidence that the replacement is fully qualified.
 
 Updated 2026-11-13: the user requested a foundation-first migration task list,
 research against current monorepo code, and explicit Local First/Clipper reuse.
