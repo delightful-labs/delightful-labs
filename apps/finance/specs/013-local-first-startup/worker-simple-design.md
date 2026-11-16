@@ -8,6 +8,12 @@ native cases pass, including WebKit. See the
 [startup research](worker-webkit-startup-research.md). Stop extending
 the grant/call-owner architecture. No production runtime cutover is implemented.
 
+Subsequent [alpha.61–65 source research](worker-jazz-release-research.md) identifies
+native immediate local-first startup and a session-owned account API that can
+simplify this integration. A coordinated upgrade is proposed for review;
+workspace versions remain alpha.60. The unpatched alpha.65 probe loses worker
+rows across a full restart, so the persistent worker bridge is still required.
+
 ## Start with the actual application
 
 One dedicated application Worker per tab runs the existing Finance domain
