@@ -2,8 +2,9 @@
 
 Researched 2026-11-16 after the user pointed out that Clipper already works in
 WebKit. The cause is established in the preserved Finance fixture. Two supported
-build corrections pass the entire native suite experimentally. Neither correction
-has been applied to the committed configuration yet.
+build corrections pass the entire native suite experimentally. The user then
+requested one shared solution for both apps; the selected correction is now
+implemented through Local First as described below.
 
 ## Cause
 
@@ -70,7 +71,7 @@ code pass when only the bundling setting changes.
 
 ## Why Clipper works
 
-Clipper's Vite config does not override the worker format. The installed Vite
+At the time of diagnosis, Clipper's Vite config did not override the worker format. The installed Vite
 default is `iife`; its existing local production artifact is a single IIFE
 bundle, without this lazy import back into its entry. Vite's installed source
 sets `codeSplitting: false` for that format. This differs from Finance's explicit
@@ -114,9 +115,38 @@ The diagnostic observation reads the preserved unminified
 findings and experiment settings are recorded here so temporary files are not
 required to understand or reproduce the investigation.
 
-The committed configuration still uses ES output with code splitting. Apply the
-chosen correction, inspect its emitted graph and run the affected worker build
-and native checks before claiming the blocker fixed on the branch. This does
-not establish full application parity, reconciliation, or resolution of the
-separate offline-edit CI failure. It provides no reason to add an SDK patch,
-replace the IndexedDB AccountStore or extend the old grant/call-owner design.
+## Shared implementation and qualification
+
+The user requested one solution both apps can use. Local First now exports
+`jazzWorkerOptions` from `backend/jazz/worker-build`: ES output with
+`codeSplitting: false` and an optional asset filename pattern. Finance's existing
+build helper, Clipper web and Clipper's extension consume it. SDK/Wasm resolution
+stays with each app, preserving its installed peer and asset layout. No Vite
+dependency, SDK patch, account store or runtime lifecycle is added or changed.
+
+Passing qualification uses the shared implementation:
+
+- All 30 Finance native cases across Chromium, Firefox and WebKit, including the
+  real Finance schema's offline saves and two full browser restarts.
+- Finance's 17 emitted-worker graph/build cases, production application build,
+  worker-proof types and browser-fixture types.
+- Clipper's two production build versions and all 12 production/offline cases.
+  Three added cases open the actual production application worker in Chromium,
+  Firefox and WebKit. Existing cases cover abrupt worker termination, offline
+  restarts, reconciliation, expired identities, annotations and shell updates.
+- The extension build and packaging check. Two capture checks fail during
+  account setup because the expected recovery field is absent. A paired baseline
+  rebuilt the extension and served the web app with their original worker
+  settings: the same toolbar test fails at the same missing field. This failure
+  therefore also exists without the shared build correction; its cause remains
+  separate work. Do not claim extension capture qualification passed.
+- The actual-tarball transport consumers compile the public build helper against
+  Vite and use it to build their self-contained module workers. Library types,
+  strict package validation and affected app type checks pass.
+
+Logs use `/private/tmp/finance-shared-worker-build-*.log`. Extension baseline
+settings were restored in a `finally` block, and its final build again uses the
+shared helper. This closes the reproduced WebKit SDK-startup blocker; it does
+not establish full Finance application parity or resolve the separate Finance
+offline-edit CI failure. Keep the old inactive grant/call implementation until
+the planned application replacement is qualified.

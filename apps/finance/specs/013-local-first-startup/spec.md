@@ -17,8 +17,12 @@ Ask product questions one at a time. Implement lower-risk local usability improv
 on native Jazz, Svelte, XState and Web Workers. The
 [simpler worker design](worker-simple-design.md) replaces the grant/call-owner
 direction with one session-scoped broker connection using existing shared APIs.
-Its initial real-SDK proof passes Chromium/Firefox cold data reopens but is
-blocked on WebKit's worker-only SDK account-handle error. No cutover is qualified.
+Its real-SDK proof now passes all 30 native cases, including cold data reopens in
+Chromium/Firefox/WebKit. The worker-entry duplication behind WebKit's account
+error is corrected through Local First's shared single-bundle ES-module settings,
+also used by Clipper web and its extension. See the
+[research and qualification](worker-webkit-startup-research.md). No production
+Finance cutover is qualified.
 The historical implementation/qualification below is not approval to continue
 building the superseded layers or evidence that the replacement is fully qualified.
 

@@ -41,6 +41,29 @@ application Worker nor changes either app's selected identity or namespace.
 Both consume the existing workspace Jazz patch, which supplies the
 `RuntimeSourcesConfig.browserWorkerHost` hook; no new patch is introduced.
 
+## Shared worker build settings
+
+Finance, Clipper web and Clipper's extension use `jazzWorkerOptions` from the
+public `backend/jazz/worker-build` export. It supplies ES-module output with
+`codeSplitting: false`. This prevents a lazy chunk from importing the worker
+entry again and duplicating Jazz's account registry in affected WebKit builds.
+The helper has no Vite runtime/type dependency and introduces no runtime owner.
+
+```ts
+import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
+
+export default { worker: jazzWorkerOptions() }
+```
+
+An optional asset filename pattern preserves an app's existing output layout;
+Finance passes `_app/immutable/assets/[name].[hash][extname]`. Apps continue
+resolving Wasm from their own SDK installation. Single-bundle output includes
+the worker's lazy JavaScript dependencies up front; the Wasm binary remains a
+separate asset. See Finance's
+[research and qualification](../../../apps/finance/specs/013-local-first-startup/worker-webkit-startup-research.md).
+
+## Extraction history
+
 The shared code lives inside Local First's Jazz integration boundary because it
 implements `RuntimeSourcesConfig.browserWorkerHost`; it imports no app schema,
 domain or UI. Clipper keeps only re-exports of the shared setup and worker facade.

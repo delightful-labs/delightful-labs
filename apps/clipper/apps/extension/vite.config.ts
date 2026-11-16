@@ -2,6 +2,7 @@ import { extensionPublicKey } from '../../tooling/extension-identity.js'
 import { defineConfig, loadEnv } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { jazzWasmEntry as wasm } from '../web/tooling/jazz-wasm.js'
+import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
 import { dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
 export default defineConfig(({ mode }) => {
@@ -81,7 +82,7 @@ export default defineConfig(({ mode }) => {
 			__CLIPPER_SERVER__: JSON.stringify(server.href),
 			__CLIPPER_WEB__: JSON.stringify(web.href)
 		},
-		worker: { format: 'es' },
+		worker: jazzWorkerOptions(),
 		build: {
 			target: 'es2023',
 			rollupOptions: {

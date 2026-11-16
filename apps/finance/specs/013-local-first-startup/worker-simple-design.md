@@ -2,8 +2,9 @@
 
 Status: the user approved starting this design on 2026-11-16, including the
 session-level bridge proposed for review. The initial real-SDK fixture is now
-implemented; the WebKit cause is identified and two build corrections pass
-experimentally, pending application to the branch. See the
+implemented; the WebKit worker-entry duplication is corrected through the shared
+Local First worker build settings used by Finance and Clipper. All 30 Finance
+native cases pass, including WebKit. See the
 [startup research](worker-webkit-startup-research.md). Stop extending
 the grant/call-owner architecture. No production runtime cutover is implemented.
 
@@ -52,7 +53,8 @@ Finance's real-SDK fixture additionally selects the configured broker asset
 pathname. SDK version queries, names and generation keys pass through unchanged
 after bounded wire validation. The root workspace Jazz patch already serves
 both apps and stays there; this extraction adds no patch or lifecycle manager.
-The known WebKit SDK-worker qualification failure below remains unresolved.
+The former WebKit SDK-worker failure and its shared build correction are recorded
+below and in the startup research.
 
 The existing shared channel records a request fault and leaves accepting before
 later requests can use that channel. It already handles callback delivery and
@@ -163,8 +165,9 @@ Results at this checkpoint:
   alone still fails. An unminified control also fails; normal minification was
   restored. At this checkpoint the cause was unresolved. Subsequent
   [research](worker-webkit-startup-research.md) establishes duplicate worker-entry
-  evaluation and verifies two build-only corrections; neither is applied yet.
-  The failing case remains enabled.
+  evaluation and verifies two build-only corrections. The selected ES-module
+  single-bundle correction is now shared by both apps through Local First;
+  the case remains enabled and passes.
 
 The first fixture build found both the SDK's emitted immutable broker asset and
 its separately bundled constructor branch. Asset selection now requires the
@@ -175,10 +178,10 @@ Preserved logs use `/private/tmp/finance-simple-sdk-*.log`; original WebKit buil
 profile artifacts remain in `.svelte-kit/finance-binding-native-HwjwkG`,
 `finance-binding-native-gni8pM`, `finance-binding-native-ZO4ABR` and
 `finance-binding-native-ewC0eU`. Do not retry unchanged startup or remove the old
-implementation as if cross-browser replacement were qualified. The research
-recommends disabling worker code splitting while preserving ES output; no
-different initialization approach or dependency patch is needed for this
-failure. The application remains Window-owned.
+implementation as if full application replacement were qualified. The selected
+build correction disables worker code splitting while preserving ES output;
+no different initialization approach or dependency patch is needed for this
+failure. The production application remains Window-owned.
 
 ## Shared Window setup checkpoint
 
@@ -194,3 +197,11 @@ checkout's cache resolved it. Logs use
 `/private/tmp/finance-shared-browser-host-*.log`. This extraction did not resolve
 or disable the WebKit worker failure. The subsequent build experiments are
 recorded in the startup research; the separate offline-edit CI failure remains.
+
+## Shared build correction checkpoint
+
+`jazzWorkerOptions` in Local First's public `backend/jazz/worker-build` module
+supplies the same single-bundle ES-module policy to Finance, Clipper web and
+Clipper's extension. Each app retains its SDK asset resolution and output paths.
+The original runtime, account store and SDK patch are unchanged. Qualification
+and the extension test limitation are recorded in the startup research.

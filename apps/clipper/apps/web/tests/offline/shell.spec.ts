@@ -4,7 +4,7 @@ import { closeLibraryPopovers, openLibrarySearch, openLibraryFilters } from '../
 import { openAddLink } from '../add-link.js'
 import { readingControls, closeReadingControls, visibleReadingParagraph } from '../reader-ui.js'
 import { app } from '../../src/lib/backend/jazz/schema.js'
-import { test, expect, chromium } from '@playwright/test'
+import { test, expect, chromium, firefox, webkit } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -133,6 +133,21 @@ test.afterAll(async () => {
 	await stopAuthority()
 	await rm(dataDir, { recursive: true, force: true })
 })
+
+for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
+	test(`production worker opens the local library in ${engine}`, async () => {
+		const browser = await browserType.launch({ headless: true })
+		try {
+			const page = await browser.newPage()
+			await page.goto('http://127.0.0.1:5190')
+			await expectLibrarySynced(page)
+			await ready(page)
+			await expect(page.getByRole('button', { name: 'Create account', exact: true })).toHaveCount(0)
+		} finally {
+			await browser.close()
+		}
+	})
+}
 
 test('production shell survives abrupt application worker termination and a full offline restart, then syncs to a restored profile', async ({
 	browser

@@ -422,6 +422,10 @@
 			"types": "./dist/backend/jazz/indexeddb-account-store.d.ts",
 			"default": "./dist/backend/jazz/indexeddb-account-store.js"
 		},
+		"./backend/jazz/worker-build": {
+			"types": "./dist/backend/jazz/worker-build.d.ts",
+			"default": "./dist/backend/jazz/worker-build.js"
+		},
 		"./backend/jazz/worker-broker": {
 			"types": "./dist/backend/jazz/worker-broker.d.ts",
 			"default": "./dist/backend/jazz/worker-broker.js"

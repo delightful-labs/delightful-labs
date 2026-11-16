@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
 
 const consumers = [
@@ -43,6 +44,8 @@ try {
 			'fixtures/package-consumer/' + consumer.source,
 			join(directory, 'consumer-' + consumer.name + '.ts')
 		)
+	const buildConsumer = join(directory, 'consumer-worker-build.ts')
+	await copyFile('fixtures/package-consumer/worker-build.ts', buildConsumer)
 	await writeFile(
 		join(directory, 'tsconfig.json'),
 		JSON.stringify({
@@ -64,6 +67,7 @@ try {
 		[resolve('node_modules/typescript/bin/tsc'), '--project', join(directory, 'tsconfig.json')],
 		{ stdio: 'pipe' }
 	)
+	const { workerBuild } = await import(pathToFileURL(buildConsumer).href)
 	for (const consumer of consumers) {
 		const entry = createRequire(join(directory, 'package.json')).resolve(consumer.subpath)
 		if (!entry.startsWith(destination))
@@ -83,7 +87,7 @@ try {
 			root: directory,
 			logLevel: 'silent',
 			worker: {
-				format: 'es',
+				...workerBuild(),
 				plugins: () => [
 					{
 						name: 'packed-worker-transport',

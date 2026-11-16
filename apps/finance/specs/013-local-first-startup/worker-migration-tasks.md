@@ -4,9 +4,14 @@ Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,
 but start with one existing broker connection and a real SDK vertical slice.
-The initial fixture passes Chromium/Firefox saves and two cold browser reopens;
-WebKit fails inside SDK local-first upgrade while the matched Window control
-passes. Resolve that finding before expanding or removing the old implementation.
+The real-SDK fixture now passes all 30 native cases, including saves and two cold
+browser reopens in Chromium/Firefox/WebKit. The WebKit failure was duplicate
+worker-entry evaluation; Finance and Clipper now use the same Local First
+single-bundle ES-module build settings. See the
+[cause and qualification](worker-webkit-startup-research.md). Next implement the
+planned worker-owned UI read slice; retain the old inactive implementation until
+its replacement is qualified. The extension capture baseline and Finance's
+separate offline-edit CI failure remain open.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 
