@@ -1,25 +1,20 @@
 # Article notes — implementation started
 
-## Companion Lexicon drafts — 2026-11-14
+## Shared Lexicon reuse — 2026-11-16
 
-The next continuation prepares concrete Highlight/Note Lexicon JSON under
-`docs/reviews/companion-lexicons/`, using the approved identity/relationship fields.
-On 2026-11-16 the user removed the supplemental `positionAnchor` proposal; shared
-anchoring uses Margin's quotation selector. The Highlight draft now contains only
-`subject`, `article` and optional `note`. Proposed names are
-`com.delightfullabs.clipper.highlight` and
-`com.delightfullabs.clipper.note`, based on the existing Clipper domain. Namespace
-approval is pending; this does not establish domain authority or publish schemas.
-The drafts retain the earlier proposal's `key: "tid"`; the key restriction,
-generation/reuse and discovery conventions are still review choices.
+The user challenged the need for the custom companions. Current sharing scope
+uses `at.margin.note` directly: a bare Highlight, a Highlight with commentary,
+or a document Note is one public annotation record. Separate private Jazz
+Highlight/Note identities do not require separate public records. The public
+record's AT URI is the external identity; local mapping remains private.
 
-The installed OAuth dependency tree contains `@atcute/lexicons@2.1.1` and its
-supported canonical record-URI/DID parsers and CID validator. Approval has been
-requested before declaring it directly for companion runtime validation. No
-package/lockfile change or application import has been made for this step.
-Both artifacts parse as JSON; this is a syntax check, not AT Lexicon semantic
-validation, runtime relationship coverage or PDS interoperability qualification.
-The review README records required cross-record/source checks and these limits.
+The companion JSON drafts are removed. No Clipper namespace, duplicate article
+association, reciprocal public links, companion strong references or extra record
+keys are needed for this scope. The companion-specific direct dependency request
+is withdrawn; manifests and lockfile are unchanged. Historical companion/group
+proposals are marked superseded and must not drive implementation. Publication
+permissions, source verification, metadata preservation, conditional writes and
+reconciliation still require implementation/qualification for the common record.
 
 ## Margin content mapper — 2026-11-14
 
@@ -60,7 +55,7 @@ This is a pure content mapper with no PDS, persistence, permission or UI effects
 Its strict schema describes newly constructed owned content, not arbitrary remote
 Margin records. Remote updates still require metadata preservation, conflict
 comparison and conditional writes, including review of dependent facets.
-Original-page capture, companion namespace, private publication models, preview,
+Original-page capture, private publication models, preview,
 grants, scheduling and reconciliation remain open.
 
 Verification passes 26 selector/mapper/native Jazz tests, including real native
@@ -88,8 +83,8 @@ never become source-page positions merely by changing the target URI.
 
 These are interchange primitives, not an export UI or a PDS publisher. The exact
 Margin content record mapping was presented for approval and subsequently
-implemented as recorded above. Companion namespace, private publication shapes,
-scheduling, permissions and reconciliation remain open under the review boundary.
+implemented as recorded above. Private publication shapes, scheduling, permissions
+and reconciliation remain open under the review boundary.
 
 Focused verification passes 14 tests, including a real Jazz-captured range and
 200 generated Unicode position cases. Full web/service-worker types, implementation
