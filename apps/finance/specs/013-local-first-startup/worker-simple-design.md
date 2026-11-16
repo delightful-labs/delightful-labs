@@ -14,6 +14,12 @@ simplify this integration. A coordinated upgrade is proposed for review;
 workspace versions remain alpha.60. The unpatched alpha.65 probe loses worker
 rows across a full restart, so the persistent worker bridge is still required.
 
+The complete [seven-item simplification checklist](worker-migration-tasks.md#seven-item-simplification-checklist)
+records the proposed cleanup, ownership, read-view, financial-workflow and test/
+spec tasks. Its execution notes distinguish deletion of confirmed-unused
+prototypes from replacement of live behavior and place the coordinated SDK
+upgrade before new worker integration glue. These tasks are not yet implemented.
+
 ## Start with the actual application
 
 One dedicated application Worker per tab runs the existing Finance domain
@@ -115,11 +121,12 @@ without copying Clipper's unrelated article/extension coordination.
 3. Connect one read-only Finance view using a small command/view union and Svelte
    subscription. Then move one existing financial form/workflow into the Worker.
    Preserve domain tests and add boundary/offline tests for the actual moved flow.
-4. Once that replacement is qualified, remove the unused Finance grant protocol,
-   grant/call owners, preparation layer, population/inbox plan and their bespoke
-   fixtures/build checks. Drop PR #39's unneeded shared interruption-type extension
-   if no remaining consumer needs it. Keep the shared broker/channel/IDB foundations
-   used by Clipper; do not rewrite or unpublish those APIs just to shrink Finance.
+4. Remove confirmed-unused experimental grant/call machinery through C1–C3's
+   import-audit gates; it need not be ported into the new implementation. Retain
+   anything serving live behavior until its replacement is qualified. Drop
+   PR #39's unneeded shared interruption-type extension only if no remaining
+   consumer needs it. Keep the shared broker/channel/IDB foundations used by
+   Clipper; do not rewrite or unpublish those APIs just to shrink Finance.
 
 Defer broader abstractions until a second real consumer demonstrates a missing
 shared capability. Preserve the product/parity requirements in W01–W21; replace

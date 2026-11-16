@@ -8,12 +8,83 @@ The real-SDK fixture now passes all 30 native cases, including saves and two col
 browser reopens in Chromium/Firefox/WebKit. The WebKit failure was duplicate
 worker-entry evaluation; Finance and Clipper now use the same Local First
 single-bundle ES-module build settings. See the
-[cause and qualification](worker-webkit-startup-research.md). Next implement the
-planned worker-owned UI read slice; retain the old inactive implementation until
-its replacement is qualified. The extension capture baseline and Finance's
+[cause and qualification](worker-webkit-startup-research.md). The latest proposed
+sequence is the bounded unused-prototype cleanup below, a coordinated SDK upgrade
+using the [alpha.61–65 research](worker-jazz-release-research.md), then the planned
+worker-owned UI read slice. Keep live behavior until its replacement is qualified.
+The extension capture baseline and Finance's
 separate offline-edit CI failure remain open.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
+
+## Seven-item simplification checklist
+
+This is the complete cleanup list proposed to the user on 2026-11-16. All seven
+items remain open; recording them does not mean implementation is complete or
+authorize a dependency upgrade or production cutover. This checklist is the
+current cleanup handoff alongside the selected simpler design. W01–W21 below
+retain their product/parity requirements, not the abandoned implementation plan.
+
+- [ ] **C1 — Delete the abandoned grant/call architecture.** Audit non-test
+      imports, then remove confirmed-unused `worker-grant-owner` and
+      `worker-sdk-call-owner` machines/contracts, `sdk-call-binding`, grant
+      binding/protocol/adapters, and their bespoke fixtures. Remove obsolete
+      population/inbox tasks rather than implementing them. Keep the shared
+      broker/channel/close APIs and port-custody behavior used by both apps.
+- [ ] **C2 — Remove the old Window account-storage bridge.** Audit the unused
+      `host-client`, `window-host`, `host-drain`, account-store facade/storage
+      adapters, selection namespace and legacy account-store machines as one
+      dependency group. Retire their Window/localStorage selection and migration
+      machinery. Use the shared worker-accessible IndexedDB AccountStore and
+      preserve the user's no-migration/no-fallback/no-dual-write decision. Do not
+      confuse the obsolete selection bridge with the still-required Window
+      broker hooks or delete the active application's SDK storage by implication.
+- [ ] **C3 — Replace the import catalog with the real application worker.**
+      `application.worker.ts` currently reports factory types rather than running
+      Finance. During cleanup, remove build-proof requirements that keep abandoned
+      components present. During the read slice, replace the catalog with the
+      actual worker entry. Keep meaningful emitted-graph checks for UI isolation,
+      SDK/Wasm assets, self-contained worker output and public package boundaries.
+- [ ] **C4 — Give the session lifecycle one owner.** Reuse Local First startup/
+      acquisition and the native Jazz session, with one Finance application
+      worker/session owner. Use the newer SDK's immediate local-first startup
+      and public session operations after a coordinated upgrade is qualified;
+      remove the redundant SDK-upgrade/opaque-handle plumbing identified in the
+      release research. Window forwards commands/views and narrow browser effects;
+      it must not maintain a matching application/domain lifecycle. Preserve real
+      domain drains, identity binding, startup interruption and shutdown outcomes.
+- [ ] **C5 — Move one read-only Finance view before adding infrastructure.**
+      Start with an accounts list scoped to the selected organization, subject to
+      confirming its existing component/query boundary. Send only the bounded
+      fields Svelte renders through a small validated command/view union. Keep
+      ordinary Svelte subscription/rendering; do not send complete XState
+      snapshots or build a generic remote Jazz/actor API. Qualify identity/scope
+      replacement, late views, unsubscribe and offline restart.
+- [ ] **C6 — Move one existing financial workflow intact.** After the read slice,
+      move one existing form/workflow's application logic into the worker, reusing
+      its validation, transaction, permissions and outcome handling. Keep DOM,
+      focus and UI interaction behavior with Svelte. Retain operation identity,
+      interruption and uncertain-write behavior; do not add a second command-owner
+      framework or replay unknown mutations.
+- [ ] **C7 — Consolidate tests and spec around the selected design.** Apply this
+      in every slice. Keep real SDK persistence/full-process restart coverage and
+      domain tests. Replace tests tied to removed grant mechanics with meaningful
+      single-session boundary cases: account switching, stale views, startup
+      interruption, native failures and close with pending writes. Retire stale
+      active plan/build assertions; keep source history and qualification records
+      traceable in Git. Do not weaken durability or call the known CI/extension
+      failures fixed without evidence.
+
+Recommended execution order: first audit and delete only confirmed-unused
+prototype code in C1/C2, trimming obsolete catalog constraints in C3 and keeping
+coverage aligned through C7. Keep the live Finance lifecycle and financial
+machines unchanged in that deletion-only slice. Next review and qualify the
+coordinated SDK upgrade, including its patch, backend/schema, auth and Vercel
+namespace boundaries. Then complete C3/C4/C5 as one real read slice, followed by
+C6. Qualification is required before replacing live behavior; the first cleanup
+must not turn into a runtime cutover or a new account-data migration.
+
+## Historical foundation backlog and product parity requirements
 
 Status: recorded migration backlog after code research on `main` at `eb0f615f`
 (2026-11-13), incorporated by [spec.md](spec.md#application-worker-migration-handoff).
