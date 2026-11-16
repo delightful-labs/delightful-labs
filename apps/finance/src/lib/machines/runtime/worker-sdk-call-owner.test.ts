@@ -1,7 +1,8 @@
 import { setImmediate } from 'node:timers/promises'
 import { afterEach, expect, it, vi } from 'vitest'
 import { waitFor } from 'xstate'
-import { sdkCallFixture, sdkKey, sdkOpen } from './worker-sdk-call-owner.test-support.js'
+import { sdkCallFixture, sdkKey, sdkOpen, sdkOrigin } from './worker-sdk-call-owner.test-support.js'
+import { prepareFinanceSdkCall } from '../../runtime/worker/sdk-call-binding.js'
 import { grantFixture } from './worker-grant-owner.test-support.js'
 
 const cleanups = new Set<() => void>()
@@ -411,9 +412,14 @@ it('captures configuration and native methods before the caller replaces them', 
 	const f = fixture({ start: false }),
 		grant = { ...f.grant },
 		bad = vi.fn()
-	f.configuration.origin = 'https://other.example'
+	expect(f.actor.getSnapshot().context.record.configuration?.prepared).toBe(f.prepared)
 	f.configuration.grant = { ...f.grant, grantId: crypto.randomUUID() }
-	f.configuration.prepared = { ...f.prepared, payloadBytes: -1 }
+	f.configuration.prepared = prepareFinanceSdkCall({
+		identity: f.identity,
+		operation: { type: 'READ', key: sdkKey + ':replacement' },
+		origin: sdkOrigin,
+		onBrokerResult: bad
+	})
 	f.configuration.custody = { recordStopResult: bad, deliver: bad }
 	f.actor.start()
 	f.actor.send({ type: 'GRANT_AVAILABLE', identity: grant })
@@ -421,6 +427,7 @@ it('captures configuration and native methods before the caller replaces them', 
 	await flush()
 	expect(bad).not.toHaveBeenCalled()
 	expect(f.recordStopResult).toHaveBeenCalledOnce()
+	expect(f.requests[0]).toBe(f.prepared.call)
 	expect(f.actor.getSnapshot().output?.grant).toEqual(grant)
 })
 
@@ -469,28 +476,17 @@ it.each([false, true])(
 	}
 )
 
-it.each(['payload', 'binding', 'scope', 'origin', 'close'])(
-	'rejects invalid %s initialization before effects',
-	(field) => {
-		const f = fixture({
-			configure(input) {
-				if (field === 'payload')
-					input.prepared = { ...input.prepared, payloadBytes: input.prepared.payloadBytes + 1 }
-				if (field === 'binding')
-					input.prepared = {
-						...input.prepared,
-						descriptor: { kind: 'generation', key: sdkKey + ':other' }
-					}
-				if (field === 'scope') input.grant = { ...input.grant, runtimeId: crypto.randomUUID() }
-				if (field === 'origin') input.origin = 'https://secret@finance.example'
-				if (field === 'close') input.closeRequestId = 'invalid'
-			}
-		})
-		expect(f.errors).toHaveLength(1)
-		expect(f.requests).toHaveLength(0)
-		expect(f.deliver).not.toHaveBeenCalled()
-	}
-)
+it.each(['scope', 'close'])('rejects invalid %s initialization before effects', (field) => {
+	const f = fixture({
+		configure(input) {
+			if (field === 'scope') input.grant = { ...input.grant, runtimeId: crypto.randomUUID() }
+			if (field === 'close') input.closeRequestId = 'invalid'
+		}
+	})
+	expect(f.errors).toHaveLength(1)
+	expect(f.requests).toHaveLength(0)
+	expect(f.deliver).not.toHaveBeenCalled()
+})
 
 it('uses the real grant/channel and native generation host through SDK delivery and host close', async () => {
 	const g = grantFixture({ descriptor: { kind: 'generation', key: sdkKey } })

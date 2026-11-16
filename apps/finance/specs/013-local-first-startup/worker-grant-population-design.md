@@ -45,8 +45,11 @@ Finance's private callback identity is a copied, validated runtime UUID plus
 request UUID. Pure call preparation captures the caller's result recipient,
 validates/canonicalizes an exact generation key or same-origin broker URL/full
 name, then validates the actual canonical operation through public
-`brokerHostCall`. Validate again after URL canonicalization where expansion could
-exceed the wire bound. Do not copy private broker schemas or SDK namespace rules.
+`brokerHostCall` after URL canonicalization, so expansion cannot exceed the wire
+bound. Preparation returns one immutable owned snapshot; accounting and the child
+use that same object without preparing it again. Do not copy private broker
+schemas or SDK namespace rules. This is an internal factory-only dependency,
+not a DTO accepted from native messages.
 
 The pending-byte calculation is UTF-8 JSON of the validated canonical operation
 payload (OPEN/READ/WRITE fields); fixed identity-envelope overhead is separately

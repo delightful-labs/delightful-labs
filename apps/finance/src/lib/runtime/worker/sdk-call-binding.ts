@@ -25,34 +25,52 @@ export function prepareFinanceSdkCall(
 		onBrokerResult: (result: BrokerHostResult) => void
 	}>
 ): FinancePreparedSdkCall {
-	const { identity: sourceIdentity, operation: sourceOperation, origin, onBrokerResult } = input
+	const {
+		identity: sourceIdentity,
+		operation: sourceOperation,
+		origin: sourceOrigin,
+		onBrokerResult
+	} = input
+	let origin: URL
+	try {
+		origin = new URL(sourceOrigin)
+	} catch {
+		throw new Error('Invalid Finance SDK callback origin')
+	}
+	if (
+		sourceOrigin.length > 8192 ||
+		!['http:', 'https:'].includes(origin.protocol) ||
+		origin.username ||
+		origin.password
+	)
+		throw new Error('Invalid Finance SDK callback origin')
 	const identity = {
 		runtimeId: financeGrantScopeSchema.parse(sourceIdentity.runtimeId),
 		requestId: financeGrantScopeSchema.parse(sourceIdentity.requestId)
 	}
 	if (typeof onBrokerResult !== 'function') throw new Error('Invalid Finance SDK result recipient')
-	// Validate/copy through the existing public broker contract, including its
-	// stricter WRITE generation representation and payload field bounds.
-	const original = brokerHostCall(identity.requestId, sourceOperation, onBrokerResult)
 	let descriptor: FinanceGrantDescriptor
-	let operation = original.request
+	let operation = sourceOperation
 	if (operation.type === 'OPEN') {
 		const selected = financeGrantDescriptor(
 			{ kind: 'broker', url: operation.url, name: operation.name },
-			origin
+			origin.origin
 		)
 		if (selected.kind !== 'broker') throw new Error('Invalid Finance SDK broker descriptor')
 		descriptor = selected
 		operation = { ...operation, url: selected.url }
 	} else {
-		descriptor = financeGrantDescriptor({ kind: 'generation', key: operation.key }, origin)
+		descriptor = financeGrantDescriptor({ kind: 'generation', key: operation.key }, origin.origin)
 	}
-	// Canonical URL expansion must still fit the actual wire operation schema.
+	// Validate/copy once through the public broker contract after canonicalization,
+	// preserving strict fields, WRITE representation and expanded URL bounds.
 	const call = brokerHostCall(identity.requestId, operation, onBrokerResult)
-	return {
-		identity,
-		descriptor,
-		call,
+	// Only owned plain records are frozen; native callbacks/resources stay opaque.
+	Object.freeze(call.request)
+	return Object.freeze({
+		identity: Object.freeze(identity),
+		descriptor: Object.freeze(descriptor),
+		call: Object.freeze(call),
 		payloadBytes: new TextEncoder().encode(JSON.stringify(call.request)).byteLength
-	}
+	})
 }

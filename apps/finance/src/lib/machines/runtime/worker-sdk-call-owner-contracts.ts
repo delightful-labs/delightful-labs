@@ -41,7 +41,6 @@ export type FinanceSdkCallOutput = Readonly<{
 }>
 export type FinanceSdkCallOwnerInput = Readonly<{
 	prepared: FinancePreparedSdkCall
-	origin: string
 	grant: FinanceGrantIdentity
 	closeRequestId: string
 	grantTo: ActorRef<Snapshot<unknown>, FinanceGrantOwnerEvent>

@@ -1,16 +1,11 @@
 import { createAsyncLogic, setup, types, type ActorRefFrom } from 'xstate'
 import type { WorkerHostClosed } from 'delightful-local-first/worker/channel/contracts'
 import type { EventPayload } from '../../contracts/event-payload.js'
-import {
-	financeGrantDescriptor,
-	financeGrantKey,
-	financeGrantScopeSchema
-} from '../../runtime/worker/grant-binding.js'
+import { financeGrantScopeSchema } from '../../runtime/worker/grant-binding.js'
 import {
 	sameFinanceGrantIdentity,
 	type FinanceGrantIdentity
 } from '../../runtime/worker/grant-protocol.js'
-import { prepareFinanceSdkCall } from '../../runtime/worker/sdk-call-binding.js'
 import type {
 	FinanceSdkCallbackIdentity,
 	FinanceSdkCallbackResult
@@ -32,36 +27,10 @@ function required<Value>(value: Value | undefined): Value {
 function sameCallback(left: FinanceSdkCallbackIdentity, right: FinanceSdkCallbackIdentity) {
 	return left.runtimeId === right.runtimeId && left.requestId === right.requestId
 }
-/** Pure capture; no callback registration, grant admission or native effect. */
+/** Capture owner dependencies; the call is already an immutable prepared snapshot.
+ * No callback registration, grant admission or native effect. */
 function selectedInput(input: FinanceSdkCallOwnerInput): FinanceSdkCallOwnerInput {
-	const {
-		prepared: source,
-		origin: sourceOrigin,
-		grant: sourceGrant,
-		closeRequestId,
-		grantTo,
-		reportTo,
-		custody
-	} = input
-	let origin: URL
-	try {
-		origin = new URL(sourceOrigin)
-	} catch {
-		throw new Error('Invalid Finance SDK callback origin')
-	}
-	if (
-		sourceOrigin.length > 8192 ||
-		!['http:', 'https:'].includes(origin.protocol) ||
-		origin.username ||
-		origin.password
-	)
-		throw new Error('Invalid Finance SDK callback origin')
-	const prepared = prepareFinanceSdkCall({
-		identity: source.identity,
-		operation: source.call.request,
-		origin: origin.origin,
-		onBrokerResult: source.call.settle
-	})
+	const { prepared, grant: sourceGrant, closeRequestId, grantTo, reportTo, custody } = input
 	const grant = {
 		runtimeId: financeGrantScopeSchema.parse(sourceGrant.runtimeId),
 		grantId: financeGrantScopeSchema.parse(sourceGrant.grantId),
@@ -69,10 +38,6 @@ function selectedInput(input: FinanceSdkCallOwnerInput): FinanceSdkCallOwnerInpu
 	}
 	if (
 		grant.runtimeId !== prepared.identity.runtimeId ||
-		source.call.requestId !== prepared.identity.requestId ||
-		source.payloadBytes !== prepared.payloadBytes ||
-		financeGrantKey(grant.runtimeId, financeGrantDescriptor(source.descriptor, origin.origin)) !==
-			financeGrantKey(grant.runtimeId, prepared.descriptor) ||
 		!financeGrantScopeSchema.safeParse(closeRequestId).success ||
 		typeof grantTo?.send !== 'function' ||
 		typeof reportTo?.send !== 'function' ||
@@ -82,7 +47,6 @@ function selectedInput(input: FinanceSdkCallOwnerInput): FinanceSdkCallOwnerInpu
 		throw new Error('Invalid Finance SDK callback input')
 	return {
 		prepared,
-		origin: origin.origin,
 		grant,
 		closeRequestId,
 		grantTo,

@@ -103,7 +103,6 @@ export async function qualifySdkCallOwner(
 		input: {
 			configuration: () => ({
 				prepared,
-				origin: location.origin,
 				grant,
 				closeRequestId: close.requestId,
 				grantTo,

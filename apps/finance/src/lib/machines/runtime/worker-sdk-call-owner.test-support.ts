@@ -179,7 +179,6 @@ export function sdkCallFixture(
 	)
 	const configuration: MutableInput = {
 		prepared,
-		origin: sdkOrigin,
 		grant,
 		closeRequestId: close.requestId,
 		grantTo: options.grantTo ?? endpoint,

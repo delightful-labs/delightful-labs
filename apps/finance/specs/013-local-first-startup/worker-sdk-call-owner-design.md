@@ -24,11 +24,23 @@ in the chart. The helper that captures input is pure validation/copying only.
 
 ## Input and lifetime
 
-Input supplies a prepared canonical call, admitted origin, exact runtime/grant/
+Input supplies a prepared canonical call, exact runtime/grant/
 acquisition identity, original close request UUID, grant/report recipients and
-the keeper's `recordStopResult`/`deliver` capabilities. Initialization revalidates
-and copies the call, recomputes its payload bytes, checks its advertised binding
-and callback request UUID, and captures those native methods before effects.
+the keeper's `recordStopResult`/`deliver` capabilities. The preparation factory
+owns origin/identity validation, binding canonicalization, final broker-operation
+validation and byte accounting. It returns an immutable snapshot, freezing only
+its newly owned plain records (identity, descriptor, call and operation).
+Initialization retains that exact snapshot and checks/captures its own grant,
+close identity and native dependencies. It does not prepare the call again.
+
+This is a trusted in-process dependency contract, not a wire/message decoder.
+Construct prepared calls through `prepareFinanceSdkCall`; do not independently
+assemble a record with advertised byte/binding fields. The future native intake
+must prepare before admission and use that same snapshot for accounting and
+child input. Caller-owned records can change without changing the capture;
+the prepared operation, callbacks and byte count cannot be replaced. Native
+handles and callback functions themselves are not frozen. No provenance registry,
+new framework or SDK patch is added.
 
 The population/native boundary must register the SDK recipient before offering
 the call or creating this child. It retains the full shared keeper outside this
@@ -222,13 +234,26 @@ types and touched-file formatting. Compiler file inventories before/after the
 root cleanup are identical (694 files). These are focused cleanup checks; no
 fresh full browser/native or Clipper qualification is claimed.
 
-Before the next intake/population implementation, review its prepared-input
-boundary: call preparation currently validates/copies the broker operation, and
-owner initialization prepares it again and checks duplicate descriptor/byte
-facts. Prefer one owned canonical capture with an explicit trust boundary over
-adding another validation layer. Do not simply remove the current checks before
-choosing that boundary: mutable input, payload accounting and exact binding
-must remain correlated. This is a design review item, not completed cleanup.
+The user directed the prepared-input simplification into this stage rather than
+deferring it to intake/population. The boundary described above now prepares
+once, preserves the canonical URL's wire-bound validation, freezes the owned
+snapshot, and removes the owner's duplicate preparation/comparison and `origin`
+input. Remaining owner checks concern its separate grant and cleanup dependencies.
+The existing input-mutation test now verifies identical preparation/dispatch
+objects. Invalid origin tests move to preparation; mutation attempts cover
+OPEN/READ/WRITE snapshots. Forged structural prepared-record tests are removed
+because assembling that internal dependency is outside the factory-only contract.
+
+Single-preparation qualification passes: 69 focused preparation/owner cases,
+400 generated sequences, all 17 real-build proof cases, and the three selected
+native callback cases across Chromium/Firefox/WebKit (the other 21 native cases
+were not selected). Host, browser-fixture, model and worker-proof types, formatting
+and shared guidance pass. Runtime/contract code is reduced by another 17 lines
+net; tests cover the new immutable boundary. Logs use
+`/private/tmp/pr39-single-preparation-*.log`. The first build-test command selected
+the host-only configuration, which excludes build tests; it found no files.
+The corrected ordinary unit configuration passed all 17 cases. No behavior test
+failed and no application-2 retry is part of this qualification.
 
 The SDK fault gate, independent native-delivery/recipient receipts and genuine
 grant-close evidence remain required by the already-reviewed behavior. Preserve

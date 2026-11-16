@@ -79,6 +79,56 @@ it('captures identity, operation and recipient before the caller changes them', 
 	expect(replacement).not.toHaveBeenCalled()
 })
 
+it.each([
+	{ type: 'OPEN', url, name },
+	{ type: 'READ', key },
+	{ type: 'WRITE', key, value: '2' }
+] satisfies BrokerHostOperation[])(
+	'keeps the prepared $type snapshot immutable through dispatch',
+	(operation) => {
+		const { prepared, recipient } = prepare(operation)
+		const replacement = vi.fn()
+		const bindingField = operation.type === 'OPEN' ? 'url' : 'key'
+		expect(Reflect.set(prepared, 'payloadBytes', 0)).toBe(false)
+		expect(Reflect.set(prepared, 'call', {})).toBe(false)
+		expect(Reflect.set(prepared.identity, 'requestId', crypto.randomUUID())).toBe(false)
+		expect(Reflect.set(prepared.descriptor, bindingField, 'replacement')).toBe(false)
+		expect(Reflect.set(prepared.call.request, bindingField, 'replacement')).toBe(false)
+		expect(Reflect.set(prepared.call, 'settle', replacement)).toBe(false)
+		expect(prepared.call.request).toEqual(operation)
+		expect(prepared.payloadBytes).toBe(Buffer.byteLength(JSON.stringify(operation), 'utf8'))
+		const result: BrokerHostResult = {
+			kind: 'refused',
+			scope: identity.runtimeId,
+			requestId: identity.requestId,
+			reason: 'closed',
+			effectOutcome: 'not-issued'
+		}
+		prepared.call.settle(result)
+		expect(recipient).toHaveBeenCalledExactlyOnceWith(result)
+		expect(replacement).not.toHaveBeenCalled()
+	}
+)
+
+it.each([
+	'invalid',
+	'ftp://finance.example',
+	'https://secret@finance.example',
+	'https://user:secret@finance.example',
+	origin + '/' + 'a'.repeat(8192)
+])('rejects invalid runtime origin before preparing a generation call: %#', (origin) => {
+	const recipient = vi.fn()
+	expect(() =>
+		prepareFinanceSdkCall({
+			identity,
+			origin,
+			operation: { type: 'READ', key },
+			onBrokerResult: recipient
+		})
+	).toThrow('Invalid Finance SDK callback origin')
+	expect(recipient).not.toHaveBeenCalled()
+})
+
 it('counts canonical UTF-8 JSON bytes including Unicode and escaping rather than string length', () => {
 	const unicodeKey = 'jazz:shared-worker-generation:jazz-runtime:é🙂"\\\n'
 	const { prepared } = prepare({ type: 'READ', key: unicodeKey })
