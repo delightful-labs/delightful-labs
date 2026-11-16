@@ -10,14 +10,48 @@ const projectRoots = {
 	'packages/ui': 'ui',
 }
 
-// Vercel: 0 cancels the build; 1 continues it. Compare with the last deployed
-// commit so an intervening Markdown commit cannot hide undeployed code changes.
+const validSha = (value) => typeof value === 'string' && /^[a-f0-9]{40,64}$/u.test(value) && !/^0+$/u.test(value)
+
+function comparisonBase(cwd, head) {
+	const previous = process.env.VERCEL_GIT_PREVIOUS_SHA
+	if (validSha(previous)) return previous
+	// An invalid previous SHA is not evidence of a branch's first deployment.
+	if (previous || process.env.VERCEL_ENV !== 'preview' ||
+		!process.env.VERCEL_GIT_COMMIT_REF || process.env.VERCEL_GIT_COMMIT_REF === 'main') {
+		throw new Error('No deployment comparison')
+	}
+	const deadline = Date.now() + 15_000
+	const git = (args) => execFileSync('git', args, {
+		cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.max(1, deadline - Date.now()),
+	}).trim()
+	if (git(['rev-parse', '--verify', 'HEAD']) !== head) throw new Error('Deployment checkout mismatch')
+	// A new preview branch has no previous deployment. Compare its entire branch
+	// delta, not HEAD^ (which loses earlier branch commits) or a stale main ref.
+	// Main-only changes after branching do not make this preview affect that app.
+	git(['fetch', '--no-tags', '--depth=1', 'origin', 'refs/heads/main'])
+	const main = git(['rev-parse', '--verify', '--end-of-options', 'FETCH_HEAD^{commit}'])
+	if (!validSha(main)) throw new Error('No production branch comparison')
+	let base
+	try {
+		base = git(['merge-base', '--all', main, head])
+	} catch {
+		// Vercel clones shallow history. Deepen the two pinned commits once;
+		// unavailable/ambiguous ancestry still builds, within one time budget.
+		git(['fetch', '--no-tags', '--deepen=100', 'origin', main, head])
+		base = git(['merge-base', '--all', main, head])
+	}
+	if (!validSha(base)) throw new Error('No unique preview merge base')
+	console.info(`Using first-preview merge base ${base} (main ${main})`)
+	return base
+}
+
+// Vercel: 0 cancels the build; 1 continues it. Existing branches retain the last
+// successful deployment comparison, including every intervening skipped commit.
 try {
-	const base = process.env.VERCEL_GIT_PREVIOUS_SHA
 	const head = process.env.VERCEL_GIT_COMMIT_SHA
-	const validSha = (value) => typeof value === 'string' && /^[a-f0-9]{40,64}$/u.test(value) && !/^0+$/u.test(value)
-	if (!validSha(base) || !validSha(head)) throw new Error('No deployment comparison')
+	if (!validSha(head)) throw new Error('No deployment commit')
 	const cwd = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
+	const base = comparisonBase(cwd, head)
 	const paths = changedPaths(base, head, cwd, '..')
 	const projectRoot = relative(cwd, process.cwd())
 	const project = Object.hasOwn(projectRoots, projectRoot) ? projectRoots[projectRoot] : undefined
