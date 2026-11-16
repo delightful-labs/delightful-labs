@@ -1,7 +1,7 @@
 {
 	"lexicon": 1,
 	"id": "com.delightfullabs.clipper.highlight",
-	"description": "Public highlight identity and source anchoring alongside a Margin annotation.",
+	"description": "Public highlight identity and relationships alongside a Margin annotation.",
 	"defs": {
 		"main": {
 			"type": "record",
@@ -24,42 +24,6 @@
 						"type": "string",
 						"format": "at-uri",
 						"description": "The current independently addressable attached Note companion."
-					},
-					"positionAnchor": {
-						"type": "object",
-						"required": ["normalizationVersion", "textHash", "selector"],
-						"description": "Verified source-page position for the quotation in the referenced Margin version. Reader positions are excluded.",
-						"properties": {
-							"normalizationVersion": {
-								"type": "string",
-								"minLength": 1
-							},
-							"textHash": {
-								"type": "string",
-								"minLength": 64,
-								"maxLength": 64,
-								"description": "Lowercase hexadecimal SHA-256 of normalized UTF-8 source text."
-							},
-							"selector": {
-								"type": "object",
-								"required": ["type", "start", "end"],
-								"properties": {
-									"type": { "type": "string", "const": "TextPositionSelector" },
-									"start": {
-										"type": "integer",
-										"minimum": 0,
-										"maximum": 9007199254740991,
-										"description": "Inclusive Unicode code-point offset in normalized source text."
-									},
-									"end": {
-										"type": "integer",
-										"minimum": 0,
-										"maximum": 9007199254740991,
-										"description": "Exclusive Unicode code-point offset, greater than start."
-									}
-								}
-							}
-						}
 					}
 				}
 			}

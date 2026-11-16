@@ -1,7 +1,9 @@
 # Companion Lexicon review artifacts
 
-These concrete JSON drafts carry the previously approved companion fields,
-including the Highlight's optional source position anchor. Their proposed names
+These concrete JSON drafts carry the approved identity and relationship fields.
+Public highlight anchoring uses the quotation selector in the Margin record;
+the user removed the supplemental `positionAnchor` proposal on 2026-11-16.
+Their proposed names
 are `com.delightfullabs.clipper.highlight` and `com.delightfullabs.clipper.note`.
 The namespace and a direct `@atcute/lexicons@2.1.1` dependency have been presented
 for approval. These files are review artifacts, not installed or published schemas.
@@ -16,8 +18,7 @@ Lexicons. This draft allocates no public identity.
 Runtime checks must supplement Lexicon validation: references must identify full
 records in the expected collections under the publishing DID; common and
 companion article/subject values must agree; attached links must be reciprocal.
-HTTP(S) source restrictions, lowercase SHA-256, nonblank normalization version,
-position ordering/bounds and agreement with verified source evidence remain
+HTTP(S) source restrictions and agreement with the referenced Margin target remain
 application checks. No Jazz IDs, quotation, commentary, private organization or
 additional timestamps are added to these records.
 

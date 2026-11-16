@@ -157,6 +157,10 @@ The current batch implements a serial library-owned image queue, private native 
 
 ## Accepted companion fields and grouped synchronization — 2026-11-07
 
+Review update, 2026-11-16: the user removed the later optional `positionAnchor`
+proposal. Public highlight anchoring uses the quotation selector in the shared
+Margin record. Companions carry the identities and relationships described below.
+
 The user approved the candidate fields and grouped synchronization approach in the [Clipper companion proposal](../../docs/reviews/clipper-companion-lexicon-proposal.md): Margin retains shared quotation/commentary; separately addressable highlight and note companions carry required `subject` (Margin URI and CID) and public `article` URI, with optional highlight-to-note `note` and note-to-highlight `highlight` relationships. Private Jazz identities and organizational data remain private. Attached note identity remains independent of highlight identity and revisions.
 
 The approved approach groups common/companion changes in conditional repository batches, with durable group attempt evidence, recovery before retry, and verification of stale observations rather than automatic repair. A companion conflict pauses the entire outgoing group. The actual namespace remains unselected. Specific key/discovery conventions, external-deletion cleanup, backfill, credential upgrade and release-dependent implementation APIs are not selected by this approval. No implementation, schema publication, dependency installation, migration or deployment is authorized by this decision alone.

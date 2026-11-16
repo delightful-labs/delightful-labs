@@ -145,9 +145,9 @@ pending/rejected writes and is not a substitute for recovery of unsaved input.
 
 ## Publication direction
 
-Follow Margin for the shared core and leave `at.margin.note` unchanged. Use a
-Clipper-controlled sidecar for additional selectors/representation evidence and
-the separately addressable entity relationships. Link companions to the Margin
+Follow Margin for the shared core and leave `at.margin.note` unchanged. Shared
+highlight anchoring uses its quotation selector. Use Clipper-controlled companions
+for separately addressable identities and relationships, linked to the Margin
 record using URI/CID as previously approved. Reuse W3C names and semantics.
 
 ### Approved Margin content mapping — 2026-11-14
@@ -184,21 +184,11 @@ The user previously approved the public relationship shapes below:
   private Jazz identities, quotation or commentary. Reciprocal links use stable
   URIs; subject uses URI/CID to identify the matching common-content version.
 
-The user also approved optional `positionAnchor` on the Highlight companion:
-
-```ts
-const sourcePositionAnchorSchema = z.object({
-  normalizationVersion: textRepresentationSchema.shape.normalizationVersion,
-  textHash: textRepresentationSchema.shape.textHash,
-  selector: textPositionSelectorSchema
-})
-```
-
-Its source is the companion's article URI, with quote/context in the referenced
-Margin version. Publish this only from verified source-page evidence using the
-retained source code-point position. Reader offsets remain private to their reader
-representation. This selects the position payload shape, not qualification of
-normalization/hash reproduction by another consumer.
+On 2026-11-16 the user removed the previously approved optional `positionAnchor`
+proposal because Margin's shared quotation selector provides highlight anchoring.
+The Highlight companion contains only `subject`, `article` and optional `note`;
+it publishes no additional position, normalization version or text hash. Native
+representation/range validation remains private to Clipper.
 
 Namespace, keys, scheduling and publication evidence remain unselected.
 Existing accepted publication policy

@@ -3,8 +3,11 @@
 ## Companion Lexicon drafts — 2026-11-14
 
 The next continuation prepares concrete Highlight/Note Lexicon JSON under
-`docs/reviews/companion-lexicons/`, using the approved fields and optional source
-position anchor. Proposed names are `com.delightfullabs.clipper.highlight` and
+`docs/reviews/companion-lexicons/`, using the approved identity/relationship fields.
+On 2026-11-16 the user removed the supplemental `positionAnchor` proposal; shared
+anchoring uses Margin's quotation selector. The Highlight draft now contains only
+`subject`, `article` and optional `note`. Proposed names are
+`com.delightfullabs.clipper.highlight` and
 `com.delightfullabs.clipper.note`, based on the existing Clipper domain. Namespace
 approval is pending; this does not establish domain authority or publish schemas.
 The drafts retain the earlier proposal's `key: "tid"`; the key restriction,
