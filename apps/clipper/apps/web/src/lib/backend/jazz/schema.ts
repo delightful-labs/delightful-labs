@@ -14,6 +14,19 @@ function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Val
 export const app = s.defineApp(
 	{
 		...authSchema,
+		publicationLinks: s.table(
+			{
+				libraryId: s.uuid(),
+				highlightId: s.uuid().optional(),
+				noteId: s.uuid().optional(),
+				uri: s.string()
+			},
+			{
+				library: s.rel('libraries', 'libraryId'),
+				highlight: s.rel('highlights', 'highlightId'),
+				note: s.rel('notes', 'noteId')
+			}
+		),
 		notes: s.table(
 			{
 				libraryId: s.uuid(),
@@ -178,7 +191,10 @@ export const app = s.defineApp(
 				site: s.rel('sites', 'siteId')
 			}
 		),
-		libraries: s.table({ ownerId: s.uuid(), bootstrapVersion: s.string() }, {}),
+		libraries: s.table(
+			{ ownerId: s.uuid(), bootstrapVersion: s.string() },
+			{ publicationLinks: s.reverse('publicationLinks', 'library') }
+		),
 		storageOperations: s.table(
 			{ libraryId: s.uuid(), payloadHash: s.string() },
 			{ library: s.rel('libraries', 'libraryId') }

@@ -185,6 +185,24 @@ binding; this review is not publication implementation or interoperability proof
 
 ## Design and evidence identified during model review
 
+### Approved private publication link — 2026-11-16
+
+The user approved a private Jazz link containing `libraryId`, `source` (exactly
+one Highlight ID or document Note ID), and a full DID-based `at.margin.note`
+record URI. Jazz supplies the link row's identity, timestamps and history.
+Native `library`/`highlight`/`note` joins implement those relationships; nullable
+backing FK columns are the stored form of the approved source union. Attached
+Notes use their Highlight's link. The URI includes its publishing DID, collection
+and key; there are no duplicate stored components or public companion records.
+
+Links are owner-readable and backend-written. The native link writer verifies
+library/account ownership, parent type/library, active Document, publisher DID and
+scope before staging. It retains addresses when source rows are deleted. A link
+is an address association, not publication acceptance evidence. Publication intent,
+issued payload/receipt, consent and reconciliation shapes remain unselected.
+
+### Earlier model review findings
+
 1. Define and qualify text normalization and DOM/code-point/UTF-16 conversion.
    In particular, exporting source-page positions later requires either the
    original normalized text or conversion evidence retained while it is available;
