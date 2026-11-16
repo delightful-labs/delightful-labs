@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { changedPaths, planForEvent, projects, selectChecks, validPrTitle } from './ci.mjs'
+import { verificationOnlyPath } from './deployment-paths.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const selected = (paths) => Object.entries(selectChecks(paths)).filter(([, value]) => value).map(([name]) => name)
@@ -196,6 +197,40 @@ test('Vercel skips unrelated apps using complete deployed-to-current Git changes
 		['pnpm-lock.yaml', [1, 1, 1, 1]],
 		['scripts/new-build.mjs', [1, 1, 1, 1]],
 		['README.md', [0, 0, 0, 0]],
+		['apps/finance/src/lib/machines/setup.test.ts', [0, 0, 0, 0]],
+		['apps/finance/src/lib/runtime/worker.test-support.ts', [0, 0, 0, 0]],
+		['apps/finance/tests/helpers/ui.ts', [0, 0, 0, 0]],
+		['apps/finance/tooling/worker-state-tests/package.json', [0, 0, 0, 0]],
+		['apps/clipper/apps/web/src/lib/policy.spec.ts', [0, 0, 0, 0]],
+		['apps/clipper/apps/web/tests/fixtures/Host.svelte', [0, 0, 0, 0]],
+		['packages/local-first/fixtures/package-consumer/consumer.ts', [0, 0, 0, 0]],
+		['packages/local-first/tests/fixtures/archive.json', [0, 0, 0, 0]],
+		['packages/ui/src/button.test.js', [0, 0, 0, 0]],
+		['packages/ui/tests/fixtures/Host.svelte', [0, 0, 0, 0]],
+		['scripts/monorepo/ci.test.mjs', [0, 0, 0, 0]],
+		['apps/finance/vitest.worker-host.config.ts', [0, 0, 0, 0]],
+		['apps/clipper/playwright.worker.config.ts', [0, 0, 0, 0]],
+		['apps/finance/vite.e2e.config.ts', [0, 0, 0, 0]],
+		['apps/finance/tsconfig.worker-host.json', [0, 0, 0, 0]],
+		['packages/local-first/tsconfig.xstate-tests.json', [0, 0, 0, 0]],
+		['apps/finance/.prettierrc.json', [0, 0, 0, 0]],
+		['packages/ui/eslint.config.js', [0, 0, 0, 0]],
+		['apps/clipper/.oxlintrc.json', [0, 0, 0, 0]],
+		['.editorconfig', [0, 0, 0, 0]],
+		['.vscode/settings.json', [0, 0, 0, 0]],
+		['.github/workflows/ci.yml', [0, 0, 0, 0]],
+		['apps/finance/vite.config.ts', [0, 1, 0, 0]],
+		['apps/finance/tsconfig.json', [0, 1, 0, 0]],
+		['apps/finance/src/service-worker/tsconfig.json', [0, 1, 0, 0]],
+		['apps/finance/package.json', [0, 1, 0, 0]],
+		['apps/finance/tooling/jazz-wasm.ts', [0, 1, 0, 0]],
+		['apps/finance/static/example.test.js', [0, 1, 0, 0]],
+		['apps/finance/custom.config.ts', [0, 1, 0, 0]],
+		['packages/local-first/tsconfig.library.json', [0, 1, 1, 0]],
+		['packages/ui/.storybook/main.js', [0, 0, 0, 1]],
+		['packages/ui/src/stories/Button.stories.svelte', [0, 0, 0, 1]],
+		['scripts/monorepo/vercel-ignore.mjs', [1, 1, 1, 1]],
+		['scripts/monorepo/deployment-paths.mjs', [1, 1, 1, 1]],
 	]) {
 		git('checkout', '--detach', base)
 		put(path)
@@ -219,5 +254,37 @@ test('Vercel skips unrelated apps using complete deployed-to-current Git changes
 	assert.deepEqual(statuses(deleted, deleted), [1, 1, 1, 1], 'explicit rebuild continues')
 	for (const missing of ['', '0'.repeat(40), 'a'.repeat(40), '--help']) {
 		assert.deepEqual(statuses(missing, deleted), [1, 1, 1, 1], 'missing/invalid history builds every app')
+	}
+	git('checkout', '--detach', base)
+	put('apps/finance/tests/helpers/ui.ts')
+	put('apps/clipper/playwright.config.ts')
+	put('README.md')
+	const verification = commit()
+	assert.deepEqual(statuses(base, verification), [0, 0, 0, 0], 'mixed tests, tooling and Markdown skip')
+	assert.deepEqual(statuses('', verification), [1, 1, 1, 1], 'verification-only first deployment still builds')
+	put('apps/website/src/app.ts')
+	const runtime = commit()
+	assert.deepEqual(statuses(base, runtime), [1, 0, 0, 0], 'only runtime consumer builds in a mixed change')
+	put('apps/website/tests/app.test.ts')
+	const laterTest = commit()
+	assert.deepEqual(statuses(verification, laterTest), [1, 0, 0, 0], 'test fix cannot hide earlier undeployed runtime code')
+	assert.deepEqual(statuses(runtime, laterTest), [0, 0, 0, 0])
+	renameSync(resolve(cwd, 'apps/website/src/app.ts'), resolve(cwd, 'apps/website/tests/moved.test.ts'))
+	const runtimeToTest = commit()
+	assert.deepEqual(statuses(laterTest, runtimeToTest), [1, 0, 0, 0], 'moving runtime code to tests removes a deployed input')
+	renameSync(resolve(cwd, 'apps/website/tests/moved.test.ts'), resolve(cwd, 'apps/finance/new-runtime.ts'))
+	const testToRuntime = commit()
+	assert.deepEqual(statuses(runtimeToTest, testToRuntime), [0, 1, 0, 0], 'moving a test into runtime deploys its new consumer')
+	rmSync(resolve(cwd, 'apps/finance/tests/helpers/ui.ts'))
+	assert.deepEqual(statuses(testToRuntime, commit()), [0, 0, 0, 0], 'test deletion needs no deployment')
+})
+
+test('deployment-only exclusions keep CI active and reject ambiguous paths', () => {
+	for (const path of ['apps/finance/src/lib/setup.test.ts', 'apps/finance/tests/helpers/ui.ts', 'apps/finance/.prettierrc.json']) {
+		assert.equal(verificationOnlyPath(path, 'finance'), true)
+		assert.equal(selectChecks([path]).finance, true, 'deployment skipping must not skip Finance CI')
+	}
+	for (const path of ['', '/apps/finance/tests/app.ts', 'apps/finance/../tests/a.ts', 'apps/finance/./tests/a.ts', 'apps/finance/tests/a\\b.ts', 'unknown/tests/app.ts', 'apps/finance/src/lib/custom.config.ts', 'apps/finance/src/lib/tests-helper.ts', 'apps/finance/tsconfig.json']) {
+		assert.equal(verificationOnlyPath(path, 'finance'), false, path)
 	}
 })

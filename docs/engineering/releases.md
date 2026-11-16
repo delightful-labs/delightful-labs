@@ -42,6 +42,16 @@ hide undeployed code. Missing/invalid history, unknown project roots (except the
 existing Markdown-only rule), and empty diffs continue the build. Vercel may
 record a canceled deployment. This script requires no dependency installation.
 
+Deployment selection also filters test/spec/test-support modules, known test
+directories and fixtures, test runner configurations, CI workflows, and explicit
+editor/formatter/linter settings. Mixed Markdown/test/tooling changes can skip
+deployment too; mixed runtime changes still rebuild their consumers. The filter
+is separate from CI selection: test and tooling fixes still run existing checks.
+Production Vite/Svelte/TypeScript settings, manifests, lockfiles, build scripts,
+static assets and unknown configuration continue to deploy. UI Storybook inputs
+still deploy the hosted UI Storybook, but do not rebuild its library consumers.
+Keep new verification-only paths explicit in `scripts/monorepo/deployment-paths.mjs`.
+
 Workflows keep their triggers and existing job names. Job conditions skip
 unaffected suites; they do not silently reduce an affected suite. A failed plan
 must fail existing selected/required check jobs rather than turn them into a green
