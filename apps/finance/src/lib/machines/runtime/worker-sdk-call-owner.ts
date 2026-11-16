@@ -1,5 +1,6 @@
 import { createAsyncLogic, setup, types, type ActorRefFrom } from 'xstate'
 import type { WorkerHostClosed } from 'delightful-local-first/worker/channel/contracts'
+import type { EventPayload } from '../../contracts/event-payload.js'
 import {
 	financeGrantDescriptor,
 	financeGrantKey,
@@ -20,9 +21,9 @@ import type {
 	FinanceSdkCallOutput
 } from './worker-sdk-call-owner-contracts.js'
 
-type Payload<Kind extends FinanceSdkCallOwnerEvent['type']> = Omit<
-	Extract<FinanceSdkCallOwnerEvent, { type: Kind }>,
-	'type'
+type Payload<Kind extends FinanceSdkCallOwnerEvent['type']> = EventPayload<
+	FinanceSdkCallOwnerEvent,
+	Kind
 >
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Missing Finance SDK callback resource')
@@ -144,9 +145,10 @@ export function createFinanceSdkCallOwner() {
 				sameCallback(context.record.identity, identity),
 			matchingGrant: ({ context }: { context: Context }, identity: FinanceGrantIdentity) =>
 				sameFinanceGrantIdentity(context.record.grant, identity),
-			matchingReceipt: ({ context }: { context: Context }, receipt: WorkerHostClosed) =>
-				receipt.scope === context.record.closeIdentity.scope &&
-				receipt.requestId === context.record.closeIdentity.requestId,
+			matchingClose: ({ context }: { context: Context }, report: Payload<'GRANT_CLOSED'>) =>
+				sameFinanceGrantIdentity(context.record.grant, report.identity) &&
+				report.receipt.scope === context.record.closeIdentity.scope &&
+				report.receipt.requestId === context.record.closeIdentity.requestId,
 			requiresGrantClosure: ({ context }: { context: Context }) => {
 				const result = required(context.record.result)
 				return (
@@ -191,11 +193,7 @@ export function createFinanceSdkCallOwner() {
 					ADMISSION_FAULTED: (args) =>
 						args.guards.matchingCallback(args, args.event.identity) ? {} : undefined,
 					GRANT_CLOSED: (args) => {
-						if (
-							!args.guards.matchingGrant(args, args.event.identity) ||
-							!args.guards.matchingReceipt(args, args.event.receipt)
-						)
-							return
+						if (!args.guards.matchingClose(args, args.event)) return
 						return {
 							context: { record: { ...args.context.record, receipt: { ...args.event.receipt } } }
 						}
@@ -205,11 +203,7 @@ export function createFinanceSdkCallOwner() {
 					waitingForGrant: {
 						on: {
 							GRANT_CLOSED: (args) => {
-								if (
-									!args.guards.matchingGrant(args, args.event.identity) ||
-									!args.guards.matchingReceipt(args, args.event.receipt)
-								)
-									return
+								if (!args.guards.matchingClose(args, args.event)) return
 								return {
 									target: 'awaitingAdmissionFault',
 									context: {
@@ -271,11 +265,7 @@ export function createFinanceSdkCallOwner() {
 					issued: {
 						on: {
 							GRANT_CLOSED: (args) => {
-								if (
-									!args.guards.matchingGrant(args, args.event.identity) ||
-									!args.guards.matchingReceipt(args, args.event.receipt)
-								)
-									return
+								if (!args.guards.matchingClose(args, args.event)) return
 								return {
 									target: 'awaitingAdmissionFault',
 									context: {
@@ -424,11 +414,7 @@ export function createFinanceSdkCallOwner() {
 					retainingSettlement: {
 						on: {
 							GRANT_CLOSED: (args) => {
-								if (
-									!args.guards.matchingGrant(args, args.event.identity) ||
-									!args.guards.matchingReceipt(args, args.event.receipt)
-								)
-									return
+								if (!args.guards.matchingClose(args, args.event)) return
 								return {
 									target: '#finance-sdk-call.released',
 									context: {

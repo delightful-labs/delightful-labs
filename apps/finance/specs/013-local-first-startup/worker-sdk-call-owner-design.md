@@ -194,7 +194,44 @@ its JSON representation alone does not preserve the runtime bindings or form a
 native-resource checkpoint. The inspection report is
 `/private/tmp/finance-worker-f4c3-definition-diagnostics.json`.
 
-Continue on PR #39 with the bounded native producer intake, aggregate population
-and acquisition transport. Preserve the callback's fault and two-receipt delivery
-joins, retain reservations until child output, and retain SDK-before-grant close
-ordering. W05 remains incomplete; no production activation is included.
+## Scope and reuse review, 2026-11-16
+
+The user requested a full necessity/simplification review before further growth.
+At `1154fefb`, PR #39 adds 701 lines across six runtime/contract files, 1,923
+test/fixture lines, 493 documentation lines and 12 configuration lines. These are
+additions, not net changes; tests/docs being the majority does not justify an
+unnecessary runtime layer. The main new behavior is the 475-line call owner and
+58-line call preparation adapter. The shared keeper changes are type-only.
+
+The call owner already composes the existing grant owner, broker/channel/request
+implementation and callback keeper. Clipper's broker wrapper and scoped account
+storage already use these shared foundations. Reusing its account-write drain
+here would add settlement/close promise adapters and give this child closure
+responsibility currently owned by the population. It is not a replacement for
+the SDK fault gate, delivery receipts or retained failed-read reservation.
+No new generic SDK-owner framework or Clipper extraction is justified yet.
+
+Concrete cleanup removes the unused `FinanceSdkCallbackStopResult` export,
+reuses the existing event-payload type in the owner/native fixture, centralizes
+the four identical full-close correlation checks in one named guard, and removes
+five redundant TypeScript roots already imported by the retained test roots.
+Lifecycle targets and effects remain in their owning states.
+The cleanup removes 23 code/configuration lines net. All 43 direct owner cases
+and the 400 generated sequences pass, as do host/browser-fixture/worker-proof
+types and touched-file formatting. Compiler file inventories before/after the
+root cleanup are identical (694 files). These are focused cleanup checks; no
+fresh full browser/native or Clipper qualification is claimed.
+
+Before the next intake/population implementation, review its prepared-input
+boundary: call preparation currently validates/copies the broker operation, and
+owner initialization prepares it again and checks duplicate descriptor/byte
+facts. Prefer one owned canonical capture with an explicit trust boundary over
+adding another validation layer. Do not simply remove the current checks before
+choosing that boundary: mutable input, payload accounting and exact binding
+must remain correlated. This is a design review item, not completed cleanup.
+
+The SDK fault gate, independent native-delivery/recipient receipts and genuine
+grant-close evidence remain required by the already-reviewed behavior. Preserve
+them when simplifying. W05 remains incomplete; no production activation is
+included. Hosted Finance CI is still red at `1154fefb`, now on the existing
+always-visible offline-edit case; this scope review is not a fix for that failure.

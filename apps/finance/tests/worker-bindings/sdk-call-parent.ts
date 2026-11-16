@@ -1,4 +1,5 @@
 import { setup, types, type ActorRefFrom } from 'xstate'
+import type { EventPayload } from '../../src/lib/contracts/event-payload.js'
 import { createFinanceSdkCallOwner } from '../../src/lib/machines/runtime/worker-sdk-call-owner.js'
 import type {
 	FinanceSdkCallOwnerInput,
@@ -8,7 +9,7 @@ import type {
 } from '../../src/lib/machines/runtime/worker-sdk-call-owner-contracts.js'
 
 type Event = FinanceSdkCallOwnerEvent | FinanceSdkCallReport
-type Payload<Kind extends Event['type']> = Omit<Extract<Event, { type: Kind }>, 'type'>
+type Payload<Kind extends Event['type']> = EventPayload<Event, Kind>
 export type SdkCallNativeParentInput = {
 	configuration: () => Omit<FinanceSdkCallOwnerInput, 'reportTo'>
 	report: (report: FinanceSdkCallReport) => void
