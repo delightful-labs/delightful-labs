@@ -42,6 +42,13 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 	policy.libraries.allowInsert.where(canonical)
 	policy.libraries.allowUpdate.whereOld(canonical).whereNew(canonical)
 	policy.libraries.allowDelete.never()
+	// Publication links are backend-owned association evidence, not client claims
+	// of publication. Keep owner reads available after a source is deleted so the
+	// future publisher can retain the address needed for public removal.
+	policy.publicationLinks.allowRead.where((row) => owns(row.libraryId))
+	policy.publicationLinks.allowInsert.never()
+	policy.publicationLinks.allowUpdate.never()
+	policy.publicationLinks.allowDelete.never()
 	const documentParent = (row: { libraryId: RowRefValue; documentId: RowRefValue }) =>
 		allOf([
 			owns(row.libraryId),

@@ -1,5 +1,45 @@
 # Article notes — implementation started
 
+## Private publication links — 2026-11-16
+
+After reviewing the concrete Zod shape, the user approved the private link between
+an existing Highlight/document Note and its `at.margin.note` URI. The implementation
+adds a Jazz table with native library/Highlight/Note relationships, Zod validation
+and DTO conversion. It stores only the approved association plus native metadata.
+Owner reads remain possible after source deletion; all client insert/update/delete
+operations are denied. Backend access uses the existing Jazz backend capability.
+
+The backend domain chart owns related-row reading, eligibility, selected insertion
+and refusal. DLF's existing transaction bridge owns acquisition, commit, rollback,
+settlement and uncertain-operation custody. Its native serializable transaction
+checks source/URI allocation together and waits for authority acceptance before
+returning success. Scope is checked before acquisition, at admission and at commit;
+reads check scope again before exposing results. An attached Note cannot acquire
+an independent link. An existing source/publisher association or occupied address
+is refused; the future publisher reads the retained link rather than allocating
+another address. Multiple independent backend writers remain a qualification topic
+beyond the native concurrent-allocation case.
+
+The approved wire source union maps to native nullable FK columns, enabling Jazz
+joins without duplicating source objects. URI validation uses AT's documented DID,
+record-key and full-record URI syntax, restricted to `at.margin.note`. It does not
+resolve accounts, prove a grant or check record existence. The future publication
+owner must supply its verified account/library and publishing DID. No HTTP write
+endpoint, PDS call, new dependency, UI or product copy is added.
+
+Native checks cover ownership/parent refusal, client write denial, concurrent
+allocation, occupied native IDs, retained addresses after deletion and link
+identity/creation metadata through a complete SQLite backend close/reopen. Owner
+reads use a filtered native library include, so incorrectly scoped backend callers
+cannot read another account's links. Capability scope values are captured on creation.
+
+Verification passes 908 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper formatting/lint, whitespace checks and
+the web production build. The ten new link tests include the URI/source-union
+boundary and native transaction/policy/restart cases. This is not browser offline
+or end-to-end public publication qualification. Publication UI, grants, PDS writes
+and durable issued-publication evidence remain unfinished.
+
 ## Shared Lexicon reuse — 2026-11-16
 
 The user challenged the need for the custom companions. Current sharing scope
