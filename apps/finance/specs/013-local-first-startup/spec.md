@@ -13,6 +13,14 @@ Ask product questions one at a time. Implement lower-risk local usability improv
 
 ## Application-worker migration handoff
 
+2026-11-16 direction: the user requested a simpler architecture leaning on
+native Jazz, Svelte, XState and Web Workers. Review the
+[simpler worker proposal](worker-simple-design.md) before extending the existing
+grant/call-owner work. It proposes one session-scoped broker connection using
+existing shared APIs; the change from exact per-binding grants requires review.
+The historical implementation/qualification below is not approval to continue
+building the superseded layers or evidence that this replacement is qualified.
+
 Updated 2026-11-13: the user requested a foundation-first migration task list,
 research against current monorepo code, and explicit Local First/Clipper reuse.
 The complete recorded backlog is

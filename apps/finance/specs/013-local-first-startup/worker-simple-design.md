@@ -1,0 +1,125 @@
+# Simpler Finance worker design
+
+Status: proposal for review, 2026-11-16. The user requested rethinking the
+architecture around Jazz, Svelte, XState and browser workers. Stop extending
+the grant/call-owner architecture while reviewing this replacement. No runtime
+replacement or changed capability policy is approved or implemented by this file.
+
+## Start with the actual application
+
+One dedicated application Worker per tab runs the existing Finance domain
+machines and Jazz client. Svelte renders bounded view data and sends user
+commands through native `postMessage`. Jazz keeps owning its persistent replica,
+authorization, synchronization, generation selection and internal connections.
+
+```mermaid
+flowchart LR
+  UI[Svelte UI] <-->|commands and views| App[Finance Worker: XState and Jazz]
+  App <-->|SDK connection| Jazz[Jazz SharedWorker: persistence and sync]
+  App <-->|existing broker channel| Window[Window: native SDK hooks]
+  Window -->|construct and transfer port| Jazz
+```
+
+The Window hooks exist because this SDK path needs Window's SharedWorker
+constructor and generation storage. Once a port is transferred, Jazz speaks to
+its worker directly. Financial queries, validation and domain decisions stay in
+the application Worker. DOM, focus, navigation and Window-only interactions stay
+with Svelte/native browser APIs.
+
+## Reuse rather than add another coordination layer
+
+| Responsibility                                                       | Starting point                                                                                                        |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Persistent SDK and identity                                          | Existing Jazz client configuration and Local First session acquisition/startup APIs.                                  |
+| Account selection                                                    | The qualified Local First IndexedDB AccountStore; preserve the user's no-migration decision.                          |
+| Window SDK hooks                                                     | One `brokerHostClient`/`serveBrokerHost` connection for the application-worker lifetime, as already wired in Clipper. |
+| Request bounds, transport errors, transferred-port custody and close | The existing shared channel and native close protocol behind that broker.                                             |
+| Application workflow                                                 | Normal XState actors and existing invoked domain children in the Worker.                                              |
+| Rendering and observation                                            | Svelte bindings and the existing synchronous store subscription contract, fed by selected worker views.               |
+| Cross-thread communication                                           | Native Worker/MessagePort messages and transfer lists with typed, validated app command/view boundaries.              |
+
+Do not mirror XState snapshots into another state machine on Window. Do not
+create an actor for each SDK callback or a generic remote-actor/RPC framework.
+Keep real financial operation identity, interruption and uncertain-write behavior
+in the existing domain workflows. Moving code across a thread does not require
+reimplementing those workflows or Jazz's internal request lifecycle.
+
+The existing shared channel records a request fault and leaves accepting before
+later requests can use that channel. It already handles callback delivery and
+unclaimed native resources. With one channel, a fallback SDK request returns to
+that same channel; it does not acquire a new grant. This removes the reason for
+a second population-wide fault acknowledgement and separate call reservation.
+SDK behavior and actual failure/close ordering still need integration tests.
+
+## The design change that makes this smaller
+
+Replace dynamically acquired exact-key/exact-name grants with one private
+connection scoped to the trusted Finance Worker/session. At the Window boundary,
+validate message shape, scope, bounded strings, the configured same-origin Jazz
+broker asset and the SDK generation-key/name conventions. Let Jazz supply names
+and keys; do not copy its namespace algorithm. Reuse the existing channel's
+bounded requests and native host bounds instead of adding another aggregate
+grant/callback budget and producer queue.
+
+This changes the earlier exact-per-binding capability decision. The proposed
+Window connection can serve multiple Jazz-selected names/keys within the session
+instead of acquiring a separate capability for each. Database access remains
+enforced by Jazz. The broader native-hook admission is nevertheless a real policy
+change and must be agreed before replacing the exact-grant adapters. Clipper is
+the concrete precedent, not proof of Finance's full identity/offline parity.
+
+The installed SDK's `browserWorkerHost` hook is supplied by the repository's
+**existing Jazz patch**, not upstream alpha.60. Keep that distinction explicit.
+This proposal uses it unchanged and adds no patch. An entirely unpatched SDK
+would require a separate supported-path investigation; do not promise that the
+same dedicated-worker persistence path works unpatched.
+
+## Keep shutdown at the session boundary
+
+The application/session lifecycle stops new domain work, drains issued financial
+operations and any pending acquisition, closes the actual Jazz session, then
+closes the account store and broker connection through their existing APIs.
+Only an observed clean result permits normal Worker termination. Svelte route
+unsubscribe detaches UI observations; it must not terminate active financial work.
+Window/worker crashes remain distinct from graceful shutdown, with no automatic
+replay of unknown mutations. Reuse the corresponding Clipper/Local First behavior,
+without copying Clipper's unrelated article/extension coordination.
+
+## Prove one small vertical slice, then remove replaced machinery
+
+1. Review the session-level native-hook boundary above. Keep native construction
+   constrained to the configured Jazz asset and retain input/resource validation.
+2. In the disposable worker fixture, open the **actual Jazz client** with the IDB
+   AccountStore and one existing broker connection. Read a real scoped Finance
+   query, save locally offline, close, reopen and verify the same identity/data.
+   Cover multiple tabs, SDK failure/fallback and close during startup. The proof
+   must exercise the SDK, not only a simulated promise recipient or factory list.
+3. Connect one read-only Finance view using a small command/view union and Svelte
+   subscription. Then move one existing financial form/workflow into the Worker.
+   Preserve domain tests and add boundary/offline tests for the actual moved flow.
+4. Once that replacement is qualified, remove the unused Finance grant protocol,
+   grant/call owners, preparation layer, population/inbox plan and their bespoke
+   fixtures/build checks. Drop PR #39's unneeded shared interruption-type extension
+   if no remaining consumer needs it. Keep the shared broker/channel/IDB foundations
+   used by Clipper; do not rewrite or unpublish those APIs just to shrink Finance.
+
+Defer broader abstractions until a second real consumer demonstrates a missing
+shared capability. Preserve the product/parity requirements in W01–W21; replace
+their overbuilt implementation sequence rather than adding another prerequisite
+framework. The existing Window application remains active until qualified cutover.
+
+## Inspected code
+
+- [Clipper SDK bootstrap](../../../clipper/apps/web/src/lib/runtime/worker/serve-application.ts)
+  constructs one broker and supplies it directly to the Jazz configuration.
+- [Clipper broker policy](../../../clipper/apps/web/src/lib/runtime/worker/broker-channel.ts)
+  delegates to the existing shared host with app-owned admission.
+- [Shared broker](../../../../packages/local-first/src/lib/backend/jazz/worker-broker.ts)
+  supplies the three SDK callbacks through the existing channel.
+- [Channel lifecycle](../../../../packages/local-first/src/lib/machines/lifecycle/worker-channel.ts)
+  owns request admission, faults, custody and native close.
+- [Existing SDK patch](../../../../patches/jazz-tools@2.0.0-alpha.60.patch)
+  supplies `browserWorkerHost` and dedicated-worker persistence support. Installed
+  source was checked for SDK generation fallback and SharedWorker shutdown.
+
+These are source findings and a proposed design, not new runtime qualification.
