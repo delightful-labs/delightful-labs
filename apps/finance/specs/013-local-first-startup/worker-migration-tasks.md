@@ -1,5 +1,176 @@
 # Finance worker migration: foundation-first tasks
 
+Current direction, 2026-11-16: implement the approved
+[simpler native-worker design](worker-simple-design.md). Do not extend the F4
+grant/call population or add its inbox. Keep W01–W21's product/parity requirements,
+but start with one existing broker connection and a real SDK vertical slice.
+The retained real-SDK/IndexedDB fixture passes all 12 native cases after C1 removes
+the obsolete grant/call scenarios; saves and two cold browser reopens remain
+covered in Chromium/Firefox/WebKit. The WebKit failure was duplicate
+worker-entry evaluation; Finance and Clipper now use the same Local First
+single-bundle ES-module build settings. See the
+[cause and qualification](worker-webkit-startup-research.md). The latest proposed
+sequence is the bounded unused-prototype cleanup below, a coordinated SDK upgrade
+using the [alpha.61–65 research](worker-jazz-release-research.md), then the planned
+worker-owned UI read slice. Keep live behavior until its replacement is qualified.
+The shared-helper extension-origin regression is corrected and all 12 extension
+browser cases pass locally. All hosted Finance, Clipper and foundation checks
+pass at the C1 cleanup head `abf31082`; the subsequent C2 head needs a fresh hosted run.
+Prior results below retain their historical scope; no replacement runtime cutover
+has been qualified.
+
+## Seven-item simplification checklist
+
+This is the complete cleanup list proposed to the user on 2026-11-16. C1/C2 are
+implemented; C3–C7 retain their remaining scope. Recording or completing cleanup
+does not authorize a dependency upgrade or production cutover. This checklist is the
+current cleanup handoff alongside the selected simpler design. W01–W21 below
+retain their product/parity requirements, not the abandoned implementation plan.
+
+- [x] **C1 — Delete the abandoned grant/call architecture.** Audit non-test
+      imports, then remove confirmed-unused `worker-grant-owner` and
+      `worker-sdk-call-owner` machines/contracts, `sdk-call-binding`, grant
+      binding/protocol/adapters, and their bespoke fixtures. Remove obsolete
+      population/inbox tasks rather than implementing them. Keep the shared
+      broker/channel/close APIs and port-custody behavior used by both apps.
+      The [C1 audit and qualification](#c1-unused-grantcall-removal) records the
+      removed dependency group and retained persistence coverage.
+- [x] **C2 — Remove the old Window account-storage bridge.** Audit the unused
+      `host-client`, `window-host`, `host-drain`, account-store facade/storage
+      adapters, selection namespace and legacy account-store machines as one
+      dependency group. Retire their Window/localStorage selection and migration
+      machinery. Use the shared worker-accessible IndexedDB AccountStore and
+      preserve the user's no-migration/no-fallback/no-dual-write decision. Do not
+      confuse the obsolete selection bridge with the still-required Window
+      broker hooks or delete the active application's SDK storage by implication.
+      The [C2 audit and qualification](#c2-unused-window-account-storage-removal)
+      records the removed dependency group, tooling and retained tests.
+- [ ] **C3 — Replace the import catalog with the real application worker.**
+      `application.worker.ts` currently reports factory types rather than running
+      Finance. During cleanup, remove build-proof requirements that keep abandoned
+      components present. During the read slice, replace the catalog with the
+      actual worker entry. Keep meaningful emitted-graph checks for UI isolation,
+      SDK/Wasm assets, self-contained worker output and public package boundaries.
+- [ ] **C4 — Give the session lifecycle one owner.** Reuse Local First startup/
+      acquisition and the native Jazz session, with one Finance application
+      worker/session owner. Use the newer SDK's immediate local-first startup
+      and public session operations after a coordinated upgrade is qualified;
+      remove the redundant SDK-upgrade/opaque-handle plumbing identified in the
+      release research. Window forwards commands/views and narrow browser effects;
+      it must not maintain a matching application/domain lifecycle. Preserve real
+      domain drains, identity binding, startup interruption and shutdown outcomes.
+- [ ] **C5 — Move one read-only Finance view before adding infrastructure.**
+      Start with an accounts list scoped to the selected organization, subject to
+      confirming its existing component/query boundary. Send only the bounded
+      fields Svelte renders through a small validated command/view union. Keep
+      ordinary Svelte subscription/rendering; do not send complete XState
+      snapshots or build a generic remote Jazz/actor API. Qualify identity/scope
+      replacement, late views, unsubscribe and offline restart.
+- [ ] **C6 — Move one existing financial workflow intact.** After the read slice,
+      move one existing form/workflow's application logic into the worker, reusing
+      its validation, transaction, permissions and outcome handling. Keep DOM,
+      focus and UI interaction behavior with Svelte. Retain operation identity,
+      interruption and uncertain-write behavior; do not add a second command-owner
+      framework or replay unknown mutations.
+- [ ] **C7 — Consolidate tests and spec around the selected design.** Apply this
+      in every slice. Keep real SDK persistence/full-process restart coverage and
+      domain tests. Replace tests tied to removed grant mechanics with meaningful
+      single-session boundary cases: account switching, stale views, startup
+      interruption, native failures and close with pending writes. Retire stale
+      active plan/build assertions; keep source history and qualification records
+      traceable in Git. Do not weaken durability or call the known CI/extension
+      failures fixed without evidence.
+
+Recommended execution order: first audit and delete only confirmed-unused
+prototype code in C1/C2, trimming obsolete catalog constraints in C3 and keeping
+coverage aligned through C7. Keep the live Finance lifecycle and financial
+machines unchanged in that deletion-only slice. Next review and qualify the
+coordinated SDK upgrade, including its patch, backend/schema, auth and Vercel
+namespace boundaries. Then complete C3/C4/C5 as one real read slice, followed by
+C6. Qualification is required before replacing live behavior; the first cleanup
+must not turn into a runtime cutover or a new account-data migration.
+
+## C1: unused grant/call removal
+
+The repository-wide source/configuration reference audit found no active Finance
+layout, session or domain-machine caller of the grant/call layer. Its only
+non-test entry was the inactive factory catalog; the build-only driver exposed
+its Window adapters. Those proof requirements kept the prototype reachable in
+test builds, not in the production application.
+
+Removed the Finance grant/call owners and contracts, descriptor/protocol/callback
+bindings, exact-grant Window adapters, bespoke native fixture parents/clients,
+two generated grant/call model suites and their omission assertions. The proof
+driver now re-exports Local First's existing `serveBrowserWorkerHost` directly.
+Its graph still checks SDK/shared implementations, UI isolation, bundled
+dependencies, the real Window adapter, the application entry and Wasm output.
+No replacement owner, protocol, patch or runtime activation was introduced.
+
+All six actual-SDK cases and all six IndexedDB isolation/serialization/restart
+cases remain and pass across Chromium, Firefox and WebKit. The count is now 12
+instead of 30 because 18 tests exercised the removed prototype; no SDK/IDB
+durability scenario was removed. Focused host tests pass (49), remaining
+account-store model tests pass (17), and real-build tests pass (11). Worker-proof,
+browser-fixture and model-package types pass. Full Finance verification passes:
+1,964 unit tests, Svelte/service-worker types, the worker-proof build and the
+production application build. The first full-unit attempt was blocked by sandbox
+listener restrictions; the authorized disposable-listener run passes. Workspace
+links and guidance pass. Historical counts below keep their original revision
+and scope; fresh hosted CI is still required for the cleanup head.
+
+At the C1 checkpoint, the old Window account-storage bridge and its model package
+remained; C2 below removes them. C3 is only partially addressed: obsolete catalog requirements
+are gone, but the entry is still build-only. C7 is ongoing. Keep shared broker,
+channel, callback-custody and close APIs; changing their public surface is not
+part of this Finance-only deletion. The active Window application, financial
+operation identity/drains and workspace dependencies are unchanged.
+
+## C2: unused Window account-storage removal
+
+The repository-wide source/configuration audit found all bridge imports and
+exported-symbol callers confined to its own implementation/tests. Neither the
+active layout/session nor the retained worker entry and SDK/browser fixtures
+depend on it. Removed `host-client`, `window-host`, `host-drain`, `host-protocol`,
+the account-store facade/storage/selection/namespace helpers and all seven legacy
+account-store machine/contract files. This also removes the unused earlier-key
+selection, root scrubbing, migration, Web Lock and Window storage transport path.
+
+The dedicated `tooling/worker-state-tests` package exercised only that retired
+graph after C1. Its tests, workspace/lock importer, package/root command aliases
+and CI invocation/counterexample artifact steps are removed together. The retired
+host test configuration is removed too. The worker-proof TypeScript configuration
+keeps the same strict compiler options directly. Existing deployment path tests
+still recognize historical test paths, including deletions; they are not callers
+of the removed code.
+
+`runtime/worker/account-store.ts` and its normal unit coverage remain unchanged,
+using the public Local First IndexedDB AccountStore. All 12 real SDK/IDB native
+scenarios remain, including isolation, serialization, close and full browser
+restarts. Shared IDB state/model/native tests remain in Local First. The active
+Finance app still uses its current Jazz storage; its authentication/readiness/
+debugging tests of SDK-default localStorage keys remain. No migration, fallback,
+dual write, reset or production storage switch is added.
+
+The lock update removes the retired importer and its unused test peer contexts.
+Existing Local First injected peer bindings are preserved; no dependency version
+or SDK/auth patch changes. Frozen offline installation, workspace peer links and
+guidance pass. The existing tooling suite passes all 19 tests. All 1,928 remaining
+Finance unit tests and all 12 native SDK/IDB cases pass across Chromium, Firefox
+and WebKit. Application/Svelte/service-worker, worker-proof and browser-fixture
+types pass, along with E2E scope checks and both production builds. The 36 removed
+unit cases and 17 dedicated test-workspace cases exercised the retired bridge;
+SDK/IDB and financial domain coverage remain. Current-head hosted CI is still
+required before merging; the C1 head `abf31082` passed every hosted Finance,
+Clipper and foundation workflow.
+
+This completes the deletion-only checkpoint. C3's actual application worker,
+C4's lifecycle integration and C5's read view remain unimplemented. Review and
+qualify the coordinated Jazz upgrade before adding new worker integration glue;
+do not activate the replacement application or change deployment namespaces as
+part of this cleanup.
+
+## Historical foundation backlog and product parity requirements
+
 Status: recorded migration backlog after code research on `main` at `eb0f615f`
 (2026-11-13), incorporated by [spec.md](spec.md#application-worker-migration-handoff).
 W01 inventory/baseline and W02's inactive build proof are complete against
@@ -55,6 +226,26 @@ The [grant-owner handoff](worker-grant-owner-design.md) records the task-list
 formatting conflict and scoped merge checks; historical counts keep their
 original baseline.
 Detailed implementation designs remain subject to their review gates.
+The user merged PR #37 at main `4301afde` on 2026-11-14. Continue on
+`feat/finance-worker-grant-population` from that merge. Its first bounded slice,
+[F4c2](worker-grant-population-design.md#f4c2-sdk-call-and-interruption-contracts),
+qualifies truthful SDK callback interruption and canonical request-byte contracts
+after the user's separate implementation/test approval on 2026-11-14. Its linked
+record owns exact checks and results. The population/inbox and actual SDK
+integration are still pending, and W05 remains incomplete.
+The qualified checkpoint is uploaded at `dce092be` in
+[draft PR #39](https://github.com/delightful-labs/delightful-labs/pull/39);
+continue the bounded population/bridge on that PR.
+The [F4c3 callback owner](worker-sdk-call-owner-design.md) passes separately
+approved qualification: 43 direct cases, 400 generated sequences, 2,148 Finance
+units and 24 native cases across three engines. It separates SDK delivery from
+native settlement/reservation release. The bounded native intake and population
+are still unimplemented; W05 remains incomplete.
+PR #39's hosted application-2 failure at `c0606557` remains under
+[offline-edit investigation](worker-pr39-ci-offline-edit.md). The original cases
+and full shard passed locally; test-only diagnostics preserve the nested error
+details missing from CI's original trace. This is not an established application
+fix or a completed hosted merge qualification.
 This is a planning artifact, not an activation or production release. Read the
 [research and source evidence](worker-migration-research.md), existing
 [ownership specification](xstate-v6-migration.md), and

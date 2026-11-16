@@ -1,11 +1,69 @@
 import {
 	createWorkerCallbackCustody,
+	type WorkerCallbackInterruption,
+	type WorkerCallbackResult,
 	type WorkerCallbackStopResult
 } from 'delightful-local-first/worker/callback-custody'
 import type { WorkerChannelResult } from 'delightful-local-first/worker/channel/contracts'
 import type { WorkerRequestIdentity } from 'delightful-local-first/worker/request/contracts'
 
 type Response = { port: MessagePort }
+// Both directions preserve the exact default result contract in published types.
+const defaultResultIsExact: WorkerCallbackResult<Response> extends WorkerChannelResult<Response>
+	? WorkerChannelResult<Response> extends WorkerCallbackResult<Response>
+		? true
+		: false
+	: false = true
+if (!defaultResultIsExact) throw new Error('Default callback result contract changed')
+
+type SdkIdentity = Readonly<{ runtimeId: string; requestId: string }>
+const sdkResults: WorkerCallbackResult<Response, WorkerCallbackInterruption>[] = []
+const sdkCustody = createWorkerCallbackCustody<SdkIdentity, Response, WorkerCallbackInterruption>({
+	sameIdentity: (a, b) => a.runtimeId === b.runtimeId && a.requestId === b.requestId,
+	discard: (response) => response.port.close()
+})
+const waitingId = { runtimeId: crypto.randomUUID(), requestId: crypto.randomUUID() }
+const issuedId = { ...waitingId, requestId: crypto.randomUUID() }
+const waitingStop: WorkerCallbackInterruption = {
+	kind: 'interrupted',
+	reason: 'closed',
+	effectOutcome: 'not-issued'
+}
+sdkCustody.register({
+	identity: waitingId,
+	stopped: waitingStop,
+	settle: (result) => {
+		sdkResults.push(result)
+	}
+})
+sdkCustody.register({
+	identity: issuedId,
+	stopped: waitingStop,
+	settle: (result) => {
+		sdkResults.push(result)
+	}
+})
+sdkCustody.recordStopResult(issuedId, {
+	kind: 'interrupted',
+	reason: 'unavailable',
+	effectOutcome: 'unknown'
+})
+sdkCustody.stop()
+sdkCustody.stop()
+const waitingResult = sdkResults[0],
+	issuedResult = sdkResults[1]
+if (
+	sdkResults.length !== 2 ||
+	waitingResult?.kind !== 'interrupted' ||
+	waitingResult.effectOutcome !== 'not-issued' ||
+	issuedResult?.kind !== 'interrupted' ||
+	issuedResult.reason !== 'unavailable' ||
+	issuedResult.effectOutcome !== 'unknown' ||
+	'identity' in waitingResult ||
+	'identity' in issuedResult
+)
+	throw new Error('Packed SDK callback stop results fabricated or lost an issuance outcome')
+
 const pair = new MessageChannel(),
 	orphan = new MessageChannel()
 const id = { scope: crypto.randomUUID(), requestId: crypto.randomUUID(), sequence: 1 }

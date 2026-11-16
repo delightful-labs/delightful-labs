@@ -12,8 +12,9 @@ const require = createRequire(import.meta.url)
 const versionSchema = z.object({ version: z.string() })
 const graphSchema = z.object({ entry: z.string() })
 const applicationEntry = 'src/lib/runtime/worker/application.worker.ts'
-const windowBindingEntry = resolve(root, 'src/lib/runtime/worker/broker-host.ts')
-const windowBindingExports = ['serveFinanceGenerationGrant', 'serveFinanceBrokerGrant']
+const windowBinding = 'delightful-local-first/backend/jazz/worker-broker'
+const windowBindingEntry = require.resolve(windowBinding)
+const windowBindingExports = ['serveBrowserWorkerHost']
 const publicEntries = [
 	'jazz-tools/client',
 	'jazz-tools/local-first',
@@ -36,10 +37,7 @@ const requiredImplementations = [
 	'/delightful-local-first/dist/backend/jazz/indexeddb-account-store.js',
 	'/delightful-local-first/dist/machines/identity/indexeddb-account-store.js',
 	'/delightful-local-first/dist/storage/indexeddb-account-store-native.js',
-	'/delightful-local-first/dist/backend/jazz/worker-broker.js',
-	'src/lib/runtime/worker/grant-binding.ts',
-	'src/lib/runtime/worker/grant-protocol.ts',
-	'src/lib/machines/runtime/worker-grant-owner.ts'
+	'/delightful-local-first/dist/backend/jazz/worker-broker.js'
 ]
 const portable = (id: string) => (isAbsolute(id) ? relative(root, id).replaceAll('\\', '/') : id)
 const clean = (id: string) => id.split('?')[0] ?? id
@@ -119,7 +117,7 @@ function artifactReport(): Plugin {
 								windowBindingExports.every((name) => module.renderedExports.includes(name))
 						)
 				)
-				if (!windowBindingPresent) this.error('Worker proof omitted Finance Window broker binding')
+				if (!windowBindingPresent) this.error('Worker proof omitted shared Window broker binding')
 				const files = Object.values(bundle)
 					.map((output) => output.fileName)
 					.sort()
@@ -158,7 +156,7 @@ function artifactReport(): Plugin {
 					source: JSON.stringify(
 						{
 							scope: 'build-only; no runtime activation',
-							windowBinding: portable(windowBindingEntry),
+							windowBinding,
 							windowBindingExports,
 							packages,
 							publicEntries: publicEntries.map((entry) => ({

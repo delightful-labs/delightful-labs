@@ -52,12 +52,12 @@ from runtime shutdown. Do not use a second Window session to satisfy old routes.
 ### 2. Storage foundations exist but are not connected to startup
 
 Finance has a bounded/validated
-[`host protocol`](../../src/lib/runtime/worker/host-protocol.ts),
-[`host client`](../../src/lib/runtime/worker/host-client.ts),
-[`Window primitive host`](../../src/lib/runtime/worker/window-host.ts), and
-[`independent close channel`](../../src/lib/runtime/worker/host-drain.ts).
-[`bindWorkerAccountStorage`](../../src/lib/runtime/worker/account-store-storage.ts)
-binds those capabilities; [`createWorkerAccountStore`](../../src/lib/runtime/worker/account-store-facade.ts)
+[`host protocol`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/runtime/worker/host-protocol.ts),
+[`host client`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/runtime/worker/host-client.ts),
+[`Window primitive host`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/runtime/worker/window-host.ts), and
+[`independent close channel`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/runtime/worker/host-drain.ts).
+[`bindWorkerAccountStorage`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/runtime/worker/account-store-storage.ts)
+binds those capabilities; [`createWorkerAccountStore`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/runtime/worker/account-store-facade.ts)
 adapts an already-owned account-store actor to the SDK. Production-source searches
 find definitions and internal foundation references, but no application startup
 that activates this tree.
@@ -68,10 +68,10 @@ runtime. Its messages are not an application intent/projection protocol.
 
 ### 3. Native lock custody is the first safety prerequisite
 
-[`account-store-operation.ts`](../../src/lib/machines/runtime/account-store-operation.ts)
-invokes [`account-store-lock.ts`](../../src/lib/machines/runtime/account-store-lock.ts)
+[`account-store-operation.ts`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/machines/runtime/account-store-operation.ts)
+invokes [`account-store-lock.ts`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/machines/runtime/account-store-lock.ts)
 with a supplied native lock manager. Unknown writes enter drain/retained states
-before release. [`account-store-legacy.ts`](../../src/lib/machines/runtime/account-store-legacy.ts)
+before release. [`account-store-legacy.ts`](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/machines/runtime/account-store-legacy.ts)
 also owns a native lock for earlier-key cleanup.
 
 These charts support cooperative draining. They do not, by themselves, prove

@@ -1,5 +1,11 @@
 # Finance v6 account-store graph
 
+Historical prototype review. [C2](worker-migration-tasks.md#c2-unused-window-account-storage-removal)
+removes this inactive Window/localStorage bridge, its account-store machines and
+bespoke test workspace. Use the shared IndexedDB AccountStore and the
+[selected worker design](worker-simple-design.md); do not restore this bridge
+or its legacy migration. The evidence below retains its original revision.
+
 Status: implemented for source review; not activated, behavior-tested or committed.
 Foundation commit: `5daf37a` on `feat/xstate-v6-worker-runtime`.
 

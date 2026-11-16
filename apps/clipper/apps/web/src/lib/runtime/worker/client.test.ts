@@ -44,7 +44,9 @@ it.each(['failure', 'detach'])(
 		vi.stubGlobal('Worker', NativeWorker)
 		vi.stubGlobal(
 			'window',
-			Object.assign(new EventTarget(), { location: { href: 'https://example.invalid/' } })
+			Object.assign(new EventTarget(), {
+				location: { href: 'https://example.invalid/', origin: 'https://example.invalid' }
+			})
 		)
 		vi.stubGlobal('navigator', { onLine: true })
 		const publish = vi.fn(),
@@ -84,7 +86,9 @@ it('binds the alpha.60 namespace before serving the worker account read', async 
 	vi.stubGlobal('Worker', NativeWorker)
 	vi.stubGlobal(
 		'window',
-		Object.assign(new EventTarget(), { location: { href: 'https://example.invalid/' } })
+		Object.assign(new EventTarget(), {
+			location: { href: 'https://example.invalid/', origin: 'https://example.invalid' }
+		})
 	)
 	vi.stubGlobal('navigator', { onLine: true })
 	const getItem = vi.fn(() => 'opaque-test-selection')
@@ -138,7 +142,7 @@ it('executes an acknowledged provider navigation and releases the already-closed
 	vi.stubGlobal('Worker', NativeWorker)
 	const assign = vi.fn()
 	const window = Object.assign(new EventTarget(), {
-		location: { href: 'https://example.invalid/', assign }
+		location: { href: 'https://example.invalid/', origin: 'https://example.invalid', assign }
 	})
 	vi.stubGlobal('window', window)
 	vi.stubGlobal('navigator', { onLine: true })
@@ -161,7 +165,9 @@ it('accepts a genuine late close acknowledgement after a shutdown failure withou
 	vi.stubGlobal('Worker', NativeWorker)
 	vi.stubGlobal(
 		'window',
-		Object.assign(new EventTarget(), { location: { href: 'https://example.invalid/' } })
+		Object.assign(new EventTarget(), {
+			location: { href: 'https://example.invalid/', origin: 'https://example.invalid' }
+		})
 	)
 	vi.stubGlobal('navigator', { onLine: true })
 	const client = openApplicationClient({
@@ -183,7 +189,9 @@ it('reports a silent Worker close as overdue, keeps native custody and accepts i
 	vi.stubGlobal('Worker', NativeWorker)
 	vi.stubGlobal(
 		'window',
-		Object.assign(new EventTarget(), { location: { href: 'https://example.invalid/' } })
+		Object.assign(new EventTarget(), {
+			location: { href: 'https://example.invalid/', origin: 'https://example.invalid' }
+		})
 	)
 	vi.stubGlobal('navigator', { onLine: true })
 	const clock = new SimulatedClock(),

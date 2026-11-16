@@ -1,7 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import type { WorkerChannelResult } from '../contracts/worker-channel.js'
 import type { WorkerRequestIdentity } from '../contracts/worker-request.js'
-import { createWorkerCallbackCustody, type WorkerCallbackStopResult } from './callback-custody.js'
+import {
+	createWorkerCallbackCustody,
+	type WorkerCallbackInterruption,
+	type WorkerCallbackResult,
+	type WorkerCallbackStopResult
+} from './callback-custody.js'
 
 type Response = { port: MessagePort }
 const ports = new Set<MessagePort>()
@@ -300,4 +305,145 @@ it('settles other callbacks when one stopped observer throws', () => {
 	f.custody.stop()
 	expect(first).toHaveBeenCalledOnce()
 	expect(second).toHaveBeenCalledOnce()
+})
+
+type CallbackIdentity = Readonly<{ runtimeId: string; requestId: string }>
+type CallbackResult = WorkerCallbackResult<Response, WorkerCallbackInterruption>
+function sdkFixture() {
+	const discard = vi.fn((response: Response) => response.port.close())
+	const custody = createWorkerCallbackCustody<
+		CallbackIdentity,
+		Response,
+		WorkerCallbackInterruption
+	>({
+		sameIdentity: (a, b) => a.runtimeId === b.runtimeId && a.requestId === b.requestId,
+		discard
+	})
+	return { custody, discard }
+}
+const callbackId = { runtimeId: 'runtime-1', requestId: 'callback-1' }
+
+it('stops waiting and issued SDK callbacks truthfully without a fabricated wire sequence', () => {
+	const f = sdkFixture(),
+		waiting = vi.fn<(result: CallbackResult) => void>(),
+		issued = vi.fn<(result: CallbackResult) => void>()
+	const waitingId = { ...callbackId, requestId: 'waiting' }
+	const initial: WorkerCallbackInterruption = {
+		kind: 'interrupted',
+		reason: 'closed',
+		effectOutcome: 'not-issued'
+	}
+	f.custody.register({ identity: waitingId, settle: waiting, stopped: initial })
+	f.custody.register({ identity: callbackId, settle: issued, stopped: initial })
+	const dispatched: {
+		kind: 'interrupted'
+		reason: 'closed' | 'unavailable'
+		effectOutcome: 'unknown'
+	} = {
+		kind: 'interrupted',
+		reason: 'unavailable',
+		effectOutcome: 'unknown'
+	}
+	f.custody.recordStopResult(callbackId, dispatched)
+	dispatched.reason = 'closed'
+	f.custody.stop()
+	f.custody.stop()
+	expect(waiting).toHaveBeenCalledExactlyOnceWith(initial)
+	expect(issued).toHaveBeenCalledExactlyOnceWith({
+		kind: 'interrupted',
+		reason: 'unavailable',
+		effectOutcome: 'unknown'
+	})
+	expect(f.discard).not.toHaveBeenCalled()
+})
+
+it.each([{ runtimeId: 'other' }, { requestId: 'other' }])(
+	'keeps SDK interruption correlation across %j without a broker identity',
+	(change) => {
+		const f = sdkFixture(),
+			settle = vi.fn<(result: CallbackResult) => void>()
+		const result: WorkerCallbackInterruption = {
+			kind: 'interrupted',
+			reason: 'unavailable',
+			effectOutcome: 'unknown'
+		}
+		f.custody.register({ identity: callbackId, settle, stopped: result })
+		f.custody.deliver({ ...callbackId, ...change }, result, undefined)
+		expect(settle).not.toHaveBeenCalled()
+		f.custody.deliver(callbackId, result, undefined)
+		f.custody.stop()
+		expect(settle).toHaveBeenCalledExactlyOnceWith(result)
+	}
+)
+
+it('disposes a retained port before selected interruption and survives a throwing SDK observer', () => {
+	const f = sdkFixture(),
+		response = resource(),
+		order: string[] = []
+	f.discard.mockImplementation((value) => {
+		order.push('discard')
+		value.port.close()
+	})
+	const result: WorkerCallbackInterruption = {
+		kind: 'interrupted',
+		reason: 'unavailable',
+		effectOutcome: 'unknown'
+	}
+	const settle = vi.fn(() => {
+		order.push('settle')
+		throw new Error('SDK stopped')
+	})
+	f.custody.register({ identity: callbackId, settle, stopped: result })
+	f.custody.deliver(callbackId, result, f.custody.capture(response))
+	f.custody.stop()
+	expect(order).toEqual(['discard', 'settle'])
+	expect(settle).toHaveBeenCalledOnce()
+	expect(f.discard).toHaveBeenCalledOnce()
+	expect(f.discard.mock.calls[0]?.[0]).toBe(response)
+})
+
+it('preserves an accepted SDK port for an opt-in callback when the keeper stops', async () => {
+	const f = sdkFixture(),
+		pair = new MessageChannel()
+	ports.add(pair.port1)
+	ports.add(pair.port2)
+	const response = { port: pair.port1 },
+		settle = vi.fn<(result: CallbackResult) => void>()
+	f.custody.register({
+		identity: callbackId,
+		settle,
+		stopped: {
+			kind: 'interrupted',
+			reason: 'closed',
+			effectOutcome: 'unknown'
+		}
+	})
+	const result: CallbackResult = succeeded(identity(), response)
+	f.custody.deliver(callbackId, result, f.custody.capture(response))
+	f.custody.stop()
+	expect(settle).toHaveBeenCalledOnce()
+	expect(settle.mock.calls[0]?.[0]).toBe(result)
+	expect(f.discard).not.toHaveBeenCalled()
+	const echo = new Promise<unknown>((resolve) => {
+		pair.port2.onmessage = (event) => resolve(event.data)
+	})
+	pair.port1.postMessage('accepted SDK custody')
+	expect(await echo).toBe('accepted SDK custody')
+})
+
+it('settles late opt-in registrations with their supplied interruption without reopening custody', () => {
+	const f = sdkFixture(),
+		settle = vi.fn<(result: CallbackResult) => void>(),
+		response = resource()
+	const result: WorkerCallbackInterruption = {
+		kind: 'interrupted',
+		reason: 'closed',
+		effectOutcome: 'not-issued'
+	}
+	f.custody.stop()
+	f.custody.register({ identity: callbackId, settle, stopped: result })
+	expect(f.custody.capture(response)).toBeUndefined()
+	f.custody.stop()
+	expect(settle).toHaveBeenCalledExactlyOnceWith(result)
+	expect(f.discard).toHaveBeenCalledOnce()
 })

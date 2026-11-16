@@ -1,5 +1,11 @@
 # Finance native host-close receipt
 
+Historical prototype review. [C2](worker-migration-tasks.md#c2-unused-window-account-storage-removal)
+removes this inactive Window/localStorage bridge, its account-store machines and
+bespoke test workspace. Use the shared IndexedDB AccountStore and the
+[selected worker design](worker-simple-design.md); do not restore this bridge
+or its legacy migration. The evidence below retains its original revision.
+
 ## Focused implementation
 
 The account-store operation graph retains the primary Web Lock after an uncertain

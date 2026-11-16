@@ -1,5 +1,15 @@
 {
-	"extends": "./tsconfig.worker-host.json",
+	"compilerOptions": {
+		"target": "ES2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"lib": ["ES2024", "DOM"],
+		"strict": true,
+		"exactOptionalPropertyTypes": true,
+		"noUncheckedIndexedAccess": true,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
 	"include": [
 		"src/lib/runtime/worker/application.worker.ts",
 		"tooling/worker-proof-driver.ts",

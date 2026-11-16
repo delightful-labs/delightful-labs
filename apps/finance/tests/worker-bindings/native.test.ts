@@ -11,6 +11,7 @@ import type {} from './driver.js'
 
 let directory = '',
 	origin = ''
+let sdkBrokerPath = ''
 let initialized = false,
 	preserveFailure = false
 let server: ReturnType<typeof createServer> | undefined
@@ -51,6 +52,13 @@ beforeAll(async () => {
 		})
 		response.end(asset?.bytes ?? 'No app, auth or Jazz endpoint exists in this fixture')
 	})
+	const brokers = [...assets.keys()].filter(
+		(path) =>
+			path.startsWith('/_app/immutable/assets/') && /\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
+	)
+	if (brokers.length !== 1 || !brokers[0])
+		throw new Error(`Expected one SDK broker asset, found ${brokers.length}`)
+	sdkBrokerPath = brokers[0]
 	server = listener
 	await new Promise<void>((resolve, reject) => {
 		listener.once('error', reject)
@@ -80,8 +88,7 @@ async function boot(context: BrowserContext) {
 	await page.waitForFunction(() => Boolean(window.financeBindingFixture))
 	return page
 }
-type Command = Exclude<Operation, { type: 'BROKER_INIT' }>
-function send(page: Page, name: string, operation: Command) {
+function send(page: Page, name: string, operation: Operation) {
 	return page.evaluate(
 		({ name, operation }) => window.financeBindingFixture.request(name, operation),
 		{ name, operation }
@@ -99,31 +106,91 @@ function retainOnFailure() {
 
 for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
 	describe(engine, () => {
-		it('decodes actual worker grant transfers, keeps refusal distinct from uncertainty and preserves both port paths', async () => {
+		it('isolates native Window SDK startup from the worker bridge', async () => {
 			retainOnFailure()
 			const browser = await browserType.launch({ headless: true })
 			try {
-				const context = await browser.newContext(),
-					page = await boot(context)
-				const result = await page.evaluate(() =>
-					window.financeBindingFixture.qualifyGrantProtocol()
-				)
-				for (const [report, frameType] of [
-					[result.acquisition, 'ACQUIRE_GRANT'],
-					[result.refused, 'GRANT_REFUSED'],
-					[result.uncertain, 'GRANT_UNCERTAIN'],
-					[result.ready, 'GRANT_READY']
-				] satisfies [typeof result.ready, string][])
-					expect(report).toMatchObject({
-						type: 'RESULT',
-						value: { kind: 'valid', frameType, ...result.identity }
-					})
-				expect(result.invalid).toMatchObject({ type: 'RESULT', value: { kind: 'invalid' } })
-				expect(result.echoes).toEqual(['data', 'control'])
+				const page = await boot(await browser.newContext())
+				expect(
+					await page.evaluate(
+						({ scope, url }) => window.financeSdkFixture.windowControl(scope, url),
+						{ scope: crypto.randomUUID(), url: origin + sdkBrokerPath }
+					)
+				).toBe(true)
 			} finally {
 				await browser.close()
 			}
 		})
+		it('uses one real SDK worker session for offline Finance saves through cold browser restarts', async () => {
+			retainOnFailure()
+			const profile = await mkdtemp(join(directory, `sdk-${engine}-`))
+			const ids = {
+				organizationId: crypto.randomUUID(),
+				accountId: crypto.randomUUID(),
+				categoryId: crypto.randomUUID(),
+				transactionId: crypto.randomUUID()
+			}
+			const scope = crypto.randomUUID()
+			let accountId: string | undefined
+			for (let cycle = 0; cycle < 3; cycle++) {
+				const context = await browserType.launchPersistentContext(profile, { headless: true })
+				try {
+					console.log(`SDK ${engine} cold cycle ${cycle + 1}`)
+					const page = await boot(context)
+					const opened = await page.evaluate(
+						({ scope, url }) => window.financeSdkFixture.open(scope, url),
+						{ scope, url: origin + sdkBrokerPath }
+					)
+					if (opened.kind !== 'opened') throw new Error('Expected SDK session')
+					expect(opened).toMatchObject({ localFirst: true, windowPresent: false })
+					if (cycle === 0) accountId = opened.accountId
+					else expect(opened.accountId).toBe(accountId)
+					await context.setOffline(true)
+					const before = await page.evaluate(
+						(organizationId) => window.financeSdkFixture.command({ type: 'READ', organizationId }),
+						ids.organizationId
+					)
+					const native = await page.evaluate(() => window.financeSdkFixture.stats())
+					expect(native.opens).toBeGreaterThan(0)
+					expect(native.reads).toBeGreaterThan(0)
+					expect(before).toEqual({
+						kind: 'rows',
+						rows:
+							cycle === 0
+								? []
+								: [
+										{
+											id: ids.transactionId,
+											amountMinor: cycle === 1 ? 5678 : 9012,
+											memo: 'Stored in the worker'
+										}
+									]
+					})
+					if (cycle === 0)
+						expect(
+							await page.evaluate(
+								(ids) => window.financeSdkFixture.command({ type: 'SEED', ...ids }),
+								ids
+							)
+						).toEqual({ kind: 'saved' })
+					if (cycle < 2)
+						expect(
+							await page.evaluate(
+								({ transactionId, amountMinor }) =>
+									window.financeSdkFixture.command({ type: 'EDIT', transactionId, amountMinor }),
+								{ transactionId: ids.transactionId, amountMinor: cycle === 0 ? 5678 : 9012 }
+							)
+						).toEqual({ kind: 'saved' })
+					expect(await page.evaluate(() => window.financeSdkFixture.close())).toEqual({
+						kind: 'closed',
+						sdkClosed: true,
+						hostClosed: true
+					})
+				} finally {
+					await context.close()
+				}
+			}
+		}, 90_000)
 		it('serializes canonical worker bindings, isolates profiles and closes the original store', async () => {
 			retainOnFailure()
 			const browser = await browserType.launch({ headless: true })
@@ -265,150 +332,6 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
 					await context.close()
 					progress.push(`step ${step}: browser closed`)
 				}
-			}
-		})
-
-		it.each<{ ownership: 'root' | 'child' | 'grant' }>([
-			{ ownership: 'root' },
-			{ ownership: 'child' },
-			{ ownership: 'grant' }
-		])(
-			'isolates $ownership-owned generation and broker grants and retains the accepted SharedWorker port after independent closure',
-			async ({ ownership }) => {
-				retainOnFailure()
-				const browser = await browserType.launch({ headless: true })
-				try {
-					const context = await browser.newContext()
-					const page = await boot(context)
-					await page.evaluate(async () => {
-						await window.financeBindingFixture.create('generation')
-						await window.financeBindingFixture.create('broker')
-					})
-					const generation = await page.evaluate(
-						(ownership) => window.financeBindingFixture.bindGeneration('generation', ownership),
-						ownership
-					)
-					const broker = await page.evaluate(
-						(ownership) => window.financeBindingFixture.bindBroker('broker', ownership),
-						ownership
-					)
-					expect(generation.scope).not.toBe(broker.scope)
-					for (const operation of [
-						{ type: 'BROKER_READ', key: generation.key + ':foreign' },
-						{ type: 'BROKER_WRITE', key: generation.key + ':foreign', value: '9' },
-						{ type: 'BROKER_OPEN', url: broker.url, name: broker.name }
-					] satisfies Command[])
-						expect(await send(page, 'generation', operation)).toMatchObject({
-							type: 'ERROR',
-							outcome: 'not-issued'
-						})
-					for (const operation of [
-						{ type: 'BROKER_OPEN', url: broker.url + '?foreign=1', name: broker.name },
-						{ type: 'BROKER_OPEN', url: broker.url, name: broker.name + ':foreign' },
-						{
-							type: 'BROKER_OPEN',
-							url: broker.url,
-							name: broker.name.replace(':generation-2', ':generation-3')
-						},
-						{
-							type: 'BROKER_OPEN',
-							url: broker.url,
-							name: broker.name.replace(':generation-2', ':generation-9007199254740992')
-						},
-						{ type: 'BROKER_READ', key: generation.key },
-						{ type: 'BROKER_WRITE', key: generation.key, value: '9' }
-					] satisfies Command[])
-						expect(await send(page, 'broker', operation)).toMatchObject({
-							type: 'ERROR',
-							outcome: 'not-issued'
-						})
-					for (const name of ['generation', 'broker'])
-						expect(
-							await page.evaluate((name) => window.financeBindingFixture.stats(name), name)
-						).toEqual({ opens: [], reads: [], writes: [] })
-					expect(
-						await send(page, 'generation', { type: 'BROKER_READ', key: generation.key })
-					).toMatchObject({ type: 'RESULT', value: 'raw SDK generation value' })
-					expect(
-						await send(page, 'generation', {
-							type: 'BROKER_WRITE',
-							key: generation.key,
-							value: '3'
-						})
-					).toMatchObject({ type: 'RESULT' })
-					expect(
-						await send(page, 'generation', { type: 'BROKER_READ', key: generation.key })
-					).toMatchObject({ type: 'RESULT', value: '3' })
-					expect(await send(page, 'generation', { type: 'BROKER_CLOSE' })).toMatchObject({
-						type: 'RESULT',
-						value: { scope: generation.scope, requestId: generation.requestId }
-					})
-					expect(
-						await send(page, 'generation', {
-							type: 'BROKER_WRITE',
-							key: generation.key,
-							value: '4'
-						})
-					).toMatchObject({ type: 'ERROR', outcome: 'not-issued' })
-					expect(
-						await send(page, 'broker', { type: 'BROKER_OPEN', url: broker.url, name: broker.name })
-					).toMatchObject({ type: 'RESULT' })
-					expect(await send(page, 'broker', { type: 'BROKER_CLOSE' })).toMatchObject({
-						type: 'RESULT',
-						value: { scope: broker.scope, requestId: broker.requestId }
-					})
-					expect(
-						await send(page, 'broker', { type: 'BROKER_OPEN', url: broker.url, name: broker.name })
-					).toMatchObject({ type: 'ERROR', outcome: 'not-issued' })
-					expect(
-						await send(page, 'broker', {
-							type: 'BROKER_ECHO',
-							value: 'SDK retains its accepted port'
-						})
-					).toMatchObject({ type: 'RESULT', value: 'SDK retains its accepted port' })
-					expect(
-						await page.evaluate(() => window.financeBindingFixture.stats('generation'))
-					).toEqual({
-						opens: [],
-						reads: [generation.key, generation.key],
-						writes: [{ key: generation.key, value: '3' }]
-					})
-					expect(await page.evaluate(() => window.financeBindingFixture.stats('broker'))).toEqual({
-						opens: [{ url: broker.url, name: broker.name }],
-						reads: [],
-						writes: []
-					})
-				} finally {
-					await browser.close()
-				}
-			}
-		)
-		it('a grant arriving after retirement closes through its real host without becoming available', async () => {
-			retainOnFailure()
-			const browser = await browserType.launch({ headless: true })
-			try {
-				const context = await browser.newContext(),
-					page = await boot(context)
-				await page.evaluate(() => window.financeBindingFixture.create('late-grant'))
-				const grant = await page.evaluate(() =>
-					window.financeBindingFixture.bindGeneration('late-grant', 'retiring-grant')
-				)
-				expect(await send(page, 'late-grant', { type: 'BROKER_CLOSE' })).toMatchObject({
-					type: 'RESULT',
-					value: { scope: grant.scope, requestId: grant.requestId }
-				})
-				expect(await send(page, 'late-grant', { type: 'GRANT_REPORTS' })).toMatchObject({
-					type: 'RESULT',
-					value: { reports: ['GRANT_ACQUIRED'], posts: 1 }
-				})
-				expect(
-					await send(page, 'late-grant', { type: 'BROKER_READ', key: grant.key })
-				).toMatchObject({ type: 'ERROR', outcome: 'not-issued' })
-				expect(await page.evaluate(() => window.financeBindingFixture.stats('late-grant'))).toEqual(
-					{ opens: [], reads: [], writes: [] }
-				)
-			} finally {
-				await browser.close()
 			}
 		})
 	})

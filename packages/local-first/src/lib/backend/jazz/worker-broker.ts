@@ -75,6 +75,53 @@ export type BrokerHostNative = {
 	storage: Pick<Storage, 'getItem' | 'setItem'>
 	open: (url: string, name: string) => BrokerHandle
 }
+export type BrowserWorkerHostNative = Pick<BrokerHostNative, 'storage' | 'open'> & {
+	/** The Window's HTTP(S) or exact Chrome-extension origin. */
+	origin: string
+	/** Restrict opens to this asset's pathname while allowing SDK version queries. */
+	brokerWorkerUrl?: string
+}
+
+function browserWorkerOrigin(url: URL) {
+	if (['http:', 'https:'].includes(url.protocol)) return url.origin
+	if (
+		url.protocol === 'chrome-extension:' &&
+		/^[a-p]{32}$/.test(url.hostname) &&
+		url.host === url.hostname
+	)
+		return `chrome-extension://${url.hostname}`
+	return undefined
+}
+
+/** Window setup for a trusted application Worker/session. Jazz selects its own
+ * names and generation keys; the wire decoder enforces their SDK prefixes. */
+export function serveBrowserWorkerHost(
+	dataPort: MessagePort,
+	controlPort: MessagePort,
+	scope: string,
+	native: BrowserWorkerHostNative
+) {
+	const origin = new URL(native.origin)
+	const selectedOrigin = browserWorkerOrigin(origin)
+	const asset = native.brokerWorkerUrl === undefined ? undefined : new URL(native.brokerWorkerUrl)
+	if (
+		selectedOrigin !== native.origin ||
+		(asset && (browserWorkerOrigin(asset) !== selectedOrigin || asset.username || asset.password))
+	)
+		throw new Error('Invalid browser worker host origin or broker asset')
+	return serveBrokerHost(dataPort, controlPort, scope, {
+		storage: native.storage,
+		open: (url, name) => native.open(url, name),
+		admitOpen: (url) => {
+			const candidate = new URL(url)
+			return (
+				browserWorkerOrigin(candidate) === selectedOrigin &&
+				(asset === undefined || candidate.pathname === asset.pathname)
+			)
+		},
+		admitGeneration: () => true
+	})
+}
 
 /** Window primitives only. Jazz in the Worker chooses URL/name and generations.
  * The independent control lease survives native data failure and starts at mount. */

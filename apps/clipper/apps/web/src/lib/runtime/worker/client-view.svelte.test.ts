@@ -54,7 +54,9 @@ function fixture() {
 	})
 	vi.stubGlobal(
 		'window',
-		Object.assign(new EventTarget(), { location: { href: 'https://example.invalid/' } })
+		Object.assign(new EventTarget(), {
+			location: { href: 'https://example.invalid/', origin: 'https://example.invalid' }
+		})
 	)
 	vi.stubGlobal('navigator', { onLine: true })
 	const failed = vi.fn()

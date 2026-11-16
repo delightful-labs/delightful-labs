@@ -2,81 +2,23 @@ import {
 	createFinanceAccountStore,
 	type FinanceAccountStoreConfiguration
 } from '../../src/lib/runtime/worker/account-store.js'
-import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
-import { createOwnedBrokerFixture } from './owned-broker.js'
-import { createGrantOwnerFixture } from './grant-owner-client.js'
-import type { FinanceGrantDescriptor } from '../../src/lib/runtime/worker/grant-binding.js'
-import {
-	decodeFinanceGrantRequest,
-	decodeFinanceGrantReply
-} from '../../src/lib/runtime/worker/grant-protocol.js'
 
 export type Operation =
-	| { type: 'GRANT_FRAME'; direction: 'request' | 'reply'; frame: unknown }
 	| { type: 'STORE_OPEN'; slot: string; configuration: FinanceAccountStoreConfiguration }
 	| { type: 'STORE_READ'; slot: string }
 	| { type: 'STORE_CLOSE'; slot: string }
 	| { type: 'STORE_APPEND'; slot: string; value: string }
-	| {
-			type: 'BROKER_INIT'
-			data: MessagePort
-			control: MessagePort
-			scope: string
-			ownership: 'root' | 'child' | 'grant' | 'retiring-grant'
-			descriptor: FinanceGrantDescriptor
-	  }
-	| { type: 'GRANT_REPORTS' }
-	| { type: 'BROKER_READ'; key: string }
-	| { type: 'BROKER_WRITE'; key: string; value: string }
-	| { type: 'BROKER_OPEN'; url: string; name: string }
-	| { type: 'BROKER_ECHO'; value: string }
-	| { type: 'BROKER_CLOSE' }
 export type Reply =
 	| { type: 'READY' }
 	| { type: 'RESULT'; id: number; value: unknown }
 	| { type: 'ERROR'; id: number; outcome: string; reason: string }
 
 const stores = new Map<string, ReturnType<typeof createFinanceAccountStore>>()
-let broker: ReturnType<typeof brokerHostClient> | undefined
-let accepted: MessagePort | undefined
-const grantReports: string[] = []
-let grantPosts = 0
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Fixture resource missing')
 	return value
 }
-async function execute(operation: Operation, ports: readonly MessagePort[]): Promise<unknown> {
-	if (operation.type === 'GRANT_REPORTS') return { reports: [...grantReports], posts: grantPosts }
-	if (operation.type === 'GRANT_FRAME') {
-		const decoded =
-			operation.direction === 'request'
-				? decodeFinanceGrantRequest(operation.frame, ports)
-				: decodeFinanceGrantReply(operation.frame, ports)
-		if (decoded.kind === 'invalid') {
-			for (const port of ports) port.close()
-			return { kind: 'invalid' }
-		}
-		const message = decoded.message
-		if (message.type === 'GRANT_READY') {
-			for (const [port, label] of [
-				[message.dataPort, 'data'],
-				[message.controlPort, 'control']
-			] satisfies [MessagePort, string][]) {
-				port.onmessage = () => {
-					port.postMessage(label)
-					port.onmessage = null
-					port.close()
-				}
-			}
-		}
-		return {
-			kind: 'valid',
-			frameType: message.type,
-			runtimeId: message.runtimeId,
-			grantId: message.grantId,
-			acquisitionId: message.acquisitionId
-		}
-	}
+async function execute(operation: Operation): Promise<unknown> {
 	if (operation.type === 'STORE_OPEN') {
 		if (stores.has(operation.slot)) throw new Error('Fixture store already open')
 		stores.set(operation.slot, createFinanceAccountStore(operation.configuration))
@@ -93,48 +35,11 @@ async function execute(operation: Operation, ports: readonly MessagePort[]): Pro
 		)
 		return null
 	}
-	if (operation.type === 'BROKER_INIT') {
-		if (broker) throw new Error('Fixture broker already open')
-		broker =
-			operation.ownership === 'grant' || operation.ownership === 'retiring-grant'
-				? createGrantOwnerFixture(
-						operation.data,
-						operation.control,
-						operation.scope,
-						operation.descriptor,
-						operation.ownership === 'retiring-grant',
-						(report) => grantReports.push(report.type),
-						() => {
-							grantPosts++
-						}
-					)
-				: operation.ownership === 'child'
-					? createOwnedBrokerFixture(operation.data, operation.control, operation.scope)
-					: brokerHostClient(operation.data, operation.control, operation.scope, {
-							onOverdue: () => {},
-							onBlocked: () => {}
-						})
-		return broker.host.identity
-	}
-	if (operation.type === 'BROKER_READ') return required(broker).readGeneration(operation.key)
-	if (operation.type === 'BROKER_WRITE') {
-		await required(broker).writeGeneration(operation.key, operation.value)
-		return null
-	}
-	if (operation.type === 'BROKER_OPEN') {
-		accepted = (await required(broker).open(operation.url, operation.name)).port
-		return null
-	}
-	if (operation.type === 'BROKER_CLOSE') return required(broker).close()
-	const port = required(accepted)
-	return new Promise<unknown>((resolve) => {
-		port.onmessage = ({ data }) => resolve(data)
-		port.postMessage(operation.value)
-	})
 }
-self.onmessage = async ({ data, ports }: MessageEvent<{ id: number; operation: Operation }>) => {
+
+self.onmessage = async ({ data }: MessageEvent<{ id: number; operation: Operation }>) => {
 	try {
-		const value = await execute(data.operation, ports)
+		const value = await execute(data.operation)
 		self.postMessage({ type: 'RESULT', id: data.id, value } satisfies Reply)
 	} catch (error) {
 		const facts = error instanceof Error ? error : undefined

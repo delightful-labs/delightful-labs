@@ -1,5 +1,11 @@
 # SDK broker binding: separate grants selected
 
+Historical design and qualification. The approved [simpler design](worker-simple-design.md)
+replaces this grant/call implementation. [C1](worker-migration-tasks.md#c1-unused-grantcall-removal)
+removes its unused Finance code and bespoke tests; do not resume the pending
+population/inbox work below. Source links for removed files refer to the last
+retained revision. Shared broker/channel/custody APIs remain.
+
 On 2026-11-13 the user selected option two: use the existing Jazz callbacks and
 separate generation-storage and broker grants. Do not add the proposed SDK
 preparation callback or extend the existing Jazz patch for this integration.
@@ -46,7 +52,7 @@ separate from the IndexedDB account-selection store and adds no migration code.
 
 ## F2 native boundary implemented and qualified
 
-[broker-host.ts](../../src/lib/runtime/worker/broker-host.ts) now provides:
+[broker-host.ts](https://github.com/delightful-labs/delightful-labs/blob/9193d7551e16e2b32ddbc6a7b1d8ae9a69e9ad20/apps/finance/src/lib/runtime/worker/broker-host.ts) now provides:
 
 - `serveFinanceGenerationGrant`: strict UUID scope and bounded SDK generation
   key; exact-key admission; receives only native storage, with no constructor.

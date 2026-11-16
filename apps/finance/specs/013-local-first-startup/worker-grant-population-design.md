@@ -1,14 +1,118 @@
 # Grant population: callback custody decision
 
+Historical design and qualification. The approved [simpler design](worker-simple-design.md)
+replaces this grant/call implementation. [C1](worker-migration-tasks.md#c1-unused-grantcall-removal)
+removes its unused Finance code and bespoke tests; do not resume the pending
+population/inbox work below. Source links for removed files refer to the last
+retained revision. Shared broker/channel/custody APIs remain.
+
 Status: the user selected approach A and approved F4c1's concrete implementation
 and tests on 2026-11-14. The shared native keeper extraction is qualified; the
-aggregate callback bridge/population remains next. Continue on
-[draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37).
+aggregate callback bridge/population remains next.
+[PR #37](https://github.com/delightful-labs/delightful-labs/pull/37) is merged at
+main `4301afde` on 2026-11-14. Continue on
+`feat/finance-worker-grant-population`, based on that merge.
+The separately approved F4c2 checkpoint is uploaded in
+[draft PR #39](https://github.com/delightful-labs/delightful-labs/pull/39) at
+`dce092be`. Continue population/bridge work on that PR; W05 remains incomplete.
+The [F4c3 callback owner](worker-sdk-call-owner-design.md) now passes separately
+approved qualification: 43 direct cases, 400 generated sequences, 2,148 Finance
+units and 24 native cases across three engines. It makes dispatch, population
+fault acknowledgement, actual SDK settlement and reservation release explicit in XState.
+The native intake/population and actual SDK integration remain pending.
 F4c1 was qualified against main `434a06ee` after F4b checkpoint `868e1e32`.
 PR #37 subsequently merges main `fca60ca0` on 2026-11-14; the
 [grant-owner handoff](worker-grant-owner-design.md) records the formatting-only
 conflict resolution and scoped merge checks. Earlier results keep their original
 baseline.
+
+## F4c2: SDK call and interruption contracts
+
+This bounded prerequisite prepares SDK callback outcomes and exact operation
+bindings before the population/producer bridge. The user reviewed and approved
+its implementation and tests on 2026-11-14 ("yes" to proceeding with the F4c2
+implementation tests). This is separate from F4c1's earlier approval.
+
+A callback waiting for acquisition has a runtime/callback identity but no broker
+wire sequence. After dispatch, a stopped write may have an unknown effect even
+if the population never received its wire identity. The existing keeper's result
+type only permits unknown failure with a required `WorkerRequestIdentity`.
+Fabricating a sequence, or using a not-issued refusal for that write, would report
+an outcome the owner did not observe.
+
+Add an opt-in `interrupted` callback result in Local First, with required
+`reason: closed | unavailable` and `effectOutcome: not-issued | unknown`, and no
+wire identity or successful response. The chart still selects this result and
+records it before dispatch; the keeper only retains/delivers it. Existing channel
+callers keep their exact result type by default. Neither the wire protocol nor
+the SDK is changed. A real channel result still carries its actual wire identity.
+
+Finance's private callback identity is a copied, validated runtime UUID plus
+request UUID. Pure call preparation captures the caller's result recipient,
+validates/canonicalizes an exact generation key or same-origin broker URL/full
+name, then validates the actual canonical operation through public
+`brokerHostCall` after URL canonicalization, so expansion cannot exceed the wire
+bound. Preparation returns one immutable owned snapshot; accounting and the child
+use that same object without preparing it again. Do not copy private broker
+schemas or SDK namespace rules. This is an internal factory-only dependency,
+not a DTO accepted from native messages.
+
+The pending-byte calculation is UTF-8 JSON of the validated canonical operation
+payload (OPEN/READ/WRITE fields); fixed identity-envelope overhead is separately
+bounded by UUIDs and callback/grant counts. This is a request-budget metric, not
+a browser-heap measurement. Preparation reports its byte count but performs no
+admission, post, listener, randomness, promise or actor creation. The later chart
+must enforce the aggregate 1 MiB/eight-callback/32-grant limits before effects.
+
+This prerequisite does not bind SDK callbacks, construct a native inbox, acquire
+grants or activate the runtime. Retain it in the inactive worker import proof.
+Approved qualification covers truthful interruption of
+waiting/issued callbacks, unchanged existing consumers, opaque-port custody,
+canonical URL expansion, caller-mutation capture, invalid scopes/operations,
+UTF-8/escaped payload accounting and real-build omission of the new preparation
+module. The population, bounded producer inbox and actual SDK fallback ordering
+remain subsequent implementation work.
+
+Static review on 2026-11-14 passes Local First source formatting/lint, library
+types, `pnpm build:libraries` (including package validation), existing public
+consumer declaration types, Finance application/service-worker/strict host/proof
+types, the real worker proof build, Clipper web/extension types, shared peer-link
+and guidance checks, and whitespace checks. The generated package declarations
+retain the default `never` parameter; the worker report contains the rendered
+`sdk-call-binding.ts` implementation. These were the pre-approval static checks;
+the approved behavioral results below are separate evidence.
+
+`worker-bundle.test.ts`'s existing broker/grant-binding omission fixtures now
+remove the new preparation import/catalog entry too: it otherwise retains those
+implementations transitively. Their actual missing-module assertions are
+preserved, with a separate preparation-module omission case. Direct custody
+cases cover waiting/issued interruption, exact callback identity, selected
+disposal, throwing observers, accepted native-port survival and late registration.
+The existing packed consumer now checks both default result compatibility and
+opt-in outcomes without fabricated wire identities. `sdk-call-binding.test.ts`
+covers the operation/capture/byte contracts above. No production implementation
+changed after review.
+
+### F4c2 qualification on main `4301afde`
+
+Run from this isolated branch using Node 24.22.2 and pnpm 10.28.0:
+
+| Scope             | Command and result                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Local First       | `pnpm exec vitest run --config vitest.config.ts`: 1,198 tests in 57 files, including all 24 direct custody cases.                                                                                            |
+| Published exports | `node fixtures/package-consumer/worker-host-close-packed.mjs`: all four actual-tarball consumers pass public declaration checks, native effects/receipts and self-contained module-worker builds.            |
+| Finance           | `pnpm test:worker-host`: 184 cases in 10 files; `pnpm test:unit --run`: 2,104 cases in 149 files, including 21 call-binding and 16 real-build proof cases; `pnpm test:worker-state`: 18 cases in four files. |
+| Native Finance    | `pnpm test:worker-bindings`: all 21 cases across Chromium/Firefox/WebKit, including accepted SharedWorker port survival and full browser-process account-store restarts.                                     |
+| Clipper           | `pnpm test:unit`: 872 cases in 134 files and 30 component cases in six files; `pnpm test:worker`: all 32 native worker cases.                                                                                |
+| Static            | Library/test and public consumer types, strict Finance host/native-fixture types, changed-file formatting/lint and whitespace pass alongside the pre-approval checks above.                                  |
+
+Logs are `/private/tmp/finance-worker-f4c2-*.log`. All completed runs pass on
+their first attempt. Existing production PWA/provider, packaged-extension and
+production-offline results below/in the linked keeper record retain their F4c1
+baseline; they were not rerun for this type extension and inactive pure helper.
+The shared native custody algorithm, live SDK facade and storage implementation
+are unchanged. Native/packed tests qualify compatibility; they do not establish
+the unimplemented population's aggregate limits or SDK fallback ordering.
 
 The [single-grant design](worker-grant-owner-design.md) remains authoritative for
 F4a/F4b. This record makes the next callback ownership decision explicit before

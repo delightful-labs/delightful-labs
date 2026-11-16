@@ -1,5 +1,11 @@
 # Worker-owned Jazz grant lifecycle
 
+Historical design and qualification. The approved [simpler design](worker-simple-design.md)
+replaces this grant/call implementation. [C1](worker-migration-tasks.md#c1-unused-grantcall-removal)
+removes its unused Finance code and bespoke tests; do not resume the pending
+population/inbox work below. Source links for removed files refer to the last
+retained revision. Shared broker/channel/custody APIs remain.
+
 F4b adds one grant's owning chart after F4a's qualified binding/
 acquisition contract. The user approved its concrete implementation/tests on
 2026-11-14; qualification below passes. F1–F3 and the close correction retain
@@ -21,6 +27,14 @@ The user requested an ongoing tracking PR and continued work on its same branch:
 [draft PR #37](https://github.com/delightful-labs/delightful-labs/pull/37),
 `feat/finance-worker-grant-owner`. The qualified F4a checkpoint is uploaded at
 `95eebd7d`. Continue this PR rather than opening a separate PR for each slice.
+
+The user subsequently merged PR #37 at main `4301afde` on 2026-11-14.
+The follow-up `feat/finance-worker-grant-population` starts from that merge.
+The [F4c2 SDK call/interruption contracts](worker-grant-population-design.md#f4c2-sdk-call-and-interruption-contracts)
+now pass separately approved qualification on that branch. Continue with the
+bounded native callback bridge/population and actual acquisition transport.
+Previous PR/branch instructions above are historical; F4c2's linked record
+preserves its exact scope and results.
 
 On 2026-11-14 this branch merges main `fca60ca0`, including PR #36's Clipper
 reader-header cleanup and the shared-workspace planning/formatting updates.

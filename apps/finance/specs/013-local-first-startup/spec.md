@@ -13,6 +13,24 @@ Ask product questions one at a time. Implement lower-risk local usability improv
 
 ## Application-worker migration handoff
 
+2026-11-16 direction: the user approved starting the simpler architecture leaning
+on native Jazz, Svelte, XState and Web Workers. The
+[simpler worker design](worker-simple-design.md) replaces the grant/call-owner
+direction with one session-scoped broker connection using existing shared APIs.
+Its retained real-SDK/IndexedDB proof passes all 12 native cases, including cold
+data reopens in Chromium/Firefox/WebKit. C1 removes the unused Finance grant/call
+prototype and its 18 native scenarios; the SDK/IDB scenarios are unchanged.
+C2 also removes the unused Window account-storage/migration bridge and its test
+workspace; the retained IDB binding and active SDK storage are unchanged.
+See the [cleanup audits and remaining tasks](worker-migration-tasks.md#c2-unused-window-account-storage-removal).
+The worker-entry duplication behind WebKit's account
+error is corrected through Local First's shared single-bundle ES-module settings,
+also used by Clipper web and its extension. See the
+[research and qualification](worker-webkit-startup-research.md). No production
+Finance cutover is qualified.
+The historical implementation/qualification below is not approval to continue
+building the superseded layers or evidence that the replacement is fully qualified.
+
 Updated 2026-11-13: the user requested a foundation-first migration task list,
 research against current monorepo code, and explicit Local First/Clipper reuse.
 The complete recorded backlog is

@@ -5,6 +5,7 @@ import { sveltekit } from '@sveltejs/kit/vite'
 import { defineConfig } from 'vite'
 import { dirname, join } from 'node:path'
 import { jazzWasmEntry as wasmEntry } from './tooling/jazz-wasm.js'
+import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
 import { jazzDev } from './tooling/jazz-dev.js'
 import svg from '@poppanator/sveltekit-svg'
 
@@ -21,6 +22,7 @@ export default defineConfig(({ command, mode }) => {
 	if (mode === 'agent' || process.env.CLIPPER_TEST === 'true')
 		process.env.CLIPPER_EPHEMERAL_JAZZ = 'true'
 	return {
+		worker: jazzWorkerOptions(),
 		envPrefix: ['VITE_', 'PUBLIC_'],
 		// Search and extraction workers start after account readiness. Prebundle
 		// their lazy dependencies so a cold optimizer cannot reload an active job.

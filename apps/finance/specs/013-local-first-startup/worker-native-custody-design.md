@@ -43,9 +43,9 @@ including custody commit `f9b2fc94accdf6a9065ebe278daea48d3003e8bf`.
   option. Local First's [session adapter](../../../../packages/local-first/src/lib/backend/jazz/session.ts)
   already forwards it. No SDK patch or alternate session owner is required to
   supply an IndexedDB store.
-- Finance's inactive [account owner](../../src/lib/machines/runtime/account-store-owner.ts),
-  [operation](../../src/lib/machines/runtime/account-store-operation.ts) and
-  [legacy cleanup](../../src/lib/machines/runtime/account-store-legacy.ts) currently
+- Finance's inactive [account owner](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/machines/runtime/account-store-owner.ts),
+  [operation](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/machines/runtime/account-store-operation.ts) and
+  [legacy cleanup](https://github.com/delightful-labs/delightful-labs/blob/abf310823c18cc23b9be04b67a51ecf0262d68e9/apps/finance/src/lib/machines/runtime/account-store-legacy.ts) currently
   orchestrate worker locks plus Window storage writes. Preserve their observable
   SDK transform and cancellation behavior, not that physical implementation.
   Legacy selection/import/cleanup is excluded by the new user instruction. Their

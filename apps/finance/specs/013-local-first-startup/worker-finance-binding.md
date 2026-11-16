@@ -1,5 +1,11 @@
 # W05: Finance storage and native broker bindings
 
+Historical design and qualification. The approved [simpler design](worker-simple-design.md)
+replaces this grant/call implementation. [C1](worker-migration-tasks.md#c1-unused-grantcall-removal)
+removes its unused Finance code and bespoke tests; do not resume the pending
+population/inbox work below. Source links for removed files refer to the last
+retained revision. Shared broker/channel/custody APIs remain.
+
 The user approved Finance-first sequencing on 2026-11-13. Clipper consumes the
 qualified shared broker/close transport; its remaining account-store and hidden
 capture-runtime conversion is a separate follow-up. It does not gate W05/W06.
@@ -25,7 +31,7 @@ close/broker consumer checks and format/lint again on this refreshed baseline.
    empty environment. Store the opaque SDK selection string under the exact
    canonical registry/environment pair in `delightful-finances-account-selection`.
    There is no localStorage access, legacy-key derivation or selection parsing.
-2. [broker-host.ts](../../src/lib/runtime/worker/broker-host.ts) validates an explicit native capability
+2. [broker-host.ts](https://github.com/delightful-labs/delightful-labs/blob/9193d7551e16e2b32ddbc6a7b1d8ae9a69e9ad20/apps/finance/src/lib/runtime/worker/broker-host.ts) validates an explicit native capability
    binding: fresh host scope, exact resolved script URL and SDK-selected base
    name. Delegate transport to Local First. Admit only the exact canonical URL,
    that base plus a safe generation suffix, and its exact generation-storage key.

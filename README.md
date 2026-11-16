@@ -65,10 +65,10 @@ The [alpha.60 source adapters](specs/002-monorepo-agent-guidance/alpha60-adapter
 are qualified locally. Finance and Clipper consume its qualified workspace source; historical archives
 remain only where retained for provenance/fixtures.
 
-Finance commands: `pnpm finance:check`, `pnpm finance:test`,
-`pnpm finance:test:worker-state`, `pnpm finance:test:worker-host` and
-`pnpm finance:build`. Use `pnpm --filter delightful-finances <command>` for other
-app scripts. Frozen installation prepares the injected UI package; after editing
+Finance commands: `pnpm finance:check`, `pnpm finance:test` and
+`pnpm finance:build`. Worker persistence/browser qualification uses
+`pnpm --filter delightful-finances test:worker-bindings`. Use
+`pnpm --filter delightful-finances <command>` for other app scripts. Frozen installation prepares the injected UI package; after editing
 UI, run `pnpm ui:package` to refresh its peer-specific copies.
 See [the Finance import record](specs/002-monorepo-agent-guidance/finance-import.md)
 for retained archives and isolated test configuration. Hosting cutover is complete;

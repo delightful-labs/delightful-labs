@@ -15,28 +15,63 @@ port already transferred into SDK custody. A data error leaves independent close
 control observable. The worker facade never retries unknown opens or generation
 writes and exposes the original host-close promise separately from forced stop.
 
-The native host receives two mandatory pure admission capabilities:
+The low-level `serveBrokerHost` receives two mandatory pure admission capabilities:
 `admitOpen(url, name)` and `admitGeneration(key)`. Apply them to bounded decoded
 requests before native opens/reads/writes. Wire schemas, SDK-prefixed names,
 generation representation checks and native port validation stay private to the
 library, avoiding the Zod minor-version coupling found during R1.
 
-Clipper's app adapter supplies its current same-origin URL admission and Jazz
-generation-key prefix. Finance's separate adapters admit one exact resolved
-URL/full worker name or one exact generation key, refusing the other operation
-kind. The existing SDK callbacks provide these values; no new SDK patch or
-private naming algorithm is required. Native grants are qualified; actual
-Finance SDK/session integration remains pending.
-There is no permissive default and no change to either app's selected identity
-or broker namespace. The SDK retains generation selection and parsing of raw
-stored values; generation storage stays in the required Window primitive and
-is independent of the new IndexedDB AccountStore.
+For one connection per trusted application Worker/session, the same public
+module exports `serveBrowserWorkerHost` and `BrowserWorkerHostNative`. Supply
+the Window's HTTP(S) or exact `chrome-extension://<id>` origin, storage and
+SharedWorker constructor adapter. Extension IDs must be 32 lowercase characters
+from `a` through `p`. Compare their scheme/host explicitly: Node URL parsing
+reports extension origins as opaque `null`, while Chrome reports their actual
+extension origin. Never treat different opaque origins as equivalent.
+The helper admits same-origin broker URLs; optional `brokerWorkerUrl` further
+restricts opens to that asset's pathname, allowing SDK version queries. Foreign
+or credential-bearing configuration is rejected before attaching listeners;
+credential-bearing requests are rejected before constructing a worker.
+The existing wire decoder still enforces bounded SDK-prefixed names and
+generation keys. The SDK retains generation selection and parsing of raw stored
+values; generation storage stays in the required Window primitive and is
+independent of the shared IndexedDB AccountStore.
+
+Clipper re-exports this setup with its existing same-origin policy. Finance's
+real-SDK fixture uses it with the configured broker asset restriction. Finance's
+older, inactive exact-name/key grant adapters still use the low-level API until
+the simpler replacement is qualified. This extraction neither activates Finance's
+application Worker nor changes either app's selected identity or namespace.
+Both consume the existing workspace Jazz patch, which supplies the
+`RuntimeSourcesConfig.browserWorkerHost` hook; no new patch is introduced.
+
+## Shared worker build settings
+
+Finance, Clipper web and Clipper's extension use `jazzWorkerOptions` from the
+public `backend/jazz/worker-build` export. It supplies ES-module output with
+`codeSplitting: false`. This prevents a lazy chunk from importing the worker
+entry again and duplicating Jazz's account registry in affected WebKit builds.
+The helper has no Vite runtime/type dependency and introduces no runtime owner.
+
+```ts
+import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
+
+export default { worker: jazzWorkerOptions() }
+```
+
+An optional asset filename pattern preserves an app's existing output layout;
+Finance passes `_app/immutable/assets/[name].[hash][extname]`. Apps continue
+resolving Wasm from their own SDK installation. Single-bundle output includes
+the worker's lazy JavaScript dependencies up front; the Wasm binary remains a
+separate asset. See Finance's
+[research and qualification](../../../apps/finance/specs/013-local-first-startup/worker-webkit-startup-research.md).
+
+## Extraction history
 
 The shared code lives inside Local First's Jazz integration boundary because it
 implements `RuntimeSourcesConfig.browserWorkerHost`; it imports no app schema,
-domain or UI. Clipper keeps a small adapter with its app admission policy and
-delegates its worker facade to the shared implementation. Existing native
-broker fixtures continue through that same adapter. Replaced broker mechanics
+domain or UI. Clipper keeps only re-exports of the shared setup and worker facade.
+Existing native broker fixtures continue through those same exports. Replaced broker mechanics
 are removed from Clipper.
 
 The library's ES2022 declaration target requires an ordinary Promise for the

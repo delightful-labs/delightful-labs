@@ -8,6 +8,37 @@ on 2026-11-14; the qualification below passes.
 The user selected this shared extraction on 2026-11-14 instead of a separate
 Finance keeper. It adds no SDK patch, actor root, timer or native listener.
 
+## F4c2 callback interruption extension
+
+PR #37 is merged at main `4301afde`. The user separately approved F4c2's concrete
+implementation/tests on 2026-11-14. The slice is qualified on
+`feat/finance-worker-grant-population`; the F4c1 results below remain historical.
+
+The future SDK bridge can know a callback was interrupted without having received
+its broker wire sequence. It must not fabricate that identity or label an issued
+write not issued. `WorkerCallbackInterruption` supplies a separate required-field
+variant: `kind: interrupted`, `reason: closed | unavailable`, and
+`effectOutcome: not-issued | unknown`. It has no successful response or wire
+identity and cannot serve as native host-close output.
+
+Keeper/result/registration/stop-result types and the factory accept an optional
+third type parameter constrained to this variant. Its default is `never`, keeping
+existing consumers' exact channel-result contract. Opt-in consumers use
+`WorkerCallbackResult<Response, WorkerCallbackInterruption>`; real broker results
+retain their actual wire identity. The native custody algorithm, chart ownership
+and channel wire protocol are unchanged. Charts still select/record stop outcomes
+before effects; the keeper only stores and delivers them.
+
+F4c2 passes all 1,198 library tests, including 24 direct custody cases and native
+accepted-port survival. All four actual-tarball consumers pass public types,
+native runtime checks and module-worker builds; the custody fixture covers both
+unchanged default result types and opt-in unknown/not-issued outcomes. Finance
+passes 2,104 units, 184 focused host cases, 18 worker-state and 21 native cases;
+Clipper passes 872 units, 30 component cases and all 32 native worker cases. The
+[F4c2 qualification record](../../../apps/finance/specs/013-local-first-startup/worker-grant-population-design.md#f4c2-qualification-on-main-4301afde)
+owns commands, logs and qualification limits. Existing
+production/offline F4c1 counts are not relabeled as new F4c2 results.
+
 ## Ownership
 
 The channel/population chart selects admission, identity, limits, dispatch,

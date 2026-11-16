@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import type { UserConfig } from 'vite'
+import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
 
 const require = createRequire(import.meta.url)
 export const jazzWasmEntry = createRequire(require.resolve('jazz-tools/package.json')).resolve(
@@ -19,11 +20,6 @@ export function workerRuntimeBuildConfig() {
 				}
 			]
 		},
-		worker: {
-			format: 'es',
-			rolldownOptions: {
-				output: { assetFileNames: '_app/immutable/assets/[name].[hash][extname]' }
-			}
-		}
+		worker: jazzWorkerOptions('_app/immutable/assets/[name].[hash][extname]')
 	} satisfies Pick<UserConfig, 'resolve' | 'worker'>
 }

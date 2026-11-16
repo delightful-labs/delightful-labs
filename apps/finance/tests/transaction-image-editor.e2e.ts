@@ -151,8 +151,18 @@ async function uploadSaved(page: Page, id: string) {
 	await expect(input).toBeEnabled()
 	await input.setInputFiles(await receipt(page))
 	await page.getByRole('button', { name: 'Save Transaction', exact: true }).click()
+	await expect(page.getByRole('status').filter({ hasText: /^Transaction saved\.$/ })).toBeVisible()
+	await expect(input).toHaveValue('')
+	await expect(input).toBeEnabled()
+	const saved = await savedImage(page, id)
+	// Start saved-image editing from a persisted detail, independent of the
+	// submission's later draft/picker remount. Verify the baseline survives reload.
+	await page.reload()
+	await expect(input).toBeEnabled()
 	await expect(page.getByRole('img', { name: 'Preview of receipt.png', exact: true })).toBeVisible()
-	return savedImage(page, id)
+	const restored = await savedImage(page, id)
+	expect(restored).toEqual(saved)
+	return restored
 }
 
 test(
