@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { webUrlSchema } from '../validation/values.js'
 import {
 	annotationNoteRowSchema,
+	anchorRowSchema,
 	highlightRowSchema,
 	noteInputTextSchema,
 	textFingerprint
@@ -39,6 +40,48 @@ export const marginRecordSchema = z.discriminatedUnion('motivation', [
 ])
 export type MarginRecord = z.infer<typeof marginRecordSchema>
 
+const documentNoteSchema = annotationNoteRowSchema.extend({
+	documentId: annotationNoteRowSchema.shape.documentId.unwrap(),
+	highlightId: z.null(),
+	source: webUrlSchema,
+	text: noteInputTextSchema
+})
+const attachedNoteSchema = annotationNoteRowSchema.extend({
+	documentId: z.null(),
+	source: z.null(),
+	highlightId: annotationNoteRowSchema.shape.highlightId.unwrap(),
+	text: noteInputTextSchema
+})
+const highlightProjectionSchema = highlightRowSchema.extend({
+	source: webUrlSchema,
+	notes: z.array(attachedNoteSchema).max(1)
+})
+const sourceAnchorSchema = anchorRowSchema.extend({
+	kind: z.literal('source'),
+	normalizationVersion: anchorRowSchema.shape.normalizationVersion.refine(hasNonblankText),
+	range: anchorRowSchema.shape.range.required({ start: true, end: true })
+})
+const selectedSourceAnchorSchema = z.tuple([sourceAnchorSchema])
+const timestampSchema = z.date().transform((value) => value.toISOString())
+
+function hasNonblankText(value: string) {
+	return value.trim().length > 0
+}
+
+function isSourceAnchorForHighlight(
+	anchor: z.infer<typeof sourceAnchorSchema>,
+	highlight: AnnotationHighlight
+) {
+	return anchor.highlightId === highlight.id
+}
+
+function isAttachedNoteForHighlight(
+	note: z.infer<typeof attachedNoteSchema>,
+	highlight: AnnotationHighlight
+) {
+	return note.libraryId === highlight.libraryId && note.highlightId === highlight.id
+}
+
 function projectionError() {
 	return new Error('Annotation cannot be projected to Margin')
 }
@@ -50,12 +93,11 @@ function parseProjection<Schema extends z.ZodType>(schema: Schema, input: unknow
 }
 
 function publicationTimes(createdAt: Date, modifiedAt?: Date) {
-	const created = parseProjection(z.date(), createdAt).toISOString()
 	return {
-		createdAt: created,
+		createdAt: parseProjection(timestampSchema, createdAt),
 		...(modifiedAt === undefined
 			? {}
-			: { modifiedAt: parseProjection(z.date(), modifiedAt).toISOString() })
+			: { modifiedAt: parseProjection(timestampSchema, modifiedAt) })
 	}
 }
 
@@ -64,10 +106,7 @@ function publicationTimes(createdAt: Date, modifiedAt?: Date) {
  * the clock or allocates a public identity. Eligibility/acceptance belongs to that
  * owner before issuance. Clearing text preserves the Note and its empty body. */
 export function toMarginDocumentNote(note: AnnotationNote, createdAt: Date, modifiedAt?: Date) {
-	const snapshot = parseProjection(annotationNoteRowSchema, note)
-	if (!snapshot.documentId || !snapshot.source || snapshot.highlightId !== null) {
-		throw projectionError()
-	}
+	const snapshot = parseProjection(documentNoteSchema, note)
 	return parseProjection(commentRecordSchema, {
 		$type: 'at.margin.note',
 		motivation: 'commenting',
@@ -91,32 +130,16 @@ export async function toMarginHighlight(
 	createdAt: Date,
 	modifiedAt?: Date
 ): Promise<MarginRecord> {
-	const snapshot = parseProjection(highlightRowSchema, highlight)
+	const snapshot = parseProjection(highlightProjectionSchema, highlight)
 	const times = publicationTimes(createdAt, modifiedAt)
-	const candidates = snapshot.anchors.filter((anchor) => anchor.id === sourceAnchorId)
-	const anchor = candidates[0]
-	if (
-		candidates.length !== 1 ||
-		!anchor ||
-		anchor.highlightId !== snapshot.id ||
-		anchor.kind !== 'source' ||
-		!anchor.normalizationVersion.trim() ||
-		snapshot.notes.length > 1
-	) {
-		throw projectionError()
-	}
+	const [anchor] = parseProjection(
+		selectedSourceAnchorSchema,
+		snapshot.anchors.filter((anchor) => anchor.id === sourceAnchorId)
+	)
+	if (!isSourceAnchorForHighlight(anchor, snapshot)) throw projectionError()
 	const note = snapshot.notes[0]
-	if (
-		note &&
-		(note.libraryId !== snapshot.libraryId ||
-			note.highlightId !== snapshot.id ||
-			note.documentId !== null ||
-			note.source !== null)
-	) {
-		throw projectionError()
-	}
-	const position = toTextPositionSelector(anchor.range, normalizedSourceText)
-	if (!position) throw projectionError()
+	if (note && !isAttachedNoteForHighlight(note, snapshot)) throw projectionError()
+	toTextPositionSelector(anchor.range, normalizedSourceText)
 	const selector = toTextQuoteSelector(anchor.range)
 	const record = parseProjection(marginRecordSchema, {
 		$type: 'at.margin.note',

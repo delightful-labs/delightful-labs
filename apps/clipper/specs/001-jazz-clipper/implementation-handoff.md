@@ -20,6 +20,14 @@ The review README records required cross-record/source checks and these limits.
 
 ## Margin content mapper — 2026-11-14
 
+Review follow-up, 2026-11-16: the user requested using Zod for more of the mapper.
+Structural input checks now compose the existing schemas: document versus attached
+Note fields, public text bounds, at most one attached Note, and exactly one selected
+source anchor with required offsets. Date serialization uses a Zod transform.
+Named predicates retain cross-record identity checks; Unicode conversion and
+SHA-256 comparison remain explicit. The stored/public shapes and constraints are
+unchanged; no dependency is added.
+
 After presentation of the concrete record and its variants, the user directed
 continuing. `annotations/margin.ts` implements the approved Margin owned-content
 shape as a Zod union and projects document Notes, bare Highlights and Highlights
