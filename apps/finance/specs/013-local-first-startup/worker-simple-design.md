@@ -2,7 +2,9 @@
 
 Status: the user approved starting this design on 2026-11-16, including the
 session-level bridge proposed for review. The initial real-SDK fixture is now
-implemented; WebKit qualification is blocked as recorded below. Stop extending
+implemented; the WebKit cause is identified and two build corrections pass
+experimentally, pending application to the branch. See the
+[startup research](worker-webkit-startup-research.md). Stop extending
 the grant/call-owner architecture. No production runtime cutover is implemented.
 
 ## Start with the actual application
@@ -159,8 +161,10 @@ Results at this checkpoint:
   `createAccountDbWithRuntimeSource`, `createRegisteredJazzClient` and the
   session upgrade. Removing automatic upgrading and testing explicit upgrading
   alone still fails. An unminified control also fails; normal minification was
-  restored. The cause is unresolved; neither an SDK patch nor an initialization
-  workaround is selected. The failing case remains enabled.
+  restored. At this checkpoint the cause was unresolved. Subsequent
+  [research](worker-webkit-startup-research.md) establishes duplicate worker-entry
+  evaluation and verifies two build-only corrections; neither is applied yet.
+  The failing case remains enabled.
 
 The first fixture build found both the SDK's emitted immutable broker asset and
 its separately bundled constructor branch. Asset selection now requires the
@@ -171,9 +175,10 @@ Preserved logs use `/private/tmp/finance-simple-sdk-*.log`; original WebKit buil
 profile artifacts remain in `.svelte-kit/finance-binding-native-HwjwkG`,
 `finance-binding-native-gni8pM`, `finance-binding-native-ZO4ABR` and
 `finance-binding-native-ewC0eU`. Do not retry unchanged startup or remove the old
-implementation as if cross-browser replacement were qualified. Discuss the
-worker-only SDK failure before choosing a different initialization approach or
-changing dependencies. The application remains Window-owned.
+implementation as if cross-browser replacement were qualified. The research
+recommends disabling worker code splitting while preserving ES output; no
+different initialization approach or dependency patch is needed for this
+failure. The application remains Window-owned.
 
 ## Shared Window setup checkpoint
 
@@ -186,5 +191,6 @@ above, the packed transport consumers, library types, Clipper web/extension type
 and Finance browser-fixture types. Clipper's first native attempt encountered an
 old Vite prebundle missing the new export; refreshing only this isolated
 checkout's cache resolved it. Logs use
-`/private/tmp/finance-shared-browser-host-*.log`. This does not resolve or disable
-the known WebKit worker failure or the separate offline-edit CI failure.
+`/private/tmp/finance-shared-browser-host-*.log`. This extraction did not resolve
+or disable the WebKit worker failure. The subsequent build experiments are
+recorded in the startup research; the separate offline-edit CI failure remains.
