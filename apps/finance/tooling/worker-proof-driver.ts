@@ -4,7 +4,4 @@ export function openWorkerImportProof() {
 		type: 'module'
 	})
 }
-export {
-	serveFinanceGenerationGrant,
-	serveFinanceBrokerGrant
-} from '../src/lib/runtime/worker/broker-host.js'
+export { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/worker-broker'

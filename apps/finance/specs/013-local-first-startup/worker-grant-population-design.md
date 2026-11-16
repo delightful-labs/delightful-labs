@@ -1,5 +1,11 @@
 # Grant population: callback custody decision
 
+Historical design and qualification. The approved [simpler design](worker-simple-design.md)
+replaces this grant/call implementation. [C1](worker-migration-tasks.md#c1-unused-grantcall-removal)
+removes its unused Finance code and bespoke tests; do not resume the pending
+population/inbox work below. Source links for removed files refer to the last
+retained revision. Shared broker/channel/custody APIs remain.
+
 Status: the user selected approach A and approved F4c1's concrete implementation
 and tests on 2026-11-14. The shared native keeper extraction is qualified; the
 aggregate callback bridge/population remains next.

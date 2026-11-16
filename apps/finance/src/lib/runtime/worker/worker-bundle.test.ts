@@ -33,7 +33,7 @@ function replaceEntry(code: string): Plugin {
 
 const manifestSchema = z.object({
 	scope: z.literal('build-only; no runtime activation'),
-	windowBinding: z.literal('src/lib/runtime/worker/broker-host.ts'),
+	windowBinding: z.literal('delightful-local-first/backend/jazz/worker-broker'),
 	windowBindingExports: z.array(z.string()),
 	publicEntries: z.array(z.object({ entry: z.string() }))
 })
@@ -49,10 +49,7 @@ it('bundles real SDK implementations, lazy chunks and a binary Wasm module', asy
 			? manifest.source
 			: new TextDecoder().decode(manifest.source)
 	const decoded: unknown = JSON.parse(source)
-	expect(manifestSchema.parse(decoded).windowBindingExports).toEqual([
-		'serveFinanceGenerationGrant',
-		'serveFinanceBrokerGrant'
-	])
+	expect(manifestSchema.parse(decoded).windowBindingExports).toEqual(['serveBrowserWorkerHost'])
 	expect(manifestSchema.parse(decoded).publicEntries.map((entry) => entry.entry)).toEqual(
 		expect.arrayContaining([
 			'jazz-tools/local-first',
@@ -82,16 +79,7 @@ it.each([
 				return code
 					.split('\n')
 					.filter(
-						(line) =>
-							!line.includes(`import { ${factory} }`) &&
-							line.trim() !== `${factory},` &&
-							(factory !== 'brokerHostClient' ||
-								(!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
-									line.trim() !== 'createFinanceGrantOwner,' &&
-									!line.includes("from './sdk-call-binding.js'") &&
-									line.trim() !== 'prepareFinanceSdkCall,' &&
-									!line.includes("from '../../machines/runtime/worker-sdk-call-owner.js'") &&
-									line.trim() !== 'createFinanceSdkCallOwner,'))
+						(line) => !line.includes(`import { ${factory} }`) && line.trim() !== `${factory},`
 					)
 					.join('\n')
 			}
@@ -103,138 +91,22 @@ it.each([
 	20_000
 )
 
-it.each([
-	{
-		missing: 'grant-binding.ts',
-		imports: ['grant-binding.js', 'grant-protocol.js'],
-		factories: [
-			'financeGrantDescriptor',
-			'financeGrantKey',
-			'decodeFinanceGrantRequest',
-			'decodeFinanceGrantReply'
-		]
-	},
-	{
-		missing: 'grant-protocol.ts',
-		imports: ['grant-protocol.js'],
-		factories: ['decodeFinanceGrantRequest', 'decodeFinanceGrantReply']
-	}
-])(
-	'refuses a worker that omits the private $missing contract',
-	async ({ missing, imports, factories }) => {
-		const remove: Plugin = {
-			name: 'worker-proof-missing-grant-contract',
-			enforce: 'pre',
-			transform(code, id) {
-				if (!id.endsWith('/runtime/worker/application.worker.ts')) return
+it('refuses a proof that omits the shared Window broker adapter', async () => {
+	const remove: Plugin = {
+		name: 'worker-proof-missing-window-binding-fixture',
+		enforce: 'pre',
+		transform(code, id) {
+			if (id.endsWith('/tooling/worker-proof-driver.ts'))
 				return code
 					.split('\n')
-					.filter(
-						(line) =>
-							!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
-							line.trim() !== 'createFinanceGrantOwner,' &&
-							!line.includes("from './sdk-call-binding.js'") &&
-							line.trim() !== 'prepareFinanceSdkCall,' &&
-							!line.includes("from '../../machines/runtime/worker-sdk-call-owner.js'") &&
-							line.trim() !== 'createFinanceSdkCallOwner,' &&
-							!imports.some((module) => line.includes(`from './${module}'`)) &&
-							!factories.some((factory) => line.trim() === `${factory},`)
-					)
+					.filter((line) => !line.startsWith('export {'))
 					.join('\n')
-			}
-		}
-		await expect(bundle(remove)).rejects.toThrow(
-			`Worker proof omitted implementation: src/lib/runtime/worker/${missing}`
-		)
-	},
-	20_000
-)
-
-it('refuses a worker that omits the grant-owner implementation', async () => {
-	const remove: Plugin = {
-		name: 'worker-proof-missing-grant-owner',
-		enforce: 'pre',
-		transform(code, id) {
-			if (!id.endsWith('/runtime/worker/application.worker.ts')) return
-			return code
-				.split('\n')
-				.filter(
-					(line) =>
-						!line.includes("from '../../machines/runtime/worker-grant-owner.js'") &&
-						line.trim() !== 'createFinanceGrantOwner,'
-				)
-				.join('\n')
 		}
 	}
-	await expect(bundle(remove)).rejects.toThrow(
-		'Worker proof omitted implementation: src/lib/machines/runtime/worker-grant-owner.ts'
+	await expect(bundle(undefined, remove)).rejects.toThrow(
+		'Worker proof omitted shared Window broker binding'
 	)
 }, 20_000)
-
-it('refuses a worker that omits SDK call preparation', async () => {
-	const remove: Plugin = {
-		name: 'worker-proof-missing-sdk-call-binding',
-		enforce: 'pre',
-		transform(code, id) {
-			if (!id.endsWith('/runtime/worker/application.worker.ts')) return
-			return code
-				.split('\n')
-				.filter(
-					(line) =>
-						!line.includes("from './sdk-call-binding.js'") &&
-						line.trim() !== 'prepareFinanceSdkCall,' &&
-						!line.includes("from '../../machines/runtime/worker-sdk-call-owner.js'") &&
-						line.trim() !== 'createFinanceSdkCallOwner,'
-				)
-				.join('\n')
-		}
-	}
-	await expect(bundle(remove)).rejects.toThrow(
-		'Worker proof omitted implementation: src/lib/runtime/worker/sdk-call-binding.ts'
-	)
-}, 20_000)
-
-it('refuses a worker that omits the SDK callback owner', async () => {
-	const remove: Plugin = {
-		name: 'worker-proof-missing-sdk-call-owner',
-		enforce: 'pre',
-		transform(code, id) {
-			if (!id.endsWith('/runtime/worker/application.worker.ts')) return
-			return code
-				.split('\n')
-				.filter(
-					(line) =>
-						!line.includes("from '../../machines/runtime/worker-sdk-call-owner.js'") &&
-						line.trim() !== 'createFinanceSdkCallOwner,'
-				)
-				.join('\n')
-		}
-	}
-	await expect(bundle(remove)).rejects.toThrow(
-		'Worker proof omitted implementation: src/lib/machines/runtime/worker-sdk-call-owner.ts'
-	)
-}, 20_000)
-
-it.each(['serveFinanceGenerationGrant', 'serveFinanceBrokerGrant'])(
-	'refuses a proof that omits the real Window adapter %s',
-	async (factory) => {
-		const remove: Plugin = {
-			name: 'worker-proof-missing-window-binding-fixture',
-			enforce: 'pre',
-			transform(code, id) {
-				if (id.endsWith('/tooling/worker-proof-driver.ts'))
-					return code
-						.split('\n')
-						.filter((line) => line.trim().replace(/,$/u, '') !== factory)
-						.join('\n')
-			}
-		}
-		await expect(bundle(undefined, remove)).rejects.toThrow(
-			'Worker proof omitted Finance Window broker binding'
-		)
-	},
-	20_000
-)
 
 it.each([
 	'/worker-proof/Forbidden.svelte.js',

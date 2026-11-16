@@ -4,8 +4,9 @@ Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,
 but start with one existing broker connection and a real SDK vertical slice.
-The real-SDK fixture now passes all 30 native cases, including saves and two cold
-browser reopens in Chromium/Firefox/WebKit. The WebKit failure was duplicate
+The retained real-SDK/IndexedDB fixture passes all 12 native cases after C1 removes
+the obsolete grant/call scenarios; saves and two cold browser reopens remain
+covered in Chromium/Firefox/WebKit. The WebKit failure was duplicate
 worker-entry evaluation; Finance and Clipper now use the same Local First
 single-bundle ES-module build settings. See the
 [cause and qualification](worker-webkit-startup-research.md). The latest proposed
@@ -13,25 +14,27 @@ sequence is the bounded unused-prototype cleanup below, a coordinated SDK upgrad
 using the [alpha.61–65 research](worker-jazz-release-research.md), then the planned
 worker-owned UI read slice. Keep live behavior until its replacement is qualified.
 The shared-helper extension-origin regression is corrected and all 12 extension
-browser cases pass locally. Latest inspected hosted Finance checks pass;
-post-correction CI is pending. See the research's current verification record.
+browser cases pass locally. All hosted Finance, Clipper and foundation checks
+pass at `9193d755`; the subsequent cleanup head needs a fresh hosted run.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 
 ## Seven-item simplification checklist
 
-This is the complete cleanup list proposed to the user on 2026-11-16. All seven
-items remain open; recording them does not mean implementation is complete or
-authorize a dependency upgrade or production cutover. This checklist is the
+This is the complete cleanup list proposed to the user on 2026-11-16. C1 is
+implemented; C2–C7 retain their remaining scope. Recording or completing cleanup
+does not authorize a dependency upgrade or production cutover. This checklist is the
 current cleanup handoff alongside the selected simpler design. W01–W21 below
 retain their product/parity requirements, not the abandoned implementation plan.
 
-- [ ] **C1 — Delete the abandoned grant/call architecture.** Audit non-test
+- [x] **C1 — Delete the abandoned grant/call architecture.** Audit non-test
       imports, then remove confirmed-unused `worker-grant-owner` and
       `worker-sdk-call-owner` machines/contracts, `sdk-call-binding`, grant
       binding/protocol/adapters, and their bespoke fixtures. Remove obsolete
       population/inbox tasks rather than implementing them. Keep the shared
       broker/channel/close APIs and port-custody behavior used by both apps.
+      The [C1 audit and qualification](#c1-unused-grantcall-removal) records the
+      removed dependency group and retained persistence coverage.
 - [ ] **C2 — Remove the old Window account-storage bridge.** Audit the unused
       `host-client`, `window-host`, `host-drain`, account-store facade/storage
       adapters, selection namespace and legacy account-store machines as one
@@ -84,6 +87,41 @@ coordinated SDK upgrade, including its patch, backend/schema, auth and Vercel
 namespace boundaries. Then complete C3/C4/C5 as one real read slice, followed by
 C6. Qualification is required before replacing live behavior; the first cleanup
 must not turn into a runtime cutover or a new account-data migration.
+
+## C1: unused grant/call removal
+
+The repository-wide source/configuration reference audit found no active Finance
+layout, session or domain-machine caller of the grant/call layer. Its only
+non-test entry was the inactive factory catalog; the build-only driver exposed
+its Window adapters. Those proof requirements kept the prototype reachable in
+test builds, not in the production application.
+
+Removed the Finance grant/call owners and contracts, descriptor/protocol/callback
+bindings, exact-grant Window adapters, bespoke native fixture parents/clients,
+two generated grant/call model suites and their omission assertions. The proof
+driver now re-exports Local First's existing `serveBrowserWorkerHost` directly.
+Its graph still checks SDK/shared implementations, UI isolation, bundled
+dependencies, the real Window adapter, the application entry and Wasm output.
+No replacement owner, protocol, patch or runtime activation was introduced.
+
+All six actual-SDK cases and all six IndexedDB isolation/serialization/restart
+cases remain and pass across Chromium, Firefox and WebKit. The count is now 12
+instead of 30 because 18 tests exercised the removed prototype; no SDK/IDB
+durability scenario was removed. Focused host tests pass (49), remaining
+account-store model tests pass (17), and real-build tests pass (11). Worker-proof,
+browser-fixture and model-package types pass. Full Finance verification passes:
+1,964 unit tests, Svelte/service-worker types, the worker-proof build and the
+production application build. The first full-unit attempt was blocked by sandbox
+listener restrictions; the authorized disposable-listener run passes. Workspace
+links and guidance pass. Historical counts below keep their original revision
+and scope; fresh hosted CI is still required for the cleanup head.
+
+C2's old Window account-storage bridge and its model package remain for the next
+audited deletion. C3 is only partially addressed: obsolete catalog requirements
+are gone, but the entry is still build-only. C7 is ongoing. Keep shared broker,
+channel, callback-custody and close APIs; changing their public surface is not
+part of this Finance-only deletion. The active Window application, financial
+operation identity/drains and workspace dependencies are unchanged.
 
 ## Historical foundation backlog and product parity requirements
 

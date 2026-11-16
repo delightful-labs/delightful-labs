@@ -1,5 +1,11 @@
 # Worker-owned Jazz grant lifecycle
 
+Historical design and qualification. The approved [simpler design](worker-simple-design.md)
+replaces this grant/call implementation. [C1](worker-migration-tasks.md#c1-unused-grantcall-removal)
+removes its unused Finance code and bespoke tests; do not resume the pending
+population/inbox work below. Source links for removed files refer to the last
+retained revision. Shared broker/channel/custody APIs remain.
+
 F4b adds one grant's owning chart after F4a's qualified binding/
 acquisition contract. The user approved its concrete implementation/tests on
 2026-11-14; qualification below passes. F1–F3 and the close correction retain

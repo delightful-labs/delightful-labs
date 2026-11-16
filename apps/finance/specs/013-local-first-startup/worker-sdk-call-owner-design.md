@@ -1,5 +1,11 @@
 # SDK callback owner: F4c3
 
+Historical design and qualification. The approved [simpler design](worker-simple-design.md)
+replaces this grant/call implementation. [C1](worker-migration-tasks.md#c1-unused-grantcall-removal)
+removes its unused Finance code and bespoke tests; do not resume the pending
+population/inbox work below. Source links for removed files refer to the last
+retained revision. Shared broker/channel/custody APIs remain.
+
 Status: the user separately approved this concrete implementation and its tests
 on 2026-11-14 ("yes" to the F4c3 review request). Qualification below passes on
 PR #39's branch after F4c2 (`dce092be`, planning follow-up `e4a3bf28`) and its

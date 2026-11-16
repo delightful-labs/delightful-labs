@@ -17,8 +17,11 @@ Ask product questions one at a time. Implement lower-risk local usability improv
 on native Jazz, Svelte, XState and Web Workers. The
 [simpler worker design](worker-simple-design.md) replaces the grant/call-owner
 direction with one session-scoped broker connection using existing shared APIs.
-Its real-SDK proof now passes all 30 native cases, including cold data reopens in
-Chromium/Firefox/WebKit. The worker-entry duplication behind WebKit's account
+Its retained real-SDK/IndexedDB proof passes all 12 native cases, including cold
+data reopens in Chromium/Firefox/WebKit. C1 removes the unused Finance grant/call
+prototype and its 18 native scenarios; the SDK/IDB scenarios are unchanged.
+See the [cleanup audit and remaining tasks](worker-migration-tasks.md#c1-unused-grantcall-removal).
+The worker-entry duplication behind WebKit's account
 error is corrected through Local First's shared single-bundle ES-module settings,
 also used by Clipper web and its extension. See the
 [research and qualification](worker-webkit-startup-research.md). No production

@@ -3,8 +3,9 @@
 Status: the user approved starting this design on 2026-11-16, including the
 session-level bridge proposed for review. The initial real-SDK fixture is now
 implemented; the WebKit worker-entry duplication is corrected through the shared
-Local First worker build settings used by Finance and Clipper. All 30 Finance
-native cases pass, including WebKit. See the
+Local First worker build settings used by Finance and Clipper. After C1 removes
+the abandoned grant/call prototype, all 12 retained SDK/IndexedDB native cases
+pass, including WebKit and full browser restarts. See the
 [startup research](worker-webkit-startup-research.md). Stop extending
 the grant/call-owner architecture. No production runtime cutover is implemented.
 
@@ -18,7 +19,8 @@ The complete [seven-item simplification checklist](worker-migration-tasks.md#sev
 records the proposed cleanup, ownership, read-view, financial-workflow and test/
 spec tasks. Its execution notes distinguish deletion of confirmed-unused
 prototypes from replacement of live behavior and place the coordinated SDK
-upgrade before new worker integration glue. These tasks are not yet implemented.
+upgrade before new worker integration glue. C1 is implemented; the checklist
+records the audited removal and the remaining C2–C7 scope.
 
 ## Start with the actual application
 
