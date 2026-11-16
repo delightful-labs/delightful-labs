@@ -18,6 +18,9 @@ browser cases pass locally. All hosted Finance, Clipper and foundation checks
 pass at the final C2 head `d8c0820e`. PR #39 is merged at `fb380114`.
 The next branch starts at that exact tree and follows the
 [coordinated SDK compatibility plan](worker-jazz-upgrade-plan.md) before C3–C5.
+Fresh preview cores are approved for Clipper only. Finance must preserve access
+to existing preview and production data; its destination inventory and retention
+gate are recorded in that plan.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

@@ -9,8 +9,10 @@ After PR #39 merged at `fb380114`, the
 [upgrade plan](worker-jazz-upgrade-plan.md) records the next compatibility steps
 and an additional executed core/Drive naming comparison. Native alpha.65 handles
 long Drive names, making Clipper's hashing workaround removable, but its custom
-preview cores cannot be addressed by the new namespace rules. Resolve that data
-destination choice before deploying the mapping.
+preview cores cannot be addressed by the new namespace rules. The user permits
+fresh Clipper preview data but requires Finance's existing data to remain
+accessible. The plan records Finance's actual core/Drive inventory and exact-name
+comparison; its custom qualification destination still needs a retention path.
 
 ## What was inspected
 

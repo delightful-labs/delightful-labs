@@ -11,6 +11,11 @@ The [release audit](worker-jazz-release-research.md) remains the implementation
 evidence. Qualify this boundary before building C3–C5's application worker/read
 slice, so its SDK integration is written once.
 
+The user resolved the preview-data decision: **fresh preview cores are acceptable
+for Clipper, but not Finance**. Finance must retain access to its existing data
+in previews and production. Clipper's approval does not authorize production data
+resets or a Finance destination change.
+
 ## Foundation-first execution
 
 - [ ] **U1 — Qualify the existing persistent-worker bridge on alpha.65 in
@@ -41,9 +46,11 @@ slice, so its SDK integration is written once.
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix
       seconds. Qualify Better Auth against alpha.65's `~1.7.22` peer and the
-      existing auth patch. Inventory core-name overrides read-only before mapping
-      namespaces; the synthetic naming proof below is not a production inventory.
-      Resolve the preview-data decision before deploying that mapping.
+      existing auth patch. Preserve Finance's existing core/Drive bindings and
+      qualify retained-data access; naming equality alone is insufficient. The
+      read-only inventory below identifies two matching destinations and one
+      custom qualification destination that must stay out of rollout until its
+      data-preserving path is verified. Clipper previews may use fresh cores.
 - [ ] **U5 — Switch and qualify the workspace coherently.** Update SDK, matching
       Wasm/native core, library peer and existing patch bindings as one reviewed
       change; preserve one compatible SDK identity per consumer. Run library
@@ -53,7 +60,7 @@ slice, so its SDK integration is written once.
       identity changes, interrupted startup, pending writes and actual close.
       Client-only success does not qualify a Vercel backend or application cutover.
 
-U1 can proceed independently of the deployment decision. U2–U4 form one
+U1 can proceed independently of the retained Finance destination work. U2–U4 form one
 coordinated compatibility change; U5 must not publish a partially upgraded graph.
 After this checkpoint, implement C3/C4/C5's one worker-owned read view, then C6's
 existing financial workflow. Do not build more alpha.60 integration glue that the
@@ -82,17 +89,42 @@ Sandbox or contacting a backend. Inputs are the existing Clipper
 | Long preview Drive           | Alpha.65 allows 128-character Sandbox names and natively truncates/hashes the Drive name to 64 characters. The tested preview works without Clipper's workaround. |
 
 This supports removing Clipper's custom preview hashing helper after adopting
-native namespaces, subject to the destination decision. The simplest proposal
-is native production/per-branch namespaces. New preview builds may have fresh
-data where the old version used a custom override. Old cores/Drives stay untouched;
-their contents do not move automatically. Existing deployed versions are unchanged
-by this experiment. Inspect explicit production overrides instead of assuming
-they match the default production example.
-
-Decision: may new previews use those fresh cores, or must existing custom-preview
-data remain accessible before upgrading? Preserving that access needs a supported
-naming/recovery path; do not default to a data-copy layer or another SDK patch.
+native namespaces. The user permits Clipper previews to start with fresh data
+where the old version used a custom override. Old cores/Drives stay untouched;
+their contents do not move automatically. This approval does not extend to
+Finance. Preserving access to a non-addressable Finance destination needs a
+supported retention path; do not default to another SDK patch or a data-copy layer.
 
 Evidence: `/private/tmp/finance-jazz-release-research/core-name-compatibility.json`.
 The inputs, functions and outcomes above keep the handoff independent of temporary
 files. Source: [alpha.65 Vercel store](https://github.com/garden-co/jazz/blob/v2.0.0-alpha.65/packages/jazz-tools/src/backend/vercel-store.ts).
+
+## Read-only Finance destination inventory
+
+The connected Vercel account identifies `delightful-finances`, project
+`prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa`, in `mjamesderochers-projects`, with
+`finance.delightfullabs.com` among its domains. The paginated Sandbox and Drive
+listings each return exactly three records with no next page. No core was
+started, created, renamed, attached or deleted; no data or settings were changed.
+
+| Existing core                                                 | Existing mounted Drive                       | Alpha.65 namespace comparison                                                                                              |
+| ------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `jazz-prj-xryqmkraddv2xuzgpexcfbsfghva-production`            | Same name plus `-data`                       | `production` yields the exact same core and Drive names.                                                                   |
+| `jazz-prj-xryqmkraddv2xuzgpexcfbsfghva-preview-mono-d7de34b1` | Same name plus `-data`                       | `preview-mono-d7de34b1` yields the exact same core and Drive names.                                                        |
+| `finance-alpha60-preview-qualification`                       | `finance-alpha60-preview-qualification-data` | No namespace reaches this custom name. Preserve both and defer this destination's rollout until retained access is solved. |
+
+The comparison executed the actual alpha.65 `coreName` and `driveName` functions
+against the observed project/core/Drive names, without opening a backend. It
+establishes name identity for the first two rows, not schema, auth, row or
+credential compatibility. Retained-store tests remain required. Do not silently
+redirect the qualification destination to an empty replacement.
+
+The project-level environment listing returns no variables and zero hidden
+production variables. This does not establish the absence of historical
+deployment-specific overrides; inspect those when a particular destination is
+upgraded. Keep Finance's local SQLite path and browser account selection unchanged
+until their independently qualified SDK integration is ready.
+
+Sanitized metadata and executable comparison results are in
+`finance-core-inventory.json` and `finance-core-compatibility.json` under the
+research artifact directory. No secrets or application records were read.
