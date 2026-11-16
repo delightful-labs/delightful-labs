@@ -23,7 +23,11 @@ library, avoiding the Zod minor-version coupling found during R1.
 
 For one connection per trusted application Worker/session, the same public
 module exports `serveBrowserWorkerHost` and `BrowserWorkerHostNative`. Supply
-the Window's HTTP(S) `origin`, storage and SharedWorker constructor adapter.
+the Window's HTTP(S) or exact `chrome-extension://<id>` origin, storage and
+SharedWorker constructor adapter. Extension IDs must be 32 lowercase characters
+from `a` through `p`. Compare their scheme/host explicitly: Node URL parsing
+reports extension origins as opaque `null`, while Chrome reports their actual
+extension origin. Never treat different opaque origins as equivalent.
 The helper admits same-origin broker URLs; optional `brokerWorkerUrl` further
 restricts opens to that asset's pathname, allowing SDK version queries. Foreign
 or credential-bearing configuration is rejected before attaching listeners;

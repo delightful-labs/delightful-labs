@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { openApplicationClient, type WorkerReply } from '../../web/src/lib/runtime/worker/client.js'
 import { accountWorker } from './account-client.js'
+import { extensionOrigin } from '../../../tooling/extension-identity.js'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -30,7 +31,7 @@ function fixture(onClosed = vi.fn()) {
 	vi.stubGlobal(
 		'window',
 		Object.assign(new EventTarget(), {
-			location: { href: 'chrome-extension://clipper/signin.html', search: '' }
+			location: { href: extensionOrigin + '/signin.html', origin: extensionOrigin, search: '' }
 		})
 	)
 	vi.stubGlobal('location', window.location)

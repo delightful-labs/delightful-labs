@@ -210,6 +210,9 @@ checkout's cache resolved it. Logs use
 `/private/tmp/finance-shared-browser-host-*.log`. This extraction did not resolve
 or disable the WebKit worker failure. The subsequent build experiments are
 recorded in the startup research; the separate offline-edit CI failure remains.
+These are historical checkpoint results. The research's extension-origin
+correction supersedes the earlier failure attribution and records current local
+and hosted evidence.
 
 ## Shared build correction checkpoint
 
@@ -217,4 +220,4 @@ recorded in the startup research; the separate offline-edit CI failure remains.
 supplies the same single-bundle ES-module policy to Finance, Clipper web and
 Clipper's extension. Each app retains its SDK asset resolution and output paths.
 The original runtime, account store and SDK patch are unchanged. Qualification
-and the extension test limitation are recorded in the startup research.
+and the later extension-origin correction are recorded in the startup research.

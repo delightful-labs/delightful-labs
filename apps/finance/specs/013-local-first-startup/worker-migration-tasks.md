@@ -12,8 +12,9 @@ single-bundle ES-module build settings. See the
 sequence is the bounded unused-prototype cleanup below, a coordinated SDK upgrade
 using the [alpha.61–65 research](worker-jazz-release-research.md), then the planned
 worker-owned UI read slice. Keep live behavior until its replacement is qualified.
-The extension capture baseline and Finance's
-separate offline-edit CI failure remain open.
+The shared-helper extension-origin regression is corrected and all 12 extension
+browser cases pass locally. Latest inspected hosted Finance checks pass;
+post-correction CI is pending. See the research's current verification record.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

@@ -134,12 +134,13 @@ Passing qualification uses the shared implementation:
   Three added cases open the actual production application worker in Chromium,
   Firefox and WebKit. Existing cases cover abrupt worker termination, offline
   restarts, reconciliation, expired identities, annotations and shell updates.
-- The extension build and packaging check. Two capture checks fail during
+- Initially, the extension build and packaging check passed but two capture checks failed during
   account setup because the expected recovery field is absent. A paired baseline
   rebuilt the extension and served the web app with their original worker
   settings: the same toolbar test fails at the same missing field. This failure
-  therefore also exists without the shared build correction; its cause remains
-  separate work. Do not claim extension capture qualification passed.
+  therefore also existed without the shared build correction. That baseline did
+  not remove the new shared Window helper and did not establish a pre-existing
+  failure. The later correction below identifies the actual regression.
 - The actual-tarball transport consumers compile the public build helper against
   Vite and use it to build their self-contained module workers. Library types,
   strict package validation and affected app type checks pass.
@@ -148,5 +149,38 @@ Logs use `/private/tmp/finance-shared-worker-build-*.log`. Extension baseline
 settings were restored in a `finally` block, and its final build again uses the
 shared helper. This closes the reproduced WebKit SDK-startup blocker; it does
 not establish full Finance application parity or resolve the separate Finance
-offline-edit CI failure. Keep the old inactive grant/call implementation until
-the planned application replacement is qualified.
+offline-edit CI failure. Unused-prototype deletion and live replacement follow
+the seven-item checklist's separate gates.
+
+## Extension-origin correction and current verification
+
+When checking whether PR #39 was ready to merge, the current hosted Clipper jobs
+were failing client lifecycle tests and extension account setup. The new shared
+Window helper incorrectly required HTTP(S). Clipper's real extension Window has
+origin `chrome-extension://inbajlgglggigfebfkmlkfbdenddpphf`, verified in a
+disposable Chromium extension profile. Rejecting it stopped initialization before
+the recovery controls appeared. This was a regression introduced by the shared
+helper, not evidence of an unrelated pre-existing extension failure.
+
+The helper now accepts HTTP(S) and an exact Chrome extension origin with a valid
+32-character ID. It compares extension scheme/host explicitly, so Node URL's
+opaque `null` origins cannot admit another extension. Foreign IDs, malformed
+extension IDs, file/opaque origins, credentials and foreign assets stay refused.
+Three client test fixtures also omitted `Location.origin`; they now model that
+native property, with the real manifest identity in the extension fixture.
+
+After merging latest main `5724d3f2` cleanly, local verification passes:
+
+- Clipper's full `pnpm verify`: format/lint, types, 908 unit tests, 31 component
+  tests and the production build.
+- All 12 packaged-extension native browser cases, including capture, sign-in,
+  restoration, offline restart/sync and repeated settings teardown.
+- All 30 Finance native binding cases; 51 shared broker cases; library types,
+  strict packaging and actual-tarball transport consumers.
+
+Logs use `/private/tmp/finance-extension-origin-*.log`. Hosted Finance checks at
+head `3e4c9941` were all green, including application-2, PWA/native bindings and
+restore recovery; the earlier offline-edit failure was not reproduced there,
+but no separate root-cause fix is claimed. Hosted CI must run again after this
+correction is pushed. The cleanup checklist remains pending; no SDK upgrade or
+Finance runtime cutover is part of this fix.

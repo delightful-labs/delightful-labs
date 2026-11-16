@@ -116,8 +116,36 @@ it('the browser host restricts the configured asset while preserving SDK queries
 	expect(await f.client.close()).toEqual(f.client.host.identity)
 })
 
+it('the browser host admits its exact extension origin without treating opaque origins as equal', async () => {
+	const extensionOrigin = 'chrome-extension://' + 'a'.repeat(32)
+	const f = fixture(false, (data, control, scope, native) =>
+		serveBrowserWorkerHost(data, control, scope, { ...native, origin: extensionOrigin })
+	)
+	for (const refused of [
+		'chrome-extension://' + 'b'.repeat(32) + '/worker.js',
+		'chrome-extension://clipper/worker.js',
+		'file:///worker.js',
+		'https://broker.example/worker.js'
+	])
+		await expect(f.client.open(refused, name)).rejects.toMatchObject({
+			workerEffectOutcome: 'not-issued'
+		})
+	expect(f.native.open).not.toHaveBeenCalled()
+	const selectedUrl = extensionOrigin + '/assets/worker.js'
+	const opened = await f.client.open(selectedUrl, name)
+	cleanup.add(() => opened.port.close())
+	expect(f.native.open).toHaveBeenCalledExactlyOnceWith(selectedUrl, name)
+	expect(await f.client.close()).toEqual(f.client.host.identity)
+})
+
 it.each([
 	{ origin: 'file:///' },
+	{ origin: 'null' },
+	{ origin: 'chrome-extension://clipper' },
+	{
+		origin: 'chrome-extension://' + 'a'.repeat(32),
+		brokerWorkerUrl: 'chrome-extension://' + 'b'.repeat(32) + '/worker.js'
+	},
 	{ origin: 'https://secret@broker.example' },
 	{ origin, brokerWorkerUrl: 'https://foreign.example/worker.js' },
 	{ origin, brokerWorkerUrl: 'https://secret@broker.example/worker.js' }
