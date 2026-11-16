@@ -5,6 +5,13 @@ before recommending cleanup. Workspace dependencies and the existing SDK patch
 remain unchanged at alpha.60. This is an upgrade proposal, not qualification of
 Finance or Clipper on alpha.65.
 
+After PR #39 merged at `fb380114`, the
+[upgrade plan](worker-jazz-upgrade-plan.md) records the next compatibility steps
+and an additional executed core/Drive naming comparison. Native alpha.65 handles
+long Drive names, making Clipper's hashing workaround removable, but its custom
+preview cores cannot be addressed by the new namespace rules. Resolve that data
+destination choice before deploying the mapping.
+
 ## What was inspected
 
 Downloaded the published `jazz-tools` tarballs for alpha.60 through alpha.65,

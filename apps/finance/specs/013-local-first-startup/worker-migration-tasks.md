@@ -15,7 +15,9 @@ using the [alpha.61–65 research](worker-jazz-release-research.md), then the pl
 worker-owned UI read slice. Keep live behavior until its replacement is qualified.
 The shared-helper extension-origin regression is corrected and all 12 extension
 browser cases pass locally. All hosted Finance, Clipper and foundation checks
-pass at the C1 cleanup head `abf31082`; the subsequent C2 head needs a fresh hosted run.
+pass at the final C2 head `d8c0820e`. PR #39 is merged at `fb380114`.
+The next branch starts at that exact tree and follows the
+[coordinated SDK compatibility plan](worker-jazz-upgrade-plan.md) before C3–C5.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 
@@ -159,9 +161,9 @@ Finance unit tests and all 12 native SDK/IDB cases pass across Chromium, Firefox
 and WebKit. Application/Svelte/service-worker, worker-proof and browser-fixture
 types pass, along with E2E scope checks and both production builds. The 36 removed
 unit cases and 17 dedicated test-workspace cases exercised the retired bridge;
-SDK/IDB and financial domain coverage remain. Current-head hosted CI is still
-required before merging; the C1 head `abf31082` passed every hosted Finance,
-Clipper and foundation workflow.
+SDK/IDB and financial domain coverage remain. Hosted CI passed at `d8c0820e`:
+every Finance, Clipper and foundation workflow is green. The user merged PR #39
+at `fb380114`; this deletion-only checkpoint is complete.
 
 This completes the deletion-only checkpoint. C3's actual application worker,
 C4's lifecycle integration and C5's read view remain unimplemented. Review and
