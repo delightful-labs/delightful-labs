@@ -32,6 +32,19 @@ the historical build total to every future week.
 
 ## Runtime observations and uncertainties
 
+### Hosted deployment-filter finding
+
+The spec-only commit `3f800029` skipped Clipper and the website but built Finance
+in deployment `dpl_AZfDgBvMrygZT993sYw8TUZ1TZ3u`. Its build log shows that
+Finance's `.vercelignore` removed `.git/HEAD`, `.git/config`, and other metadata
+before running the ignore command. Git then reported that no repository was
+available, so the command continued via its missing-comparison fallback. This is
+a confirmed Finance configuration defect, not a Markdown classification failure.
+The PR correction retains that metadata while preserving local secret exclusions;
+a subsequent hosted documentation-only comparison still needs qualification.
+
+### Jazz observations
+
 - Finance's error summary reported 71 occurrences of requests reaching the
   300-second function limit on `/jazz/[...path]`. The response's first/last-seen
   dates span November 11–16 despite a requested recent window; do not call this

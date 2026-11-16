@@ -1,4 +1,5 @@
-.git
+# The Ignored Build Step compares commits before installation. Keep Git metadata
+# available here; excluding .git makes every comparison fall back to a full build.
 .vercel
 .netlify
 .wrangler

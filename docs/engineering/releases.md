@@ -41,6 +41,9 @@ successful deployment SHA for that project and branch, so skipped commits cannot
 hide undeployed code. Missing/invalid history, unknown project roots (except the
 existing Markdown-only rule), and empty diffs continue the build. Vercel may
 record a canceled deployment. This script requires no dependency installation.
+Project upload-ignore rules must retain Git metadata: Vercel applies
+`.vercelignore` before the ignored-build command. Removing `.git` at that stage
+breaks comparison and makes the conservative fallback build even documentation.
 
 Deployment selection also filters test/spec/test-support modules, known test
 directories and fixtures, test runner configurations, CI workflows, and explicit

@@ -170,6 +170,19 @@ test('every hosted Vercel project resolves the shared ignore script from its app
 	}
 })
 
+test('Finance upload ignore rules preserve Git metadata required before build selection', (t) => {
+	const cwd = mkdtempSync(resolve(tmpdir(), 'delightful-vercel-upload-'))
+	t.after(() => rmSync(cwd, { recursive: true, force: true }))
+	execFileSync('git', ['init', '--quiet'], { cwd })
+	// Vercel applies .vercelignore before its Ignored Build Step. Exercise the
+	// actual ignore file with Git's ignore matcher, including nested objects.
+	const check = spawnSync('git', ['-c', `core.excludesFile=${resolve(root, 'apps/finance/.vercelignore')}`, 'check-ignore', '--no-index', '--', '.git/HEAD', '.git/config', '.git/objects/pack/fixture.pack'], { cwd, encoding: 'utf8' })
+	assert.equal(check.status, 1, `Build comparison metadata must survive upload filtering: ${check.stdout}${check.stderr}`)
+	const secrets = spawnSync('git', ['-c', `core.excludesFile=${resolve(root, 'apps/finance/.vercelignore')}`, 'check-ignore', '--no-index', '--', '.env', '.env.production'], { cwd, encoding: 'utf8' })
+	assert.equal(secrets.status, 0)
+	assert.deepEqual(secrets.stdout.trim().split('\n'), ['.env', '.env.production'], 'local environment files remain excluded')
+})
+
 test('Vercel skips unrelated apps using complete deployed-to-current Git changes', (t) => {
 	const cwd = mkdtempSync(resolve(tmpdir(), 'delightful-vercel-scopes-'))
 	t.after(() => rmSync(cwd, { recursive: true, force: true }))
