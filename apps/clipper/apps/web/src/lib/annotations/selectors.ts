@@ -19,6 +19,54 @@ export const textPositionSelectorSchema = z
 	})
 	.refine(({ start, end }) => end > start)
 
+const wellFormedTextSchema = z.string().refine(isWellFormedText)
+const quoteOnlyRangeSchema = nativeRangeSchema.extend({
+	start: z.undefined().optional(),
+	end: z.undefined().optional()
+})
+const positionedRangeSchema = nativeRangeSchema
+	.required({ start: true, end: true })
+	.extend({
+		before: nativeRangeSchema.shape.before.refine(isWellFormedText),
+		matched: nativeRangeSchema.shape.matched.refine(isWellFormedText),
+		after: nativeRangeSchema.shape.after.refine(isWellFormedText)
+	})
+	.refine(({ start, end }) => end > start)
+const positionInputBaseSchema = z.object({
+	range: nativeRangeSchema,
+	normalizedText: wellFormedTextSchema
+})
+const positionedInputSchema = positionInputBaseSchema.extend({ range: positionedRangeSchema })
+const textPositionInputSchema = z.union([
+	positionInputBaseSchema.extend({ range: quoteOnlyRangeSchema }),
+	positionedInputSchema
+		.refine(({ range, normalizedText }) => range.end <= normalizedText.length)
+		.refine(hasWholeCodePointBoundaries)
+		.refine(matchesCapturedText)
+])
+
+function isWellFormedText(text: string) {
+	return text.isWellFormed()
+}
+
+function hasWholeCodePointBoundaries({
+	range,
+	normalizedText
+}: z.infer<typeof positionedInputSchema>) {
+	return (
+		normalizedText.slice(0, range.start).isWellFormed() &&
+		normalizedText.slice(range.end).isWellFormed()
+	)
+}
+
+function matchesCapturedText({ range, normalizedText }: z.infer<typeof positionedInputSchema>) {
+	return (
+		normalizedText.slice(range.start, range.end) === range.matched &&
+		normalizedText.slice(0, range.start).endsWith(range.before) &&
+		normalizedText.slice(range.end).startsWith(range.after)
+	)
+}
+
 function projectionError() {
 	return new Error('Annotation selector cannot be projected')
 }
@@ -44,33 +92,15 @@ export function toTextPositionSelector(
 	range: z.infer<typeof nativeRangeSchema>,
 	normalizedText: string
 ) {
-	const parsed = nativeRangeSchema.safeParse(range)
-	if (!parsed.success || !normalizedText.isWellFormed()) throw projectionError()
-	const { start, end, matched, before, after } = parsed.data
-	if (start === undefined && end === undefined) return undefined
-	if (start === undefined || end === undefined || end <= start || end > normalizedText.length) {
-		throw projectionError()
-	}
-	const preceding = normalizedText.slice(0, start)
-	const selected = normalizedText.slice(start, end)
-	const following = normalizedText.slice(end)
-	if (
-		!preceding.isWellFormed() ||
-		!selected.isWellFormed() ||
-		!following.isWellFormed() ||
-		!before.isWellFormed() ||
-		!after.isWellFormed() ||
-		selected !== matched ||
-		!preceding.endsWith(before) ||
-		!following.startsWith(after)
-	) {
-		throw projectionError()
-	}
-	const codePointStart = Array.from(preceding).length
+	const parsed = textPositionInputSchema.safeParse({ range, normalizedText })
+	if (!parsed.success) throw projectionError()
+	const captured = parsed.data.range
+	if (captured.start === undefined) return undefined
+	const codePointStart = Array.from(normalizedText.slice(0, captured.start)).length
 	return textPositionSelectorSchema.parse({
 		type: 'TextPositionSelector',
 		start: codePointStart,
-		end: codePointStart + Array.from(selected).length
+		end: codePointStart + Array.from(captured.matched).length
 	})
 }
 

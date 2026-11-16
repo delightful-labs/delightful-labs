@@ -52,6 +52,7 @@ it('uses the same normalized text for quotation and positions', () => {
 it('keeps quote-only native ranges usable without inventing position evidence', () => {
 	const range = { before: '', matched: 'passage', after: '' }
 	expect(toTextPositionSelector(range, 'passage')).toBeUndefined()
+	expect(() => toTextPositionSelector(range, 'passage\ud800')).toThrow()
 	expect(toTextQuoteSelector(range)).toEqual({
 		type: 'TextQuoteSelector',
 		exact: 'passage',
@@ -79,6 +80,8 @@ it('refuses contradictory positions, context, bounds and split surrogate pairs',
 		toTextPositionSelector({ start: 1, end: 2, before: '', matched: '\udc00', after: '' }, '🦊')
 	).toThrow()
 	expect(() => toTextPositionSelector(range, '🦊 passage!\ud800')).toThrow()
+	expect(() => toTextPositionSelector({ ...range, before: '\udd8a ' }, '🦊 passage!')).toThrow()
+	expect(() => toTextPositionSelector({ ...range, after: '\ud83e' }, '🦊 passage🦊')).toThrow()
 })
 
 it('refuses oversized quotes/context and malformed Unicode without truncation', () => {

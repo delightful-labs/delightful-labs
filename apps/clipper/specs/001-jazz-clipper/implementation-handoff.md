@@ -28,6 +28,15 @@ Named predicates retain cross-record identity checks; Unicode conversion and
 SHA-256 comparison remain explicit. The stored/public shapes and constraints are
 unchanged; no dependency is added.
 
+The user's subsequent selector review applies the same approach to
+`toTextPositionSelector`: schemas composed from the native range now distinguish
+quote-only versus complete offsets and validate bounds, well-formed Unicode,
+code-point boundaries and quote/context agreement through named refinements.
+Unicode offset conversion remains explicit. Missing offsets still return
+`undefined`; partial offsets and contradictory evidence still fail. Regression
+assertions include malformed context snippets that would otherwise match half a
+surrogate pair at the edge of surrounding text.
+
 After presentation of the concrete record and its variants, the user directed
 continuing. `annotations/margin.ts` implements the approved Margin owned-content
 shape as a Zod union and projects document Notes, bare Highlights and Highlights
