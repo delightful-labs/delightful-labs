@@ -135,3 +135,5 @@ archived article bodies, captures, images or import tooling. The old blog
 repository remains the owner's archive. Only six compatibility mappings remain
 in `src/lib/server/publication/legacy.json` for redirects, aliases and stable feed
 IDs. New articles need no repository changes.
+
+<!-- Fresh-preview deployment-scope qualification; temporary verification branch. -->
