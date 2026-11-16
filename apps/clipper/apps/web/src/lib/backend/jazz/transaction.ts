@@ -1,8 +1,8 @@
 import type { DetachedTransaction } from 'delightful-local-first/workspace/creation/contracts'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import type { SyncReceipt } from '../../contracts/storage.js'
-// This module lives in the application worker. An unexpectedly stopped owner
-// transfers native custody here for the remainder of that realm's lifetime.
+// An unexpectedly stopped worker or backend owner transfers native custody here
+// for the remainder of that realm's lifetime.
 // Never replay it or infer that an issued commit can safely be rolled back.
 const detached = new Set<DetachedTransaction<unknown, unknown>>()
 export function retainDetachedTransaction<Resource, Write>(

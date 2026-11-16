@@ -1,5 +1,137 @@
 # Article notes — implementation started
 
+## Private publication links — 2026-11-16
+
+After reviewing the concrete Zod shape, the user approved the private link between
+an existing Highlight/document Note and its `at.margin.note` URI. The implementation
+adds a Jazz table with native library/Highlight/Note relationships, Zod validation
+and DTO conversion. It stores only the approved association plus native metadata.
+Owner reads remain possible after source deletion; all client insert/update/delete
+operations are denied. Backend access uses the existing Jazz backend capability.
+
+The backend domain chart owns related-row reading, eligibility, selected insertion
+and refusal. DLF's existing transaction bridge owns acquisition, commit, rollback,
+settlement and uncertain-operation custody. Its native serializable transaction
+checks source/URI allocation together and waits for authority acceptance before
+returning success. Scope is checked before acquisition, at admission and at commit;
+reads check scope again before exposing results. An attached Note cannot acquire
+an independent link. An existing source/publisher association or occupied address
+is refused; the future publisher reads the retained link rather than allocating
+another address. Multiple independent backend writers remain a qualification topic
+beyond the native concurrent-allocation case.
+
+The approved wire source union maps to native nullable FK columns, enabling Jazz
+joins without duplicating source objects. URI validation uses AT's documented DID,
+record-key and full-record URI syntax, restricted to `at.margin.note`. It does not
+resolve accounts, prove a grant or check record existence. The future publication
+owner must supply its verified account/library and publishing DID. No HTTP write
+endpoint, PDS call, new dependency, UI or product copy is added.
+
+Native checks cover ownership/parent refusal, client write denial, concurrent
+allocation, occupied native IDs, retained addresses after deletion and link
+identity/creation metadata through a complete SQLite backend close/reopen. Owner
+reads use a filtered native library include, so incorrectly scoped backend callers
+cannot read another account's links. Capability scope values are captured on creation.
+
+Verification passes 908 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper formatting/lint, whitespace checks and
+the web production build. The ten new link tests include the URI/source-union
+boundary and native transaction/policy/restart cases. This is not browser offline
+or end-to-end public publication qualification. Publication UI, grants, PDS writes
+and durable issued-publication evidence remain unfinished.
+
+## Shared Lexicon reuse — 2026-11-16
+
+The user challenged the need for the custom companions. Current sharing scope
+uses `at.margin.note` directly: a bare Highlight, a Highlight with commentary,
+or a document Note is one public annotation record. Separate private Jazz
+Highlight/Note identities do not require separate public records. The public
+record's AT URI is the external identity; local mapping remains private.
+
+The companion JSON drafts are removed. No Clipper namespace, duplicate article
+association, reciprocal public links, companion strong references or extra record
+keys are needed for this scope. The companion-specific direct dependency request
+is withdrawn; manifests and lockfile are unchanged. Historical companion/group
+proposals are marked superseded and must not drive implementation. Publication
+permissions, source verification, metadata preservation, conditional writes and
+reconciliation still require implementation/qualification for the common record.
+
+## Margin content mapper — 2026-11-14
+
+Review follow-up, 2026-11-16: the user requested using Zod for more of the mapper.
+Structural input checks now compose the existing schemas: document versus attached
+Note fields, public text bounds, at most one attached Note, and exactly one selected
+source anchor with required offsets. Date serialization uses a Zod transform.
+Named predicates retain cross-record identity checks; Unicode conversion and
+SHA-256 comparison remain explicit. The stored/public shapes and constraints are
+unchanged; no dependency is added.
+
+The user's subsequent selector review applies the same approach to
+`toTextPositionSelector`: schemas composed from the native range now distinguish
+quote-only versus complete offsets and validate bounds, well-formed Unicode,
+code-point boundaries and quote/context agreement through named refinements.
+Unicode offset conversion remains explicit. Missing offsets still return
+`undefined`; partial offsets and contradictory evidence still fail. Regression
+assertions include malformed context snippets that would otherwise match half a
+surrogate pair at the edge of surrounding text.
+
+After presentation of the concrete record and its variants, the user directed
+continuing. `annotations/margin.ts` implements the approved Margin owned-content
+shape as a Zod union and projects document Notes, bare Highlights and Highlights
+with one attached Note. Cleared note text remains an empty body. The caller
+supplies stable first-publication and optional fixed update timestamps; private
+Jazz identities and organization are excluded. Public text limits are reused
+without truncating native merged values.
+
+Highlight mapping requires an explicitly selected source anchor, correct parent
+relationships, matching normalized-source SHA-256, complete native offsets and
+matching quote/context. It refuses reader-only anchors, missing/contradictory
+evidence and competing attached Notes. The normalized capture text must be
+available; quote-only source ranges need later native resolution qualification.
+This selects no source normalization algorithm. Inputs/timestamps are copied
+before digest completion so later edits cannot alter the selected projection.
+
+This is a pure content mapper with no PDS, persistence, permission or UI effects.
+Its strict schema describes newly constructed owned content, not arbitrary remote
+Margin records. Remote updates still require metadata preservation, conflict
+comparison and conditional writes, including review of dependent facets.
+Original-page capture, private publication models, preview,
+grants, scheduling and reconciliation remain open.
+
+Verification passes 26 selector/mapper/native Jazz tests, including real native
+source anchors and document Notes, reader substitution refusal, competing Notes,
+oversized values and edits during digest completion. Web/service-worker types,
+scoped lint, implementation formatting and whitespace checks pass. This is not
+real Margin/PDS interoperability qualification.
+
+## Annotation interchange primitives — 2026-11-14
+
+PR #38 is merged on `main` at `ba0723b9`. The next focused slice implements the
+previously approved TextQuoteSelector/TextPositionSelector projections and source
+timestamp serialization in `annotations/selectors.ts`. Jazz's native range and
+Date remain the stored values; no new table, publication bookkeeping, namespace,
+dependency or product copy is introduced.
+
+Quotation/context retain their exact text and enforce the approved public byte
+and grapheme bounds without truncation. Position conversion requires the owning
+normalized text, checks bounds and quotation/context agreement, refuses malformed
+Unicode and split surrogate pairs, then counts Unicode code points. A native range
+with no offsets remains quotation-only; partial or contradictory offsets are
+refused. No fuzzy resolution is added. This helper cannot establish source-page
+representation identity: callers must verify it, and saved-reader positions must
+never become source-page positions merely by changing the target URI.
+
+These are interchange primitives, not an export UI or a PDS publisher. The exact
+Margin content record mapping was presented for approval and subsequently
+implemented as recorded above. Private publication shapes, scheduling, permissions
+and reconciliation remain open under the review boundary.
+
+Focused verification passes 14 tests, including a real Jazz-captured range and
+200 generated Unicode position cases. Full web/service-worker types, implementation
+formatting, scoped lint and whitespace checks pass. Specs are excluded by the
+project formatter and retain their existing Markdown layout. No browser or PDS
+interoperability claim follows from this helper qualification.
+
 ## Annotation save feedback — CI follow-up, 2026-11-14
 
 PR #38's offline annotation case could close the browser after observing the note

@@ -1,5 +1,11 @@
 # AT Protocol: consolidated research and decisions
 
+**Current public representation, 2026-11-16:** reuse `at.margin.note` directly.
+The custom companion proposal and its namespace/key/dependency choices are removed
+from scope. Separate private Jazz entities do not require separate public records.
+The [current decision](../specs/001-jazz-clipper/design-decisions.md#shared-annotation-lexicon-reuse--2026-11-16)
+supersedes historical companion/group requirements below.
+
 Consolidated 2026-11-07; implementation status updated 2026-11-10 after PR #20 merged.
 The [current specification checkpoint](../specs/001-jazz-clipper/atproto.md) separates delivered identity behavior, accepted publication requirements and remaining work.
 
@@ -31,29 +37,31 @@ Sources: [Margin schema](https://github.com/paddinglabs/margin/blob/271462120689
 
 ## Accepted publication behavior
 
-| Area                      | Accepted decision                                                                                                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Originals                 | Jazz remains source authority; local IDs are distinct from DID, public URI and content CID.                                                                                                                         |
-| First publication         | Explicitly confirmed for the selected item/destination. If edited before issue, publish its latest eligible saved version.                                                                                          |
-| Source acceptance         | AT writes wait for Jazz server acceptance of the relevant source; local editing stays available offline.                                                                                                            |
-| Ongoing changes           | Jazz edits update the public copy automatically. Adding a first note to an already-public bare highlight updates that annotation automatically.                                                                     |
-| Remove only attached note | Keep the Margin address and quotation; update it to a bare highlight.                                                                                                                                               |
-| Root deletion and Trash   | Request public deletion. A local deletion is not a confirmed PDS deletion or network-wide erasure.                                                                                                                  |
-| Restore                   | Previously published items republish at their original public address; unpublished items stay unpublished. Do not bypass explicit unpublish or external conflict/deletion pauses.                                   |
-| Unpublish                 | Keep local content, request public deletion and stop outgoing sync until explicit publication again.                                                                                                                |
-| Foreign content edit      | Pause; compare preserved versions. User may publish the reviewed Clipper version, explicitly apply the reviewed public version locally, or leave paused. Recheck that the reviewed versions are still current.      |
-| Foreign deletion          | Keep local originals and pause. Recreation requires explicit choice; later edits/reconnect/restart do not recreate automatically.                                                                                   |
-| Foreign metadata          | Preserve valid non-content additions, such as public tags, and continue; not every unknown field is harmless.                                                                                                       |
-| Organization              | Clipper tags stay private. Do not import public tags into private organization.                                                                                                                                     |
-| Note bounds               | Both 3,000 grapheme clusters and 10,000 UTF-8 bytes. Oversized paste remains intact in a recoverable draft until shortened before save.                                                                             |
-| Quote bounds              | New highlights fit both 1,500 grapheme clusters and 5,000 UTF-8 bytes. No silent splitting/truncation.                                                                                                              |
-| Surrounding context       | Include in preview; each side fits both 150 graphemes and 500 UTF-8 bytes, keeping nearest complete graphemes.                                                                                                      |
-| Companion fields          | Separate public highlight/note records with required `subject` (Margin URI/CID) and `article` URI; optional reciprocal `note`/`highlight` links. No private Jazz IDs.                                               |
-| Group synchronization     | Conditional repository batches, durable attempt evidence and reconciliation before replay. Companion conflicts pause the outgoing group; stale observations require verification, not destructive automatic repair. |
+| Area                      | Accepted decision                                                                                                                                                                                              |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Originals                 | Jazz remains source authority; local IDs are distinct from DID, public URI and content CID.                                                                                                                    |
+| First publication         | Explicitly confirmed for the selected item/destination. If edited before issue, publish its latest eligible saved version.                                                                                     |
+| Source acceptance         | AT writes wait for Jazz server acceptance of the relevant source; local editing stays available offline.                                                                                                       |
+| Ongoing changes           | Jazz edits update the public copy automatically. Adding a first note to an already-public bare highlight updates that annotation automatically.                                                                |
+| Remove only attached note | Keep the Margin address and quotation; update it to a bare highlight.                                                                                                                                          |
+| Root deletion and Trash   | Request public deletion. A local deletion is not a confirmed PDS deletion or network-wide erasure.                                                                                                             |
+| Restore                   | Previously published items republish at their original public address; unpublished items stay unpublished. Do not bypass explicit unpublish or external conflict/deletion pauses.                              |
+| Unpublish                 | Keep local content, request public deletion and stop outgoing sync until explicit publication again.                                                                                                           |
+| Foreign content edit      | Pause; compare preserved versions. User may publish the reviewed Clipper version, explicitly apply the reviewed public version locally, or leave paused. Recheck that the reviewed versions are still current. |
+| Foreign deletion          | Keep local originals and pause. Recreation requires explicit choice; later edits/reconnect/restart do not recreate automatically.                                                                              |
+| Foreign metadata          | Preserve valid non-content additions, such as public tags, and continue; not every unknown field is harmless.                                                                                                  |
+| Organization              | Clipper tags stay private. Do not import public tags into private organization.                                                                                                                                |
+| Note bounds               | Both 3,000 grapheme clusters and 10,000 UTF-8 bytes. Oversized paste remains intact in a recoverable draft until shortened before save.                                                                        |
+| Quote bounds              | New highlights fit both 1,500 grapheme clusters and 5,000 UTF-8 bytes. No silent splitting/truncation.                                                                                                         |
+| Surrounding context       | Include in preview; each side fits both 150 graphemes and 500 UTF-8 bytes, keeping nearest complete graphemes.                                                                                                 |
+| Public record reuse       | One `at.margin.note` record for a bare Highlight, a Highlight with commentary or a document Note. Article, quote and commentary use the existing schema; private Jazz IDs are excluded.                        |
+| Synchronization safety    | Conditional writes, retained outcome evidence and reconciliation before replay. Stale observations require verification, not destructive automatic repair. Companion-specific grouping is superseded.          |
 
-The approved companion family results in two records for an article note or bare highlight, and three for a highlight with commentary. Text is shared through Margin rather than duplicated in companions. Public relationship disclosure belongs in the publication preview.
-
-The actual namespace, precise key/discovery convention, private intent/binding/attempt schemas, executor scheduling, companion-only deletion/cleanup, progressive consent and oversized existing/imported content handling remain open. The companion document distinguishes those proposals from approved fields. Do not infer installation, schema publication or implementation approval from product approval.
+No companion namespace or extra public relationship records are needed for the
+current scope. Private publication mapping/outcome schemas, public key allocation,
+executor scheduling, progressive consent and unsupported existing/imported content
+handling remain open. Do not infer installation, publication or implementation
+approval from product approval.
 
 ## Jazz platform reuse after the upgrade
 

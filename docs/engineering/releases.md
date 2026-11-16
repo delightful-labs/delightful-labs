@@ -31,10 +31,29 @@ Root/unknown/config/guidance uncertainty and manual/missing-history events selec
 all. Renames/deletions include both old and new paths. Selection and PR-title
 checks still run so required checks resolve without workflow-level path filters.
 
-Vercel projects use the shared ignored-build script to cancel Markdown-only
-builds before installation. It compares the current commit with Vercel's previous
-deployment SHA; missing/invalid history continues the build. This also covers
-Markdown-only pushes after merge. Vercel may record a canceled deployment.
+Vercel projects use the shared ignored-build script to cancel Markdown-only and
+unaffected-project builds before installation. It resolves the project from the
+app root and reuses the CI scopes, including transitive consumers and Clipper's
+parent tooling/extension boundary. Shared UI, root and unknown changes rebuild
+all projects; Local First changes rebuild Finance and Clipper. Previews remain
+enabled for affected apps. It compares the current commit with Vercel's last
+successful deployment SHA for that project and branch, so skipped commits cannot
+hide undeployed code. Missing/invalid history, unknown project roots (except the
+existing Markdown-only rule), and empty diffs continue the build. Vercel may
+record a canceled deployment. This script requires no dependency installation.
+Project upload-ignore rules must retain Git metadata: Vercel applies
+`.vercelignore` before the ignored-build command. Removing `.git` at that stage
+breaks comparison and makes the conservative fallback build even documentation.
+
+Deployment selection also filters test/spec/test-support modules, known test
+directories and fixtures, test runner configurations, CI workflows, and explicit
+editor/formatter/linter settings. Mixed Markdown/test/tooling changes can skip
+deployment too; mixed runtime changes still rebuild their consumers. The filter
+is separate from CI selection: test and tooling fixes still run existing checks.
+Production Vite/Svelte/TypeScript settings, manifests, lockfiles, build scripts,
+static assets and unknown configuration continue to deploy. UI Storybook inputs
+still deploy the hosted UI Storybook, but do not rebuild its library consumers.
+Keep new verification-only paths explicit in `scripts/monorepo/deployment-paths.mjs`.
 
 Workflows keep their triggers and existing job names. Job conditions skip
 unaffected suites; they do not silently reduce an affected suite. A failed plan
