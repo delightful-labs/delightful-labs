@@ -40,8 +40,10 @@ Finance's `.vercelignore` removed `.git/HEAD`, `.git/config`, and other metadata
 before running the ignore command. Git then reported that no repository was
 available, so the command continued via its missing-comparison fallback. This is
 a confirmed Finance configuration defect, not a Markdown classification failure.
-The PR correction retains that metadata while preserving local secret exclusions;
-a subsequent hosted documentation-only comparison still needs qualification.
+The PR correction retains that metadata while preserving local secret exclusions.
+Corrective deployment `dpl_CDQxAYwcY8zfEqG6Rz6LgEHDAvqk` reached Ready and its
+log confirms that the Git comparison ran successfully. The documentation-only
+follow-up and its hosted result are recorded in PR #44's validation notes.
 
 ### Jazz observations
 
