@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { relative } from 'node:path'
 import { changedPaths, markdownOnly, selectChecks } from './ci.mjs'
+import { verificationOnlyPath } from './deployment-paths.mjs'
 
 const projectRoots = {
 	'apps/website': 'website',
@@ -22,11 +23,15 @@ try {
 	const project = Object.hasOwn(projectRoots, projectRoot) ? projectRoots[projectRoot] : undefined
 	// Reuse the CI scopes: Clipper's parent tooling and extension remain one
 	// scope, Local First affects both apps, and UI/unknown paths affect all.
-	// An empty diff may be an intentional rebuild, so continue it.
+	// Filter verification inputs only for deployment; leave CI selection intact.
+	// An empty Git diff may be an intentional rebuild, so continue it.
 	const docsOnly = markdownOnly(paths)
-	const unaffected = paths.length > 0 && project !== undefined && !selectChecks(paths)[project]
-	const skip = docsOnly || unaffected
-	console.info(docsOnly ? 'Skipping Markdown-only deployment' : unaffected
+	const deploymentPaths = paths.filter((path) => !verificationOnlyPath(path, project))
+	const verificationOnly = paths.length > 0 && project !== undefined && deploymentPaths.length === 0
+	const unaffected = deploymentPaths.length > 0 && project !== undefined && !selectChecks(deploymentPaths)[project]
+	const skip = docsOnly || verificationOnly || unaffected
+	console.info(docsOnly ? 'Skipping Markdown-only deployment' : verificationOnly
+		? 'Skipping test/tooling-only deployment' : unaffected
 		? `Skipping unaffected ${project} deployment`
 		: 'Building: affected project, explicit rebuild, or unknown project root')
 	process.exitCode = skip ? 0 : 1
