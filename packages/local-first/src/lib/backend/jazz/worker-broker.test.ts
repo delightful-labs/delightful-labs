@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { SimulatedClock } from 'xstate'
 import type { WorkerRequestIdentity } from '../../contracts/worker-request.js'
-import { brokerHostClient, serveBrokerHost } from './worker-broker.js'
+import { brokerHostClient, serveBrokerHost, serveBrowserWorkerHost } from './worker-broker.js'
 import { serveHostClose } from '../../worker/host-close.js'
 
 function required<Value>(value: Value | undefined): Value {
@@ -44,7 +44,7 @@ function channel() {
 	})
 	return { ...pair, closed }
 }
-function fixture(manual = false) {
+function fixture(manual = false, serve: typeof serveBrokerHost = serveBrokerHost) {
 	const data = new MessageChannel(),
 		control = new MessageChannel()
 	const scope = crypto.randomUUID(),
@@ -68,7 +68,7 @@ function fixture(manual = false) {
 				data.port1.onmessage = null
 				data.port1.close()
 			})
-		: serveBrokerHost(data.port1, control.port1, scope, native)
+		: serve(data.port1, control.port1, scope, native)
 	const client = brokerHostClient(data.port2, control.port2, scope, {
 		clock,
 		requestTimeoutMs: 5,
@@ -85,6 +85,58 @@ function fixture(manual = false) {
 	})
 	return { data, control, scope, clock, native, client, onOverdue, onBlocked, onCloseFailure }
 }
+
+it('the browser host restricts the configured asset while preserving SDK queries, names and keys', async () => {
+	const f = fixture(false, (data, control, scope, native) =>
+		serveBrowserWorkerHost(data, control, scope, { ...native, origin, brokerWorkerUrl: url })
+	)
+	for (const refused of [
+		origin + '/sibling-worker.js',
+		'https://foreign.example/jazz-runtime-worker.js',
+		'https://secret@broker.example/jazz-runtime-worker.js'
+	])
+		await expect(f.client.open(refused, name)).rejects.toMatchObject({
+			workerEffectOutcome: 'not-issued'
+		})
+	expect(f.native.open).not.toHaveBeenCalled()
+	await expect(f.client.readGeneration('foreign-key')).rejects.toMatchObject({
+		workerEffectOutcome: 'not-issued'
+	})
+	expect(f.native.storage.getItem).not.toHaveBeenCalled()
+	const selectedUrl = url + '?runtimeVersion=sdk-selected'
+	const selectedName = 'jazz-runtime:another-sdk-scope:generation-5'
+	const selectedKey = 'jazz:shared-worker-generation:jazz-runtime:another-sdk-scope'
+	const opened = await f.client.open(selectedUrl, selectedName)
+	cleanup.add(() => opened.port.close())
+	expect(f.native.open).toHaveBeenCalledExactlyOnceWith(selectedUrl, selectedName)
+	expect(await f.client.readGeneration(selectedKey)).toBe('2')
+	await f.client.writeGeneration(selectedKey, '6')
+	expect(f.native.storage.getItem).toHaveBeenCalledExactlyOnceWith(selectedKey)
+	expect(f.native.storage.setItem).toHaveBeenCalledExactlyOnceWith(selectedKey, '6')
+	expect(await f.client.close()).toEqual(f.client.host.identity)
+})
+
+it.each([
+	{ origin: 'file:///' },
+	{ origin: 'https://secret@broker.example' },
+	{ origin, brokerWorkerUrl: 'https://foreign.example/worker.js' },
+	{ origin, brokerWorkerUrl: 'https://secret@broker.example/worker.js' }
+])('rejects invalid browser host configuration before attaching listeners: %j', (configuration) => {
+	const data = channel(),
+		control = channel()
+	const listen = vi.spyOn(data.port1, 'addEventListener')
+	const native = {
+		...configuration,
+		storage: { getItem: vi.fn(() => null), setItem: vi.fn() },
+		open: vi.fn(() => {
+			throw new Error('Unexpected native open')
+		})
+	}
+	expect(() => serveBrowserWorkerHost(data.port1, control.port1, 'scope', native)).toThrow()
+	expect(listen).not.toHaveBeenCalled()
+	expect(native.storage.getItem).not.toHaveBeenCalled()
+	expect(native.open).not.toHaveBeenCalled()
+})
 
 it('the root facade reports native close failure without resolving closure or restarting its deadline', async () => {
 	const f = fixture()

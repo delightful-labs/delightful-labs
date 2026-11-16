@@ -28,21 +28,29 @@ with Svelte/native browser APIs.
 
 ## Reuse rather than add another coordination layer
 
-| Responsibility                                                       | Starting point                                                                                                        |
-| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Persistent SDK and identity                                          | Existing Jazz client configuration and Local First session acquisition/startup APIs.                                  |
-| Account selection                                                    | The qualified Local First IndexedDB AccountStore; preserve the user's no-migration decision.                          |
-| Window SDK hooks                                                     | One `brokerHostClient`/`serveBrokerHost` connection for the application-worker lifetime, as already wired in Clipper. |
-| Request bounds, transport errors, transferred-port custody and close | The existing shared channel and native close protocol behind that broker.                                             |
-| Application workflow                                                 | Normal XState actors and existing invoked domain children in the Worker.                                              |
-| Rendering and observation                                            | Svelte bindings and the existing synchronous store subscription contract, fed by selected worker views.               |
-| Cross-thread communication                                           | Native Worker/MessagePort messages and transfer lists with typed, validated app command/view boundaries.              |
+| Responsibility                                                       | Starting point                                                                                                                                        |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Persistent SDK and identity                                          | Existing Jazz client configuration and Local First session acquisition/startup APIs.                                                                  |
+| Account selection                                                    | The qualified Local First IndexedDB AccountStore; preserve the user's no-migration decision.                                                          |
+| Window SDK hooks                                                     | One shared `brokerHostClient`/`serveBrowserWorkerHost` connection for the application-worker lifetime. Clipper re-exports the same Local First setup. |
+| Request bounds, transport errors, transferred-port custody and close | The existing shared channel and native close protocol behind that broker.                                                                             |
+| Application workflow                                                 | Normal XState actors and existing invoked domain children in the Worker.                                                                              |
+| Rendering and observation                                            | Svelte bindings and the existing synchronous store subscription contract, fed by selected worker views.                                               |
+| Cross-thread communication                                           | Native Worker/MessagePort messages and transfer lists with typed, validated app command/view boundaries.                                              |
 
 Do not mirror XState snapshots into another state machine on Window. Do not
 create an actor for each SDK callback or a generic remote-actor/RPC framework.
 Keep real financial operation identity, interruption and uncertain-write behavior
 in the existing domain workflows. Moving code across a thread does not require
 reimplementing those workflows or Jazz's internal request lifecycle.
+
+The shared Window setup lives in Local First's existing public
+`backend/jazz/worker-broker` module. Clipper retains same-origin admission;
+Finance's real-SDK fixture additionally selects the configured broker asset
+pathname. SDK version queries, names and generation keys pass through unchanged
+after bounded wire validation. The root workspace Jazz patch already serves
+both apps and stays there; this extraction adds no patch or lifecycle manager.
+The known WebKit SDK-worker qualification failure below remains unresolved.
 
 The existing shared channel records a request fault and leaves accepting before
 later requests can use that channel. It already handles callback delivery and
@@ -113,7 +121,7 @@ framework. The existing Window application remains active until qualified cutove
 - [Clipper SDK bootstrap](../../../clipper/apps/web/src/lib/runtime/worker/serve-application.ts)
   constructs one broker and supplies it directly to the Jazz configuration.
 - [Clipper broker policy](../../../clipper/apps/web/src/lib/runtime/worker/broker-channel.ts)
-  delegates to the existing shared host with app-owned admission.
+  re-exports the shared same-origin Window setup.
 - [Shared broker](../../../../packages/local-first/src/lib/backend/jazz/worker-broker.ts)
   supplies the three SDK callbacks through the existing channel.
 - [Channel lifecycle](../../../../packages/local-first/src/lib/machines/lifecycle/worker-channel.ts)
@@ -166,3 +174,17 @@ profile artifacts remain in `.svelte-kit/finance-binding-native-HwjwkG`,
 implementation as if cross-browser replacement were qualified. Discuss the
 worker-only SDK failure before choosing a different initialization approach or
 changing dependencies. The application remains Window-owned.
+
+## Shared Window setup checkpoint
+
+The user requested sharing the remaining Window setup in Local First. Clipper
+and Finance's real-SDK fixture now use `serveBrowserWorkerHost` from the existing
+public Jazz broker module; the request and close lifecycles are unchanged.
+Qualification passes: 47 shared broker cases, four Clipper broker/model cases,
+two Clipper native broker cases, the five selected Finance SDK browser controls
+above, the packed transport consumers, library types, Clipper web/extension types,
+and Finance browser-fixture types. Clipper's first native attempt encountered an
+old Vite prebundle missing the new export; refreshing only this isolated
+checkout's cache resolved it. Logs use
+`/private/tmp/finance-shared-browser-host-*.log`. This does not resolve or disable
+the known WebKit worker failure or the separate offline-edit CI failure.

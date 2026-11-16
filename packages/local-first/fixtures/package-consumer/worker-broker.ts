@@ -1,7 +1,7 @@
 import {
 	brokerHostClient,
-	serveBrokerHost,
-	type BrokerHostNative
+	serveBrowserWorkerHost,
+	type BrowserWorkerHostNative
 } from 'delightful-local-first/backend/jazz/worker-broker'
 
 async function bounded<Value>(promise: Promise<Value>) {
@@ -31,9 +31,9 @@ let stored = 'raw SDK generation representation',
 	opens = 0,
 	writes = 0
 const peers: MessagePort[] = []
-const native: BrokerHostNative = {
-	admitOpen: (candidate, candidateName) => candidate === url && candidateName === name,
-	admitGeneration: (candidate) => candidate === key,
+const native: BrowserWorkerHostNative = {
+	origin: new URL(url).origin,
+	brokerWorkerUrl: url,
 	storage: {
 		getItem: () => stored,
 		setItem: (_key, value) => {
@@ -49,7 +49,7 @@ const native: BrokerHostNative = {
 		return Object.assign(new EventTarget(), { port: pair.port1 })
 	}
 }
-const release = serveBrokerHost(data.port1, control.port1, scope, native)
+const release = serveBrowserWorkerHost(data.port1, control.port1, scope, native)
 const client = brokerHostClient(data.port2, control.port2, scope, {
 	onOverdue: () => {
 		throw new Error('Unexpected broker close deadline')
@@ -63,8 +63,8 @@ try {
 	if ((await bounded(client.readGeneration(key))) !== stored)
 		throw new Error('Broker changed the SDK generation representation')
 	try {
-		await bounded(client.writeGeneration(key + ':foreign', '9'))
-		throw new Error('Broker admitted a foreign generation write')
+		await bounded(client.writeGeneration('foreign-generation-key', '9'))
+		throw new Error('Broker admitted a non-SDK generation write')
 	} catch (error) {
 		if (
 			!(error instanceof Error) ||

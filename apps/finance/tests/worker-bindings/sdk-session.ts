@@ -1,4 +1,4 @@
-import { serveBrokerHost } from 'delightful-local-first/backend/jazz/worker-broker'
+import { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/worker-broker'
 import type { SdkCommand, SdkReply } from './sdk-session.worker.js'
 import wasmUrl from '#jazz-wasm-binary?url'
 
@@ -51,21 +51,16 @@ const fixture = {
 		if (active) throw new Error('SDK fixture already active')
 		const data = new MessageChannel(),
 			control = new MessageChannel()
-		const asset = new URL(brokerUrl)
-		if (asset.origin !== location.origin) throw new Error('Foreign SDK broker asset')
 		const stats = { opens: 0, reads: 0 }
-		const release = serveBrokerHost(data.port1, control.port1, scope, {
+		const release = serveBrowserWorkerHost(data.port1, control.port1, scope, {
+			origin: location.origin,
+			brokerWorkerUrl: brokerUrl,
 			storage: {
 				getItem: (key) => {
 					stats.reads++
 					return localStorage.getItem(key)
 				},
 				setItem: (key, value) => localStorage.setItem(key, value)
-			},
-			admitGeneration: (key) => key.startsWith('jazz:shared-worker-generation:jazz-runtime:'),
-			admitOpen: (url) => {
-				const selected = new URL(url)
-				return selected.origin === asset.origin && selected.pathname === asset.pathname
 			},
 			open: (url, name) => {
 				stats.opens++
