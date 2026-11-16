@@ -242,8 +242,9 @@ test('Vercel skips unrelated apps using complete deployed-to-current Git changes
 		['packages/local-first/tsconfig.library.json', [0, 1, 1, 0]],
 		['packages/ui/.storybook/main.js', [0, 0, 0, 1]],
 		['packages/ui/src/stories/Button.stories.svelte', [0, 0, 0, 1]],
-		['scripts/monorepo/vercel-ignore.mjs', [1, 1, 1, 1]],
-		['scripts/monorepo/deployment-paths.mjs', [1, 1, 1, 1]],
+		['scripts/monorepo/ci.mjs', [0, 0, 0, 0]],
+		['scripts/monorepo/vercel-ignore.mjs', [0, 0, 0, 0]],
+		['scripts/monorepo/deployment-paths.mjs', [0, 0, 0, 0]],
 	]) {
 		git('checkout', '--detach', base)
 		put(path)
@@ -300,6 +301,12 @@ test('deployment-only exclusions keep CI active and reject ambiguous paths', () 
 	for (const path of ['', '/apps/finance/tests/app.ts', 'apps/finance/../tests/a.ts', 'apps/finance/./tests/a.ts', 'apps/finance/tests/a\\b.ts', 'unknown/tests/app.ts', 'apps/finance/src/lib/custom.config.ts', 'apps/finance/src/lib/tests-helper.ts', 'apps/finance/tsconfig.json']) {
 		assert.equal(verificationOnlyPath(path, 'finance'), false, path)
 	}
+	for (const path of ['scripts/monorepo/ci.mjs', 'scripts/monorepo/vercel-ignore.mjs', 'scripts/monorepo/deployment-paths.mjs']) {
+		assert.equal(verificationOnlyPath(path, 'website'), true)
+		assert.deepEqual(Object.values(selectChecks([path])), projects.map(() => true), 'deployment controls retain all CI verification')
+	}
+	assert.equal(verificationOnlyPath('scripts/new-build.mjs', 'website'), false)
+	assert.equal(verificationOnlyPath('apps/website/src/vercel-ignore.mjs', 'website'), false)
 })
 
 function previewFixture(t) {
@@ -351,6 +358,7 @@ test('first shallow preview branches select affected apps without a previous dep
 		['local-first', ['packages/local-first/src/index.ts'], [0, 1, 1, 0]],
 		['ui', ['packages/ui/src/Button.svelte'], [1, 1, 1, 1]],
 		['root', ['pnpm-lock.yaml'], [1, 1, 1, 1]],
+		['deployment-controls', ['scripts/monorepo/ci.mjs', 'scripts/monorepo/vercel-ignore.mjs', 'scripts/monorepo/deployment-paths.mjs'], [0, 0, 0, 0]],
 		['docs', ['README.md'], [0, 0, 0, 0]],
 		['verification', ['apps/finance/src/setup.test.ts', 'apps/finance/.prettierrc.json', 'apps/clipper/playwright.config.ts'], [0, 0, 0, 0]],
 	]) {

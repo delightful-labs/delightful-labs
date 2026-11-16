@@ -58,6 +58,10 @@ directories and fixtures, test runner configurations, CI workflows, and explicit
 editor/formatter/linter settings. Mixed Markdown/test/tooling changes can skip
 deployment too; mixed runtime changes still rebuild their consumers. The filter
 is separate from CI selection: test and tooling fixes still run existing checks.
+The three exact deployment-control modules (`scripts/monorepo/ci.mjs`,
+`vercel-ignore.mjs` and `deployment-paths.mjs` in that directory) run only before
+installation or in CI, so their changes also skip app builds while retaining all
+CI suites. This exception does not cover unknown scripts or app build commands.
 Production Vite/Svelte/TypeScript settings, manifests, lockfiles, build scripts,
 static assets and unknown configuration continue to deploy. UI Storybook inputs
 still deploy the hosted UI Storybook, but do not rebuild its library consumers.

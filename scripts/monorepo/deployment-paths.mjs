@@ -5,9 +5,18 @@ const roots = [
 	'apps/website/', 'apps/finance/', 'packages/local-first/', 'packages/ui/',
 ]
 
+// These run only in CI/the pre-install deployment gate, not in app builds.
+// Keep them explicit: unknown build scripts still affect every deployment.
+const deploymentControlPaths = new Set([
+	'scripts/monorepo/ci.mjs',
+	'scripts/monorepo/vercel-ignore.mjs',
+	'scripts/monorepo/deployment-paths.mjs',
+])
+
 export function verificationOnlyPath(path, project) {
 	if (!path || path.startsWith('/') || path.includes('\\') || path.split('/').some((part) => part === '..' || part === '.')) return false
 	if (/\.md$/iu.test(path)) return true
+	if (deploymentControlPaths.has(path)) return true
 	if (path.startsWith('.github/workflows/') || path.startsWith('.vscode/')) return true
 	const root = roots.find((prefix) => path.startsWith(prefix))
 	const local = root ? path.slice(root.length) : path
