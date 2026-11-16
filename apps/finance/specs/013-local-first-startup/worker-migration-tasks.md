@@ -15,14 +15,14 @@ using the [alpha.61–65 research](worker-jazz-release-research.md), then the pl
 worker-owned UI read slice. Keep live behavior until its replacement is qualified.
 The shared-helper extension-origin regression is corrected and all 12 extension
 browser cases pass locally. All hosted Finance, Clipper and foundation checks
-pass at `9193d755`; the subsequent cleanup head needs a fresh hosted run.
+pass at the C1 cleanup head `abf31082`; the subsequent C2 head needs a fresh hosted run.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 
 ## Seven-item simplification checklist
 
-This is the complete cleanup list proposed to the user on 2026-11-16. C1 is
-implemented; C2–C7 retain their remaining scope. Recording or completing cleanup
+This is the complete cleanup list proposed to the user on 2026-11-16. C1/C2 are
+implemented; C3–C7 retain their remaining scope. Recording or completing cleanup
 does not authorize a dependency upgrade or production cutover. This checklist is the
 current cleanup handoff alongside the selected simpler design. W01–W21 below
 retain their product/parity requirements, not the abandoned implementation plan.
@@ -35,7 +35,7 @@ retain their product/parity requirements, not the abandoned implementation plan.
       broker/channel/close APIs and port-custody behavior used by both apps.
       The [C1 audit and qualification](#c1-unused-grantcall-removal) records the
       removed dependency group and retained persistence coverage.
-- [ ] **C2 — Remove the old Window account-storage bridge.** Audit the unused
+- [x] **C2 — Remove the old Window account-storage bridge.** Audit the unused
       `host-client`, `window-host`, `host-drain`, account-store facade/storage
       adapters, selection namespace and legacy account-store machines as one
       dependency group. Retire their Window/localStorage selection and migration
@@ -43,6 +43,8 @@ retain their product/parity requirements, not the abandoned implementation plan.
       preserve the user's no-migration/no-fallback/no-dual-write decision. Do not
       confuse the obsolete selection bridge with the still-required Window
       broker hooks or delete the active application's SDK storage by implication.
+      The [C2 audit and qualification](#c2-unused-window-account-storage-removal)
+      records the removed dependency group, tooling and retained tests.
 - [ ] **C3 — Replace the import catalog with the real application worker.**
       `application.worker.ts` currently reports factory types rather than running
       Finance. During cleanup, remove build-proof requirements that keep abandoned
@@ -116,12 +118,56 @@ listener restrictions; the authorized disposable-listener run passes. Workspace
 links and guidance pass. Historical counts below keep their original revision
 and scope; fresh hosted CI is still required for the cleanup head.
 
-C2's old Window account-storage bridge and its model package remain for the next
-audited deletion. C3 is only partially addressed: obsolete catalog requirements
+At the C1 checkpoint, the old Window account-storage bridge and its model package
+remained; C2 below removes them. C3 is only partially addressed: obsolete catalog requirements
 are gone, but the entry is still build-only. C7 is ongoing. Keep shared broker,
 channel, callback-custody and close APIs; changing their public surface is not
 part of this Finance-only deletion. The active Window application, financial
 operation identity/drains and workspace dependencies are unchanged.
+
+## C2: unused Window account-storage removal
+
+The repository-wide source/configuration audit found all bridge imports and
+exported-symbol callers confined to its own implementation/tests. Neither the
+active layout/session nor the retained worker entry and SDK/browser fixtures
+depend on it. Removed `host-client`, `window-host`, `host-drain`, `host-protocol`,
+the account-store facade/storage/selection/namespace helpers and all seven legacy
+account-store machine/contract files. This also removes the unused earlier-key
+selection, root scrubbing, migration, Web Lock and Window storage transport path.
+
+The dedicated `tooling/worker-state-tests` package exercised only that retired
+graph after C1. Its tests, workspace/lock importer, package/root command aliases
+and CI invocation/counterexample artifact steps are removed together. The retired
+host test configuration is removed too. The worker-proof TypeScript configuration
+keeps the same strict compiler options directly. Existing deployment path tests
+still recognize historical test paths, including deletions; they are not callers
+of the removed code.
+
+`runtime/worker/account-store.ts` and its normal unit coverage remain unchanged,
+using the public Local First IndexedDB AccountStore. All 12 real SDK/IDB native
+scenarios remain, including isolation, serialization, close and full browser
+restarts. Shared IDB state/model/native tests remain in Local First. The active
+Finance app still uses its current Jazz storage; its authentication/readiness/
+debugging tests of SDK-default localStorage keys remain. No migration, fallback,
+dual write, reset or production storage switch is added.
+
+The lock update removes the retired importer and its unused test peer contexts.
+Existing Local First injected peer bindings are preserved; no dependency version
+or SDK/auth patch changes. Frozen offline installation, workspace peer links and
+guidance pass. The existing tooling suite passes all 19 tests. All 1,928 remaining
+Finance unit tests and all 12 native SDK/IDB cases pass across Chromium, Firefox
+and WebKit. Application/Svelte/service-worker, worker-proof and browser-fixture
+types pass, along with E2E scope checks and both production builds. The 36 removed
+unit cases and 17 dedicated test-workspace cases exercised the retired bridge;
+SDK/IDB and financial domain coverage remain. Current-head hosted CI is still
+required before merging; the C1 head `abf31082` passed every hosted Finance,
+Clipper and foundation workflow.
+
+This completes the deletion-only checkpoint. C3's actual application worker,
+C4's lifecycle integration and C5's read view remain unimplemented. Review and
+qualify the coordinated Jazz upgrade before adding new worker integration glue;
+do not activate the replacement application or change deployment namespaces as
+part of this cleanup.
 
 ## Historical foundation backlog and product parity requirements
 

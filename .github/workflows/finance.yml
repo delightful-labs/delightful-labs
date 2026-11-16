@@ -65,17 +65,6 @@ jobs:
       - run: pnpm check:tests
       - run: pnpm check:e2e
       - run: pnpm test:unit --run
-      - run: pnpm --filter @delightful-finances/worker-state-tests check
-      - run: pnpm test:worker-state
-      - name: Retain generated worker-state counterexamples
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: worker-state-counterexamples
-          path: apps/finance/tooling/worker-state-tests/.xstate-test/
-          include-hidden-files: true
-          if-no-files-found: ignore
-          retention-days: 3
       - name: Build without a live or production Jazz service
         run: pnpm build
         env:

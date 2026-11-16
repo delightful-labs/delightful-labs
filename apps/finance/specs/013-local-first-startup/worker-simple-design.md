@@ -19,8 +19,9 @@ The complete [seven-item simplification checklist](worker-migration-tasks.md#sev
 records the proposed cleanup, ownership, read-view, financial-workflow and test/
 spec tasks. Its execution notes distinguish deletion of confirmed-unused
 prototypes from replacement of live behavior and place the coordinated SDK
-upgrade before new worker integration glue. C1 is implemented; the checklist
-records the audited removal and the remaining C2–C7 scope.
+upgrade before new worker integration glue. C1/C2 remove the unused grant/call
+prototype and Window account-storage bridge, including their bespoke tooling.
+The checklist records both audits and the remaining C3–C7 scope.
 
 ## Start with the actual application
 

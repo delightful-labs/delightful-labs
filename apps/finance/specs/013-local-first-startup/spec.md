@@ -20,7 +20,9 @@ direction with one session-scoped broker connection using existing shared APIs.
 Its retained real-SDK/IndexedDB proof passes all 12 native cases, including cold
 data reopens in Chromium/Firefox/WebKit. C1 removes the unused Finance grant/call
 prototype and its 18 native scenarios; the SDK/IDB scenarios are unchanged.
-See the [cleanup audit and remaining tasks](worker-migration-tasks.md#c1-unused-grantcall-removal).
+C2 also removes the unused Window account-storage/migration bridge and its test
+workspace; the retained IDB binding and active SDK storage are unchanged.
+See the [cleanup audits and remaining tasks](worker-migration-tasks.md#c2-unused-window-account-storage-removal).
 The worker-entry duplication behind WebKit's account
 error is corrected through Local First's shared single-bundle ES-module settings,
 also used by Clipper web and its extension. See the
