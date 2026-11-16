@@ -168,3 +168,56 @@ test('every hosted Vercel project resolves the shared ignore script from its app
 		assert.equal(resolve(root, app, config.ignoreCommand.replace(/^node /u, '')), resolve(root, 'scripts/monorepo/vercel-ignore.mjs'))
 	}
 })
+
+test('Vercel skips unrelated apps using complete deployed-to-current Git changes', (t) => {
+	const cwd = mkdtempSync(resolve(tmpdir(), 'delightful-vercel-scopes-'))
+	t.after(() => rmSync(cwd, { recursive: true, force: true }))
+	const roots = ['apps/website', 'apps/finance', 'apps/clipper/apps/web', 'packages/ui']
+	const git = (...args) => execFileSync('git', ['-c', 'user.name=CI Test', '-c', 'user.email=ci@example.invalid', '-c', 'commit.gpgSign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+	const put = (path) => { mkdirSync(dirname(resolve(cwd, path)), { recursive: true }); writeFileSync(resolve(cwd, path), 'fixture') }
+	const commit = () => { git('add', '-A'); git('commit', '-m', 'fixture'); return git('rev-parse', 'HEAD') }
+	const ignore = (base, head, app) => spawnSync(process.execPath, [resolve(root, 'scripts/monorepo/vercel-ignore.mjs')], {
+		cwd: resolve(cwd, app), encoding: 'utf8', env: { ...process.env, VERCEL_GIT_PREVIOUS_SHA: base, VERCEL_GIT_COMMIT_SHA: head },
+	})
+	const statuses = (base, head) => roots.map((app) => ignore(base, head, app).status)
+	git('init', '--quiet')
+	for (const app of roots) put(`${app}/base.txt`)
+	const base = commit()
+	// Exit 1 means build; exit 0 means skip. Expectations are deployment
+	// behavior, exercised through the real CLI/Git boundary before any install.
+	for (const [path, expected] of [
+		['apps/website/src/page.svelte', [1, 0, 0, 0]],
+		['apps/finance/src/page.svelte', [0, 1, 0, 0]],
+		['apps/clipper/apps/web/src/page.svelte', [0, 0, 1, 0]],
+		['apps/clipper/tooling/build.mjs', [0, 0, 1, 0]],
+		['apps/clipper/apps/extension/src/popup.ts', [0, 0, 1, 0]],
+		['packages/local-first/src/index.ts', [0, 1, 1, 0]],
+		['packages/ui/src/Button.svelte', [1, 1, 1, 1]],
+		['pnpm-lock.yaml', [1, 1, 1, 1]],
+		['scripts/new-build.mjs', [1, 1, 1, 1]],
+		['README.md', [0, 0, 0, 0]],
+	]) {
+		git('checkout', '--detach', base)
+		put(path)
+		const head = commit()
+		assert.deepEqual(statuses(base, head), expected, path)
+		if (path === 'apps/finance/src/page.svelte') {
+			put('apps/finance/notes.md')
+			const docs = commit()
+			assert.deepEqual(statuses(base, docs), [0, 1, 0, 0], 'later docs cannot hide undeployed Finance code')
+			assert.deepEqual(statuses(head, docs), [0, 0, 0, 0], 'already deployed code needs no rebuild')
+			assert.equal(ignore(base, head, '.').status, 1, 'unknown app root builds')
+		}
+	}
+	git('checkout', '--detach', base)
+	renameSync(resolve(cwd, 'apps/website/base.txt'), resolve(cwd, 'apps/finance/moved.txt'))
+	const renamed = commit()
+	assert.deepEqual(statuses(base, renamed), [1, 1, 0, 0], 'rename affects both old and new app')
+	rmSync(resolve(cwd, 'apps/finance/moved.txt'))
+	const deleted = commit()
+	assert.deepEqual(statuses(renamed, deleted), [0, 1, 0, 0], 'deletion rebuilds its app')
+	assert.deepEqual(statuses(deleted, deleted), [1, 1, 1, 1], 'explicit rebuild continues')
+	for (const missing of ['', '0'.repeat(40), 'a'.repeat(40), '--help']) {
+		assert.deepEqual(statuses(missing, deleted), [1, 1, 1, 1], 'missing/invalid history builds every app')
+	}
+})
