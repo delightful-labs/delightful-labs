@@ -1,5 +1,38 @@
 # Article notes — implementation started
 
+## Document-note publication preview — 2026-11-16
+
+The user approved the temporary Zod response containing `libraryId`, the existing
+`source` union, `publishingDid` and the existing Margin `record`. No new stored
+model, Lexicon or public metadata is selected. The first implementation supports
+document Notes; source-verified Highlight capture remains a separate prerequisite.
+
+The backend creates the preview chart with a verified account/library/DID binding
+and a scope-validity capability. One invocation owns one copied source selection
+and caller-selected candidate publication time. Admission refuses expired scopes,
+invalid identifiers and Highlights before reading. The reading state owns one
+native remote-tier related query for the Note, its Document, owner-filtered Library
+and source-filtered publication links. A named eligibility guard checks ownership,
+active same-library parent, document-Note type and absence of an existing link for
+this publisher. Projection reuses the approved Margin mapper and limits.
+
+The finite outcomes are ready (the approved preview) or unavailable (no content).
+Read/projection failures, scope expiry, a 30-second read timeout and cancellation
+produce unavailable. Stopping the chart stops its invoked child; the underlying
+Jazz read has no abort API or acquired transaction to drain, and late native
+completions cannot expose a preview. The future request
+host owns the chart lifetime. No HTTP endpoint, product copy, PDS operation,
+permission escalation or reservation is introduced. This snapshot is not consent
+or issued-publication evidence; future confirmation must recheck accepted data,
+scope and destination. Its candidate time does not establish publication acceptance.
+
+Verification passes 918 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper formatting/lint, whitespace checks and
+the web production build. Ten new native tests cover owner/parent/type and existing
+link refusal, empty/oversized content, malformed admission, read errors, scope expiry,
+cancellation, timeouts, host stop and copied selections across held native reads.
+No browser publication flow, real PDS write or permission grant is qualified here.
+
 ## Private publication links — 2026-11-16
 
 After reviewing the concrete Zod shape, the user approved the private link between
