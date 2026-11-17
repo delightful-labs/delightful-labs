@@ -1,5 +1,46 @@
 # Article notes — implementation started
 
+## Approved TID address allocation — 2026-11-17
+
+The user approved adding `@atcute/tid@1.1.4` after reviewing why a retained address
+must be allocated before a PDS write. The direct dependency and its clock helper
+`@atcute/time-ms@1.3.3` are now locked. Existing package versions, workspace peer
+bindings and dependency snapshots are unchanged; unrelated pnpm peer-reference
+rewrites were removed, then frozen offline installation and workspace links passed.
+
+`publication/address.ts` exports one invoked `allocatePublicationAddress` async
+logic for the selected allocation effect. It accepts the existing publisher DID,
+validates it before calling the library, validates the generated TID through the
+existing first-write field schema and returns the existing full record-URI value.
+There are no new data models, storage fields, revision counters, token stores or
+application clock codecs. Allocation belongs in a selected owner invocation,
+never a guard, selector or output calculation. The library owns clock/random
+generation; Jazz owns accepted URI custody, uniqueness and history.
+
+The value is a candidate until the existing store accepts its issued Publication.
+The future publisher must perform scope/grant/source admission, wait for that
+acceptance before network dispatch and reuse an already-issued address on resume.
+The allocator itself neither stores intent nor proves control, uniqueness, native
+acceptance or remote absence. The existing store prevents retargeting issued
+addresses; remote collisions still require conditional writes/reconciliation.
+No production publisher owner invokes this allocation logic yet.
+
+All 103 publication/auth regressions pass. The native SQLite reopen test now uses
+a real generated address and confirms that the accepted issued URI survives the
+restart unchanged, including its later request/comparison use. Unit cases cover
+wire/schema compatibility, invalid publishers before generation and malformed
+generator output. The 2,500-allocation burst uses the clock helper's fake-Date
+fallback, verifying its timestamp and no duplicate candidates in that bounded
+sample, without assuming global uniqueness or ordering across clock corrections.
+The normal Node process reports native precision available and passes allocation/
+native-store tests; unsupported-platform/hosted native precision is not claimed.
+The helper packages its native prebuilds and falls back to Date.now when unavailable.
+No live PDS read/write, new UI wording or complete publisher loop is added.
+Strict root/web/service-worker/extension types, Clipper lint/formatting, vendor
+integrity, workspace links, frozen offline installation, whitespace and the
+production web/server/service-worker build pass. Existing package versions and
+peer bindings remain unchanged outside the two approved new package entries.
+
 ## Frozen owned-content comparison — 2026-11-17
 
 `publication/compare.ts` adds the pure `matchesIssuedContent` guard over the

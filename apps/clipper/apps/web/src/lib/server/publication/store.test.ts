@@ -13,6 +13,7 @@ import { newDocumentValues } from '../../backend/jazz/document-values.js'
 import { createPublicationStore } from './store.js'
 import { toFirstPublicationWrite } from './first-write.js'
 import { matchesIssuedContent } from './compare.js'
+import { allocatePublicationAddress } from './address.js'
 import {
 	publicationFromRow,
 	publicationSchema,
@@ -363,7 +364,11 @@ it('retains requested/issued state, exact payload, native identity and history t
 		expect(await createPublicationStore(backend.db, scope).list({ noteId })).toEqual([
 			requested(source)
 		])
-		const key = '3jzfcijpj2z2a'
+		const allocator = createActor(allocatePublicationAddress, { input: publishingDid })
+		const allocation = toPromise(allocator)
+		allocator.start()
+		const address = await allocation.finally(() => allocator.stop())
+		const key = address.slice(address.lastIndexOf('/') + 1)
 		const publication = issued(source, key, 'Retained')
 		expect((await stage(createPublicationStore(backend.db, scope), publication)).outcome).toBe(
 			'succeeded'
@@ -377,6 +382,8 @@ it('retains requested/issued state, exact payload, native identity and history t
 		)
 		expect(after?.id).toBe(before.id)
 		expect(after?.$createdAt).toEqual(before.$createdAt)
+		const reopened = publicationFromRow(after)
+		expect('uri' in reopened && reopened.uri).toBe(address)
 		const frozenWrite = toFirstPublicationWrite(publicationFromRow(after))
 		expect(frozenWrite).toEqual({
 			repo: publishingDid,

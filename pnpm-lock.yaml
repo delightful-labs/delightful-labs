@@ -110,6 +110,9 @@ importers:
       '@atcute/lexicons':
         specifier: 2.1.1
         version: 2.1.1
+      '@atcute/tid':
+        specifier: 1.1.4
+        version: 1.1.4
       '@faker-js/faker':
         specifier: 10.6.0
         version: 10.6.0
@@ -623,6 +626,12 @@ packages:
 
   '@atcute/oauth-types@1.0.1':
     resolution: {integrity: sha512-9uFP/nK0PgPDsaNbLArzrCHvTZO1k04cSEX5jZ75W2Jh7Jxbh/CSTenSrad3CZXuX6y6hDquEtl6H/IqLtTmHw==}
+
+  '@atcute/tid@1.1.4':
+    resolution: {integrity: sha512-RVjGAxu+WgcQjs7AkicZKOqLOncnuXh7a0xUHTfXTYZjXSszB7jBLgrcLWjpU0mBTko9dT+GajsXAcBGYmzYKQ==}
+
+  '@atcute/time-ms@1.3.3':
+    resolution: {integrity: sha512-FeK2Xsv4ymP+PoTWtmMFuJmpxDBQsj+jNMnd/YpIm3etcIPj1YFb7DeTAG1c/Xvp8AM38MLdqUCc35/mANnBtw==}
 
   '@atcute/uint8array@1.2.1':
     resolution: {integrity: sha512-qsDY5lKIutT5FJeVOD3Au0OxqRJjEd5UKm4z7zM0kMQFX4vMKfBIEmBMDAEUpwZXlpxkvGhVZ1PEu67BG9o8cw==}
@@ -5645,6 +5654,12 @@ snapshots:
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
+
+  '@atcute/tid@1.1.4':
+    dependencies:
+      '@atcute/time-ms': 1.3.3
+
+  '@atcute/time-ms@1.3.3': {}
 
   '@atcute/uint8array@1.2.1': {}
 
