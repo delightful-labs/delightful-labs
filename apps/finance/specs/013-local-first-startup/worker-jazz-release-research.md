@@ -13,6 +13,9 @@ preview cores cannot be addressed by the new namespace rules. The user permits
 fresh Clipper preview data but requires Finance's existing data to remain
 accessible. The plan records Finance's actual core/Drive inventory and exact-name
 comparison; its custom qualification destination still needs a retention path.
+The subsequent [U1 proof](worker-jazz-upgrade-plan.md#u1-isolated-worker-qualification)
+passes all 15 actual Finance SDK/IDB cases with an isolated worker-only rebase of
+the existing bridge. This does not qualify the complete patch or app upgrade.
 
 ## What was inspected
 

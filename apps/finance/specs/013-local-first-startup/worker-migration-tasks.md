@@ -21,6 +21,9 @@ The next branch starts at that exact tree and follows the
 Fresh preview cores are approved for Clipper only. Finance must preserve access
 to existing preview and production data; its destination inventory and retention
 gate are recorded in that plan.
+U1's isolated alpha.65 worker bridge now passes strict types and 15 native
+Finance SDK/IDB cases across Chromium/Firefox/WebKit. Workspace pins and the
+active patch remain alpha.60; full shared-session/backend qualification is next.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

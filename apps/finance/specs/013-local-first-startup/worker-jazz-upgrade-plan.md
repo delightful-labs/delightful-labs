@@ -2,8 +2,9 @@
 
 Baseline: PR #39 merged at `fb380114` on 2026-11-16. Its final head `d8c0820e`
 passed every hosted Finance, Clipper and foundation workflow. C1/C2 are complete.
-`feat/jazz-native-session-upgrade` starts from that exact merge tree. No SDK pin,
-patch, application behavior or deployment setting has changed here. The npm
+`feat/jazz-native-session-upgrade` starts from that exact merge tree. Workspace
+SDK pins, the active patch, application behavior and deployment settings remain
+unchanged; the worker-only alpha.65 candidate below is an isolated fixture. The npm
 package-tag endpoint was rechecked: `latest` is alpha.65; `alpha` still selects
 alpha.60. Use explicit coordinated pins after qualification.
 
@@ -18,7 +19,7 @@ resets or a Finance destination change.
 
 ## Foundation-first execution
 
-- [ ] **U1 — Qualify the existing persistent-worker bridge on alpha.65 in
+- [x] **U1 — Qualify the existing persistent-worker bridge on alpha.65 in
       isolation.** The unpatched SDK already fails cold worker data retention.
       Adapt the existing patch's worker detection/Window-hook behavior to the
       changed source, adding no preparation callback or per-call owner. Run the
@@ -27,6 +28,8 @@ resets or a Finance destination change.
       separately: native device-account APIs do not establish joining-proof,
       extension-origin or offline-retry parity. Discuss any newly required patch
       behavior before implementing it. No workspace pin/backend destination changes.
+      The [U1 qualification](#u1-isolated-worker-qualification) records the focused
+      proof and the remaining full-patch/backend boundaries.
 - [ ] **U2 — Adapt Local First's session boundary and both consumers together.**
       Use `initial: 'device'`, `localFirst: 'now'` with the public client loader,
       `user.accountId`/kind/identity, `exportDeviceKey()`,
@@ -72,6 +75,52 @@ finds four files whose alpha.60 patch hunks need rebasing: `runtime/context.d.ts
 and `worker/jazz-broker-worker.js` under `dist/`. No hunks were applied. Textual
 applicability of the other files is not behavioral qualification. The check log
 is `alpha65-existing-patch-check.log` in the research artifact directory.
+
+## U1: isolated worker qualification
+
+The [reproducer](../../tests/worker-upgrade/README.md) reuses the maintained Finance
+native fixture/schema and the public Local First store/broker/build package in a
+temporary project. Exact SDK and Wasm versions are both `2.0.0-alpha.65`;
+the downloaded SDK's SHA-512 integrity is checked before patching. The candidate
+carries only the existing worker-host responsibility into six files. The new
+store-deletion leaf also needs to await its now-asynchronous generation reader
+and broker constructor; no new capability or naming algorithm was added.
+
+The complete clean setup, strict fixture type check and **15 native cases pass**
+in Chromium, Firefox and WebKit:
+
+- Three Window SDK controls remain independent of the worker hooks.
+- Three actual worker SDK cases retain the same identity and Finance expense
+  through two full browser-process restarts. They save 1,234 minor units, edit to
+  5,678, reopen offline, edit to 9,012 and verify that second edit after another
+  restart. Every cycle verifies SDK/store/broker close receipts.
+- Six retained IndexedDB cases cover canonical bindings, profile isolation,
+  concurrent serialized updates, close and offline full-process restarts.
+- Three new cases reject the immediate client loader, verify no native broker
+  open/generation read occurred, close the acquired store/channel, then reopen
+  and close the actual SDK successfully.
+
+Alpha.65 emits its one broker asset under `assets/`; the former fixture's
+`_app/immutable/assets/` restriction initially stopped setup before any cases ran.
+The overlay now discovers the emitted hashed broker by name and still requires
+exactly one. The other initial setup failure was an unsupported pnpm pack flag;
+the reproducer uses the CLI-supported configuration flag. Neither is relabeled
+as a browser/SDK data failure. Formatting-only overlay changes were removed and
+their emitted JavaScript equivalence and strict types verified.
+
+The clean run's artifact directory is
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha65-0RQp9f`;
+the external run log is `/private/tmp/finance-alpha65-bridge-clean.log`.
+Recorded tooling: Vite 8.3.4, Vitest 4.1.11, Playwright 1.64.0, TypeScript 6.0.3,
+XState 6.0.0-beta.1, Svelte 5.57.2 and Zod 4.1.11. The script captures installed
+versions and the generated lock for each run. Both final overlays also apply
+cleanly to pristine inputs.
+
+This qualifies the focused persistent-worker bridge, not all of alpha.65 for
+either app. The rest of the existing SDK/auth patch, native construction/failure
+paths, identity switching, schema history, extension and backend/core behavior
+still need U2–U5 qualification. No existing Finance store, credentials, namespace
+or deployment was changed. The application worker/read view remains C3–C5 work.
 
 ## Native Vercel naming: additional code proof
 

@@ -1,0 +1,166 @@
+--- a/tests/worker-bindings/sdk-session.worker.ts
++++ b/tests/worker-bindings/sdk-session.worker.ts
+@@ -5,7 +5,14 @@
+ import { app } from '../../src/lib/schema.js'
+ 
+ export type SdkCommand =
+-	| { type: 'OPEN'; scope: string; brokerUrl: string; data: MessagePort; control: MessagePort }
++	| {
++			type: 'OPEN'
++			scope: string
++			brokerUrl: string
++			data: MessagePort
++			control: MessagePort
++			failLoader: boolean
++	  }
+ 	| { type: 'READ'; organizationId: string }
+ 	| {
+ 			type: 'SEED'
+@@ -28,8 +35,8 @@
+ let broker: ReturnType<typeof brokerHostClient> | undefined
+ function current() {
+ 	const snapshot = session?.getSnapshot()
+-	if (!snapshot?.client || !snapshot.account) throw new Error('SDK fixture session unavailable')
+-	return { db: snapshot.client.db, accountId: snapshot.account.id }
++	if (!session || !snapshot?.user) throw new Error('SDK fixture session unavailable')
++	return { db: session.db, accountId: snapshot.user.accountId }
+ }
+ 
+ // Disposable SDK controls, not an application runtime. The test owns operation
+@@ -48,7 +55,12 @@
+ 			scope: command.scope,
+ 			env: 'sdk-proof',
+ 			store,
+-			initial: 'local-first',
++			initial: 'device',
++			localFirst: 'now',
++			client: () => {
++				if (command.failLoader) throw new Error('Expected SDK loader failure')
++				return import('jazz-tools/local-first')
++			},
+ 			runtimeSources: {
+ 				wasmUrl,
+ 				brokerWorkerUrl: command.brokerUrl,
+@@ -57,7 +69,6 @@
+ 			}
+ 		})
+ 		const { db, accountId } = current()
+-		await db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
+ 		return {
+ 			kind: 'opened',
+ 			accountId,
+@@ -66,9 +77,9 @@
+ 		}
+ 	}
+ 	if (command.type === 'CLOSE') {
+-		if (!session || !store || !broker) throw new Error('SDK fixture was not opened')
+-		await session.close()
+-		const sdkClosed = session.getSnapshot().status === 'closed'
++		if (!store || !broker) throw new Error('SDK fixture was not opened')
++		await session?.close()
++		const sdkClosed = session === undefined || session.getSnapshot().status === 'closed'
+ 		await store.close()
+ 		const receipt = await broker.close()
+ 		return {
+--- a/tests/worker-bindings/sdk-session.ts
++++ b/tests/worker-bindings/sdk-session.ts
+@@ -34,20 +34,21 @@
+ 			scope,
+ 			env: 'sdk-proof',
+ 			store,
+-			initial: 'local-first',
++			initial: 'device',
++			localFirst: 'now',
++			client: () => import('jazz-tools/local-first'),
+ 			runtimeSources: { wasmUrl, brokerWorkerUrl: brokerUrl, wasmVersion: 'finance-sdk-proof-1' }
+ 		})
+ 		try {
+-			const db = session.getSnapshot().client?.db
++			const db = session.db
+ 			if (!db) throw new Error('Window SDK control unavailable')
+-			await db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
+ 			return db.isLocalFirst()
+ 		} finally {
+ 			await session.close()
+ 			await store.close()
+ 		}
+ 	},
+-	async open(scope: string, brokerUrl: string) {
++	async open(scope: string, brokerUrl: string, failLoader = false) {
+ 		if (active) throw new Error('SDK fixture already active')
+ 		const data = new MessageChannel(),
+ 			control = new MessageChannel()
+@@ -72,7 +73,14 @@
+ 			release,
+ 			stats
+ 		}
+-		return command({ type: 'OPEN', scope, brokerUrl, data: data.port2, control: control.port2 })
++		return command({
++			type: 'OPEN',
++			scope,
++			brokerUrl,
++			data: data.port2,
++			control: control.port2,
++			failLoader
++		})
+ 	},
+ 	command,
+ 	stats: () => ({ ...active?.stats }),
+--- a/tests/worker-bindings/native.test.ts
++++ b/tests/worker-bindings/native.test.ts
+@@ -52,10 +52,7 @@
+ 		})
+ 		response.end(asset?.bytes ?? 'No app, auth or Jazz endpoint exists in this fixture')
+ 	})
+-	const brokers = [...assets.keys()].filter(
+-		(path) =>
+-			path.startsWith('/_app/immutable/assets/') && /\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
+-	)
++	const brokers = [...assets.keys()].filter((path) => /\/jazz-broker-worker[.-][^/]+\.js$/.test(path))
+ 	if (brokers.length !== 1 || !brokers[0])
+ 		throw new Error(`Expected one SDK broker asset, found ${brokers.length}`)
+ 	sdkBrokerPath = brokers[0]
+@@ -117,6 +114,43 @@
+ 						{ scope: crypto.randomUUID(), url: origin + sdkBrokerPath }
+ 					)
+ 				).toBe(true)
++			} finally {
++				await browser.close()
++			}
++		})
++		it('closes acquired resources after immediate SDK loader failure and reopens', async () => {
++			retainOnFailure()
++			const browser = await browserType.launch({ headless: true })
++			try {
++				const page = await boot(await browser.newContext())
++				const input = {
++					scope: crypto.randomUUID(),
++					url: origin + sdkBrokerPath
++				}
++				await expect(
++					page.evaluate(({ scope, url }) => window.financeSdkFixture.open(scope, url, true), input)
++				).rejects.toThrow('Expected SDK loader failure')
++				expect(await page.evaluate(() => window.financeSdkFixture.stats())).toEqual({
++					opens: 0,
++					reads: 0
++				})
++				expect(await page.evaluate(() => window.financeSdkFixture.close())).toEqual({
++					kind: 'closed',
++					sdkClosed: true,
++					hostClosed: true
++				})
++				expect(
++					await page.evaluate(({ scope, url }) => window.financeSdkFixture.open(scope, url), input)
++				).toMatchObject({
++					kind: 'opened',
++					localFirst: true,
++					windowPresent: false
++				})
++				expect(await page.evaluate(() => window.financeSdkFixture.close())).toEqual({
++					kind: 'closed',
++					sdkClosed: true,
++					hostClosed: true
++				})
+ 			} finally {
+ 				await browser.close()
+ 			}
