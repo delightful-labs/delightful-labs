@@ -35,6 +35,16 @@
 			}
 		})
 	}
+	function publish() {
+		binding.client.send({
+			type: 'ANNOTATION',
+			command: {
+				type: 'PUBLISH_NOTE',
+				documentId: binding.documentId,
+				requestId: binding.requestId
+			}
+		})
+	}
 	function retry() {
 		if (binding.noteId)
 			binding.client.send({
@@ -74,6 +84,9 @@
 		{/if}
 		{#if view.publication}<output><code>{view.publication.uri}</code></output>{/if}
 		<div class="preview-actions">
+			{#if view.canPublish}<Button disabled={!enabled} onclick={publish}
+					>{t('publication.publish')}</Button
+				>{/if}
 			{#if view.authorize && view.value}<Button
 					disabled={!enabled}
 					onclick={() =>

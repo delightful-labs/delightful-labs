@@ -220,6 +220,10 @@ it('publishes the displayed selection once and exposes an address only after con
 	gate.resolve(Response.json(published))
 	await waitFor(a.actor, (s) => s.matches('published'))
 	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toEqual(published)
+	expect(selectSharingPreview(a.actor.getSnapshot()).message).toEqual({
+		text: 'Published',
+		variant: 'info'
+	})
 	expect(selectSharingPreview(a.actor.getSnapshot()).canPublish).toBe(false)
 })
 it('offers provider sign-in after missing permission and keeps failed publishing retryable', async () => {
@@ -246,6 +250,10 @@ it('offers provider sign-in after missing permission and keeps failed publishing
 	})
 	await waitFor(a.actor, (s) => s.matches('publishFailed'))
 	expect(selectSharingPreview(a.actor.getSnapshot()).canPublish).toBe(true)
+	expect(selectSharingPreview(a.actor.getSnapshot()).message).toEqual({
+		text: 'Publishing could not be confirmed. Try again.',
+		variant: 'error'
+	})
 	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
 })
 it('dismisses in-flight publishing and ignores its late successful result', async () => {

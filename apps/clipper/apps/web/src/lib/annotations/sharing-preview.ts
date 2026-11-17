@@ -228,9 +228,10 @@ export const sharingPreviewMachine = setup({
 				}
 			}
 		},
-		published: {},
+		published: { meta: { name: t('publication.published'), variant: 'info' } },
 		authorize: {},
 		publishFailed: {
+			meta: { name: t('publication.failed'), variant: 'error' },
 			on: {
 				PUBLISH: ({ context, event }) =>
 					context.capability?.isCurrent() && event.requestId === context.requestId

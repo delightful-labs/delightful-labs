@@ -4,8 +4,8 @@ import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
 import { handlePreviewRequest } from '../../src/lib/server/publication/request.js'
 import { handlePublicationPublish } from '../../src/lib/server/publication/publish.js'
+import { publicationSchema } from '../../src/lib/annotations/publication.js'
 import { firstPublicationWriteSchema } from '../../src/lib/server/publication/first-write.js'
-import { handlePublicationSubmit } from '../../src/lib/server/publication/submit.js'
 import { chromium, expect, test } from '@playwright/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -103,8 +103,6 @@ for (const mode of ['linked', 'existing', 'expired'])
 					}
 					return handlePublicationPublish(publicationAuth, authority.backend, request, origin)
 				}
-				if (new URL(request.url).pathname === '/api/publication/request')
-					return handlePublicationSubmit(auth, authority.backend, request, origin)
 				const response = await handleConfiguredAuth(auth, request, { origin, secret })
 				if (new URL(request.url).pathname === '/api/auth/sign-out')
 					signOutResponses.push(response.status)
@@ -369,51 +367,48 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await preview.getByRole('button', { name: 'Close', exact: true }).click()
 				await expect(preview).not.toBeVisible()
 				checkpoint('authenticated sharing preview verified')
-				// Exercise the new server boundary directly. A Publish control is not
-				// exposed until its wording and permission-upgrade interaction are reviewed.
-				const selection = {
-					libraryId: accountId,
-					source: { noteId: savedNote.id },
-					publishingDid: 'did:plc:offlinefixture'
-				}
-				for (let attempt = 0; attempt < 2; attempt++) {
-					const accepted = await page.evaluate(async (selection) => {
-						const response = await fetch('/api/publication/request', {
-							method: 'POST',
-							credentials: 'same-origin',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(selection)
-						})
-						const value: unknown = await response.json()
-						return { status: response.status, cache: response.headers.get('cache-control'), value }
-					}, selection)
-					expect(accepted).toEqual({
-						status: 202,
-						cache: 'private, no-store',
-						value: { ...selection, state: 'requested' }
-					})
-				}
-				expect(
-					await authority.backend.db.all(app.publications.where({ libraryId: accountId }))
-				).toHaveLength(1)
-				checkpoint('authenticated publication request verified')
-				// Real cookies, worker preview and native account mapping; the remote PDS
-				// alone is synthetic. The UI action wording remains under copy review.
-				const published = await page.evaluate(async (selection) => {
-					const response = await fetch('/api/publication/publish', {
-						method: 'POST',
-						credentials: 'same-origin',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify(selection)
-					})
-					return { status: response.status, value: await response.json() }
-				}, selection)
-				expect(published.status).toBe(200)
-				expect(published.value.state).toBe('published')
-				publishedUri = published.value.uri
-				expect(publicWrites).toBe(1)
 				await page.getByRole('button', { name: 'Preview sharing', exact: true }).click()
-				await expect(preview.getByText(published.value.uri, { exact: true })).toBeVisible()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toBeVisible()
+				// A failed submission stays retryable and never claims publication.
+				await page.route('**/api/publication/publish', (route) => route.abort(), { times: 1 })
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(
+					preview.getByText('Publishing could not be confirmed. Try again.', { exact: true })
+				).toBeVisible()
+				expect(publicWrites).toBe(0)
+				const release = Promise.withResolvers<void>()
+				await page.route(
+					'**/api/publication/publish',
+					async (route) => {
+						await release.promise
+						await route.continue()
+					},
+					{ times: 1 }
+				)
+				const publishedResponse = page.waitForResponse((response) =>
+					response.url().endsWith('/api/publication/publish')
+				)
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(preview.getByText('Preparing…', { exact: true })).toBeVisible()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+				release.resolve()
+				const publicationResponse = await publishedResponse
+				expect(publicationResponse.status()).toBe(200)
+				const value: unknown = await publicationResponse.json()
+				const published = publicationSchema.parse(value)
+				if (published.state !== 'published') throw new Error('Expected confirmed publication')
+				publishedUri = published.uri
+				expect(publicWrites).toBe(1)
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toBeVisible()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await expect(preview).not.toBeVisible()
+				await page.getByRole('button', { name: 'Preview sharing', exact: true }).click()
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toBeVisible()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+				expect(publicWrites).toBe(1)
 				await preview.getByRole('button', { name: 'Close', exact: true }).click()
 				await expect(preview).not.toBeVisible()
 				checkpoint('authenticated publication and visible retained address verified')
