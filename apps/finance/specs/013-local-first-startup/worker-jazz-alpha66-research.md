@@ -216,8 +216,10 @@ null semantics; do not emulate the old conversion. Backup/restore's complete
 caller qualification remains required. Counts use the existing native INT
 range; BigInt amounts retain their validated safe-number view.
 
-The historical two-app `previousApp` restore experiment and backup table typing
-are not ported by this selected proof. Nor does it qualify all Finance callers,
+The initial authoring checkpoint did not port the historical two-app
+`previousApp` restore experiment or backup table typing. The subsequent backup
+checkpoint below handles the production reader; the full restore harness remains
+open. This does not qualify all Finance callers,
 Clipper, browser worker durability, backend auth, every existing patch
 responsibility or Finance's retained Vercel destinations. Keep U3/U4/U5 open.
 
@@ -225,6 +227,35 @@ Final packaged proof: `/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-
 log: `/private/tmp/finance-alpha66-schema-final.log`. Strict fixture types, native
 generation/identity checks and all 138 cases pass in that same clean copy. Active
 alpha.60 Finance test types, workspace links and shared guidance checks also pass.
+
+### Finance backup caller and retained archive
+
+The maintained schema mode now also compiles and runs the actual backup reader,
+its existing workflow and all 37 native backup cases. The inactive caller uses
+only current generated queries: it removes the previous-schema override and
+per-read table choice, without changing the released-field allowlist or archive
+profile. No old schema is needed in the production reader.
+
+A native diagnostic rejected current-schema queries on a Db initialized with
+the older schema: `Db is already initialized with a different schema`. Selecting
+only common fields does not remove Jazz's exact schema binding. Do not work
+around it with a schema-swapping Db facade. Instead, `backup-seed.mjs` runs the
+actual released v1 reader with its own preceding schema/permissions on alpha.60,
+using a real device account and disposable native authority. Alpha.66 separately
+opens and validates those retained archive bytes. Workspace/account IDs,
+maximum-safe financial amounts and attachment bytes survive exactly.
+
+The fresh proof passes **176 tests**, strict selected types (now including backup
+tests and their reader/workflow), native generation/check and unchanged schema/
+permission identities. Artifact directory:
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-UmoCBx`;
+log: `/private/tmp/finance-alpha66-backup-proof-final.log`. This includes the
+previous 138 cases, 37 backup cases and one cross-version archive case. It does
+not establish alpha.66 restore staging/publication, cancellation, identity
+replacement, pending-write drains or the full 107-case historical suite. Port
+that existing workflow/harness next, retaining its behavioral checks and the
+approved shared application Db. The older independent account-client probes
+must not drive a replacement SDK facade around removed APIs.
 
 ## Clipper native schema foundation
 

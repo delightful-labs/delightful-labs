@@ -24,6 +24,16 @@ The [qualified scope](worker-jazz-alpha66-research.md#clipper-native-schema-foun
 keeps full adoption and the remaining upgrade gates open; Finance's 138 cases
 also pass after the fixture reuse.
 
+The next Finance checkpoint extends the schema mode to **176 passing tests**:
+the prior 138, all 37 existing backup cases and one real alpha.60 v1 archive
+independently opened/validated on alpha.66. The candidate reader drops its
+previous-schema override and uses current native generated queries. Historical
+archives are generated under their own old SDK/schema, preserving exact amounts,
+IDs and attachment bytes without a compatibility layer. See the
+[backup evidence](worker-jazz-alpha66-research.md#finance-backup-caller-and-retained-archive).
+The full restore workflow/browser harness remains next; staging/publication and
+identity/write-drain qualification are still required before adoption.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,

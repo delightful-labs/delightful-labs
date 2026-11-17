@@ -117,6 +117,15 @@ expanding commands. Do not build a generic SDK command surface ahead of callers.
       [Clipper qualification](worker-jazz-alpha66-research.md#clipper-native-schema-foundation).
       Full callers, Finance's historical backup/restore cases, browser-worker
       and backend/destination qualification remain; U3 is still open.
+      **Finance backup caller now passes:** the current generated-query reader
+      removes the old per-read schema override. Its 37 existing cases and a real
+      alpha.60 v1 archive reopened/validated on alpha.66 bring the fresh schema
+      proof to **176 passing tests**, with strict backup types and unchanged
+      schema/permission identities. Jazz enforces exact Db/schema binding;
+      generate historical archives with their own native old bindings instead
+      of introducing compatibility code. The full restore workflow/browser
+      harness, including staging, publication and drains, remains the next
+      caller task; retained-file decoding alone does not qualify it.
 - [ ] **U4 — Qualify backend authentication and destinations.** Replace the
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix

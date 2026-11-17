@@ -8,6 +8,8 @@ export default defineConfig({
 		include: [
 			'src/lib/permissions.test.ts',
 			'src/lib/schema-upgrade.test.ts',
+			'src/lib/backup/workspace.test.ts',
+			'src/lib/backup/backup-upgrade.test.ts',
 			'src/lib/bank-sync-log-permissions.test.ts',
 			'src/lib/bank-sync-log-retention-permissions.test.ts'
 		],

@@ -73,6 +73,7 @@ const packages = [
 	'@sveltejs/vite-plugin-svelte',
 	'xstate',
 	'zod',
+	'ws',
 	'@opentelemetry/api'
 ]
 // Read exact installed versions through pnpm; some packages hide package.json.

@@ -2779,3 +2779,332 @@ index 5520f12..d660db4 100644
  			payerName: s.string().optional(),
  			bankName: s.string().optional(),
  			memoOnCheck: s.string().optional()
+diff --git a/src/lib/backup/workspace.ts b/src/lib/backup/workspace.ts
+--- a/src/lib/backup/workspace.ts
++++ b/src/lib/backup/workspace.ts
+@@ -11,7 +11,7 @@
+ 	ArchiveAttachment
+ } from 'delightful-local-first/backup/archive'
+ import { parseArchivePayload, payloadLimits } from 'delightful-local-first/backup/archive'
+-import { app, previousApp } from '../schema.js'
++import { app } from '../queries.js'
+ import { currencyText, dateOnlyText } from '../validation/transactions.js'
+ import { syncOutcome, syncSettlement, syncFailureCode } from '../validation/bank-sync-log.js'
+ 
+@@ -515,7 +515,6 @@
+ 	}
+ }
+ type PrivateRead = {
+-	tables: typeof previousApp
+ 	version: 1 | 2
+ 	sources: { sourceFileId: string; payloadSha256: string }[]
+ 	rows: Map<RowType, PlainRow[]>
+@@ -534,7 +533,6 @@
+ }
+ export function beginFinanceRead(input: JazzArchiveReaderInput) {
+ 	reads.set(input, {
+-		tables: app,
+ 		version: 1,
+ 		sources: [],
+ 		rows: new Map(),
+@@ -583,22 +581,18 @@
+ 		)
+ 	})
+ }
+-export function readFinanceAuthority(
+-	input: JazzArchiveReaderInput,
+-	tables: typeof previousApp = app
+-) {
+-	data(input).tables = tables
++export function readFinanceAuthority(input: JazzArchiveReaderInput) {
+ 	const organizationId = input.binding.workspaceId
+ 	return Promise.all([
+ 		retain(
+ 			input,
+ 			'organizations',
+-			tables.organizations.where({ id: organizationId }).select('*', ...auditColumns)
++			app.organizations.where({ id: organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'organizationMembers',
+-			tables.organizationMembers.where({ organizationId }).select('*', ...auditColumns)
++			app.organizationMembers.where({ organizationId }).select('*', ...auditColumns)
+ 		)
+ 	]).then(() => {})
+ }
+@@ -614,55 +608,50 @@
+ 	)
+ }
+ export function readFinanceMetadata(input: JazzArchiveReaderInput) {
+-	const tables = data(input).tables
+ 	const organizationId = input.binding.workspaceId
+ 	return Promise.all([
+-		retain(
+-			input,
+-			'accounts',
+-			tables.accounts.where({ organizationId }).select('*', ...auditColumns)
+-		),
++		retain(input, 'accounts', app.accounts.where({ organizationId }).select('*', ...auditColumns)),
+ 		retain(
+ 			input,
+ 			'accountMemberships',
+-			tables.accountMemberships.where({ organizationId }).select('*', ...auditColumns)
++			app.accountMemberships.where({ organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'categories',
+-			tables.categories.where({ organizationId }).select('*', ...auditColumns)
+-		),
+-		retain(input, 'tags', tables.tags.where({ organizationId }).select('*', ...auditColumns)),
++			app.categories.where({ organizationId }).select('*', ...auditColumns)
++		),
++		retain(input, 'tags', app.tags.where({ organizationId }).select('*', ...auditColumns)),
+ 		retain(
+ 			input,
+ 			'transactions',
+-			tables.transactions.where({ organizationId }).select('*', ...auditColumns)
++			app.transactions.where({ organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'transactionTags',
+-			tables.transactionTags.where({ organizationId }).select('*', ...auditColumns)
+-		),
+-		retain(input, 'checks', tables.checks.where({ organizationId }).select('*', ...auditColumns)),
++			app.transactionTags.where({ organizationId }).select('*', ...auditColumns)
++		),
++		retain(input, 'checks', app.checks.where({ organizationId }).select('*', ...auditColumns)),
+ 		retain(
+ 			input,
+ 			'internalTransfers',
+-			tables.internalTransfers.where({ organizationId }).select('*', ...auditColumns)
++			app.internalTransfers.where({ organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'transactionBatches',
+-			tables.transactionBatches.where({ organizationId }).select('*', ...auditColumns)
++			app.transactionBatches.where({ organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'batchTemplates',
+-			tables.batchTemplates.where({ organizationId }).select('*', ...auditColumns)
++			app.batchTemplates.where({ organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'simplefinConnections',
+-			tables.simplefinConnections
++			app.simplefinConnections
+ 				.where({ organizationId })
+ 				.select(
+ 					'id',
+@@ -681,22 +670,21 @@
+ 		retain(
+ 			input,
+ 			'simplefinAccountLinks',
+-			tables.simplefinAccountLinks.where({ organizationId }).select('*', ...auditColumns)
++			app.simplefinAccountLinks.where({ organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'simplefinSyncAttempts',
+-			tables.simplefinSyncAttempts.where({ organizationId }).select('*', ...auditColumns)
++			app.simplefinSyncAttempts.where({ organizationId }).select('*', ...auditColumns)
+ 		),
+ 		retain(
+ 			input,
+ 			'simplefinSyncAccountResults',
+-			tables.simplefinSyncAccountResults.where({ organizationId }).select('*', ...auditColumns)
++			app.simplefinSyncAccountResults.where({ organizationId }).select('*', ...auditColumns)
+ 		)
+ 	]).then(() => {})
+ }
+ export function readFinanceRelations(input: JazzArchiveReaderInput) {
+-	const tables = data(input).tables
+ 	const current = data(input),
+ 		transactionIds = (current.rows.get('transactions') ?? []).map((row) => row.id),
+ 		profileIds = (current.rows.get('organizationMembers') ?? []).flatMap((row) =>
+@@ -707,7 +695,7 @@
+ 			? retain(
+ 					input,
+ 					'transactionAttachments',
+-					tables.transactionAttachments
++					app.transactionAttachments
+ 						.where({ transactionId: { in: transactionIds } })
+ 						.select('*', ...auditColumns)
+ 				)
+@@ -716,7 +704,7 @@
+ 			? retain(
+ 					input,
+ 					'profiles',
+-					tables.profiles
++					app.profiles
+ 						.where({ id: { in: profileIds } })
+ 						.select('id', 'userId', 'displayName', ...auditColumns)
+ 				)
+@@ -724,21 +712,18 @@
+ 	]).then(() => {})
+ }
+ export function readFinanceFiles(input: JazzArchiveReaderInput) {
+-	const tables = data(input).tables
+ 	const current = data(input),
+ 		ids = (current.rows.get('transactionAttachments') ?? []).map((row) =>
+ 			z.string().parse(row.fileId)
+ 		)
+ 	return Promise.all([
+ 		ids.length
+-			? retain(input, 'files', tables.files.where({ id: { in: ids } }).select('*', ...auditColumns))
++			? retain(input, 'files', app.files.where({ id: { in: ids } }).select('*', ...auditColumns))
+ 			: Promise.resolve(current.rows.set('files', [])),
+ 		current.sources.length
+ 			? input
+ 					.all(
+-						tables.files
+-							.where({ id: { in: current.sources.map((row) => row.sourceFileId) } })
+-							.limit(2)
++						app.files.where({ id: { in: current.sources.map((row) => row.sourceFileId) } }).limit(2)
+ 					)
+ 					.then((files) => {
+ 						const target = data(input)
+@@ -794,12 +779,11 @@
+ 	return sources.length ? [...files, ...sources] : files
+ }
+ export function readFinanceParts(input: JazzArchiveReaderInput) {
+-	const tables = data(input).tables
+ 	const ids = financeFiles(input).map((row) => row.id)
+ 	if (!ids.length) return Promise.resolve()
+ 	return input
+ 		.all(
+-			tables.fileParts
++			app.fileParts
+ 				.where({ fileId: { in: ids } })
+ 				.select('id', 'fileId', 'partIndex', 'sizeBytes')
+ 				.limit(input.limits.records + 1)
+@@ -882,13 +866,12 @@
+ 	return current.partIndex < (current.parts.get(file(input).id)?.length ?? 0)
+ }
+ export function readFinancePart(input: JazzArchiveReaderInput) {
+-	const tables = data(input).tables
+ 	const current = data(input),
+ 		metadata = current.parts.get(file(input).id)?.[current.partIndex]
+ 	if (!metadata) return invalid()
+ 	return input
+ 		.all(
+-			tables.fileParts
++			app.fileParts
+ 				.where({ id: metadata.id, fileId: metadata.fileId })
+ 				.select('id', 'data', 'sizeBytes', 'partIndex')
+ 				.limit(2)
+diff --git a/src/lib/backup/workspace.test.ts b/src/lib/backup/workspace.test.ts
+--- a/src/lib/backup/workspace.test.ts
++++ b/src/lib/backup/workspace.test.ts
+@@ -4,7 +4,7 @@
+ 	createJazzClient,
+ 	createJazz,
+ 	memory,
+-	acceptLocalFirstAuth,
++	acceptDeviceAccounts,
+ 	type JazzClient
+ } from 'jazz-tools/backend'
+ import { createServer } from 'node:http'
+@@ -19,8 +19,8 @@
+ import { prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
+ import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
+ import type { ArchivePayload } from 'delightful-local-first/backup/archive'
+-import { app } from '../schema.js'
+-import permissions from '../permissions.js'
++import { app } from '../queries.js'
++import permissions from '../jazz.permissions.json' with { type: 'json' }
+ import {
+ 	financeBackupReader,
+ 	createWorkspaceBackupMachine,
+@@ -45,7 +45,7 @@
+ 	identityId: string
+ const sessions: JazzSession<JazzClient>[] = []
+ beforeAll(async () => {
+-	authority = createJazz({ app, permissions, store: memory(), authenticate: acceptLocalFirstAuth })
++	authority = createJazz({ app, permissions, store: memory(), authenticate: acceptDeviceAccounts })
+ 	server = createServer((request, response) => authority.nodeHandler(request, response))
+ 	await authority.attach(server)
+ 	await authority.ready()
+@@ -57,14 +57,14 @@
+ 		permissions,
+ 		serverUrl: `http://127.0.0.1:${address.port}/jazz`,
+ 		driver: { type: 'memory' },
+-		initial: 'local-first'
++		initial: 'device'
+ 	})
+ 	sessions.push(session)
+ 	const owner = session.getSnapshot()
+-	if (!owner.client || !owner.account) throw new Error('Disposable backup client unavailable')
++	if (!owner.client || !owner.user) throw new Error('Disposable backup client unavailable')
+ 	db = owner.client.db
+ 	writer = authority.db
+-	identityId = owner.account.id
++	identityId = owner.user.accountId
+ 	db.onMutationError(() => {})
+ }, 30000)
+ afterEach(() => vi.restoreAllMocks())
+diff --git a/src/lib/backup/backup-upgrade.test.ts b/src/lib/backup/backup-upgrade.test.ts
+new file mode 100644
+--- /dev/null
++++ b/src/lib/backup/backup-upgrade.test.ts
+@@ -0,0 +1,54 @@
++import { readFile } from 'node:fs/promises'
++import { expect, it } from 'vitest'
++import { createActor, toPromise } from 'xstate'
++import { prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
++import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
++import { decodeFinanceBackup, validateFinanceBackup } from './workspace.js'
++import retained from '../../../retained-backup.json' with { type: 'json' }
++
++it('independently reopens an actual alpha.60 v1 archive with exact amounts, identities and attachment bytes', async () => {
++	const bytes = await readFile(new URL('../../../retained-backup.dlf', import.meta.url))
++	const request = prepareArchiveOpen(bytes)
++	try {
++		const result = await toPromise(
++			createActor(createArchiveEnvelopeMachine(), { input: { request } }).start()
++		)
++		if (result.outcome !== 'integrityChecked')
++			throw new Error('Historical archive failed independent reopening')
++		try {
++			const payload = result.archive.readPayload(),
++				decoded = decodeFinanceBackup(payload)
++			expect(retained.sdk).toBe('2.0.0-alpha.60')
++			expect(payload.profile).toEqual({ id: 'delightful.finance.workspace', version: 1 })
++			expect(validateFinanceBackup(payload)).toBe(true)
++			expect(decoded.organizations).toMatchObject([
++				{ id: retained.ids.organization, ownerId: retained.ids.owner, name: 'Historical household' }
++			])
++			expect(decoded.transactions).toMatchObject([
++				{
++					id: retained.ids.transaction,
++					accountId: retained.ids.account,
++					categoryId: retained.ids.category,
++					amountMinor: Number.MAX_SAFE_INTEGER,
++					bookedOn: '2026-11-17'
++				}
++			])
++			expect(
++				payload.records.find((row) => row.id === retained.ids.transaction)?.fields.amountMinor
++			).toEqual({ kind: 'integer', value: String(Number.MAX_SAFE_INTEGER) })
++			expect(
++				payload.records.find((row) => row.id === retained.ids.organization)?.fields
++			).not.toHaveProperty('restoreOperationId')
++			expect(payload.coverage.recordTypes).not.toContain('sourceDocuments')
++			expect(payload.attachments).toHaveLength(1)
++			expect(payload.attachments[0]?.id).toBe(retained.ids.file)
++			expect(Buffer.from(payload.attachments[0]?.data ?? '', 'base64')).toEqual(
++				Buffer.from([0, 1, 127, 255])
++			)
++		} finally {
++			result.archive.release()
++		}
++	} finally {
++		request.release()
++	}
++})

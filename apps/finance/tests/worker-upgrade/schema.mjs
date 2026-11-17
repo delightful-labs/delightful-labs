@@ -37,6 +37,10 @@ export async function checkSchema(directory, source, proof, versions, scope) {
 	}
 	cpSync(join(proof, `${prefix}schema-seed.mjs`), join(legacy, 'schema-seed.mjs'))
 	run(['exec', 'node', 'schema-seed.mjs', app], legacy)
+	if (!clipper) {
+		cpSync(join(proof, 'backup-seed.mjs'), join(legacy, 'backup-seed.mjs'))
+		run(['exec', 'node', 'backup-seed.mjs', app], legacy)
+	}
 	// The legacy compiler supplies comparison metadata only; it is never a live rollout.
 	run(['add', '--ignore-scripts', 'jazz-tools@2.0.0-alpha.65'], legacy)
 	run(['exec', 'jazz-tools', 'validate', '--schema-dir', schemaPath], legacy)

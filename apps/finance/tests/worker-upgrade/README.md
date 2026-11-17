@@ -29,25 +29,38 @@ text-column wrapper. Source-import changes occur only in copied consumers;
 active application source and dependency pins remain alpha.60.
 
 Strict authoring/query/transform/native-fixture types and `generate --check`
-pass. All **138 tests pass**: 128 existing permission/bank-log cases and ten
-native transform/retention cases. A real alpha.60 store keeps its app identity,
+pass. All **176 tests pass**: 128 existing permission/bank-log cases, ten native
+transform/retention cases, 37 existing backup cases and one retained-archive case.
+A real alpha.60 store keeps its app identity,
 maximum-safe minor-unit amount and normalized text after opening with alpha.66;
 an alpha.66 edit survives another close/reopen. The test also distinguishes a
 stored zero from an absent optional amount. Jazz's native null passthrough
 replaces alpha.60's accidental `Number(null)` read as zero; no compatibility
 transform is added. Sync counts retain the existing native signed-32-bit storage.
 
-The new native test lives in the patch and runs/types against the candidate SDK,
+The backup caller now uses only the current generated queries. Its previous-schema
+override and per-read table selection are removed. `backup-seed.mjs` runs the
+released v1 reader against the actual preceding schema and a real device account
+on alpha.60, retaining the resulting archive bytes. Alpha.66 independently opens
+and validates that file: workspace/account IDs, maximum-safe minor units and
+attachment bytes survive exactly. No old/new-schema Db adapter is introduced.
+Jazz rejects using current-schema queries on a Db already bound to the older
+schema; the old archive must be generated with its own native query bindings.
+
+The new native tests live in the patch and run/type against the candidate SDK,
 so alpha.66 imports do not enter active alpha.60 test discovery. Svelte's normal
 compiler handles the existing shared data module. The runner adds no runtime
 framework, production migration, dependency pin, catalog generation or SDK patch.
 Artifacts include the source copies, locks, generated history/JSON/bindings,
-retained records/store and `schema-identity.json` in the printed directory.
+retained records/store, `retained-backup.dlf`, its fixture IDs and
+`schema-identity.json` in the printed directory.
 
 This does not qualify Clipper, all Finance callers/backup/restore experiments,
 worker durability, backend auth, the full existing SDK patch or Vercel data
-destinations. In particular, the historical `previousApp` restore experiment and
-backup table typing still need their native caller port. U3 remains open for the
+destinations. In particular, the full historical restore experiment and its
+browser/session harness still need their native caller port. Opening a retained
+archive does not prove restore staging, publication, cancellation or drains on
+alpha.66. U3 remains open for the
 rest of those boundaries; U4/U5 remain required before any live switch.
 
 ## Alpha.66 Clipper schema, reading and retained data
