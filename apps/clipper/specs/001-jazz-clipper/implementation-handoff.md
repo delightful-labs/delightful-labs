@@ -1,5 +1,40 @@
 # Article notes — implementation started
 
+## Approved PDS record reader — 2026-11-17
+
+`publication/pds-record.ts` implements the reviewed `getRecord` response schema
+and inferred `PdsRecord`. Its pure `parsePdsRecord` reader checks that the returned
+URI exactly matches the retained address and preserves the complete JSON value,
+including unfamiliar fields at every level. It does not run remote records through
+Clipper's narrow Margin serializer. Unknown motivations/foreign metadata remain
+available to a future reconciliation policy rather than being stripped.
+
+Supplied CIDs use the existing AT library's syntax check; absent CIDs remain absent.
+Neither case verifies a content digest, proves freshness or selects a write.
+Malformed/error bodies are refused with a sanitized error, never interpreted as
+record absence. The reader also compares the parsed value with the input using
+Node's supported deep equality helper: Zod intentionally drops `__proto__` keys,
+so a lossy parse is refused instead of exposing metadata that a later write could
+silently erase. No custom JSON validator or vendor patch is introduced.
+
+The user approved making `@atcute/lexicons@2.1.1` a direct web-app dependency after
+clarifying that it already comes from the existing auth plugin/OAuth SDK. Its
+exact version is reused. Only that importer declaration changes in the lockfile;
+package versions and dependency snapshots remain unchanged. A frozen offline
+installation and workspace link check pass. The dependency's presence does not
+introduce another OAuth client or alter credential/session ownership.
+
+Eleven focused PDS-reader/first-write tests pass, covering full unknown-field
+preservation, lossy-parse refusal, optional/invalid CIDs, exact destination binding,
+unsupported content and malformed/non-JSON values. Actual HTTP reads, absence/error
+classification, content comparison, PDS writes/reconciliation and the publisher's
+XState lifetime remain separate work. No new stored data or UI wording is added.
+After linking the dependency, all 79 publication/auth regressions pass, including
+the real OAuth client/native Jazz cases. Strict root/web/service-worker/extension
+types, Clipper lint/formatting, vendor integrity, workspace links, whitespace and
+the production web/server/service-worker build pass. Provider HTTP in the native
+regressions remains synthetic; no new browser or live PDS evidence is claimed.
+
 ## Approved first-write request preparation — 2026-11-17
 
 Following the user's approval of the concrete Zod body, backend

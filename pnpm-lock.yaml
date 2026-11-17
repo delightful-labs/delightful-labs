@@ -107,6 +107,9 @@ importers:
 
   apps/clipper/apps/web:
     dependencies:
+      '@atcute/lexicons':
+        specifier: 2.1.1
+        version: 2.1.1
       '@faker-js/faker':
         specifier: 10.6.0
         version: 10.6.0

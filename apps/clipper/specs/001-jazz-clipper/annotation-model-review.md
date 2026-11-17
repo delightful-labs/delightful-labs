@@ -353,6 +353,34 @@ authorizes dispatch, confirms a PDS outcome or permits replay after uncertainty.
 The future publisher must supply those observations. No Jazz model, TID generator,
 dependency, product wording or live PDS write is added by this contract.
 
+### Approved PDS record observation — 2026-11-17
+
+After reviewing this response shape and the dependency's origin, the user approved
+using the already-resolved `@atcute/lexicons@2.1.1` as a direct Clipper dependency:
+
+```ts
+import { isCid } from '@atcute/lexicons/syntax'
+
+const pdsRecordSchema = z.object({
+  uri: atRecordUriSchema,
+  cid: z.string().refine(isCid).optional(),
+  value: z.record(z.string(), z.json())
+})
+```
+
+This reads the complete remote JSON record instead of applying the narrow owned
+Margin serializer. CID remains optional as permitted by `getRecord`; a record
+without a CID is still an existing record, not absence. `isCid` checks syntax,
+not whether that CID matches the supplied content. Future conditional updates
+must establish their own required version evidence.
+
+The reader requires the exact retained URI and refuses any parse that changes
+the remote value. In particular, Zod strips `__proto__` keys; such observations
+are refused rather than exposed with missing metadata. Ordinary unknown nested
+fields, foreign content and metadata are retained. No Jazz fields, lifecycle
+variants, live PDS read/write or public Lexicon are introduced. The lockfile only
+adds the existing version to Clipper's importer; no package versions change.
+
 ### Earlier model review findings
 
 The authenticated request endpoint now reuses the approved `publicationBaseSchema`
