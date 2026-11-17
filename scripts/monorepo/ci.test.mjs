@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { changedPaths, planForEvent, projects, selectChecks, validPrTitle } from './ci.mjs'
 import { verificationOnlyPath } from './deployment-paths.mjs'
 
@@ -242,8 +242,9 @@ test('Vercel skips unrelated apps using complete deployed-to-current Git changes
 		['packages/local-first/tsconfig.library.json', [0, 1, 1, 0]],
 		['packages/ui/.storybook/main.js', [0, 0, 0, 1]],
 		['packages/ui/src/stories/Button.stories.svelte', [0, 0, 0, 1]],
-		['scripts/monorepo/vercel-ignore.mjs', [1, 1, 1, 1]],
-		['scripts/monorepo/deployment-paths.mjs', [1, 1, 1, 1]],
+		['scripts/monorepo/ci.mjs', [0, 0, 0, 0]],
+		['scripts/monorepo/vercel-ignore.mjs', [0, 0, 0, 0]],
+		['scripts/monorepo/deployment-paths.mjs', [0, 0, 0, 0]],
 	]) {
 		git('checkout', '--detach', base)
 		put(path)
@@ -300,4 +301,144 @@ test('deployment-only exclusions keep CI active and reject ambiguous paths', () 
 	for (const path of ['', '/apps/finance/tests/app.ts', 'apps/finance/../tests/a.ts', 'apps/finance/./tests/a.ts', 'apps/finance/tests/a\\b.ts', 'unknown/tests/app.ts', 'apps/finance/src/lib/custom.config.ts', 'apps/finance/src/lib/tests-helper.ts', 'apps/finance/tsconfig.json']) {
 		assert.equal(verificationOnlyPath(path, 'finance'), false, path)
 	}
+	for (const path of ['scripts/monorepo/ci.mjs', 'scripts/monorepo/vercel-ignore.mjs', 'scripts/monorepo/deployment-paths.mjs']) {
+		assert.equal(verificationOnlyPath(path, 'website'), true)
+		assert.deepEqual(Object.values(selectChecks([path])), projects.map(() => true), 'deployment controls retain all CI verification')
+	}
+	assert.equal(verificationOnlyPath('scripts/new-build.mjs', 'website'), false)
+	assert.equal(verificationOnlyPath('apps/website/src/vercel-ignore.mjs', 'website'), false)
+})
+
+function previewFixture(t) {
+	const directory = mkdtempSync(resolve(tmpdir(), 'delightful-first-preview-'))
+	t.after(() => rmSync(directory, { recursive: true, force: true }))
+	const seed = resolve(directory, 'seed'), origin = resolve(directory, 'origin.git')
+	mkdirSync(seed)
+	const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=CI Test', '-c', 'user.email=ci@example.invalid', '-c', 'commit.gpgSign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
+		cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+	}).trim()
+	const put = (path, contents = 'fixture') => { mkdirSync(dirname(resolve(seed, path)), { recursive: true }); writeFileSync(resolve(seed, path), contents) }
+	const commit = () => { git(seed, 'add', '-A'); git(seed, 'commit', '-m', 'fixture'); return git(seed, 'rev-parse', 'HEAD') }
+	const roots = ['apps/website', 'apps/finance', 'apps/clipper/apps/web', 'packages/ui']
+	git(seed, 'init', '--quiet', '--initial-branch=main')
+	for (const app of roots) {
+		put(`${app}/base.txt`)
+		put(`${app}/package.json`, '{}')
+	}
+	const base = commit()
+	git(directory, 'init', '--bare', '--quiet', '--initial-branch=main', origin)
+	git(seed, 'remote', 'add', 'origin', origin)
+	git(seed, 'push', '--quiet', 'origin', 'main')
+	const branch = (name) => git(seed, 'checkout', '-B', name, base)
+	const clone = (name) => {
+		git(seed, 'push', '--quiet', 'origin', name)
+		const cwd = resolve(directory, name)
+		git(directory, 'clone', '--quiet', '--depth=1', '--branch', name, pathToFileURL(origin).href, cwd)
+		assert.equal(git(cwd, 'rev-parse', '--is-shallow-repository'), 'true')
+		assert.throws(() => git(cwd, 'rev-parse', '--verify', 'refs/remotes/origin/main'), 'a fresh Vercel-like branch has no local main ref')
+		return cwd
+	}
+	const ignore = (cwd, app, metadata = {}) => spawnSync(process.execPath, [resolve(root, 'scripts/monorepo/vercel-ignore.mjs')], {
+		cwd: resolve(cwd, app), encoding: 'utf8', env: {
+			...process.env, VERCEL_ENV: 'preview', VERCEL_GIT_PREVIOUS_SHA: '',
+			VERCEL_GIT_PROVIDER: '', VERCEL_GIT_REPO_OWNER: '', VERCEL_GIT_REPO_SLUG: '',
+			VERCEL_GIT_COMMIT_REF: 'feature', VERCEL_GIT_COMMIT_SHA: git(cwd, 'rev-parse', 'HEAD'), ...metadata,
+		},
+	})
+	const statuses = (cwd, metadata) => roots.map((app) => ignore(cwd, app, metadata).status)
+	return { directory, seed, origin, base, roots, git, put, commit, branch, clone, ignore, statuses }
+}
+
+test('first shallow preview branches select affected apps without a previous deployment, including the PR 45 paths', (t) => {
+	const f = previewFixture(t)
+	for (const [name, paths, expected] of [
+		['website', ['apps/website/vercel.json', 'apps/website/README.md'], [1, 0, 0, 0]],
+		['finance', ['apps/finance/src/app.ts'], [0, 1, 0, 0]],
+		['clipper', ['apps/clipper/apps/web/src/app.ts'], [0, 0, 1, 0]],
+		['extension', ['apps/clipper/apps/extension/src/app.ts'], [0, 0, 1, 0]],
+		['local-first', ['packages/local-first/src/index.ts'], [0, 1, 1, 0]],
+		['ui', ['packages/ui/src/Button.svelte'], [1, 1, 1, 1]],
+		['root', ['pnpm-lock.yaml'], [1, 1, 1, 1]],
+		['deployment-controls', ['scripts/monorepo/ci.mjs', 'scripts/monorepo/vercel-ignore.mjs', 'scripts/monorepo/deployment-paths.mjs'], [0, 0, 0, 0]],
+		['docs', ['README.md'], [0, 0, 0, 0]],
+		['verification', ['apps/finance/src/setup.test.ts', 'apps/finance/.prettierrc.json', 'apps/clipper/playwright.config.ts'], [0, 0, 0, 0]],
+	]) {
+		f.branch(name)
+		for (const path of paths) f.put(path)
+		f.commit()
+		// A later Markdown commit must not conceal the earlier branch changes.
+		f.put('branch-notes.md', name)
+		f.commit()
+		const cwd = f.clone(name)
+		assert.deepEqual(f.statuses(cwd), expected, name)
+		assert.match(f.ignore(cwd, f.roots[0]).stdout, new RegExp(`Using first-preview merge base ${f.base}`, 'u'))
+	}
+})
+
+test('first preview comparison fetches authoritative main, covers renames/deletions and excludes main-only changes', (t) => {
+	const f = previewFixture(t)
+	f.branch('renamed')
+	renameSync(resolve(f.seed, 'apps/website/base.txt'), resolve(f.seed, 'apps/finance/moved.txt'))
+	f.commit()
+	const renamed = f.clone('renamed')
+	assert.deepEqual(f.statuses(renamed), [1, 1, 0, 0])
+	f.branch('deleted')
+	rmSync(resolve(f.seed, 'apps/finance/base.txt'))
+	f.commit()
+	assert.deepEqual(f.statuses(f.clone('deleted')), [0, 1, 0, 0])
+	f.branch('website')
+	f.put('apps/website/src/app.ts')
+	const head = f.commit()
+	const cwd = f.clone('website')
+	f.git(cwd, 'update-ref', 'refs/remotes/origin/main', head)
+	assert.deepEqual(f.statuses(cwd), [1, 0, 0, 0], 'a stale local main cannot hide the branch change')
+	f.git(f.seed, 'checkout', 'main')
+	f.put('apps/finance/src/new-on-main.ts')
+	const main = f.commit()
+	f.git(f.seed, 'push', '--quiet', 'origin', 'main')
+	assert.deepEqual(f.statuses(cwd), [1, 0, 0, 0], 'newer Finance code only on main is not a website branch change')
+	assert.match(f.ignore(cwd, 'apps/finance').stdout, new RegExp(`merge base ${f.base} \\(main ${main}\\)`, 'u'))
+})
+
+test('first preview fallback never overrides deployed history, production, explicit rebuilds or failed comparisons', (t) => {
+	const f = previewFixture(t)
+	f.branch('finance')
+	f.put('apps/finance/src/app.ts')
+	const runtime = f.commit()
+	f.put('notes.md')
+	const head = f.commit()
+	assert.deepEqual(f.statuses(f.seed, { VERCEL_GIT_PREVIOUS_SHA: f.base }), [0, 1, 0, 0], 'all undeployed commits remain in the comparison')
+	assert.deepEqual(f.statuses(f.seed, { VERCEL_GIT_PREVIOUS_SHA: runtime }), [0, 0, 0, 0], 'already deployed runtime followed by docs skips')
+	assert.deepEqual(f.statuses(f.seed, { VERCEL_GIT_PREVIOUS_SHA: head }), [1, 1, 1, 1], 'an explicit rebuild remains a build')
+	for (const metadata of [
+		{ VERCEL_ENV: 'production' }, { VERCEL_ENV: '' }, { VERCEL_GIT_COMMIT_REF: 'main' },
+		{ VERCEL_GIT_COMMIT_REF: '' }, { VERCEL_GIT_COMMIT_SHA: f.base },
+		...['0'.repeat(40), 'a'.repeat(40), '--help'].map((sha) => ({ VERCEL_GIT_PREVIOUS_SHA: sha })),
+	]) assert.deepEqual(f.statuses(f.seed, metadata), [1, 1, 1, 1], JSON.stringify(metadata))
+	const cwd = f.clone('finance')
+	f.git(cwd, 'remote', 'set-url', 'origin', resolve(f.directory, 'unavailable.git'))
+	assert.deepEqual(f.statuses(cwd), [1, 1, 1, 1], 'failed main fetch builds rather than guessing')
+})
+
+test('Vercel reconstructed checkouts without origin use validated GitHub metadata', (t) => {
+	const f = previewFixture(t)
+	f.branch('reconstructed')
+	f.put('apps/website/vercel.json')
+	f.commit()
+	f.put('README.md')
+	f.commit()
+	const cwd = f.clone('reconstructed')
+	f.git(cwd, 'remote', 'remove', 'origin')
+	f.git(cwd, 'branch', '-m', 'master')
+	assert.equal(f.git(cwd, 'remote'), '')
+	assert.deepEqual(f.git(cwd, 'for-each-ref', '--format=%(refname)').split('\n'), ['refs/heads/master'])
+	// Keep this native Git test offline while exercising the constructed URL.
+	f.git(cwd, 'config', `url.${pathToFileURL(f.origin).href}.insteadOf`, 'https://github.com/delightful-labs/delightful-labs.git')
+	const metadata = { VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'delightful-labs', VERCEL_GIT_REPO_SLUG: 'delightful-labs' }
+	assert.deepEqual(f.statuses(cwd, metadata), [1, 0, 0, 0])
+	for (const changed of [
+		{ VERCEL_GIT_PROVIDER: 'gitlab' }, { VERCEL_GIT_REPO_OWNER: '' },
+		{ VERCEL_GIT_REPO_OWNER: 'invalid/owner' }, { VERCEL_GIT_REPO_SLUG: '../repo' },
+		{ VERCEL_GIT_REPO_SLUG: '' }, { VERCEL_GIT_REPO_SLUG: 'repo?token=anything' },
+	]) assert.deepEqual(f.statuses(cwd, { ...metadata, ...changed }), [1, 1, 1, 1], 'unavailable or malformed repository metadata builds')
 })
