@@ -1,12 +1,11 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { createActor, toPromise } from 'xstate'
-import type { Db } from 'jazz-tools'
 import { createJazz, sqlite } from 'jazz-tools/backend'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createPolicyTestApp } from 'jazz-tools/testing'
-import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
+import type { PolicyTestApp } from 'jazz-tools/testing'
 import { app } from '../../backend/jazz/schema.js'
 import permissions from '../../backend/jazz/permissions.js'
 import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
@@ -17,6 +16,7 @@ import {
 	publicationLinkValues
 } from '../../annotations/publication-link.js'
 import type { PublicationLink } from '../../annotations/publication-link.js'
+import { createPublicationOwner } from './owner.test-support.js'
 
 let fixture: PolicyTestApp
 const publishingDid = 'did:plc:ewvi7nxzyoun6zhxrhs64oiz'
@@ -25,64 +25,17 @@ beforeAll(async () => {
 })
 afterAll(async () => fixture?.shutdown())
 
-async function owner(name: string) {
-	const session = { user_id: name, authMode: 'local-first', claims: {} } satisfies PolicyTestSession
-	const libraryId = fixture.accountFor(session)
-	const db = fixture.as(session)
-	const backend = await fixture.seed<Db>((server) => {
-		const write = server.upsert(app.libraries, libraryId, {
-			ownerId: libraryId,
-			bootstrapVersion: '1'
-		})
-		return {
-			value: server,
-			wait: async (options) => {
-				await write.wait(options)
-				return server
-			}
-		}
-	})
-	const documentId = crypto.randomUUID(),
-		highlightId = crypto.randomUUID(),
-		noteId = crypto.randomUUID()
-	await backend
-		.insert(
-			app.libraryDocuments,
-			newDocumentValues(documentId, libraryId, 'https://example.org/article'),
-			{ id: documentId }
-		)
-		.wait({ tier: 'global' })
-	await backend
-		.insert(
-			app.highlights,
-			{ libraryId, documentId, source: 'https://example.org/article' },
-			{ id: highlightId }
-		)
-		.wait({ tier: 'global' })
-	await backend
-		.insert(
-			app.notes,
-			{
-				libraryId,
-				documentId,
-				highlightId: null,
-				source: 'https://example.org/article',
-				text: 'Document note'
-			},
-			{ id: noteId }
-		)
-		.wait({ tier: 'global' })
-	const scope = { libraryId, accountId: libraryId, publishingDid, isCurrent: () => true }
-	return {
-		db,
-		backend,
-		libraryId,
-		documentId,
-		highlightId,
-		noteId,
-		scope,
-		store: createPublicationLinkStore(backend, scope)
-	}
+function owner(name: string) {
+	return createPublicationOwner({
+		fixture,
+		name,
+		publishingDid,
+		noteText: 'Document note',
+		withHighlight: true
+	}).then((owner) => ({
+		...owner,
+		store: createPublicationLinkStore(owner.backend, owner.scope)
+	}))
 }
 
 async function stage(
