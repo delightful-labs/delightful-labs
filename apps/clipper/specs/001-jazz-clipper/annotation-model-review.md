@@ -381,6 +381,32 @@ fields, foreign content and metadata are retained. No Jazz fields, lifecycle
 variants, live PDS read/write or public Lexicon are introduced. The lockfile only
 adds the existing version to Clipper's importer; no package versions change.
 
+### Approved explicit PDS read result — 2026-11-17
+
+The user rejected a nullable result and approved this explicit alternative:
+
+```ts
+const pdsReadResultSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('found'),
+    record: pdsRecordSchema
+  }),
+  z.strictObject({
+    status: z.literal('notFound'),
+    uri: atRecordUriSchema
+  })
+])
+```
+
+This is a transient read observation, with no Jazz fields. found preserves the
+full reviewed record response; notFound identifies the retained address that the
+PDS reported as unavailable. The reference PDS also reports RecordNotFound for
+takedowns, so this does not establish deletion/absence or authorize recreation.
+Network, malformed-response, authentication, timeout, cancellation and scope-loss
+failures stay on XState error paths. Only a named JSON RecordNotFound response on
+400/404 produces notFound. The SDK session remains owned by the existing auth host;
+the finite child owns request/body lifetime and emits one terminal observation.
+
 ### Earlier model review findings
 
 The authenticated request endpoint now reuses the approved `publicationBaseSchema`

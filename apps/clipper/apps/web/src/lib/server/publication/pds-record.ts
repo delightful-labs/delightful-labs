@@ -13,6 +13,12 @@ export const pdsRecordSchema = z.object({
 })
 export type PdsRecord = z.infer<typeof pdsRecordSchema>
 
+export const pdsReadResultSchema = z.discriminatedUnion('status', [
+	z.strictObject({ status: z.literal('found'), record: pdsRecordSchema }),
+	z.strictObject({ status: z.literal('notFound'), uri: atRecordUriSchema })
+])
+export type PdsReadResult = z.infer<typeof pdsReadResultSchema>
+
 /** A successful response must identify the exact address the owner inspected.
  * This pure reader does not classify HTTP errors/absence, compare owned content,
  * prove PDS freshness or authorize sending/retrying a write. */

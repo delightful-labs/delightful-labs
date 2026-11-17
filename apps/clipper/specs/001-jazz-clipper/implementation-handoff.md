@@ -1,5 +1,54 @@
 # Article notes — implementation started
 
+## PDS read ownership — 2026-11-17
+
+The user rejected nullable read outcomes and approved the explicit transient
+`found { record } | notFound { uri }` result. A finite backend XState child now
+binds one retained URI to an already-restored SDK session and a current-scope
+predicate. Admission validates the URI and exact session DID before network I/O.
+One invoked GET adapter owns acquisition, bounded native body reading and release,
+so a Response is never transferred between actor lifetimes. Its observed HTTP
+facts are consumed by the chart: exact-URI parsed 200 becomes found; a JSON
+RecordNotFound on 400/404 becomes notFound; other observations fail. No additional
+attempt/revision/storage model is introduced.
+
+The parent owns invocation and replacement of this child. The child owns its
+30-second deadline and CANCEL event, aborts the read on timeout/cancellation/stop,
+releases any acquired or late body and suppresses late results. The SDK/auth host
+continues to own the session and any SDK-managed token refresh; no sign-out or
+application retry loop is added. Caller scope is checked at admission and result
+consumption. The child cannot authorize a write or interpret notFound as proof
+of deletion/absence: the reference PDS also uses that response for takedowns.
+Reconciliation and explicit recreation remain later publisher decisions.
+
+Implementation is `publication/pds-read.ts`, with the reviewed result schema in
+`pds-record.ts`. Native GET options disable caching and redirects; response content
+must be JSON with valid UTF-8, bounded to 1 MiB without truncation. The adapter
+observes elapsed wall time as well as the chart-owned timeout, refusing late
+completion even if timer delivery was delayed. HTTP 200 must pass the complete
+exact-URI reader; generic 404, authentication/server errors, unsupported bodies,
+scope loss and malformed data cannot become notFound. Failures are sanitized;
+timeout/cancellation use native TimeoutError/AbortError paths rather than another
+result variant. No production HTTP endpoint or publication loop invokes this child
+yet; it is ready for the future verified publisher host.
+
+All 94 publication/auth tests pass. Controlled native Response/ReadableStream cases
+exercise acquisition, cancellation, external stop, stalled/oversized/unsupported
+bodies, delayed timers and late SDK response release. Two native Jazz/auth cases
+restore the actual plugin OAuth session and verify bound DPoP-authenticated GETs
+return both approved alternatives through synthetic PDS responses, without changing
+publication intent. An independent @xstate/test contract campaign uses seed 61117,
+100 runs and at most 20 commands per run, requiring full model state/event/transition
+coverage and retaining the standard failure-artifact location. This bounded
+campaign is not proof of all platform schedules. No live PDS read/write is made.
+Thirteen final read/campaign regressions pass after tightening address-whitespace
+admission. Strict root/web/service-worker/extension types, Clipper lint/formatting,
+whitespace and the production web/server/service-worker build pass. Installed v6
+serialization diagnostics were inspected: code expressions, runtime schemas and
+the SDK-bound read/guard implementations require their original runtime sources.
+This ephemeral child is not persisted/revived from JSON; no serialized actor or
+live-session portability claim is made.
+
 ## Approved PDS record reader — 2026-11-17
 
 `publication/pds-record.ts` implements the reviewed `getRecord` response schema

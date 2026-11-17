@@ -19,6 +19,8 @@ import { createPublicationPermission, handlePublicationPermission } from './perm
 import { handlePublicationSubmit } from './submit.js'
 import { origin, requestFixture } from './request.test-support.js'
 import type { PublicationAuth } from './access.js'
+import { pdsRead } from './pds-read.js'
+import type { PdsReadSession } from './pds-read.js'
 
 const pluginRequire = createRequire(import.meta.resolve('@kingironman2011/better-auth-bsky'))
 const oauthPath = pathToFileURL(pluginRequire.resolve('@atcute/oauth-node-client')).href
@@ -80,11 +82,17 @@ const backend = (a: Fixture) => ({
 })
 
 // The fixture uses the installed OAuth client and native plugin session store.
-// Only provider discovery/refresh HTTP responses are synthetic; no PDS XRPC path
-// is handled, so any attempted repository read/write fails the test.
-function network(did: string, refreshScope = identity, revoked = false) {
+// Only provider discovery/refresh and explicitly supplied read HTTP responses
+// are synthetic. No repository mutation path is handled.
+function network(
+	did: string,
+	refreshScope = identity,
+	revoked = false,
+	read?: (request: Request) => Response
+) {
 	const fetcher = vi.fn<typeof fetch>(async (input, init) => {
 		const req = new Request(input, init)
+		if (read && req.url.startsWith(pds + '/xrpc/com.atproto.repo.getRecord?')) return read(req)
 		if (req.url === issuer + '/.well-known/oauth-authorization-server')
 			return Response.json({
 				issuer,
@@ -447,3 +455,71 @@ it('fails closed when the configured auth host lacks the server-only plugin capa
 			.status
 	).toBe(503)
 })
+
+function hasReadSession(value: unknown): value is { session: PdsReadSession } {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'session' in value &&
+		typeof value.session === 'object' &&
+		value.session !== null &&
+		'did' in value.session &&
+		typeof value.session.did === 'string' &&
+		'handle' in value.session &&
+		typeof value.session.handle === 'function'
+	)
+}
+
+for (const found of [true, false])
+	it(`reads an explicit ${found ? 'found' : 'notFound'} outcome through the real restored plugin session`, async () => {
+		const did = 'did:plc:ewvi7nxzyoun6zhxrhs64oiz'
+		const uri = `at://${did}/at.margin.note/3jzfcijpj2z2a`
+		const record = {
+			uri,
+			value: {
+				$type: 'at.margin.note',
+				motivation: 'commenting',
+				foreign: { retained: [true, null] }
+			}
+		}
+		const read = vi.fn((request: Request) => {
+			expect(request.method).toBe('GET')
+			expect(request.headers.has('DPoP')).toBe(true)
+			expect(request.headers.has('authorization')).toBe(true)
+			expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual({
+				repo: did,
+				collection: 'at.margin.note',
+				rkey: '3jzfcijpj2z2a'
+			})
+			return found
+				? Response.json(record)
+				: Response.json({ error: 'RecordNotFound' }, { status: 400 })
+		})
+		network(did, identity, false, read)
+		const a = await setup('pds-native-' + found)
+		await seedProvider(a, identity)
+		const api: unknown = a.auth.api
+		if (
+			typeof api !== 'object' ||
+			api === null ||
+			!('getAtprotoClient' in api) ||
+			typeof api.getAtprotoClient !== 'function'
+		)
+			throw new Error('Expected server-only SDK capability')
+		const restored: unknown = await api.getAtprotoClient({ body: { did } })
+		if (!hasReadSession(restored)) throw new Error('Expected native SDK session')
+		const actor = createActor(pdsRead, {
+			input: { uri, session: restored.session, isCurrent: () => true }
+		})
+		try {
+			const result = toPromise(actor)
+			actor.start()
+			expect(await result).toEqual(
+				found ? { status: 'found', record } : { status: 'notFound', uri }
+			)
+			expect(read).toHaveBeenCalledTimes(1)
+			expect(await a.owner.backend.all(app.publications)).toHaveLength(0)
+		} finally {
+			actor.stop()
+		}
+	})
