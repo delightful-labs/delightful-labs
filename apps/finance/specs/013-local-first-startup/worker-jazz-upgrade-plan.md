@@ -186,6 +186,19 @@ do not accumulate a second implementation alongside the selected native path.
       [bounded backend evidence](worker-jazz-alpha66-research.md#native-gateway-admission-foundation).
       Better Auth/provider/session-expiry, retained destinations and full-patch
       gates remain open; U4 is not complete.
+      **Better Auth/actual expiry now also passes:** the same proof's `--auth`
+      mode runs all 29 existing Clipper auth cases plus one real backend-entry
+      integration, with strict types and the eight gateway cases on Better Auth
+      1.7.22. Admission uses actual Unix-second expiry and existing read-only
+      session options; the native Jazz refresh hook owns renewal and forwards
+      native cookies. Negative controls establish expiry/read-only requirements
+      and the continued need for the unchanged one-line provider patch. No new
+      session framework or dependency patch behavior is added. The source copy
+      adopts native Vercel namespace configuration only to compile the real entry;
+      no live destination/override is changed or qualified. See the
+      [actual backend evidence](worker-jazz-alpha66-research.md#better-auth-and-real-backend-expiry).
+      Keep U4/U5 open for retained destinations, broader caller/backend coverage
+      and the coherent full-patch/dependency switch.
 - [ ] **U5 — Switch and qualify the workspace coherently.** Update SDK, matching
       Wasm/native core, library peer and existing patch bindings as one reviewed
       change; preserve one compatible SDK identity per consumer. Run library

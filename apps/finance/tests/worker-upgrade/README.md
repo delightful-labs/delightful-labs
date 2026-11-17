@@ -175,6 +175,43 @@ the exact reused backend patch/hash and `backend-qualification.json`. The source
 SDK tarball and preceding unpatched schema proof remain intact. See the
 [backend scope and remaining gates](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#native-gateway-admission-foundation).
 
+## Alpha.66 Better Auth and actual backend session expiry
+
+Add `--auth` to the same backend command:
+
+```sh
+node tests/worker-upgrade/backend.mjs /path/to/finance-jazz-alpha66-artifacts --auth
+```
+
+This reuses the generated schema, gateway pipeline and all 29 existing Clipper
+auth tests. Only the disposable dependency graph adopts Better Auth **1.7.22**,
+the SDK's required peer baseline, with Clipper's existing ATProto peer versions.
+`clipper-auth.patch` ports the actual server entry and adds one native integration
+case. Strict types, **30 auth cases and eight gateway cases pass** on that graph.
+
+Admission supplies the real session expiry in Unix seconds and uses Better Auth's
+read-only session options already used by Clipper's publication endpoint. Jazz's
+native `refresh` hook renews due sessions and forwards Better Auth's returned
+cookies. Native Better Auth 1.7.22 keeps the session token during this renewal;
+`next(request)` therefore sees the same valid cookie and updated database expiry.
+No application session wrapper, renewal actor or custom cookie parser is added.
+The new case imports the real server, uses its lazy auth/Db integration, verifies
+that ordinary admission does not renew, checks renewal and cookies through Jazz's
+backend-user route, and proves revoked access is refused.
+
+Three negative controls retain their logs: the published unpatched provider fails
+its real callback on the removed `findAccountByProviderId`; omitted expiry fails
+native admission; allowing refresh during admission changes the stored expiry and
+fails the read-only assertion. The existing one-line provider patch applies
+unchanged to a copied package. This adds no dependency patch behavior.
+
+The source overlay also replaces removed Vercel `name` configuration with the
+native production/per-branch namespace API so the real server type-checks. Tests
+open only disposable memory/SQLite stores. **Live destination access and core-name
+override retirement are not qualified or changed.** Active app pins remain
+alpha.60; full consumer/patch adoption and retained Vercel data are still gates.
+See the [auth evidence and reuse findings](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#better-auth-and-real-backend-expiry).
+
 ## Alpha.66 persistent worker and session boundary
 
 From a clean checkout with current built public Local First/DUI packages and

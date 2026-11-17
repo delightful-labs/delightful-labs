@@ -517,6 +517,70 @@ full SDK patch/consumer graph. U4/U5 remain open. Next qualify the existing Bett
 Auth lifecycle/provider cases with the required peer and pass the actual session
 expiry through Clipper's thin backend callback.
 
+## Better Auth and real backend expiry
+
+U4's next bounded slice now passes on Better Auth **1.7.22**, alpha.66's peer
+baseline. `backend.mjs <clipper-schema-artifact-directory> --auth` extends the
+existing proof instead of creating another auth harness. It reuses the 29 actual
+Clipper auth tests unchanged after schema import rewriting: provider callback,
+persisted session renewal/expiry/revocation, provider token refresh and revoked
+refresh, handler, completion and request-machine behavior. One new native case
+imports the real `server/jazz.ts` and its lazy configured auth/Db integration.
+**All 30 auth cases, eight gateway cases and strict selected types pass.**
+
+The thin backend candidate uses supported APIs in that one existing server entry:
+
+- `authenticate` returns `acceptDeviceAccounts(request)` or the authenticated
+  user ID and real Better Auth session expiry, floored to Unix seconds.
+- It reads fresh sessions with `disableCookieCache: true, disableRefresh: true`,
+  reusing Clipper's existing publication authorization pattern. Removing the
+  latter option actually extends a due session during admission and fails the
+  new case. Omitting expiry raises native `AuthenticateExpiresAtError`.
+- Jazz's native `refresh(request, next)` hook performs the normal Better Auth
+  session read with refresh enabled, then forwards returned `Set-Cookie` headers.
+  The native SDK owns refresh scheduling/serialization; no application renewal
+  workflow, SDK facade or cookie parser is added. Direct `accountFor` admission
+  remains read-only. The native integration case verifies unchanged expiry on
+  admission, renewed expiry and cookies through the backend-user route, canonical
+  account identity, and refusal after native session revocation.
+
+This follows the published alpha.66
+[backend contract](https://github.com/garden-co/jazz/blob/v2.0.0-alpha.66/packages/jazz-tools/src/backend/create-jazz.ts).
+The installed Better Auth 1.7.22 `api/routes/session.mjs` refreshes expiry and
+updated-at without changing the session token. Passing `next(request)` is valid
+for that implementation; do not invent rotated-cookie parsing. Read-only checks
+disable renewal, not Better Auth's native cleanup of already expired rows.
+The existing persisted lifecycle tests separately cover expiry/revocation after
+backend restart. This bounded HTTP/native proof does not establish full browser
+reauthentication, production OAuth or the complete app/extension caller port.
+
+The unpatched published ATProto provider 0.3.2 still fails its real callback with
+`findAccountByProviderId is not a function` under Better Auth 1.7.22. Reapplying
+Clipper's existing one-line `findAccountByKey` patch restores that test. Its
+behavior is unchanged; no additional SDK/provider patch is introduced. Existing
+ATProto peer versions are mirrored in the isolated graph, not upgraded alongside
+auth. The active root lockfile, installed workspace packages and app pins remain
+unchanged. Better Auth 1.7.25 is available; this result qualifies 1.7.22 exactly,
+not every release allowed by the SDK's peer range.
+
+The copied server must also use the native Vercel `namespace` option because
+alpha.66 refuses old `name` configuration. Its production/per-branch candidate
+does not open a Vercel store. Read-only project environment metadata on November
+17 lists a core-name override only for preview branch `test/atproto-cold-reader`,
+with none listed for production and no hidden production entries. Values were
+not decrypted; no settings, deployments, cores or Drive data were changed. This
+inventory is not retained-data qualification, proof about every historic deployment
+override, or permission to retire the existing override. Keep that rollout gate
+open, especially Finance's requirement to preserve preview and production data.
+
+Evidence: artifact directory `finance-jazz-alpha66-1uP9bj`, native fixture
+`backend-PHOJIw`, `backend-qualification.json` and three `backend-*.log` auth
+controls; full log `/private/tmp/clipper-alpha66-auth-repeatable.log`. The first
+attempt was blocked from binding a native local listener by the sandbox; the
+permitted isolated run passes. This is environment setup evidence, not an app
+failure. U4 remains open for retained destinations and broader backend adoption;
+U5 still requires the coherent full dependency/patch/consumer switch.
+
 ## Execution order
 
 1. Keep the approved private session actor and awaited native factory. Finish

@@ -135,6 +135,24 @@ above. Do not assign it the same root cause without the actual error.
 Artifact `14356618664` is preserved at
 `/private/tmp/finance-pr46-workspace-ci.zip`, extracted under the same prefix.
 
+The same case recurred at `0d2b1939af92203f6491224a82b5d97989d93531` in
+[run 44166122208](https://github.com/delightful-labs/delightful-labs/actions/runs/44166122208/job/134332637217):
+54 passed, one failed. The initial rename and reload succeed; the subsequent
+USD → TZS save fails at line 55. Its retained page again shows failed-save and
+unknown-result feedback. The new native source label identifies `write` on
+`finance-workspace-naming-persistence` and `naming` on `workspace-naming`;
+the trace still does not retain the underlying SDK cause or a financial
+persistence `commit`/`settle` label. This is evidence of a real unconfirmed save,
+not proof of the earlier cross-node protocol error or of whether the update
+persisted. No retry, timeout change or recovery change is introduced.
+
+Artifact `14366321038` is retained at `/private/tmp/finance-0d-workspace-ci.zip`
+and extracted under the same prefix; SHA-256
+`cf6b68a403d2ad1400cf0305c431e7f279e760e82c0a8828c31a7b2cab2cdda1`.
+All other Finance jobs at that head, including application-2 with the imported
+offline edits and image-editor case, pass. Clipper and foundation also pass.
+These results establish intermittency, not a fix or a completed alpha.66 switch.
+
 ## Native source follow-up
 
 ### Tagged native source and bounded reproduction

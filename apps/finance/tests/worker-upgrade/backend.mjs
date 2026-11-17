@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,15 +47,15 @@ const core = JSON.parse(
 assert.equal(core.version, metadata.version)
 run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.backend.json'])
 const testArgs = ['exec', 'vitest', 'run', '--config', 'vitest.backend.config.mjs']
-function control(name, expected) {
-	const result = spawnSync(
-		'pnpm',
-		[...testArgs, '--testNamePattern', 'admits signed registered guests'],
-		{
-			cwd: app,
-			encoding: 'utf8'
-		}
-	)
+function control(
+	name,
+	expected,
+	args = [...testArgs, '--testNamePattern', 'admits signed registered guests']
+) {
+	const result = spawnSync('pnpm', args, {
+		cwd: app,
+		encoding: 'utf8'
+	})
 	if (result.error) throw result.error
 	const output = result.stdout + result.stderr
 	writeFileSync(join(directory, `backend-${name}.log`), output)
@@ -89,14 +89,97 @@ json(join(app, 'package.json'), manifest)
 run('pnpm', ['install', '--offline', '--ignore-scripts'])
 run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.backend.json'])
 run('pnpm', testArgs)
+const withAuth = process.argv.includes('--auth')
+if (withAuth) {
+	run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'clipper-auth.patch')])
+	run('git', ['apply', join(proof, 'clipper-auth.patch')])
+	json(join(app, 'tsconfig.auth.json'), {
+		extends: './tsconfig.schema.json',
+		include: ['src/lib/server/auth/*.ts', 'src/lib/server/jazz.ts']
+	})
+	writeFileSync(
+		join(app, 'vitest.auth.config.mjs'),
+		"import { defineConfig } from 'vitest/config'\n" +
+			"export default defineConfig({ test: { include: ['src/lib/server/auth/*.test.ts'], testTimeout: 15000, hookTimeout: 30000 } })\n"
+	)
+	// Mirror Clipper's existing provider peers; upgrade only the SDK-required auth peer.
+	Object.assign(manifest.pnpm.overrides, {
+		'@atcute/identity-resolver': '2.0.3',
+		'@atcute/lexicons': '2.1.1',
+		'@atcute/oauth-node-client': '2.0.1',
+		'@atcute/identity': '2.0.2'
+	})
+	Object.assign(manifest.dependencies, {
+		'better-auth': '1.7.22',
+		'@kingironman2011/better-auth-bsky': '0.3.2',
+		'@atcute/identity': '2.0.2'
+	})
+	json(join(app, 'package.json'), manifest)
+	run('pnpm', ['install', '--offline', '--ignore-scripts'])
+	const authArgs = ['exec', 'vitest', 'run', '--config', 'vitest.auth.config.mjs']
+	control('unpatched-provider', 'findAccountByProviderId is not a function', [
+		...authArgs,
+		'src/lib/server/auth/atproto-callback.test.ts'
+	])
+	const provider = join(directory, 'backend-provider', 'package')
+	cpSync(realpathSync(join(app, 'node_modules/@kingironman2011/better-auth-bsky')), provider, {
+		recursive: true
+	})
+	const providerPatch = join(
+		workspace,
+		'apps/clipper/patches/better-auth-bsky-0.3.2-better-auth-1.7.patch'
+	)
+	run('git', ['apply', '--check', '--whitespace=error-all', providerPatch], provider)
+	run('git', ['apply', providerPatch], provider)
+	run('tar', ['-czf', join(directory, 'backend-provider.tgz'), '-C', dirname(provider), 'package'])
+	manifest.dependencies['@kingironman2011/better-auth-bsky'] = 'file:../backend-provider.tgz'
+	json(join(app, 'package.json'), manifest)
+	run('pnpm', ['install', '--offline', '--ignore-scripts'])
+	const entry = join(app, 'src/lib/server/jazz.ts')
+	const admission = readFileSync(entry, 'utf8')
+	for (const [name, from, to, expected] of [
+		[
+			'missing-expiry',
+			'userId: session.user.id,\n\t\t\t\t\texpiresAt: Math.floor(session.session.expiresAt.getTime() / 1000)',
+			'userId: session.user.id',
+			'AuthenticateExpiresAtError'
+		],
+		[
+			'renewing-admission',
+			'query: { disableCookieCache: true, disableRefresh: true }',
+			'query: { disableCookieCache: true }',
+			'AssertionError'
+		]
+	]) {
+		assert.equal(admission.split(from).length, 2)
+		try {
+			writeFileSync(entry, admission.replace(from, to))
+			control(name, expected, [...authArgs, 'src/lib/server/auth/backend-expiry.test.ts'])
+		} finally {
+			writeFileSync(entry, admission)
+		}
+	}
+	run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.auth.json'])
+	run('pnpm', authArgs)
+	// Auth changed the dependency graph: keep gateway admission qualified on that graph.
+	run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.backend.json'])
+	run('pnpm', testArgs)
+}
 json(join(directory, 'backend-qualification.json'), {
 	sdkVersion: metadata.version,
 	fixtureDirectory: app,
 	existingBackendPatchSha256: createHash('sha256').update(backendPatch).digest('hex'),
 	unpatchedControls: ['extension-origin-startup-refused', 'registered-device-account-refused'],
 	patchedGatewayCases: 8,
+	...(withAuth
+		? {
+				betterAuthVersion: '1.7.22',
+				authCases: 30,
+				authControls: ['unpatched-provider', 'missing-expiry', 'renewing-admission']
+			}
+		: {}),
 	remaining: [
-		'Better Auth/session expiry',
+		...(withAuth ? [] : ['Better Auth/session expiry']),
 		'retained Vercel destinations',
 		'full patch and consumer switch'
 	]
