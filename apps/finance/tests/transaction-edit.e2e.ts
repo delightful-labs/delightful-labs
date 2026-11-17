@@ -198,6 +198,10 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 			// Browser offline mode prevents Vite from forwarding these diagnostics to CI.
 			// Preserve the already-sanitized error details instead of the trace's object preview.
 			const machineFailures: Promise<unknown>[] = []
+			let transactionId: string | undefined
+			let requestedCategoryId: string | undefined
+			let attemptedSave = false
+			let saveConfirmed = false
 			page.on('console', (message) => {
 				if (message.text().startsWith('[state-machine] Machine entered an error state')) {
 					for (const argument of message.args().slice(1)) {
@@ -210,6 +214,7 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 					page,
 					kind === 'expense' ? 'imported' : 'imported-income'
 				)
+				transactionId = seed.id
 				await page.goto(`/${kind === 'expense' ? 'expenses' : 'income'}/${seed.id}`)
 				const amount = page.getByLabel('Amount', { exact: true })
 				const save = page.getByRole('button', { name: 'Save Transaction', exact: true })
@@ -240,6 +245,7 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 							?.getAttribute('value')
 					)
 				if (!replacementId) throw new Error('Missing alternate category')
+				requestedCategoryId = replacementId
 				await context.setOffline(true)
 				await category.selectOption(replacementId)
 				await amount.fill('56.78')
@@ -250,8 +256,10 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 					.or(page.getByRole('combobox', { name: 'Tags', exact: true }))
 				await tags.fill('User tag')
 				await tags.press('Enter')
+				attemptedSave = true
 				await save.click()
 				await expect(page.getByText('Transaction saved.', { exact: true })).toBeVisible()
+				saveConfirmed = true
 				await expect(save).toBeDisabled()
 				await expect
 					.poll(() => persisted(page, seed.id))
@@ -279,6 +287,36 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 						body: JSON.stringify(await Promise.all(machineFailures), null, 2),
 						contentType: 'application/json'
 					})
+				}
+				if (transactionId && attemptedSave && !saveConfirmed) {
+					const id = transactionId
+					try {
+						const row = await test.step(
+							'Read native rows after unconfirmed save',
+							() => persisted(page, id),
+							{ timeout: 5000 }
+						)
+						await testInfo.attach('offline-edit-readback', {
+							body: JSON.stringify({
+								observation: 'live-client-local-read',
+								requestedAmount: row.amountMinor === 5678,
+								originalAmount: row.amountMinor === 1234,
+								requestedMemo: row.memo === 'User notes',
+								originalMemo: row.memo === 'Original memo',
+								requestedCategory: row.categoryId === requestedCategoryId,
+								requestedDescription: row.description === 'User description',
+								provenancePreserved:
+									row.source === 'simplefin' && row.externalId === 'imported-edit-test',
+								linksCount: row.links.length
+							}),
+							contentType: 'application/json'
+						})
+					} catch {
+						await testInfo.attach('offline-edit-readback', {
+							body: JSON.stringify({ observation: 'live-client-local-read', available: false }),
+							contentType: 'application/json'
+						})
+					}
 				}
 			}
 		}
