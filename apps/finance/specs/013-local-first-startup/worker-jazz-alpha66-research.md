@@ -2,8 +2,9 @@
 
 Researched 2026-11-17 against the published package, not just the release notes.
 The upgrade target is now **2.0.0-alpha.66**. Live workspace pins and the active
-patch remain alpha.60; the maintained isolated upgrade runner still targets
-alpha.65. Its results must not be relabeled as alpha.66 qualification.
+patch remain alpha.60. The maintained schema and `--worker` modes now qualify
+bounded alpha.66 slices below. The historical default worker/caller mode still
+targets alpha.65; its results must not be relabeled as alpha.66 qualification.
 
 The user reiterated the design constraint during this audit: concentrate Jazz
 integration in thin native adapters and app-owned native schemas/permissions;
@@ -350,6 +351,51 @@ or establish persistent-worker/process-restart behavior. Keep those boundaries
 and full policy/role coverage explicit. The next foundation is alpha.66's actual
 worker/session requalification before broader caller adoption; these passing
 memory-driver restore cases do not substitute for it.
+
+## Alpha.66 persistent worker and private session adapter
+
+The maintained [worker mode](../../tests/worker-upgrade/README.md#alpha66-persistent-worker-and-session-boundary)
+now runs with `node tests/worker-upgrade/run.mjs --worker`. It reuses the schema
+pipeline, existing six-file SDK bridge patch, session/recovery adapter patch,
+Svelte consumer patch and all 30 native fixture cases. The one worker import
+moves from the old authoring entry to native generated queries. No SDK bridge,
+adapter, actor or fixture behavior is added or changed for this version.
+
+The complete run passes **200 schema/restore checks and 30 worker/session cases**,
+strict selected adapter/fixture types, Svelte checks with no errors/warnings,
+native schema/history/identity checks, and one broker asset per production and
+development build. Cold browser-process restarts preserve offline Finance saves
+and edits in Chromium/Firefox/WebKit. Actual SDK sessions stay inside dedicated
+Workers with development XState freezing enabled; signed-out startup, held
+acquisition/close, loader failure/retry and SDK/AccountStore/broker teardown pass.
+The native Svelte provider and actual Finance recovery component also pass.
+
+An unpatched Chromium control uses the published alpha.66 package with the
+patch-only host option omitted. Its bridge counter assertions are omitted only
+in the disposable diagnostic; every actual row/identity/save/edit/close check
+is retained. It saves and edits successfully in the first process, retains the
+account ID in the next process, but returns no transaction where the edited
+5678-minor-unit row is expected. The existing bridge remains necessary for this
+supported-startup path. Do not replace it with the SDK's internal inspector
+attachment ports, which are not public application account admission.
+
+Evidence: successful artifact directory
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-8OYup9`;
+log `/private/tmp/finance-alpha66-worker-proof.log`. Negative control:
+`/private/tmp/finance-alpha66-worker-control/app`, log
+`/private/tmp/finance-alpha66-worker-control-retention.log`. The clean checkout
+builds committed foundation source and reuses already generated catalogs without
+regeneration. The unadopted sign-out prototype is excluded from this result.
+
+Simplification finding: the shared native adapter boundary survives this release
+unchanged; reuse it instead of version-specific lifecycle code. The schema and
+worker proofs share one setup/generation pipeline. Keep the alpha.65 caller
+experiment as explicit historical/incomplete evidence until its real Clipper
+replacement qualifies, then retire that active duplicate. This proof does not
+make its 15 failing raw-session-context cases pass or complete caller adoption.
+Backend/auth, retained Finance destinations, joining/extension/offline-retry
+responsibilities and full workspace-patch qualification remain open. No active
+SDK pin, user storage, deployment setting or additional SDK patch is changed.
 
 ## Clipper native schema foundation
 

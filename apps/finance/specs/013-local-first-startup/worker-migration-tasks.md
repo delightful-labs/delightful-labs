@@ -65,6 +65,17 @@ Broader policy/role and rollback/restart/conflict/cleanup variants remain open.
 Return to the alpha.66 worker/session foundation before broader caller adoption;
 memory-driver restore success does not qualify persistent worker ownership.
 
+The alpha.66 worker/session foundation now passes **30 native cases** after the
+200 schema/restore checks, with strict private-adapter/fixture types and native
+Svelte checks. The same SDK bridge, actor and recovery adapters need no behavior
+changes. Full-process offline Finance save/edit retention, actor lifetime with
+development freezing, and SDK/AccountStore/broker close pass in all three browsers.
+An unpatched control retains identity but loses its edited row after cold restart;
+keep the existing bridge, with no new patch behavior. See the
+[worker qualification and cleanup findings](worker-jazz-alpha66-research.md#alpha66-persistent-worker-and-private-session-adapter).
+The old Clipper caller overlay remains incomplete; actual shared-owner adoption,
+backend/auth, retained Finance destinations and full-patch parity remain open.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,

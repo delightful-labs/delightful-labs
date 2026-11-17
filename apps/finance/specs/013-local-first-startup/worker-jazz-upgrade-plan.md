@@ -11,7 +11,8 @@ qualification. The [alpha.66 audit](worker-jazz-alpha66-research.md) records its
 breaking schema/permission changes, 24 passing native lifecycle cases and a
 reproduced late-close failure in the new immediate factory. Keep the supported
 awaited factory in the approved private session actor; no new SDK patch.
-Historical alpha.65 qualification below has not been rerun on alpha.66.
+The bounded worker/session proof now also passes on alpha.66; the separate
+historical Clipper caller overlay remains unported/incomplete.
 
 The branch subsequently merges main `5e78a349` (PR #45's website/deployment-control
 fixes). No SDK, Finance schema, Local First implementation or native fixture
@@ -51,7 +52,7 @@ replaced code when its replacement is adopted and qualified. Follow the
 [continuous simplification requirements](worker-migration-tasks.md#continuous-simplification-during-implementation);
 do not accumulate a second implementation alongside the selected native path.
 
-- [x] **U1 — Qualify the existing persistent-worker bridge on alpha.65 in
+- [x] **U1 — Qualify the existing persistent-worker bridge on alpha.66 in
       isolation.** The unpatched SDK already fails cold worker data retention.
       Adapt the existing patch's worker detection/Window-hook behavior to the
       changed source, adding no preparation callback or per-call owner. Run the
@@ -61,7 +62,14 @@ do not accumulate a second implementation alongside the selected native path.
       extension-origin or offline-retry parity. Discuss any newly required patch
       behavior before implementing it. No workspace pin/backend destination changes.
       The [U1 qualification](#u1-isolated-worker-qualification) records the focused
-      proof and the remaining full-patch/backend boundaries.
+      alpha.65 baseline and remaining full-patch/backend boundaries. The new
+      [alpha.66 worker/session qualification](worker-jazz-alpha66-research.md#alpha66-persistent-worker-and-private-session-adapter)
+      passes the same 30 native cases, private adapter types and Svelte checks
+      after all 200 schema/restore cases. Existing bridge/adapter implementations
+      are unchanged; native generated queries replace the worker's authoring
+      import. An unpatched alpha.66 control loses the edited row on cold restart,
+      so retain this bridge without extending it. Caller adoption and the other
+      workspace patch responsibilities remain open.
 - [ ] **U2 — Adapt Local First's session boundary and both consumers together.**
       Use `initial: 'device'`, `localFirst: 'now'` with the public client loader,
       `user.accountId`/kind/identity, `exportDeviceKey()`,

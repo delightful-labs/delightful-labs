@@ -18,8 +18,11 @@ const schemaScope = process.argv.includes('--clipper-schema')
 		? 'finance'
 		: undefined
 const schemaOnly = schemaScope !== undefined
-const sdkVersion = schemaOnly ? '2.0.0-alpha.66' : '2.0.0-alpha.65'
-const directory = mkdtempSync(join(tmpdir(), `finance-jazz-alpha${schemaOnly ? 66 : 65}-`))
+const workerOnly = process.argv.includes('--worker')
+if (schemaOnly && workerOnly) throw new Error('Choose either a schema or worker proof')
+const alpha66 = schemaOnly || workerOnly
+const sdkVersion = alpha66 ? '2.0.0-alpha.66' : '2.0.0-alpha.65'
+const directory = mkdtempSync(join(tmpdir(), `finance-jazz-alpha${alpha66 ? 66 : 65}-`))
 console.log(`Upgrade proof artifacts: ${directory}`)
 const run = (command, args, cwd = directory) =>
 	execFileSync(command, args, { cwd, stdio: 'inherit' })
@@ -103,7 +106,8 @@ if (schemaOnly) {
 	process.exit(0)
 }
 const app = join(directory, 'app')
-mkdirSync(app)
+if (workerOnly) await checkSchema(directory, finance, proof, versions, 'finance')
+else mkdirSync(app)
 for (const path of [
 	'src/lib/schema.ts',
 	'src/lib/schema',
@@ -117,12 +121,24 @@ for (const path of [
 	'tooling/jazz-wasm.ts',
 	'vitest.worker-bindings.config.ts'
 ]) {
+	// The alpha.66 schema pipeline already copied and ported the actual app source.
+	if (workerOnly && path.startsWith('src/')) continue
 	const target = join(app, path)
 	mkdirSync(dirname(target), { recursive: true })
 	cpSync(join(finance, path), target, { recursive: true })
 }
 run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'fixture.patch')], app)
 run('git', ['apply', join(proof, 'fixture.patch')], app)
+if (workerOnly) {
+	const worker = join(app, 'tests/worker-bindings/sdk-session.worker.ts')
+	writeFileSync(
+		worker,
+		readFileSync(worker, 'utf8').replace(
+			"from '../../src/lib/schema.js'",
+			"from '../../src/lib/queries.js'"
+		)
+	)
+}
 run(
 	'git',
 	['apply', '--check', '--whitespace=error-all', join(proof, 'consumer-session.patch')],
@@ -154,6 +170,7 @@ json(join(app, 'tsconfig.json'), {
 		exactOptionalPropertyTypes: true,
 		noUncheckedIndexedAccess: true,
 		skipLibCheck: true,
+		resolveJsonModule: true,
 		noEmit: true,
 		types: ['node', 'vite/client', 'svelte']
 	},
@@ -166,7 +183,7 @@ json(join(app, 'tsconfig.json'), {
 	]
 })
 run('pnpm', ['install', '--ignore-scripts'], app)
-// Compile the selected shared session adapters against alpha.65, then test their
+// Compile the selected shared session adapters against the candidate, then test their
 // normal public package exports. Unrelated library code keeps its built output.
 const library = join(finance, '../../packages/local-first')
 const sources = join(app, 'session-adapters')
@@ -240,5 +257,7 @@ json(join(directory, 'versions.json'), {
 run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.json'], app)
 run('pnpm', ['exec', 'svelte-check', '--tsconfig', './tsconfig.json', '--fail-on-warnings'], app)
 run('pnpm', ['exec', 'vitest', 'run', '--config', 'vitest.worker-bindings.config.ts'], app)
-checkClipper(directory, proof, join(finance, '../clipper'))
-console.log(`Upgrade proof passed; artifacts retained at ${directory}`)
+if (!workerOnly) checkClipper(directory, proof, join(finance, '../clipper'))
+console.log(
+	`${workerOnly ? 'Finance alpha.66 worker' : 'Upgrade'} proof passed; artifacts retained at ${directory}`
+)

@@ -1,10 +1,11 @@
 # Isolated Jazz upgrade proofs
 
 The coordinated upgrade target is now alpha.66. The schema mode below qualifies
-Finance's native authoring boundary on that version; the default worker/session
-suite still targets alpha.65. See the
+Finance's native authoring boundary on that version; `--worker` also qualifies
+the alpha.66 persistent-worker/session boundary. The historical default
+worker/session suite still targets alpha.65. See the
 [alpha.66 source audit and qualification boundaries](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md).
-The two modes have separate qualification scopes.
+The modes have separate qualification scopes.
 
 ## Alpha.66 Finance schema, permissions and retained data
 
@@ -138,6 +139,50 @@ Finance and dependency pins remain alpha.60. Full app/extension/session adoption
 Better Auth/provider qualification, persistent browser-worker qualification and
 retained Vercel destinations remain separate gates. This mode does not turn the
 known alpha.65 caller experiment green or complete U3/U4/U5.
+
+## Alpha.66 persistent worker and session boundary
+
+From a clean checkout with current built public Local First/DUI packages and
+the installed Playwright browsers:
+
+```sh
+node tests/worker-upgrade/run.mjs --worker
+```
+
+This reuses the Finance schema pipeline and all existing worker/session fixture
+and adapter patches. It applies the existing six-file worker bridge to the
+integrity-verified alpha.66 SDK, generates the native Finance schema/history, and
+runs the **200 schema/restore checks** before the **30 worker/session cases**.
+The worker imports the native generated runtime queries. The SDK bridge and
+shared session/recovery adapter implementations need no further changes.
+Strict adapter/fixture types and native Svelte checks pass. Each production and
+development build retains exactly one broker asset.
+
+The 30 cases cover the same cold-process restart/offline Finance records, native
+SDK/Svelte recovery, loader failures and development XState actor lifetime as
+the alpha.65 fixture. Chromium/Firefox/WebKit pass, including actual SDK sessions
+inside dedicated Workers, signed-out startup, close during held acquisition,
+SDK/AccountStore/broker teardown and development freezing. This proof uses a
+clean committed foundation; the unadopted sign-out prototype is outside its scope.
+
+An unpatched alpha.66 Chromium control still loses the saved/edited Finance row
+after the first full browser-process restart, while retaining the account ID.
+For that diagnostic, use the published SDK tarball, omit the patch-only host
+option, and omit only the two bridge-hook counter assertions; keep the actual
+row, identity, save/edit and close checks. The maintained positive fixture is
+unchanged. Evidence: `/private/tmp/finance-alpha66-worker-control-retention.log`;
+the diagnostic project is `/private/tmp/finance-alpha66-worker-control/app`.
+Keep the existing bridge; no additional patch behavior is introduced.
+
+Successful artifact directory:
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-8OYup9`;
+log: `/private/tmp/finance-alpha66-worker-proof.log`. Workspace pins and deployment
+destinations remain unchanged. This is Finance's bounded worker/session proof,
+not full Finance/Clipper adoption, backend authentication, retained Vercel data,
+extension/joining-proof/offline-retry parity or the complete workspace patch.
+The default alpha.65 Clipper overlay still has its documented 15 failures; this
+mode does not run or relabel it. Retire that historical path only after its real
+Clipper replacement qualifies.
 
 ## Alpha.65 worker and session boundary
 
