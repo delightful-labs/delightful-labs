@@ -217,3 +217,64 @@ durability wait. Locate that SDK boundary before proposing a patch or recovery
 policy. Retain the existing unknown-save protection and financial identity. Keep
 this investigation separate from F4c3's worker/native qualification and production
 merge/deployment guarantees.
+
+### Hosted original-case investigation
+
+All normal Finance, Clipper and foundation jobs passed at `4916a48a`, including
+Finance's full application-2 shard and the operation-source diagnostic checks.
+The original failure remains unexplained.
+
+The separate branch `investigate/finance-offline-edit-ci`, based on that exact
+head, runs the two original imported offline-edit cases at most ten times each,
+with two workers, no retries and a stop at the first failure. Its job uses the
+normal pinned Ubuntu/Playwright container, Node and pnpm versions, the existing
+application project/configuration, and disposable in-memory Jazz backend. Traces
+are retained for every execution, alongside the existing sanitized machine-error
+attachment. No original form/persistence assertion is removed or weakened.
+
+After an attempted but unconfirmed save, a test-only readback records comparisons
+against the original/requested fields, provenance and link count. It runs after
+the original assertion fails, has a separate five-second bound and does not
+issue writes. Its observation is explicitly `live-client-local-read`: it cannot
+establish cold-restart durability or authority acceptance.
+
+The diagnostic branch reuses a snapshot of existing Finance catalogs and public
+Local First/UI builds, installs with scripts disabled and checks injected package
+identity. Its Vite configuration omits only the catalog-generation plugin. These
+investigation setup changes stay off PR46 and are not a merge candidate; the
+regular qualification workflow remains unchanged. This is a focused CI experiment,
+not a claim to reproduce the entire prior shard's history or load.
+
+The [initial dispatch](https://github.com/delightful-labs/delightful-labs/actions/runs/44160298061)
+selected no tests because the grep was anchored while Playwright includes project,
+file and tag text. No application case ran. The corrected filter was checked
+locally with `--list`, selecting exactly 20 executions. Corrected branch head
+`5ac961f5` runs at
+[44160709480](https://github.com/delightful-labs/delightful-labs/actions/runs/44160709480);
+it passed all **20 cases in 2.7 minutes**, with zero retries, skipped cases or
+flaky/unexpected results. The result archive contains 20 traces and no
+machine-failure attachments. Thus the real CI environment and repeated original
+cases still do not reproduce the protocol error. Do not call the issue fixed or
+continue increasing repetition without a new hypothesis or failure evidence.
+
+Artifact `14363312293` is retained locally at
+`/private/tmp/finance-offline-edit-hosted-batch.zip`; its verified SHA-256 is
+`22a852a7294632aef24822fb283bded60946c3a2c1e168fae3e16b7c257d93d4`.
+The extracted result JSON and checked summary use the same prefix with
+`-results.json` and `-summary.json`. GitHub retains this diagnostic artifact until
+2026-11-24.
+
+The failure-only readback is also retained in the ordinary PR46 test cases,
+reusing the existing `persisted()` helper. Readback collection was included in the
+20 hosted product cases above. Its final bookkeeping uses one unconfirmed-request
+record in place of four fields/flags and passes strict browser test TypeScript
+checking. Those successful cases do not execute the unconfirmed-save readback
+branch or establish what the hosted failed write did. There are no additional production changes, SDK patches
+or financial retries; the workflow/catalog snapshot setup remains confined to
+the investigation branch.
+
+Keep the issue open with the source labels and readback available for its next
+real occurrence. In the absence of a reproduction, no application recovery
+change is justified by this batch. Continue qualifying the SDK upgrade on its
+existing evidence and retained-data gates, without claiming it resolves this
+alpha.60 failure.
