@@ -1,0 +1,674 @@
+diff --git a/src/lib/backend/jazz/account.ts b/src/lib/backend/jazz/account.ts
+index cb9162a..dc7d8df 100644
+--- a/src/lib/backend/jazz/account.ts
++++ b/src/lib/backend/jazz/account.ts
+@@ -22,16 +22,13 @@ import { app } from './schema.js'
+ export type Session = JazzSession<JazzClient>
+ 
+ export type LibraryFactory = typeof createLibraryCapability
+-function externallySignedIn(account: { identity: { issuer: string } }) {
+-	return !['urn:jazz:local-first', 'urn:jazz:anonymous'].includes(account.identity.issuer)
+-}
+ function bindHost(
+ 	session: Session,
+ 	libraryFactory: LibraryFactory,
+ 	cacheNamespace: string
+ ): AccountHost {
+ 	const readiness = createJazzSessionReadinessAdapter(session)
+-	const recovery = createJazzRecoveryAdapter(() => session.getSnapshot().account)
++	const recovery = createJazzRecoveryAdapter(() => session)
+ 	const identities = new WeakMap<object, object>()
+ 	const candidates = new WeakMap<ReadyAccountObservation, () => AccountBinding>()
+ 	const identity = (resource: object) => {
+@@ -44,18 +41,18 @@ function bindHost(
+ 	}
+ 	const read = (): AccountObservation => {
+ 		const snapshot = session.getSnapshot()
+-		recovery.observeAccount(snapshot.account)
+-		if (snapshot.status !== 'ready' || !snapshot.account || !snapshot.client) {
++		recovery.observeSession()
++		if (snapshot.status !== 'ready' || !snapshot.user || !snapshot.client) {
+ 			return { status: snapshot.status === 'ready' ? 'error' : snapshot.status }
+ 		}
+-		const account = snapshot.account
++		const user = snapshot.user
+ 		const client = snapshot.client
+ 		const db = client.db
+ 		const check = () => {
+ 			const now = session.getSnapshot()
+ 			if (
+ 				now.status !== 'ready' ||
+-				now.account !== account ||
++				now.user !== user ||
+ 				now.client !== client ||
+ 				now.client?.db !== db
+ 			)
+@@ -68,48 +65,43 @@ function bindHost(
+ 			}
+ 			return {
+ 				status: 'ready',
+-				localFirst: db.isLocalFirst(),
+-				binding: identity(account),
++				binding: identity(user),
+ 				clientBinding: identity(client),
+ 				databaseBinding: identity(db),
+-				prepare: () => {
+-					admitted()
+-					return db.upgradeToLocalFirst(localFirst)
+-				},
+ 				logout: () => {
+ 					// Native mutation admission stays bound to the selected identity.
+ 					admitted()
+-					return session.logout()
++					return session.signOut()
+ 				},
+ 				logoutStatus: () => {
+ 					const now = session.getSnapshot()
+ 					if (
+ 						now.status === 'signed-out' ||
+-						(now.status === 'ready' && now.account && !externallySignedIn(now.account))
++						(now.status === 'ready' && now.user && now.user.kind === 'device')
+ 					)
+ 						return 'signed-out'
+-					if (now.status !== 'ready' || !now.account || !now.client) return 'unavailable'
+-					return now.account === account && now.client === client && now.client.db === db && live()
++					if (now.status !== 'ready' || !now.user || !now.client) return 'unavailable'
++					return now.user === user && now.client === client && now.client.db === db && live()
+ 						? 'current'
+ 						: 'replaced'
+ 				},
+-				accountId: account.id,
+-				signedIn: externallySignedIn(account),
++				accountId: user.accountId,
++				signedIn: user.kind === 'backend',
+ 				root: {
+ 					read: async () => {
+ 						admitted()
+-						const row = await db.one(app.libraries.where({ id: account.id }), {
++						const row = await db.one(app.libraries.where({ id: user.accountId }), {
+ 							tier: ReadTier.LocalFirst
+ 						})
+ 						if (!row) return 'missing'
+-						return row.ownerId === account.id && row.bootstrapVersion === '1'
++						return row.ownerId === user.accountId && row.bootstrapVersion === '1'
+ 							? 'compatible'
+ 							: 'incompatible'
+ 					},
+ 					ensure: () => {
+ 						admitted()
+-						const write = db.upsert(app.libraries, account.id, {
+-							ownerId: account.id,
++						const write = db.upsert(app.libraries, user.accountId, {
++							ownerId: user.accountId,
+ 							bootstrapVersion: '1'
+ 						})
+ 						return {
+@@ -122,7 +114,7 @@ function bindHost(
+ 					capability: recovery.capability,
+ 					source: {
+ 						subscribe: (notify) => {
+-							const publish = () => notify(recovery.observeAccount(session.getSnapshot().account))
++							const publish = () => notify(recovery.observeSession())
+ 							publish()
+ 							return session.subscribe(publish)
+ 						}
+@@ -140,7 +132,7 @@ function bindHost(
+ 				library: libraryFactory(
+ 					createLibraryRecords(
+ 						db,
+-						account.id,
++						user.accountId,
+ 						() => {
+ 							try {
+ 								check()
+@@ -152,7 +144,7 @@ function bindHost(
+ 						},
+ 						readConnection(db)
+ 					),
+-					account.id,
++					user.accountId,
+ 					requestCapture,
+ 					cacheNamespace
+ 				)
+@@ -176,7 +168,7 @@ function bindHost(
+ 			return create()
+ 		},
+ 		readiness,
+-		create: () => session.createLocalFirst(),
++		create: () => session.createDeviceAccount(),
+ 		signOut: async () => {
+ 			const response = await fetch('/api/auth/sign-out', {
+ 				method: 'POST',
+@@ -188,7 +180,7 @@ function bindHost(
+ 			})
+ 			if (!response.ok) throw new Error('Provider sign-out failed')
+ 		},
+-		logout: () => session.logout(),
++		logout: () => session.signOut(),
+ 		release: () => {
+ 			recovery.invalidate()
+ 			restored.invalidate()
+@@ -210,7 +202,8 @@ export function accountInput(
+ 		startup: registry.getJazzStartupBinding({
+ 			...config,
+ 			client: localFirst,
+-			initial: 'local-first',
++			initial: 'device',
++			localFirst: 'now',
+ 			runtimeSources: config.runtimeSources ?? runtimeSources
+ 		}),
+ 		bind: (session) =>
+@@ -231,6 +224,7 @@ export function existingAccountInput(
+ 		startup: registry.getJazzStartupBinding({
+ 			...config,
+ 			client: localFirst,
++			localFirst: 'now',
+ 			runtimeSources: config.runtimeSources ?? runtimeSources
+ 		}),
+ 		bind: (session) =>
+@@ -246,15 +240,15 @@ export function existingAccountInput(
+ export function currentLibraryRecords() {
+ 	const session = registry.getCurrentJazzSession()
+ 	const snapshot = session?.getSnapshot()
+-	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
++	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
+ 		throw new Error('Library scope unavailable')
+-	const { account, client } = snapshot
++	const { user, client } = snapshot
+ 	return createLibraryRecords(
+ 		client.db,
+-		account.id,
++		user.accountId,
+ 		() => {
+ 			const now = session.getSnapshot()
+-			return now.status === 'ready' && now.account === account && now.client === client
++			return now.status === 'ready' && now.user === user && now.client === client
+ 		},
+ 		readConnection(client.db)
+ 	)
+@@ -268,9 +262,9 @@ export async function requestCapture(
+ ) {
+ 	const session = registry.getCurrentJazzSession()
+ 	const snapshot = session?.getSnapshot()
+-	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
++	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
+ 		throw new Error('Account scope unavailable')
+-	const { account, client } = snapshot
++	const { user, client } = snapshot
+ 	const token = client.db.getConfig().jwtToken
+ 	const response = await fetch(`/api/capture/${operation}`, {
+ 		method: 'POST',
+@@ -285,7 +279,7 @@ export async function requestCapture(
+ 		body: JSON.stringify(body)
+ 	})
+ 	const now = session.getSnapshot()
+-	if (now.status !== 'ready' || now.account !== account || now.client !== client) {
++	if (now.status !== 'ready' || now.user !== user || now.client !== client) {
+ 		await response.body?.cancel()
+ 		throw new Error('Account scope expired')
+ 	}
+diff --git a/src/lib/contracts/account.ts b/src/lib/contracts/account.ts
+index cc83019..4d5f14b 100644
+--- a/src/lib/contracts/account.ts
++++ b/src/lib/contracts/account.ts
+@@ -26,11 +26,9 @@ export type RecoveryBinding = Readonly<{
+ export type AccountObservation =
+ 	| Readonly<{
+ 			status: 'ready'
+-			localFirst?: boolean
+ 			binding: object
+ 			clientBinding?: object
+ 			databaseBinding?: object
+-			prepare?: () => Promise<void>
+ 			logout?: () => Promise<void>
+ 			logoutStatus?: () => SignOutSessionStatus
+ 			accountId: string
+@@ -39,7 +37,7 @@ export type AccountObservation =
+ 			root: RootAccess
+ 			recovery: RecoveryBinding
+ 	  }>
+-	| Readonly<{ status: 'signed-out' | 'transitioning' | 'error' | 'closed' }>
++	| Readonly<{ status: 'starting' | 'signed-out' | 'transitioning' | 'error' | 'closed' }>
+ export type ReadyAccountObservation = Extract<AccountObservation, { status: 'ready' }>
+ export type AccountBindingIdentity = Pick<
+ 	ReadyAccountObservation,
+@@ -81,7 +79,6 @@ export function sameAccountBinding(
+ export type AccountHost = Readonly<{
+ 	read: () => AccountObservation
+ 	adopt?: (observation: ReadyAccountObservation) => AccountBinding
+-	prepare?: () => Promise<void>
+ 	readiness: SessionReadinessBinding
+ 	create: () => Promise<void>
+ 	signOut?: () => Promise<void>
+diff --git a/src/lib/machines/runtime/application-readiness.test.ts b/src/lib/machines/runtime/application-readiness.test.ts
+index bd417ed..c91a05e 100644
+--- a/src/lib/machines/runtime/application-readiness.test.ts
++++ b/src/lib/machines/runtime/application-readiness.test.ts
+@@ -306,87 +306,68 @@ describe('account/root ownership', () => {
+ 		}
+ 	})
+ 
+-	it('waits for worker local-first preparation before reading the library root', async () => {
+-		const preparation = Promise.withResolvers<void>()
+-		const read = vi.fn(async () => 'compatible' as const)
+-		const observation = ready('local-first-startup', { read, ensure: vi.fn() })
+-		const f = fixture({ ...observation, localFirst: false })
+-		const prepare = vi.fn(() => preparation.promise)
+-		const actor = createActor(applicationReadinessMachine, {
+-			input: input({ ...f.host, prepare })
+-		}).start()
++	it('waits for native startup before admitting library work', async () => {
++		const read = vi.fn<RootAccess['read']>(async () => 'compatible')
++		const ensure = vi.fn()
++		const observation = ready('native-startup', { read, ensure })
++		const f = fixture({ status: 'starting' })
++		const actor = createActor(applicationReadinessMachine, { input: input(f.host) }).start()
+ 		try {
+ 			await waitFor(actor, (snapshot) =>
+-				snapshot.matches({ active: { flow: { running: { preparing: 'active' } } } })
++				snapshot.matches({ active: { flow: { running: 'waiting' } } })
+ 			)
+-			expect(prepare).toHaveBeenCalledOnce()
+ 			expect(read).not.toHaveBeenCalled()
+-			f.emit({ ...observation, localFirst: true })
++			expect(selectRecoveryBinding(actor.getSnapshot())).toBeUndefined()
++			f.emit({ status: 'transitioning' })
++			await waitFor(actor, (snapshot) => snapshot.context.observation.status === 'transitioning')
+ 			expect(read).not.toHaveBeenCalled()
+-			preparation.resolve()
+-			await vi.waitFor(() => expect(read).toHaveBeenCalledOnce())
++			f.emit(observation)
++			await waitFor(actor, (snapshot) => !!selectLibraryActor(snapshot))
++			expect(read).toHaveBeenCalledOnce()
++			expect(ensure).not.toHaveBeenCalled()
+ 		} finally {
+-			preparation.resolve()
+ 			actor.send({ type: 'SHUTDOWN' })
+ 			await waitFor(actor, (snapshot) => snapshot.status === 'done')
+ 			actor.stop()
+ 		}
+ 	})
+-	it('drains worker local-first preparation before acknowledging shutdown', async () => {
+-		const preparation = Promise.withResolvers<void>()
+-		const read = vi.fn(async () => 'compatible' as const)
+-		const f = fixture({
+-			...ready('local-first-drain', { read, ensure: vi.fn() }),
+-			localFirst: false
+-		})
+-		const actor = createActor(applicationReadinessMachine, {
+-			input: input({ ...f.host, prepare: () => preparation.promise })
+-		}).start()
++	it('reports native startup failure without admitting library work', async () => {
++		const f = fixture({ status: 'starting' })
++		const actor = createActor(applicationReadinessMachine, { input: input(f.host) }).start()
+ 		try {
+ 			await waitFor(actor, (snapshot) =>
+-				snapshot.matches({ active: { flow: { running: { preparing: 'active' } } } })
++				snapshot.matches({ active: { flow: { running: 'waiting' } } })
++			)
++			f.emit({ status: 'error' })
++			await waitFor(actor, (snapshot) =>
++				snapshot.matches({ active: { flow: { running: 'unavailable' } } })
+ 			)
++			expect(selectLibraryActor(actor.getSnapshot())).toBeUndefined()
++			expect(selectRecoveryBinding(actor.getSnapshot())).toBeUndefined()
++		} finally {
+ 			actor.send({ type: 'SHUTDOWN' })
+-			expect(
+-				actor.getSnapshot().matches({ active: { flow: { running: { preparing: 'stopping' } } } })
+-			).toBe(true)
+-			expect(actor.getSnapshot().status).toBe('active')
+-			expect(f.host.release).not.toHaveBeenCalled()
+-			preparation.resolve()
+ 			await waitFor(actor, (snapshot) => snapshot.status === 'done')
+-			expect(read).not.toHaveBeenCalled()
+-			expect(f.host.release).toHaveBeenCalledOnce()
+-		} finally {
+-			preparation.resolve()
+ 			actor.stop()
+ 		}
+ 	})
+-	it('does not bootstrap a thin client after local-first preparation fails', async () => {
+-		const read = vi.fn(async () => 'compatible' as const)
+-		const f = fixture({
+-			...ready('local-first-failure', { read, ensure: vi.fn() }),
+-			localFirst: false
+-		})
+-		const actor = createActor(applicationReadinessMachine, {
+-			input: input({
+-				...f.host,
+-				prepare: async () => {
+-					throw new Error('Synthetic local runtime failure')
+-				}
+-			})
+-		}).start()
++	it('withdraws the application during native startup and rejects late readiness', async () => {
++		const read = vi.fn<RootAccess['read']>(async () => 'compatible')
++		const f = fixture({ status: 'starting' })
++		const actor = createActor(applicationReadinessMachine, { input: input(f.host) }).start()
+ 		try {
+ 			await waitFor(actor, (snapshot) =>
+-				snapshot.matches({ active: { flow: { running: 'unavailable' } } })
++				snapshot.matches({ active: { flow: { running: 'waiting' } } })
+ 			)
+-			expect(read).not.toHaveBeenCalled()
+-		} finally {
+ 			actor.send({ type: 'SHUTDOWN' })
+ 			await waitFor(actor, (snapshot) => snapshot.status === 'done')
++			f.emit(ready('late-native-startup', { read, ensure: vi.fn() }))
++			expect(read).not.toHaveBeenCalled()
++			expect(f.host.release).toHaveBeenCalledOnce()
++			expect(selectLibraryActor(actor.getSnapshot())).toBeUndefined()
++		} finally {
+ 			actor.stop()
+ 		}
+ 	})
+-
+ 	it('reuses DLF-owned late acquisition after releasing the first attachment', async () => {
+ 		const opening = Promise.withResolvers<AccountHost>()
+ 		const { host } = fixture({ status: 'signed-out' })
+@@ -955,98 +936,6 @@ it('rejects forged private completion events while session acquisition is pendin
+ 	session.owner.stop()
+ })
+ 
+-it('does not apply a superseded guest preparation failure to the backend account Jazz has opened', async () => {
+-	const pending = Promise.withResolvers<void>()
+-	const access = root(Promise.resolve(), Promise.resolve())
+-	const guest = { ...ready('guest', access), localFirst: false }
+-	const backend = { ...ready('backend', access), localFirst: true, signedIn: true }
+-	const f = fixture(guest)
+-	const actor = createActor(applicationReadinessMachine, {
+-		input: input({ ...f.host, prepare: () => pending.promise })
+-	}).start()
+-	try {
+-		await waitFor(actor, (snapshot) =>
+-			snapshot.matches({ active: { flow: { running: 'preparing' } } })
+-		)
+-		f.emit(backend)
+-		await waitFor(
+-			actor,
+-			(snapshot) =>
+-				snapshot.context.observation.status === 'ready' &&
+-				snapshot.context.observation.accountId === 'backend'
+-		)
+-		pending.reject(new Error('The guest client closed during native account following'))
+-		await waitFor(
+-			actor,
+-			(snapshot) => snapshot.matches({ active: { flow: { running: 'library' } } }),
+-			{ timeout: 1000 }
+-		)
+-		expect(actor.getSnapshot().context.observation).toBe(backend)
+-	} finally {
+-		actor.stop()
+-	}
+-})
+-
+-it('does not retry failed preparation just because the same account replaced its thin binding', async () => {
+-	const access = root(Promise.resolve(), Promise.resolve())
+-	const thin = { ...ready('guest', access), localFirst: false }
+-	const f = fixture(thin)
+-	let calls = 0
+-	const prepare = vi.fn(async () => {
+-		if (++calls === 1) f.emit({ ...thin, binding: {} })
+-		throw new Error('Local persistence unavailable')
+-	})
+-	const actor = createActor(applicationReadinessMachine, {
+-		input: input({ ...f.host, prepare })
+-	}).start()
+-	try {
+-		await waitFor(
+-			actor,
+-			(snapshot) => snapshot.matches({ active: { flow: { running: 'unavailable' } } }),
+-			{ timeout: 1000 }
+-		)
+-		expect(prepare).toHaveBeenCalledOnce()
+-	} finally {
+-		actor.stop()
+-	}
+-})
+-
+-it('prepares a different backend account after its superseded guest preparation fails', async () => {
+-	const pending = Promise.withResolvers<void>()
+-	const access = root(Promise.resolve(), Promise.resolve())
+-	const guest = { ...ready('guest', access), localFirst: false }
+-	const backend = { ...ready('backend', access), localFirst: false, signedIn: true }
+-	const f = fixture(guest)
+-	let calls = 0
+-	const prepare = vi.fn(async () => {
+-		if (++calls === 1) return pending.promise
+-		f.emit({ ...backend, binding: {}, localFirst: true })
+-	})
+-	const actor = createActor(applicationReadinessMachine, {
+-		input: input({ ...f.host, prepare })
+-	}).start()
+-	try {
+-		await waitFor(actor, (s) => s.matches({ active: { flow: { running: 'preparing' } } }))
+-		f.emit(backend)
+-		await waitFor(
+-			actor,
+-			(s) =>
+-				s.context.observation.status === 'ready' && s.context.observation.accountId === 'backend'
+-		)
+-		pending.reject(new Error('The guest closed while Jazz opened the backend account'))
+-		await waitFor(actor, (s) => s.matches({ active: { flow: { running: 'library' } } }), {
+-			timeout: 1000
+-		})
+-		expect(prepare).toHaveBeenCalledTimes(2)
+-		expect(actor.getSnapshot().context.observation).toMatchObject({
+-			accountId: 'backend',
+-			localFirst: true
+-		})
+-	} finally {
+-		actor.stop()
+-	}
+-})
+-
+ function adoptingFixture(initial: Extract<AccountObservation, { status: 'ready' }>) {
+ 	const f = fixture(initial)
+ 	const released: ReturnType<typeof vi.fn>[] = []
+@@ -1057,7 +946,7 @@ function adoptingFixture(initial: Extract<AccountObservation, { status: 'ready'
+ 	})
+ 	return { ...f, adopt, released, input: input({ ...f.host, adopt }) }
+ }
+-it('adopts once for unchanged native identity/preparation facts and reuses the library actor', async () => {
++it('adopts once for unchanged native identity facts and reuses the library actor', async () => {
+ 	const initial = {
+ 		...ready('stable', { read: async () => 'compatible', ensure: vi.fn() }),
+ 		clientBinding: {},
+diff --git a/src/lib/machines/runtime/application-readiness.ts b/src/lib/machines/runtime/application-readiness.ts
+index 9424980..79b9b3d 100644
+--- a/src/lib/machines/runtime/application-readiness.ts
++++ b/src/lib/machines/runtime/application-readiness.ts
+@@ -203,10 +203,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 		library: libraryMachine,
+ 		startup: createSessionStartupMachine<Session>(),
+ 		readiness: createSessionReadinessMachine(),
+-		prepare: createAsyncLogic({
+-			run: ({ input }: { input: { host: AccountHost; observation: ReadyAccountObservation } }) =>
+-				(input.observation.prepare ?? required(input.host.prepare))()
+-		}),
+ 		create: createAsyncLogic({ run: ({ input }: { input: AccountHost }) => input.create() }),
+ 		logout: signOutMachine,
+ 		bootstrap: rootBootstrapMachine,
+@@ -265,7 +261,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 				readiness: types<import('xstate').ActorRefFrom<(typeof accountActors)['readiness']>>(),
+ 				bindingCustody: types<import('xstate').ActorRefFrom<typeof accountActors.bindingCustody>>(),
+ 				libraryBinding: types<import('xstate').ActorRefFrom<typeof accountActors.libraryBinding>>(),
+-				prepare: types<import('xstate').ActorRefFrom<(typeof accountActors)['prepare']>>(),
+ 				create: types<import('xstate').ActorRefFrom<(typeof accountActors)['create']>>(),
+ 				logout: types<import('xstate').ActorRefFrom<(typeof accountActors)['logout']>>(),
+ 				bootstrap: types<import('xstate').ActorRefFrom<(typeof accountActors)['bootstrap']>>(),
+@@ -330,15 +325,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 										},
+ 										states: { waiting: {}, accepting: {}, stopping: {} }
+ 									},
+-									preparing: {
+-										schemas: {
+-											context: types<{ preparing: AccountBindingIdentity }>()
+-										},
+-										states: {
+-											active: {},
+-											stopping: {}
+-										}
+-									},
+ 									signedOut: {},
+ 									waiting: {},
+ 									unavailable: {},
+@@ -473,22 +459,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 				'observation' in event &&
+ 				event.observation === context.observationAttempt,
+ 
+-			stoppingPreparation: ({ value }: { value: import('xstate').StateValue }) =>
+-				matchesState({ active: { flow: { running: { preparing: 'stopping' } } } }, value),
+-			preparationReplaced: (
+-				{ context }: { context: Context<Session> },
+-				preparing: AccountBindingIdentity
+-			) =>
+-				context.observation.status === 'ready' &&
+-				!sameAccountBinding(context.observation, preparing) &&
+-				(context.observation.localFirst !== false ||
+-					context.observation.accountId !== preparing.accountId ||
+-					context.observation.clientBinding !== preparing.clientBinding ||
+-					context.observation.databaseBinding !== preparing.databaseBinding),
+-			needsLocalFirst: ({ context }) =>
+-				context.observation.status === 'ready' &&
+-				context.observation.localFirst === false &&
+-				!!(context.observation.prepare ?? context.host?.prepare),
+ 			stoppingCreate: ({ value }: { value: import('xstate').StateValue }) =>
+ 				matchesState({ active: { flow: { running: { creating: 'stopping' } } } }, value),
+ 			stoppingRestore: ({ value }: { value: import('xstate').StateValue }) =>
+@@ -503,8 +473,7 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 				event.type === 'OBSERVED' &&
+ 				event.observation.status === 'ready' &&
+ 				context.observation.status === 'ready' &&
+-				sameAccountBinding(event.observation, context.observation) &&
+-				event.observation.localFirst === context.observation.localFirst
++				sameAccountBinding(event.observation, context.observation)
+ 		},
+ 		actions: {
+ 			refreshBinding: ({ context, event }: { context: Context<Session>; event: Event<Session> }) =>
+@@ -830,16 +799,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 													context: { observation: { status: 'error' } }
+ 												}
+ 											}
+-											if (args.guards.needsLocalFirst(args)) {
+-												if (context.observation.status !== 'ready')
+-													throw new Error('Preparation scope unavailable')
+-												return {
+-													target: 'preparing',
+-													context: {
+-														preparing: accountBindingIdentity(context.observation)
+-													}
+-												}
+-											}
+ 											if (context.observation.status === 'ready') {
+ 												if (
+ 													context.host.adopt &&
+@@ -857,9 +816,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 														observation: context.adoption
+ 															? {
+ 																	...context.adoption.observation,
+-																	...(context.observation.localFirst === undefined
+-																		? {}
+-																		: { localFirst: context.observation.localFirst }),
+ 																	...(context.observation.signedIn === undefined
+ 																		? {}
+ 																		: { signedIn: context.observation.signedIn })
+@@ -873,7 +829,10 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 											if (context.observation.status === 'signed-out') {
+ 												return { target: 'signedOut', context: { adoption: undefined } }
+ 											}
+-											if (context.observation.status === 'transitioning') {
++											if (
++												context.observation.status === 'starting' ||
++												context.observation.status === 'transitioning'
++											) {
+ 												return { target: 'waiting', context: { adoption: undefined } }
+ 											}
+ 											return { target: 'unavailable', context: { adoption: undefined } }
+@@ -944,42 +903,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 											}
+ 										}
+ 									},
+-									preparing: {
+-										meta: starting,
+-										initial: 'active',
+-										states: { active: {}, stopping: {} },
+-										on: { SHUTDOWN: { target: '.stopping' } },
+-										invoke: {
+-											id: 'prepare',
+-											src: 'prepare',
+-											input: ({ context }) => {
+-												if (context.observation.status !== 'ready')
+-													throw new Error('Account scope unavailable')
+-												return { host: context.host, observation: context.observation }
+-											},
+-											onDone: (args, _enq) => {
+-												if (args.guards.stoppingPreparation(args)) {
+-													return { target: 'draining' }
+-												}
+-
+-												return { target: 'refreshing' }
+-											},
+-											onError: (args) => {
+-												if (args.guards.stoppingPreparation(args)) {
+-													return { target: 'draining' }
+-												}
+-												if (args.guards.preparationReplaced(args, args.context.preparing))
+-													return { target: 'refreshing' }
+-												return {
+-													target: 'unavailable',
+-													context: {
+-														observation: { status: 'error' },
+-														failedBinding: args.context.preparing
+-													}
+-												}
+-											}
+-										}
+-									},
+ 									signedOut: {
+ 										meta: accountStatus('signedOut', t('account.status.signedOut')),
+ 										on: {
+diff --git a/src/lib/runtime/worker/host-bindings.test.ts b/src/lib/runtime/worker/host-bindings.test.ts
+index 8112d41..02a2c67 100644
+--- a/src/lib/runtime/worker/host-bindings.test.ts
++++ b/src/lib/runtime/worker/host-bindings.test.ts
+@@ -83,7 +83,6 @@ function fixture() {
+ 		clientBinding: {},
+ 		databaseBinding: {},
+ 		accountId,
+-		localFirst: true,
+ 		root: { read: async () => 'compatible', ensure: vi.fn() },
+ 		recovery: {
+ 			capability: { isCurrentScope: () => false, readPhrase: async () => '' },
+diff --git a/src/lib/runtime/worker/host-machine.test-support.ts b/src/lib/runtime/worker/host-machine.test-support.ts
+index a4e8c37..a0a6082 100644
+--- a/src/lib/runtime/worker/host-machine.test-support.ts
++++ b/src/lib/runtime/worker/host-machine.test-support.ts
+@@ -21,13 +21,20 @@ export function createWorkerHostFixture(
+ 	const unused = vi.fn(async () => {})
+ 	const close = vi.fn(async () => {})
+ 	const session: Session = {
+-		getSnapshot: () => ({ status: 'signed-out' }),
++		getSnapshot: () => ({ status: 'signed-out', user: null, localFirst: false }),
++		get db(): Session['db'] {
++			throw new Error('Fixture session is signed out')
++		},
+ 		subscribe: () => () => {},
+-		createLocalFirst: unused,
+-		restoreLocalFirst: unused,
+-		loginWithBackend: unused,
+-		linkWithBackend: unused,
+-		logout: unused,
++		createDeviceAccount: unused,
++		restoreDeviceAccount: unused,
++		reopenDeviceAccount: unused,
++		linkDeviceAccount: unused,
++		refresh: unused,
++		exportDeviceKey: () => {
++			throw new Error('Fixture session has no device key')
++		},
++		signOut: unused,
+ 		retry: unused,
+ 		close
+ 	}

@@ -39,6 +39,21 @@ Both libraries' `dist` outputs must be current before packing.
   copied unchanged rather than regenerated.
 - `run.mjs` supplies dependency/build isolation; it adds no application runtime,
   actor owner, RPC layer, workspace package or CI job.
+- `clipper-session.patch` ports the actual Clipper account host/contract and
+  readiness chart, removing the separate SDK preparation phase. Its worker-host
+  fixture retains a faithful signed-out session `db` getter. `clipper.mjs` copies
+  the current Clipper source and runs strict types plus its maintained startup,
+  root, sign-out and worker-host tests in a separate temporary package with
+  Clipper's own installed dependency versions and the same candidate tarballs.
+
+**Current blocker:** the expanded Clipper check currently fails,
+with 52/67 cases passing. Development XState walks the native SDK facade in
+context and invokes its new throwing `db` getter while signed out. Strict types
+and all 46 application-readiness cases pass; an actual SDK/browser development
+diagnostic reproduces the owner failure. The runner therefore does not report
+overall success at this checkpoint. Resolve the
+[shared resource-custody decision](../../specs/013-local-first-startup/worker-session-resource-decision.md)
+before adoption; do not weaken the fixture or disable development checks.
 
 Strict declaration/fixture types, native Svelte checks and all **21 native cases**
 pass in the isolated candidate, including the prior 18 worker/session cases.

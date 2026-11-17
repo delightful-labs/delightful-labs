@@ -14,6 +14,10 @@ changes came from that refresh. All 23 current monorepo tooling tests and the
 six-context guidance check pass. All seven PR paths classify as verification/
 documentation inputs under the updated deployment selector.
 
+The latest refresh includes main `2d1b5cd2` (PR #49's Clipper sharing-preview
+work). The candidate checks use that updated domain graph; no SDK pins or active
+session integration changed in the refresh.
+
 The [release audit](worker-jazz-release-research.md) remains the implementation
 evidence. Qualify this boundary before building C3–C5's application worker/read
 slice, so its SDK integration is written once.
@@ -46,8 +50,11 @@ resets or a Finance destination change.
       Window SDK session for the future worker UI.
       **In progress:** U2a's selected shared adapters pass public-package/native
       qualification below. The native Svelte/Finance recovery candidate also
-      passes its focused qualification. Remaining Finance/Clipper caller adoption
-      and removal of their explicit upgrade phases remain U2b; U2 is not complete.
+      passes its focused qualification. Clipper's inactive caller port now passes
+      types and 46 startup tests, but expanded worker-host coverage exposed the
+      [native session custody decision](worker-session-resource-decision.md).
+      Resolve that shared development-mode failure before finishing either
+      consumer's caller port. U2 is not complete.
       U2b source review also found Finance's separate account-handle-based restore
       client. The user approved the shared application Db in the
       [resource ownership decision](worker-restore-session-decision.md).
@@ -257,6 +264,38 @@ overlays now use Git's added-source whitespace checks before application.
 Artifacts: `/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha65-5gK1Bv`;
 log: `/private/tmp/finance-alpha65-svelte-proof.log`. The complete Finance/Clipper
 caller port and persistent backend upgrade remain unqualified on alpha.65.
+
+## U2b: Clipper startup caller and resource-custody blocker
+
+`clipper-session.patch` stages the actual Clipper account host/contract and
+readiness chart while the workspace remains on alpha.60. Native startup uses
+`localFirst: 'now'`; only web startup adds `initial: 'device'`. The extension's
+existing-account admission remains intact. Public user metadata/device methods
+replace the removed opaque-account APIs and hardcoded issuer classification.
+
+The existing Local First acquisition owner retains SDK startup. The application
+waits on `starting`/`transitioning`, adopts the exact user/client/Db binding, then
+runs its existing domain bootstrap. The separate SDK preparation actor/state,
+optional capabilities and thin-client retry bookkeeping are removed, reducing
+production code by 86 net lines. Library adoption, root write settlement,
+stale bindings, restoration, ordered sign-out and shutdown retain their owners.
+
+The isolated runner now checks Clipper in its own temporary package, retaining
+its installed dependency versions (including Zod 4.6.7 and Vitest 4.1.8) instead
+of substituting Finance's versions. It reuses the same SDK/Local First tarballs
+and the maintained Clipper Vitest configuration. Strict types and all 46
+application-readiness tests pass. Expanded root/sign-out/worker-host coverage
+passes 52 of 67 cases: the other 15 fail when development XState traverses the
+new native session's throwing `db` getter. The actual SDK/browser diagnostic
+confirms the same acquisition-owner failure. This candidate is **not qualified**.
+
+The [decision record](worker-session-resource-decision.md) contains the exact
+failure, evidence, supported solution and alternatives. Discuss keeping the
+native handle outside immutable context within the existing owner before
+implementation. Do not fix only the fixture, disable development checks or add
+an SDK patch. This shared foundation correction precedes the remaining Finance
+layout/startup port and further Clipper adoption. Backend/schema/extension
+qualification and the coordinated U5 switch remain open.
 
 ## Native Vercel naming: additional code proof
 

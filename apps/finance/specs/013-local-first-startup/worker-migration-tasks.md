@@ -40,6 +40,14 @@ U2b's isolated native Svelte/recovery slice now passes strict types, zero Svelte
 warnings and all 21 native cases, including the actual Finance recovery UI under
 `JazzProvider` in all three engines. [The qualification](worker-jazz-upgrade-plan.md#u2b-native-svelte-session-boundary)
 records its per-provider scope and remaining layout/Clipper host/startup work.
+Clipper's inactive native startup caller now passes types and 46 startup tests
+and removes 86 net production lines. Expanded worker-host coverage exposed
+XState development traversal of the new SDK session's throwing `db` getter;
+an actual SDK/browser diagnostic confirms it. The
+[resource-custody decision](worker-session-resource-decision.md) must be discussed
+and resolved before completing either caller port. Keep the existing owner and
+domain drains; do not add an SDK patch or hide the failure in a fixture. U2
+remains open, and active alpha.60 behavior is unchanged.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

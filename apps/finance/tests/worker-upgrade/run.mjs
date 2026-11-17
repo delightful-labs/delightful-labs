@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkClipper } from './clipper.mjs'
 
 // Upgrade experiment only: reuse the maintained Finance fixture in a disposable
 // project, with its own dependencies. No workspace pin or installed SDK is edited.
@@ -206,4 +207,5 @@ json(join(directory, 'versions.json'), {
 run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.json'], app)
 run('pnpm', ['exec', 'svelte-check', '--tsconfig', './tsconfig.json', '--fail-on-warnings'], app)
 run('pnpm', ['exec', 'vitest', 'run', '--config', 'vitest.worker-bindings.config.ts'], app)
+checkClipper(directory, proof, join(finance, '../clipper'))
 console.log(`Upgrade proof passed; artifacts retained at ${directory}`)
