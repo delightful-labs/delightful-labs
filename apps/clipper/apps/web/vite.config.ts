@@ -24,11 +24,12 @@ export default defineConfig(({ command, mode }) => {
 	return {
 		worker: jazzWorkerOptions(),
 		envPrefix: ['VITE_', 'PUBLIC_'],
-		// Search and extraction workers start after account readiness. Prebundle
-		// their lazy dependencies so a cold optimizer cannot reload an active job.
+		// Workers and account routes load dependencies lazily. Prebundle them
+		// so a cold optimizer cannot reload an active account or job.
 		optimizeDeps: {
 			exclude: ['delightful-ui', 'jazz-wasm', 'microlighter'],
 			include: [
+				'@atcute/lexicons/syntax',
 				'minisearch',
 				'@mozilla/readability',
 				'@mozilla/readability/JSDOMParser.js',
