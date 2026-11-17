@@ -1,5 +1,68 @@
 # Article notes — implementation started
 
+## Authenticated preview request — workflow
+
+The next host is a same-origin, JSON POST accepting only the existing preview
+shape's `libraryId` and `source`. The client supplies neither a publishing DID nor
+timestamps/content. The request chart owns bounded input reading, a fresh native
+Better Auth session read, canonical Jazz account/provider-link admission, the
+existing preview child, then fresh session and binding checks before disclosure.
+The server chooses the destination from the session's verified AT profile and
+checks its matching Better Auth provider account. Identity-only login is enough
+for this read; no grant restoration, refresh or PDS operation is selected.
+
+The HTTP host owns one request root and forwards disconnect. Expected terminal
+responses are 200 (approved preview), 400 (input), 403 (origin), 401 (identity),
+409 (preview unavailable) and 503 (unexpected failure/timeout), all private and
+no-store. A disconnect stops invoked work and discards any preview; the request
+has a bounded lifetime. Native reads that lack abort support may complete late,
+but cannot publish a result after their owning state exits. No account or library
+is created. UI copy approval remains pending and does not block the backend work.
+Admission is cookie-only: an Authorization header is refused, so a second proof
+cannot select a different Jazz account from the verified provider session. Fresh
+binding observations also enforce the session expiry before exposing the preview.
+The existing preview child now receives its copied binding through actor input,
+allowing a typed state-owned invocation after authentication without a nested root.
+
+Native request tests use real signed Better Auth cookies and auth rows, with
+explicit setup states for annotation ownership, auth initialization, credential
+signing and a selected native seed batch. They exercise foreign/invalid input,
+expired/revoked sessions, profile/link changes, canonical account replacement,
+disconnect, timeout and body-reader cancellation. Canonical Jazz account mapping
+is controlled in these request tests; the existing gateway integration suite
+separately exercises the actual native `accountFor` admission boundary. No browser
+reader-to-preview flow or real AT service interaction is qualified yet.
+Verification passes 929 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper lint/formatting, whitespace checks,
+workspace links and the web production build. Ten new request tests exercise the
+authenticated boundary; existing preview tests retain their prior behavior after
+moving the verified binding into actor input. The isolated checkout's frozen
+dependencies and workspace packages were refreshed after the intervening merges;
+no manifest, lockfile, catalog or shared-library source changes are included.
+
+### Pending preview UI copy approval
+
+These proposed entries belong in the document-note preview control/dialog and its
+worker-owned loading/error feedback. No interpolation, plural or context forms
+are proposed. They have not been added to the catalog or product callers.
+
+| Key | Proposed English text |
+| --- | --- |
+| `publication.preview_action` | Preview sharing |
+| `publication.preview_heading` | Sharing preview |
+| `publication.account` | AT Protocol account |
+| `publication.disclosure` | This is a preview. Publishing would make this note and its article URL public. |
+| `publication.loading` | Preparing sharing preview… |
+| `publication.unavailable` | Sharing preview is unavailable. Check your AT Protocol sign-in and saved note, then try again. |
+
+Reuse `actions.close`, `actions.retry`, `nouns.note` and `capture.url_label` for
+existing labels. `actions.show_subject` with `nouns.note` describes the note
+already displayed; `status.unavailable_subject` with that noun would incorrectly
+describe the local note as unavailable. Existing account-working feedback describes
+an account change. Those messages cannot identify this read-only sharing preview
+or its public destination/disclosure. The shared localization guide requires
+explicit approval before adding these entries; the approval request is pending.
+
 ## Document-note publication preview — 2026-11-16
 
 The user approved the temporary Zod response containing `libraryId`, the existing

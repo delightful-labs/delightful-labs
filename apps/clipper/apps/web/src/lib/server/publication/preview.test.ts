@@ -87,8 +87,8 @@ function preview(
 	source: PublicationSource = { noteId: a.noteId }
 ) {
 	return toPromise(
-		createActor(createDocumentNotePreview(a.backend, a.scope), {
-			input: { source, createdAt }
+		createActor(createDocumentNotePreview(a.backend), {
+			input: { source, createdAt, binding: a.scope }
 		}).start()
 	)
 }
@@ -172,8 +172,8 @@ it('refuses highlights before reading and does not treat an attached note as an 
 	}
 	expect(
 		await toPromise(
-			createActor(createDocumentNotePreview({ one }, a.scope), {
-				input: { source: { highlightId }, createdAt }
+			createActor(createDocumentNotePreview({ one }), {
+				input: { source: { highlightId }, createdAt, binding: a.scope }
 			}).start()
 		)
 	).toBeUndefined()
@@ -247,8 +247,8 @@ it('rejects expired scopes and malformed destinations before reading, and contai
 	]) {
 		expect(
 			await toPromise(
-				createActor(createDocumentNotePreview({ one }, scope), {
-					input: { source: { noteId: a.noteId }, createdAt }
+				createActor(createDocumentNotePreview({ one }), {
+					input: { source: { noteId: a.noteId }, createdAt, binding: scope }
 				}).start()
 			)
 		).toBeUndefined()
@@ -261,8 +261,8 @@ it('rejects expired scopes and malformed destinations before reading, and contai
 	]) {
 		expect(
 			await toPromise(
-				createActor(createDocumentNotePreview({ one }, a.scope), {
-					input
+				createActor(createDocumentNotePreview({ one }), {
+					input: { ...input, binding: a.scope }
 				}).start()
 			)
 		).toBeUndefined()
@@ -270,8 +270,8 @@ it('rejects expired scopes and malformed destinations before reading, and contai
 	expect(reads).toBe(0)
 	expect(
 		await toPromise(
-			createActor(createDocumentNotePreview({ one }, a.scope), {
-				input: { source: { noteId: a.noteId }, createdAt }
+			createActor(createDocumentNotePreview({ one }), {
+				input: { source: { noteId: a.noteId }, createdAt, binding: a.scope }
 			}).start()
 		)
 	).toBeUndefined()
@@ -283,8 +283,8 @@ it('bounds a stalled read and ignores late completion after timeout or host stop
 	for (const stop of [false, true]) {
 		const held = holdRead(a.backend),
 			clock = new SimulatedClock()
-		const actor = createActor(createDocumentNotePreview(held, a.scope), {
-			input: { source: { noteId: a.noteId }, createdAt },
+		const actor = createActor(createDocumentNotePreview(held), {
+			input: { source: { noteId: a.noteId }, createdAt, binding: a.scope },
 			clock
 		}).start()
 		try {
@@ -311,13 +311,16 @@ it('discards an in-flight result after scope invalidation or cancellation', asyn
 	for (const cancel of [false, true]) {
 		const held = holdRead(a.backend)
 		let current = true
-		const actor = createActor(
-			createDocumentNotePreview(held, {
-				...a.scope,
-				isCurrent: () => current
-			}),
-			{ input: { source: { noteId: a.noteId }, createdAt } }
-		).start()
+		const actor = createActor(createDocumentNotePreview(held), {
+			input: {
+				source: { noteId: a.noteId },
+				createdAt,
+				binding: {
+					...a.scope,
+					isCurrent: () => current
+				}
+			}
+		}).start()
 		const result = toPromise(actor)
 		try {
 			await held.entered
@@ -339,8 +342,8 @@ it('copies the selected source, destination binding and candidate time before aw
 	const source = { noteId: a.noteId },
 		time = new Date(createdAt),
 		binding = { ...a.scope }
-	const actor = createActor(createDocumentNotePreview(held, binding), {
-		input: { source, createdAt: time }
+	const actor = createActor(createDocumentNotePreview(held), {
+		input: { source, createdAt: time, binding: binding }
 	}).start()
 	const result = toPromise(actor)
 	try {
