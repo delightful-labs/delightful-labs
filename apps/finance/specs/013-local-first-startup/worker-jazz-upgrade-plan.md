@@ -8,6 +8,12 @@ unchanged; the worker-only alpha.65 candidate below is an isolated fixture. The 
 package-tag endpoint was rechecked: `latest` is alpha.65; `alpha` still selects
 alpha.60. Use explicit coordinated pins after qualification.
 
+The branch subsequently merges main `5e78a349` (PR #45's website/deployment-control
+fixes). No SDK, Finance schema, Local First implementation or native fixture
+changes came from that refresh. All 23 current monorepo tooling tests and the
+six-context guidance check pass. All seven PR paths classify as verification/
+documentation inputs under the updated deployment selector.
+
 The [release audit](worker-jazz-release-research.md) remains the implementation
 evidence. Qualify this boundary before building C3–C5's application worker/read
 slice, so its SDK integration is written once.
