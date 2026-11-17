@@ -594,14 +594,18 @@ The refreshed read-only CLI inventory finds the same three mount pairs, with
 production running at observation time. The native SDK startup script would
 update version/core files and may restart the original core; do not use it as a
 read-only compatibility probe. Native Vercel Drive snapshot mounts provide
-point-in-time read-only access without stopping the source. The first cloud
-inspection is prepared in the
-[retained Drive plan](worker-jazz-upgrade-plan.md#retained-drive-inspection-prepared-next-step),
-including its exact command, snapshot-versus-fork tradeoff and approval boundary.
-Its small metadata probe passes a local disposable layout smoke check. The
-Sandbox has not been created, retained cloud data has not been read, and schema,
-row, attachment and workload-credential compatibility remain open. No custom
-retention layer, namespace workaround or new patch is added.
+point-in-time read-only access without stopping the source. The user approved
+the bounded cloud inspection, which now passes on all three Drives: each has a
+nonempty retained app ID, pinned trust metadata, native alpha.60 version marker
+and nonempty store. No row or private metadata values were printed/downloaded.
+The one-vCPU nonpersistent Sandbox stopped after 24.116 seconds; its final native
+listing confirms stopped status and three `snapshot` mounts. The
+[retained Drive evidence](worker-jazz-upgrade-plan.md#retained-drive-inspection-source-preserving-access)
+records exact file/byte totals, the command, cleanup and log hash. No original
+core was opened/upgraded or source Drive changed. This qualifies metadata access,
+not alpha.66 schema, row, attachment or workload-credential compatibility. Those
+checks remain open; no custom retention layer, namespace workaround or new patch
+is added.
 
 At the preceding auth checkpoint `708ccfe2`, all normal hosted Finance, Clipper
 and Foundation jobs pass. This does not fix the intermittent unknown-save

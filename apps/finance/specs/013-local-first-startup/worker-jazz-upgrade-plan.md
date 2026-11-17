@@ -199,6 +199,13 @@ do not accumulate a second implementation alongside the selected native path.
       [actual backend evidence](worker-jazz-alpha66-research.md#better-auth-and-real-backend-expiry).
       Keep U4/U5 open for retained destinations, broader caller/backend coverage
       and the coherent full-patch/dependency switch.
+      **Retained snapshot metadata access now passes:** the approved temporary
+      Sandbox reads all three existing Finance Drives through native read-only
+      snapshot mounts. Each retains alpha.60 version, identity/trust metadata
+      and a nonempty store. Cleanup stops only the inspection Sandbox. See the
+      [cloud evidence](#retained-drive-inspection-source-preserving-access).
+      This does not yet qualify alpha.66 financial rows/attachments or live
+      workload admission; compare native readers on disposable copies next.
 - [ ] **U5 — Switch and qualify the workspace coherently.** Update SDK, matching
       Wasm/native core, library peer and existing patch bindings as one reviewed
       change; preserve one compatible SDK identity per consumer. Run library
@@ -480,7 +487,7 @@ Sanitized metadata and executable comparison results are in
 `finance-core-inventory.json` and `finance-core-compatibility.json` under the
 research artifact directory. No secrets or application records were read.
 
-## Retained Drive inspection: prepared next step
+## Retained Drive inspection: source-preserving access
 
 **November 17 refresh:** Vercel CLI 65.15.0 confirms the Finance project ID and
 `apps/finance` root. Its Sandbox/Drive listings still show the same three names
@@ -503,9 +510,10 @@ mount captures a point-in-time read-only view, alongside the original writable
 mount. Existing production can continue running. This is a Drive snapshot, not
 `sandbox snapshot --stop`, which would stop the source Sandbox.
 
-The prepared first cloud action is **one nonpersistent five-minute, one-vCPU
-Sandbox**, with networking denied, no published ports, and all three existing
-Drives mounted read-only. Run from Finance after confirming the project again:
+The user approved the following bounded cloud action on November 17, and it
+completed successfully: **one nonpersistent five-minute, one-vCPU Sandbox**,
+with networking denied, no published ports, and all three existing Drives mounted
+read-only. The executed command, from Finance after reconfirming the project:
 
 ```sh
 vercel sandbox create \
@@ -518,16 +526,38 @@ vercel sandbox create \
   --mount finance-alpha60-preview-qualification-data:/retained/qualification:snapshot
 ```
 
-Then use native `sandbox copy` to upload only
+Native `sandbox copy` uploaded only
 `tests/worker-upgrade/inspect-retained-drive.mjs` into that Sandbox, `sandbox exec`
-to run `node /vercel/sandbox/inspect-retained-drive.mjs /retained`, and
-`sandbox stop` in cleanup, all with the same explicit project/scope. CLI help
-confirms these exact commands and snapshot-mount flags. The script reads only
+ran `node /vercel/sandbox/inspect-retained-drive.mjs /retained`, and
+`sandbox stop` completed in cleanup, all with the same explicit project/scope.
+The final native listing confirms the inspection Sandbox is stopped and all
+three mounts have mode `snapshot`. The script reads only
 the native `app-id`, `version`, `trust` and `store` layout. Output is limited to
 identity/trust presence, version, store file count and byte total; no private
 values or financial records are printed or downloaded. A local disposable
 layout containing the existing retained-store fixture passes this smoke check.
 It does not assert row contents or schema compatibility.
+
+The cloud probe succeeds for every destination. All report native version
+`2.0.0-alpha.60`, a present/nonempty app ID and pinned trust metadata:
+
+| Snapshot destination | Store files | Store bytes |
+| -------------------- | ----------- | ----------- |
+| Production           | 2           | 2,899,978   |
+| `mono` preview       | 2           | 1,196,043   |
+| Custom qualification | 2           | 1,212,427   |
+
+These are counts and file sizes, not financial records or row counts. The
+inspection session ran for **24.116 seconds**, with 2.07 seconds active CPU.
+No original core was opened, started, stopped or upgraded by this probe; no
+source Drive was mounted read-write, forked, renamed or deleted. Production
+kept its existing independent writable mount. No deployment settings or pins
+changed. Only the temporary inspection Sandbox was created and stopped.
+
+Evidence: `/private/tmp/finance-snapshot-inspection.log`, SHA-256
+`d15d7236c8b55a19ae9b808ac3d2e084b7c8abf1370b0638a6351ab85956444a`;
+cleanup `/private/tmp/finance-snapshot-stop.log`; final stopped/snapshot-mode
+confirmation `/private/tmp/finance-snapshot-final-state.txt`.
 
 Alternatives considered: `Drive.fork()` creates an independent writable Drive
 and remains available if a large compatibility run needs it, but adds a persistent
@@ -538,14 +568,8 @@ updates the highest-version marker, may restart the core and publishes schema.
 Calling that path a read-only query would be incorrect. Do not create a custom
 copy/retention service or a naming patch for the unreachable destination.
 
-**Prepared, not executed:** the Vercel CLI skill's Sandbox reference explicitly
-requires confirming intent before creating or connecting to cloud compute.
-Ask approval for the concrete Sandbox above after uploading this checkpoint.
-No Sandbox/Drive create, fork, mount, start, stop, delete, rename or deployment
-setting change has occurred in this investigation.
-
-After observing the actual retained layout, qualify old/new native readers on
-separate disposable scratch copies from that same immutable view, preserving
+**Next qualification, not yet run:** prepare old/new native readers on separate
+disposable scratch copies from the same immutable snapshot view, preserving
 app ID, rows, schema and attachment bytes. Report comparison results without row
 contents. That result still does not establish live workload/OIDC admission;
 qualify the intended deployment credential boundary separately. Keep the custom

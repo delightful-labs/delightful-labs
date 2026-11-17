@@ -227,15 +227,18 @@ core/Drive names match exactly; the custom qualification name remains unreachabl
 This replaces the historical alpha.65-only naming evidence with a repeatable
 alpha.66 check; it adds no application naming helper or dependency patch.
 
-The prepared `inspect-retained-drive.mjs` uses only Node filesystem reads. It
+`inspect-retained-drive.mjs` uses only Node filesystem reads. It
 checks retained app-ID/trust presence, native version and store file/byte totals
 on three native read-only snapshot mounts. It prints no IDs, trust contents,
-file names or financial rows. A disposable local layout smoke check passes;
-**the cloud inspection has not run**. No Jazz core is opened by this probe.
+file names or financial rows. Both a disposable local layout smoke check and the
+user-approved cloud inspection pass. All three retained Drives report alpha.60
+version markers, present identity/trust metadata and nonempty stores. The
+temporary Sandbox stopped after 24.116 seconds; the final listing confirms its
+stopped state and all three snapshot mounts. No original Jazz core was opened.
 
-The [concrete snapshot inspection plan](../../specs/013-local-first-startup/worker-jazz-upgrade-plan.md#retained-drive-inspection-prepared-next-step)
-records the exact mounts, bounded Sandbox command, alternatives and approval
-boundary. Snapshot access does not itself qualify alpha.66 schema/auth/data
+The [snapshot inspection evidence](../../specs/013-local-first-startup/worker-jazz-upgrade-plan.md#retained-drive-inspection-source-preserving-access)
+records the exact mounts, bounded Sandbox command, results, cleanup and log hash.
+Snapshot access does not itself qualify alpha.66 schema/auth/data
 access: compare native old/new readers on independent scratch copies afterward.
 
 ## Alpha.66 persistent worker and session boundary
