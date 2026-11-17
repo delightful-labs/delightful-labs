@@ -20,6 +20,19 @@ The previous prototype and isolated proof scripts are preserved on [archive/pre-
 
 All changes use feature branches and pull requests targeting monorepo `master`.
 
+## Vercel dependency installation
+
+The web deployment installs with:
+
+```sh
+pnpm --filter '@delightful-clipper/web...' --filter delightful-clipper install --frozen-lockfile
+```
+
+This selects the web app, UI, Local First and the coordinator. Including the
+coordinator preserves its existing preinstall checks; unrelated app preparation
+and extension installation are excluded. Use the full workspace install above
+for development and CI, including the extension fixtures used by web type checks.
+
 ## Development schema baseline
 
 Clipper uses one current Jazz schema with `migrations: 'none'`. Historical schema

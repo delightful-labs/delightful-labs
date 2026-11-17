@@ -31,6 +31,10 @@ preview, build with `PUBLIC_JAZZ_SERVER_URL=same-origin`; start the preview with
 
 ## Vercel deployment
 
+Vercel installs with `pnpm --filter 'delightful-finances...' install --frozen-lockfile`.
+This retains Finance, UI and Local First, including their existing preparation and
+packaging hooks. Development and CI keep the full workspace installation.
+
 `vercel.json` selects SvelteKit, the frozen pnpm lockfile, and `pnpm build`. The Vercel adapter
 uses Node 24 in `iad1`. `/jazz` exposes Jazz's supported backend handler with local-first guest
 admission; backend credentials stay server-side. Production does not need Jazz Cloud provisioning
