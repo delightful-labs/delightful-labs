@@ -25,10 +25,25 @@ function comparisonBase(cwd, head) {
 		cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.max(1, deadline - Date.now()),
 	}).trim()
 	if (git(['rev-parse', '--verify', 'HEAD']) !== head) throw new Error('Deployment checkout mismatch')
+	let source = 'origin'
+	try {
+		git(['remote', 'get-url', 'origin'])
+	} catch {
+		// Vercel may reconstruct Git metadata without any remotes. Its GitHub
+		// system metadata identifies this public repository without credentials.
+		const owner = process.env.VERCEL_GIT_REPO_OWNER
+		const repo = process.env.VERCEL_GIT_REPO_SLUG
+		if (process.env.VERCEL_GIT_PROVIDER !== 'github' ||
+			typeof owner !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9-]*$/u.test(owner) ||
+			typeof repo !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/u.test(repo)) {
+			throw new Error('No preview repository source')
+		}
+		source = `https://github.com/${owner}/${repo}.git`
+	}
 	// A new preview branch has no previous deployment. Compare its entire branch
 	// delta, not HEAD^ (which loses earlier branch commits) or a stale main ref.
 	// Main-only changes after branching do not make this preview affect that app.
-	git(['fetch', '--no-tags', '--depth=1', 'origin', 'refs/heads/main'])
+	git(['fetch', '--no-tags', '--depth=1', source, 'refs/heads/main'])
 	const main = git(['rev-parse', '--verify', '--end-of-options', 'FETCH_HEAD^{commit}'])
 	if (!validSha(main)) throw new Error('No production branch comparison')
 	let base
@@ -37,7 +52,7 @@ function comparisonBase(cwd, head) {
 	} catch {
 		// Vercel clones shallow history. Deepen the two pinned commits once;
 		// unavailable/ambiguous ancestry still builds, within one time budget.
-		git(['fetch', '--no-tags', '--deepen=100', 'origin', main, head])
+		git(['fetch', '--no-tags', '--deepen=100', source, main, head])
 		base = git(['merge-base', '--all', main, head])
 	}
 	if (!validSha(base)) throw new Error('No unique preview merge base')
