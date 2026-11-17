@@ -479,3 +479,75 @@ until their independently qualified SDK integration is ready.
 Sanitized metadata and executable comparison results are in
 `finance-core-inventory.json` and `finance-core-compatibility.json` under the
 research artifact directory. No secrets or application records were read.
+
+## Retained Drive inspection: prepared next step
+
+**November 17 refresh:** Vercel CLI 65.15.0 confirms the Finance project ID and
+`apps/finance` root. Its Sandbox/Drive listings still show the same three names
+and mount pairs. The preview and qualification Sandboxes are stopped; production
+was running with its Drive attached at inspection time. These are observations,
+not instructions to stop or detach it. Project environment metadata still lists
+no variables and zero hidden production variables. No live store was opened.
+
+`tests/worker-upgrade/vercel-names.mjs` now executes alpha.66's own `coreName`,
+`driveName`, `perBranch` and removed-name refusal against these destinations.
+Both default core/Drive pairs match exactly, including native `perBranch('mono')`.
+The old custom qualification name is refused with the native explanation that
+no namespace reaches it. The pure proof passes and writes
+`vercel-name-qualification.json`; retained data remains explicitly unqualified.
+No new application helper, namespace algorithm or SDK patch is added.
+
+The installed Sandbox SDK and [Vercel's Drive documentation](https://vercel.com/docs/sandbox/concepts/drives#snapshots)
+provide a smaller supported way to inspect retained data: a native `snapshot`
+mount captures a point-in-time read-only view, alongside the original writable
+mount. Existing production can continue running. This is a Drive snapshot, not
+`sandbox snapshot --stop`, which would stop the source Sandbox.
+
+The prepared first cloud action is **one nonpersistent five-minute, one-vCPU
+Sandbox**, with networking denied, no published ports, and all three existing
+Drives mounted read-only. Run from Finance after confirming the project again:
+
+```sh
+vercel sandbox create \
+  --name finance-alpha66-retained-inspection-20261117 \
+  --project prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa \
+  --scope mjamesderochers-projects \
+  --vcpus 1 --timeout 5m --non-persistent --network-policy deny-all \
+  --mount jazz-prj-xryqmkraddv2xuzgpexcfbsfghva-production-data:/retained/production:snapshot \
+  --mount jazz-prj-xryqmkraddv2xuzgpexcfbsfghva-preview-mono-d7de34b1-data:/retained/preview:snapshot \
+  --mount finance-alpha60-preview-qualification-data:/retained/qualification:snapshot
+```
+
+Then use native `sandbox copy` to upload only
+`tests/worker-upgrade/inspect-retained-drive.mjs` into that Sandbox, `sandbox exec`
+to run `node /vercel/sandbox/inspect-retained-drive.mjs /retained`, and
+`sandbox stop` in cleanup, all with the same explicit project/scope. CLI help
+confirms these exact commands and snapshot-mount flags. The script reads only
+the native `app-id`, `version`, `trust` and `store` layout. Output is limited to
+identity/trust presence, version, store file count and byte total; no private
+values or financial records are printed or downloaded. A local disposable
+layout containing the existing retained-store fixture passes this smoke check.
+It does not assert row contents or schema compatibility.
+
+Alternatives considered: `Drive.fork()` creates an independent writable Drive
+and remains available if a large compatibility run needs it, but adds a persistent
+data copy and cleanup. An ephemeral scratch copy from a read-only snapshot is
+enough for the bounded next checks. Running alpha.66 against an original Drive
+is unsuitable for qualification: the SDK startup script installs the core,
+updates the highest-version marker, may restart the core and publishes schema.
+Calling that path a read-only query would be incorrect. Do not create a custom
+copy/retention service or a naming patch for the unreachable destination.
+
+**Prepared, not executed:** the Vercel CLI skill's Sandbox reference explicitly
+requires confirming intent before creating or connecting to cloud compute.
+Ask approval for the concrete Sandbox above after uploading this checkpoint.
+No Sandbox/Drive create, fork, mount, start, stop, delete, rename or deployment
+setting change has occurred in this investigation.
+
+After observing the actual retained layout, qualify old/new native readers on
+separate disposable scratch copies from that same immutable view, preserving
+app ID, rows, schema and attachment bytes. Report comparison results without row
+contents. That result still does not establish live workload/OIDC admission;
+qualify the intended deployment credential boundary separately. Keep the custom
+qualification destination excluded from rollout until a supported way to reach
+its retained data is agreed. U4/U5 stay open; no partial app pin switch is made.

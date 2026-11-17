@@ -581,6 +581,32 @@ permitted isolated run passes. This is environment setup evidence, not an app
 failure. U4 remains open for retained destinations and broader backend adoption;
 U5 still requires the coherent full dependency/patch/consumer switch.
 
+## Retained Vercel destination follow-up
+
+The maintained `vercel-names.mjs` source-only proof now passes against the actual
+alpha.66 package, replacing reliance on alpha.65's naming comparison. Both
+observed default Finance core/Drive pairs remain exact, and native
+`perBranch('mono')` matches the existing preview namespace. The custom
+`finance-alpha60-preview-qualification` name is still refused by the native API.
+This qualifies names only; the result explicitly marks live data unqualified.
+
+The refreshed read-only CLI inventory finds the same three mount pairs, with
+production running at observation time. The native SDK startup script would
+update version/core files and may restart the original core; do not use it as a
+read-only compatibility probe. Native Vercel Drive snapshot mounts provide
+point-in-time read-only access without stopping the source. The first cloud
+inspection is prepared in the
+[retained Drive plan](worker-jazz-upgrade-plan.md#retained-drive-inspection-prepared-next-step),
+including its exact command, snapshot-versus-fork tradeoff and approval boundary.
+Its small metadata probe passes a local disposable layout smoke check. The
+Sandbox has not been created, retained cloud data has not been read, and schema,
+row, attachment and workload-credential compatibility remain open. No custom
+retention layer, namespace workaround or new patch is added.
+
+At the preceding auth checkpoint `708ccfe2`, all normal hosted Finance, Clipper
+and Foundation jobs pass. This does not fix the intermittent unknown-save
+failures, qualify live retained destinations or activate the SDK upgrade.
+
 ## Execution order
 
 1. Keep the approved private session actor and awaited native factory. Finish

@@ -212,6 +212,32 @@ override retirement are not qualified or changed.** Active app pins remain
 alpha.60; full consumer/patch adoption and retained Vercel data are still gates.
 See the [auth evidence and reuse findings](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#better-auth-and-real-backend-expiry).
 
+## Alpha.66 retained Vercel destinations
+
+After either alpha.66 schema mode, run the source-only naming check:
+
+```sh
+node tests/worker-upgrade/vercel-names.mjs /path/to/finance-jazz-alpha66-artifacts
+```
+
+It executes the installed candidate's native naming functions without opening a
+store or contacting Vercel. Finance's observed production and `mono` preview
+core/Drive names match exactly; the custom qualification name remains unreachable.
+`vercel-name-qualification.json` explicitly records that live data is unqualified.
+This replaces the historical alpha.65-only naming evidence with a repeatable
+alpha.66 check; it adds no application naming helper or dependency patch.
+
+The prepared `inspect-retained-drive.mjs` uses only Node filesystem reads. It
+checks retained app-ID/trust presence, native version and store file/byte totals
+on three native read-only snapshot mounts. It prints no IDs, trust contents,
+file names or financial rows. A disposable local layout smoke check passes;
+**the cloud inspection has not run**. No Jazz core is opened by this probe.
+
+The [concrete snapshot inspection plan](../../specs/013-local-first-startup/worker-jazz-upgrade-plan.md#retained-drive-inspection-prepared-next-step)
+records the exact mounts, bounded Sandbox command, alternatives and approval
+boundary. Snapshot access does not itself qualify alpha.66 schema/auth/data
+access: compare native old/new readers on independent scratch copies afterward.
+
 ## Alpha.66 persistent worker and session boundary
 
 From a clean checkout with current built public Local First/DUI packages and
