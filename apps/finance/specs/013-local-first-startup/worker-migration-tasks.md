@@ -24,6 +24,10 @@ gate are recorded in that plan.
 U1's isolated alpha.65 worker bridge now passes strict types and 15 native
 Finance SDK/IDB cases across Chromium/Firefox/WebKit. Workspace pins and the
 active patch remain alpha.60; full shared-session/backend qualification is next.
+U2a's shared native recovery/restoration/readiness candidate now passes strict
+types and all 18 native cases. [Its qualification](worker-jazz-upgrade-plan.md#u2a-shared-native-session-adapter-qualification)
+records the scope guarantees and remaining Finance/Clipper caller adoption; U2
+remains open until those consumers are adapted and qualified together.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

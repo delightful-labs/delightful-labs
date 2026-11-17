@@ -1,7 +1,10 @@
 --- a/tests/worker-bindings/sdk-session.worker.ts
 +++ b/tests/worker-bindings/sdk-session.worker.ts
-@@ -5,7 +5,14 @@
+@@ -3,9 +3,17 @@
+ import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
+ import { createFinanceAccountStore } from '../../src/lib/runtime/worker/account-store.js'
  import { app } from '../../src/lib/schema.js'
++import { qualifyNativeSession } from './session-qualification.js'
  
  export type SdkCommand =
 -	| { type: 'OPEN'; scope: string; brokerUrl: string; data: MessagePort; control: MessagePort }
@@ -16,7 +19,20 @@
  	| { type: 'READ'; organizationId: string }
  	| {
  			type: 'SEED'
-@@ -28,8 +35,8 @@
+@@ -16,10 +24,12 @@
+ 	  }
+ 	| { type: 'EDIT'; transactionId: string; amountMinor: number }
+ 	| { type: 'CLOSE' }
++	| { type: 'QUALIFY_SESSION' }
+ export type SdkReply =
+ 	| { kind: 'opened'; accountId: string; localFirst: boolean; windowPresent: boolean }
+ 	| { kind: 'rows'; rows: { id: string; amountMinor: number; memo: string | null }[] }
+ 	| { kind: 'saved' }
++	| { kind: 'session-qualified'; report: Awaited<ReturnType<typeof qualifyNativeSession>> }
+ 	| { kind: 'closed'; sdkClosed: boolean; hostClosed: boolean }
+ 	| { kind: 'failed'; message: string; stack?: string }
+ 
+@@ -28,8 +38,8 @@
  let broker: ReturnType<typeof brokerHostClient> | undefined
  function current() {
  	const snapshot = session?.getSnapshot()
@@ -27,7 +43,7 @@
  }
  
  // Disposable SDK controls, not an application runtime. The test owns operation
-@@ -48,7 +55,12 @@
+@@ -48,7 +58,12 @@
  			scope: command.scope,
  			env: 'sdk-proof',
  			store,
@@ -41,7 +57,7 @@
  			runtimeSources: {
  				wasmUrl,
  				brokerWorkerUrl: command.brokerUrl,
-@@ -57,7 +69,6 @@
+@@ -57,7 +72,6 @@
  			}
  		})
  		const { db, accountId } = current()
@@ -49,7 +65,7 @@
  		return {
  			kind: 'opened',
  			accountId,
-@@ -66,9 +77,9 @@
+@@ -66,9 +80,9 @@
  		}
  	}
  	if (command.type === 'CLOSE') {
@@ -62,6 +78,17 @@
  		await store.close()
  		const receipt = await broker.close()
  		return {
+@@ -78,6 +92,10 @@
+ 				receipt.scope === broker.host.identity.scope &&
+ 				receipt.requestId === broker.host.identity.requestId
+ 		}
++	}
++	if (command.type === 'QUALIFY_SESSION') {
++		if (!session) throw new Error('SDK session unavailable')
++		return { kind: 'session-qualified', report: await qualifyNativeSession(session) }
+ 	}
+ 	const { db, accountId } = current()
+ 	if (command.type === 'READ') {
 --- a/tests/worker-bindings/sdk-session.ts
 +++ b/tests/worker-bindings/sdk-session.ts
 @@ -34,20 +34,21 @@
@@ -120,14 +147,10 @@
  	if (brokers.length !== 1 || !brokers[0])
  		throw new Error(`Expected one SDK broker asset, found ${brokers.length}`)
  	sdkBrokerPath = brokers[0]
-@@ -117,6 +114,43 @@
- 						{ scope: crypto.randomUUID(), url: origin + sdkBrokerPath }
- 					)
- 				).toBe(true)
-+			} finally {
-+				await browser.close()
-+			}
-+		})
+@@ -121,6 +118,83 @@
+ 				await browser.close()
+ 			}
+ 		})
 +		it('closes acquired resources after immediate SDK loader failure and reopens', async () => {
 +			retainOnFailure()
 +			const browser = await browserType.launch({ headless: true })
@@ -161,6 +184,168 @@
 +					sdkClosed: true,
 +					hostClosed: true
 +				})
- 			} finally {
- 				await browser.close()
- 			}
++			} finally {
++				await browser.close()
++			}
++		})
++		it('qualifies shared native session recovery, restoration and scope retirement', async () => {
++			retainOnFailure()
++			const browser = await browserType.launch({ headless: true })
++			try {
++				const page = await boot(await browser.newContext())
++				await page.evaluate(({ scope, url }) => window.financeSdkFixture.open(scope, url), {
++					scope: crypto.randomUUID(),
++					url: origin + sdkBrokerPath
++				})
++				expect(
++					await page.evaluate(() => window.financeSdkFixture.command({ type: 'QUALIFY_SESSION' }))
++				).toEqual({
++					kind: 'session-qualified',
++					report: {
++						observedStatuses: true,
++						exportMatchesNative: true,
++						userStable: true,
++						sameAccountRetiresScope: true,
++						replacedBeforeObservation: true,
++						abaRetiresScopes: true,
++						restorationReportsCurrent: true,
++						signedOutUnavailable: true,
++						staleReadRejected: true,
++						reopenedSameAccount: true,
++						getterFailureRejected: true,
++						replacedSessionRejected: true,
++						foreignScopeRejected: true,
++						invalidationPure: true,
++						invalidRestorationRejected: true
++					}
++				})
++				expect(await page.evaluate(() => window.financeSdkFixture.close())).toEqual({
++					kind: 'closed',
++					sdkClosed: true,
++					hostClosed: true
++				})
++			} finally {
++				await browser.close()
++			}
++		})
+ 		it('uses one real SDK worker session for offline Finance saves through cold browser restarts', async () => {
+ 			retainOnFailure()
+ 			const profile = await mkdtemp(join(directory, `sdk-${engine}-`))
+--- /dev/null
++++ b/tests/worker-bindings/session-qualification.ts
+@@ -0,0 +1,115 @@
++import type { JazzClient, JazzSession } from 'jazz-tools/client'
++import { createJazzRecoveryAdapter } from 'delightful-local-first/backend/jazz/recovery'
++import { createJazzRestorationAdapter } from 'delightful-local-first/backend/jazz/restoration'
++import { createJazzSessionReadinessAdapter } from 'delightful-local-first/backend/jazz/session-readiness'
++import type {
++	AvailableRecoveryScope,
++	RecoveryScope
++} from 'delightful-local-first/recovery/contracts'
++
++function available(scope: RecoveryScope): AvailableRecoveryScope {
++	if (scope.kind !== 'available') throw new Error('Native session recovery unavailable')
++	return scope
++}
++
++// Test controls own SDK operation order. Return observations only: no phrase,
++// device key, raw user, client or session crosses back to the browser test.
++export async function qualifyNativeSession(session: JazzSession<JazzClient>) {
++	let current: JazzSession<unknown> | undefined = session
++	let getterFails = false
++	const recovery = createJazzRecoveryAdapter(() => {
++		if (getterFails) throw new Error('Expected session getter failure')
++		return current
++	})
++	const restoration = createJazzRestorationAdapter(session, () => current)
++	const readiness = createJazzSessionReadinessAdapter(session)
++	const seen = new Set<string>()
++	const stop = readiness.capability.subscribe(() => seen.add(readiness.capability.readStatus()))
++	const firstUser = session.getSnapshot().user
++	const first = available(recovery.observeSession())
++	const phrase = await recovery.capability.readPhrase(first)
++	const key = await restoration.capability.parsePhrase(phrase)
++	const exportMatchesNative = key === session.exportDeviceKey()
++	const userStable = session.getSnapshot().user === firstUser && recovery.observeSession() === first
++	const scope = { binding: restoration.binding, attempt: 1 }
++	await restoration.capability.restoreIdentity(scope, key)
++	const sameAccount = available(recovery.observeSession())
++	const sameAccountRetiresScope =
++		sameAccount.identityId === first.identityId &&
++		sameAccount.generation > first.generation &&
++		session.getSnapshot().user !== firstUser &&
++		!recovery.capability.isCurrentScope(first)
++	await session.createDeviceAccount()
++	const replacedBeforeObservation = !recovery.capability.isCurrentScope(sameAccount)
++	const second = available(recovery.observeSession())
++	await restoration.capability.restoreIdentity(scope, key)
++	const restored = available(recovery.observeSession())
++	const abaRetiresScopes =
++		second.identityId !== first.identityId &&
++		restored.identityId === first.identityId &&
++		restored.generation > second.generation &&
++		!recovery.capability.isCurrentScope(first) &&
++		!recovery.capability.isCurrentScope(second) &&
++		recovery.capability.isCurrentScope(restored)
++	const restoredIdentity = await restoration.capability.readIdentity(scope)
++	const restorationReportsCurrent =
++		restoredIdentity.kind === 'ready' && restoredIdentity.identityId === restored.identityId
++	await session.signOut()
++	const signedOutIdentity = await restoration.capability.readIdentity(scope)
++	const signedOutUnavailable =
++		readiness.capability.readStatus() === 'signed-out' &&
++		signedOutIdentity.kind === 'unavailable' &&
++		!recovery.capability.isCurrentScope(restored) &&
++		recovery.observeSession().kind === 'unavailable'
++	const staleReadRejected = await recovery.capability.readPhrase(restored).then(
++		() => false,
++		(error) => error instanceof Error && error.message === 'Recovery scope unavailable'
++	)
++	await session.reopenDeviceAccount()
++	const reopened = available(recovery.observeSession())
++	const reopenedSameAccount =
++		readiness.capability.readStatus() === 'ready' &&
++		reopened.identityId === first.identityId &&
++		reopened.generation > restored.generation
++	getterFails = true
++	const getterFailureRejected = !recovery.capability.isCurrentScope(reopened)
++	getterFails = false
++	current = undefined
++	const replacedSessionRejected =
++		!recovery.capability.isCurrentScope(reopened) &&
++		!restoration.capability.isCurrentBinding(restoration.binding)
++	current = session
++	const other = createJazzRecoveryAdapter(() => session)
++	other.observeSession()
++	const foreignScopeRejected = !other.capability.isCurrentScope(reopened)
++	const beforeInvalidate = session.getSnapshot().user
++	const invalidationPure =
++		recovery.invalidate().kind === 'unavailable' &&
++		!recovery.capability.isCurrentScope(reopened) &&
++		session.getSnapshot().user === beforeInvalidate &&
++		session.getSnapshot().status === 'ready'
++	restoration.invalidate()
++	const invalidRestorationRejected = await restoration.capability.restoreIdentity(scope, key).then(
++		() => false,
++		(error) => error instanceof Error && error.message === 'Restoration binding unavailable'
++	)
++	stop()
++	const observedStatuses = seen.has('ready') && seen.has('signed-out')
++	return {
++		observedStatuses,
++		exportMatchesNative,
++		userStable,
++		sameAccountRetiresScope,
++		replacedBeforeObservation,
++		abaRetiresScopes,
++		restorationReportsCurrent,
++		signedOutUnavailable,
++		staleReadRejected,
++		reopenedSameAccount,
++		getterFailureRejected,
++		replacedSessionRejected,
++		foreignScopeRejected,
++		invalidationPure,
++		invalidRestorationRejected
++	}
++}

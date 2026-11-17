@@ -16,6 +16,10 @@ comparison; its custom qualification destination still needs a retention path.
 The subsequent [U1 proof](worker-jazz-upgrade-plan.md#u1-isolated-worker-qualification)
 passes all 15 actual Finance SDK/IDB cases with an isolated worker-only rebase of
 the existing bridge. This does not qualify the complete patch or app upgrade.
+The subsequent [U2a proof](worker-jazz-upgrade-plan.md#u2a-shared-native-session-adapter-qualification)
+adds shared native-session adapter coverage: all 18 cases pass, with same-account
+replacement, A → B → A, sign-out/reopen and stale recovery scope checks. App
+caller/provider adoption and whole-library compatibility are still pending.
 
 ## What was inspected
 

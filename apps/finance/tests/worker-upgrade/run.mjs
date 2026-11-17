@@ -77,11 +77,20 @@ const versions = Object.fromEntries(
 		'zod'
 	].map((name) => [name, require(`${name}/package.json`).version])
 )
+// Match Finance's approved API pin rather than resolving a newer SDK peer.
+const telemetry = JSON.parse(
+	execFileSync('pnpm', ['list', '@opentelemetry/api', '--depth', '0', '--json'], {
+		cwd: finance,
+		encoding: 'utf8'
+	})
+)
+versions['@opentelemetry/api'] = telemetry[0].dependencies['@opentelemetry/api'].version
 json(join(app, 'package.json'), {
 	name: 'finance-jazz-upgrade-proof',
 	private: true,
 	type: 'module',
 	imports: { '#lib/*': './src/lib/*' },
+	pnpm: { overrides: { '@opentelemetry/api': versions['@opentelemetry/api'] } },
 	dependencies: {
 		...versions,
 		'jazz-tools': 'file:../candidate-sdk.tgz',
@@ -110,6 +119,53 @@ json(join(app, 'tsconfig.json'), {
 	]
 })
 run('pnpm', ['install', '--ignore-scripts'], app)
+// Compile the selected shared session adapters against alpha.65, then test their
+// normal public package exports. Unrelated library code keeps its built output.
+const library = join(finance, '../../packages/local-first')
+const sources = join(app, 'session-adapters')
+for (const path of [
+	'src/lib/backend/jazz/recovery-phrase.ts',
+	'src/lib/backend/jazz/restoration.ts',
+	'src/lib/backend/jazz/session-readiness.ts',
+	'src/lib/contracts/recovery-phrase.ts',
+	'src/lib/contracts/restoration.ts',
+	'src/lib/contracts/session.ts'
+]) {
+	mkdirSync(dirname(join(sources, path)), { recursive: true })
+	cpSync(join(library, path), join(sources, path))
+}
+run('git', ['apply', '--check', join(proof, 'session-adapters.patch')], sources)
+run('git', ['apply', join(proof, 'session-adapters.patch')], sources)
+const adapted = join(directory, 'adapted-local-first')
+mkdirSync(adapted)
+run('tar', ['-xzf', join(directory, 'local-first.tgz'), '-C', adapted])
+json(join(sources, 'tsconfig.json'), {
+	compilerOptions: {
+		target: 'ES2024',
+		module: 'NodeNext',
+		moduleResolution: 'NodeNext',
+		lib: ['ES2024', 'DOM'],
+		strict: true,
+		exactOptionalPropertyTypes: true,
+		noUncheckedIndexedAccess: true,
+		skipLibCheck: true,
+		declaration: true,
+		rootDir: './src/lib',
+		outDir: join(adapted, 'package/dist')
+	},
+	include: [
+		'src/lib/backend/jazz/recovery-phrase.ts',
+		'src/lib/backend/jazz/restoration.ts',
+		'src/lib/backend/jazz/session-readiness.ts'
+	]
+})
+run('pnpm', ['exec', 'tsc', '--project', 'session-adapters/tsconfig.json'], app)
+run('tar', ['-czf', join(directory, 'adapted-local-first.tgz'), '-C', adapted, 'package'])
+run(
+	'pnpm',
+	['add', '--ignore-scripts', 'delightful-local-first@file:../adapted-local-first.tgz'],
+	app
+)
 const installed = createRequire(join(app, 'package.json'))
 const wasm = createRequire(installed.resolve('jazz-tools/package.json'))
 if (

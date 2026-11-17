@@ -44,6 +44,9 @@ resets or a Finance destination change.
       leaves and corresponding opaque-account plumbing. Keep the existing
       session owner, stale binding checks and domain drains; do not create a
       Window SDK session for the future worker UI.
+      **In progress:** U2a's selected shared adapters pass public-package/native
+      qualification below. Finance/Clipper caller adoption, provider changes and
+      removal of their explicit upgrade phases remain U2b; U2 is not complete.
 - [ ] **U3 — Establish SDK schema history before persistent-backend startup.**
       Both active apps use `migrations: 'none'`; alpha.65 rejects this on SQLite,
       remote and Vercel stores before opening them. Use the SDK's generated
@@ -127,6 +130,61 @@ either app. The rest of the existing SDK/auth patch, native construction/failure
 paths, identity switching, schema history, extension and backend/core behavior
 still need U2–U5 qualification. No existing Finance store, credentials, namespace
 or deployment was changed. The application worker/read view remains C3–C5 work.
+
+## U2a: shared native-session adapter qualification
+
+The isolated candidate now ports the existing Local First recovery/restoration
+adapters without opaque `AccountHandle` values or `exportLocalFirstSecret`.
+Recovery observes the existing native session, exports through
+`exportDeviceKey()`, and admits only a ready device user. Its captured binding
+checks both the session facade and public user object before export; account-ID
+equality alone cannot preserve a stale scope. Invalidation releases the adapter's
+observation without signing out or closing the host session. Restoration keeps
+its existing session binding/attempt contract and calls `restoreDeviceAccount()`.
+
+Alpha.65's `session/jazz-session.js` caches the public user for the same underlying
+account and replaces it for a replacement handle. The new native tests verify
+that behavior, including replacement with the same account ID and A → B → A.
+This is a version-qualified public-observation boundary, not an assumption that
+user IDs uniquely identify every attachment. SDK keys and phrases stay inside
+the disposable Worker; reports return booleans only.
+
+The existing readiness adapter compiles unchanged after its status contract adds
+the SDK's `starting` observation. This forwards a native fact, not another
+application lifecycle. No SDK session, subscription manager or workflow owner is
+created by these adapters.
+
+The reproducer compiles the selected source adapters/contracts against alpha.65
+and packages them into a temporary Local First tarball. The tests use ordinary
+public package exports. Strict declaration/fixture types and the full **18-case
+native suite pass** in Chromium, Firefox and WebKit, including all 15 U1 cases.
+The three new cases exercise phrase/native-key equivalence, same-account scope
+replacement, live replacement before observation, A → B → A retirement,
+sign-out/reopen, native readiness notifications, getter failure, replaced-session
+and foreign-adapter rejection, pure invalidation and denied restoration after
+binding invalidation.
+
+The final clean run uses Finance's installed OpenTelemetry API 1.9.1 throughout
+the temporary dependency graph. A range-only first attempt resolved 1.10.0 and
+produced incompatible SDK peer warnings; the runner now reads the installed
+version and enforces it through pnpm's native override. No workspace dependency
+was changed. The remaining alpha.60 library peer warning is expected for this
+partial candidate, not whole-library compatibility evidence.
+
+Artifacts: `/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha65-KuzinX`;
+log: `/private/tmp/finance-alpha65-u2-qualified.log`. The source overlay is
+`tests/worker-upgrade/session-adapters.patch`. Both source patch applicability and
+added-source whitespace are checked with Git's patch parser; diff-context tabs
+are patch data, not indentation changes to application code.
+
+Next is U2b: adapt Finance's layout/recovery integration/session preparation and
+Clipper's account host/callers, then qualify the native Svelte provider and retire
+their SDK-upgrade phases. Alpha.65 session subscribers receive notifications
+without a snapshot argument; use its current snapshot/native Svelte store and
+ensure initial publication. Preserve actual domain initialization and drains.
+Those consumers and the coherent SDK switch remain unimplemented. Workspace
+SDK pins, active adapters/patch, application behavior and Vercel data destinations
+are unchanged by U2a.
 
 ## Native Vercel naming: additional code proof
 
