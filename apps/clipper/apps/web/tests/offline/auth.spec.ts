@@ -4,6 +4,7 @@ import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
 import { handlePreviewRequest } from '../../src/lib/server/publication/request.js'
 import { handlePublicationPublish } from '../../src/lib/server/publication/publish.js'
+import { cidSchema } from '../../src/lib/annotations/publication-link.js'
 import { publicationSchema } from '../../src/lib/annotations/publication.js'
 import { firstPublicationWriteSchema } from '../../src/lib/server/publication/first-write.js'
 import { chromium, expect, test } from '@playwright/test'
@@ -38,6 +39,8 @@ for (const mode of ['linked', 'existing', 'expired'])
 		)
 		const publicRecords = new Map<string, unknown>()
 		let publicWrites = 0
+		let publicRemovals = 0
+		const publicCid = 'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
 		let publishedUri: string | undefined
 		const signOutResponses: number[] = []
 		let auth: ReturnType<typeof createAuthServer>
@@ -55,7 +58,13 @@ for (const mode of ['linked', 'existing', 'expired'])
 			ui.useAuth(async (request) => {
 				if (new URL(request.url).pathname === '/api/publication/preview')
 					return handlePreviewRequest(auth, authority.backend, request, origin)
-				if (new URL(request.url).pathname === '/api/publication/publish') {
+				if (
+					[
+						'/api/publication/publish',
+						'/api/publication/unpublish',
+						'/api/publication/cleanup'
+					].includes(new URL(request.url).pathname)
+				) {
 					const publicationAuth = {
 						api: {
 							getSession: auth.api.getSession,
@@ -85,6 +94,26 @@ for (const mode of ['linked', 'existing', 'expired'])
 											publicWrites++
 											return Response.json({ uri, cid: 'unused-synthetic-write-receipt' })
 										}
+										if (path === '/xrpc/com.atproto.repo.deleteRecord') {
+											const removal = firstPublicationWriteSchema
+												.pick({ repo: true, collection: true, rkey: true })
+												.extend({ swapRecord: cidSchema })
+												.parse(JSON.parse(String(init?.body)))
+											const uri =
+												'at://' + removal.repo + '/' + removal.collection + '/' + removal.rkey
+											const rows = await authority.backend.db.all(
+												app.publications.where({ publishingDid: removal.repo })
+											)
+											expect(rows[0]?.lifecycle).toEqual({
+												state: 'unpublishing',
+												uri,
+												cid: publicCid
+											})
+											expect(removal.swapRecord).toBe(publicCid)
+											publicRecords.delete(uri)
+											publicRemovals++
+											return Response.json({})
+										}
 										const params = new URL(path, origin).searchParams
 										const uri =
 											'at://' +
@@ -94,14 +123,25 @@ for (const mode of ['linked', 'existing', 'expired'])
 											'/' +
 											params.get('rkey')
 										return publicRecords.has(uri)
-											? Response.json({ uri, value: publicRecords.get(uri) })
+											? Response.json({ uri, value: publicRecords.get(uri), cid: publicCid })
 											: Response.json({ error: 'RecordNotFound' }, { status: 400 })
 									}
 								}
 							})
 						}
 					}
-					return handlePublicationPublish(publicationAuth, authority.backend, request, origin)
+					const path = new URL(request.url).pathname
+					return handlePublicationPublish(
+						publicationAuth,
+						authority.backend,
+						request,
+						origin,
+						path.endsWith('/unpublish')
+							? 'unpublish'
+							: path.endsWith('/cleanup')
+								? 'cleanup'
+								: 'publish'
+					)
 				}
 				const response = await handleConfiguredAuth(auth, request, { origin, secret })
 				if (new URL(request.url).pathname === '/api/auth/sign-out')
@@ -409,9 +449,22 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await expect(preview.getByText(published.uri, { exact: true })).toBeVisible()
 				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
 				expect(publicWrites).toBe(1)
+				await preview.getByRole('button', { name: 'Unpublish', exact: true }).click()
+				await expect(preview.getByText('Unpublished', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toHaveCount(0)
+				expect(publicRecords.size).toBe(0)
+				expect(publicRemovals).toBe(1)
+				expect((await authority.backend.db.one(app.notes.where({ id: savedNote.id })))?.text).toBe(
+					'Changed on another device.'
+				)
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toBeVisible()
+				expect(publicWrites).toBe(2)
+				expect(publicRecords.size).toBe(1)
 				await preview.getByRole('button', { name: 'Close', exact: true }).click()
 				await expect(preview).not.toBeVisible()
-				checkpoint('authenticated publication and visible retained address verified')
+				checkpoint('authenticated publish, unpublish and republish verified')
 			}
 			await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
@@ -488,6 +541,20 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await page.getByRole('link', { name: 'Native authorized article', exact: true }).click()
 				await expect(page.getByRole('article')).toContainText('Readable native backend capture.')
 				await readingControls(page)
+				if (mode === 'linked') {
+					if (restart === 0) {
+						await page.getByRole('button', { name: 'Remove note', exact: true }).click()
+						await expect(
+							page.getByRole('button', { name: 'Remove note', exact: true })
+						).toHaveCount(0)
+						expect(publicRecords.size).toBe(1)
+						expect(publicRemovals).toBe(1)
+					} else {
+						await expect(
+							page.getByRole('button', { name: 'Remove note', exact: true })
+						).toHaveCount(0)
+					}
+				}
 				await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
 				checkpoint('offline reader verified ' + restart)
@@ -527,8 +594,19 @@ for (const mode of ['linked', 'existing', 'expired'])
 					app.publications.where({ libraryId: accountId! })
 				)
 				expect(publications).toHaveLength(1)
-				expect(publications[0]?.lifecycle).toEqual({ state: 'published', uri: publishedUri })
-				expect(publicWrites).toBe(1)
+				await expect
+					.poll(
+						async () =>
+							(await authority.backend.db.all(app.publications.where({ libraryId: accountId! })))[0]
+								?.lifecycle,
+						{ timeout: 15_000 }
+					)
+					.toEqual({ state: 'unpublished', uri: publishedUri })
+				expect(publications).toHaveLength(1)
+				expect(publicWrites).toBe(2)
+				expect(publicRemovals).toBe(2)
+				expect(publicRecords.size).toBe(0)
+				checkpoint('offline note deletion removed the retained public record after reconnect')
 				checkpoint('signing out')
 				await test.step('sign out through the real auth handler', async () => {
 					const previous = signOutResponses.length

@@ -37,6 +37,7 @@ export function createLibraryCapability(
 	})
 	return {
 		reader: records.reader.capability,
+		publicationCleanup: records.publicationCleanup,
 		annotations: {
 			...records.annotations,
 			recovery: {

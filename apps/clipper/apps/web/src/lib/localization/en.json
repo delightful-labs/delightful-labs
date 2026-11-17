@@ -187,6 +187,8 @@
 	"publication": {
 		"preview_action": "Preview sharing",
 		"publish": "Publish",
+		"unpublish": "Unpublish",
+		"unpublished": "Unpublished",
 		"published": "Published",
 		"failed": "Publishing could not be confirmed. Try again.",
 		"preview_heading": "Preview",

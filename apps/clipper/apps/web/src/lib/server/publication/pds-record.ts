@@ -1,14 +1,13 @@
 import { z } from 'zod'
-import { isCid } from '@atcute/lexicons/syntax'
 import { isDeepStrictEqual } from 'node:util'
-import { atRecordUriSchema } from '../../annotations/publication-link.js'
+import { atRecordUriSchema, cidSchema } from '../../annotations/publication-link.js'
 
 /** The approved getRecord response subset. Keep the complete JSON record rather
  * than applying Clipper's narrow owned-content serializer to remote metadata.
  * CID syntax is checked when supplied; this does not verify a content hash. */
 export const pdsRecordSchema = z.object({
 	uri: atRecordUriSchema,
-	cid: z.string().refine(isCid).optional(),
+	cid: cidSchema.optional(),
 	value: z.record(z.string(), z.json())
 })
 export type PdsRecord = z.infer<typeof pdsRecordSchema>

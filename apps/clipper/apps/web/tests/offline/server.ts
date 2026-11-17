@@ -26,7 +26,9 @@ export function staticShellServer(initialRoot: string) {
 			(url.pathname.startsWith('/api/auth/') ||
 				url.pathname === '/api/publication/preview' ||
 				url.pathname === '/api/publication/request' ||
-				url.pathname === '/api/publication/publish')
+				url.pathname === '/api/publication/publish' ||
+				url.pathname === '/api/publication/unpublish' ||
+				url.pathname === '/api/publication/cleanup')
 		) {
 			const chunks: Buffer[] = []
 			for await (const chunk of req) chunks.push(Buffer.from(chunk))

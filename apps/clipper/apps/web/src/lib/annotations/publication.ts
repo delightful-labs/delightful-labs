@@ -1,7 +1,12 @@
 import { z } from 'zod'
 import { marginRecordSchema } from './margin.js'
 import { lowercaseUuidSchema } from '../validation/values.js'
-import { atRecordUriSchema, didSchema, publicationSourceSchema } from './publication-link.js'
+import {
+	atRecordUriSchema,
+	cidSchema,
+	didSchema,
+	publicationSourceSchema
+} from './publication-link.js'
 
 export const publicationBaseSchema = z.strictObject({
 	libraryId: lowercaseUuidSchema,
@@ -17,11 +22,19 @@ const issuedLifecycle = z.strictObject({
 })
 const publishedLifecycle = z.strictObject({ state: z.literal('published'), uri: atRecordUriSchema })
 
+const unpublishingLifecycle = publishedLifecycle.extend({
+	state: z.literal('unpublishing'),
+	cid: cidSchema
+})
+const unpublishedLifecycle = publishedLifecycle.extend({ state: z.literal('unpublished') })
+
 export const publicationLifecycleSchema = z.discriminatedUnion('state', [
 	privateLifecycle,
 	requestedLifecycle,
 	issuedLifecycle,
-	publishedLifecycle
+	publishedLifecycle,
+	unpublishingLifecycle,
+	unpublishedLifecycle
 ])
 
 function hasMatchingPublisher(value: { publishingDid: string; uri?: string }) {
@@ -37,7 +50,9 @@ export const publicationSchema = z
 		publicationBaseSchema.extend(privateLifecycle.shape),
 		publicationBaseSchema.extend(requestedLifecycle.shape),
 		publicationBaseSchema.extend(issuedLifecycle.shape),
-		publicationBaseSchema.extend(publishedLifecycle.shape)
+		publicationBaseSchema.extend(publishedLifecycle.shape),
+		publicationBaseSchema.extend(unpublishingLifecycle.shape),
+		publicationBaseSchema.extend(unpublishedLifecycle.shape)
 	])
 	.refine(hasMatchingPublisher)
 

@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { isCid } from '@atcute/lexicons/syntax'
+
+export const cidSchema = z.string().refine(isCid)
 import { lowercaseUuidSchema } from '../validation/values.js'
 
 // AT's generic DID syntax: https://atproto.com/specs/did#did-identifier-syntax

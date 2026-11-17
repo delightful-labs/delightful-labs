@@ -284,3 +284,52 @@ it('dismisses in-flight publishing and ignores its late successful result', asyn
 	expect(selectSharingPreview(a.actor.getSnapshot()).open).toBe(false)
 	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
 })
+
+it('unpublishes the current record and hides its address while retaining republish', async () => {
+	const a = fixture()
+	const published = {
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid,
+		state: 'published',
+		uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a'
+	}
+	const fetch = vi.fn<typeof globalThis.fetch>(async (path) =>
+		path === '/api/publication/preview'
+			? Response.json(published)
+			: Response.json({ ...published, state: 'unpublished' })
+	)
+	vi.stubGlobal('fetch', fetch)
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await waitFor(a.actor, (s) => s.matches('published'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).canUnpublish).toBe(true)
+	a.actor.send({
+		type: 'UNPUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	await waitFor(a.actor, (s) => s.matches('unpublished'))
+	const view = selectSharingPreview(a.actor.getSnapshot())
+	expect(view.message).toEqual({ text: 'Unpublished', variant: 'info' })
+	expect(view.publication).toBeUndefined()
+	expect(view.canPublish).toBe(true)
+	expect(view.canUnpublish).toBe(false)
+	expect(fetch.mock.calls[1]?.[0]).toBe('/api/publication/unpublish')
+})
+it('keeps an unconfirmed removal retryable without offering another publish', async () => {
+	const a = fixture()
+	const value = {
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid,
+		state: 'unpublishing',
+		uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a',
+		cid: 'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
+	}
+	vi.stubGlobal('fetch', async () => Response.json(value))
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await waitFor(a.actor, (s) => s.matches('unpublishFailed'))
+	const view = selectSharingPreview(a.actor.getSnapshot())
+	expect(view.canUnpublish).toBe(true)
+	expect(view.canPublish).toBe(false)
+	expect(view.publication).toBeUndefined()
+})

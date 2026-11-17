@@ -17,6 +17,7 @@ import permissions from '../../backend/jazz/permissions.js'
 import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
 import { createPublicationPermission, handlePublicationPermission } from './permission.js'
 import { handlePublicationPublish } from './publish.js'
+import { cidSchema } from '../../annotations/publication-link.js'
 import { firstPublicationWriteSchema } from './first-write.js'
 import { publicationSchema } from '../../annotations/publication.js'
 import { handlePublicationSubmit } from './submit.js'
@@ -99,7 +100,8 @@ function network(
 		if (
 			read &&
 			(req.url.startsWith(pds + '/xrpc/com.atproto.repo.getRecord?') ||
-				req.url === pds + '/xrpc/com.atproto.repo.putRecord')
+				req.url === pds + '/xrpc/com.atproto.repo.putRecord' ||
+				req.url === pds + '/xrpc/com.atproto.repo.deleteRecord')
 		)
 			return read(req)
 		if (req.url === issuer + '/.well-known/oauth-authorization-server')
@@ -550,6 +552,16 @@ it('publishes through the real OAuth SDK, refreshes the grant and reads back bef
 	network('did:plc:ewvi7nxzyoun6zhxrhs64oiz', granted, false, async (req) => {
 		expect(req.headers.has('DPoP')).toBe(true)
 		expect(req.headers.get('Authorization')).toBe('DPoP synthetic-access-after')
+		if (req.url.endsWith('/xrpc/com.atproto.repo.deleteRecord')) {
+			const removal = firstPublicationWriteSchema
+				.pick({ repo: true, collection: true, rkey: true })
+				.extend({ swapRecord: cidSchema })
+				.parse(await req.json())
+			expect(removal.swapRecord).toBe('bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')
+			const uri = 'at://' + removal.repo + '/' + removal.collection + '/' + removal.rkey
+			records.delete(uri)
+			return Response.json({})
+		}
 		if (req.method === 'POST') {
 			const write = firstPublicationWriteSchema.parse(await req.json())
 			const uri = 'at://' + write.repo + '/' + write.collection + '/' + write.rkey
@@ -566,7 +578,11 @@ it('publishes through the real OAuth SDK, refreshes the grant and reads back bef
 		const uri =
 			'at://' + params.get('repo') + '/' + params.get('collection') + '/' + params.get('rkey')
 		return records.has(uri)
-			? Response.json({ uri, value: records.get(uri) })
+			? Response.json({
+					uri,
+					value: records.get(uri),
+					cid: 'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
+				})
 			: Response.json({ error: 'RecordNotFound' }, { status: 400 })
 	})
 	const a = await setup('publish-sdk')
@@ -579,4 +595,14 @@ it('publishes through the real OAuth SDK, refreshes the grant and reads back bef
 	const again = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
 	expect(await again.json()).toEqual(published)
 	expect(writes).toBe(1)
+	const removal = await handlePublicationPublish(
+		a.auth,
+		backend(a),
+		request(a),
+		origin,
+		'unpublish'
+	)
+	expect(removal.status).toBe(200)
+	expect(publicationSchema.parse(await removal.json()).state).toBe('unpublished')
+	expect(records.size).toBe(0)
 })

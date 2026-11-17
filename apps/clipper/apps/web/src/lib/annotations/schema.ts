@@ -29,7 +29,11 @@ export const annotationCommandSchema = z.discriminatedUnion('type', [
 	z.object({ type: z.literal('OPEN'), ...parentFields, text: z.string().max(8_000_000) }),
 	z.object({ type: z.literal('CLOSE') }),
 	z.object({ type: z.literal('PREVIEW_NOTE'), ...parentFields, id: lowercaseUuidSchema }),
-	z.object({ type: z.literal('PUBLISH_NOTE'), ...parentFields, requestId: offsetSchema }),
+	z.object({
+		type: z.enum(['PUBLISH_NOTE', 'UNPUBLISH_NOTE']),
+		...parentFields,
+		requestId: offsetSchema
+	}),
 	z.object({ type: z.literal('CLOSE_PREVIEW'), ...parentFields, requestId: offsetSchema }),
 	z.object({
 		type: z.literal('KEEP_DRAFT'),
@@ -65,7 +69,16 @@ export const annotationCommandSchema = z.discriminatedUnion('type', [
 export type AnnotationCommand = z.infer<typeof annotationCommandSchema>
 export type AnnotationMutation = Exclude<
 	AnnotationCommand,
-	{ type: 'OPEN' | 'CLOSE' | 'KEEP_DRAFT' | 'PREVIEW_NOTE' | 'CLOSE_PREVIEW' | 'PUBLISH_NOTE' }
+	{
+		type:
+			| 'OPEN'
+			| 'CLOSE'
+			| 'KEEP_DRAFT'
+			| 'PREVIEW_NOTE'
+			| 'CLOSE_PREVIEW'
+			| 'PUBLISH_NOTE'
+			| 'UNPUBLISH_NOTE'
+	}
 >
 export type PreparedAnnotation = {
 	command: AnnotationMutation

@@ -45,6 +45,16 @@
 			}
 		})
 	}
+	function unpublish() {
+		binding.client.send({
+			type: 'ANNOTATION',
+			command: {
+				type: 'UNPUBLISH_NOTE',
+				documentId: binding.documentId,
+				requestId: binding.requestId
+			}
+		})
+	}
 	function retry() {
 		if (binding.noteId)
 			binding.client.send({
@@ -80,10 +90,17 @@
 					readonly
 					label={noun('note')}
 					defaultValue={view.value.record.body.value}
+				/>{:else if view.noteText !== undefined}<Textarea
+					readonly
+					label={noun('note')}
+					defaultValue={view.noteText}
 				/>{/if}
 		{/if}
 		{#if view.publication}<output><code>{view.publication.uri}</code></output>{/if}
 		<div class="preview-actions">
+			{#if view.canUnpublish}<Button disabled={!enabled} onclick={unpublish}
+					>{t('publication.unpublish')}</Button
+				>{/if}
 			{#if view.canPublish}<Button disabled={!enabled} onclick={publish}
 					>{t('publication.publish')}</Button
 				>{/if}

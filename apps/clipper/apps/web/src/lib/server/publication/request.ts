@@ -177,9 +177,7 @@ export function createPreviewRequest(auth: PreviewAuth, backend: Pick<Jazz, 'acc
 							(value) => value.publishingDid === context.access.did
 						)
 						const value = values[0]
-						return values.length === 1 &&
-							value &&
-							(value.state === 'issued' || value.state === 'published')
+						return values.length === 1 && value && 'uri' in value
 							? { target: 'checkingAccess', context: { preview: value } }
 							: { target: 'unavailable' }
 					},

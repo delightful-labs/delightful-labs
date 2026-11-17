@@ -37,13 +37,16 @@ type Context = Input & { facts: Facts | undefined }
 
 function permitsTransition({ current, publication }: Facts) {
 	if (!current) return publication.state === 'private' || publication.state === 'requested'
-	if (current.value.state === 'private') return publication.state === 'requested'
-	if (current.value.state === 'requested')
+	const previous = current.value
+	if (previous.state === 'private') return publication.state === 'requested'
+	if (previous.state === 'requested')
 		return publication.state === 'private' || publication.state === 'issued'
+	if (!('uri' in publication) || previous.uri !== publication.uri) return false
+	if (previous.state === 'unpublished') return publication.state === 'issued'
+	if (previous.state === 'unpublishing') return publication.state === 'unpublished'
 	return (
-		current.value.state === 'issued' &&
-		publication.state === 'published' &&
-		current.value.uri === publication.uri
+		publication.state === 'unpublishing' ||
+		(previous.state === 'issued' && publication.state === 'published')
 	)
 }
 
@@ -185,7 +188,10 @@ export function createPublicationStore(
 				permitsTransition(facts) &&
 				(facts.parentAvailable ||
 					(facts.current !== undefined &&
-						(facts.publication.state === 'private' || facts.publication.state === 'published'))) &&
+						(facts.publication.state === 'private' ||
+							facts.publication.state === 'published' ||
+							facts.publication.state === 'unpublishing' ||
+							facts.publication.state === 'unpublished'))) &&
 				facts.contentMatches
 		}
 	})
@@ -256,6 +262,24 @@ export function createPublicationStore(
 	function assertCurrent() {
 		if (!scope.isCurrent()) throw new Error('Publication scope expired')
 	}
+	async function entries(source: PublicationSource) {
+		assertCurrent()
+		const parsed = publicationSourceSchema.parse(source)
+		const library = await db.one(
+			app.libraries.where({ id: scope.libraryId, ownerId: scope.accountId }).include({
+				publications: app.publications.where({
+					highlightId: 'highlightId' in parsed ? parsed.highlightId : null,
+					noteId: 'noteId' in parsed ? parsed.noteId : null
+				})
+			}),
+			{ tier: ReadTier.Remote }
+		)
+		assertCurrent()
+		return (library?.publications ?? []).map((row) => ({
+			id: row.id,
+			value: publicationFromRow(row)
+		}))
+	}
 	return {
 		stage: createDomainTransaction<Publication, Resource, Write>(
 			(spawn, input) => spawn(domain, { input }),
@@ -285,20 +309,7 @@ export function createPublicationStore(
 				rollback: (resource) => resource.tx.rollback()
 			}
 		),
-		list: async (source: PublicationSource) => {
-			assertCurrent()
-			const parsed = publicationSourceSchema.parse(source)
-			const library = await db.one(
-				app.libraries.where({ id: scope.libraryId, ownerId: scope.accountId }).include({
-					publications: app.publications.where({
-						highlightId: 'highlightId' in parsed ? parsed.highlightId : null,
-						noteId: 'noteId' in parsed ? parsed.noteId : null
-					})
-				}),
-				{ tier: ReadTier.Remote }
-			)
-			assertCurrent()
-			return (library?.publications ?? []).map(publicationFromRow)
-		}
+		entries,
+		list: async (source: PublicationSource) => (await entries(source)).map((row) => row.value)
 	}
 }

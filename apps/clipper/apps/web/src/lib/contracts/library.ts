@@ -12,6 +12,7 @@ export type FakeDataRef = ActorInstance<
 >
 export type FakeDataSpawner = import('../machines/children.js').ChildSpawner
 export type LibraryCapability = {
+	publicationCleanup?: import('../backend/jazz/publication-cleanup.js').PublicationCleanupCapability
 	annotations?: import('../backend/jazz/annotations.js').AnnotationCapability
 	images?: import('./images.js').ImageCapability
 	reader?: import('./reader.js').ReaderCapability

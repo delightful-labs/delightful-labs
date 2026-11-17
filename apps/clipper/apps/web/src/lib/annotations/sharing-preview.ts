@@ -44,38 +44,42 @@ const request = createAsyncLogic({
 		return z.union([publicationPreviewSchema, publicationSchema]).parse(value)
 	}
 })
-const publish = createAsyncLogic({
-	run: async ({ input, signal }: { input: Preview; signal: AbortSignal }) => {
-		const response = await fetch('/api/publication/publish', {
-			method: 'POST',
-			credentials: 'same-origin',
-			cache: 'no-store',
-			redirect: 'error',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(
-				publicationBaseSchema.parse({
-					libraryId: input.libraryId,
-					source: input.source,
-					publishingDid: input.publishingDid
-				})
-			)
-		})
-		if (!response.ok) {
-			void response.body?.cancel().catch(() => {})
-			return { status: response.status, publication: undefined }
+const submission = (operation: 'publish' | 'unpublish') =>
+	createAsyncLogic({
+		run: async ({ input, signal }: { input: Preview; signal: AbortSignal }) => {
+			const response = await fetch('/api/publication/' + operation, {
+				method: 'POST',
+				credentials: 'same-origin',
+				cache: 'no-store',
+				redirect: 'error',
+				signal,
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(
+					publicationBaseSchema.parse({
+						libraryId: input.libraryId,
+						source: input.source,
+						publishingDid: input.publishingDid
+					})
+				)
+			})
+			if (!response.ok) {
+				void response.body?.cancel().catch(() => {})
+				return { status: response.status, publication: undefined }
+			}
+			const value: unknown = await response.json()
+			signal.throwIfAborted()
+			return { status: response.status, publication: publicationSchema.parse(value) }
 		}
-		const value: unknown = await response.json()
-		signal.throwIfAborted()
-		return { status: response.status, publication: publicationSchema.parse(value) }
-	}
-})
+	})
+const publish = submission('publish')
+const unpublish = submission('unpublish')
 export const sharingPreviewMachine = setup({
 	schemas: {
 		input: types<{ capability: Capability | undefined }>(),
 		context: types<Context>(),
 		events: {
 			PUBLISH: types<{ requestId: number }>(),
+			UNPUBLISH: types<{ requestId: number }>(),
 			SHOW: types<{ note: AnnotationNote }>(),
 			DISMISS: types<{ requestId?: number }>(),
 			OBSERVED: types<{ notes: AnnotationNote[] }>(),
@@ -85,10 +89,11 @@ export const sharingPreviewMachine = setup({
 		meta: types<{ name?: string; variant?: WorkflowMessage['variant'] }>(),
 		children: {
 			request: types<import('xstate').ActorRefFrom<typeof request>>(),
-			publish: types<import('xstate').ActorRefFrom<typeof publish>>()
+			publish: types<import('xstate').ActorRefFrom<typeof publish>>(),
+			unpublish: types<import('xstate').ActorRefFrom<typeof unpublish>>()
 		}
 	},
-	actors: { request, publish },
+	actors: { request, publish, unpublish },
 	states: {
 		closed: {},
 		loading: { schemas: { context: types<{ capability: Capability; note: AnnotationNote }>() } },
@@ -104,6 +109,9 @@ export const sharingPreviewMachine = setup({
 		},
 		authorize: { schemas: { context: types<{ value: Preview }>() } },
 		publishFailed: { schemas: { context: types<{ value: Preview }>() } },
+		unpublishing: { schemas: { context: types<{ value: Preview }>() } },
+		unpublished: { schemas: { context: types<{ value: Preview }>() } },
+		unpublishFailed: { schemas: { context: types<{ value: Preview }>() } },
 		unavailable: {},
 		stopped: {}
 	},
@@ -187,6 +195,10 @@ export const sharingPreviewMachine = setup({
 				onDone: (args) => {
 					const value = args.event.output
 					if (!args.guards.matching(args, value)) return { target: 'unavailable' }
+					if ('state' in value && value.state === 'unpublished')
+						return { target: 'unpublished', context: { value } }
+					if ('state' in value && value.state === 'unpublishing')
+						return { target: 'unpublishFailed', context: { value } }
 					return 'state' in value && value.state === 'published'
 						? { target: 'published', context: { value, publication: value } }
 						: { target: 'ready', context: { value } }
@@ -224,11 +236,64 @@ export const sharingPreviewMachine = setup({
 						value.source.noteId !== context.value.source.noteId
 					)
 						return { target: 'publishFailed' }
-					return { target: 'published', context: { publication: value } }
+					return { target: 'published', context: { publication: value, value } }
 				}
 			}
 		},
-		published: { meta: { name: t('publication.published'), variant: 'info' } },
+		published: {
+			meta: { name: t('publication.published'), variant: 'info' },
+			on: {
+				UNPUBLISH: ({ context, event }) =>
+					context.capability?.isCurrent() && event.requestId === context.requestId
+						? { target: 'unpublishing' }
+						: undefined
+			}
+		},
+		unpublishing: {
+			meta: { name: t('status.preparing'), variant: 'info' },
+			invoke: {
+				id: 'unpublish',
+				src: 'unpublish',
+				input: ({ context }) => context.value,
+				timeout: 125_000,
+				onTimeout: { target: 'unpublishFailed' },
+				onError: { target: 'unpublishFailed' },
+				onDone: ({ context, event }) => {
+					if (event.output.status === 403) return { target: 'authorize' }
+					const value = event.output.publication
+					if (
+						!value ||
+						value.state !== 'unpublished' ||
+						!context.capability?.isCurrent() ||
+						value.libraryId !== context.value.libraryId ||
+						value.publishingDid !== context.value.publishingDid ||
+						!('noteId' in value.source) ||
+						!('noteId' in context.value.source) ||
+						value.source.noteId !== context.value.source.noteId
+					)
+						return { target: 'unpublishFailed' }
+					return { target: 'unpublished', context: { value } }
+				}
+			}
+		},
+		unpublished: {
+			meta: { name: t('publication.unpublished'), variant: 'info' },
+			on: {
+				PUBLISH: ({ context, event }) =>
+					context.capability?.isCurrent() && event.requestId === context.requestId
+						? { target: 'publishing' }
+						: undefined
+			}
+		},
+		unpublishFailed: {
+			meta: { name: t('status.save_unknown'), variant: 'error' },
+			on: {
+				UNPUBLISH: ({ context, event }) =>
+					context.capability?.isCurrent() && event.requestId === context.requestId
+						? { target: 'unpublishing' }
+						: undefined
+			}
+		},
 		authorize: {},
 		publishFailed: {
 			meta: { name: t('publication.failed'), variant: 'error' },
@@ -257,11 +322,21 @@ export function selectSharingPreview(
 		noteId: open ? snapshot?.context.note?.id : undefined,
 		value: open ? snapshot?.context.value : undefined,
 		canPublish:
-			open && (snapshot?.matches('ready') === true || snapshot?.matches('publishFailed') === true),
+			open &&
+			(snapshot?.matches('ready') === true ||
+				snapshot?.matches('publishFailed') === true ||
+				snapshot?.matches('unpublished') === true),
+		canUnpublish:
+			open &&
+			(snapshot?.matches('published') === true || snapshot?.matches('unpublishFailed') === true),
+		noteText: open ? snapshot?.context.note?.text : undefined,
 		authorize: open && snapshot?.matches('authorize') === true,
 		publication: open && snapshot?.matches('published') ? snapshot.context.publication : undefined,
 		pending:
-			open && (snapshot?.matches('loading') === true || snapshot?.matches('publishing') === true),
+			open &&
+			(snapshot?.matches('loading') === true ||
+				snapshot?.matches('publishing') === true ||
+				snapshot?.matches('unpublishing') === true),
 		retry: open && snapshot?.matches('unavailable') === true,
 		message: open && snapshot ? stateFeedback(Object.values(snapshot.getMeta())) : undefined
 	}

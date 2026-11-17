@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { ReadTier } from 'jazz-tools'
+import { app } from '../../backend/jazz/schema.js'
 import type { Jazz } from 'jazz-tools/backend'
 import { createActor, createAsyncLogic, matchesState, setup, toPromise, types } from 'xstate'
 import type { ActorRefFrom } from 'xstate'
@@ -8,7 +10,7 @@ import type {
 	TransactionAttempt
 } from 'delightful-local-first/transactions/contracts'
 import type { SyncReceipt } from '../../contracts/storage.js'
-import { publicationBaseSchema } from '../../annotations/publication.js'
+import { publicationBaseSchema, publicationFromRow } from '../../annotations/publication.js'
 import type { Publication } from '../../annotations/publication.js'
 import type { PublicationPreview } from '../../annotations/publication-preview.js'
 import { authorizePublicationTransaction, createPublicationAccess } from './access.js'
@@ -33,12 +35,17 @@ type Selection = z.infer<typeof publicationBaseSchema>
 type Input = { request: Request; origin: string }
 type Session = PdsReadSession & { getTokenInfo: () => Promise<unknown> }
 type Selected = { selection: Selection; access: PublicationAccess }
+type Removing = Extract<Publication, { state: 'unpublishing' }>
+type Mode = 'publish' | 'unpublish' | 'cleanup'
 type Issued = Extract<Publication, { state: 'issued' }>
 type Context = Input & {
 	selection: Selection | undefined
 	access: PublicationAccess | undefined
 	publication: Publication | undefined
+	publicationId: string | undefined
 	preview: PublicationPreview | undefined
+	issued: Issued | undefined
+	removalAccepted: boolean | undefined
 	session: Session | undefined
 }
 type StageInput = { attempt: TransactionAttempt<Publication> }
@@ -67,12 +74,13 @@ function binding(input: Input & Selected) {
 	}
 }
 
-/** Explicit document-note Publish. Jazz owns accepted intent and the immutable
+/** Document-note publication/removal owner. Jazz owns accepted intent and the immutable
  * issued address/payload. Only this request's newly accepted issuance may PUT;
  * resumed issued work only reads back. No automatic replay, update or overwrite. */
 export function createPublicationPublish(
 	auth: PublicationAuth,
-	backend: Pick<Jazz, 'accountFor' | 'db'>
+	backend: Pick<Jazz, 'accountFor' | 'db'>,
+	mode: Mode = 'publish'
 ) {
 	const actors = {
 		input: createAsyncLogic({
@@ -82,7 +90,68 @@ export function createPublicationPublish(
 		access: createPublicationAccess(auth, backend),
 		current: createAsyncLogic({
 			run: ({ input }: { input: Input & Selected }) =>
-				createPublicationStore(backend.db, binding(input)).list(input.selection.source)
+				createPublicationStore(backend.db, binding(input)).entries(input.selection.source)
+		}),
+		history: createAsyncLogic({
+			run: async ({ input }: { input: Selected & { uri: string; publicationId: string } }) => {
+				const source = input.selection.source
+				const rows = await backend.db.all(
+					app.$history.publications
+						.where({
+							id: input.publicationId,
+							libraryId: input.selection.libraryId,
+							publishingDid: input.access.did,
+							highlightId: null,
+							noteId: 'noteId' in source ? source.noteId : null
+						})
+						.orderBy('$acceptedAt', 'desc'),
+					{ tier: ReadTier.Remote }
+				)
+				const matches = rows
+					.map(publicationFromRow)
+					.filter((value): value is Issued => value.state === 'issued' && value.uri === input.uri)
+				return matches[0]
+			}
+		}),
+		deleted: createAsyncLogic({
+			run: async ({ input }: { input: Selection }) => {
+				if (!('noteId' in input.source)) return false
+				const row = await backend.db.one(
+					app.notes
+						.includeDeleted()
+						.where({ id: input.source.noteId, libraryId: input.libraryId })
+						.select('*', '$deletedAt'),
+					{ tier: ReadTier.Remote }
+				)
+				return !!row?.$deletedAt
+			}
+		}),
+		remove: createAsyncLogic({
+			run: async ({
+				input,
+				signal
+			}: {
+				input: { publication: Removing; session: Session }
+				signal: AbortSignal
+			}) => {
+				const publication = input.publication
+				signal.throwIfAborted()
+				const response = await input.session.handle('/xrpc/com.atproto.repo.deleteRecord', {
+					method: 'POST',
+					signal,
+					redirect: 'error',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						repo: publication.publishingDid,
+						collection: 'at.margin.note',
+						rkey: publication.uri.split('/')[4],
+						swapRecord: publication.cid
+					})
+				})
+				void response.body?.cancel().catch(() => {})
+				signal.throwIfAborted()
+				return { status: response.status, redirected: response.redirected }
+			}
 		}),
 		preview: createDocumentNotePreview(backend.db),
 		restore: createAsyncLogic({
@@ -134,6 +203,9 @@ export function createPublicationPublish(
 				input: types<ActorRefFrom<typeof actors.input>>(),
 				access: types<ActorRefFrom<typeof actors.access>>(),
 				current: types<ActorRefFrom<typeof actors.current>>(),
+				history: types<ActorRefFrom<typeof actors.history>>(),
+				deleted: types<ActorRefFrom<typeof actors.deleted>>(),
+				remove: types<ActorRefFrom<typeof actors.remove>>(),
 				preview: types<ActorRefFrom<typeof actors.preview>>(),
 				restore: types<ActorRefFrom<typeof actors.restore>>(),
 				grant: types<ActorRefFrom<typeof actors.grant>>(),
@@ -150,6 +222,31 @@ export function createPublicationPublish(
 			readingInput: {},
 			readingAccess: { schemas: { context: types<{ selection: Selection }>() } },
 			readingCurrent: { schemas: { context: types<Selected>() } },
+			checkingDeletion: { schemas: { context: types<Selected & { publication: Publication }>() } },
+			readingIssued: {
+				schemas: {
+					context: types<
+						Selected & { publication: Extract<Publication, { uri: string }>; publicationId: string }
+					>()
+				}
+			},
+			readingRemovalTarget: {
+				schemas: {
+					context: types<
+						Selected & { publication: Extract<Publication, { uri: string }>; session: Session }
+					>()
+				}
+			},
+			removing: {
+				schemas: { context: types<Selected & { publication: Removing; session: Session }>() }
+			},
+			verifyingRemoval: {
+				schemas: {
+					context: types<
+						Selected & { publication: Removing; session: Session; removalAccepted: boolean }
+					>()
+				}
+			},
 			previewing: { schemas: { context: types<Selected>() } },
 			restoring: { schemas: { context: types<Selected & { publication: Publication }>() } },
 			checkingGrant: {
@@ -167,8 +264,13 @@ export function createPublicationPublish(
 				},
 				states: { waiting: {}, draining: {} }
 			},
+			checkingCleanupDispatch: {
+				schemas: { context: types<Selected & { publication: Removing; session: Session }>() }
+			},
 			checkingDispatchAccess: {
-				schemas: { context: types<Selected & { publication: Issued; session: Session }>() }
+				schemas: {
+					context: types<Selected & { publication: Issued | Removing; session: Session }>()
+				}
 			},
 			writing: {
 				schemas: { context: types<Selected & { publication: Issued; session: Session }>() }
@@ -193,7 +295,10 @@ export function createPublicationPublish(
 			selection: undefined,
 			access: undefined,
 			publication: undefined,
+			publicationId: undefined,
 			preview: undefined,
+			issued: undefined,
+			removalAccepted: undefined,
 			session: undefined
 		}),
 		timeout: 120_000,
@@ -250,26 +355,80 @@ export function createPublicationPublish(
 					}),
 					onDone: ({ context, event }) => {
 						const matches = event.output.filter(
-							(value) => value.publishingDid === context.access.did
+							(row) => row.value.publishingDid === context.access.did
 						)
 						if (matches.length > 1) return { target: 'unavailable' }
-						const publication = matches[0]
+						const current = matches[0]
+						const publication = current?.value
+						if (mode !== 'publish') {
+							if (!publication || !('uri' in publication)) return { target: 'unavailable' }
+							if (publication.state === 'unpublished')
+								return { target: 'ready', context: { publication, publicationId: current?.id } }
+							return mode === 'cleanup'
+								? {
+										target: 'checkingDeletion',
+										context: { publication, publicationId: current?.id }
+									}
+								: { target: 'restoring', context: { publication, publicationId: current?.id } }
+						}
+						if (publication?.state === 'unpublishing') return { target: 'unavailable' }
+						if (publication?.state === 'unpublished' && current)
+							return {
+								target: 'readingIssued',
+								context: { publication, publicationId: current.id }
+							}
 						return publication?.state === 'published'
-							? { target: 'ready', context: { publication } }
+							? { target: 'ready', context: { publication, publicationId: current?.id } }
 							: publication?.state === 'issued'
-								? { target: 'restoring', context: { publication } }
-								: { target: 'previewing', context: { publication } }
+								? { target: 'restoring', context: { publication, publicationId: current?.id } }
+								: { target: 'previewing', context: { publication, publicationId: current?.id } }
 					},
 					onError: { target: 'failed' }
 				}
 			},
+			checkingDeletion: {
+				invoke: {
+					id: 'deleted',
+					src: 'deleted',
+					input: ({ context }) => context.selection,
+					onDone: ({ event }) =>
+						event.output ? { target: 'restoring' } : { target: 'unavailable' },
+					onError: { target: 'failed' }
+				}
+			},
+			readingIssued: {
+				invoke: {
+					id: 'history',
+					src: 'history',
+					input: ({ context }) => ({
+						selection: context.selection,
+						access: context.access,
+						uri: context.publication.uri,
+						publicationId: context.publicationId
+					}),
+					onDone: ({ context, event }) =>
+						event.output
+							? mode === 'publish'
+								? { target: 'previewing', context: { issued: event.output } }
+								: context.session
+									? {
+											target: 'readingRemovalTarget',
+											context: { issued: event.output, session: context.session }
+										}
+									: { target: 'failed' }
+							: { target: 'unavailable' },
+					onError: { target: 'failed' }
+				}
+			},
+
 			previewing: {
 				invoke: {
 					id: 'preview',
 					src: 'preview',
 					input: ({ context }) => ({
 						source: context.selection.source,
-						createdAt: new Date(context.access.observedAt),
+						createdAt: new Date(context.issued?.record.createdAt ?? context.access.observedAt),
+						republish: context.publication?.state === 'unpublished',
 						binding: binding(context)
 					}),
 					onDone: ({ context, event }) =>
@@ -309,8 +468,32 @@ export function createPublicationPublish(
 			},
 			choosingWork: {
 				type: 'choice',
-				choice: ({ context }) =>
-					context.publication.state === 'issued'
+				choice: ({ context }) => {
+					if (mode !== 'publish')
+						return context.publication.state === 'unpublishing'
+							? { target: 'readingRemovalTarget', context: { publication: context.publication } }
+							: 'uri' in context.publication && context.publicationId
+								? {
+										target: 'readingIssued',
+										context: {
+											publication: context.publication,
+											publicationId: context.publicationId
+										}
+									}
+								: { target: 'unavailable' }
+					if (context.publication.state === 'unpublished' && context.preview)
+						return {
+							target: 'identifyingSave',
+							context: {
+								publication: {
+									...context.selection,
+									state: 'issued',
+									uri: context.publication.uri,
+									record: context.preview.record
+								}
+							}
+						}
+					return context.publication.state === 'issued'
 						? { target: 'readingRemote', context: { publication: context.publication } }
 						: context.publication.state === 'requested'
 							? { target: 'allocating' }
@@ -318,6 +501,7 @@ export function createPublicationPublish(
 									target: 'identifyingSave',
 									context: { publication: { ...context.selection, state: 'requested' } }
 								}
+				}
 			},
 			allocating: {
 				invoke: {
@@ -354,9 +538,22 @@ export function createPublicationPublish(
 					input: ({ context, input }) => {
 						const scope = binding(context),
 							access = context.access
-						const logic = createPublicationStore(backend.db, scope, (tx) =>
-							authorizePublicationTransaction(tx, access)
-						).stage
+						const logic = createPublicationStore(backend.db, scope, async (tx) => {
+							const source = context.selection.source
+							const [authorized, note] = await Promise.all([
+								authorizePublicationTransaction(tx, access),
+								mode === 'cleanup' && 'noteId' in source
+									? tx.one(
+											app.notes
+												.includeDeleted()
+												.where({ id: source.noteId, libraryId: scope.libraryId })
+												.select('*', '$deletedAt'),
+											{ tier: ReadTier.Remote }
+										)
+									: Promise.resolve(undefined)
+							])
+							return authorized && (mode !== 'cleanup' || !!note?.$deletedAt)
+						}).stage
 						return {
 							operationId: input.operationId,
 							input: {
@@ -377,12 +574,17 @@ export function createPublicationPublish(
 							return { target: 'unavailable' }
 						if (context.publication.state === 'requested' && context.preview)
 							return { target: 'allocating', context: { preview: context.preview } }
-						if (context.publication.state === 'issued' && context.session)
+						if (
+							(context.publication.state === 'issued' ||
+								context.publication.state === 'unpublishing') &&
+							context.session
+						)
 							return {
 								target: 'checkingDispatchAccess',
 								context: { publication: context.publication, session: context.session }
 							}
-						return context.publication.state === 'published'
+						return context.publication.state === 'published' ||
+							context.publication.state === 'unpublished'
 							? { target: 'ready' }
 							: { target: 'failed' }
 					},
@@ -414,11 +616,31 @@ export function createPublicationPublish(
 					id: 'access',
 					src: 'access',
 					input: ({ context }) => ({ request: context.request, expected: context.access }),
-					onDone: ({ event }) =>
-						event.output.kind === 'allowed' ? { target: 'writing' } : { target: 'unauthenticated' },
+					onDone: ({ context, event }) =>
+						event.output.kind === 'allowed'
+							? context.publication.state === 'unpublishing'
+								? mode === 'cleanup'
+									? {
+											target: 'checkingCleanupDispatch',
+											context: { publication: context.publication }
+										}
+									: { target: 'removing', context: { publication: context.publication } }
+								: { target: 'writing', context: { publication: context.publication } }
+							: { target: 'unauthenticated' },
 					onError: { target: 'failed' }
 				}
 			},
+			checkingCleanupDispatch: {
+				invoke: {
+					id: 'deleted',
+					src: 'deleted',
+					input: ({ context }) => context.selection,
+					onDone: ({ event }) =>
+						event.output ? { target: 'removing' } : { target: 'unavailable' },
+					onError: { target: 'failed' }
+				}
+			},
+
 			writing: {
 				invoke: {
 					id: 'write',
@@ -430,6 +652,97 @@ export function createPublicationPublish(
 					onError: { target: 'readingRemote' }
 				}
 			},
+			readingRemovalTarget: {
+				invoke: {
+					id: 'read',
+					src: 'read',
+					input: ({ context }) => ({
+						uri: context.publication.uri,
+						session: context.session,
+						isCurrent: () => !context.request.signal.aborted
+					}),
+					onDone: ({ context, event }) => {
+						const result = event.output
+						if (result.status === 'notFound')
+							return context.publication.state === 'unpublishing'
+								? {
+										target: 'checkingDispatchAccess',
+										context: { publication: context.publication }
+									}
+								: { target: 'unavailable' }
+						if (context.publication.state === 'unpublishing')
+							return result.record.cid === context.publication.cid
+								? {
+										target: 'checkingDispatchAccess',
+										context: { publication: context.publication }
+									}
+								: { target: 'unavailable' }
+						if (
+							!context.issued ||
+							!result.record.cid ||
+							!matchesIssuedContent(context.issued, result.record)
+						)
+							return { target: 'unavailable' }
+						return {
+							target: 'identifyingSave',
+							context: {
+								publication: {
+									...context.selection,
+									state: 'unpublishing',
+									uri: context.publication.uri,
+									cid: result.record.cid
+								}
+							}
+						}
+					},
+					onError: { target: 'failed' }
+				}
+			},
+			removing: {
+				invoke: {
+					id: 'remove',
+					src: 'remove',
+					input: ({ context }) => ({ publication: context.publication, session: context.session }),
+					timeout: 30_000,
+					onTimeout: { target: 'verifyingRemoval', context: { removalAccepted: false } },
+					onError: { target: 'verifyingRemoval', context: { removalAccepted: false } },
+					onDone: ({ event }) => ({
+						target: 'verifyingRemoval',
+						context: {
+							removalAccepted:
+								event.output.status >= 200 && event.output.status < 300 && !event.output.redirected
+						}
+					})
+				}
+			},
+			verifyingRemoval: {
+				invoke: {
+					id: 'read',
+					src: 'read',
+					input: ({ context }) => ({
+						uri: context.publication.uri,
+						session: context.session,
+						isCurrent: () => !context.request.signal.aborted
+					}),
+					onDone: ({ context, event }) =>
+						event.output.status === 'notFound'
+							? context.removalAccepted
+								? {
+										target: 'identifyingSave',
+										context: {
+											publication: {
+												...context.selection,
+												state: 'unpublished',
+												uri: context.publication.uri
+											}
+										}
+									}
+								: { target: 'unavailable' }
+							: { target: 'unavailable' },
+					onError: { target: 'failed' }
+				}
+			},
+
 			readingRemote: {
 				invoke: {
 					id: 'read',
@@ -480,9 +793,12 @@ export async function handlePublicationPublish(
 	auth: PublicationAuth,
 	backend: Pick<Jazz, 'accountFor' | 'db'>,
 	request: Request,
-	origin: string
+	origin: string,
+	mode: Mode = 'publish'
 ) {
-	const actor = createActor(createPublicationPublish(auth, backend), { input: { request, origin } })
+	const actor = createActor(createPublicationPublish(auth, backend, mode), {
+		input: { request, origin }
+	})
 	const disconnect = () => actor.send({ type: 'DISCONNECT' })
 	request.signal.addEventListener('abort', disconnect, { once: true })
 	try {

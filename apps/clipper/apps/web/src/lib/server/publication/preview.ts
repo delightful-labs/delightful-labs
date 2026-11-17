@@ -16,7 +16,7 @@ type Binding = {
 	publishingDid: string
 	isCurrent: () => boolean
 }
-type Input = { source: PublicationSource; createdAt: Date; binding: Binding }
+type Input = { source: PublicationSource; createdAt: Date; binding: Binding; republish?: boolean }
 type Context = Input & { preview: PublicationPreview | undefined }
 
 /** Backend-only read capability, not an authenticated request endpoint. The host
@@ -104,7 +104,8 @@ export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
 				!facts.publications.some(
 					(publication) =>
 						publication.publishingDid === context.binding.publishingDid &&
-						(publication.state === 'issued' || publication.state === 'published')
+						'uri' in publication &&
+						!(context.republish && publication.state === 'unpublished')
 				)
 		}
 	})
@@ -115,6 +116,7 @@ export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
 			binding: { ...input.binding },
 			source: { ...input.source },
 			createdAt: new Date(input.createdAt),
+			republish: input.republish ?? false,
 			preview: undefined
 		}),
 		output: ({ context }) => context.preview,
