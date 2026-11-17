@@ -1,5 +1,50 @@
 # Article notes — implementation started
 
+## Document-note publication preview — 2026-11-16
+
+The user approved the temporary Zod response containing `libraryId`, the existing
+`source` union, `publishingDid` and the existing Margin `record`. No new stored
+model, Lexicon or public metadata is selected. The first implementation supports
+document Notes; source-verified Highlight capture remains a separate prerequisite.
+
+The backend creates the preview chart with a verified account/library/DID binding
+and a scope-validity capability. One invocation owns one copied source selection
+and caller-selected candidate publication time. Admission refuses expired scopes,
+invalid identifiers and Highlights before reading. The reading state owns one
+native remote-tier related query for the Note, its Document, owner-filtered Library
+and source-filtered publication links. A named eligibility guard checks ownership,
+active same-library parent, document-Note type and absence of an existing link for
+this publisher. Projection reuses the approved Margin mapper and limits.
+
+The finite outcomes are ready (the approved preview) or unavailable (no content).
+Read/projection failures, scope expiry, a 30-second read timeout and cancellation
+produce unavailable. Stopping the chart stops its invoked child; the underlying
+Jazz read has no abort API or acquired transaction to drain, and late native
+completions cannot expose a preview. The future request
+host owns the chart lifetime. No HTTP endpoint, product copy, PDS operation,
+permission escalation or reservation is introduced. This snapshot is not consent
+or issued-publication evidence; future confirmation must recheck accepted data,
+scope and destination. Its candidate time does not establish publication acceptance.
+
+Verification passes 918 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper formatting/lint, whitespace checks and
+the web production build. Ten new native tests cover owner/parent/type and existing
+link refusal, empty/oversized content, malformed admission, read errors, scope expiry,
+cancellation, timeouts, host stop and copied selections across held native reads.
+No browser publication flow, real PDS write or permission grant is qualified here.
+
+Review follow-up: both publication suites now use a shared fixture chart instead
+of procedural `owner` setup. Its states allocate identities, seed the library,
+create the document, optionally create a highlight, create the note and complete.
+Each selected native write settles before the next state is admitted. Every stage
+has an explicit failure transition that propagates the fixture error to the test
+host. The host subscribes before starting and releases the finite root on
+settlement; `PolicyTestApp` retains native clients/receipts and suite teardown.
+Already accepted fixture rows are not described as rolled back.
+Both affected publication suites pass (19 tests), including injected failures at
+each write stage that preserve earlier accepted rows and admit no later writes.
+Web/service-worker types and full Clipper lint/formatting pass after the refactor.
+
 ## Private publication links — 2026-11-16
 
 After reviewing the concrete Zod shape, the user approved the private link between

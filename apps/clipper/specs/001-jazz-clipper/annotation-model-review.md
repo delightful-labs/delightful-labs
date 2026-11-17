@@ -201,6 +201,27 @@ scope before staging. It retains addresses when source rows are deleted. A link
 is an address association, not publication acceptance evidence. Publication intent,
 issued payload/receipt, consent and reconciliation shapes remain unselected.
 
+### Approved temporary publication preview — 2026-11-16
+
+The user approved this concrete Zod response shape before implementation:
+
+```ts
+const publicationPreviewSchema = z.strictObject({
+  libraryId: publicationLinkSchema.shape.libraryId,
+  source: publicationSourceSchema,
+  publishingDid: didSchema,
+  record: marginRecordSchema
+})
+```
+
+This is a temporary snapshot, not a Jazz table, public Lexicon, consent token,
+reserved address or accepted-publication receipt. It reuses existing validation
+for the private source, DID and Margin content. The initial backend reader handles
+document Notes only and refuses existing same-publisher links; source-page
+verification and remote-record reconciliation remain prerequisites for other
+paths. The caller supplies a copied candidate creation time for display. Future
+confirmation must recheck accepted content, scope and destination before issuance.
+
 ### Earlier model review findings
 
 1. Define and qualify text normalization and DOM/code-point/UTF-16 conversion.

@@ -3,7 +3,7 @@ import { lowercaseUuidSchema } from '../validation/values.js'
 
 // AT's generic DID syntax: https://atproto.com/specs/did#did-identifier-syntax
 // This does not resolve the DID or prove account control.
-const didSchema = z
+export const didSchema = z
 	.string()
 	.max(2048)
 	.regex(/^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$/)
