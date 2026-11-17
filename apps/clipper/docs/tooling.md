@@ -163,7 +163,7 @@ Current addresses: `https://192.168.8.183:5182/` on the LAN and `https://100.78.
 
 ## Jazz alpha.60 on Vercel
 
-The Vercel project root is `apps/web`, using Node 24.x, `pnpm install --frozen-lockfile` and `pnpm run build`. The SvelteKit adapter selects Vercel when `VERCEL` is set. `/jazz` serves the native Jazz handler; its managed Sandbox owns SQLite data and resumes after hibernation. Capture parsing runs in a traced Node worker. Local development uses a separate `.jazz/alpha60` SQLite store. The old Netlify deployment is retained for rollback; its storage is not upgraded in place. Clipper starts with fresh data, as authorized for this migration.
+The Vercel project root is `apps/web`, using Node 24.x, the [scoped dependency installation](../README.md#vercel-dependency-installation) and `pnpm run build`. The SvelteKit adapter selects Vercel when `VERCEL` is set. `/jazz` serves the native Jazz handler; its managed Sandbox owns SQLite data and resumes after hibernation. Capture parsing runs in a traced Node worker. Local development uses a separate `.jazz/alpha60` SQLite store. The old Netlify deployment is retained for rollback; its storage is not upgraded in place. Clipper starts with fresh data, as authorized for this migration.
 
 `patches/jazz-tools@2.0.0-alpha.60.patch` is part of the installed runtime. It supplies worker host compatibility, signed local-first gateway admission, the managed core's local-first authentication option and exact Chrome extension origin parsing. It does not grant local-first identities backend database access. Native tests retain signature, audience, registry, revocation and cross-identity checks.
 
