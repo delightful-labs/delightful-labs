@@ -135,11 +135,85 @@ above. Do not assign it the same root cause without the actual error.
 Artifact `14356618664` is preserved at
 `/private/tmp/finance-pr46-workspace-ci.zip`, extracted under the same prefix.
 
-## Next step
+## Native source follow-up
 
-Use a minimal native reproduction or a subsequent retained diagnostic to locate
-the protocol error before proposing an SDK patch or application recovery policy.
-Retain the existing unknown-save protection and financial identity. A later green
-run establishes intermittent behavior, not an explanation or fix. Keep this
-investigation separate from F4c3's worker/native qualification and from production
+### Tagged native source and bounded reproduction
+
+The tagged Rust source now identifies the static error family. Alpha.60 and
+alpha.66 have identical `sync_conflicts.rs` blobs
+(`3f7db8fcd1b0969176caf8e925bdcd2691da701d`):
+[alpha.60](https://github.com/garden-co/jazz/blob/v2.0.0-alpha.60/crates/jazz/layers/db/src/sync_conflicts.rs),
+[alpha.66](https://github.com/garden-co/jazz/blob/v2.0.0-alpha.66/crates/jazz/layers/db/src/sync_conflicts.rs).
+`unknown_base()` constructs this error when a write names a base the receiving
+store cannot resolve. Its `another node's commit` variant, passed through the
+existing `diagnosticText()` quote-redaction expression, exactly matches the
+retained sanitized message. The two apostrophes in the SDK's static wording
+cause the redaction; this comparison does not recover private data.
+
+The relevant callers resolve or translate predecessor references across nodes
+in `relay_bases()`, `resolve_bases()` and `relay_landed()`. This narrows the error
+to native commit ancestry/relay handling, rather than form validation. It still
+does not identify which store/branch raised the hosted error or why its reference
+was unavailable. Identical code here does not rule out fixes elsewhere, and does
+not establish that alpha.66 fixes this case.
+
+A disposable Chromium experiment used each release's actual Wasm client,
+persistent SharedWorker, IndexedDB account selection, native test authority and
+the existing silent Jazz proxy. Fourteen cases completed and their retained
+results were independently checked:
+
+| Scope                            | Cases per release | Observations                                                                                                                                                                                                              |
+| -------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native single-row transactions   | 5                 | Same-account second document after local seeding; edit staged before predecessor acceptance; edit after acceptance; abrupt reload with Jazz unreachable; abrupt reload followed by predecessor acceptance before editing. |
+| Actual Finance persistence actor | 2                 | Both abrupt-reload variants, using the imported-income edit, retained archived tag and new tag/link writes, with native XState development freezing enabled.                                                              |
+
+All ten native cases retained identity and changed amount/memo from the original
+to the requested values. All four actor cases reported `succeeded` /
+`locallyPersisted`, retained two tag links and had frozen context. Thus those
+specific timings do not reproduce the protocol error; they are negative
+reproduction evidence, not a fix or exhaustive race coverage. These are document
+reloads, not full browser-process restarts or the full Svelte product flow.
+
+One earlier actor-fixture variant began before observing the related tag/link
+query shapes. It completed with three links instead of two on both releases.
+The comparable cases first verified the locally observed historical tag and
+single link, as separate readiness facts; they did not require remote acceptance.
+Keep the earlier partial-replica observation separate: it is not the hosted
+protocol error and does not justify a global-persistence preflight or new
+application repair code. The product form's corresponding readiness behavior
+has not been established by this isolated experiment.
+
+Artifacts use the `/private/tmp/finance-offline-protocol-` prefix: `alpha60.log`,
+`alpha66.log`, `abrupt-alpha60.log`, `abrupt-alpha66.log`,
+`actor-dev-alpha60.log` and `actor-dev-alpha66.log`. The aggregate checked result
+is `/private/tmp/finance-offline-protocol-harness/validated-results.json`.
+The alpha.60 runner is under the isolated worker checkout's
+`apps/finance/tests/offline-protocol/`; the alpha.66 runner is under the retained
+`finance-jazz-alpha66-8OYup9/app/tests/offline-protocol/` experiment. Both use
+independent dependencies and reused catalogs, preserving user environments.
+Temporary research fixtures are not another application implementation.
+
+### Native operation labels in existing diagnostics
+
+The only production change adds the named actor `source` to the existing
+sanitized failure report. It reads XState's native actor source metadata through
+the existing data-property/identifier checks; opaque logic is omitted. The next
+retained child error can identify `commit`, `settle` or `rollback`, even though
+the parent snapshot has already advanced to its cleanup state. This needs two
+lines in the diagnostic adapter, with no SDK method wrapper, source registry,
+transaction-chart change, retry or new patch.
+
+The existing ten diagnostic tests pass, including an actual invoked async child
+whose source name and original error are retained. Full app Svelte/TypeScript
+checking passes with zero errors and warnings. At `426c6617`, all hosted Finance,
+Clipper and foundation jobs also passed. That green run confirms intermittency;
+it is not evidence of a fix.
+
+Next inspect a subsequent retained failure's native source label to distinguish
+failure of the commit invocation from failure while awaiting its write handle.
+A `settle` source can also report rejection of the handle's transaction-ID
+promise; it does not by itself prove that commit completed or isolate the native
+durability wait. Locate that SDK boundary before proposing a patch or recovery
+policy. Retain the existing unknown-save protection and financial identity. Keep
+this investigation separate from F4c3's worker/native qualification and production
 merge/deployment guarantees.

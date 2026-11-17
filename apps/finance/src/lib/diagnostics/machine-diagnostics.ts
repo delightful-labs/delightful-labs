@@ -233,8 +233,10 @@ export function logMachineFailure(event: InspectionEvent) {
 			field(field(context, 'result'), 'error') ??
 			field(output, 'error')
 		const machine = identifier(field(field(field(actorRef, 'logic'), 'config'), 'id'))
+		const source = event.type === '@xstate.actor' ? event.src : field(actorRef, 'src')
 		const details: Details = {
 			machine: machine ?? 'invoked-actor',
+			source: identifier(source),
 			actorSessionId: actorRef.sessionId,
 			rootSessionId: event.rootId,
 			status: identifier(status),

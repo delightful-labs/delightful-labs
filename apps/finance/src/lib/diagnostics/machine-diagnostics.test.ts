@@ -102,6 +102,14 @@ it('observes rejected child actors and their handled parent error', async () => 
 	expect(console.error).toHaveBeenCalledWith(
 		'[state-machine] Machine entered an error state',
 		expect.objectContaining({
+			machine: 'invoked-actor',
+			source: 'fetch',
+			error: expect.objectContaining({ code: 'unauthorized' })
+		})
+	)
+	expect(console.error).toHaveBeenCalledWith(
+		'[state-machine] Machine entered an error state',
+		expect.objectContaining({
 			machine: 'session-startup',
 			error: expect.objectContaining({
 				message: 'Permissions head fetch failed',
