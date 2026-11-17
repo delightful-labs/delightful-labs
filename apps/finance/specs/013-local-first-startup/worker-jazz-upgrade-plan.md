@@ -53,8 +53,11 @@ resets or a Finance destination change.
       passes its focused qualification. Clipper's inactive caller port now passes
       types and 46 startup tests, but expanded worker-host coverage exposed the
       [native session custody decision](worker-session-resource-decision.md).
-      Resolve that shared development-mode failure before finishing either
-      consumer's caller port. U2 is not complete.
+      The user chose an actor-owned boundary. Its shared acquisition/observation/
+      close foundation now passes 234 affected tests and nine real development
+      browser cases (30 native cases total). Identity commands and actual caller
+      adoption remain open; the old Clipper overlay still fails 15/67 cases.
+      U2 is not complete.
       U2b source review also found Finance's separate account-handle-based restore
       client. The user approved the shared application Db in the
       [resource ownership decision](worker-restore-session-decision.md).
@@ -289,13 +292,18 @@ passes 52 of 67 cases: the other 15 fail when development XState traverses the
 new native session's throwing `db` getter. The actual SDK/browser diagnostic
 confirms the same acquisition-owner failure. This candidate is **not qualified**.
 
-The [decision record](worker-session-resource-decision.md) contains the exact
-failure, evidence, supported solution and alternatives. Discuss keeping the
-native handle outside immutable context within the existing owner before
-implementation. Do not fix only the fixture, disable development checks or add
-an SDK patch. This shared foundation correction precedes the remaining Finance
-layout/startup port and further Clipper adoption. Backend/schema/extension
-qualification and the coordinated U5 switch remain open.
+The user selected the actor boundary in the
+[decision record](worker-session-resource-decision.md#accepted-direction).
+Its first shared acquisition/observation/close slice is implemented and qualified
+there: 234 affected tests and 30 native browser cases pass, including actual
+signed-out SDK sessions under development XState. The Jazz facade stays private
+to the adapter, which also owns the native loader/immediate local-first setup.
+Next implement identity/recovery commands and actual Finance/Clipper adoption;
+the existing raw-session Clipper overlay remains a failing regression until it
+is replaced. Keep native Svelte qualification as legacy-boundary evidence; the
+worker UI receives bounded views instead of a Window SDK session. Do not fix only
+the fixtures, disable development checks or add an SDK patch. Backend/schema/
+extension qualification and the coordinated U5 switch remain open.
 
 ## Native Vercel naming: additional code proof
 

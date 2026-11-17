@@ -117,6 +117,29 @@ afterEach(() => {
 })
 
 describe('session acquisition owner', () => {
+	it('cancels only the selected storage wait attachment and aborts after its last release', async () => {
+		const source = unavailableOwner()
+		const first = recipient<SessionOwnerReply<Session>>()
+		const second = recipient<SessionOwnerReply<Session>>()
+		const firstScope = scope(source.binding),
+			secondScope = scope(source.binding)
+		source.actor.send({ type: 'ACQUIRE', scope: firstScope, replyTo: first.actor })
+		source.actor.send({ type: 'ACQUIRE', scope: secondScope, replyTo: second.actor })
+		await vi.waitFor(() => expect(source.wait).toHaveBeenCalledOnce())
+		const signal = source.wait.mock.calls[0]?.[1]
+		source.actor.send({ type: 'CANCEL_WAIT', scope: firstScope, replyTo: second.actor })
+		expect(signal?.aborted).toBe(false)
+		source.actor.send({ type: 'CANCEL_WAIT', scope: firstScope, replyTo: first.actor })
+		expect(first.events).toContainEqual({ type: 'RELEASED', scope: firstScope })
+		expect(signal?.aborted).toBe(false)
+		source.actor.send({ type: 'CANCEL_WAIT', scope: secondScope, replyTo: second.actor })
+		expect(second.events).toContainEqual({ type: 'RELEASED', scope: secondScope })
+		expect(signal?.aborted).toBe(true)
+		source.availability.resolve()
+		await Promise.resolve()
+		expect(source.acquire).toHaveBeenCalledOnce()
+		expect(selectAcquiredSession(source.actor.getSnapshot())).toBeUndefined()
+	})
 	it('reuses a supplied reference and never closes/logs out the host resource', async () => {
 		const existing = resource()
 		const f = owner(undefined, existing)
@@ -423,6 +446,7 @@ describe('startup attachment lifecycle', () => {
 								>(),
 							RELEASE:
 								types<EventPayload<SessionOwnerEvent<Session> | { type: 'CRASH' }, 'RELEASE'>>(),
+							CANCEL_WAIT: types<EventPayload<SessionOwnerEvent<Session>, 'CANCEL_WAIT'>>(),
 							CRASH: types<EventPayload<SessionOwnerEvent<Session> | { type: 'CRASH' }, 'CRASH'>>()
 						}
 					}

@@ -146,6 +146,76 @@ index f15347c..a322805 100644
  					: { kind: 'unavailable' }
  			}
  		}
+diff --git a/src/lib/backend/jazz/session-runtime.ts b/src/lib/backend/jazz/session-runtime.ts
+new file mode 100644
+index 0000000..95b281f
+--- /dev/null
++++ b/src/lib/backend/jazz/session-runtime.ts
+@@ -0,0 +1,64 @@
++import { createJazzClient } from 'jazz-tools/client'
++import type { JazzClient, JazzClientConfig, JazzSessionSnapshot } from 'jazz-tools/client'
++import type {
++	SessionRuntimeInput,
++	SessionRuntimeObservation
++} from '../../contracts/session-runtime.js'
++
++const loadLocalFirstClient = () => import('jazz-tools/local-first')
++
++/** Only this native adapter retains the SDK facade. Session operations belong to its actor. */
++export function createJazzSessionRuntime(
++	config: Omit<JazzClientConfig, 'client' | 'localFirst'>
++): SessionRuntimeInput {
++	const captured: JazzClientConfig = { ...config, client: loadLocalFirstClient, localFirst: 'now' }
++	return {
++		binding: Object.freeze({}),
++		capability: {
++			open: async () => {
++				const session = await createJazzClient(captured)
++				let previous: JazzSessionSnapshot<JazzClient> | undefined
++				let binding: object = Object.freeze({})
++				const read = (): SessionRuntimeObservation => {
++					const snapshot = session.getSnapshot()
++					if (snapshot.status !== 'ready') {
++						previous = snapshot
++						return { status: snapshot.status }
++					}
++					if (!snapshot.user || !snapshot.client)
++						throw new Error('Jazz ready session resources unavailable')
++					if (
++						previous?.status !== 'ready' ||
++						previous.user !== snapshot.user ||
++						previous.client !== snapshot.client ||
++						previous.client?.db !== snapshot.client.db
++					)
++						binding = Object.freeze({})
++					previous = snapshot
++					return {
++						status: 'ready',
++						binding,
++						identityId: snapshot.user.accountId,
++						identityKind: snapshot.user.kind,
++						localFirst: snapshot.localFirst
++					}
++				}
++				return {
++					observe: (publish, failed) => {
++						const notify = () => {
++							try {
++								publish(read())
++							} catch {
++								failed()
++							}
++						}
++						const unsubscribe = session.subscribe(notify)
++						notify()
++						return unsubscribe
++					},
++					close: () => session.close()
++				}
++			}
++		}
++	}
++}
 diff --git a/src/lib/contracts/session.ts b/src/lib/contracts/session.ts
 index 86ce088..8b56980 100644
 --- a/src/lib/contracts/session.ts

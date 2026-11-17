@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -149,6 +149,7 @@ for (const path of [
 	'src/lib/backend/jazz/recovery-phrase.ts',
 	'src/lib/backend/jazz/restoration.ts',
 	'src/lib/backend/jazz/session-readiness.ts',
+	'src/lib/contracts/session-runtime.ts',
 	'src/lib/contracts/recovery-phrase.ts',
 	'src/lib/contracts/restoration.ts',
 	'src/lib/contracts/session.ts'
@@ -165,6 +166,12 @@ run('git', ['apply', join(proof, 'session-adapters.patch')], sources)
 const adapted = join(directory, 'adapted-local-first')
 mkdirSync(adapted)
 run('tar', ['-xzf', join(directory, 'local-first.tgz'), '-C', adapted])
+const adaptedManifest = JSON.parse(readFileSync(join(adapted, 'package/package.json'), 'utf8'))
+adaptedManifest.exports['./backend/jazz/session-runtime'] = {
+	types: './dist/backend/jazz/session-runtime.d.ts',
+	default: './dist/backend/jazz/session-runtime.js'
+}
+json(join(adapted, 'package/package.json'), adaptedManifest)
 json(join(sources, 'tsconfig.json'), {
 	compilerOptions: {
 		target: 'ES2024',
@@ -182,7 +189,8 @@ json(join(sources, 'tsconfig.json'), {
 	include: [
 		'src/lib/backend/jazz/recovery-phrase.ts',
 		'src/lib/backend/jazz/restoration.ts',
-		'src/lib/backend/jazz/session-readiness.ts'
+		'src/lib/backend/jazz/session-readiness.ts',
+		'src/lib/backend/jazz/session-runtime.ts'
 	]
 })
 run('pnpm', ['exec', 'tsc', '--project', 'session-adapters/tsconfig.json'], app)

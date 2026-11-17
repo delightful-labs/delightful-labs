@@ -32,6 +32,9 @@ Both libraries' `dist` outputs must be current before packing.
   tarball, and tests the normal public package exports. Recovery needs only the
   native snapshot getter and device-key export; it also accepts that observation
   pair from a native Svelte context without requiring session ownership methods.
+  It also adds the approved actor's private Jazz adapter to the temporary package.
+  This adapter owns native session creation, client loading, immediate local-first
+  setup and observation projection; its SDK facade stays inside native closures.
 - `consumer-session.patch` adapts Finance's recovery component to native
   `getJazzSession()`/`get(store)` and the bound export action. Svelte's store owns
   subscription and initial publication; the existing recovery actor still owns
@@ -51,12 +54,25 @@ with 52/67 cases passing. Development XState walks the native SDK facade in
 context and invokes its new throwing `db` getter while signed out. Strict types
 and all 46 application-readiness cases pass; an actual SDK/browser development
 diagnostic reproduces the owner failure. The runner therefore does not report
-overall success at this checkpoint. Resolve the
-[shared resource-custody decision](../../specs/013-local-first-startup/worker-session-resource-decision.md)
-before adoption; do not weaken the fixture or disable development checks.
+overall success at this checkpoint. The approved
+[actor boundary](../../specs/013-local-first-startup/worker-session-resource-decision.md)
+now passes its first foundation qualification; identity commands and actual
+Clipper/Finance adoption remain. Do not weaken the old fixture or disable checks.
 
-Strict declaration/fixture types, native Svelte checks and all **21 native cases**
-pass in the isolated candidate, including the prior 18 worker/session cases.
+Strict declaration/fixture types, native Svelte checks and all **30 native cases**
+pass in the isolated candidate, including the prior 21 worker/session/Svelte cases.
+Nine new cases exercise the actual packed shared session actor with real SDK
+sessions inside dedicated Workers in a separate development build. They assert
+that XState froze its context, no Window exists in that realm, signed-out/device
+startup succeeds and actual SDK close completes once.
+Close during late acquisition never subscribes or publishes that session.
+Worker teardown awaits native SDK, AccountStore and exact broker-host receipts.
+The controls reuse the existing SDK fixture's broker host and typed command
+channel; Window code only supplies the narrow native bridge and test controls.
+Production and development each retain exactly one broker asset. The actor uses
+the existing acquisition chart, not a copied fixture workflow. It adds no SDK
+patch. Full shared types, library Svelte checks, packaging/publint and 234 affected
+identity/backend tests also pass.
 The three Svelte cases cover initial availability, phrase/native-key equality,
 clearing an open phrase on same-account replacement, the SDK's `loading` snippet,
 sign-out/reopen, external-provider unmount/remount and native close. Mounting the

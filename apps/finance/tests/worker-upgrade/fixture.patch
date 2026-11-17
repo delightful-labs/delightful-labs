@@ -1,17 +1,213 @@
+diff --git a/tests/worker-bindings/actor/client.ts b/tests/worker-bindings/actor/client.ts
+new file mode 100644
+index 0000000..44ce355
+--- /dev/null
++++ b/tests/worker-bindings/actor/client.ts
+@@ -0,0 +1,20 @@
++import { fixture as sdk } from '../sdk-session.js'
++
++const fixture = {
++	open: (initial: 'device' | 'signed-out', scope: string, brokerUrl: string, hold = false) =>
++		sdk.openActor(initial, scope, brokerUrl, hold),
++	async state() {
++		const reply = await sdk.command({ type: 'ACTOR_STATE' })
++		if (reply.kind !== 'actor-state') throw new Error('Unexpected actor state reply')
++		return reply.state
++	},
++	close: () => sdk.command({ type: 'CLOSE_ACTOR' }),
++	releaseOpen: () => sdk.command({ type: 'RELEASE_ACTOR_OPEN' }),
++	dispose: () => sdk.closeActor()
++}
++declare global {
++	interface Window {
++		financeSessionActorFixture: typeof fixture
++	}
++}
++window.financeSessionActorFixture = fixture
+diff --git a/tests/worker-bindings/actor/index.html b/tests/worker-bindings/actor/index.html
+new file mode 100644
+index 0000000..6edd339
+--- /dev/null
++++ b/tests/worker-bindings/actor/index.html
+@@ -0,0 +1,10 @@
++<!doctype html>
++<html lang="en">
++	<head>
++		<meta charset="UTF-8" />
++		<title>Native session actor qualification</title>
++	</head>
++	<body>
++		<script type="module" src="./client.ts"></script>
++	</body>
++</html>
+diff --git a/tests/worker-bindings/actor/session.ts b/tests/worker-bindings/actor/session.ts
+new file mode 100644
+index 0000000..f6043de
+--- /dev/null
++++ b/tests/worker-bindings/actor/session.ts
+@@ -0,0 +1,137 @@
++import { createActor, waitFor } from 'xstate'
++import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
++import {
++	sessionRuntimeMachine,
++	selectSessionRuntimeObservation
++} from 'delightful-local-first/session/runtime'
++import { createFinanceAccountStore } from '../../../src/lib/runtime/worker/account-store.js'
++import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
++import wasmUrl from '#jazz-wasm-binary?url'
++
++let broker: ReturnType<typeof brokerHostClient> | undefined
++let actor: ReturnType<typeof createActor<typeof sessionRuntimeMachine>> | undefined
++let store: ReturnType<typeof createFinanceAccountStore> | undefined
++let held: ReturnType<typeof Promise.withResolvers<void>> | undefined
++let acquired = 0,
++	subscribed = 0,
++	unsubscribed = 0,
++	closed = 0,
++	actorFailed = false
++function owner() {
++	if (!actor) throw new Error('Native session actor not open')
++	return actor
++}
++export const actorFixture = {
++	open(
++		initial: 'device' | 'signed-out',
++		scope: string,
++		brokerWorkerUrl: string,
++		hold: boolean,
++		data: MessagePort,
++		control: MessagePort
++	) {
++		if (actor) throw new Error('Native session actor already open')
++		broker = brokerHostClient(data, control, scope, {
++			onOverdue: () => {
++				actorFailed = true
++			},
++			onBlocked: () => {
++				actorFailed = true
++			}
++		})
++		const serverUrl = location.origin + '/jazz'
++		const selected = createFinanceAccountStore({ serverUrl, scope, environment: 'actor-proof' })
++		store = selected
++		const native = createJazzSessionRuntime({
++			serverUrl,
++			scope,
++			env: 'actor-proof',
++			store: selected,
++			initial,
++			runtimeSources: {
++				wasmUrl,
++				brokerWorkerUrl,
++				wasmVersion: 'finance-sdk-proof-1',
++				browserWorkerHost: broker
++			}
++		})
++		if (hold) held = Promise.withResolvers<void>()
++		actor = createActor(sessionRuntimeMachine, {
++			input: {
++				...native,
++				capability: {
++					open: async () => {
++						const resource = await native.capability.open()
++						acquired++
++						await held?.promise
++						return {
++							observe: (publish, failed) => {
++								subscribed++
++								const stop = resource.observe(publish, failed)
++								return () => {
++									stop()
++									unsubscribed++
++								}
++							},
++							close: async () => {
++								await resource.close()
++								closed++
++							}
++						}
++					}
++				}
++			}
++		})
++		actor.subscribe({
++			error: () => {
++				actorFailed = true
++			}
++		})
++		actor.start()
++	},
++	state() {
++		const snapshot = owner().getSnapshot()
++		const observation = selectSessionRuntimeObservation(snapshot)
++		return {
++			actorFailed,
++			windowPresent: typeof window !== 'undefined',
++			contextFrozen: Object.isFrozen(snapshot.context),
++			failed: actorFailed || snapshot.matches('openFailed') || snapshot.matches('ownerFailed'),
++			acquired,
++			subscribed,
++			unsubscribed,
++			closed,
++			done: snapshot.status === 'done',
++			clean: snapshot.output?.outcome === 'closed',
++			status: observation?.status,
++			identityId: observation?.status === 'ready' ? observation.identityId : undefined,
++			localFirst: observation?.status === 'ready' ? observation.localFirst : undefined
++		}
++	},
++	close() {
++		owner().send({ type: 'CLOSE' })
++	},
++	releaseOpen() {
++		held?.resolve()
++	},
++	async dispose() {
++		held?.resolve()
++		const current = owner()
++		if (current.getSnapshot().status !== 'done') current.send({ type: 'CLOSE' })
++		await waitFor(current, (snapshot) => snapshot.status === 'done', { timeout: 5000 })
++		if (current.getSnapshot().output?.outcome !== 'closed')
++			throw new Error('Native session close failed')
++		await store?.close()
++		if (!broker) throw new Error('Actor broker missing')
++		const receipt = await broker.close()
++		const hostClosed =
++			receipt.scope === broker.host.identity.scope &&
++			receipt.requestId === broker.host.identity.requestId
++		if (!hostClosed) throw new Error('Actor broker close receipt mismatch')
++		actor = undefined
++		store = undefined
++		held = undefined
++		broker = undefined
++		return { sdkClosed: true, storeClosed: true, hostClosed }
++	}
++}
 diff --git a/tests/worker-bindings/native.test.ts b/tests/worker-bindings/native.test.ts
-index eb4c31d..d5a9a4f 100644
+index eb4c31d..1eb0efb 100644
 --- a/tests/worker-bindings/native.test.ts
 +++ b/tests/worker-bindings/native.test.ts
-@@ -4,6 +4,8 @@ import { join, resolve, extname } from 'node:path'
+@@ -4,6 +4,9 @@ import { join, resolve, extname } from 'node:path'
  import { beforeAll, afterAll, describe, expect, it, onTestFailed } from 'vitest'
  import { chromium, firefox, webkit, type BrowserContext, type Page } from '@playwright/test'
  import { build } from 'vite'
 +import { svelte } from '@sveltejs/vite-plugin-svelte'
 +import type {} from './svelte/client.js'
++import type {} from './actor/client.js'
  import { workerRuntimeBuildConfig } from '../../tooling/jazz-wasm.js'
  import type { FinanceAccountStoreConfiguration } from '../../src/lib/runtime/worker/account-store.js'
  import type { Operation } from './bindings.worker.js'
-@@ -23,10 +25,16 @@ beforeAll(async () => {
+@@ -11,7 +14,8 @@ import type {} from './driver.js'
+ 
+ let directory = '',
+ 	origin = ''
+-let sdkBrokerPath = ''
++let sdkBrokerPath = '',
++	actorBrokerPath = ''
+ let initialized = false,
+ 	preserveFailure = false
+ let server: ReturnType<typeof createServer> | undefined
+@@ -23,25 +27,55 @@ beforeAll(async () => {
  		...workerRuntimeBuildConfig(),
  		configFile: false,
  		logLevel: 'silent',
@@ -26,37 +222,186 @@ index eb4c31d..d5a9a4f 100644
 +					resolve('tests/worker-bindings/svelte/index.html')
 +				]
 +			}
++		}
++	})
++	const development = join(directory, 'development')
++	await build({
++		...workerRuntimeBuildConfig(),
++		configFile: false,
++		logLevel: 'silent',
++		base: '/development/',
++		resolve: {
++			...workerRuntimeBuildConfig().resolve,
++			conditions: ['development', 'browser', 'module']
++		},
++		define: { 'process.env.NODE_ENV': JSON.stringify('development') },
++		build: {
++			outDir: development,
++			emptyOutDir: true,
++			rolldownOptions: { input: resolve('tests/worker-bindings/actor/index.html') }
  		}
  	})
  	const assets = new Map<string, { bytes: Buffer; type: string }>()
-@@ -38,9 +46,11 @@ beforeAll(async () => {
- 			type:
- 				extname(file) === '.html'
- 					? 'text/html'
+-	for await (const file of glob('**/*', { cwd: output })) {
+-		const path = join(output, file)
+-		if (!(await stat(path)).isFile()) continue
+-		assets.set('/' + file, {
+-			bytes: await readFile(path),
+-			type:
+-				extname(file) === '.html'
+-					? 'text/html'
 -					: extname(file) === '.js'
 -						? 'application/javascript'
 -						: 'application/octet-stream'
-+					: extname(file) === '.css'
-+						? 'text/css'
-+						: extname(file) === '.js'
-+							? 'application/javascript'
-+							: 'application/octet-stream'
- 		})
+-		})
++	for (const source of [
++		{ prefix: '', directory: output },
++		{ prefix: '/development', directory: development }
++	]) {
++		for await (const file of glob('**/*', { cwd: source.directory })) {
++			const path = join(source.directory, file)
++			if (!(await stat(path)).isFile()) continue
++			assets.set(source.prefix + '/' + file, {
++				bytes: await readFile(path),
++				type:
++					extname(file) === '.html'
++						? 'text/html'
++						: extname(file) === '.css'
++							? 'text/css'
++							: extname(file) === '.js'
++								? 'application/javascript'
++								: 'application/octet-stream'
++			})
++		}
  	}
  	const listener = createServer((request, response) => {
-@@ -52,9 +62,8 @@ beforeAll(async () => {
- 		})
+ 		const pathname = new URL(request.url ?? '/', origin || 'http://fixture.invalid').pathname
+@@ -53,12 +87,17 @@ beforeAll(async () => {
  		response.end(asset?.bytes ?? 'No app, auth or Jazz endpoint exists in this fixture')
  	})
--	const brokers = [...assets.keys()].filter(
+ 	const brokers = [...assets.keys()].filter(
 -		(path) =>
 -			path.startsWith('/_app/immutable/assets/') && /\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
-+	const brokers = [...assets.keys()].filter((path) =>
-+		/\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
++		(path) => !path.startsWith('/development/') && /\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
  	)
  	if (brokers.length !== 1 || !brokers[0])
  		throw new Error(`Expected one SDK broker asset, found ${brokers.length}`)
-@@ -121,6 +130,152 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
+ 	sdkBrokerPath = brokers[0]
++	const developmentBrokers = [...assets.keys()].filter(
++		(path) => path.startsWith('/development/') && /\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
++	)
++	if (developmentBrokers.length !== 1 || !developmentBrokers[0])
++		throw new Error('Expected one development broker asset')
++	actorBrokerPath = developmentBrokers[0]
+ 	server = listener
+ 	await new Promise<void>((resolve, reject) => {
+ 		listener.once('error', reject)
+@@ -106,6 +145,104 @@ function retainOnFailure() {
+ 
+ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
+ 	describe(engine, () => {
++		it.each([{ initial: 'device' }, { initial: 'signed-out' }] satisfies {
++			initial: 'device' | 'signed-out'
++		}[])(
++			'owns an actual %s SDK session inside a dedicated Worker with development XState',
++			async ({ initial }) => {
++				retainOnFailure()
++				const browser = await browserType.launch({ headless: true })
++				let page: Page | undefined
++				try {
++					const actorPage = await browser.newPage()
++					page = actorPage
++					await actorPage.goto(origin + '/development/tests/worker-bindings/actor/index.html')
++					await actorPage.waitForFunction(() => Boolean(window.financeSessionActorFixture))
++					await actorPage.evaluate(
++						({ initial, scope, broker }) =>
++							window.financeSessionActorFixture.open(initial, scope, broker),
++						{ initial, scope: crypto.randomUUID(), broker: origin + actorBrokerPath }
++					)
++					await expect
++						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()), {
++							timeout: 10000
++						})
++						.toMatchObject({ status: initial === 'device' ? 'ready' : 'signed-out' })
++					const observed = await actorPage.evaluate(() => window.financeSessionActorFixture.state())
++					expect(observed).toMatchObject({
++						actorFailed: false,
++						windowPresent: false,
++						contextFrozen: true,
++						acquired: 1,
++						subscribed: 1
++					})
++					if (initial === 'device') {
++						expect(observed.localFirst).toBe(true)
++						expect(observed.identityId).toMatch(/\S/)
++					}
++					await actorPage.evaluate(() => window.financeSessionActorFixture.close())
++					await expect
++						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()), {
++							timeout: 10000
++						})
++						.toMatchObject({ done: true, clean: true, closed: 1, unsubscribed: 1 })
++					expect(
++						await actorPage.evaluate(() => window.financeSessionActorFixture.dispose())
++					).toEqual({ sdkClosed: true, storeClosed: true, hostClosed: true })
++				} finally {
++					if (page)
++						await page.evaluate(() => window.financeSessionActorFixture.dispose()).catch(() => {})
++					await browser.close()
++				}
++			}
++		)
++		it('closes an actual SDK acquired after its owning actor receives CLOSE without publishing it', async () => {
++			retainOnFailure()
++			const browser = await browserType.launch({ headless: true })
++			let page: Page | undefined
++			try {
++				const actorPage = await browser.newPage()
++				page = actorPage
++				await actorPage.goto(origin + '/development/tests/worker-bindings/actor/index.html')
++				await actorPage.waitForFunction(() => Boolean(window.financeSessionActorFixture))
++				await actorPage.evaluate(
++					({ scope, broker }) =>
++						window.financeSessionActorFixture.open('device', scope, broker, true),
++					{ scope: crypto.randomUUID(), broker: origin + actorBrokerPath }
++				)
++				await expect
++					.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()), {
++						timeout: 10000
++					})
++					.toMatchObject({ acquired: 1 })
++				await actorPage.evaluate(() => window.financeSessionActorFixture.close())
++				expect(
++					await actorPage.evaluate(() => window.financeSessionActorFixture.state())
++				).toMatchObject({ done: false, closed: 0, subscribed: 0 })
++				await actorPage.evaluate(() => window.financeSessionActorFixture.releaseOpen())
++				await expect
++					.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()), {
++						timeout: 10000
++					})
++					.toMatchObject({
++						done: true,
++						actorFailed: false,
++						windowPresent: false,
++						contextFrozen: true,
++						clean: true,
++						closed: 1,
++						subscribed: 0
++					})
++				expect(await actorPage.evaluate(() => window.financeSessionActorFixture.dispose())).toEqual(
++					{ sdkClosed: true, storeClosed: true, hostClosed: true }
++				)
++			} finally {
++				if (page)
++					await page.evaluate(() => window.financeSessionActorFixture.dispose()).catch(() => {})
++				await browser.close()
++			}
++		})
++
+ 		it('isolates native Window SDK startup from the worker bridge', async () => {
+ 			retainOnFailure()
+ 			const browser = await browserType.launch({ headless: true })
+@@ -121,6 +258,152 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
  				await browser.close()
  			}
  		})
@@ -210,10 +555,54 @@ index eb4c31d..d5a9a4f 100644
  			retainOnFailure()
  			const profile = await mkdtemp(join(directory, `sdk-${engine}-`))
 diff --git a/tests/worker-bindings/sdk-session.ts b/tests/worker-bindings/sdk-session.ts
-index a968589..bf7244b 100644
+index a968589..2520fa3 100644
 --- a/tests/worker-bindings/sdk-session.ts
 +++ b/tests/worker-bindings/sdk-session.ts
-@@ -34,20 +34,21 @@ const fixture = {
+@@ -18,11 +18,41 @@ function command(operation: SdkCommand) {
+ 	})
+ 	active.worker.postMessage(operation, [
+ 		reply.port2,
+-		...(operation.type === 'OPEN' ? [operation.data, operation.control] : [])
++		...(operation.type === 'OPEN' || operation.type === 'OPEN_ACTOR'
++			? [operation.data, operation.control]
++			: [])
+ 	])
+ 	return result
+ }
+-const fixture = {
++function startWorker(scope: string, brokerUrl: string) {
++	if (active) throw new Error('SDK fixture already active')
++	const data = new MessageChannel(),
++		control = new MessageChannel()
++	const stats = { opens: 0, reads: 0 }
++	const release = serveBrowserWorkerHost(data.port1, control.port1, scope, {
++		origin: location.origin,
++		brokerWorkerUrl: brokerUrl,
++		storage: {
++			getItem: (key) => {
++				stats.reads++
++				return localStorage.getItem(key)
++			},
++			setItem: (key, value) => localStorage.setItem(key, value)
++		},
++		open: (url, name) => {
++			stats.opens++
++			return new SharedWorker(url, { type: 'module', name })
++		}
++	})
++	active = {
++		worker: new Worker(new URL('./sdk-session.worker.ts', import.meta.url), { type: 'module' }),
++		release,
++		stats
++	}
++
++	return { data, control }
++}
++export const fixture = {
+ 	async windowControl(scope: string, brokerUrl: string) {
+ 		const { createJazzClient } = await import('jazz-tools/client')
+ 		const { createFinanceAccountStore } =
+@@ -34,45 +64,56 @@ const fixture = {
  			scope,
  			env: 'sdk-proof',
  			store,
@@ -235,15 +624,26 @@ index a968589..bf7244b 100644
  		}
  	},
 -	async open(scope: string, brokerUrl: string) {
+-		if (active) throw new Error('SDK fixture already active')
+-		const data = new MessageChannel(),
+-			control = new MessageChannel()
+-		const stats = { opens: 0, reads: 0 }
+-		const release = serveBrowserWorkerHost(data.port1, control.port1, scope, {
+-			origin: location.origin,
+-			brokerWorkerUrl: brokerUrl,
+-			storage: {
+-				getItem: (key) => {
+-					stats.reads++
+-					return localStorage.getItem(key)
+-				},
+-				setItem: (key, value) => localStorage.setItem(key, value)
+-			},
+-			open: (url, name) => {
+-				stats.opens++
+-				return new SharedWorker(url, { type: 'module', name })
+-			}
 +	async open(scope: string, brokerUrl: string, failLoader = false) {
- 		if (active) throw new Error('SDK fixture already active')
- 		const data = new MessageChannel(),
- 			control = new MessageChannel()
-@@ -72,7 +73,14 @@ const fixture = {
- 			release,
- 			stats
- 		}
--		return command({ type: 'OPEN', scope, brokerUrl, data: data.port2, control: control.port2 })
++		const { data, control } = startWorker(scope, brokerUrl)
 +		return command({
 +			type: 'OPEN',
 +			scope,
@@ -251,15 +651,50 @@ index a968589..bf7244b 100644
 +			data: data.port2,
 +			control: control.port2,
 +			failLoader
+ 		})
+-		active = {
+-			worker: new Worker(new URL('./sdk-session.worker.ts', import.meta.url), { type: 'module' }),
+-			release,
+-			stats
+-		}
+-		return command({ type: 'OPEN', scope, brokerUrl, data: data.port2, control: control.port2 })
++	},
++	async openActor(
++		initial: 'device' | 'signed-out',
++		scope: string,
++		brokerUrl: string,
++		hold: boolean
++	) {
++		const { data, control } = startWorker(scope, brokerUrl)
++		return command({
++			type: 'OPEN_ACTOR',
++			initial,
++			scope,
++			brokerUrl,
++			hold,
++			data: data.port2,
++			control: control.port2
 +		})
++	},
++	async closeActor() {
++		if (!active) return
++		const result = await command({ type: 'DISPOSE_ACTOR' })
++		if (result.kind !== 'actor-disposed') throw new Error('Unexpected actor dispose result')
++		active.release()
++		active.worker.terminate()
++		active = undefined
++		return result.receipt
  	},
  	command,
  	stats: () => ({ ...active?.stats }),
 diff --git a/tests/worker-bindings/sdk-session.worker.ts b/tests/worker-bindings/sdk-session.worker.ts
-index f8a8f90..32577ac 100644
+index f8a8f90..29a2e66 100644
 --- a/tests/worker-bindings/sdk-session.worker.ts
 +++ b/tests/worker-bindings/sdk-session.worker.ts
-@@ -3,9 +3,17 @@ import wasmUrl from '#jazz-wasm-binary?url'
+@@ -1,11 +1,33 @@
++import { actorFixture } from './actor/session.js'
+ import { createJazzClient } from 'jazz-tools/client'
+ import wasmUrl from '#jazz-wasm-binary?url'
  import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
  import { createFinanceAccountStore } from '../../src/lib/runtime/worker/account-store.js'
  import { app } from '../../src/lib/schema.js'
@@ -267,6 +702,19 @@ index f8a8f90..32577ac 100644
  
  export type SdkCommand =
 -	| { type: 'OPEN'; scope: string; brokerUrl: string; data: MessagePort; control: MessagePort }
++	| {
++			type: 'OPEN_ACTOR'
++			initial: 'device' | 'signed-out'
++			scope: string
++			brokerUrl: string
++			hold: boolean
++			data: MessagePort
++			control: MessagePort
++	  }
++	| { type: 'ACTOR_STATE' }
++	| { type: 'CLOSE_ACTOR' }
++	| { type: 'RELEASE_ACTOR_OPEN' }
++	| { type: 'DISPOSE_ACTOR' }
 +	| {
 +			type: 'OPEN'
 +			scope: string
@@ -278,12 +726,15 @@ index f8a8f90..32577ac 100644
  	| { type: 'READ'; organizationId: string }
  	| {
  			type: 'SEED'
-@@ -16,10 +24,12 @@ export type SdkCommand =
+@@ -16,10 +38,15 @@ export type SdkCommand =
  	  }
  	| { type: 'EDIT'; transactionId: string; amountMinor: number }
  	| { type: 'CLOSE' }
 +	| { type: 'QUALIFY_SESSION' }
  export type SdkReply =
++	| { kind: 'actor-started' }
++	| { kind: 'actor-state'; state: ReturnType<typeof actorFixture.state> }
++	| { kind: 'actor-disposed'; receipt: Awaited<ReturnType<typeof actorFixture.dispose>> }
  	| { kind: 'opened'; accountId: string; localFirst: boolean; windowPresent: boolean }
  	| { kind: 'rows'; rows: { id: string; amountMinor: number; memo: string | null }[] }
  	| { kind: 'saved' }
@@ -291,7 +742,7 @@ index f8a8f90..32577ac 100644
  	| { kind: 'closed'; sdkClosed: boolean; hostClosed: boolean }
  	| { kind: 'failed'; message: string; stack?: string }
  
-@@ -28,8 +38,8 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
+@@ -28,13 +55,36 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
  let broker: ReturnType<typeof brokerHostClient> | undefined
  function current() {
  	const snapshot = session?.getSnapshot()
@@ -302,7 +753,35 @@ index f8a8f90..32577ac 100644
  }
  
  // Disposable SDK controls, not an application runtime. The test owns operation
-@@ -48,7 +58,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+ // order, fixture seeding and browser-process restarts through these SDK leaves.
+ async function execute(command: SdkCommand): Promise<SdkReply> {
++	if (command.type === 'OPEN_ACTOR') {
++		actorFixture.open(
++			command.initial,
++			command.scope,
++			command.brokerUrl,
++			command.hold,
++			command.data,
++			command.control
++		)
++		return { kind: 'actor-started' }
++	}
++	if (command.type === 'DISPOSE_ACTOR')
++		return { kind: 'actor-disposed', receipt: await actorFixture.dispose() }
++	if (
++		command.type === 'ACTOR_STATE' ||
++		command.type === 'CLOSE_ACTOR' ||
++		command.type === 'RELEASE_ACTOR_OPEN'
++	) {
++		if (command.type === 'CLOSE_ACTOR') actorFixture.close()
++		if (command.type === 'RELEASE_ACTOR_OPEN') actorFixture.releaseOpen()
++		return { kind: 'actor-state', state: actorFixture.state() }
++	}
++
+ 	if (command.type === 'OPEN') {
+ 		if (session || store || broker) throw new Error('SDK fixture already open')
+ 		const serverUrl = new URL('/jazz', location.origin).href
+@@ -48,7 +98,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  			scope: command.scope,
  			env: 'sdk-proof',
  			store,
@@ -316,7 +795,7 @@ index f8a8f90..32577ac 100644
  			runtimeSources: {
  				wasmUrl,
  				brokerWorkerUrl: command.brokerUrl,
-@@ -57,7 +72,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -57,7 +112,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  			}
  		})
  		const { db, accountId } = current()
@@ -324,7 +803,7 @@ index f8a8f90..32577ac 100644
  		return {
  			kind: 'opened',
  			accountId,
-@@ -66,9 +80,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -66,9 +120,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  		}
  	}
  	if (command.type === 'CLOSE') {
@@ -337,7 +816,7 @@ index f8a8f90..32577ac 100644
  		await store.close()
  		const receipt = await broker.close()
  		return {
-@@ -79,6 +93,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -79,6 +133,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  				receipt.requestId === broker.host.identity.requestId
  		}
  	}

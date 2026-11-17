@@ -44,10 +44,13 @@ Clipper's inactive native startup caller now passes types and 46 startup tests
 and removes 86 net production lines. Expanded worker-host coverage exposed
 XState development traversal of the new SDK session's throwing `db` getter;
 an actual SDK/browser diagnostic confirms it. The
-[resource-custody decision](worker-session-resource-decision.md) must be discussed
-and resolved before completing either caller port. Keep the existing owner and
-domain drains; do not add an SDK patch or hide the failure in a fixture. U2
-remains open, and active alpha.60 behavior is unchanged.
+[resource-custody decision](worker-session-resource-decision.md) now records the
+approved actor boundary and its first implemented acquisition/observation/close
+slice. It passes 234 affected tests and 30 native browser cases, including nine
+actual SDK/development-XState cases. Identity/recovery commands and actual caller
+adoption remain next; the raw-session Clipper overlay still fails 15/67 cases.
+Keep application domain drains, and do not add an SDK patch or hide that failure
+in a fixture. U2 remains open, and active alpha.60 behavior is unchanged.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

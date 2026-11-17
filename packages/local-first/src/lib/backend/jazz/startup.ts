@@ -2,7 +2,11 @@ import { createActor } from 'xstate'
 import type { ActorRefFrom } from 'xstate'
 import type { JazzClient, JazzSession, JazzClientConfig } from 'jazz-tools/client'
 import { createJazzSessionAcquisition } from './session.js'
-import { createSessionAcquisitionMachine, selectAcquiredSession } from '../../session.js'
+import {
+	createSessionAcquisitionMachine,
+	selectAcquiredSession,
+	selectSessionAcquisitionAvailability
+} from '../../session.js'
 import type { SessionOwnerRef } from '../../session.js'
 import type { SessionScope } from '../../contracts/session.js'
 
@@ -50,7 +54,7 @@ export function createJazzStartupRegistry(
 
 	function getCurrentSessionAvailability() {
 		const snapshot = shared?.owner.getSnapshot()
-		return snapshot?.matches('waitingForAvailability') ? snapshot.context.availability : undefined
+		return snapshot ? selectSessionAcquisitionAvailability(snapshot) : undefined
 	}
 
 	return { getCurrentJazzSession, getJazzStartupBinding, getCurrentSessionAvailability }

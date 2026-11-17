@@ -13,6 +13,15 @@ registry across layout remounts; attachments get distinct scope tokens. A change
 coordinated shutdown. Do not create a second session cache or await remote authentication first.
 The host checks its browser/SSR boundary before asking the registry for a binding.
 
+The coordinated worker upgrade adds `session/runtime`: an SDK-neutral actor for
+acquisition, observation and graceful close, composed with the existing acquisition
+chart. Native SDK references stay inside adapter closures; consumers receive bounded
+observations and send commands. Its alpha.65 Jazz adapter is currently isolated in
+Finance's [upgrade proof](../../../apps/finance/tests/worker-upgrade/README.md).
+Identity/recovery commands and both apps' adoption remain open, so the active
+alpha.60 integration above remains the current application path. Do not persist
+runtime snapshots or treat actor stop as native close acknowledgement.
+
 Recovery uses `recovery/svelte` or the lower-level `recovery/workflow`; explicit identity restoration
 uses `restoration/workflow` and `backend/jazz/restoration`. `recovery/coordination` adds the existing
 validate → request host drain → restore → check navigation facts → navigate sequence. Its host sends

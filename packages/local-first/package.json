@@ -148,6 +148,10 @@
 			"types": "./dist/backend/jazz/restoration.d.ts",
 			"default": "./dist/backend/jazz/restoration.js"
 		},
+		"./session/runtime": {
+			"types": "./dist/session-runtime.d.ts",
+			"default": "./dist/session-runtime.js"
+		},
 		"./session/contracts": {
 			"types": "./dist/contracts/session.d.ts",
 			"default": "./dist/contracts/session.js"

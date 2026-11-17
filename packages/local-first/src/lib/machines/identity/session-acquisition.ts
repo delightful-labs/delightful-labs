@@ -31,6 +31,11 @@ export type SessionOwnerEvent<Session extends object> =
 			Readonly<{
 				type: 'RELEASE'
 			}>)
+	| (Request<Session> &
+			Readonly<{
+				/** Cancel only a storage wait; an issued native open still belongs to this owner. */
+				type: 'CANCEL_WAIT'
+			}>)
 export type SessionOwnerRef<Session extends object> = ActorRef<
 	Snapshot<unknown>,
 	SessionOwnerEvent<Session>
@@ -118,7 +123,8 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 			events: {
 				ACQUIRE: types<EventPayload<SessionOwnerEvent<Session>, 'ACQUIRE'>>(),
 				RETRY_ACQUIRE: types<EventPayload<SessionOwnerEvent<Session>, 'RETRY_ACQUIRE'>>(),
-				RELEASE: types<EventPayload<SessionOwnerEvent<Session>, 'RELEASE'>>()
+				RELEASE: types<EventPayload<SessionOwnerEvent<Session>, 'RELEASE'>>(),
+				CANCEL_WAIT: types<EventPayload<SessionOwnerEvent<Session>, 'CANCEL_WAIT'>>()
 			},
 			input: types<SessionOwnerInput<Session>>()
 		},
@@ -201,6 +207,7 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 			}
 		}),
 		on: {
+			CANCEL_WAIT: {},
 			RELEASE: (args, enq) => {
 				const { event } = args
 				if (args.guards.allowedRelease(args)) {
@@ -352,6 +359,14 @@ export function createSessionAcquisitionMachine<Session extends object>() {
 					}
 				},
 				on: {
+					CANCEL_WAIT: (args, enq) => {
+						if (!args.guards.allowedRelease(args)) return
+						const patch = patches.release(args)
+						enq.sendTo(args.event.replyTo, { type: 'RELEASED', scope: args.event.scope })
+						return patch.requests?.length === 0
+							? { target: 'idle', context: { ...patch, availability: undefined } }
+							: { context: patch }
+					},
 					RELEASE: (args, enq) => {
 						const { event } = args
 						enq.sendTo(event.replyTo, { type: 'RELEASED', scope: event.scope })
@@ -497,5 +512,14 @@ export function selectAcquiredSession<Session extends object>(
 ): Session | undefined {
 	return snapshot.status === 'active' && snapshot.matches('acquired')
 		? snapshot.context.acquisition.session
+		: undefined
+}
+
+/** Bounded storage-wait fact. Admission/cancellation remains with the acquisition chart. */
+export function selectSessionAcquisitionAvailability<Session extends object>(
+	snapshot: SnapshotFrom<ReturnType<typeof createSessionAcquisitionMachine<Session>>>
+) {
+	return snapshot.status === 'active' && snapshot.matches('waitingForAvailability')
+		? snapshot.context.availability
 		: undefined
 }
