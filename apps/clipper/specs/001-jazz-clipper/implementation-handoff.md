@@ -1,5 +1,62 @@
 # Article notes — implementation started
 
+## Current publication permission observation — 2026-11-17
+
+`POST /api/publication/permission` reuses the approved `publicationBaseSchema`
+and returns an empty HTTP 204 when an eligible document Note's selected publisher
+has the full Margin-note grant in the restored OAuth SDK session. It introduces
+no stored model, grant flag, public payload, UI wording, dependency or vendor
+patch. This is an observation for the future consent interaction, not authority
+to issue a later write. An executor must independently check its current grant
+and source at issuance/dispatch; this endpoint does not close that gate.
+
+The HTTP host owns a finite XState root, its abort listener and a 30-second
+deadline. States own bounded input reading, app access, source preview, provider
+restoration, current token-information reading and a final app-access recheck.
+Only a valid same-origin cookie-only request for an owned, eligible document Note
+can reach the provider. The same session, DID, native account and linked provider
+must still be selected when the observation returns. Sources already issued or
+published remain outside this first-publication endpoint.
+
+Restoration calls the existing plugin's server-only `getAtprotoClient` capability
+with the verified DID, then the actual session's `getTokenInfo()` with the SDK's
+default automatic refresh. Configuration and linked-account scope are never
+used as grant evidence. Both session DID and TokenInfo subject must match. The
+check recognizes the exact full `repo:at.margin.note` scope token alongside
+`atproto`, independent of token ordering. It refuses expired/invalid expiry
+observations, similarly named collections and attenuated action-only grants;
+those do not establish the full lifecycle permission this app requests. This
+follows the [repository permission definition](https://atproto.com/specs/permission#repo),
+where an omitted action permits create/update/delete. No general permission-set,
+wildcard or legacy-scope evaluator is introduced.
+
+HTTP 400/403/401 retain input/origin/app-auth refusal; 409 means an inspected source
+or grant is unavailable. Missing/revoked SDK sessions and unexpected provider
+errors return empty 503, without claiming the absence is permanent or initiating
+reauthorization. Every response is private/no-store and varies on Cookie. It
+does not return token information, credentials or SDK handles. Existing requested
+intent and history are untouched by the observation.
+
+The auth host retains the shared SDK session. Cancellation/deadline suppresses
+late results and never revokes that session. The SDK has no request-level abort
+parameter on restoration/token inspection; an already-started refresh may still
+settle into its existing auth store. No repository XRPC request is issued. The
+returned observation is not authorization-server introspection or proof that a
+provider has not independently revoked an otherwise unexpired token.
+
+Focused qualification passes 68 publication/auth tests using native Jazz signed
+cookies and the real plugin/OAuth client, with synthetic discovery/refresh HTTP.
+It covers contrary linked-account metadata, fresh and refreshed grants including
+reduction, native refresh revocation, missing sessions, source/proof admission,
+session/DID/link replacement, exact requested-state/history preservation, SDK
+failures, cancellation and late completion after the deadline. SDK prototype
+doubles are limited to malformed observations and controlled lifetime races.
+Each case owns an isolated provider store so the same fixture DID cannot select
+another case's grant. Live provider consent and the future Publish UI remain open.
+Strict root/web/service-worker/extension type checks, Clipper lint/formatting,
+whitespace checks and the production web/server/service-worker build also pass.
+No new browser or live-provider qualification is claimed for this endpoint.
+
 ## Authenticated publication request — 2026-11-17
 
 `POST /api/publication/request` accepts the existing strict
