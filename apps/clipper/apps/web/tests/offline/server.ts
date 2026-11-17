@@ -21,7 +21,10 @@ export function staticShellServer(initialRoot: string) {
 	}
 	const server = createServer(async (req, res) => {
 		const url = new URL(req.url ?? '/', 'http://127.0.0.1:5190')
-		if (auth && url.pathname.startsWith('/api/auth/')) {
+		if (
+			auth &&
+			(url.pathname.startsWith('/api/auth/') || url.pathname === '/api/publication/preview')
+		) {
 			const chunks: Buffer[] = []
 			for await (const chunk of req) chunks.push(Buffer.from(chunk))
 			const headers = new Headers()

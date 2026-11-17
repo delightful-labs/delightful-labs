@@ -1,4 +1,5 @@
 import { annotationRecoveryMachine, selectAnnotationRecovery } from './recovery.js'
+import { sharingPreviewMachine, selectSharingPreview } from './sharing-preview.js'
 import { setup, types, createAsyncLogic, createCallbackLogic, matchesState } from 'xstate'
 import type { SnapshotFrom } from 'xstate'
 import { createOwnedOperation } from 'delightful-local-first/lifecycle/operation/workflow'
@@ -63,6 +64,7 @@ const actors = {
 		})
 	}),
 	recovery: annotationRecoveryMachine,
+	sharingPreview: sharingPreviewMachine,
 	writeOperation,
 	receipts: syncOwnerMachine,
 	prepare: createAsyncLogic({
@@ -111,6 +113,8 @@ const model = setup({
 		events: {
 			OPEN: types<Extract<Event, { type: 'OPEN' }>>(),
 			CLOSE: types(),
+			PREVIEW_NOTE: types<{ documentId: string; id: string }>(),
+			CLOSE_PREVIEW: types<{ documentId: string; requestId: number }>(),
 			HIGHLIGHT: types<Extract<Event, { type: 'HIGHLIGHT' }>>(),
 			ADD_NOTE: types<Extract<Event, { type: 'ADD_NOTE' }>>(),
 			EDIT_NOTE: types<Extract<Event, { type: 'EDIT_NOTE' }>>(),
@@ -134,6 +138,7 @@ const model = setup({
 		children: {
 			fingerprint: types<import('xstate').ActorRefFrom<typeof actors.fingerprint>>(),
 			recovery: types<import('xstate').ActorRefFrom<typeof actors.recovery>>(),
+			sharingPreview: types<import('xstate').ActorRefFrom<typeof actors.sharingPreview>>(),
 			prepare: types<import('xstate').ActorRefFrom<typeof actors.prepare>>(),
 			observe: types<import('xstate').ActorRefFrom<typeof actors.observe>>(),
 			writeOperation: types<import('xstate').ActorRefFrom<typeof actors.writeOperation>>(),
@@ -182,12 +187,45 @@ export const annotationsMachine = model.createMachine({
 			invoke: { id: 'receipts', src: 'receipts', input: ({ self }) => ({ reportTo: self }) },
 			always: ({ value }) =>
 				matchesState(
-					{ active: { control: 'closing', writer: 'idle', recoveryLifecycle: 'closed' } },
+					{
+						active: {
+							control: 'closing',
+							writer: 'idle',
+							recoveryLifecycle: 'closed',
+							sharingLifecycle: 'closed'
+						}
+					},
 					value
 				)
 					? { target: 'closed' }
 					: undefined,
 			on: {
+				PREVIEW_NOTE: (args, enq) => {
+					if (
+						!args.guards.accepting(args) ||
+						!args.guards.currentDocument(args, args.event) ||
+						args.context.prepared ||
+						args.context.queue.length ||
+						!matchesState({ active: { writer: 'idle' } }, args.value)
+					)
+						return
+					const note = args.context.visibleRows.notes.find((note) => note.id === args.event.id)
+					const recovery = selectAnnotationRecovery(
+						args.self.getSnapshot().children.recovery?.getSnapshot()
+					)
+					if (
+						!note ||
+						args.context.invalidNotes[note.id] !== undefined ||
+						!recovery.ready ||
+						recovery.records.some((record) => record.draft.noteId === note.id)
+					)
+						return
+					enq.sendTo('sharingPreview', { type: 'SHOW', note })
+				},
+				CLOSE_PREVIEW: (args, enq) => {
+					if (!args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', { type: 'DISMISS', requestId: args.event.requestId })
+				},
 				HIGHLIGHT: (args, enq) => {
 					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
 					enq.raise({ type: 'QUEUED' })
@@ -200,6 +238,7 @@ export const annotationsMachine = model.createMachine({
 				},
 				KEEP_DRAFT: (args, enq) => {
 					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', { type: 'INVALIDATED', noteId: args.event.id })
 					const recovered = selectAnnotationRecovery(
 						args.self.getSnapshot().children.recovery?.getSnapshot()
 					).records.find(
@@ -227,6 +266,7 @@ export const annotationsMachine = model.createMachine({
 				},
 				EDIT_NOTE: (args, enq) => {
 					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', { type: 'INVALIDATED', noteId: args.event.id })
 					if (args.context.capability?.recovery)
 						enq.sendTo('recovery', { type: 'RETAIN', noteId: args.event.id, text: args.event.text })
 					if (!noteInputTextSchema.safeParse(args.event.text).success) {
@@ -280,11 +320,49 @@ export const annotationsMachine = model.createMachine({
 				},
 				DELETE_NOTE: (args, enq) => {
 					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', { type: 'INVALIDATED', noteId: args.event.id })
 					enq.raise({ type: 'QUEUED' })
 					return args.actions.enqueue(args, { command: args.event })
 				}
 			},
 			states: {
+				sharingLifecycle: {
+					initial: 'active',
+					invoke: {
+						id: 'sharingPreview',
+						src: 'sharingPreview',
+						input: ({ context }) => ({ capability: context.capability }),
+						onSnapshot: {},
+						onDone: { target: '.closed' },
+						onError: { target: '.closed' }
+					},
+					states: {
+						active: {
+							on: {
+								OPEN: (_, enq) => enq.sendTo('sharingPreview', { type: 'DISMISS' }),
+								CLOSE: (_, enq) => enq.sendTo('sharingPreview', { type: 'DISMISS' }),
+								ROWS: ({ context, event }, enq) => {
+									if (
+										event.documentId !== context.documentId ||
+										event.generation !== context.observationGeneration ||
+										!event.rows.notes
+									)
+										return
+									enq.sendTo('sharingPreview', { type: 'OBSERVED', notes: event.rows.notes })
+								},
+								OBSERVATION_FAILED: ({ context, event }, enq) => {
+									if (
+										event.documentId === context.documentId &&
+										event.generation === context.observationGeneration
+									)
+										enq.sendTo('sharingPreview', { type: 'DISMISS' })
+								},
+								SHUTDOWN: (_, enq) => enq.sendTo('sharingPreview', { type: 'SHUTDOWN' })
+							}
+						},
+						closed: {}
+					}
+				},
 				recoveryLifecycle: {
 					initial: 'active',
 					invoke: {
@@ -658,6 +736,9 @@ export function selectAnnotations(snapshot: SnapshotFrom<typeof annotationsMachi
 		}
 	})
 	return {
+		preview: selectSharingPreview(
+			ready ? snapshot?.children.sharingPreview?.getSnapshot() : undefined
+		),
 		documentId: ready && context ? context.documentId : '',
 		highlights,
 		notes: rows.notes.map((note) => ({

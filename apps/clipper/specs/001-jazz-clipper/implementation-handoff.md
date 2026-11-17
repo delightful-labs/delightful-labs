@@ -1,5 +1,109 @@
 # Article notes — implementation started
 
+## Reader sharing preview — 2026-11-16
+
+Document Notes now offer `Preview sharing`. The worker owns the request and its
+localized preparing/error states. DUI renders a native `Preview` dialog with the
+destination DID, original article URL and exact plain-text Note. The explanation
+is omitted and loading uses the approved generic `Preparing…` entry. Highlights
+remain gated on source-page evidence, and publishing/consent/PDS writes remain
+unfinished. No stored model or public record shape changes in this UI slice.
+
+The native dialog is keyed by library client and preview request, and captures
+that binding eagerly at mount. Its queued native close callback therefore retains
+the original client/document/request even when Retry replaces the dialog. The
+worker rejects close reports from older requests. Native source changes and reader
+scope changes dismiss the preview; a request-specific network failure remains
+retryable while its owning library attachment is current.
+
+Qualification passes 935 unit/native tests, 31 component tests and all four saved-
+reader annotation browser regressions, plus strict root/web/service-worker/
+extension types, Clipper lint/formatting and both production offline fixture
+builds. The built Chromium flow uses real Better Auth cookies, native Jazz account
+mapping and the production preview handler. It verifies preparing/ready/error and
+Retry, exact destination/text, private no-store responses, Escape/Close focus
+return, remote-edit invalidation, then two complete offline browser restarts and
+reconciliation. No live AT account or PDS is contacted. The fixture deliberately
+fails only the preview API when testing Retry, since a whole-account reconnect
+may replace the owning attachment and must dismiss its old preview.
+
+## Authenticated preview request — workflow
+
+The host is a same-origin, JSON POST accepting only the existing preview
+shape's `libraryId` and `source`. The client supplies neither a publishing DID nor
+timestamps/content. The request chart owns bounded input reading, a fresh native
+Better Auth session read, canonical Jazz account/provider-link admission, the
+existing preview child, then fresh session and binding checks before disclosure.
+The server chooses the destination from the session's verified AT profile and
+checks its matching Better Auth provider account. Identity-only login is enough
+for this read; no grant restoration, refresh or PDS operation is selected.
+
+The HTTP host owns one request root and forwards disconnect. Expected terminal
+responses are 200 (approved preview), 400 (input), 403 (origin), 401 (identity),
+409 (preview unavailable) and 503 (unexpected failure/timeout), all private and
+no-store. A disconnect stops invoked work and discards any preview; the request
+has a bounded lifetime. Native reads that lack abort support may complete late,
+but cannot publish a result after their owning state exits. No account or library
+is created. The reader wording approval is recorded below.
+Admission is cookie-only: an Authorization header is refused, so a second proof
+cannot select a different Jazz account from the verified provider session. Fresh
+binding observations also enforce the session expiry before exposing the preview.
+The existing preview child now receives its copied binding through actor input,
+allowing a typed state-owned invocation after authentication without a nested root.
+
+Native request tests use real signed Better Auth cookies and auth rows, with
+explicit setup states for annotation ownership, auth initialization, credential
+signing and a selected native seed batch. They exercise foreign/invalid input,
+expired/revoked sessions, profile/link changes, canonical account replacement,
+disconnect, timeout and body-reader cancellation. Canonical Jazz account mapping
+is controlled in these request tests; the existing gateway integration suite
+separately exercises the actual native `accountFor` admission boundary. The built
+browser qualification adds a real mapped provider session and native account
+lookup. No real AT service interaction is qualified.
+Verification passes 929 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper lint/formatting, whitespace checks,
+workspace links and the web production build. Ten new request tests exercise the
+authenticated boundary; existing preview tests retain their prior behavior after
+moving the verified binding into actor input. The isolated checkout's frozen
+dependencies and workspace packages were refreshed after the intervening merges;
+no manifest, lockfile or shared-library source changes are included. Subsequent
+reader work adds only the explicitly approved catalog entries below.
+
+### Approved preview UI wording and workflow
+
+The user approved the proposed wording with these changes: omit the explanation,
+use `Preview` as the heading and a generic preparing label for loading. The
+document-note control/dialog and worker feedback use the following entries, with
+no interpolation, plural or context forms:
+
+| Key | Approved English text |
+| --- | --- |
+| `publication.preview_action` | Preview sharing |
+| `publication.preview_heading` | Preview |
+| `publication.account` | AT Protocol account |
+| `status.preparing` | Preparing… |
+| `publication.unavailable` | Sharing preview is unavailable. Check your AT Protocol sign-in and saved note, then try again. |
+
+Reuse `actions.close`, `actions.retry`, `nouns.note` and `capture.url_label` for
+existing labels. `actions.show_subject` with `nouns.note` describes the note
+already displayed; `status.unavailable_subject` with that noun would incorrectly
+describe the local note as unavailable. Existing account-working feedback describes
+an account change. Those messages cannot identify this read-only sharing preview
+or its destination. No explanation/disclosure entry is added.
+
+The existing worker-owned annotation chart invokes one sharing-preview child.
+The child owns closed, loading, ready and unavailable states, selected-note
+snapshots, the abortable POST, response validation and localized feedback. It
+compares the returned library/source, URL and text with the selected local Note,
+refusing older server content while local edits are still awaiting acceptance.
+Local edits, recovery choices, deletion, observed source changes, navigation and
+shutdown invalidate the displayed preview and cancel any read. Dismissals carry
+the child request sequence so a native close event from an older dialog cannot
+close a newer request. This sequence is transient UI correlation, not stored
+revision or publication evidence. Preview commands are read-only in the Window
+transport and never create pending-save feedback. The main thread renders DUI's
+native dialog and forwards intent; validation and network work stay in the worker.
+
 ## Document-note publication preview — 2026-11-16
 
 The user approved the temporary Zod response containing `libraryId`, the existing
