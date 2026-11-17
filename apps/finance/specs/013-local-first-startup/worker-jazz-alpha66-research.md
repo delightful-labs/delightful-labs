@@ -321,6 +321,36 @@ blocked-cleanup recovery and broader policy/role coverage remain open on alpha.6
 These memory-driver browser tests do not qualify persistent-worker storage,
 process-restart recovery or full application adoption.
 
+### Destination conflict and artifact cleanup retry
+
+Six further cases reuse the same native browser harness, with no application
+chart or SDK implementation changes. In Chromium/Firefox/WebKit, an authority
+edit to the accepted financial row before resume produces a conflict. Resume
+does not write or publish membership, preserves the edited destination and
+retains the previous journal record. The check independently reloads that record
+from actual IndexedDB. This matches the historical workflow: conflict is the
+operation's outcome, while the existing checkpoint/evidence remains unchanged.
+An initial test expectation of a replacement `conflict` checkpoint was corrected
+after reviewing that chart and its historical assertion.
+
+Each browser also exercises one controlled artifact-release failure after real
+publication. The existing `artifactsBlocked` state retains custody; cancellation
+does not claim release. `RETRY_RELEASE` releases once on the second attempt,
+leaves the shared application Db usable and performs no additional Jazz commits.
+The fixture uses the existing native session/probe and journal-step actor rather
+than a simulated transaction or new cleanup mechanism.
+
+Fresh combined proof: **200 passing tests**, including **24 browser restore
+cases**, with strict types, generation/check and unchanged schema/permission
+identities. Artifact directory:
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-4SeMpE`;
+log: `/private/tmp/finance-alpha66-recovery-proof-final.log`. This does not port
+the full historical suite, prove every conflict/rollback/restart/cleanup variant
+or establish persistent-worker/process-restart behavior. Keep those boundaries
+and full policy/role coverage explicit. The next foundation is alpha.66's actual
+worker/session requalification before broader caller adoption; these passing
+memory-driver restore cases do not substitute for it.
+
 ## Clipper native schema foundation
 
 The same [maintained schema runner](../../tests/worker-upgrade/README.md#alpha66-clipper-schema-reading-and-retained-data)

@@ -144,6 +144,14 @@ expanding commands. Do not build a generic SDK command surface ahead of callers.
       still pass. The fresh combined proof is **194 tests**, including 18 browser
       cases. Conflict/blocked-cleanup recovery, the broader policy/role matrix
       and remaining worker/session/backend/adoption gates stay open.
+      **Bounded conflict/cleanup qualification also passes:** three browsers
+      reject a real changed destination on resume without further Jazz writes,
+      preserving both destination data and the prior IndexedDB journal evidence.
+      Artifact cleanup failure remains blocked until the existing retry releases
+      once without replay. The fresh combined proof is **200 tests**, including
+      24 browser cases. No application-chart change is needed. Broader policy,
+      rollback/restart/conflict/cleanup variants remain for full qualification;
+      proceed with alpha.66 worker/session foundation before broader adoption.
 - [ ] **U4 — Qualify backend authentication and destinations.** Replace the
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix

@@ -55,6 +55,16 @@ passes using the same extracted test probe. See the
 Conflict/blocked-cleanup recovery and broader policy/role coverage remain open,
 along with the worker/session and coordinated adoption gates.
 
+The next bounded recovery checks also pass across all three browsers: a real
+changed destination refuses resume without writes or journal-evidence replacement,
+and failed artifact cleanup retains custody until retry releases once without
+repeating Jazz commits. The combined proof passes **200 tests**, including 24
+browser restore cases; the application charts remain unchanged. See the
+[conflict/cleanup evidence](worker-jazz-alpha66-research.md#destination-conflict-and-artifact-cleanup-retry).
+Broader policy/role and rollback/restart/conflict/cleanup variants remain open.
+Return to the alpha.66 worker/session foundation before broader caller adoption;
+memory-driver restore success does not qualify persistent worker ownership.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,

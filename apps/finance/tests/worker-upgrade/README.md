@@ -29,9 +29,9 @@ text-column wrapper. Source-import changes occur only in copied consumers;
 active application source and dependency pins remain alpha.60.
 
 Strict authoring/query/transform/native-fixture types and `generate --check`
-pass. All **194 tests pass**: 128 existing permission/bank-log cases, ten native
+pass. All **200 tests pass**: 128 existing permission/bank-log cases, ten native
 transform/retention cases, 37 existing backup cases, one retained-archive case
-and 18 native browser restore cases.
+and 24 native browser restore cases.
 A real alpha.60 store keeps its app identity,
 maximum-safe minor-unit amount and normalized text after opening with alpha.66;
 an alpha.66 edit survives another close/reopen. The test also distinguishes a
@@ -71,6 +71,16 @@ the alpha.60 experiment and alpha.66 candidate; its chart body is unchanged.
 Both original alpha.60 accepted-commit cases also pass after that extraction.
 No application workflow or SDK implementation change is needed for these cases.
 
+Three additional native cases change an accepted financial row before resume.
+The actual stored mismatch produces a conflict, performs no further destination
+writes and leaves membership unpublished. Both the returned record and the
+reopened IndexedDB journal preserve the previous evidence; the existing workflow
+does not replace that checkpoint with a new conflict marker. Three cleanup cases
+inject one artifact-release failure after real publication, retain custody in
+the existing blocked state, and release once on `RETRY_RELEASE` without additional
+Jazz commits. All three browsers cover both boundaries. The application charts
+remain unchanged; the fixture reuses the existing probe and journal-step actor.
+
 The new native tests live in the patch and run/type against the candidate SDK,
 so alpha.66 imports do not enter active alpha.60 test discovery. Svelte's normal
 compiler handles the existing shared data module. The runner adds no runtime
@@ -82,8 +92,8 @@ retained records/store, `retained-backup.dlf`, its fixture IDs and
 This does not qualify Clipper, all Finance callers/backup/restore experiments,
 worker durability, backend auth, the full existing SDK patch or Vercel data
 destinations. The full 107-case historical restore experiment is not ported by
-these 18 browser cases. Conflict/blocked-cleanup recovery and the broader
-policy/role matrix remain required on
+these 24 browser cases. Rollback/restart failure paths, broader conflict and
+cleanup variants, and the full policy/role matrix remain required on
 alpha.66. U3 remains open for the
 rest of those boundaries; U4/U5 remain required before any live switch.
 

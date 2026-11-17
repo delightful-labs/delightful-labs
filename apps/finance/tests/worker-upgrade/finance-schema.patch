@@ -3207,12 +3207,13 @@ diff --git a/src/lib/backup/restore-upgrade.browser.ts b/src/lib/backup/restore-
 new file mode 100644
 --- /dev/null
 +++ b/src/lib/backup/restore-upgrade.browser.ts
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,64 @@
 +import { createJazzClient } from 'jazz-tools/client'
 +import { createActor, waitFor, toPromise, type ActorRefFrom } from 'xstate'
 +import { createRecoveryProbe } from '../../../tests/helpers/restore-probe.js'
 +import { prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
 +import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
++import { createRestoreJournalStepMachine } from 'delightful-local-first/backup/restore/workflow'
 +import type { BackupBinding } from 'delightful-local-first/backup/binding'
 +import {
 +	prepareFinanceRestorePlan,
@@ -3239,6 +3240,7 @@ new file mode 100644
 +			client: () => import('jazz-tools/local-first'),
 +			localFirst: 'now'
 +		}),
++	createRestoreJournalStepMachine,
 +	toPromise,
 +	createRecoveryProbe,
 +	prepareArchiveOpen,
@@ -3264,7 +3266,7 @@ new file mode 100644
 +			binding: BackupBinding
 +			plan: FinanceRestorePlan
 +			commits: string[]
-+			stats: { releases: number }
++			stats: { releases: number; releaseAttempts: number }
 +			finishReplacement?: () => Promise<void>
 +		}
 +	}
@@ -3274,7 +3276,7 @@ diff --git a/src/lib/backup/restore-upgrade.test.ts b/src/lib/backup/restore-upg
 new file mode 100644
 --- /dev/null
 +++ b/src/lib/backup/restore-upgrade.test.ts
-@@ -0,0 +1,530 @@
+@@ -0,0 +1,639 @@
 +import { readFile } from 'node:fs/promises'
 +import { createSilentJazzProxy } from '../../../tests/helpers/silent-jazz-proxy.js'
 +import { afterAll, beforeAll, expect, it } from 'vitest'
@@ -3603,10 +3605,11 @@ new file mode 100644
 +	file: number[],
 +	serverUrl: string,
 +	scope: string,
-+	mode: 'new' | 'resume'
++	mode: 'new' | 'resume',
++	fault: 'hold-commit' | 'artifacts' = 'hold-commit'
 +) {
 +	return page.evaluate(
-+		async ({ file, serverUrl, scope, mode }) => {
++		async ({ file, serverUrl, scope, mode, fault }) => {
 +			const api = window.financeRestoreUpgrade
 +			const session =
 +				mode === 'new' ? await api.open(serverUrl, scope) : window.financeRestoreUpgradeSession
@@ -3640,9 +3643,11 @@ new file mode 100644
 +			if (planned.outcome !== 'planned') throw new Error('Drain planning failed')
 +			const plan = planned.plan.read(),
 +				binding = { ...sourceBinding, workspaceId: plan.intent.operation.destinationWorkspaceId }
-+			const heldWrite = mode === 'new' ? plan.intent.plan.batches[0]?.writeId : undefined
-+			if (mode === 'new' && !heldWrite) throw new Error('Missing financial write to hold')
-+			const stats = { releases: 0 }
++			const heldWrite =
++				mode === 'new' && fault === 'hold-commit' ? plan.intent.plan.batches[0]?.writeId : undefined
++			if (mode === 'new' && fault === 'hold-commit' && !heldWrite)
++				throw new Error('Missing financial write to hold')
++			const stats = { releases: 0, releaseAttempts: 0 }
 +			let commits: string[] = []
 +			const machine = api.createFinanceRestoreSession(
 +				{
@@ -3653,6 +3658,9 @@ new file mode 100644
 +					databaseName: 'finance-alpha66-accepted-drain',
 +					mode,
 +					releaseArtifacts() {
++						stats.releaseAttempts++
++						if (fault === 'artifacts' && stats.releaseAttempts === 1)
++							throw new Error('Controlled artifact release failure')
 +						stats.releases++
 +						planning.release()
 +						checked.archive.release()
@@ -3677,17 +3685,19 @@ new file mode 100644
 +			actor.start()
 +			return { workspaceId: binding.workspaceId, identityId: user.accountId }
 +		},
-+		{ file, serverUrl, scope, mode }
++		{ file, serverUrl, scope, mode, fault }
 +	)
 +}
 +
 +it.each(
-+	engines.flatMap(({ name, engine }) =>
-+		['cancel', 'native replacement'].map((interruption) => ({ name, engine, interruption }))
-+	)
++	engines.flatMap(({ name, engine }) => [
++		{ name, engine, interruption: 'cancel', resolution: 'resume' },
++		{ name, engine, interruption: 'native replacement', resolution: 'resume' },
++		{ name, engine, interruption: 'cancel', resolution: 'conflict' }
++	])
 +)(
-+	'$name drains an accepted commit after $interruption and resumes without replay',
-+	async ({ name, engine, interruption }) => {
++	'$name drains an accepted commit after $interruption and handles $resolution without replay',
++	async ({ name, engine, interruption, resolution }) => {
 +		const browser = await engine.launch({
 +			headless: true,
 +			...(name === 'chromium' ? { channel: 'chromium' } : {})
@@ -3768,6 +3778,16 @@ new file mode 100644
 +				commits: 2,
 +				result: { outcome: interruption === 'cancel' ? 'cancelled' : 'invalidated' }
 +			})
++			if (resolution === 'conflict') {
++				const transaction = accepted[0]
++				if (!transaction) throw new Error('Missing accepted row to change')
++				await database
++					.update(app.transactions, transaction.id, { amountMinor: Number.MAX_SAFE_INTEGER - 1 })
++					.wait({ tier: 'global' })
++			}
++			const beforeResume = await database.all(
++				app.transactions.where({ organizationId: admitted.workspaceId })
++			)
 +			const resumed = await startOwnedDrain(page, file, transport.url, authority.appId, 'resume')
 +			expect(resumed).toEqual(admitted)
 +			const completed = await page.evaluate(async () => {
@@ -3775,21 +3795,39 @@ new file mode 100644
 +					runtime = window.financeRestoreDrain
 +				const result = await api.toPromise(runtime.actor)
 +				const stats = { releases: runtime.stats.releases, commits: runtime.commits.length }
++				const journal = await api.toPromise(
++					api
++						.createActor(api.createRestoreJournalStepMachine(), {
++							input: {
++								databaseName: 'finance-alpha66-accepted-drain',
++								binding: runtime.binding,
++								command: { mode: 'load', intent: runtime.plan.intent }
++							}
++						})
++						.start()
++				)
 +				await window.financeRestoreUpgradeSession.close()
-+				return { result, ...stats }
++				return { result, journal, ...stats }
 +			})
 +			expect(completed).toMatchObject({
 +				releases: 1,
-+				commits: 1,
-+				result: { outcome: 'complete', record: { checkpoint: { kind: 'complete' } } }
++				commits: resolution === 'conflict' ? 0 : 1,
++				result: { outcome: resolution === 'conflict' ? 'conflict' : 'complete' },
++				journal: { outcome: 'loaded' }
 +			})
++			if (resolution === 'conflict') {
++				expect(completed.result.record).toEqual(settled.result.record)
++				expect(completed.journal.record).toEqual(settled.result.record)
++			} else expect(completed.journal.record?.checkpoint.kind).toBe('complete')
 +			expect(
 +				await database.all(app.transactions.where({ organizationId: admitted.workspaceId }))
-+			).toEqual(accepted)
++			).toEqual(beforeResume)
 +			expect(await database.all(app.organizations)).toHaveLength(1)
 +			expect(
 +				await database.all(app.organizationMembers.where({ organizationId: admitted.workspaceId }))
-+			).toMatchObject([{ userId: admitted.identityId, role: 'owner' }])
++			).toMatchObject(
++				resolution === 'conflict' ? [] : [{ userId: admitted.identityId, role: 'owner' }]
++			)
 +		} finally {
 +			proxy?.resume()
 +			try {
@@ -3800,6 +3838,79 @@ new file mode 100644
 +				} finally {
 +					await authority?.stop()
 +				}
++			}
++		}
++	},
++	60_000
++)
++
++it.each(engines)(
++	'$name retains artifacts after failed cleanup and releases them once on retry',
++	async ({ name, engine }) => {
++		const browser = await engine.launch({
++			headless: true,
++			...(name === 'chromium' ? { channel: 'chromium' } : {})
++		})
++		let authority: TestJazz | undefined
++		try {
++			authority = await startTestJazz({ app, permissions, jazz: { allowedOrigins: [origin] } })
++			const page = await browser.newPage()
++			await page.goto(origin)
++			await page.waitForFunction(() => Boolean(window.financeRestoreUpgrade))
++			const admitted = await startOwnedDrain(
++				page,
++				file,
++				authority.url,
++				authority.appId,
++				'new',
++				'artifacts'
++			)
++			const blocked = await page.evaluate(async () => {
++				const api = window.financeRestoreUpgrade,
++					runtime = window.financeRestoreDrain
++				await api.waitFor(runtime.actor, (state) => state.matches('artifactsBlocked'))
++				runtime.actor.send({ type: 'CANCEL' })
++				return {
++					status: runtime.actor.getSnapshot().status,
++					...runtime.stats,
++					commits: runtime.commits.length
++				}
++			})
++			expect(blocked).toEqual({ status: 'active', releases: 0, releaseAttempts: 1, commits: 3 })
++			const accepted = await authority.jazz.db.all(
++				app.transactions.where({ organizationId: admitted.workspaceId })
++			)
++			expect(accepted).toMatchObject([{ amountMinor: Number.MAX_SAFE_INTEGER }])
++			const done = await page.evaluate(async () => {
++				const api = window.financeRestoreUpgrade,
++					runtime = window.financeRestoreDrain
++				runtime.actor.send({ type: 'RETRY_RELEASE' })
++				const result = await api.toPromise(runtime.actor)
++				const current = window.financeRestoreUpgradeSession.getSnapshot()
++				if (!current.client) throw new Error('Cleanup closed the application Db')
++				const usable =
++					(await current.client.db.all(api.app.organizations, { tier: 'remote' })).length === 1
++				await window.financeRestoreUpgradeSession.close()
++				return { result, usable, ...runtime.stats, commits: runtime.commits.length }
++			})
++			expect(done).toMatchObject({
++				releases: 1,
++				releaseAttempts: 2,
++				commits: 3,
++				usable: true,
++				result: { outcome: 'cancelled' }
++			})
++			expect(
++				await authority.jazz.db.all(
++					app.transactions.where({ organizationId: admitted.workspaceId })
++				)
++			).toEqual(accepted)
++			expect(await authority.jazz.db.all(app.organizations)).toHaveLength(1)
++		} finally {
++			try {
++				await browser.close()
++			} finally {
++				await authority?.stop()
 +			}
 +		}
 +	},
