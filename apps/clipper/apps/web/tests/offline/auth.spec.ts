@@ -3,6 +3,8 @@ import { expectLibrarySynced, openAccountSettings, expectSignedInAccount } from 
 import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
 import { handlePreviewRequest } from '../../src/lib/server/publication/request.js'
+import { handlePublicationPublish } from '../../src/lib/server/publication/publish.js'
+import { firstPublicationWriteSchema } from '../../src/lib/server/publication/first-write.js'
 import { handlePublicationSubmit } from '../../src/lib/server/publication/submit.js'
 import { chromium, expect, test } from '@playwright/test'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -34,6 +36,9 @@ for (const mode of ['linked', 'existing', 'expired'])
 		const ui = staticShellServer(
 			fileURLToPath(new URL('../../.offline-test-builds/a/', import.meta.url))
 		)
+		const publicRecords = new Map<string, unknown>()
+		let publicWrites = 0
+		let publishedUri: string | undefined
 		const signOutResponses: number[] = []
 		let auth: ReturnType<typeof createAuthServer>
 		const start = async () => {
@@ -50,6 +55,54 @@ for (const mode of ['linked', 'existing', 'expired'])
 			ui.useAuth(async (request) => {
 				if (new URL(request.url).pathname === '/api/publication/preview')
 					return handlePreviewRequest(auth, authority.backend, request, origin)
+				if (new URL(request.url).pathname === '/api/publication/publish') {
+					const publicationAuth = {
+						api: {
+							getSession: auth.api.getSession,
+							getAtprotoClient: async () => ({
+								session: {
+									did: 'did:plc:offlinefixture',
+									getTokenInfo: async () => ({
+										sub: 'did:plc:offlinefixture',
+										scope: 'atproto repo:at.margin.note'
+									}),
+									handle: async (path: string, init?: RequestInit) => {
+										if (path === '/xrpc/com.atproto.repo.putRecord') {
+											const write = firstPublicationWriteSchema.parse(
+												JSON.parse(String(init?.body))
+											)
+											const uri = 'at://' + write.repo + '/' + write.collection + '/' + write.rkey
+											const rows = await authority.backend.db.all(
+												app.publications.where({ publishingDid: write.repo })
+											)
+											expect(rows[0]?.lifecycle).toEqual({
+												state: 'issued',
+												uri,
+												record: write.record
+											})
+											expect(publicRecords.has(uri)).toBe(false)
+											publicRecords.set(uri, write.record)
+											publicWrites++
+											return Response.json({ uri, cid: 'unused-synthetic-write-receipt' })
+										}
+										const params = new URL(path, origin).searchParams
+										const uri =
+											'at://' +
+											params.get('repo') +
+											'/' +
+											params.get('collection') +
+											'/' +
+											params.get('rkey')
+										return publicRecords.has(uri)
+											? Response.json({ uri, value: publicRecords.get(uri) })
+											: Response.json({ error: 'RecordNotFound' }, { status: 400 })
+									}
+								}
+							})
+						}
+					}
+					return handlePublicationPublish(publicationAuth, authority.backend, request, origin)
+				}
 				if (new URL(request.url).pathname === '/api/publication/request')
 					return handlePublicationSubmit(auth, authority.backend, request, origin)
 				const response = await handleConfiguredAuth(auth, request, { origin, secret })
@@ -344,6 +397,26 @@ for (const mode of ['linked', 'existing', 'expired'])
 					await authority.backend.db.all(app.publications.where({ libraryId: accountId }))
 				).toHaveLength(1)
 				checkpoint('authenticated publication request verified')
+				// Real cookies, worker preview and native account mapping; the remote PDS
+				// alone is synthetic. The UI action wording remains under copy review.
+				const published = await page.evaluate(async (selection) => {
+					const response = await fetch('/api/publication/publish', {
+						method: 'POST',
+						credentials: 'same-origin',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify(selection)
+					})
+					return { status: response.status, value: await response.json() }
+				}, selection)
+				expect(published.status).toBe(200)
+				expect(published.value.state).toBe('published')
+				publishedUri = published.value.uri
+				expect(publicWrites).toBe(1)
+				await page.getByRole('button', { name: 'Preview sharing', exact: true }).click()
+				await expect(preview.getByText(published.value.uri, { exact: true })).toBeVisible()
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await expect(preview).not.toBeVisible()
+				checkpoint('authenticated publication and visible retained address verified')
 			}
 			await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
@@ -459,7 +532,8 @@ for (const mode of ['linked', 'existing', 'expired'])
 					app.publications.where({ libraryId: accountId! })
 				)
 				expect(publications).toHaveLength(1)
-				expect(publications[0]?.lifecycle).toEqual({ state: 'requested' })
+				expect(publications[0]?.lifecycle).toEqual({ state: 'published', uri: publishedUri })
+				expect(publicWrites).toBe(1)
 				checkpoint('signing out')
 				await test.step('sign out through the real auth handler', async () => {
 					const previous = signOutResponses.length

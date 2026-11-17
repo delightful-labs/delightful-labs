@@ -260,6 +260,7 @@ export type LibraryClient = {
 	getView: () => LibraryRender
 	subscribe: (changed: (view: LibraryRender) => void) => { unsubscribe: () => void }
 	send: (intent: LibraryIntent) => void
+	authorizePublication: (did: string) => void
 	more: () => void
 	editTags: (id: string | undefined) => void
 	tags: (event: { type: 'RESET' } | { type: 'SELECT'; id: string; names: string[] }) => void
@@ -319,6 +320,13 @@ export function openApplicationClient(input: Input) {
 					}
 				},
 				send: (event) => post({ type: 'LIBRARY', scope, requestId: crypto.randomUUID(), event }),
+				authorizePublication: (did) =>
+					post({
+						type: 'ATPROTO',
+						scope,
+						handle: did,
+						authorizationScope: 'atproto repo:at.margin.note'
+					}),
 				more: () => post({ type: 'MORE', scope }),
 				editTags: (id) => post({ type: 'TAG_EDIT', scope, ...(id ? { id } : {}) }),
 				tags: (event) => post({ type: 'TAG_FORM', scope, requestId: crypto.randomUUID(), event }),

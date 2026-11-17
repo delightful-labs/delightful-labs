@@ -185,3 +185,94 @@ it('contains errors, permits a fresh retry and aborts timeout or shutdown', asyn
 	expect(selectSharingPreview(a.actor.getSnapshot()).value).toBeUndefined()
 	pending.resolve(Response.json(a.value))
 })
+
+it('publishes the displayed selection once and exposes an address only after confirmation', async () => {
+	const a = fixture()
+	const published = {
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid,
+		state: 'published',
+		uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a'
+	}
+	const gate = Promise.withResolvers<Response>()
+	const fetch = vi.fn<typeof globalThis.fetch>(async (path) =>
+		path === '/api/publication/preview' ? Response.json(a.value) : gate.promise
+	)
+	vi.stubGlobal('fetch', fetch)
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	const requestId = selectSharingPreview(a.actor.getSnapshot()).requestId
+	a.actor.send({ type: 'PUBLISH', requestId: requestId - 1 })
+	expect(fetch).toHaveBeenCalledTimes(1)
+	a.actor.send({ type: 'PUBLISH', requestId })
+	a.actor.send({ type: 'PUBLISH', requestId })
+	expect(selectSharingPreview(a.actor.getSnapshot()).pending).toBe(true)
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+	const [url, init] = fetch.mock.calls[1] ?? []
+	expect(url).toBe('/api/publication/publish')
+	expect(JSON.parse(String(init?.body))).toEqual({
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid
+	})
+	expect(fetch).toHaveBeenCalledTimes(2)
+	gate.resolve(Response.json(published))
+	await waitFor(a.actor, (s) => s.matches('published'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toEqual(published)
+	expect(selectSharingPreview(a.actor.getSnapshot()).canPublish).toBe(false)
+})
+it('offers provider sign-in after missing permission and keeps failed publishing retryable', async () => {
+	const a = fixture()
+	let status = 403
+	vi.stubGlobal('fetch', async (path: unknown) =>
+		path === '/api/publication/preview' ? Response.json(a.value) : new Response(null, { status })
+	)
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	a.actor.send({
+		type: 'PUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	await waitFor(a.actor, (s) => s.matches('authorize'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).authorize).toBe(true)
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	status = 503
+	a.actor.send({
+		type: 'PUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	await waitFor(a.actor, (s) => s.matches('publishFailed'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).canPublish).toBe(true)
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+})
+it('dismisses in-flight publishing and ignores its late successful result', async () => {
+	const a = fixture(),
+		gate = Promise.withResolvers<Response>()
+	let signal: AbortSignal | null | undefined
+	vi.stubGlobal('fetch', async (path: unknown, init?: RequestInit) => {
+		if (path === '/api/publication/preview') return Response.json(a.value)
+		signal = init?.signal
+		return gate.promise
+	})
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	a.actor.send({
+		type: 'PUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	a.actor.send({ type: 'DISMISS' })
+	expect(signal?.aborted).toBe(true)
+	gate.resolve(
+		Response.json({
+			...a.value,
+			state: 'published',
+			uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a'
+		})
+	)
+	await Promise.resolve()
+	expect(selectSharingPreview(a.actor.getSnapshot()).open).toBe(false)
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+})

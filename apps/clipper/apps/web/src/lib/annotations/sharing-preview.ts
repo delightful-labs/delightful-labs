@@ -1,3 +1,6 @@
+import { z } from 'zod'
+import { publicationBaseSchema, publicationSchema } from './publication.js'
+import type { Publication } from './publication.js'
 import { createAsyncLogic, setup, types } from 'xstate'
 import type { SnapshotFrom } from 'xstate'
 import { publicationPreviewSchema } from './publication-preview.js'
@@ -7,12 +10,13 @@ import { t } from '../localization/index.js'
 import { stateFeedback } from '../contracts/feedback.js'
 import type { WorkflowMessage } from '../contracts/feedback.js'
 
+type Preview = PublicationPreview | Publication
 type Capability = { libraryId: string; isCurrent: () => boolean }
 type Context = {
 	capability: Capability | undefined
 	note: AnnotationNote | undefined
 	requestId: number
-	value: PublicationPreview | undefined
+	value: Preview | undefined
 }
 const request = createAsyncLogic({
 	run: async ({
@@ -37,7 +41,33 @@ const request = createAsyncLogic({
 		}
 		const value: unknown = await response.json()
 		signal.throwIfAborted()
-		return publicationPreviewSchema.parse(value)
+		return z.union([publicationPreviewSchema, publicationSchema]).parse(value)
+	}
+})
+const publish = createAsyncLogic({
+	run: async ({ input, signal }: { input: Preview; signal: AbortSignal }) => {
+		const response = await fetch('/api/publication/publish', {
+			method: 'POST',
+			credentials: 'same-origin',
+			cache: 'no-store',
+			redirect: 'error',
+			signal,
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(
+				publicationBaseSchema.parse({
+					libraryId: input.libraryId,
+					source: input.source,
+					publishingDid: input.publishingDid
+				})
+			)
+		})
+		if (!response.ok) {
+			void response.body?.cancel().catch(() => {})
+			return { status: response.status, publication: undefined }
+		}
+		const value: unknown = await response.json()
+		signal.throwIfAborted()
+		return { status: response.status, publication: publicationSchema.parse(value) }
 	}
 })
 export const sharingPreviewMachine = setup({
@@ -45,6 +75,7 @@ export const sharingPreviewMachine = setup({
 		input: types<{ capability: Capability | undefined }>(),
 		context: types<Context>(),
 		events: {
+			PUBLISH: types<{ requestId: number }>(),
 			SHOW: types<{ note: AnnotationNote }>(),
 			DISMISS: types<{ requestId?: number }>(),
 			OBSERVED: types<{ notes: AnnotationNote[] }>(),
@@ -52,26 +83,41 @@ export const sharingPreviewMachine = setup({
 			INVALIDATED: types<{ noteId: string }>()
 		},
 		meta: types<{ name?: string; variant?: WorkflowMessage['variant'] }>(),
-		children: { request: types<import('xstate').ActorRefFrom<typeof request>>() }
+		children: {
+			request: types<import('xstate').ActorRefFrom<typeof request>>(),
+			publish: types<import('xstate').ActorRefFrom<typeof publish>>()
+		}
 	},
-	actors: { request },
+	actors: { request, publish },
 	states: {
 		closed: {},
 		loading: { schemas: { context: types<{ capability: Capability; note: AnnotationNote }>() } },
-		ready: { schemas: { context: types<{ value: PublicationPreview }>() } },
+		ready: { schemas: { context: types<{ value: Preview }>() } },
+		publishing: { schemas: { context: types<{ value: Preview }>() } },
+		published: {
+			schemas: {
+				context: types<{
+					value: Preview
+					publication: Extract<Publication, { state: 'published' }>
+				}>()
+			}
+		},
+		authorize: { schemas: { context: types<{ value: Preview }>() } },
+		publishFailed: { schemas: { context: types<{ value: Preview }>() } },
 		unavailable: {},
 		stopped: {}
 	},
 	guards: {
-		matching: ({ context }: { context: Context }, value: PublicationPreview) =>
+		matching: ({ context }: { context: Context }, value: Preview) =>
 			!!context.capability?.isCurrent() &&
 			value.libraryId === context.capability.libraryId &&
 			'noteId' in value.source &&
 			value.source.noteId === context.note?.id &&
-			value.record.motivation === 'commenting' &&
-			value.record.target.selector === undefined &&
-			value.record.target.source === context.note.source &&
-			value.record.body.value === context.note.text
+			('state' in value ||
+				(value.record.motivation === 'commenting' &&
+					value.record.target.selector === undefined &&
+					value.record.target.source === context.note.source &&
+					value.record.body.value === context.note.text))
 	}
 }).createMachine({
 	id: 'sharing-preview',
@@ -138,13 +184,60 @@ export const sharingPreviewMachine = setup({
 				timeout: 50_000,
 				onTimeout: { target: 'unavailable' },
 				onError: { target: 'unavailable' },
-				onDone: (args) =>
-					args.guards.matching(args, args.event.output)
-						? { target: 'ready', context: { value: args.event.output } }
-						: { target: 'unavailable' }
+				onDone: (args) => {
+					const value = args.event.output
+					if (!args.guards.matching(args, value)) return { target: 'unavailable' }
+					return 'state' in value && value.state === 'published'
+						? { target: 'published', context: { value, publication: value } }
+						: { target: 'ready', context: { value } }
+				}
 			}
 		},
-		ready: {},
+		ready: {
+			on: {
+				PUBLISH: ({ context, event }) =>
+					context.capability?.isCurrent() && event.requestId === context.requestId
+						? { target: 'publishing' }
+						: undefined
+			}
+		},
+		publishing: {
+			meta: { name: t('status.preparing'), variant: 'info' },
+			invoke: {
+				id: 'publish',
+				src: 'publish',
+				input: ({ context }) => context.value,
+				timeout: 125_000,
+				onTimeout: { target: 'publishFailed' },
+				onError: { target: 'publishFailed' },
+				onDone: ({ context, event }) => {
+					const value = event.output.publication
+					if (event.output.status === 403) return { target: 'authorize' }
+					if (
+						!value ||
+						value.state !== 'published' ||
+						!context.capability?.isCurrent() ||
+						value.libraryId !== context.value.libraryId ||
+						value.publishingDid !== context.value.publishingDid ||
+						!('noteId' in value.source) ||
+						!('noteId' in context.value.source) ||
+						value.source.noteId !== context.value.source.noteId
+					)
+						return { target: 'publishFailed' }
+					return { target: 'published', context: { publication: value } }
+				}
+			}
+		},
+		published: {},
+		authorize: {},
+		publishFailed: {
+			on: {
+				PUBLISH: ({ context, event }) =>
+					context.capability?.isCurrent() && event.requestId === context.requestId
+						? { target: 'publishing' }
+						: undefined
+			}
+		},
 		unavailable: { meta: { name: t('publication.unavailable'), variant: 'error' } },
 		stopped: { type: 'final' }
 	}
@@ -161,8 +254,13 @@ export function selectSharingPreview(
 		open,
 		requestId: snapshot?.context.requestId ?? 0,
 		noteId: open ? snapshot?.context.note?.id : undefined,
-		value: open && snapshot?.matches('ready') ? snapshot.context.value : undefined,
-		pending: open && snapshot?.matches('loading') === true,
+		value: open ? snapshot?.context.value : undefined,
+		canPublish:
+			open && (snapshot?.matches('ready') === true || snapshot?.matches('publishFailed') === true),
+		authorize: open && snapshot?.matches('authorize') === true,
+		publication: open && snapshot?.matches('published') ? snapshot.context.publication : undefined,
+		pending:
+			open && (snapshot?.matches('loading') === true || snapshot?.matches('publishing') === true),
 		retry: open && snapshot?.matches('unavailable') === true,
 		message: open && snapshot ? stateFeedback(Object.values(snapshot.getMeta())) : undefined
 	}

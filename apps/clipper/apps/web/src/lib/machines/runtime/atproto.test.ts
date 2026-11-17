@@ -284,3 +284,23 @@ it.each(['authorization', 'completion'] as const)(
 		}
 	}
 )
+
+it('requests Margin permission only for an explicit publishing authorization', async () => {
+	const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+		Response.json({ url: 'https://provider.example.invalid/authorize' })
+	)
+	vi.stubGlobal('fetch', fetch)
+	const f = fixture()
+	try {
+		f.actor.send({
+			type: 'BEGIN',
+			handle: 'did:plc:ewvi7nxzyoun6zhxrhs64oiz',
+			authorizationScope: 'atproto repo:at.margin.note'
+		})
+		await waitFor(f.actor, (s) => s.matches('redirecting'))
+		const init: RequestInit | undefined = fetch.mock.calls[0]?.[1]
+		expect(JSON.parse(String(init?.body))).toMatchObject({ scope: 'atproto repo:at.margin.note' })
+	} finally {
+		f.owner.stop()
+	}
+})

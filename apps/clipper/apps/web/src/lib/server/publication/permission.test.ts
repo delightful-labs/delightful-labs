@@ -16,6 +16,9 @@ import { app } from '../../backend/jazz/schema.js'
 import permissions from '../../backend/jazz/permissions.js'
 import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
 import { createPublicationPermission, handlePublicationPermission } from './permission.js'
+import { handlePublicationPublish } from './publish.js'
+import { firstPublicationWriteSchema } from './first-write.js'
+import { publicationSchema } from '../../annotations/publication.js'
 import { handlePublicationSubmit } from './submit.js'
 import { origin, requestFixture } from './request.test-support.js'
 import type { PublicationAuth } from './access.js'
@@ -83,17 +86,22 @@ const backend = (a: Fixture) => ({
 })
 
 // The fixture uses the installed OAuth client and native plugin session store.
-// Only provider discovery/refresh and explicitly supplied read HTTP responses
-// are synthetic. No repository mutation path is handled.
+// Provider discovery/refresh and explicitly supplied repository responses are
+// synthetic; the SDK and native session store are real. No live PDS is used.
 function network(
 	did: string,
 	refreshScope = identity,
 	revoked = false,
-	read?: (request: Request) => Response
+	read?: (request: Request) => Response | Promise<Response>
 ) {
 	const fetcher = vi.fn<typeof fetch>(async (input, init) => {
 		const req = new Request(input, init)
-		if (read && req.url.startsWith(pds + '/xrpc/com.atproto.repo.getRecord?')) return read(req)
+		if (
+			read &&
+			(req.url.startsWith(pds + '/xrpc/com.atproto.repo.getRecord?') ||
+				req.url === pds + '/xrpc/com.atproto.repo.putRecord')
+		)
+			return read(req)
 		if (req.url === issuer + '/.well-known/oauth-authorization-server')
 			return Response.json({
 				issuer,
@@ -535,3 +543,40 @@ for (const found of [true, false])
 			actor.stop()
 		}
 	})
+
+it('publishes through the real OAuth SDK, refreshes the grant and reads back before native confirmation', async () => {
+	const records = new Map<string, unknown>()
+	let writes = 0
+	network('did:plc:ewvi7nxzyoun6zhxrhs64oiz', granted, false, async (req) => {
+		expect(req.headers.has('DPoP')).toBe(true)
+		expect(req.headers.get('Authorization')).toBe('DPoP synthetic-access-after')
+		if (req.method === 'POST') {
+			const write = firstPublicationWriteSchema.parse(await req.json())
+			const uri = 'at://' + write.repo + '/' + write.collection + '/' + write.rkey
+			const rows = await a.owner.backend.all(
+				app.publications.where({ libraryId: a.owner.libraryId })
+			)
+			expect(rows[0]?.lifecycle).toEqual({ state: 'issued', uri, record: write.record })
+			expect(records.has(uri)).toBe(false)
+			records.set(uri, write.record)
+			writes++
+			return Response.json({ uri, cid: 'unused-write-receipt' })
+		}
+		const params = new URL(req.url).searchParams
+		const uri =
+			'at://' + params.get('repo') + '/' + params.get('collection') + '/' + params.get('rkey')
+		return records.has(uri)
+			? Response.json({ uri, value: records.get(uri) })
+			: Response.json({ error: 'RecordNotFound' }, { status: 400 })
+	})
+	const a = await setup('publish-sdk')
+	await seedProvider(a, granted, true)
+	const response = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
+	expect(response.status).toBe(200)
+	const published = publicationSchema.parse(await response.json())
+	expect(published.state).toBe('published')
+	expect(writes).toBe(1)
+	const again = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
+	expect(await again.json()).toEqual(published)
+	expect(writes).toBe(1)
+})

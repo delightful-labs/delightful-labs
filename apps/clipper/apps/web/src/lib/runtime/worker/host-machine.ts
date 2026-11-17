@@ -411,7 +411,11 @@ export const workerHostMachine = setup({
 					on: {
 						ATPROTO: (args, enq) => {
 							if (!args.guards.currentAccount(args)) return
-							enq.sendTo('oauth', { type: 'BEGIN', handle: args.event.handle })
+							enq.sendTo('oauth', {
+								type: 'BEGIN',
+								handle: args.event.handle,
+								authorizationScope: args.event.authorizationScope
+							})
 							return { context: { oauthScope: args.context.scope } }
 						},
 						OAUTH_RETURNED: ({ context }, enq) => {

@@ -59,20 +59,27 @@
 			<dl>
 				<dt>{t('publication.account')}</dt>
 				<dd><code>{view.value.publishingDid}</code></dd>
-				<dt>{t('capture.url_label')}</dt>
-				<dd>
-					<a href={view.value.record.target.source} target="_blank" rel="noreferrer"
-						>{view.value.record.target.source}</a
-					>
-				</dd>
+				{#if 'record' in view.value}<dt>{t('capture.url_label')}</dt>
+					<dd>
+						<a href={view.value.record.target.source} target="_blank" rel="noreferrer"
+							>{view.value.record.target.source}</a
+						>
+					</dd>{/if}
 			</dl>
-			{#if view.value.record.motivation === 'commenting'}<Textarea
+			{#if 'record' in view.value && view.value.record.motivation === 'commenting'}<Textarea
 					readonly
 					label={noun('note')}
 					defaultValue={view.value.record.body.value}
 				/>{/if}
 		{/if}
+		{#if view.publication}<output><code>{view.publication.uri}</code></output>{/if}
 		<div class="preview-actions">
+			{#if view.authorize && view.value}<Button
+					disabled={!enabled}
+					onclick={() =>
+						view.value && binding.client.authorizePublication(view.value.publishingDid)}
+					>{t('account.atproto.sign_in')}</Button
+				>{/if}
 			<Button onclick={close}>{t('actions.close')}</Button>
 			{#if view.retry && binding.noteId}<Button disabled={!enabled} onclick={retry}
 					>{t('actions.retry')}</Button

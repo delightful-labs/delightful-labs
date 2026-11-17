@@ -34,7 +34,12 @@ export const libraryIntentSchema = z.discriminatedUnion('type', [
 ])
 export type LibraryIntent = z.infer<typeof libraryIntentSchema>
 export const commandSchema = z.discriminatedUnion('type', [
-	z.object({ type: z.literal('ATPROTO'), scope: z.uuid(), handle: z.string().min(1).max(1024) }),
+	z.object({
+		type: z.literal('ATPROTO'),
+		scope: z.uuid(),
+		handle: z.string().min(1).max(1024),
+		authorizationScope: z.enum(['atproto', 'atproto repo:at.margin.note']).optional()
+	}),
 	z.object({ type: z.literal('SHUTDOWN') }),
 	z.object({ type: z.literal('CONNECTIVITY'), online: z.boolean() }),
 	z.object({

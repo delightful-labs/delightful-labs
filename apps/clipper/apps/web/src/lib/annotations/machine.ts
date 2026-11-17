@@ -114,6 +114,7 @@ const model = setup({
 			OPEN: types<Extract<Event, { type: 'OPEN' }>>(),
 			CLOSE: types(),
 			PREVIEW_NOTE: types<{ documentId: string; id: string }>(),
+			PUBLISH_NOTE: types<{ documentId: string; requestId: number }>(),
 			CLOSE_PREVIEW: types<{ documentId: string; requestId: number }>(),
 			HIGHLIGHT: types<Extract<Event, { type: 'HIGHLIGHT' }>>(),
 			ADD_NOTE: types<Extract<Event, { type: 'ADD_NOTE' }>>(),
@@ -221,6 +222,10 @@ export const annotationsMachine = model.createMachine({
 					)
 						return
 					enq.sendTo('sharingPreview', { type: 'SHOW', note })
+				},
+				PUBLISH_NOTE: (args, enq) => {
+					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', { type: 'PUBLISH', requestId: args.event.requestId })
 				},
 				CLOSE_PREVIEW: (args, enq) => {
 					if (!args.guards.currentDocument(args, args.event)) return

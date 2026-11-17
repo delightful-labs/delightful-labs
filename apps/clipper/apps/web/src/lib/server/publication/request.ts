@@ -3,6 +3,8 @@ import type { Jazz } from 'jazz-tools/backend'
 import { createActor, createAsyncLogic, setup, toPromise, types } from 'xstate'
 import type { ActorRefFrom } from 'xstate'
 import { publicationPreviewSchema } from '../../annotations/publication-preview.js'
+import type { Publication } from '../../annotations/publication.js'
+import { createPublicationStore } from './store.js'
 import type { PublicationPreview } from '../../annotations/publication-preview.js'
 import { createDocumentNotePreview } from './preview.js'
 import { createPublicationAccess } from './access.js'
@@ -19,16 +21,30 @@ const inputSchema = publicationPreviewSchema.pick({ libraryId: true, source: tru
 type Selection = z.infer<typeof inputSchema>
 export type PreviewAuth = PublicationAuth
 type Input = { request: Request; origin: string }
+type Preview = PublicationPreview | Publication
 type Context = Input & {
 	selection: Selection | undefined
 	access: PublicationAccess | undefined
-	preview: PublicationPreview | undefined
+	preview: Preview | undefined
 }
 
 export function createPreviewRequest(auth: PreviewAuth, backend: Pick<Jazz, 'accountFor' | 'db'>) {
 	const actors = {
 		preview: createDocumentNotePreview(backend.db),
 		access: createPublicationAccess(auth, backend),
+		current: createAsyncLogic({
+			run: ({
+				input
+			}: {
+				input: { selection: Selection; access: PublicationAccess; request: Request }
+			}) =>
+				createPublicationStore(backend.db, {
+					libraryId: input.selection.libraryId,
+					accountId: input.access.accountId,
+					publishingDid: input.access.did,
+					isCurrent: () => !input.request.signal.aborted
+				}).list(input.selection.source)
+		}),
 		input: createAsyncLogic({
 			run: ({ input, signal }: { input: Request; signal: AbortSignal }) =>
 				readPublicationInput(input, signal, inputSchema, 2048)
@@ -42,6 +58,7 @@ export function createPreviewRequest(auth: PreviewAuth, backend: Pick<Jazz, 'acc
 			events: { DISCONNECT: types() },
 			children: {
 				input: types<ActorRefFrom<typeof actors.input>>(),
+				current: types<ActorRefFrom<typeof actors.current>>(),
 				access: types<ActorRefFrom<typeof actors.access>>(),
 				preview: types<ActorRefFrom<typeof actors.preview>>()
 			}
@@ -51,6 +68,9 @@ export function createPreviewRequest(auth: PreviewAuth, backend: Pick<Jazz, 'acc
 			admitting: {},
 			readingInput: {},
 			readingAccess: { schemas: { context: types<{ selection: Selection }>() } },
+			readingPublication: {
+				schemas: { context: types<{ selection: Selection; access: PublicationAccess }>() }
+			},
 			previewing: {
 				schemas: { context: types<{ selection: Selection; access: PublicationAccess }>() }
 			},
@@ -59,11 +79,11 @@ export function createPreviewRequest(auth: PreviewAuth, backend: Pick<Jazz, 'acc
 					context: types<{
 						selection: Selection
 						access: PublicationAccess
-						preview: PublicationPreview
+						preview: Preview
 					}>()
 				}
 			},
-			ready: { schemas: { context: types<{ preview: PublicationPreview }>() } },
+			ready: { schemas: { context: types<{ preview: Preview }>() } },
 			invalid: {},
 			forbidden: {},
 			unauthenticated: {},
@@ -139,7 +159,30 @@ export function createPreviewRequest(auth: PreviewAuth, backend: Pick<Jazz, 'acc
 					onDone: ({ event }) =>
 						event.output
 							? { target: 'checkingAccess', context: { preview: event.output } }
-							: { target: 'unavailable' },
+							: { target: 'readingPublication' },
+					onError: { target: 'failed' }
+				}
+			},
+			readingPublication: {
+				invoke: {
+					id: 'current',
+					src: 'current',
+					input: ({ context }) => ({
+						selection: context.selection,
+						access: context.access,
+						request: context.request
+					}),
+					onDone: ({ context, event }) => {
+						const values = event.output.filter(
+							(value) => value.publishingDid === context.access.did
+						)
+						const value = values[0]
+						return values.length === 1 &&
+							value &&
+							(value.state === 'issued' || value.state === 'published')
+							? { target: 'checkingAccess', context: { preview: value } }
+							: { target: 'unavailable' }
+					},
 					onError: { target: 'failed' }
 				}
 			},

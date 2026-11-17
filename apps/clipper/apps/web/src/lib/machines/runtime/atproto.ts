@@ -33,7 +33,11 @@ type Input = {
 	now?: () => number
 }
 type Context = Input
-type Event = { type: 'BEGIN'; handle: string }
+type Authorization = {
+	handle: string
+	authorizationScope?: 'atproto' | 'atproto repo:at.margin.note' | undefined
+}
+type Event = { type: 'BEGIN' } & Authorization
 const actors = {
 	identity: identityLogic,
 	authorize: createAsyncLogic({
@@ -41,7 +45,7 @@ const actors = {
 			input,
 			signal
 		}: {
-			input: { handle: string; attemptId: string; now: () => number }
+			input: Authorization & { attemptId: string; now: () => number }
 			signal: AbortSignal
 		}) => {
 			const result = await requestJSON(
@@ -52,6 +56,7 @@ const actors = {
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
 						handle: input.handle,
+						scope: input.authorizationScope ?? 'atproto',
 						callbackURL: '/?atproto_attempt=' + input.attemptId
 					})
 				},
@@ -86,7 +91,7 @@ export const atprotoMachine = setup({
 	schemas: {
 		context: types<Context>(),
 		input: types<Input>(),
-		events: { BEGIN: types<{ handle: string }>() },
+		events: { BEGIN: types<Authorization>() },
 		tags: types<string>(),
 		meta: types<NamedState & { confirmation?: 'uncertain' }>(),
 		children: {
@@ -101,9 +106,9 @@ export const atprotoMachine = setup({
 		failed: {},
 		completionUncertain: {},
 		issuingAttempt: {
-			schemas: { context: types<{ handle: string }>() }
+			schemas: { context: types<Authorization>() }
 		},
-		authorizing: { schemas: { input: types<{ handle: string; attemptId: string }>() } },
+		authorizing: { schemas: { input: types<Authorization & { attemptId: string }>() } },
 		redirecting: { schemas: { input: types<{ url: string }>() } },
 		completing: { schemas: { input: types<{ attemptId: string }>() } }
 	},
@@ -132,7 +137,13 @@ export const atprotoMachine = setup({
 			on: {
 				BEGIN: (args) => {
 					if (!args.guards.validHandle(args)) return
-					return { target: 'issuingAttempt', context: { handle: args.event.handle.trim() } }
+					return {
+						target: 'issuingAttempt',
+						context: {
+							handle: args.event.handle.trim(),
+							authorizationScope: args.event.authorizationScope
+						}
+					}
 				}
 			}
 		},
@@ -144,7 +155,11 @@ export const atprotoMachine = setup({
 				src: 'identity',
 				onDone: ({ event, context }) => ({
 					target: 'authorizing',
-					input: { handle: context.handle, attemptId: event.output }
+					input: {
+						handle: context.handle,
+						authorizationScope: context.authorizationScope,
+						attemptId: event.output
+					}
 				}),
 				onError: { target: 'failed' }
 			}
@@ -203,7 +218,13 @@ export const atprotoMachine = setup({
 			on: {
 				BEGIN: (args) => {
 					if (!args.guards.validHandle(args)) return
-					return { target: 'issuingAttempt', context: { handle: args.event.handle.trim() } }
+					return {
+						target: 'issuingAttempt',
+						context: {
+							handle: args.event.handle.trim(),
+							authorizationScope: args.event.authorizationScope
+						}
+					}
 				}
 			}
 		},
@@ -212,7 +233,13 @@ export const atprotoMachine = setup({
 			on: {
 				BEGIN: (args) => {
 					if (!args.guards.validHandle(args)) return
-					return { target: 'issuingAttempt', context: { handle: args.event.handle.trim() } }
+					return {
+						target: 'issuingAttempt',
+						context: {
+							handle: args.event.handle.trim(),
+							authorizationScope: args.event.authorizationScope
+						}
+					}
 				}
 			}
 		}
