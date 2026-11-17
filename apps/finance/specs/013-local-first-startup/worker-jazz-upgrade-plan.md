@@ -135,6 +135,15 @@ expanding commands. Do not build a generic SDK command surface ahead of callers.
       data drivers, not persistent-worker qualification. The full historical
       suite, accepted-commit interruption/drains, conflict/cleanup recovery and
       broader policy/role checks remain open.
+      **Accepted-commit drain/resume now also passes:** six additional cases
+      cover cancellation/native identity replacement in all three browsers,
+      holding real server responses after authority acceptance. Artifacts stay
+      retained until settlement; resume uses the same destination and commits
+      only activation without replaying financial writes. The unchanged existing
+      probe is shared with the alpha.60 experiment, whose two original cases
+      still pass. The fresh combined proof is **194 tests**, including 18 browser
+      cases. Conflict/blocked-cleanup recovery, the broader policy/role matrix
+      and remaining worker/session/backend/adoption gates stay open.
 - [ ] **U4 — Qualify backend authentication and destinations.** Replace the
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix

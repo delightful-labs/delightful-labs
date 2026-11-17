@@ -45,6 +45,16 @@ The next restore gate is interruption after authority acceptance, pending-write
 drain/resume without replay, conflict/cleanup recovery and broader policy/role
 checks. Memory-driver browser success does not qualify persistent-worker storage.
 
+Accepted-commit interruption/drain now passes six more real-browser cases:
+cancellation and native replacement in Chromium/Firefox/WebKit, with responses
+held after authority acceptance. The same journal resumes without replaying the
+financial write; release waits for settlement. The combined proof passes **194
+tests**, including 18 browser restore cases. The original alpha.60 pair also
+passes using the same extracted test probe. See the
+[drain evidence](worker-jazz-alpha66-research.md#accepted-commit-interruption-and-drain).
+Conflict/blocked-cleanup recovery and broader policy/role coverage remain open,
+along with the worker/session and coordinated adoption gates.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,

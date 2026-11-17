@@ -290,6 +290,37 @@ interruption/drains, conflict and blocked-cleanup recovery, and the broader
 policy/role matrix open. Reuse the existing authority-delay/proxy tests when
 porting those cases; do not replace them with a simulated SDK transaction.
 
+### Accepted-commit interruption and drain
+
+The same browser proof now includes cancellation and native identity replacement
+after the authority accepts the financial commit while the real transport proxy
+withholds its response. Both scenarios pass in Chromium, Firefox and WebKit.
+The application actor remains active, retains its artifacts and does not publish
+membership until its native receipt settles. After transport resumes, artifacts
+release exactly once. Reopening the same journal/intent resumes the same
+destination, commits only activation and preserves the accepted financial rows;
+the preparation/financial steps are not replayed. Development freezing remains
+enabled throughout.
+
+This reuses `tests/helpers/silent-jazz-proxy.ts` and the existing restore probe.
+The probe's unchanged chart body moves from the historical browser harness into
+[`tests/helpers/restore-probe.ts`](../../tests/helpers/restore-probe.ts), shared
+by both SDK versions. Its input is the actual Finance plan rather than the
+browser harness's larger sample DTO. The two original alpha.60 accepted-commit
+cases pass after extraction, as do active Finance test types. No production
+workflow, session/Db facade, dependency or SDK patch is added for this slice.
+
+Fresh combined proof: **194 passing tests**, including **18 browser restore
+cases**, with strict types, native generation/check and unchanged identities.
+Artifact directory:
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-agns1k`;
+log: `/private/tmp/finance-alpha66-drain-proof-final.log`. The alpha.60 pair is
+recorded in `/private/tmp/finance-restore-probe-alpha60-native.log` (2 selected
+cases pass; the other 105 were not rerun). The full historical suite, conflict/
+blocked-cleanup recovery and broader policy/role coverage remain open on alpha.66.
+These memory-driver browser tests do not qualify persistent-worker storage,
+process-restart recovery or full application adoption.
+
 ## Clipper native schema foundation
 
 The same [maintained schema runner](../../tests/worker-upgrade/README.md#alpha66-clipper-schema-reading-and-retained-data)

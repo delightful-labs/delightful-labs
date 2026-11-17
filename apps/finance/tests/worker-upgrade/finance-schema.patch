@@ -3207,27 +3207,45 @@ diff --git a/src/lib/backup/restore-upgrade.browser.ts b/src/lib/backup/restore-
 new file mode 100644
 --- /dev/null
 +++ b/src/lib/backup/restore-upgrade.browser.ts
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,62 @@
 +import { createJazzClient } from 'jazz-tools/client'
-+import { createActor, waitFor } from 'xstate'
++import { createActor, waitFor, toPromise, type ActorRefFrom } from 'xstate'
++import { createRecoveryProbe } from '../../../tests/helpers/restore-probe.js'
++import { prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
++import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
++import type { BackupBinding } from 'delightful-local-first/backup/binding'
++import {
++	prepareFinanceRestorePlan,
++	financeRestorePlanningMachine,
++	type FinanceRestorePlan
++} from '../machines/workspaces/workspace-restore-plan.js'
 +import {
 +	createWorkspaceRestoreController,
 +	prepareWorkspaceRestoreFile,
 +	bindWorkspaceRestoreFile,
 +	selectWorkspaceRestoreReport,
-+	createFinanceWorkspaceRestore
++	createFinanceWorkspaceRestore,
++	createFinanceRestoreSession
 +} from '../machines/workspaces/workspace-restore.js'
 +import { app } from '../queries.js'
 +
 +const api = {
-+	open: (serverUrl: string) =>
++	open: (serverUrl: string, scope?: string) =>
 +		createJazzClient({
 +			serverUrl,
++			...(scope ? { scope } : {}),
 +			initial: 'device',
 +			driver: { type: 'memory' },
 +			client: () => import('jazz-tools/local-first'),
 +			localFirst: 'now'
 +		}),
++	toPromise,
++	createRecoveryProbe,
++	prepareArchiveOpen,
++	createArchiveEnvelopeMachine,
++	prepareFinanceRestorePlan,
++	financeRestorePlanningMachine,
++	createFinanceRestoreSession,
 +	createActor,
 +	waitFor,
 +	app,
@@ -3241,6 +3259,14 @@ new file mode 100644
 +	interface Window {
 +		financeRestoreUpgrade: typeof api
 +		financeRestoreUpgradeSession: Awaited<ReturnType<typeof api.open>>
++		financeRestoreDrain: {
++			actor: ActorRefFrom<ReturnType<typeof createFinanceRestoreSession>>
++			binding: BackupBinding
++			plan: FinanceRestorePlan
++			commits: string[]
++			stats: { releases: number }
++			finishReplacement?: () => Promise<void>
++		}
 +	}
 +}
 +window.financeRestoreUpgrade = api
@@ -3248,8 +3274,9 @@ diff --git a/src/lib/backup/restore-upgrade.test.ts b/src/lib/backup/restore-upg
 new file mode 100644
 --- /dev/null
 +++ b/src/lib/backup/restore-upgrade.test.ts
-@@ -0,0 +1,321 @@
+@@ -0,0 +1,530 @@
 +import { readFile } from 'node:fs/promises'
++import { createSilentJazzProxy } from '../../../tests/helpers/silent-jazz-proxy.js'
 +import { afterAll, beforeAll, expect, it } from 'vitest'
 +import { chromium, firefox, webkit } from '@playwright/test'
 +import { createServer, type ViteDevServer } from 'vite'
@@ -3565,6 +3592,214 @@ new file mode 100644
 +				await browser.close()
 +			} finally {
 +				await authority?.stop()
++			}
++		}
++	},
++	60_000
++)
++
++async function startOwnedDrain(
++	page: import('@playwright/test').Page,
++	file: number[],
++	serverUrl: string,
++	scope: string,
++	mode: 'new' | 'resume'
++) {
++	return page.evaluate(
++		async ({ file, serverUrl, scope, mode }) => {
++			const api = window.financeRestoreUpgrade
++			const session =
++				mode === 'new' ? await api.open(serverUrl, scope) : window.financeRestoreUpgradeSession
++			window.financeRestoreUpgradeSession = session
++			const selected = session.getSnapshot(),
++				db = selected.client?.db,
++				user = selected.user
++			if (!db || !user) throw new Error('Missing native drain identity')
++			const isCurrent = () => {
++				const current = session.getSnapshot()
++				return current.status === 'ready' && current.user === user && current.client?.db === db
++			}
++			const previous = mode === 'resume' ? window.financeRestoreDrain.plan.intent : undefined
++			const opening = api.prepareArchiveOpen(new Uint8Array(file))
++			const checked = await api.toPromise(
++				api.createActor(api.createArchiveEnvelopeMachine(), { input: { request: opening } }).start()
++			)
++			if (checked.outcome !== 'integrityChecked') throw new Error('Missing retained drain archive')
++			const sourceBinding = {
++				applicationId: 'delightful-finances',
++				environment: 'upgrade-proof',
++				identityId: user.accountId,
++				operationId: previous?.operation.operationId ?? crypto.randomUUID(),
++				workspaceId: checked.archive.readPayload().source.workspaceId,
++				generation: 1
++			}
++			const planning = api.prepareFinanceRestorePlan(checked.archive, sourceBinding, previous)
++			const planned = await api.toPromise(
++				api.createActor(api.financeRestorePlanningMachine, { input: { request: planning } }).start()
++			)
++			if (planned.outcome !== 'planned') throw new Error('Drain planning failed')
++			const plan = planned.plan.read(),
++				binding = { ...sourceBinding, workspaceId: plan.intent.operation.destinationWorkspaceId }
++			const heldWrite = mode === 'new' ? plan.intent.plan.batches[0]?.writeId : undefined
++			if (mode === 'new' && !heldWrite) throw new Error('Missing financial write to hold')
++			const stats = { releases: 0 }
++			let commits: string[] = []
++			const machine = api.createFinanceRestoreSession(
++				{
++					db,
++					isCurrent,
++					binding,
++					intent: plan.intent,
++					databaseName: 'finance-alpha66-accepted-drain',
++					mode,
++					releaseArtifacts() {
++						stats.releases++
++						planning.release()
++						checked.archive.release()
++						opening.release()
++					}
++				},
++				(db, retain) => {
++					const probe = api.createRecoveryProbe(
++						db,
++						plan,
++						checked.archive,
++						heldWrite,
++						retain,
++						isCurrent
++					)
++					commits = probe.commits
++					return probe
++				}
++			)
++			const actor = api.createActor(machine)
++			window.financeRestoreDrain = { actor, binding, plan, commits, stats }
++			actor.start()
++			return { workspaceId: binding.workspaceId, identityId: user.accountId }
++		},
++		{ file, serverUrl, scope, mode }
++	)
++}
++
++it.each(
++	engines.flatMap(({ name, engine }) =>
++		['cancel', 'native replacement'].map((interruption) => ({ name, engine, interruption }))
++	)
++)(
++	'$name drains an accepted commit after $interruption and resumes without replay',
++	async ({ name, engine, interruption }) => {
++		const browser = await engine.launch({
++			headless: true,
++			...(name === 'chromium' ? { channel: 'chromium' } : {})
++		})
++		let authority: TestJazz | undefined, proxy: ReturnType<typeof createSilentJazzProxy> | undefined
++		try {
++			authority = await startTestJazz({ app, permissions, jazz: { allowedOrigins: [origin] } })
++			const transport = createSilentJazzProxy(authority.url)
++			proxy = transport
++			await transport.listen(0)
++			const page = await browser.newPage()
++			await page.exposeFunction('pauseRecoveryReplies', () => transport.pauseServerReplies())
++			await page.goto(origin)
++			await page.waitForFunction(() => Boolean(window.financeRestoreUpgrade))
++			const admitted = await startOwnedDrain(page, file, transport.url, authority.appId, 'new')
++			const database = authority.jazz.db
++			await expect
++				.poll(
++					async () =>
++						(await database.all(app.transactions.where({ organizationId: admitted.workspaceId })))
++							.length
++				)
++				.toBe(1)
++			const accepted = await database.all(
++				app.transactions.where({ organizationId: admitted.workspaceId })
++			)
++			const pending = await page.evaluate(async (interruption) => {
++				const api = window.financeRestoreUpgrade,
++					runtime = window.financeRestoreDrain
++				if (interruption === 'cancel') runtime.actor.send({ type: 'CANCEL' })
++				else {
++					const session = window.financeRestoreUpgradeSession,
++						selected = session.getSnapshot()
++					const key = session.exportDeviceKey()
++					const stop = session.subscribe(() => {
++						const now = session.getSnapshot()
++						if (
++							now.status !== 'ready' ||
++							now.user !== selected.user ||
++							now.client !== selected.client
++						)
++							runtime.actor.send({ type: 'INVALIDATE', binding: runtime.binding })
++					})
++					const replacement = session.createDeviceAccount()
++					void replacement.catch(() => {})
++					runtime.finishReplacement = async () => {
++						await replacement
++						stop()
++						await session.restoreDeviceAccount(key)
++					}
++				}
++				await api.waitFor(
++					runtime.actor,
++					(state) => state.matches('waitingForPending') || state.matches('settlingCommit')
++				)
++				return {
++					status: runtime.actor.getSnapshot().status,
++					releases: runtime.stats.releases,
++					commits: runtime.commits.length,
++					frozen: Object.isFrozen(runtime.actor.getSnapshot().context)
++				}
++			}, interruption)
++			expect(pending).toEqual({ status: 'active', releases: 0, commits: 2, frozen: true })
++			expect(
++				await database.all(app.organizationMembers.where({ organizationId: admitted.workspaceId }))
++			).toEqual([])
++			transport.resume()
++			const settled = await page.evaluate(async () => {
++				const api = window.financeRestoreUpgrade,
++					runtime = window.financeRestoreDrain
++				const result = await api.toPromise(runtime.actor)
++				const stats = { releases: runtime.stats.releases, commits: runtime.commits.length }
++				await runtime.finishReplacement?.()
++				return { result, ...stats }
++			})
++			expect(settled).toMatchObject({
++				releases: 1,
++				commits: 2,
++				result: { outcome: interruption === 'cancel' ? 'cancelled' : 'invalidated' }
++			})
++			const resumed = await startOwnedDrain(page, file, transport.url, authority.appId, 'resume')
++			expect(resumed).toEqual(admitted)
++			const completed = await page.evaluate(async () => {
++				const api = window.financeRestoreUpgrade,
++					runtime = window.financeRestoreDrain
++				const result = await api.toPromise(runtime.actor)
++				const stats = { releases: runtime.stats.releases, commits: runtime.commits.length }
++				await window.financeRestoreUpgradeSession.close()
++				return { result, ...stats }
++			})
++			expect(completed).toMatchObject({
++				releases: 1,
++				commits: 1,
++				result: { outcome: 'complete', record: { checkpoint: { kind: 'complete' } } }
++			})
++			expect(
++				await database.all(app.transactions.where({ organizationId: admitted.workspaceId }))
++			).toEqual(accepted)
++			expect(await database.all(app.organizations)).toHaveLength(1)
++			expect(
++				await database.all(app.organizationMembers.where({ organizationId: admitted.workspaceId }))
++			).toMatchObject([{ userId: admitted.identityId, role: 'owner' }])
++		} finally {
++			proxy?.resume()
++			try {
++				await browser.close()
++			} finally {
++				try {
++					await proxy?.close()
++				} finally {
++					await authority?.stop()
++				}
 +			}
 +		}
 +	},

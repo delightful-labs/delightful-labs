@@ -111,6 +111,9 @@ export async function checkSchema(directory, source, proof, versions, scope) {
 	if (!clipper) {
 		mkdirSync(join(app, 'tooling'))
 		cpSync(join(source, 'tooling/jazz-wasm.ts'), join(app, 'tooling/jazz-wasm.ts'))
+		mkdirSync(join(app, 'tests/helpers'), { recursive: true })
+		for (const name of ['restore-probe.ts', 'silent-jazz-proxy.ts'])
+			cpSync(join(source, 'tests/helpers', name), join(app, 'tests/helpers', name))
 	}
 	run(
 		['exec', 'jazz-tools', 'migrations', 'create', '--name', 'initial', '--schema-dir', schemaPath],
