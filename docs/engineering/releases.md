@@ -40,7 +40,11 @@ enabled for affected apps. It compares the current commit with Vercel's last
 successful deployment SHA for that project and branch, so skipped commits cannot
 hide undeployed code. A first Preview deployment, with no previous SHA and a
 known non-main branch, fetches `main` from the checkout's origin and compares the
-unique merge base with the checked-out deployment commit. This covers the entire
+unique merge base with the checked-out deployment commit. When Vercel reconstructs
+Git metadata without an origin remote, validated GitHub provider/owner/repository
+system variables supply the HTTPS URL of this public repository. This needs no
+new credentials; inaccessible/private sources retain the conservative build.
+This covers the entire
 branch, including earlier skipped commits, without treating newer main-only
 changes as changes on the preview branch. Shallow history is deepened once by
 100 commits for the pinned main/head SHAs if necessary, within a total 15-second

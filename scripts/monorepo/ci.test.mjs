@@ -341,6 +341,7 @@ function previewFixture(t) {
 	const ignore = (cwd, app, metadata = {}) => spawnSync(process.execPath, [resolve(root, 'scripts/monorepo/vercel-ignore.mjs')], {
 		cwd: resolve(cwd, app), encoding: 'utf8', env: {
 			...process.env, VERCEL_ENV: 'preview', VERCEL_GIT_PREVIOUS_SHA: '',
+			VERCEL_GIT_PROVIDER: '', VERCEL_GIT_REPO_OWNER: '', VERCEL_GIT_REPO_SLUG: '',
 			VERCEL_GIT_COMMIT_REF: 'feature', VERCEL_GIT_COMMIT_SHA: git(cwd, 'rev-parse', 'HEAD'), ...metadata,
 		},
 	})
@@ -417,4 +418,27 @@ test('first preview fallback never overrides deployed history, production, expli
 	const cwd = f.clone('finance')
 	f.git(cwd, 'remote', 'set-url', 'origin', resolve(f.directory, 'unavailable.git'))
 	assert.deepEqual(f.statuses(cwd), [1, 1, 1, 1], 'failed main fetch builds rather than guessing')
+})
+
+test('Vercel reconstructed checkouts without origin use validated GitHub metadata', (t) => {
+	const f = previewFixture(t)
+	f.branch('reconstructed')
+	f.put('apps/website/vercel.json')
+	f.commit()
+	f.put('README.md')
+	f.commit()
+	const cwd = f.clone('reconstructed')
+	f.git(cwd, 'remote', 'remove', 'origin')
+	f.git(cwd, 'branch', '-m', 'master')
+	assert.equal(f.git(cwd, 'remote'), '')
+	assert.deepEqual(f.git(cwd, 'for-each-ref', '--format=%(refname)').split('\n'), ['refs/heads/master'])
+	// Keep this native Git test offline while exercising the constructed URL.
+	f.git(cwd, 'config', `url.${pathToFileURL(f.origin).href}.insteadOf`, 'https://github.com/delightful-labs/delightful-labs.git')
+	const metadata = { VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'delightful-labs', VERCEL_GIT_REPO_SLUG: 'delightful-labs' }
+	assert.deepEqual(f.statuses(cwd, metadata), [1, 0, 0, 0])
+	for (const changed of [
+		{ VERCEL_GIT_PROVIDER: 'gitlab' }, { VERCEL_GIT_REPO_OWNER: '' },
+		{ VERCEL_GIT_REPO_OWNER: 'invalid/owner' }, { VERCEL_GIT_REPO_SLUG: '../repo' },
+		{ VERCEL_GIT_REPO_SLUG: '' }, { VERCEL_GIT_REPO_SLUG: 'repo?token=anything' },
+	]) assert.deepEqual(f.statuses(cwd, { ...metadata, ...changed }), [1, 1, 1, 1], 'unavailable or malformed repository metadata builds')
 })
