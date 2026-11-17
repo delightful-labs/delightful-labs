@@ -4,9 +4,14 @@ Baseline: PR #39 merged at `fb380114` on 2026-11-16. Its final head `d8c0820e`
 passed every hosted Finance, Clipper and foundation workflow. C1/C2 are complete.
 `feat/jazz-native-session-upgrade` starts from that exact merge tree. Workspace
 SDK pins, the active patch, application behavior and deployment settings remain
-unchanged; the worker-only alpha.65 candidate below is an isolated fixture. The npm
-package-tag endpoint was rechecked: `latest` is alpha.65; `alpha` still selects
-alpha.60. Use explicit coordinated pins after qualification.
+unchanged; the worker-only alpha.65 candidate below is an isolated fixture.
+**2026-11-17: the coordinated target is now alpha.66.** npm `latest` selects
+alpha.66; `alpha` still selects alpha.60. Use explicit coordinated pins after
+qualification. The [alpha.66 audit](worker-jazz-alpha66-research.md) records its
+breaking schema/permission changes, 24 passing native lifecycle cases and a
+reproduced late-close failure in the new immediate factory. Keep the supported
+awaited factory in the approved private session actor; no new SDK patch.
+Historical alpha.65 qualification below has not been rerun on alpha.66.
 
 The branch subsequently merges main `5e78a349` (PR #45's website/deployment-control
 fixes). No SDK, Finance schema, Local First implementation or native fixture
@@ -28,6 +33,16 @@ in previews and production. Clipper's approval does not authorize production dat
 resets or a Finance destination change.
 
 ## Foundation-first execution
+
+Before broadening U2's consumer ports, complete U3's alpha.66 schema/permission/
+history foundation in isolation and rerun U1/session qualification on alpha.66.
+Bounded SDK-neutral actor work can continue with the existing awaited acquisition
+protocol. Do not redo application ports around alpha.65's removed authoring API
+or switch to `startJazzClient` without reliable late-close failure propagation.
+Keep adapters thin and reuse the existing workflows and native library behavior.
+Record SDK gaps and defer them when product requirements permit; the late-close
+finding adds no workaround task. Review the unadopted sign-out work before
+expanding commands. Do not build a generic SDK command surface ahead of callers.
 
 - [x] **U1 — Qualify the existing persistent-worker bridge on alpha.65 in
       isolation.** The unpatched SDK already fails cold worker data retention.
@@ -64,10 +79,20 @@ resets or a Finance destination change.
       That boundary is now implemented and qualified on alpha.60 (1,928 unit
       tests and 107 restore tests). The alpha.65 caller port remains open;
       public user metadata cannot reopen the old independent client.
-- [ ] **U3 — Establish SDK schema history before persistent-backend startup.**
+- [ ] **U3 — Establish alpha.66 schema/permissions and SDK history before broader
+      caller adoption or persistent-backend startup.** Replace removed
+      `defineApp`/callback permissions with the native authoring DSL and generated
+      bindings/permissions JSON in isolation. Preserve Finance's prior/current
+      restore definitions and permission overrides. Port Finance's 22 validation/
+      amount/count transform columns and Clipper's two reading transforms through
+      native named transforms; the upgrader refuses those TypeScript transforms.
+      Actual alpha.60 validation passes but emits no required JSON. Reuse the
+      disposable alpha.65 compiler output as a comparison baseline, not a live
+      intermediate rollout or custom compatibility layer. Verify generated schema
+      hashes, bundle identity and existing policy behavior.
       Both active apps use `migrations: 'none'`; alpha.65 rejects this on SQLite,
       remote and Vercel stores before opening them. Use the SDK's generated
-      initial history/validation tools, preserving domain schemas, permissions
+      initial history/generation tools, preserving domain schemas, permissions
       and app IDs. Test fresh stores and disposable retained alpha.60 SQLite
       stores with records/identities/permissions. This is SDK schema history,
       not the excluded account-selection migration/fallback layer.

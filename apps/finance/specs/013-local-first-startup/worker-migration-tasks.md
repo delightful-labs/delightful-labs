@@ -1,5 +1,14 @@
 # Finance worker migration: foundation-first tasks
 
+**2026-11-17 release update:** target alpha.66 for the coordinated upgrade.
+The [actual-code audit and revised order](worker-jazz-alpha66-research.md)
+retain the private session actor and awaited SDK factory, and move the isolated
+schema/permission/history foundation ahead of broader caller adoption. All
+alpha.65 results below retain their original version scope; active pins remain
+alpha.60. Alpha.66's new immediate factory passed 24 native lifecycle cases but
+lost a late-resource close failure in a separate source-level reproduction, so
+it does not replace Finance's awaited acquisition/close protocol.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,

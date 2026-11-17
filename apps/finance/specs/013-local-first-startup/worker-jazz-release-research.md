@@ -1,5 +1,10 @@
 # Jazz alpha.61–65: code audit for worker simplification
 
+**2026-11-17 update:** the upgrade target is now alpha.66. Its
+[source audit, native lifecycle checks and revised execution order](worker-jazz-alpha66-research.md)
+supersede the version recommendation below. The alpha.65 results remain
+historical evidence, not alpha.66 qualification. Workspace pins remain alpha.60.
+
 Researched 2026-11-16 at the user's request to inspect the actual newer releases
 before recommending cleanup. Workspace dependencies and the existing SDK patch
 remain unchanged at alpha.60. This is an upgrade proposal, not qualification of

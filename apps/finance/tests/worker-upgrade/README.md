@@ -1,5 +1,11 @@
 # Isolated Jazz alpha.65 worker proof
 
+The coordinated upgrade target is now alpha.66. This runner and the results
+below remain alpha.65 evidence until the removed schema/permission APIs have
+been ported and the suite rerun. See the
+[alpha.66 source audit and qualification boundaries](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md).
+Changing only the runner's version constant is insufficient.
+
 From Finance, with the workspace's Node/pnpm and installed Playwright browsers:
 
 ```sh
