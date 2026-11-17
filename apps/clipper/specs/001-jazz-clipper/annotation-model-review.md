@@ -267,6 +267,43 @@ retrying an uncertain write; the shape alone is not authority for replay.
 Unpublishing, retained-address restoration and conflict pauses still need their
 reviewed lifecycle extensions; these four variants cover only first publication.
 
+### Approved native publication storage — 2026-11-17
+
+The user approved evolving the existing `publicationLinks` storage into
+`publications` after reviewing this concrete shape and its explanation:
+
+```ts
+publications: s.table(
+  {
+    libraryId: s.uuid(),
+    highlightId: s.uuid().optional(),
+    noteId: s.uuid().optional(),
+    publishingDid: s.string(),
+    lifecycle: s.json(publicationLifecycleSchema)
+  },
+  {
+    library: s.rel('libraries', 'libraryId'),
+    highlight: s.rel('highlights', 'highlightId'),
+    note: s.rel('notes', 'noteId')
+  }
+)
+```
+
+`publicationLifecycleSchema` is the previously approved union's state-specific
+fields only. The native binding columns are stored once, with exactly one source
+FK, and reconstructed into the unchanged flattened `publicationSchema` at the
+domain boundary. Whole-record validation checks that an addressed lifecycle's
+repository DID matches `publishingDid`. Backend-only transitions own uniqueness,
+ownership, active-source eligibility and accepted-content matching in native
+serializable transactions. All ordinary client writes remain denied.
+
+Jazz supplies identity, timestamps and accepted history. No custom revision or
+attempt graph is added. Issued payloads are saved before any future dispatch and
+remain in accepted native history after the current row advances to published.
+The persistence capability requires its trusted backend caller to supply only
+actually confirmed published outcomes. It does not issue or reconcile PDS writes.
+New first-publication transitions for Highlights remain gated on source evidence.
+
 ### Earlier model review findings
 
 1. Define and qualify text normalization and DOM/code-point/UTF-16 conversion.

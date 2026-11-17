@@ -1,22 +1,28 @@
 import { z } from 'zod'
 import { marginRecordSchema } from './margin.js'
-import {
-	atRecordUriSchema,
-	didSchema,
-	publicationLinkSchema,
-	publicationSourceSchema
-} from './publication-link.js'
+import { lowercaseUuidSchema } from '../validation/values.js'
+import { atRecordUriSchema, didSchema, publicationSourceSchema } from './publication-link.js'
 
 export const publicationBaseSchema = z.strictObject({
-	libraryId: publicationLinkSchema.shape.libraryId,
+	libraryId: lowercaseUuidSchema,
 	source: publicationSourceSchema,
 	publishingDid: didSchema
 })
-const addressed = publicationBaseSchema.extend({ uri: atRecordUriSchema })
-const issuedPublicationSchema = addressed.extend({
+const privateLifecycle = z.strictObject({ state: z.literal('private') })
+const requestedLifecycle = z.strictObject({ state: z.literal('requested') })
+const issuedLifecycle = z.strictObject({
 	state: z.literal('issued'),
+	uri: atRecordUriSchema,
 	record: marginRecordSchema
 })
+const publishedLifecycle = z.strictObject({ state: z.literal('published'), uri: atRecordUriSchema })
+
+export const publicationLifecycleSchema = z.discriminatedUnion('state', [
+	privateLifecycle,
+	requestedLifecycle,
+	issuedLifecycle,
+	publishedLifecycle
+])
 
 function hasMatchingPublisher(value: { publishingDid: string; uri?: string }) {
 	return value.uri === undefined || value.uri.split('/')[2] === value.publishingDid
@@ -25,14 +31,46 @@ function hasMatchingPublisher(value: { publishingDid: string; uri?: string }) {
 /** The approved first-publication lifecycle. Issued retains the exact record to
  * accept durably in Jazz before dispatch: it may have been sent and still needs
  * confirmation. This contract alone neither persists that evidence nor authorizes
- * sending/replaying a PDS request. Reserved addresses remain in the private links. */
+ * sending/replaying a PDS request. */
 export const publicationSchema = z
 	.discriminatedUnion('state', [
-		publicationBaseSchema.extend({ state: z.literal('private') }),
-		publicationBaseSchema.extend({ state: z.literal('requested') }),
-		issuedPublicationSchema,
-		addressed.extend({ state: z.literal('published') })
+		publicationBaseSchema.extend(privateLifecycle.shape),
+		publicationBaseSchema.extend(requestedLifecycle.shape),
+		publicationBaseSchema.extend(issuedLifecycle.shape),
+		publicationBaseSchema.extend(publishedLifecycle.shape)
 	])
 	.refine(hasMatchingPublisher)
 
 export type Publication = z.infer<typeof publicationSchema>
+
+/** Native columns hold the binding once; one JSON value holds its lifecycle. */
+export function publicationValues(publication: Publication) {
+	const { libraryId, source, publishingDid, ...lifecycle } = publicationSchema.parse(publication)
+	return {
+		libraryId,
+		highlightId: 'highlightId' in source ? source.highlightId : null,
+		noteId: 'noteId' in source ? source.noteId : null,
+		publishingDid,
+		lifecycle
+	}
+}
+
+const rowBaseSchema = publicationBaseSchema
+	.omit({ source: true })
+	.extend({ lifecycle: publicationLifecycleSchema })
+	.strip()
+const publicationRowSchema = z.union([
+	rowBaseSchema.extend({ highlightId: lowercaseUuidSchema, noteId: z.null() }),
+	rowBaseSchema.extend({ highlightId: z.null(), noteId: lowercaseUuidSchema })
+])
+
+export function publicationFromRow(row: unknown): Publication {
+	const value = publicationRowSchema.parse(row)
+	return publicationSchema.parse({
+		libraryId: value.libraryId,
+		source:
+			value.highlightId === null ? { noteId: value.noteId } : { highlightId: value.highlightId },
+		publishingDid: value.publishingDid,
+		...value.lifecycle
+	})
+}

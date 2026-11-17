@@ -1,5 +1,6 @@
 import { schema as s } from 'jazz-tools'
 import { nativeRangeSchema } from '../../annotations/schema.js'
+import { publicationLifecycleSchema } from '../../annotations/publication.js'
 import { z } from 'zod'
 import { schema as authSchema } from './auth-schema.js'
 import { captureSourceSchema } from '../../capture/article-schema.js'
@@ -14,12 +15,13 @@ function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Val
 export const app = s.defineApp(
 	{
 		...authSchema,
-		publicationLinks: s.table(
+		publications: s.table(
 			{
 				libraryId: s.uuid(),
 				highlightId: s.uuid().optional(),
 				noteId: s.uuid().optional(),
-				uri: s.string()
+				publishingDid: s.string(),
+				lifecycle: s.json(publicationLifecycleSchema)
 			},
 			{
 				library: s.rel('libraries', 'libraryId'),
@@ -193,7 +195,7 @@ export const app = s.defineApp(
 		),
 		libraries: s.table(
 			{ ownerId: s.uuid(), bootstrapVersion: s.string() },
-			{ publicationLinks: s.reverse('publicationLinks', 'library') }
+			{ publications: s.reverse('publications', 'library') }
 		),
 		storageOperations: s.table(
 			{ libraryId: s.uuid(), payloadHash: s.string() },

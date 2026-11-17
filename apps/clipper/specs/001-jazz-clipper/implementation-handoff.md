@@ -1,6 +1,53 @@
 # Article notes — implementation started
 
-## First-publication lifecycle contract — 2026-11-17
+## Durable first-publication storage — 2026-11-17
+
+After reviewing the concrete stored shape and its explanation, the user approved
+evolving `publicationLinks` into `publications`. One native row binds a library,
+exactly one Highlight/document Note and publishing DID. A single validated JSON
+`lifecycle` contains the approved state-specific fields; URI and issued payload
+are not separately duplicated. Native library/highlight/note joins remain intact,
+and Jazz owns row identity, creation metadata and accepted version history.
+
+The backend-only store uses the existing DLF transaction lifecycle and a local
+XState domain child: read a serializable snapshot, assess transition/ownership,
+prepare, insert or update, then wait for native authority acceptance. It admits
+new private/requested choices, private to requested, requested to private/issued,
+and issued to published at the same URI. No repeated issuance, URI replacement,
+skipped states or erasure of an unresolved address is admitted. Source/publisher
+and URI collision checks share the transaction. Updating a lifecycle retains the
+same Jazz row identity.
+
+Document-note issuance must match the accepted Note through the reviewed Margin
+projector. Unsupported/oversized content is refused without truncation. Highlight
+issuance remains blocked pending source-page evidence and publisher admission.
+An issued payload remains unchanged when its Note is edited or deleted. The
+trusted backend may record a matching PDS confirmation after source deletion so
+public cleanup obligations retain evidence. That host must actually confirm the
+PDS write; this persistence capability is not an HTTP consent/confirmation API.
+
+Owner reads, including history, survive source deletion; foreign reads and all
+client inserts/updates/deletes are refused by native policies. Preview still
+works for private/requested choices and leaves issued/published records to future
+reconciliation. Its response shape and UI copy are unchanged.
+
+Native qualification covers same-authority concurrent request/issuance conflicts,
+two complete SQLite backend restarts, exact issued payload retention, stable
+native identity/creation metadata, accepted history after confirmation, and
+history access control. This does not qualify independent backend writers or
+provide a scheduler, progressive OAuth grants, user Publish admission, PDS I/O,
+unknown-outcome reconciliation or ongoing public synchronization. Schema changes
+use the accepted disposable-development-data scope; no existing hosted store is
+reset or migrated by this work.
+
+Verification passes 942 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper lint/formatting and whitespace checks.
+Both production offline fixture builds pass. The built authenticated preview,
+two full offline browser restarts and reconnect reconciliation pass in 8.4 seconds
+(9.1 seconds including test-runner startup). These browser checks qualify the
+existing preview/read path against the new schema, not a user Publish flow.
+
+## Earlier first-publication lifecycle contract — 2026-11-17
 
 The user approved the discriminated union `private | requested | issued |
 published`. Only issued/published carry a required full Margin record URI, whose

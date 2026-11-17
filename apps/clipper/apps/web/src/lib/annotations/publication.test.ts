@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { publicationSchema } from './publication.js'
+import { publicationFromRow, publicationSchema, publicationValues } from './publication.js'
 
 const record = {
 	$type: 'at.margin.note',
@@ -53,4 +53,24 @@ it('requires the exact validated Margin record only while issuance needs confirm
 		expect(publicationSchema.safeParse({ ...issued, record: invalid }).success).toBe(false)
 	}
 	expect(publicationSchema.safeParse({ ...issued, state: 'published' }).success).toBe(false)
+})
+
+it('reads native metadata without copying it into the lifecycle or allowing ambiguous parents', () => {
+	const publication = publicationSchema.parse({
+		libraryId: crypto.randomUUID(),
+		source: { noteId: crypto.randomUUID() },
+		publishingDid: 'did:web:owner.example',
+		state: 'issued',
+		uri: 'at://did:web:owner.example/at.margin.note/self',
+		record
+	})
+	const row = {
+		...publicationValues(publication),
+		id: crypto.randomUUID(),
+		$acceptedAt: new Date()
+	}
+	expect(publicationFromRow(row)).toEqual(publication)
+	expect(() => publicationFromRow({ ...row, highlightId: crypto.randomUUID() })).toThrow()
+	expect(() => publicationFromRow({ ...row, noteId: null })).toThrow()
+	expect(() => publicationFromRow({ ...row, publishingDid: 'did:web:other.example' })).toThrow()
 })
