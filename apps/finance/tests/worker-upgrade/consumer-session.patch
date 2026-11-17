@@ -1,0 +1,33 @@
+diff --git a/src/lib/components/identity/RecoveryPhraseIntegration.svelte b/src/lib/components/identity/RecoveryPhraseIntegration.svelte
+index d686dea..2c597d7 100644
+--- a/src/lib/components/identity/RecoveryPhraseIntegration.svelte
++++ b/src/lib/components/identity/RecoveryPhraseIntegration.svelte
+@@ -1,5 +1,6 @@
+ <script lang="ts">
+ 	import { getJazzSession } from 'jazz-tools/svelte'
++	import { get } from 'svelte/store'
+ 	import RecoveryPhrase from 'delightful-local-first/recovery/svelte'
+ 	import { createJazzRecoveryAdapter } from 'delightful-local-first/backend/jazz/recovery'
+ 	import { createRecoveryMessages } from 'delightful-local-first/recovery/messages'
+@@ -7,14 +8,15 @@
+ 	import { getLocale } from '#lib/paraglide/runtime.js'
+ 
+ 	const session = getJazzSession()
+-	const adapter = createJazzRecoveryAdapter(() => {
+-		const snapshot = session.getSnapshot()
+-		return snapshot.status === 'ready' ? snapshot.account : undefined
+-	})
++	const binding = {
++		getSnapshot: () => get(session),
++		exportDeviceKey: session.exportDeviceKey
++	}
++	const adapter = createJazzRecoveryAdapter(() => binding)
+ 	const source: RecoveryScopeSource = {
+ 		subscribe(publish) {
+-			const unsubscribe = session.subscribe((snapshot) => {
+-				publish(adapter.observeAccount(snapshot.status === 'ready' ? snapshot.account : undefined))
++			const unsubscribe = session.subscribe(() => {
++				publish(adapter.observeSession())
+ 			})
+ 			return () => {
+ 				try {

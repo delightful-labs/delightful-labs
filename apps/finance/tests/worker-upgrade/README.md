@@ -7,12 +7,13 @@ node tests/worker-upgrade/run.mjs
 ```
 
 This reuses `tests/worker-bindings`, the actual Finance schema/validation and
-the current built public Local First package. It creates a temporary project
+recovery integration, and the current built public Local First/DUI packages.
+It creates a temporary project
 with separate dependencies and browser profiles. It downloads the exact
 alpha.65 SDK, checks npm's SHA-512 integrity, applies the inactive candidate,
 checks types and runs the native suite. The generated dependency lock, SDK
 metadata, versions and sources remain in the printed artifact directory.
-The Local First `dist` output must be current before packing.
+Both libraries' `dist` outputs must be current before packing.
 
 - `worker-bridge.patch` carries only the existing worker detection, Window hooks,
   asynchronous generation operations and clone exclusion into six alpha.65 files.
@@ -22,13 +23,30 @@ The Local First `dist` output must be current before packing.
 - `fixture.patch` adapts the maintained SDK leaf to immediate local-first startup,
   public user/account IDs and the new emitted broker location. It retains exactly
   one hashed broker asset and adds loader-failure and native session-adapter
-  qualification cases per engine. Reports contain booleans, never keys or phrases.
+  qualification cases per engine. It also builds a native Svelte page with the
+  actual Finance recovery integration and packed shared UI. Reports compare
+  recovery phrases inside the browser and return booleans, never keys or phrases.
 - `session-adapters.patch` ports shared recovery/restoration to the public session
   methods and exposes native `starting` status. The runner compiles those source
   adapters and their contracts against alpha.65, updates a temporary library
-  tarball, and tests the normal public package exports.
+  tarball, and tests the normal public package exports. Recovery needs only the
+  native snapshot getter and device-key export; it also accepts that observation
+  pair from a native Svelte context without requiring session ownership methods.
+- `consumer-session.patch` adapts Finance's recovery component to native
+  `getJazzSession()`/`get(store)` and the bound export action. Svelte's store owns
+  subscription and initial publication; the existing recovery actor still owns
+  its scope and secret lifetime. The component's existing locale runtime is
+  copied unchanged rather than regenerated.
 - `run.mjs` supplies dependency/build isolation; it adds no application runtime,
   actor owner, RPC layer, workspace package or CI job.
+
+Strict declaration/fixture types, native Svelte checks and all **21 native cases**
+pass in the isolated candidate, including the prior 18 worker/session cases.
+The three Svelte cases cover initial availability, phrase/native-key equality,
+clearing an open phrase on same-account replacement, the SDK's `loading` snippet,
+sign-out/reopen, external-provider unmount/remount and native close. Mounting the
+provider does not reread the AccountStore; unmounting leaves the SDK session ready.
+These checks use actual SDK operations and public Svelte/package exports.
 
 The candidate is **not the complete workspace Jazz patch**. Backend/guest proof,
 Chrome-extension admission, joining-peer proof and offline-retry behavior remain

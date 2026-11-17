@@ -3398,16 +3398,16 @@ describe('browser replica separation', () => {
 							])
 						})
 					else
-						await expect
-							.poll(() =>
-								page.evaluate(() => window.financeRestoreSessionRuntime.stats.releaseAttempts)
+						await page.evaluate(async () => {
+							const runtime = window.financeRestoreSessionRuntime
+							await window.financeRestoreRecovery.waitFor(runtime.actor, (snapshot) =>
+								snapshot.matches('artifactsBlocked')
 							)
-							.toBe(1)
+						})
 					await page.evaluate((fault) => {
 						const runtime = window.financeRestoreSessionRuntime
 						runtime.actor.send({ type: 'CANCEL' })
 						if (fault === 'rollback') runtime.releaseTransaction()
-						else runtime.releaseTransaction()
 					}, fault)
 					await page.evaluate(async (fault) => {
 						const api = window.financeRestoreRecovery,
@@ -3423,7 +3423,8 @@ describe('browser replica separation', () => {
 						}))
 					).toMatchObject({
 						status: 'active',
-						releases: 0
+						releases: 0,
+						releaseAttempts: fault === 'rollback' ? 0 : 1
 					})
 					await page.evaluate(() =>
 						window.financeRestoreSessionRuntime.actor.send({ type: 'RETRY_RELEASE' })

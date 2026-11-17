@@ -45,8 +45,9 @@ resets or a Finance destination change.
       session owner, stale binding checks and domain drains; do not create a
       Window SDK session for the future worker UI.
       **In progress:** U2a's selected shared adapters pass public-package/native
-      qualification below. Finance/Clipper caller adoption, provider changes and
-      removal of their explicit upgrade phases remain U2b; U2 is not complete.
+      qualification below. The native Svelte/Finance recovery candidate also
+      passes its focused qualification. Remaining Finance/Clipper caller adoption
+      and removal of their explicit upgrade phases remain U2b; U2 is not complete.
       U2b source review also found Finance's separate account-handle-based restore
       client. The user approved the shared application Db in the
       [resource ownership decision](worker-restore-session-decision.md).
@@ -196,16 +197,66 @@ replacement during an accepted write awaiting acknowledgement and resume without
 replay. The decision record contains the exact scope and remaining alpha.65
 qualification; no additional SDK session or patch was introduced.
 
-Next, adapt Finance's layout/recovery integration/session
-preparation and Clipper's account host/callers, qualify the native Svelte provider
-and retire their SDK-upgrade phases. Alpha.65 imperative session subscribers
+U2b's native Svelte boundary is now qualified in isolation. Alpha.65's context
+supplies a readable store and bound actions, not an imperative `getSnapshot()`.
+The candidate narrows recovery's input to the two public methods it actually
+needs (snapshot observation and device-key export). Finance binds those methods
+to native Svelte `get(store)` and the SDK's bound action. The existing recovery
+actor and UI retain scope/secret cleanup; no second session, subscription manager
+or application lifecycle is introduced. The candidate uses the actual Finance
+integration and packed Local First/DUI components under native `JazzProvider`,
+with SDK operations and initial publication, transition, sign-out, reopen,
+external-provider unmount and close as the acceptance boundaries. Strict adapter,
+fixture and Svelte checks pass, as do all 21 native cases (the previous 18 plus
+one framework case per browser). The active alpha.60 component/library are
+unchanged by this source overlay.
+
+Next, adapt Finance's layout/session preparation and Clipper's account
+host/callers and retire their SDK-upgrade phases. Alpha.65 imperative subscribers
 receive notifications without a snapshot argument or initial delivery. Its
 `getJazzSession()` Svelte context already supplies a readable store with bound
 actions and initial publication: existing `fromStore(getJazzSession())` callers
 do not need an extra `sessionState()` wrapper. Preserve actual domain
-initialization and drains. Those consumers and the coherent SDK switch remain
-unimplemented. Workspace SDK pins, active adapters/patch, application behavior and Vercel data destinations
-are unchanged by U2a.
+initialization and drains. Those remaining consumers and the coherent SDK switch
+are not implemented; schema/auth/retained-data gates still apply.
+
+## U2b: native Svelte session boundary
+
+The isolated runner now packs both existing public Local First and DUI outputs,
+copies Finance's actual `RecoveryPhraseIntegration.svelte` and existing locale
+runtime, applies the inactive consumer overlay and builds a native Svelte page.
+It uses alpha.65's real `JazzProvider`, native readable context and bound actions;
+the actual shared recovery actor/view render and clear the phrase. There are no
+mock sessions, copied recovery machines, new session owners or SDK patches.
+
+Recovery's source type requires only the public snapshot getter and device-key
+export. A native SDK facade supplies these directly; a Svelte provider instance
+supplies `get(store)` and its SDK-bound export action. The binding stays within
+that provider instance. When porting replaceable external session props, key the
+provider by that session: the inspected SDK captures one session per instance
+and owns withdrawing/acknowledging its rendered client frame during replacement.
+Do not retarget an existing view binding to another session or create a Window
+SDK owner for the future worker UI.
+
+The three new browser cases verify initial scope publication, native-key/phrase
+equality, clearing an open phrase during same-account restoration, the native
+`loading` snippet, sign-out/reopen, provider unmount/remount and SDK close.
+Provider mount leaves the AccountStore read count unchanged; unmount clears the
+phrase while leaving the externally owned session ready. Explicit disposal must
+close the native SDK, unmount the UI and finish the AccountStore close receipt.
+Phrase comparisons happen inside the browser and return booleans only.
+
+The clean run passes all **21 native cases**, retaining the existing worker,
+IndexedDB, loader-failure and restart tests. Strict declaration/fixture types and
+Svelte checks pass with zero errors/warnings. SDK and Wasm are alpha.65, Svelte is
+5.57.2, the existing installed plugin/checker versions are 7.3.1/4.7.6, and
+OpenTelemetry API remains 1.9.1. The runner reads exact installed versions using
+`pnpm list`, because the plugin does not export its package manifest. All source
+overlays now use Git's added-source whitespace checks before application.
+
+Artifacts: `/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha65-5gK1Bv`;
+log: `/private/tmp/finance-alpha65-svelte-proof.log`. The complete Finance/Clipper
+caller port and persistent backend upgrade remain unqualified on alpha.65.
 
 ## Native Vercel naming: additional code proof
 

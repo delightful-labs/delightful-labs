@@ -1,156 +1,134 @@
---- a/tests/worker-bindings/sdk-session.worker.ts
-+++ b/tests/worker-bindings/sdk-session.worker.ts
-@@ -3,9 +3,17 @@
- import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
- import { createFinanceAccountStore } from '../../src/lib/runtime/worker/account-store.js'
- import { app } from '../../src/lib/schema.js'
-+import { qualifyNativeSession } from './session-qualification.js'
- 
- export type SdkCommand =
--	| { type: 'OPEN'; scope: string; brokerUrl: string; data: MessagePort; control: MessagePort }
-+	| {
-+			type: 'OPEN'
-+			scope: string
-+			brokerUrl: string
-+			data: MessagePort
-+			control: MessagePort
-+			failLoader: boolean
-+	  }
- 	| { type: 'READ'; organizationId: string }
- 	| {
- 			type: 'SEED'
-@@ -16,10 +24,12 @@
- 	  }
- 	| { type: 'EDIT'; transactionId: string; amountMinor: number }
- 	| { type: 'CLOSE' }
-+	| { type: 'QUALIFY_SESSION' }
- export type SdkReply =
- 	| { kind: 'opened'; accountId: string; localFirst: boolean; windowPresent: boolean }
- 	| { kind: 'rows'; rows: { id: string; amountMinor: number; memo: string | null }[] }
- 	| { kind: 'saved' }
-+	| { kind: 'session-qualified'; report: Awaited<ReturnType<typeof qualifyNativeSession>> }
- 	| { kind: 'closed'; sdkClosed: boolean; hostClosed: boolean }
- 	| { kind: 'failed'; message: string; stack?: string }
- 
-@@ -28,8 +38,8 @@
- let broker: ReturnType<typeof brokerHostClient> | undefined
- function current() {
- 	const snapshot = session?.getSnapshot()
--	if (!snapshot?.client || !snapshot.account) throw new Error('SDK fixture session unavailable')
--	return { db: snapshot.client.db, accountId: snapshot.account.id }
-+	if (!session || !snapshot?.user) throw new Error('SDK fixture session unavailable')
-+	return { db: session.db, accountId: snapshot.user.accountId }
- }
- 
- // Disposable SDK controls, not an application runtime. The test owns operation
-@@ -48,7 +58,12 @@
- 			scope: command.scope,
- 			env: 'sdk-proof',
- 			store,
--			initial: 'local-first',
-+			initial: 'device',
-+			localFirst: 'now',
-+			client: () => {
-+				if (command.failLoader) throw new Error('Expected SDK loader failure')
-+				return import('jazz-tools/local-first')
-+			},
- 			runtimeSources: {
- 				wasmUrl,
- 				brokerWorkerUrl: command.brokerUrl,
-@@ -57,7 +72,6 @@
- 			}
- 		})
- 		const { db, accountId } = current()
--		await db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
- 		return {
- 			kind: 'opened',
- 			accountId,
-@@ -66,9 +80,9 @@
- 		}
- 	}
- 	if (command.type === 'CLOSE') {
--		if (!session || !store || !broker) throw new Error('SDK fixture was not opened')
--		await session.close()
--		const sdkClosed = session.getSnapshot().status === 'closed'
-+		if (!store || !broker) throw new Error('SDK fixture was not opened')
-+		await session?.close()
-+		const sdkClosed = session === undefined || session.getSnapshot().status === 'closed'
- 		await store.close()
- 		const receipt = await broker.close()
- 		return {
-@@ -78,6 +92,10 @@
- 				receipt.scope === broker.host.identity.scope &&
- 				receipt.requestId === broker.host.identity.requestId
- 		}
-+	}
-+	if (command.type === 'QUALIFY_SESSION') {
-+		if (!session) throw new Error('SDK session unavailable')
-+		return { kind: 'session-qualified', report: await qualifyNativeSession(session) }
- 	}
- 	const { db, accountId } = current()
- 	if (command.type === 'READ') {
---- a/tests/worker-bindings/sdk-session.ts
-+++ b/tests/worker-bindings/sdk-session.ts
-@@ -34,20 +34,21 @@
- 			scope,
- 			env: 'sdk-proof',
- 			store,
--			initial: 'local-first',
-+			initial: 'device',
-+			localFirst: 'now',
-+			client: () => import('jazz-tools/local-first'),
- 			runtimeSources: { wasmUrl, brokerWorkerUrl: brokerUrl, wasmVersion: 'finance-sdk-proof-1' }
- 		})
- 		try {
--			const db = session.getSnapshot().client?.db
-+			const db = session.db
- 			if (!db) throw new Error('Window SDK control unavailable')
--			await db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
- 			return db.isLocalFirst()
- 		} finally {
- 			await session.close()
- 			await store.close()
- 		}
- 	},
--	async open(scope: string, brokerUrl: string) {
-+	async open(scope: string, brokerUrl: string, failLoader = false) {
- 		if (active) throw new Error('SDK fixture already active')
- 		const data = new MessageChannel(),
- 			control = new MessageChannel()
-@@ -72,7 +73,14 @@
- 			release,
- 			stats
- 		}
--		return command({ type: 'OPEN', scope, brokerUrl, data: data.port2, control: control.port2 })
-+		return command({
-+			type: 'OPEN',
-+			scope,
-+			brokerUrl,
-+			data: data.port2,
-+			control: control.port2,
-+			failLoader
-+		})
- 	},
- 	command,
- 	stats: () => ({ ...active?.stats }),
+diff --git a/tests/worker-bindings/native.test.ts b/tests/worker-bindings/native.test.ts
+index eb4c31d..d5a9a4f 100644
 --- a/tests/worker-bindings/native.test.ts
 +++ b/tests/worker-bindings/native.test.ts
-@@ -52,10 +52,7 @@
+@@ -4,6 +4,8 @@ import { join, resolve, extname } from 'node:path'
+ import { beforeAll, afterAll, describe, expect, it, onTestFailed } from 'vitest'
+ import { chromium, firefox, webkit, type BrowserContext, type Page } from '@playwright/test'
+ import { build } from 'vite'
++import { svelte } from '@sveltejs/vite-plugin-svelte'
++import type {} from './svelte/client.js'
+ import { workerRuntimeBuildConfig } from '../../tooling/jazz-wasm.js'
+ import type { FinanceAccountStoreConfiguration } from '../../src/lib/runtime/worker/account-store.js'
+ import type { Operation } from './bindings.worker.js'
+@@ -23,10 +25,16 @@ beforeAll(async () => {
+ 		...workerRuntimeBuildConfig(),
+ 		configFile: false,
+ 		logLevel: 'silent',
++		plugins: [svelte({ configFile: false })],
+ 		build: {
+ 			outDir: output,
+ 			emptyOutDir: true,
+-			rolldownOptions: { input: resolve('tests/worker-bindings/index.html') }
++			rolldownOptions: {
++				input: [
++					resolve('tests/worker-bindings/index.html'),
++					resolve('tests/worker-bindings/svelte/index.html')
++				]
++			}
+ 		}
+ 	})
+ 	const assets = new Map<string, { bytes: Buffer; type: string }>()
+@@ -38,9 +46,11 @@ beforeAll(async () => {
+ 			type:
+ 				extname(file) === '.html'
+ 					? 'text/html'
+-					: extname(file) === '.js'
+-						? 'application/javascript'
+-						: 'application/octet-stream'
++					: extname(file) === '.css'
++						? 'text/css'
++						: extname(file) === '.js'
++							? 'application/javascript'
++							: 'application/octet-stream'
+ 		})
+ 	}
+ 	const listener = createServer((request, response) => {
+@@ -52,9 +62,8 @@ beforeAll(async () => {
  		})
  		response.end(asset?.bytes ?? 'No app, auth or Jazz endpoint exists in this fixture')
  	})
 -	const brokers = [...assets.keys()].filter(
 -		(path) =>
 -			path.startsWith('/_app/immutable/assets/') && /\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
--	)
-+	const brokers = [...assets.keys()].filter((path) => /\/jazz-broker-worker[.-][^/]+\.js$/.test(path))
++	const brokers = [...assets.keys()].filter((path) =>
++		/\/jazz-broker-worker[.-][^/]+\.js$/.test(path)
+ 	)
  	if (brokers.length !== 1 || !brokers[0])
  		throw new Error(`Expected one SDK broker asset, found ${brokers.length}`)
- 	sdkBrokerPath = brokers[0]
-@@ -121,6 +118,83 @@
+@@ -121,6 +130,152 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
  				await browser.close()
  			}
  		})
++		it('uses the native Svelte provider and Finance recovery component without another session', async () => {
++			retainOnFailure()
++			const browser = await browserType.launch({ headless: true })
++			let page: Page | undefined
++			try {
++				page = await browser.newPage()
++				await page.goto(origin + '/tests/worker-bindings/svelte/index.html')
++				await page.waitForFunction(() => Boolean(window.financeSvelteFixture))
++				await page.evaluate(
++					({ scope, brokerUrl }) => window.financeSvelteFixture.open(scope, brokerUrl),
++					{ scope: crypto.randomUUID(), brokerUrl: origin + sdkBrokerPath }
++				)
++				const initial = await page.evaluate(() => window.financeSvelteFixture.state())
++				const labels = await page.evaluate(() => window.financeSvelteFixture.labels())
++				await page.evaluate(() => window.financeSvelteFixture.show())
++				const show = page.getByRole('button', { name: labels.show, exact: true })
++				await show.waitFor({ state: 'visible' })
++				expect(await show.isEnabled()).toBe(true)
++				expect(await page.evaluate(() => window.financeSvelteFixture.state())).toEqual(initial)
++				await show.click()
++				await page.getByRole('dialog', { name: labels.heading }).waitFor({ state: 'visible' })
++				expect(await page.evaluate(() => window.financeSvelteFixture.phraseMatchesNative())).toBe(
++					true
++				)
++				await page.evaluate(() => window.financeSvelteFixture.beginSameAccountRestore())
++				await page.getByText('Session loading', { exact: true }).waitFor({ state: 'visible' })
++				expect(await page.getByLabel(labels.phraseLabel, { exact: true }).count()).toBe(0)
++				await page.evaluate(() => window.financeSvelteFixture.finishRestore())
++				await show.waitFor({ state: 'visible' })
++				expect(await show.isEnabled()).toBe(true)
++				expect(await page.getByLabel(labels.phraseLabel, { exact: true }).count()).toBe(0)
++				expect((await page.evaluate(() => window.financeSvelteFixture.state())).accountId).toBe(
++					initial.accountId
++				)
++				await show.click()
++				await page.getByRole('dialog', { name: labels.heading }).waitFor({ state: 'visible' })
++				expect(await page.evaluate(() => window.financeSvelteFixture.phraseMatchesNative())).toBe(
++					true
++				)
++				await page.evaluate(() => window.financeSvelteFixture.hide())
++				expect((await page.evaluate(() => window.financeSvelteFixture.state())).status).toBe(
++					'ready'
++				)
++				expect(await page.getByLabel(labels.phraseLabel, { exact: true }).count()).toBe(0)
++				await page.evaluate(() => window.financeSvelteFixture.show())
++				await show.waitFor({ state: 'visible' })
++				expect(await show.isEnabled()).toBe(true)
++				await page.evaluate(() => window.financeSvelteFixture.signOut())
++				await page.getByText('Session signed out', { exact: true }).waitFor({ state: 'visible' })
++				expect(await page.getByLabel(labels.phraseLabel, { exact: true }).count()).toBe(0)
++				await page.evaluate(() => window.financeSvelteFixture.reopen())
++				await show.waitFor({ state: 'visible' })
++				expect((await page.evaluate(() => window.financeSvelteFixture.state())).accountId).toBe(
++					initial.accountId
++				)
++				await page.evaluate(() => window.financeSvelteFixture.closeSession())
++				await page.getByText('Session closed', { exact: true }).waitFor({ state: 'visible' })
++				await page.evaluate(() => window.financeSvelteFixture.dispose())
++			} finally {
++				if (page)
++					await page
++						.evaluate(async () => {
++							await window.financeSvelteFixture.finishRestore()
++							await window.financeSvelteFixture.dispose()
++						})
++						.catch(() => {})
++				await browser.close()
++			}
++		})
 +		it('closes acquired resources after immediate SDK loader failure and reopens', async () => {
 +			retainOnFailure()
 +			const browser = await browserType.launch({ headless: true })
@@ -231,6 +209,148 @@
  		it('uses one real SDK worker session for offline Finance saves through cold browser restarts', async () => {
  			retainOnFailure()
  			const profile = await mkdtemp(join(directory, `sdk-${engine}-`))
+diff --git a/tests/worker-bindings/sdk-session.ts b/tests/worker-bindings/sdk-session.ts
+index a968589..bf7244b 100644
+--- a/tests/worker-bindings/sdk-session.ts
++++ b/tests/worker-bindings/sdk-session.ts
+@@ -34,20 +34,21 @@ const fixture = {
+ 			scope,
+ 			env: 'sdk-proof',
+ 			store,
+-			initial: 'local-first',
++			initial: 'device',
++			localFirst: 'now',
++			client: () => import('jazz-tools/local-first'),
+ 			runtimeSources: { wasmUrl, brokerWorkerUrl: brokerUrl, wasmVersion: 'finance-sdk-proof-1' }
+ 		})
+ 		try {
+-			const db = session.getSnapshot().client?.db
++			const db = session.db
+ 			if (!db) throw new Error('Window SDK control unavailable')
+-			await db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
+ 			return db.isLocalFirst()
+ 		} finally {
+ 			await session.close()
+ 			await store.close()
+ 		}
+ 	},
+-	async open(scope: string, brokerUrl: string) {
++	async open(scope: string, brokerUrl: string, failLoader = false) {
+ 		if (active) throw new Error('SDK fixture already active')
+ 		const data = new MessageChannel(),
+ 			control = new MessageChannel()
+@@ -72,7 +73,14 @@ const fixture = {
+ 			release,
+ 			stats
+ 		}
+-		return command({ type: 'OPEN', scope, brokerUrl, data: data.port2, control: control.port2 })
++		return command({
++			type: 'OPEN',
++			scope,
++			brokerUrl,
++			data: data.port2,
++			control: control.port2,
++			failLoader
++		})
+ 	},
+ 	command,
+ 	stats: () => ({ ...active?.stats }),
+diff --git a/tests/worker-bindings/sdk-session.worker.ts b/tests/worker-bindings/sdk-session.worker.ts
+index f8a8f90..32577ac 100644
+--- a/tests/worker-bindings/sdk-session.worker.ts
++++ b/tests/worker-bindings/sdk-session.worker.ts
+@@ -3,9 +3,17 @@ import wasmUrl from '#jazz-wasm-binary?url'
+ import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
+ import { createFinanceAccountStore } from '../../src/lib/runtime/worker/account-store.js'
+ import { app } from '../../src/lib/schema.js'
++import { qualifyNativeSession } from './session-qualification.js'
+ 
+ export type SdkCommand =
+-	| { type: 'OPEN'; scope: string; brokerUrl: string; data: MessagePort; control: MessagePort }
++	| {
++			type: 'OPEN'
++			scope: string
++			brokerUrl: string
++			data: MessagePort
++			control: MessagePort
++			failLoader: boolean
++	  }
+ 	| { type: 'READ'; organizationId: string }
+ 	| {
+ 			type: 'SEED'
+@@ -16,10 +24,12 @@ export type SdkCommand =
+ 	  }
+ 	| { type: 'EDIT'; transactionId: string; amountMinor: number }
+ 	| { type: 'CLOSE' }
++	| { type: 'QUALIFY_SESSION' }
+ export type SdkReply =
+ 	| { kind: 'opened'; accountId: string; localFirst: boolean; windowPresent: boolean }
+ 	| { kind: 'rows'; rows: { id: string; amountMinor: number; memo: string | null }[] }
+ 	| { kind: 'saved' }
++	| { kind: 'session-qualified'; report: Awaited<ReturnType<typeof qualifyNativeSession>> }
+ 	| { kind: 'closed'; sdkClosed: boolean; hostClosed: boolean }
+ 	| { kind: 'failed'; message: string; stack?: string }
+ 
+@@ -28,8 +38,8 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
+ let broker: ReturnType<typeof brokerHostClient> | undefined
+ function current() {
+ 	const snapshot = session?.getSnapshot()
+-	if (!snapshot?.client || !snapshot.account) throw new Error('SDK fixture session unavailable')
+-	return { db: snapshot.client.db, accountId: snapshot.account.id }
++	if (!session || !snapshot?.user) throw new Error('SDK fixture session unavailable')
++	return { db: session.db, accountId: snapshot.user.accountId }
+ }
+ 
+ // Disposable SDK controls, not an application runtime. The test owns operation
+@@ -48,7 +58,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+ 			scope: command.scope,
+ 			env: 'sdk-proof',
+ 			store,
+-			initial: 'local-first',
++			initial: 'device',
++			localFirst: 'now',
++			client: () => {
++				if (command.failLoader) throw new Error('Expected SDK loader failure')
++				return import('jazz-tools/local-first')
++			},
+ 			runtimeSources: {
+ 				wasmUrl,
+ 				brokerWorkerUrl: command.brokerUrl,
+@@ -57,7 +72,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+ 			}
+ 		})
+ 		const { db, accountId } = current()
+-		await db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
+ 		return {
+ 			kind: 'opened',
+ 			accountId,
+@@ -66,9 +80,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+ 		}
+ 	}
+ 	if (command.type === 'CLOSE') {
+-		if (!session || !store || !broker) throw new Error('SDK fixture was not opened')
+-		await session.close()
+-		const sdkClosed = session.getSnapshot().status === 'closed'
++		if (!store || !broker) throw new Error('SDK fixture was not opened')
++		await session?.close()
++		const sdkClosed = session === undefined || session.getSnapshot().status === 'closed'
+ 		await store.close()
+ 		const receipt = await broker.close()
+ 		return {
+@@ -79,6 +93,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+ 				receipt.requestId === broker.host.identity.requestId
+ 		}
+ 	}
++	if (command.type === 'QUALIFY_SESSION') {
++		if (!session) throw new Error('SDK session unavailable')
++		return { kind: 'session-qualified', report: await qualifyNativeSession(session) }
++	}
+ 	const { db, accountId } = current()
+ 	if (command.type === 'READ') {
+ 		const rows = await db.all(app.transactions.where({ organizationId: command.organizationId }), {
+diff --git a/tests/worker-bindings/session-qualification.ts b/tests/worker-bindings/session-qualification.ts
+new file mode 100644
+index 0000000..a2a0b55
 --- /dev/null
 +++ b/tests/worker-bindings/session-qualification.ts
 @@ -0,0 +1,115 @@
@@ -349,3 +469,156 @@
 +		invalidRestorationRejected
 +	}
 +}
+diff --git a/tests/worker-bindings/svelte/Fixture.svelte b/tests/worker-bindings/svelte/Fixture.svelte
+new file mode 100644
+index 0000000..8f87edf
+--- /dev/null
++++ b/tests/worker-bindings/svelte/Fixture.svelte
+@@ -0,0 +1,15 @@
++<script lang="ts">
++	import { JazzProvider } from 'jazz-tools/svelte'
++	import type { JazzClient, JazzSession } from 'jazz-tools/client'
++	import RecoveryPhraseIntegration from '../../../src/lib/components/identity/RecoveryPhraseIntegration.svelte'
++
++	let { session }: { session: JazzSession<JazzClient> } = $props()
++</script>
++
++{#snippet loading()}<p role="status">Session loading</p>{/snippet}
++{#snippet signedOut()}<p role="status">Session signed out</p>{/snippet}
++{#snippet closed()}<p role="status">Session closed</p>{/snippet}
++
++<JazzProvider {session} {loading} {signedOut} {closed}>
++	<RecoveryPhraseIntegration />
++</JazzProvider>
+diff --git a/tests/worker-bindings/svelte/client.ts b/tests/worker-bindings/svelte/client.ts
+new file mode 100644
+index 0000000..5e1e877
+--- /dev/null
++++ b/tests/worker-bindings/svelte/client.ts
+@@ -0,0 +1,109 @@
++import 'delightful-ui/theme.css'
++import { mount, unmount, tick } from 'svelte'
++import {
++	createJazzClient,
++	type JazzSession,
++	type JazzClient,
++	type AccountStore
++} from 'jazz-tools/client'
++import { RecoveryPhrase } from 'jazz-tools/passphrase'
++import { createRecoveryMessages } from 'delightful-local-first/recovery/messages'
++import { createFinanceAccountStore } from '../../../src/lib/runtime/worker/account-store.js'
++import wasmUrl from '#jazz-wasm-binary?url'
++import Fixture from './Fixture.svelte'
++
++// Test controls retain the actual SDK session and native Svelte disposer. Keys
++// and phrases never leave this browser module; assertions receive booleans.
++let session: JazzSession<JazzClient> | undefined
++let store: ReturnType<typeof createFinanceAccountStore> | undefined
++let dispose: (() => Promise<void>) | undefined
++let held: ReturnType<typeof Promise.withResolvers<void>> | undefined
++let operation: Promise<void> | undefined
++let reads = 0
++function current() {
++	if (!session) throw new Error('Native session not open')
++	return session
++}
++const fixture = {
++	async open(scope: string, brokerUrl: string) {
++		if (session) throw new Error('Native session already open')
++		const serverUrl = location.origin + '/jazz'
++		const selected = createFinanceAccountStore({ serverUrl, scope, environment: 'svelte-proof' })
++		const accountStore: AccountStore = {
++			read: () => {
++				reads++
++				return selected.read()
++			},
++			update: async (transform) => {
++				await held?.promise
++				await selected.update(transform)
++			}
++		}
++		try {
++			session = await createJazzClient({
++				serverUrl,
++				scope,
++				env: 'svelte-proof',
++				store: accountStore,
++				initial: 'device',
++				localFirst: 'now',
++				client: () => import('jazz-tools/local-first'),
++				runtimeSources: { wasmUrl, brokerWorkerUrl: brokerUrl, wasmVersion: 'finance-sdk-proof-1' }
++			})
++			store = selected
++		} catch (error) {
++			await selected.close()
++			throw error
++		}
++	},
++	async show() {
++		if (dispose) throw new Error('Provider already mounted')
++		const target = document.getElementById('fixture')
++		if (!target) throw new Error('Missing fixture target')
++		const component = mount(Fixture, { target, props: { session: current() } })
++		dispose = () => unmount(component)
++		await tick()
++	},
++	async hide() {
++		await dispose?.()
++		dispose = undefined
++		await tick()
++	},
++	state() {
++		const snapshot = current().getSnapshot()
++		return { status: snapshot.status, accountId: snapshot.user?.accountId, reads }
++	},
++	labels: () => createRecoveryMessages('en'),
++	phraseMatchesNative() {
++		const field = document.getElementsByTagName('textarea').item(0)
++		return field !== null && field.value === RecoveryPhrase.fromSecret(current().exportDeviceKey())
++	},
++	beginSameAccountRestore() {
++		if (operation || held) throw new Error('Native operation already pending')
++		held = Promise.withResolvers<void>()
++		operation = current().restoreDeviceAccount(current().exportDeviceKey())
++		void operation.catch(() => {})
++	},
++	async finishRestore() {
++		held?.resolve()
++		held = undefined
++		await operation
++		operation = undefined
++	},
++	signOut: () => current().signOut(),
++	reopen: () => current().reopenDeviceAccount(),
++	closeSession: () => current().close(),
++	async dispose() {
++		await fixture.hide()
++		await current().close()
++		await store?.close()
++		session = undefined
++		store = undefined
++	}
++}
++declare global {
++	interface Window {
++		financeSvelteFixture: typeof fixture
++	}
++}
++window.financeSvelteFixture = fixture
+diff --git a/tests/worker-bindings/svelte/index.html b/tests/worker-bindings/svelte/index.html
+new file mode 100644
+index 0000000..a9a35c5
+--- /dev/null
++++ b/tests/worker-bindings/svelte/index.html
+@@ -0,0 +1,11 @@
++<!doctype html>
++<html lang="en">
++	<head>
++		<meta charset="utf-8" />
++		<title>Native Finance session integration</title>
++	</head>
++	<body>
++		<div id="fixture"></div>
++		<script type="module" src="./client.ts"></script>
++	</body>
++</html>

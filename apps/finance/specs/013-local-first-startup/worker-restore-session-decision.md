@@ -149,6 +149,16 @@ These are alpha.60 results. Repeat the relevant native/session cases on the
 coordinated alpha.65 candidate; U1/U2a do not qualify the complete Finance restore
 or its existing backend data on that release.
 
+Hosted qualification at `81f9faaa` subsequently passed types/unit/build, the PWA
+and application/auth/permissions/workspace/startup browser suites, but the
+restore job passed 106 of 107 cases. The artifact-failure test's default
+one-second counter poll expired before the native restore reached release.
+The test now awaits the real `artifactsBlocked` state, asserts one failed release
+attempt with resources still retained, then retries and checks actual release.
+The production behavior, resource assertions and overall test timeout are unchanged. Both
+affected native rollback/artifact cases pass locally; hosted confirmation of
+the corrected checkpoint is still required.
+
 ## Qualification required before adopting the replacement
 
 - Restore and conflict comparison through the actual Finance schema and public

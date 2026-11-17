@@ -36,6 +36,10 @@ On alpha.60, strict types, 1,928 unit tests and all 107 restore qualification
 tests pass, including actual native identity replacement with a pending write
 and journal resume without replay. The alpha.65 consumer port remains open;
 this does not complete U2 or qualify an SDK/backend data upgrade.
+U2b's isolated native Svelte/recovery slice now passes strict types, zero Svelte
+warnings and all 21 native cases, including the actual Finance recovery UI under
+`JazzProvider` in all three engines. [The qualification](worker-jazz-upgrade-plan.md#u2b-native-svelte-session-boundary)
+records its per-provider scope and remaining layout/Clipper host/startup work.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

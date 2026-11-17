@@ -1,3 +1,5 @@
+diff --git a/src/lib/backend/jazz/recovery-phrase.ts b/src/lib/backend/jazz/recovery-phrase.ts
+index 2819104..846ef3d 100644
 --- a/src/lib/backend/jazz/recovery-phrase.ts
 +++ b/src/lib/backend/jazz/recovery-phrase.ts
 @@ -1,4 +1,4 @@
@@ -6,9 +8,12 @@
  import { RecoveryPhrase } from 'jazz-tools/passphrase'
  import type {
  	AvailableRecoveryScope,
-@@ -7,71 +7,83 @@
+@@ -6,72 +6,86 @@ import type {
+ 	RecoveryScope
  } from '../../contracts/recovery-phrase.js'
  
++type RecoverySession = Pick<JazzSession<unknown>, 'getSnapshot' | 'exportDeviceKey'>
++
  export type JazzRecoveryAdapter = Readonly<{
 -	/** Call from the host's existing account observation before publishing the returned scope. */
 -	observeAccount: (account: AccountHandle | null | undefined) => RecoveryScope
@@ -22,11 +27,11 @@
  /** No client, provider, subscription, or credential store is created here. */
  export function createJazzRecoveryAdapter(
 -	getAccount: () => AccountHandle | null | undefined
-+	getSession: () => JazzSession<unknown> | null | undefined
++	getSession: () => RecoverySession | null | undefined
  ): JazzRecoveryAdapter {
  	const binding = Object.freeze({})
 -	let observedAccount: AccountHandle | null = null
-+	let observedSession: JazzSession<unknown> | null = null
++	let observedSession: RecoverySession | null = null
 +	let observedUser: JazzSessionSnapshot<unknown>['user'] = null
  	let generation = 0
  	let scope: RecoveryScope = { kind: 'unavailable' }
@@ -121,9 +126,11 @@
  			}
  		}
  	}
+diff --git a/src/lib/backend/jazz/restoration.ts b/src/lib/backend/jazz/restoration.ts
+index f15347c..a322805 100644
 --- a/src/lib/backend/jazz/restoration.ts
 +++ b/src/lib/backend/jazz/restoration.ts
-@@ -38,12 +38,12 @@
+@@ -38,12 +38,12 @@ export function createJazzRestorationAdapter(
  				const current = currentSession(scope.binding)
  				if (!current) throw new Error('Restoration binding unavailable')
  				// Adjacent invariant recheck followed by exactly one host-session SDK operation.
@@ -139,9 +146,11 @@
  					: { kind: 'unavailable' }
  			}
  		}
+diff --git a/src/lib/contracts/session.ts b/src/lib/contracts/session.ts
+index 86ce088..8b56980 100644
 --- a/src/lib/contracts/session.ts
 +++ b/src/lib/contracts/session.ts
-@@ -30,7 +30,13 @@
+@@ -30,7 +30,13 @@ export type SessionStartupReport<Session extends object> =
  export type SessionStartupOutput = Readonly<{ outcome: 'closed' }>
  
  /** SDK status only: never a workspace permission, remote freshness, or retry-settlement claim. */

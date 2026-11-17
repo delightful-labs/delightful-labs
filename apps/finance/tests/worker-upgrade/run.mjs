@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url'
 // project, with its own dependencies. No workspace pin or installed SDK is edited.
 const finance = fileURLToPath(new URL('../../', import.meta.url))
 const proof = dirname(fileURLToPath(import.meta.url))
-const require = createRequire(join(finance, 'package.json'))
 const directory = mkdtempSync(join(tmpdir(), 'finance-jazz-alpha65-'))
 console.log(`Upgrade proof artifacts: ${directory}`)
 const run = (command, args, cwd = directory) =>
@@ -34,19 +33,21 @@ const candidate = join(directory, 'candidate')
 mkdirSync(candidate)
 run('tar', ['-xzf', tarball, '-C', candidate])
 const sdk = join(candidate, 'package')
-run('git', ['apply', '--check', join(proof, 'worker-bridge.patch')], sdk)
+run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'worker-bridge.patch')], sdk)
 run('git', ['apply', join(proof, 'worker-bridge.patch')], sdk)
 run('tar', ['-czf', join(directory, 'candidate-sdk.tgz'), '-C', candidate, 'package'])
 
-// Pack the current built public library without running generation/prepack hooks.
-writeFileSync(
-	join(directory, 'pack-library.log'),
-	execFileSync(
-		'pnpm',
-		['pack', '--config.ignore-scripts=true', '--out', join(directory, 'local-first.tgz')],
-		{ cwd: join(finance, '../../packages/local-first') }
+// Pack the current built public libraries without generation/prepack hooks.
+for (const name of ['local-first', 'ui']) {
+	writeFileSync(
+		join(directory, `pack-${name}.log`),
+		execFileSync(
+			'pnpm',
+			['pack', '--config.ignore-scripts=true', '--out', join(directory, `${name}.tgz`)],
+			{ cwd: join(finance, '../../packages', name) }
+		)
 	)
-)
+}
 const app = join(directory, 'app')
 mkdirSync(app)
 for (const path of [
@@ -55,6 +56,9 @@ for (const path of [
 	'src/lib/domain',
 	'src/lib/validation',
 	'src/lib/runtime/worker/account-store.ts',
+	'src/lib/components/identity/RecoveryPhraseIntegration.svelte',
+	'src/lib/paraglide/runtime.js',
+	'src/lib/paraglide/runtime.d.ts',
 	'tests/worker-bindings',
 	'tooling/jazz-wasm.ts',
 	'vitest.worker-bindings.config.ts'
@@ -63,28 +67,42 @@ for (const path of [
 	mkdirSync(dirname(target), { recursive: true })
 	cpSync(join(finance, path), target, { recursive: true })
 }
-run('git', ['apply', '--check', join(proof, 'fixture.patch')], app)
+run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'fixture.patch')], app)
 run('git', ['apply', join(proof, 'fixture.patch')], app)
-const versions = Object.fromEntries(
-	[
-		'vite',
-		'vitest',
-		'@playwright/test',
-		'typescript',
-		'@types/node',
-		'svelte',
-		'xstate',
-		'zod'
-	].map((name) => [name, require(`${name}/package.json`).version])
+run(
+	'git',
+	['apply', '--check', '--whitespace=error-all', join(proof, 'consumer-session.patch')],
+	app
 )
-// Match Finance's approved API pin rather than resolving a newer SDK peer.
-const telemetry = JSON.parse(
-	execFileSync('pnpm', ['list', '@opentelemetry/api', '--depth', '0', '--json'], {
+run('git', ['apply', join(proof, 'consumer-session.patch')], app)
+const packages = [
+	'vite',
+	'vitest',
+	'@playwright/test',
+	'typescript',
+	'@types/node',
+	'svelte',
+	'svelte-check',
+	'@sveltejs/vite-plugin-svelte',
+	'xstate',
+	'zod',
+	'@opentelemetry/api'
+]
+// Read exact installed versions through pnpm; some packages hide package.json.
+const workspacePackages = JSON.parse(
+	execFileSync('pnpm', ['list', ...packages, '--depth', '0', '--json'], {
 		cwd: finance,
 		encoding: 'utf8'
 	})
 )
-versions['@opentelemetry/api'] = telemetry[0].dependencies['@opentelemetry/api'].version
+const versions = Object.fromEntries(
+	packages.map((name) => {
+		const dependency =
+			workspacePackages[0].dependencies?.[name] ?? workspacePackages[0].devDependencies?.[name]
+		if (!dependency) throw new Error(`Installed proof dependency missing: ${name}`)
+		return [name, dependency.version]
+	})
+)
 json(join(app, 'package.json'), {
 	name: 'finance-jazz-upgrade-proof',
 	private: true,
@@ -94,6 +112,7 @@ json(join(app, 'package.json'), {
 	dependencies: {
 		...versions,
 		'jazz-tools': 'file:../candidate-sdk.tgz',
+		'delightful-ui': 'file:../ui.tgz',
 		'delightful-local-first': 'file:../local-first.tgz'
 	}
 })
@@ -110,10 +129,12 @@ json(join(app, 'tsconfig.json'), {
 		noUncheckedIndexedAccess: true,
 		skipLibCheck: true,
 		noEmit: true,
-		types: ['node', 'vite/client']
+		types: ['node', 'vite/client', 'svelte']
 	},
 	include: [
 		'tests/worker-bindings/**/*.ts',
+		'tests/worker-bindings/**/*.svelte',
+		'src/lib/components/identity/RecoveryPhraseIntegration.svelte',
 		'tooling/jazz-wasm.ts',
 		'vitest.worker-bindings.config.ts'
 	]
@@ -134,7 +155,11 @@ for (const path of [
 	mkdirSync(dirname(join(sources, path)), { recursive: true })
 	cpSync(join(library, path), join(sources, path))
 }
-run('git', ['apply', '--check', join(proof, 'session-adapters.patch')], sources)
+run(
+	'git',
+	['apply', '--check', '--whitespace=error-all', join(proof, 'session-adapters.patch')],
+	sources
+)
 run('git', ['apply', join(proof, 'session-adapters.patch')], sources)
 const adapted = join(directory, 'adapted-local-first')
 mkdirSync(adapted)
@@ -179,5 +204,6 @@ json(join(directory, 'versions.json'), {
 	wasm: wasm('jazz-wasm/package.json').version
 })
 run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.json'], app)
+run('pnpm', ['exec', 'svelte-check', '--tsconfig', './tsconfig.json', '--fail-on-warnings'], app)
 run('pnpm', ['exec', 'vitest', 'run', '--config', 'vitest.worker-bindings.config.ts'], app)
 console.log(`Upgrade proof passed; artifacts retained at ${directory}`)
