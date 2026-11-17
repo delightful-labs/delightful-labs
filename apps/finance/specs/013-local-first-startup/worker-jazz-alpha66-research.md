@@ -644,6 +644,12 @@ worker/auth/caller qualification before replacing the coordinated target at
 cutover. This result does not make the 200 schema/restore or 30 worker/session
 cases alpha.67-qualified. Live workload credentials and the custom original core
 name remain separate gaps. No active source, pin, deployment or patch changes.
+The user has since selected the existing UI backup/restore flow for that custom
+qualification environment. Follow the
+[owner export and restore handoff](worker-jazz-upgrade-plan.md#accepted-custom-core-path-ui-backup-and-restore)
+instead of investigating another naming workaround. Approach selection is
+complete; owner backups, destination preparation and verified restore are still
+pending. This does not authorize resetting the normal Finance destinations.
 
 ## Execution order
 
