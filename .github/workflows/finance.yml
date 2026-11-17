@@ -48,7 +48,7 @@ jobs:
         run: >-
           pnpm exec playwright test transaction-edit.e2e.ts
           --config=playwright.config.ts --project=application
-          --grep='^imported (expense|income) supports category, tag and note edits offline without changing provenance$'
+          --grep='imported (expense|income) supports category, tag and note edits offline without changing provenance'
           --repeat-each=10 --workers=2 --retries=0 --max-failures=1
           --trace=on --forbid-only
       - name: Retain all probe diagnostics
