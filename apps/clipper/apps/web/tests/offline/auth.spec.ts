@@ -2,6 +2,7 @@ import { openArticleActions } from '../article-actions.js'
 import { expectLibrarySynced, openAccountSettings, expectSignedInAccount } from '../account-ui.js'
 import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
+import { handlePreviewRequest } from '../../src/lib/server/publication/request.js'
 import { chromium, expect, test } from '@playwright/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -46,6 +47,8 @@ for (const mode of ['linked', 'existing', 'expired'])
 			})
 			auth = createAuthServer({ db: () => authority.backend.db, schema: app }, { origin, secret })
 			ui.useAuth(async (request) => {
+				if (new URL(request.url).pathname === '/api/publication/preview')
+					return handlePreviewRequest(auth, authority.backend, request, origin)
 				const response = await handleConfiguredAuth(auth, request, { origin, secret })
 				if (new URL(request.url).pathname === '/api/auth/sign-out')
 					signOutResponses.push(response.status)
@@ -98,6 +101,17 @@ for (const mode of ['linked', 'existing', 'expired'])
 					oauth: { providerId: 'atproto', profile: { did: 'did:plc:offlinefixture' } }
 				}
 			)
+			if (mode === 'linked') {
+				await authority.backend.db
+					.update(app.better_auth_user, user.id, { atprotoDid: 'did:plc:offlinefixture' })
+					.wait({ tier: 'global' })
+				await authContext.internalAdapter.linkAccount({
+					userId: user.id,
+					providerId: 'atproto',
+					accountId: 'did:plc:offlinefixture',
+					scope: 'atproto'
+				})
+			}
 			const issueSession = async () => {
 				const session = await (await auth!.$context).internalAdapter.createSession(user.id)
 				await context.addCookies([
@@ -214,6 +228,92 @@ for (const mode of ['linked', 'existing', 'expired'])
 			await page.getByRole('link', { name: 'Native authorized article', exact: true }).click()
 			await expect(page.getByRole('article')).toContainText('Readable native backend capture.')
 			await readingControls(page)
+			if (mode === 'linked') {
+				await page.getByRole('button', { name: 'Add note', exact: true }).click()
+				const note = page
+					.getByRole('textbox', { name: 'note', exact: true })
+					.and(page.locator(':not([readonly])'))
+				await note.fill('Preview my café 🦊 note.')
+				await expect(page.getByText('note synced', { exact: true })).toBeVisible()
+				const entered = Promise.withResolvers<void>(),
+					gate = Promise.withResolvers<void>()
+				await page.route(
+					'**/api/publication/preview',
+					async (route) => {
+						entered.resolve()
+						await gate.promise
+						await route.continue()
+					},
+					{ times: 1 }
+				)
+				const preview = page.getByRole('dialog', { name: 'Preview', exact: true })
+				const trigger = page.getByRole('button', { name: 'Preview sharing', exact: true })
+				const response = page.waitForResponse((response) =>
+					response.url().endsWith('/api/publication/preview')
+				)
+				try {
+					await trigger.click()
+					await entered.promise
+					await expect(preview.getByText('Preparing…', { exact: true })).toBeVisible()
+					await expect(
+						page.getByRole('region', { name: 'highlights', exact: true })
+					).toHaveAttribute('aria-busy', 'false')
+				} finally {
+					gate.resolve()
+				}
+				const result = await response
+				expect(result.status()).toBe(200)
+				expect(result.headers()['cache-control']).toBe('private, no-store')
+				await expect(preview.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
+					'Preview my café 🦊 note.'
+				)
+				await expect(preview.getByText('did:plc:offlinefixture', { exact: true })).toBeVisible()
+				await expect(
+					preview.getByRole('heading', { name: 'Sharing preview', exact: true })
+				).toHaveCount(0)
+				await expect(preview.getByText('This is a preview.', { exact: false })).toHaveCount(0)
+				await page.keyboard.press('Escape')
+				await expect(preview).not.toBeVisible()
+				await expect(trigger).toBeFocused()
+				await trigger.click()
+				await expect(preview.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
+					'Preview my café 🦊 note.'
+				)
+				if (!accountId || !id) throw new Error('Missing signed-in reader identity')
+				const savedNote = await authority.backend.db.one(
+					app.notes.where({ libraryId: accountId, documentId: id, highlightId: null })
+				)
+				if (!savedNote) throw new Error('Missing preview note')
+				await authority.backend.db
+					.update(app.notes, savedNote.id, { text: 'Changed on another device.' })
+					.wait({ tier: 'global' })
+				await expect(preview).not.toBeVisible()
+				await expect(note).toHaveValue('Changed on another device.')
+				await trigger.click()
+				await expect(preview.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
+					'Changed on another device.'
+				)
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await expect(preview).not.toBeVisible()
+				await expect(trigger).toBeFocused()
+				// Fail only the preview request: taking the whole account offline can
+				// replace its attachment on reconnect, which intentionally dismisses it.
+				await page.route('**/api/publication/preview', (route) => route.abort(), { times: 1 })
+				await trigger.click()
+				await expect(
+					preview.getByText(
+						'Sharing preview is unavailable. Check your AT Protocol sign-in and saved note, then try again.',
+						{ exact: true }
+					)
+				).toBeVisible()
+				await preview.getByRole('button', { name: 'Retry', exact: true }).click()
+				await expect(preview.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
+					'Changed on another device.'
+				)
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await expect(preview).not.toBeVisible()
+				checkpoint('authenticated sharing preview verified')
+			}
 			await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
 			// A fresh authenticated replica must support opening the saved reader URL

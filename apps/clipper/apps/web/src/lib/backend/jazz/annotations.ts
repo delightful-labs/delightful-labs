@@ -178,6 +178,7 @@ export function createAnnotationRecords(
 		transactionLifecycle(db, isCurrent)
 	)
 	return {
+		libraryId,
 		isCurrent,
 		stage,
 		recoveryTargets: async (documentId: string) => {

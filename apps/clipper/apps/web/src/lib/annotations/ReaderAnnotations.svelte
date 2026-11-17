@@ -7,13 +7,16 @@
 	import { measureReaderText, measureSelection, renderHighlights } from './surface.js'
 	import type { AnnotationCommand } from './schema.js'
 	import NoteEditor from './NoteEditor.svelte'
+	import SharingPreview from './SharingPreview.svelte'
 	let selected = $state(false)
+	const previewDialogId = $props.id()
 	let {
 		client,
 		documentId,
 		root
 	}: { client: LibraryClient; documentId: string; root: HTMLElement | undefined } = $props()
 	const annotations = $derived($client.view.annotations)
+	const preview = $derived(annotations.preview)
 	function send(command: AnnotationCommand) {
 		client?.send({ type: 'ANNOTATION', command })
 	}
@@ -87,7 +90,25 @@
 	{#if annotations.message}<StatusMessage {...annotations.message} />{/if}
 	{#each annotations.notes as note (note.id)}
 		<NoteEditor {note} {documentId} enabled={annotations.enabled} {send} />
+		<Button
+			disabled={!annotations.enabled || annotations.pending || !!note.drafts.length}
+			aria-haspopup="dialog"
+			aria-controls={previewDialogId}
+			onclick={() => send({ type: 'PREVIEW_NOTE', documentId, id: note.id })}
+			>{t('publication.preview_action')}</Button
+		>
 	{/each}
+	{#key client}
+		{#key preview.requestId}
+			<SharingPreview
+				{client}
+				{documentId}
+				id={previewDialogId}
+				view={preview}
+				enabled={annotations.enabled && !annotations.pending}
+			/>
+		{/key}
+	{/key}
 	{#if annotations.highlights.length}<Heading level="h2">{noun('highlight', 2)}</Heading>{/if}
 	{#each annotations.highlights as highlight (highlight.id)}
 		<div class="annotation" role="group" aria-label={noun('highlight')}>
