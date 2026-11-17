@@ -33,6 +33,18 @@ link refusal, empty/oversized content, malformed admission, read errors, scope e
 cancellation, timeouts, host stop and copied selections across held native reads.
 No browser publication flow, real PDS write or permission grant is qualified here.
 
+Review follow-up: both publication suites now use a shared fixture chart instead
+of procedural `owner` setup. Its states allocate identities, seed the library,
+create the document, optionally create a highlight, create the note and complete.
+Each selected native write settles before the next state is admitted. Every stage
+has an explicit failure transition that propagates the fixture error to the test
+host. The host subscribes before starting and releases the finite root on
+settlement; `PolicyTestApp` retains native clients/receipts and suite teardown.
+Already accepted fixture rows are not described as rolled back.
+Both affected publication suites pass (19 tests), including injected failures at
+each write stage that preserve earlier accepted rows and admit no later writes.
+Web/service-worker types and full Clipper lint/formatting pass after the refactor.
+
 ## Private publication links — 2026-11-16
 
 After reviewing the concrete Zod shape, the user approved the private link between

@@ -1,14 +1,14 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { createActor, SimulatedClock, toPromise } from 'xstate'
+import { createActor, createAsyncLogic, SimulatedClock, toPromise } from 'xstate'
 import type { Db } from 'jazz-tools'
 import { createPolicyTestApp } from 'jazz-tools/testing'
-import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
+import type { PolicyTestApp } from 'jazz-tools/testing'
 import { app } from '../../backend/jazz/schema.js'
 import permissions from '../../backend/jazz/permissions.js'
 import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
-import { newDocumentValues } from '../../backend/jazz/document-values.js'
 import { createDocumentNotePreview } from './preview.js'
 import type { PublicationSource } from '../../annotations/publication-link.js'
+import { createPublicationOwner, publicationOwnerFixture } from './owner.test-support.js'
 
 let fixture: PolicyTestApp
 const publishingDid = 'did:plc:ewvi7nxzyoun6zhxrhs64oiz'
@@ -18,52 +18,69 @@ beforeAll(async () => {
 })
 afterAll(async () => fixture?.shutdown())
 
-async function owner(name: string) {
-	const session = { user_id: name, authMode: 'local-first', claims: {} } satisfies PolicyTestSession
-	const libraryId = fixture.accountFor(session)
-	const backend = await fixture.seed<Db>((server) => {
-		const write = server.upsert(app.libraries, libraryId, {
-			ownerId: libraryId,
-			bootstrapVersion: '1'
-		})
-		return {
-			value: server,
-			wait: async (options) => {
-				await write.wait(options)
-				return server
-			}
-		}
+function owner(name: string) {
+	return createPublicationOwner({
+		fixture,
+		name,
+		publishingDid,
+		noteText: 'My private note 🦊',
+		withHighlight: false
 	})
-	const documentId = crypto.randomUUID(),
-		noteId = crypto.randomUUID()
-	await backend
-		.insert(
-			app.libraryDocuments,
-			newDocumentValues(documentId, libraryId, 'https://example.org/article'),
-			{ id: documentId }
-		)
-		.wait({ tier: 'global' })
-	await backend
-		.insert(
-			app.notes,
-			{
-				libraryId,
-				documentId,
-				highlightId: null,
-				source: 'https://example.org/article',
-				text: 'My private note 🦊'
-			},
-			{ id: noteId }
-		)
-		.wait({ tier: 'global' })
-	return {
-		backend,
-		libraryId,
-		documentId,
-		noteId,
-		scope: { libraryId, accountId: libraryId, publishingDid, isCurrent: () => true }
-	}
 }
+
+it('propagates fixture setup failures without starting later writes', async () => {
+	const error = new Error('Fixture write rejected')
+	const failure = createAsyncLogic({ run: () => Promise.reject(error) })
+	const cases = [
+		{
+			logic: publicationOwnerFixture.provide({ actors: { seedLibrary: failure } }),
+			documentExists: false,
+			highlightExists: false
+		},
+		{
+			logic: publicationOwnerFixture.provide({ actors: { createDocument: failure } }),
+			documentExists: false,
+			highlightExists: false
+		},
+		{
+			logic: publicationOwnerFixture.provide({ actors: { createHighlight: failure } }),
+			documentExists: true,
+			highlightExists: false
+		},
+		{
+			logic: publicationOwnerFixture.provide({ actors: { createNote: failure } }),
+			documentExists: true,
+			highlightExists: true
+		}
+	]
+	for (const [index, testCase] of cases.entries()) {
+		const actor = createActor(testCase.logic, {
+			input: {
+				fixture,
+				name: `fixture-failure-${index}`,
+				publishingDid,
+				noteText: 'Never inserted',
+				withHighlight: true
+			}
+		})
+		const result = toPromise(actor)
+		actor.start()
+		try {
+			await expect(result).rejects.toBe(error)
+			const prepared = actor.getSnapshot().context.prepared
+			if (!prepared) throw new Error('Expected allocated fixture identities')
+			expect(await prepared.db.all(app.notes.where({ id: prepared.noteId }))).toEqual([])
+			const document = await prepared.db.one(
+				app.libraryDocuments.where({ id: prepared.documentId })
+			)
+			expect(document !== null).toBe(testCase.documentExists)
+			const highlight = await prepared.db.one(app.highlights.where({ id: prepared.highlightId }))
+			expect(highlight !== null).toBe(testCase.highlightExists)
+		} finally {
+			actor.stop()
+		}
+	}
+})
 
 function preview(
 	a: Awaited<ReturnType<typeof owner>>,
