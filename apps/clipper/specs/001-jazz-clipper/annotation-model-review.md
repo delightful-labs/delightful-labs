@@ -322,6 +322,37 @@ OAuth SDK enforces the declared ceiling. Actual grants belong to the provider's
 OAuth session, not configuration or linked-account metadata. No additional Jazz
 model, public Lexicon or token store is introduced by this authorization choice.
 
+### Approved first-publication PDS request — 2026-11-17
+
+The user approved this request body for `com.atproto.repo.putRecord`:
+
+```ts
+const tidSchema = z
+  .string()
+  .regex(/^[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{12}$/)
+
+const firstPublicationWriteSchema = z.strictObject({
+  repo: publicationBaseSchema.shape.publishingDid,
+  collection: z.literal('at.margin.note'),
+  rkey: tidSchema,
+  record: marginRecordSchema,
+  swapRecord: z.null()
+})
+```
+
+Implementation additionally applies `.length(13)` to enforce the approved exact
+TID length even when JavaScript's `$` anchor could accept a final line break.
+The repository, key and record are derived together from the retained `issued`
+Publication. Explicit null is mandatory; the body cannot omit the absence guard
+or replace it with a previous-record CID. No caller override fields are admitted.
+The existing generic record-URI reader remains broad enough for retained/imported
+addresses, while this first-write contract requires Margin's TID key syntax.
+
+This is request preparation only. It neither establishes native acceptance nor
+authorizes dispatch, confirms a PDS outcome or permits replay after uncertainty.
+The future publisher must supply those observations. No Jazz model, TID generator,
+dependency, product wording or live PDS write is added by this contract.
+
 ### Earlier model review findings
 
 The authenticated request endpoint now reuses the approved `publicationBaseSchema`

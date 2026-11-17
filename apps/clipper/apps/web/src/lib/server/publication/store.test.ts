@@ -11,6 +11,7 @@ import permissions from '../../backend/jazz/permissions.js'
 import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
 import { newDocumentValues } from '../../backend/jazz/document-values.js'
 import { createPublicationStore } from './store.js'
+import { toFirstPublicationWrite } from './first-write.js'
 import {
 	publicationFromRow,
 	publicationSchema,
@@ -361,7 +362,8 @@ it('retains requested/issued state, exact payload, native identity and history t
 		expect(await createPublicationStore(backend.db, scope).list({ noteId })).toEqual([
 			requested(source)
 		])
-		const publication = issued(source, 'retained', 'Retained')
+		const key = '3jzfcijpj2z2a'
+		const publication = issued(source, key, 'Retained')
 		expect((await stage(createPublicationStore(backend.db, scope), publication)).outcome).toBe(
 			'succeeded'
 		)
@@ -374,6 +376,19 @@ it('retains requested/issued state, exact payload, native identity and history t
 		)
 		expect(after?.id).toBe(before.id)
 		expect(after?.$createdAt).toEqual(before.$createdAt)
+		const frozenWrite = toFirstPublicationWrite(publicationFromRow(after))
+		expect(frozenWrite).toEqual({
+			repo: publishingDid,
+			collection: 'at.margin.note',
+			rkey: key,
+			record: 'record' in publication ? publication.record : undefined,
+			swapRecord: null
+		})
+		await backend.db
+			.update(app.notes, noteId, { text: 'Accepted after issuance' })
+			.wait({ tier: 'global' })
+		const retained = await backend.db.one(app.publications.where({ id: before.id }))
+		expect(toFirstPublicationWrite(publicationFromRow(retained))).toEqual(frozenWrite)
 		expect(
 			(await backend.db.all(app.$history.publications.where({ id: before.id }))).map(
 				publicationFromRow

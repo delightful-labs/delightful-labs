@@ -1,5 +1,37 @@
 # Article notes — implementation started
 
+## Approved first-write request preparation — 2026-11-17
+
+Following the user's approval of the concrete Zod body, backend
+`publication/first-write.ts` now owns `firstPublicationWriteSchema` and its inferred
+DTO for `com.atproto.repo.putRecord`. `toFirstPublicationWrite` validates an issued
+Publication, derives its repository and TID key from the same retained destination,
+copies the exact approved Margin payload and always includes `swapRecord: null`.
+Private/requested/published values, mismatched publishers, other collections,
+non-TID keys, guard omission and extra/private wire fields are refused. Errors
+contain no rejected input. TID length is checked explicitly as well as by the
+approved alphabet/leading-bit regex, rejecting final line breaks.
+
+This pure projector has no authority, clock, key allocation, persistence, grant,
+network, retry or confirmation effects. Its caller must read the accepted issued
+value, verify current scope/grant/source eligibility and reconcile the retained
+PDS address before dispatch or replay. The generic retained record-URI contract
+is unchanged; existing/imported non-TID addresses still parse but cannot become
+new first-write requests through this projector. Highlight wire payloads reuse
+the same approved record shape; source-page evidence/issuance remains gated by
+the existing store.
+
+Focused qualification passes 22 first-write/publication contract and native store
+tests. The SQLite restart regression prepares the request from a natively accepted
+issued row after reopening the backend, then verifies that a later accepted Note
+edit leaves that request unchanged. Contract tests cover exact timestamp/text,
+detached payload values, TID bounds, destination/lifecycle refusal and mandatory
+absence guard. This is preparation evidence, not PDS conditional-write or lost-
+response qualification. No new UI, stored fields, dependency or live write is added.
+Strict root/web/service-worker/extension type checks, Clipper lint/formatting and
+whitespace checks pass. The changed production code is a pure preparer; no new
+build, browser, hosted provider or PDS execution evidence is claimed for this slice.
+
 ## Current publication permission observation — 2026-11-17
 
 `POST /api/publication/permission` reuses the approved `publicationBaseSchema`
