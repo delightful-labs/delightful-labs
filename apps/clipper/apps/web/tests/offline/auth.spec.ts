@@ -3,6 +3,7 @@ import { expectLibrarySynced, openAccountSettings, expectSignedInAccount } from 
 import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
 import { handlePreviewRequest } from '../../src/lib/server/publication/request.js'
+import { handlePublicationSubmit } from '../../src/lib/server/publication/submit.js'
 import { chromium, expect, test } from '@playwright/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -49,6 +50,8 @@ for (const mode of ['linked', 'existing', 'expired'])
 			ui.useAuth(async (request) => {
 				if (new URL(request.url).pathname === '/api/publication/preview')
 					return handlePreviewRequest(auth, authority.backend, request, origin)
+				if (new URL(request.url).pathname === '/api/publication/request')
+					return handlePublicationSubmit(auth, authority.backend, request, origin)
 				const response = await handleConfiguredAuth(auth, request, { origin, secret })
 				if (new URL(request.url).pathname === '/api/auth/sign-out')
 					signOutResponses.push(response.status)
@@ -313,6 +316,34 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await preview.getByRole('button', { name: 'Close', exact: true }).click()
 				await expect(preview).not.toBeVisible()
 				checkpoint('authenticated sharing preview verified')
+				// Exercise the new server boundary directly. A Publish control is not
+				// exposed until its wording and permission-upgrade interaction are reviewed.
+				const selection = {
+					libraryId: accountId,
+					source: { noteId: savedNote.id },
+					publishingDid: 'did:plc:offlinefixture'
+				}
+				for (let attempt = 0; attempt < 2; attempt++) {
+					const accepted = await page.evaluate(async (selection) => {
+						const response = await fetch('/api/publication/request', {
+							method: 'POST',
+							credentials: 'same-origin',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify(selection)
+						})
+						const value: unknown = await response.json()
+						return { status: response.status, cache: response.headers.get('cache-control'), value }
+					}, selection)
+					expect(accepted).toEqual({
+						status: 202,
+						cache: 'private, no-store',
+						value: { ...selection, state: 'requested' }
+					})
+				}
+				expect(
+					await authority.backend.db.all(app.publications.where({ libraryId: accountId }))
+				).toHaveLength(1)
+				checkpoint('authenticated publication request verified')
 			}
 			await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
@@ -424,6 +455,11 @@ for (const mode of ['linked', 'existing', 'expired'])
 				.toBeGreaterThan(0)
 			checkpoint('reconnected and reconciled')
 			if (mode === 'linked') {
+				const publications = await authority.backend.db.all(
+					app.publications.where({ libraryId: accountId! })
+				)
+				expect(publications).toHaveLength(1)
+				expect(publications[0]?.lifecycle).toEqual({ state: 'requested' })
 				checkpoint('signing out')
 				await test.step('sign out through the real auth handler', async () => {
 					const previous = signOutResponses.length

@@ -1,5 +1,58 @@
 # Article notes — implementation started
 
+## Authenticated publication request — 2026-11-17
+
+`POST /api/publication/request` accepts the existing strict
+`publicationBaseSchema` (`libraryId`, `source`, `publishingDid`) and acknowledges
+only an authority-accepted `requested` Publication with HTTP 202. No new stored
+shape, public record, copy, dependency or publication URI is introduced. This
+online admission endpoint supports document Notes only; it does not yet implement
+an offline Publish interaction, permission upgrade, PDS write or Publish control.
+
+The request chart checks same-origin cookie-only JSON input, fresh Better Auth
+session/profile and native canonical Jazz account/provider linking, selected DID,
+and the accepted active Note through the existing preview projector. It rechecks
+the same session/destination/account before writing. Session, profile DID and
+provider-account reads also participate in the native serializable publication
+transaction, so observed revocation/link changes invalidate acceptance. Current
+session expiry is assessed by that read; no PDS grant is inferred from it.
+
+Preview and consent share a read-only XState access child and bounded stream
+reader; preview's response/cancellation behavior remains unchanged. Consent uses
+DLF's existing owned-operation child around the existing publication transaction
+chart, keeping dynamic scoped construction, cancellation, drain and uncertain
+native custody with qualified library owners. Preparation is bounded at 30 seconds;
+save and drain each have a 10-second deadline. A final deadline returns 503 with
+native unresolved custody retained through the existing DLF mechanism. It is not
+proof that nothing was stored. Retained write capabilities capture only the native
+abort signal and scoped identity facts, not request headers/cookies.
+
+An already-requested source/publisher is acknowledged without another write or
+history version. Concurrent contenders may receive 409 for a domain refusal or
+503 for native commit rejection; there is no automatic write replay. A subsequent
+explicit retry reads the accepted row first. Issued/published rows are never
+rewritten to requested. Responses are private/no-store and vary on Cookie, with
+no refresh cookie or private error payload.
+
+Native qualification covers strict input/proof refusal, real signed cookies,
+source ownership and eligibility, destination/session/link changes, revocation
+after the transaction read, concurrent requests, idempotent observation, stalled
+body release, cancellation/drain and suppressed late completion after deadline.
+Backend execution remains single-authority qualified; independent writers,
+current PDS grants/issuance and user-facing publication remain separate work.
+
+Verification passes 956 unit/native tests and 31 component tests, plus 32 final
+targeted request/preview/store regressions after tightening retained capabilities.
+Strict root/web/service-worker/extension types, Clipper lint/formatting, whitespace
+checks and both production offline fixture builds pass. The built browser checks
+use real cookies and native account mapping to submit twice, retain one requested
+row, complete two offline process restarts and reconnect with that row intact
+(8.6 seconds, 9.3 including runner startup). This is direct API qualification;
+no Publish button, offline request queue or PDS effect is claimed. Native owned-
+operation tests can report a late automatic `xstate.done.actor` after the already
+correlated terminal report settled its controller; no acknowledgement remains
+outstanding and such a delivery cannot restart the completed request.
+
 ## Per-authorization OAuth scopes — 2026-11-17
 
 The user approved the concrete `authorizationScopeSchema` enum: `atproto` or

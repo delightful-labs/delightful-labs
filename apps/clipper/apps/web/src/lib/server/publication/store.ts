@@ -31,6 +31,7 @@ type Facts = {
 	parentAvailable: boolean
 	occupied: boolean
 	contentMatches: boolean
+	authorized: boolean
 }
 type Context = Input & { facts: Facts | undefined }
 
@@ -69,7 +70,13 @@ function matchesAcceptedNote(publication: Publication, note: unknown) {
  * write before supplying published. Never dispatch until this chart succeeds. */
 export function createPublicationStore(
 	db: Pick<Db, 'one' | 'beginSerializableTransaction'>,
-	binding: { libraryId: string; accountId: string; publishingDid: string; isCurrent: () => boolean }
+	binding: {
+		libraryId: string
+		accountId: string
+		publishingDid: string
+		isCurrent: () => boolean
+	},
+	authorize: (tx: Transaction<'serializable'>) => Promise<boolean> = () => Promise.resolve(true)
 ) {
 	const scope = { ...binding }
 	const actors = {
@@ -78,8 +85,8 @@ export function createPublicationStore(
 				const publication = publicationSchema.parse(input.attempt.draft)
 				const values = publicationValues(publication)
 				const tx = input.resource.tx
-				const [library, highlight, note, sourceRows, publisherRows, existingId] = await Promise.all(
-					[
+				const [library, highlight, note, sourceRows, publisherRows, existingId, authorized] =
+					await Promise.all([
 						tx.one(app.libraries.where({ id: scope.libraryId, ownerId: scope.accountId }), {
 							tier: ReadTier.Remote
 						}),
@@ -113,14 +120,15 @@ export function createPublicationStore(
 						}),
 						tx.one(app.publications.where({ id: input.attempt.operationId }), {
 							tier: ReadTier.Remote
-						})
-					]
-				)
+						}),
+						authorize(tx)
+					])
 				const document = values.highlightId ? highlight?.document : note?.document
 				const row = sourceRows[0]
 				const current = row ? { id: row.id, value: publicationFromRow(row) } : undefined
 				return {
 					publication,
+					authorized,
 					current,
 					owned:
 						!!library &&
@@ -171,6 +179,7 @@ export function createPublicationStore(
 		guards: {
 			eligible: (_, { facts }: { facts: Facts }) =>
 				scope.isCurrent() &&
+				facts.authorized &&
 				facts.owned &&
 				!facts.occupied &&
 				permitsTransition(facts) &&

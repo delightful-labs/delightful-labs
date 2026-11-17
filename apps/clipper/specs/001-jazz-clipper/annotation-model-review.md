@@ -324,6 +324,12 @@ model, public Lexicon or token store is introduced by this authorization choice.
 
 ### Earlier model review findings
 
+The authenticated request endpoint now reuses the approved `publicationBaseSchema`
+directly as its input and returns the approved `requested` Publication after Jazz
+acceptance. It adds no data model or stored fields. Its transient authentication
+facts are extracted from the existing preview owner for reuse. UI copy, offline
+Publish interaction, actual permission upgrade and PDS dispatch remain unfinished.
+
 1. Define and qualify text normalization and DOM/code-point/UTF-16 conversion.
    In particular, exporting source-page positions later requires either the
    original normalized text or conversion evidence retained while it is available;
