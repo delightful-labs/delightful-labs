@@ -644,12 +644,14 @@ worker/auth/caller qualification before replacing the coordinated target at
 cutover. This result does not make the 200 schema/restore or 30 worker/session
 cases alpha.67-qualified. Live workload credentials and the custom original core
 name remain separate gaps. No active source, pin, deployment or patch changes.
-The user has since selected the existing UI backup/restore flow for that custom
-qualification environment. Follow the
-[owner export and restore handoff](worker-jazz-upgrade-plan.md#accepted-custom-core-path-ui-backup-and-restore)
-instead of investigating another naming workaround. Approach selection is
-complete; owner backups, destination preparation and verified restore are still
-pending. This does not authorize resetting the normal Finance destinations.
+The user reported that the historical qualification preview did not show their
+transactions and confirmed `https://finance.delightfullabs.com` as the actual
+source. Follow the [corrected production backup handoff](worker-jazz-upgrade-plan.md#production-backup-handoff-and-custom-core-scope).
+Production retains its compatible existing core/Drive in place; its UI backup
+is additional preservation, not a requirement to move into a fresh core. Leave
+the separate qualification environment unchanged and excluded from rollout.
+Its ownership/retention needs are unconfirmed; do not ask the user to export
+unfamiliar data, reset anything or build a naming workaround for it.
 
 ## Execution order
 

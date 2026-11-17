@@ -591,8 +591,8 @@ disposable scratch copies from the same immutable snapshot view, preserving
 app ID, rows, schema and attachment bytes. Report comparison results without row
 contents. That result still does not establish live workload/OIDC admission;
 qualify the intended deployment credential boundary separately. Keep the custom
-qualification destination excluded from rollout until the approved UI backup/
-restoration below is verified. U4/U5 stay open; no partial app pin switch is made.
+qualification destination unchanged and excluded from rollout; the corrected
+production backup handoff below does not move or reset it. U4/U5 stay open; no partial app pin switch is made.
 
 ## Native reader comparison on retained snapshots
 
@@ -665,46 +665,51 @@ artifact: `finance-retained-readers-GKzIwf`; local proof log:
 This qualifies **retained snapshot read compatibility**, not live deployment
 workload/OIDC admission or a production schema/SDK rollout. The custom
 qualification data is readable on copies but its original name remains outside
-the native namespace form. The user subsequently selected UI backup/restore
-below; keep that destination out of rollout until its backups and restoration
-are verified. Reuse these same readers if needed; do not
+the native namespace form. Keep the qualification destination unchanged and outside rollout;
+the corrected production backup handoff below does not require migrating it. Reuse these same readers if needed; do not
 build a data-copy service, automatic replay or a naming patch. Finish live
 credential/destination admission and actual consumer/worker qualification before
 the coherent version switch. U4/U5 remain open.
 
-## Accepted custom-core path: UI backup and restore
+## Production backup handoff and custom-core scope
 
-The user approved using the existing per-workspace UI backup/restore flow for
-`finance-alpha60-preview-qualification`. This resolves the approach decision:
-do not add a naming patch, copy service or application migration layer for that
-core. Execution is pending owner exports, a prepared destination and verified
-restoration. Original production/default-preview cores retain their existing
-destinations; this decision is specific to the custom qualification environment.
+The earlier historical-preview handoff was incorrect for the user's data. The
+preview had a custom-core override configured, but that was not proof that it
+contained the user's workspaces. The user opened it and reported that their
+existing transactions were absent, then explicitly identified
+`https://finance.delightfullabs.com` as the site showing those transactions.
+Do not reuse the historical qualification-preview URL as their backup source.
 
-The historical preview candidate is
-`https://delightful-finances-ps042n0m4-mjamesderochers-projects.vercel.app/settings/workspace`,
-deployment `dpl_7Cg8uYevZ9kRkuJQETvDSWPCfgvX`. Its raw deployment metadata lists
-`FINANCE_JAZZ_CORE_NAME`; the adjacent initial preview and production deployments
-do not. The uploaded server source consumes that override, and the historical
-build includes workspace backup UI. Metadata does not expose the override's
-value, so the owner must confirm the intended workspaces are visible before
-exporting; do not assume the current production URL is this source. The dirty
-CLI deployment's commit SHA alone is insufficient proof of its uploaded source.
+The corrected owner handoff is
+`https://finance.delightfullabs.com/settings/workspace`: select each owned
+workspace, choose password protection and download its `.dlf` file. Keep files
+and passwords locally; report how many workspaces were backed up. No recovery
+phrase, password or archive needs to be sent in chat. If expected data is missing
+or export is disabled, resolve that specific production identity/access issue
+before claiming a backup. No owner backup has yet been confirmed.
 
-Owner handoff: open that preview with the existing identity, select each owned
-workspace in Settings → Workspace, choose password protection and download its
-`.dlf` file. Keep files/passwords locally and report which/how many workspaces
-were exported. If the expected workspaces are missing or export is disabled,
-resolve identity/source access before proceeding. No recovery phrase or backup
-password needs to be sent in chat.
+Current Vercel alias resolution confirms that domain targets a READY production
+deployment, `dpl_WoqfZvJZjbd9xSz3Yc8MzRXNpAUG`. The user's confirmation establishes
+which site holds their visible data; deployment metadata alone does not establish
+ownership. No environment variables, deployments, cores or data were changed
+while correcting the handoff.
 
-Then prepare the supported destination UI, restore each archive through the
-existing review/confirmation flow, and verify the financial records and
-attachments before considering retirement of the old environment. Restoration
-creates a new workspace with the restoring owner. The released field allowlist
-excludes bank secrets, profile avatars and operational jobs; memberships and
-bank connection metadata are inert references, not live grants/credentials.
-Reconnect banks and re-establish sharing as needed. Preserve the old core/Drive
-as rollback until verification and an explicit retirement decision. No user
-backup has yet been confirmed, no destination created, and no data deleted by
-this handoff.
+**Production is an in-place upgrade.** Its existing core and Drive already have
+compatible native names, and their retained snapshot reads pass on alpha.66/67.
+The UI backup is additional preservation before upgrading; production does not
+need a fresh core or workspace restore to solve the separate custom naming issue.
+Preserve its existing destination, identities and data through the coordinated
+SDK switch, with remaining workload/auth/caller gates intact.
+
+The separate `finance-alpha60-preview-qualification` environment remains
+unchanged and excluded from rollout. Its data ownership/retention needs have not
+been established by the user's production login. Do not require them to back up
+unfamiliar qualification workspaces, invent a naming workaround, or delete/reset
+that core or Drive. The existing UI backup/restore approach remains available if
+its data actually needs moving under a separately confirmed owner/source.
+
+For such a move, restoration creates a new workspace owned by the restoring
+identity. The released field allowlist excludes bank secrets, profile avatars
+and operational jobs; memberships and bank metadata are inert references, not
+live grants/credentials. Reconnect banks and re-establish sharing as needed.
+That is distinct from preserving the existing production core in place.
