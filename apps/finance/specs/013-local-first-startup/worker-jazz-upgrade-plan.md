@@ -22,7 +22,14 @@ native binaries. Treat alpha.67 as the latest release candidate for the coherent
 switch, after reviewing the remaining release delta and requalifying worker,
 auth, shared-owner callers and the other affected gates. Do not rewrite the
 qualified schema/permissions or add compatibility code for unchanged APIs.
-Existing alpha.66 evidence remains version-scoped; no live pins are changed.
+The subsequent [alpha.67 requalification](worker-jazz-alpha66-research.md#alpha67-native-source-review-and-requalification)
+now passes the same 200 Finance schema/restore, 30 worker/session, 57 Clipper
+schema/reading, 30 auth and eight gateway cases. Native source review identifies
+policy-ordering and enum-support fixes; the schemas/adapters and existing patch
+bodies are reused unchanged. The unpatched cold-worker retention control still
+fails, so the existing bridge remains necessary. Actual caller adoption, broader
+restore/patch responsibilities, live workload admission and the coherent switch
+remain open. No live pins are changed.
 
 The branch subsequently merges main `5e78a349` (PR #45's website/deployment-control
 fixes). No SDK, Finance schema, Local First implementation or native fixture
@@ -62,7 +69,7 @@ replaced code when its replacement is adopted and qualified. Follow the
 [continuous simplification requirements](worker-migration-tasks.md#continuous-simplification-during-implementation);
 do not accumulate a second implementation alongside the selected native path.
 
-- [x] **U1 — Qualify the existing persistent-worker bridge on alpha.66 in
+- [x] **U1 — Qualify the existing persistent-worker bridge on alpha.66/67 in
       isolation.** The unpatched SDK already fails cold worker data retention.
       Adapt the existing patch's worker detection/Window-hook behavior to the
       changed source, adding no preparation callback or per-call owner. Run the
@@ -80,6 +87,9 @@ do not accumulate a second implementation alongside the selected native path.
       import. An unpatched alpha.66 control loses the edited row on cold restart,
       so retain this bridge without extending it. Caller adoption and the other
       workspace patch responsibilities remain open.
+      The alpha.67 repeat now passes the same 200 schema/restore and 30 native
+      worker/session cases with unchanged implementation/patch bodies; its
+      published unpatched cold-restart control still loses the edited row.
 - [ ] **U2 — Adapt Local First's session boundary and both consumers together.**
       Use `initial: 'device'`, `localFirst: 'now'` with the public client loader,
       `user.accountId`/kind/identity, `exportDeviceKey()`,
@@ -686,7 +696,11 @@ workspace, choose password protection and download its `.dlf` file. Keep files
 and passwords locally; report how many workspaces were backed up. No recovery
 phrase, password or archive needs to be sent in chat. If expected data is missing
 or export is disabled, resolve that specific production identity/access issue
-before claiming a backup. No owner backup has yet been confirmed.
+before claiming a backup. The user has now confirmed that the production backup
+files are saved. This records their completed export; archive contents have not
+been independently opened or restored by the agent. Files/passwords remain local
+to the user. Continue the in-place upgrade qualification without waiting on
+qualification-preview backups or preparing a replacement production core.
 
 Current Vercel alias resolution confirms that domain targets a READY production
 deployment, `dpl_WoqfZvJZjbd9xSz3Yc8MzRXNpAUG`. The user's confirmation establishes

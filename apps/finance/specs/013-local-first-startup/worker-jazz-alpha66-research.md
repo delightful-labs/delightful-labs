@@ -639,11 +639,11 @@ Better Auth's peer remains `~1.7.22`. The same generated Finance bindings work
 with the matching alpha.67 native binary in the bounded read proof; there is no
 reason to reauthor the schema or backend callback for an unchanged API.
 
-Alpha.67 still needs the remaining release/patch responsibility review and
-worker/auth/caller qualification before replacing the coordinated target at
-cutover. This result does not make the 200 schema/restore or 30 worker/session
-cases alpha.67-qualified. Live workload credentials and the custom original core
-name remain separate gaps. No active source, pin, deployment or patch changes.
+At that retained-reader checkpoint, alpha.67's worker/auth/caller qualification
+remained open; the reader result alone did not qualify the other cases. The
+native source review and bounded schema/worker/auth requalification below now
+pass. Live workload credentials, actual callers and the remaining broader
+release/patch gates still apply. No active source, pin, deployment or patch changes.
 The user reported that the historical qualification preview did not show their
 transactions and confirmed `https://finance.delightfullabs.com` as the actual
 source. Follow the [corrected production backup handoff](worker-jazz-upgrade-plan.md#production-backup-handoff-and-custom-core-scope).
@@ -652,6 +652,94 @@ is additional preservation, not a requirement to move into a fresh core. Leave
 the separate qualification environment unchanged and excluded from rollout.
 Its ownership/retention needs are unconfirmed; do not ask the user to export
 unfamiliar data, reset anything or build a naming workaround for it.
+
+## Alpha.67 native source review and requalification
+
+The exact upstream tag comparison is
+[alpha.66 → alpha.67](https://github.com/garden-co/jazz/compare/v2.0.0-alpha.66...v2.0.0-alpha.67),
+from `5eeabfa1033cb57557fee39f4807c41123e25fef` to
+`27eb8f54165460aa397a198466ddc4bc1b0aebda`. The actual Rust changes explain the
+native rebuild despite unchanged TypeScript backend/Db APIs:
+
+- `layers/db/src/db.rs` evaluates update/delete and read-for-write eligibility
+  against committed state while deciding a transaction, including inherited
+  branch heads. Tracking for those heads is scoped to one unit/overlay. It also
+  guards against another identity's writes or another handle's commit joining
+  an open callback transaction. Upstream tests exercise staging, upload, relay,
+  branch views and callback cancellation. These are native policy rules; add no
+  app-level ordering or transaction-claims workaround.
+- `layers/db/src/sync.rs` translates a portable enum variant name to the receiving
+  column's stored tag when locating supporting rows for a correlation. Upstream
+  tests cover policy `EXISTS`, subqueries, joins and relayed grants. This is an
+  engine sync-support fix, not a reason to change Finance's literal role/kind
+  policies or replace native queries with application lookups.
+
+The unresolved cross-node commit-base diagnostic is not changed directly by this
+diff: `sync_conflicts.rs` is unchanged. Branch-head policy tracking is not proof
+that the intermittent Finance save failure is fixed. Keep its existing unknown
+outcome protection and diagnostic investigation; add no replay/retry workaround.
+The published source comparison is retained in
+`/private/tmp/finance-jazz-latest-audit/67/upstream-compare.json`.
+
+The maintained runner now accepts `--sdk=2.0.0-alpha.67` for schema/worker modes;
+backend qualification accepts the matching artifact. This adds only version
+selection and correctly labeled identity metadata to the existing pipeline.
+All implementation/schema/permission/adapter/fixture overlays and patch bodies
+are unchanged. **All 325 positive cases pass**:
+
+| Native boundary                                    | Passing cases |
+| -------------------------------------------------- | ------------- |
+| Finance schema/permissions/backup/restore          | 200           |
+| Finance persistent worker/private session/Svelte   | 30            |
+| Clipper schema/reading/retained data               | 57            |
+| Clipper Better Auth/provider/actual backend expiry | 30            |
+| Clipper gateway admission                          | 8             |
+
+Strict selected types, generation checks, unchanged schema/permission identity,
+matching SDK/native/Wasm versions and zero Svelte errors/warnings pass. The worker
+fixture retains one broker asset per production/development build. Chromium,
+Firefox and WebKit preserve actual offline saves/edits across full process
+restarts, native identity/recovery and pending-acquisition cleanup. A clean
+committed checkout excludes the unadopted sign-out prototype. Main was refreshed
+and already remains an ancestor; unchanged public library builds and generated
+catalogs are reused without generation or user-server dependency sharing.
+
+**Unpatched solution checked first:** the published alpha.67 cold-worker control
+still reaches cycle two with the same account identity but an empty transaction
+query instead of the edited 5,678-minor-unit fixture row. Its six bridge-target
+SDK files match the pristine published package; SDK/Wasm both report alpha.67.
+Only the unsupported `browserWorkerHost` option and two bridge-hook counter
+assertions are omitted. Financial row/identity/save/edit/close assertions stay
+intact. The existing bridge therefore remains necessary; its six-file patch
+applies directly and passes the positive cases with no new patch behavior.
+
+The backend proof also replays all five existing negative controls: unpatched
+extension-origin startup and registered-device gateway admission, unpatched
+provider callback, missing expiry, and renewal during read-only admission. They
+fail for their expected reasons. Existing backend patch SHA-256 remains
+`8981cc48ad6ca81f318fd93bc56a3fa5b25406a67d8824ca21ca73637ab5f0d4`;
+Better Auth remains exactly 1.7.22 with the unchanged provider patch.
+
+Evidence: Finance artifact `finance-jazz-alpha.67-D9sKVS`,
+`/private/tmp/finance-alpha67-worker-proof.log`; unpatched project
+`/private/tmp/finance-alpha67-unpatched-control/app` and log
+`/private/tmp/finance-alpha67-unpatched-control.log`; Clipper artifact
+`finance-jazz-alpha67-ajlkTn`, backend fixture `backend-K6F10J`,
+`/private/tmp/clipper-alpha67-schema-proof.log` and
+`/private/tmp/clipper-alpha67-backend-auth-proof.log`. The first worker command
+invoked the root link script from an app without the root flag and stopped
+before testing; the corrected root invocation passes. This is setup evidence,
+not an application failure. The later directory-label correction affects only
+temporary path spelling, not SDK selection or test behavior.
+
+Production UI backups are now confirmed saved by the user; archive contents have
+not been independently opened. Production remains an in-place upgrade on its
+existing destination. Actual shared-session caller adoption and commands, the
+broader historical restore variants, remaining patch responsibilities, live
+Vercel workload admission and U5's coherent graph/build/application checks remain
+open. The old alpha.65 raw-session Clipper experiment remains explicitly
+incomplete; 57 schema cases do not qualify its startup callers. Add no general
+SDK facade, callback shim or new patch to fill those remaining gates by default.
 
 ## Execution order
 

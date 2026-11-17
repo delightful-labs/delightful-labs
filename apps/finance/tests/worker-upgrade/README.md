@@ -1,14 +1,47 @@
 # Isolated Jazz upgrade proofs
 
-The schema and persistent-worker proofs currently qualify alpha.66. The schema mode below qualifies
+The schema and persistent-worker proofs qualify alpha.66 and, with the explicit
+SDK selector below, alpha.67. The schema mode below qualifies
 Finance's native authoring boundary on that version; `--worker` also qualifies
 the alpha.66 persistent-worker/session boundary. The historical default
 worker/session suite still targets alpha.65. See the
 [alpha.66 source audit and qualification boundaries](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md).
 The modes have separate qualification scopes.
-The registry now selects alpha.67 as `latest`. The retained-store comparison
-below covers alpha.66 **and alpha.67** against alpha.60; it does not extend the
-other modes' qualification or change workspace pins.
+The registry selects alpha.67 as `latest`. The retained-store comparison also
+covers both releases against alpha.60. All modes keep their bounded scopes and
+do not change workspace pins.
+
+## Alpha.67 qualification with the existing proofs
+
+Use the same schema/worker pipeline with an explicit published version:
+
+```sh
+node tests/worker-upgrade/run.mjs --worker --sdk=2.0.0-alpha.67
+node tests/worker-upgrade/run.mjs --clipper-schema --sdk=2.0.0-alpha.67
+node tests/worker-upgrade/backend.mjs /path/to/reported-clipper-alpha67-artifacts --auth
+```
+
+All **325 positive cases pass**: 200 Finance schema/permission/backup/restore,
+30 worker/session, 57 Clipper schema/reading, 30 auth and eight gateway cases.
+Strict selected types, Svelte checks and native schema/bundle identity pass.
+The existing schema, workflow, adapter and patch bodies are reused unchanged.
+`schema-identity.json` labels the candidate's actual version; alpha.66/default
+and historical alpha.65 behavior remain available rather than being relabeled.
+
+A published unpatched alpha.67 Chromium control still retains account identity
+but loses the saved/edited Finance row on its first full-process restart. It
+omits only the unsupported host option and two hook-counter assertions; the
+financial row/identity/save/edit/close checks are unchanged. All six SDK files
+touched by the bridge match the pristine package in that control. Retain the
+existing bridge without extending its responsibilities. Backend/provider and
+expiry/read-only negative controls also fail as expected; no new patch behavior.
+
+The worker run uses an isolated checkout of the committed foundation, excluding
+the unadopted sign-out prototype, with unchanged built public libraries and
+catalogs reused without generation. This does not complete actual application
+caller adoption, the entire historical restore matrix, live Vercel workload
+admission or the coherent workspace switch. See the
+[alpha.67 source review and evidence](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#alpha67-native-source-review-and-requalification).
 
 ## Alpha.66 Finance schema, permissions and retained data
 
@@ -249,7 +282,7 @@ access: compare native old/new readers on independent scratch copies afterward.
 Prepare the readers from a successful Finance `--schema` or `--worker` artifact:
 
 ```sh
-node tests/worker-upgrade/retained-prepare.mjs /path/to/finance-jazz-alpha66-artifacts
+node tests/worker-upgrade/retained-prepare.mjs /path/to/qualified-finance-schema-artifacts
 ```
 
 The printed directory contains independent alpha.60/66/67 installs, locks and

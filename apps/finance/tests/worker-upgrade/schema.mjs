@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 /** Isolated native schema port, not an application migration or compatibility layer. */
-export async function checkSchema(directory, source, proof, versions, scope) {
+export async function checkSchema(directory, source, proof, versions, scope, sdkVersion) {
 	const run = (args, cwd) => execFileSync('pnpm', args, { cwd, stdio: 'inherit' })
 	const json = (path, value) => writeFileSync(path, JSON.stringify(value, null, 2) + '\n')
 	const clipper = scope === 'clipper'
@@ -124,11 +124,11 @@ export async function checkSchema(directory, source, proof, versions, scope) {
 	run(['exec', 'tsc', '--project', 'tsconfig.schema.json'], app)
 	const installed = createRequire(join(app, 'package.json'))
 	const sdk = dirname(installed.resolve('jazz-tools/package.json'))
-	assert.equal(installed('jazz-tools/package.json').version, '2.0.0-alpha.66')
+	assert.equal(installed('jazz-tools/package.json').version, sdkVersion)
 	const core = createRequire(join(sdk, 'package.json')).resolve('jazz-napi')
 	assert.equal(
 		JSON.parse(readFileSync(join(dirname(core), 'package.json'), 'utf8')).version,
-		'2.0.0-alpha.66'
+		sdkVersion
 	)
 	// Use the pinned SDK upgrader's own identity comparison, not an application hash model.
 	const { artifactIdentity, identityDifferences } = await import(
@@ -147,7 +147,7 @@ export async function checkSchema(directory, source, proof, versions, scope) {
 	json(join(directory, 'schema-identity.json'), {
 		alpha60: retained.schemaHash,
 		alpha65: before,
-		alpha66: after
+		[sdkVersion.replace('2.0.0-alpha.', 'alpha')]: after
 	})
 	run(['exec', 'vitest', 'run', '--config', 'vitest.schema.config.mjs'], app)
 }

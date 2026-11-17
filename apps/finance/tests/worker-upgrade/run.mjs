@@ -20,9 +20,17 @@ const schemaScope = process.argv.includes('--clipper-schema')
 const schemaOnly = schemaScope !== undefined
 const workerOnly = process.argv.includes('--worker')
 if (schemaOnly && workerOnly) throw new Error('Choose either a schema or worker proof')
-const alpha66 = schemaOnly || workerOnly
-const sdkVersion = alpha66 ? '2.0.0-alpha.66' : '2.0.0-alpha.65'
-const directory = mkdtempSync(join(tmpdir(), `finance-jazz-alpha${alpha66 ? 66 : 65}-`))
+const selectedVersion = process.argv.find((argument) => argument.startsWith('--sdk='))?.slice(6)
+if (
+	selectedVersion !== undefined &&
+	(!(schemaOnly || workerOnly) || !['2.0.0-alpha.66', '2.0.0-alpha.67'].includes(selectedVersion))
+)
+	throw new Error('--sdk selects alpha.66 or alpha.67 for a schema/worker proof')
+const sdkVersion =
+	selectedVersion ?? (schemaOnly || workerOnly ? '2.0.0-alpha.66' : '2.0.0-alpha.65')
+const directory = mkdtempSync(
+	join(tmpdir(), `finance-jazz-${sdkVersion.replace('2.0.0-alpha.', 'alpha')}-`)
+)
 console.log(`Upgrade proof artifacts: ${directory}`)
 const run = (command, args, cwd = directory) =>
 	execFileSync(command, args, { cwd, stdio: 'inherit' })
@@ -100,13 +108,14 @@ if (schemaOnly) {
 		schemaScope === 'clipper' ? join(finance, '../clipper/apps/web') : finance,
 		proof,
 		schemaScope === 'clipper' ? clipperProofVersions(join(finance, '../clipper')) : versions,
-		schemaScope
+		schemaScope,
+		sdkVersion
 	)
 	console.log(`${schemaScope} schema proof passed; artifacts retained at ${directory}`)
 	process.exit(0)
 }
 const app = join(directory, 'app')
-if (workerOnly) await checkSchema(directory, finance, proof, versions, 'finance')
+if (workerOnly) await checkSchema(directory, finance, proof, versions, 'finance', sdkVersion)
 else mkdirSync(app)
 for (const path of [
 	'src/lib/schema.ts',
@@ -121,7 +130,7 @@ for (const path of [
 	'tooling/jazz-wasm.ts',
 	'vitest.worker-bindings.config.ts'
 ]) {
-	// The alpha.66 schema pipeline already copied and ported the actual app source.
+	// The schema pipeline already copied and ported the actual app source.
 	if (workerOnly && path.startsWith('src/')) continue
 	const target = join(app, path)
 	mkdirSync(dirname(target), { recursive: true })
@@ -259,5 +268,5 @@ run('pnpm', ['exec', 'svelte-check', '--tsconfig', './tsconfig.json', '--fail-on
 run('pnpm', ['exec', 'vitest', 'run', '--config', 'vitest.worker-bindings.config.ts'], app)
 if (!workerOnly) checkClipper(directory, proof, join(finance, '../clipper'))
 console.log(
-	`${workerOnly ? 'Finance alpha.66 worker' : 'Upgrade'} proof passed; artifacts retained at ${directory}`
+	`${workerOnly ? `Finance ${sdkVersion} worker` : 'Upgrade'} proof passed; artifacts retained at ${directory}`
 )

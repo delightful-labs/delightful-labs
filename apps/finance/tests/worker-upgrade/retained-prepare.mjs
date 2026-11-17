@@ -8,11 +8,16 @@ import { fileURLToPath } from 'node:url'
 
 // Reuse the qualified Finance schema artifact. No workspace installs or generation.
 const proof = dirname(fileURLToPath(import.meta.url))
-if (!process.argv[2]) throw new Error('Pass the Finance alpha.66 schema artifact directory')
+if (!process.argv[2]) throw new Error('Pass a qualified Finance schema artifact directory')
 const artifact = resolve(process.argv[2])
 const identity = JSON.parse(readFileSync(join(artifact, 'schema-identity.json'), 'utf8'))
-assert.equal(identity.alpha60, identity.alpha66.current)
 const tools = createRequire(join(artifact, 'app/package.json'))
+const sdkVersion = tools('jazz-tools/package.json').version
+assert.equal(
+	JSON.parse(readFileSync(join(artifact, 'sdk-metadata.json'), 'utf8')).version,
+	sdkVersion
+)
+assert.equal(identity.alpha60, identity[sdkVersion.replace('2.0.0-alpha.', 'alpha')].current)
 const sdk = createRequire(tools.resolve('jazz-tools/package.json'))
 const { build } = sdk('esbuild')
 const directory = mkdtempSync(join(tmpdir(), 'finance-retained-readers-'))
