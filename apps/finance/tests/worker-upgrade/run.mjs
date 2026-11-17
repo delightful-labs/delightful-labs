@@ -6,17 +6,19 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkClipper } from './clipper.mjs'
+import { checkFinanceSchema } from './schema.mjs'
 
 // Upgrade experiment only: reuse the maintained Finance fixture in a disposable
 // project, with its own dependencies. No workspace pin or installed SDK is edited.
 const finance = fileURLToPath(new URL('../../', import.meta.url))
 const proof = dirname(fileURLToPath(import.meta.url))
-const directory = mkdtempSync(join(tmpdir(), 'finance-jazz-alpha65-'))
+const schemaOnly = process.argv.includes('--schema')
+const sdkVersion = schemaOnly ? '2.0.0-alpha.66' : '2.0.0-alpha.65'
+const directory = mkdtempSync(join(tmpdir(), `finance-jazz-alpha${schemaOnly ? 66 : 65}-`))
 console.log(`Upgrade proof artifacts: ${directory}`)
 const run = (command, args, cwd = directory) =>
 	execFileSync(command, args, { cwd, stdio: 'inherit' })
 const json = (path, value) => writeFileSync(path, JSON.stringify(value, null, 2) + '\n')
-const sdkVersion = '2.0.0-alpha.65'
 const metadataResponse = await fetch(`https://registry.npmjs.org/jazz-tools/${sdkVersion}`)
 if (!metadataResponse.ok) throw new Error(`SDK metadata: ${metadataResponse.status}`)
 const metadata = await metadataResponse.json()
@@ -34,8 +36,14 @@ const candidate = join(directory, 'candidate')
 mkdirSync(candidate)
 run('tar', ['-xzf', tarball, '-C', candidate])
 const sdk = join(candidate, 'package')
-run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'worker-bridge.patch')], sdk)
-run('git', ['apply', join(proof, 'worker-bridge.patch')], sdk)
+if (!schemaOnly) {
+	run(
+		'git',
+		['apply', '--check', '--whitespace=error-all', join(proof, 'worker-bridge.patch')],
+		sdk
+	)
+	run('git', ['apply', join(proof, 'worker-bridge.patch')], sdk)
+}
 run('tar', ['-czf', join(directory, 'candidate-sdk.tgz'), '-C', candidate, 'package'])
 
 // Pack the current built public libraries without generation/prepack hooks.
@@ -49,33 +57,6 @@ for (const name of ['local-first', 'ui']) {
 		)
 	)
 }
-const app = join(directory, 'app')
-mkdirSync(app)
-for (const path of [
-	'src/lib/schema.ts',
-	'src/lib/schema',
-	'src/lib/domain',
-	'src/lib/validation',
-	'src/lib/runtime/worker/account-store.ts',
-	'src/lib/components/identity/RecoveryPhraseIntegration.svelte',
-	'src/lib/paraglide/runtime.js',
-	'src/lib/paraglide/runtime.d.ts',
-	'tests/worker-bindings',
-	'tooling/jazz-wasm.ts',
-	'vitest.worker-bindings.config.ts'
-]) {
-	const target = join(app, path)
-	mkdirSync(dirname(target), { recursive: true })
-	cpSync(join(finance, path), target, { recursive: true })
-}
-run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'fixture.patch')], app)
-run('git', ['apply', join(proof, 'fixture.patch')], app)
-run(
-	'git',
-	['apply', '--check', '--whitespace=error-all', join(proof, 'consumer-session.patch')],
-	app
-)
-run('git', ['apply', join(proof, 'consumer-session.patch')], app)
 const packages = [
 	'vite',
 	'vitest',
@@ -104,6 +85,38 @@ const versions = Object.fromEntries(
 		return [name, dependency.version]
 	})
 )
+if (schemaOnly) {
+	await checkFinanceSchema(directory, finance, proof, versions)
+	console.log(`Finance schema proof passed; artifacts retained at ${directory}`)
+	process.exit(0)
+}
+const app = join(directory, 'app')
+mkdirSync(app)
+for (const path of [
+	'src/lib/schema.ts',
+	'src/lib/schema',
+	'src/lib/domain',
+	'src/lib/validation',
+	'src/lib/runtime/worker/account-store.ts',
+	'src/lib/components/identity/RecoveryPhraseIntegration.svelte',
+	'src/lib/paraglide/runtime.js',
+	'src/lib/paraglide/runtime.d.ts',
+	'tests/worker-bindings',
+	'tooling/jazz-wasm.ts',
+	'vitest.worker-bindings.config.ts'
+]) {
+	const target = join(app, path)
+	mkdirSync(dirname(target), { recursive: true })
+	cpSync(join(finance, path), target, { recursive: true })
+}
+run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'fixture.patch')], app)
+run('git', ['apply', join(proof, 'fixture.patch')], app)
+run(
+	'git',
+	['apply', '--check', '--whitespace=error-all', join(proof, 'consumer-session.patch')],
+	app
+)
+run('git', ['apply', join(proof, 'consumer-session.patch')], app)
 json(join(app, 'package.json'), {
 	name: 'finance-jazz-upgrade-proof',
 	private: true,

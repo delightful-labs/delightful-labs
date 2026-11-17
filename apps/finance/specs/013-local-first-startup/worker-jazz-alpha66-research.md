@@ -173,6 +173,57 @@ of this qualifies our alpha.60 retained stores or changes Finance's destination
 retention gate. Preserve preview and production data; Clipper's preview reset
 approval does not extend to Finance.
 
+## Finance native schema foundation
+
+The maintained [schema experiment](../../tests/worker-upgrade/README.md#alpha66-finance-schema-permissions-and-retained-data)
+now runs with `node tests/worker-upgrade/run.mjs --schema`. It uses the unpatched
+published alpha.66 package and matching native core. Workspace dependencies and
+the separate alpha.65 worker/session experiment remain unchanged.
+
+The inactive source overlay keeps Finance's modular tables, replaces the old
+callback/raw permission composition with native `schema.definePermissions`, and
+declares eight native named transforms for the 22 existing column uses. Their
+implementations reuse existing validators and BigInt conversion in
+`jazz.computed.ts`, checked against Jazz's generated `AppTransforms` type. The
+old `validatedTextColumn` wrapper is deleted. Runtime queries/types move out of
+the authoring entry. No adapter framework or new SDK patch is introduced.
+
+The SDK's own compiler/upgrader confirms identical identities:
+
+- Current stored schema, including the alpha.60 baseline:
+  `b33f0ec2011b495d8d345a92a9047724789fea986aaae6513df707abf9ba0633`.
+- Permission bundle:
+  `9be840f3bc2ff7e6543bfbc7bb48d9ed9ba946e826677e8e39150c33a985d9e2`.
+- Schema-version set: the same single current version; no schema transformation
+  or data reset is needed for this authoring port. `migrations create --name initial`
+  records it through native tooling.
+
+Strict selected authoring/query/transform/native-fixture types and native
+`generate --check` pass. All **138 cases pass**: 128 existing full-policy and
+bank-log cases plus ten native transform/retention cases. A real alpha.60 SQLite
+store, closed before the new SDK opens it, retains its app identity, records,
+normalized text and maximum-safe minor-unit amount. A new alpha.66 edit survives
+another native close/reopen. These use isolated test authorities and directories.
+
+One native behavior change is explicit: alpha.66 bypasses transforms for null.
+An absent optional amount now reads null; alpha.60 passed it through the old
+`Number(value)` conversion and read zero. A stored zero stays zero. Existing
+transfer matching selects its legacy amount/currency path from the nullable
+side currency, and restore staging already omits null side fields. Keep native
+null semantics; do not emulate the old conversion. Backup/restore's complete
+caller qualification remains required. Counts use the existing native INT
+range; BigInt amounts retain their validated safe-number view.
+
+The historical two-app `previousApp` restore experiment and backup table typing
+are not ported by this selected proof. Nor does it qualify all Finance callers,
+Clipper, browser worker durability, backend auth, every existing patch
+responsibility or Finance's retained Vercel destinations. Keep U3/U4/U5 open.
+
+Final packaged proof: `/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-GJSvMl`;
+log: `/private/tmp/finance-alpha66-schema-final.log`. Strict fixture types, native
+generation/identity checks and all 138 cases pass in that same clean copy. Active
+alpha.60 Finance test types, workspace links and shared guidance checks also pass.
+
 ## Execution order
 
 1. Keep the approved private session actor and awaited native factory. Finish

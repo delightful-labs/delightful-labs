@@ -96,6 +96,15 @@ expanding commands. Do not build a generic SDK command surface ahead of callers.
       and app IDs. Test fresh stores and disposable retained alpha.60 SQLite
       stores with records/identities/permissions. This is SDK schema history,
       not the excluded account-selection migration/fallback layer.
+      **Finance authoring proof passes:** the maintained `--schema` experiment
+      ports 22 columns to eight native transforms and replaces callback/raw
+      policies with the native DSL. The stored-schema hash and permission bundle
+      remain identical. Native initial history/generation, strict selected types
+      and all 138 cases pass, including actual alpha.60 SQLite retention and a
+      subsequent alpha.66 write/close/reopen. See the
+      [qualified scope](worker-jazz-alpha66-research.md#finance-native-schema-foundation).
+      Clipper, full Finance callers/legacy backup-restore experiments and the
+      remaining backend/destination gates are still open. U3 is not complete.
 - [ ] **U4 — Qualify backend authentication and destinations.** Replace the
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix

@@ -1,10 +1,56 @@
-# Isolated Jazz alpha.65 worker proof
+# Isolated Jazz upgrade proofs
 
-The coordinated upgrade target is now alpha.66. This runner and the results
-below remain alpha.65 evidence until the removed schema/permission APIs have
-been ported and the suite rerun. See the
+The coordinated upgrade target is now alpha.66. The schema mode below qualifies
+Finance's native authoring boundary on that version; the default worker/session
+suite still targets alpha.65. See the
 [alpha.66 source audit and qualification boundaries](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md).
-Changing only the runner's version constant is insufficient.
+The two modes have separate qualification scopes.
+
+## Alpha.66 Finance schema, permissions and retained data
+
+From Finance, using the workspace's Node/pnpm and current built Local First:
+
+```sh
+node tests/worker-upgrade/run.mjs --schema
+```
+
+This uses the published, integrity-verified **unpatched alpha.66** SDK and its
+matching native core. It copies real Finance source into disposable projects,
+creates/closes actual alpha.60 SQLite records, and uses the alpha.65 compiler
+only to produce comparison metadata. `finance-schema.patch` ports the native
+authoring source; Jazz generates its initial history, bindings and permission
+JSON. No generated artifact is hand-edited. The SDK upgrader's identity comparison
+checks the stored-schema hash and permission bundle before tests run.
+
+The patch replaces callback/raw permission composition with the native DSL,
+moves runtime query definitions out of authoring `schema.ts`, and implements
+eight native named transforms for the existing 22 columns. It removes the old
+text-column wrapper. Source-import changes occur only in copied consumers;
+active application source and dependency pins remain alpha.60.
+
+Strict authoring/query/transform/native-fixture types and `generate --check`
+pass. All **138 tests pass**: 128 existing permission/bank-log cases and ten
+native transform/retention cases. A real alpha.60 store keeps its app identity,
+maximum-safe minor-unit amount and normalized text after opening with alpha.66;
+an alpha.66 edit survives another close/reopen. The test also distinguishes a
+stored zero from an absent optional amount. Jazz's native null passthrough
+replaces alpha.60's accidental `Number(null)` read as zero; no compatibility
+transform is added. Sync counts retain the existing native signed-32-bit storage.
+
+The new native test lives in the patch and runs/types against the candidate SDK,
+so alpha.66 imports do not enter active alpha.60 test discovery. Svelte's normal
+compiler handles the existing shared data module. The runner adds no runtime
+framework, production migration, dependency pin, catalog generation or SDK patch.
+Artifacts include the source copies, locks, generated history/JSON/bindings,
+retained records/store and `schema-identity.json` in the printed directory.
+
+This does not qualify Clipper, all Finance callers/backup/restore experiments,
+worker durability, backend auth, the full existing SDK patch or Vercel data
+destinations. In particular, the historical `previousApp` restore experiment and
+backup table typing still need their native caller port. U3 remains open for the
+rest of those boundaries; U4/U5 remain required before any live switch.
+
+## Alpha.65 worker and session boundary
 
 From Finance, with the workspace's Node/pnpm and installed Playwright browsers:
 

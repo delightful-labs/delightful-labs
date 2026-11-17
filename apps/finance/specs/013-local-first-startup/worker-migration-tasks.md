@@ -9,6 +9,13 @@ alpha.60. Alpha.66's new immediate factory passed 24 native lifecycle cases but
 lost a late-resource close failure in a separate source-level reproduction, so
 it does not replace Finance's awaited acquisition/close protocol.
 
+The isolated Finance alpha.66 authoring slice now passes strict selected types,
+native generation/history and **138 tests**, including retained alpha.60 SQLite
+records and another native write/close/reopen. Schema and permission identities
+remain unchanged. The [qualified scope](worker-jazz-alpha66-research.md#finance-native-schema-foundation)
+keeps Clipper, broad caller/backup/restore adoption and the remaining upgrade
+gates open. Active app dependencies and source stay alpha.60.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,
