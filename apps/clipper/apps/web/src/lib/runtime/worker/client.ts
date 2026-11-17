@@ -193,6 +193,7 @@ const clientMachine = setup({
 									message.event.command.type !== 'OPEN' &&
 									message.event.command.type !== 'CLOSE' &&
 									message.event.command.type !== 'PREVIEW_NOTE' &&
+									message.event.command.type !== 'PREVIEW_HIGHLIGHT' &&
 									message.event.command.type !== 'CLOSE_PREVIEW'
 										? [
 												...context.annotationPending,

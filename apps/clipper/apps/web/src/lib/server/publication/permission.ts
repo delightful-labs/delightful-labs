@@ -6,7 +6,7 @@ import { publicationBaseSchema } from '../../annotations/publication.js'
 import { didSchema } from '../../annotations/publication-link.js'
 import { createPublicationAccess } from './access.js'
 import type { PublicationAccess, PublicationAuth } from './access.js'
-import { createDocumentNotePreview } from './preview.js'
+import { createPublicationPreview } from './annotation-preview.js'
 import {
 	isJsonRequest,
 	isPublicationPost,
@@ -81,7 +81,7 @@ export function createPublicationPermission(
 				readPublicationInput(input, signal, publicationBaseSchema, 4096)
 		}),
 		access: createPublicationAccess(auth, backend),
-		preview: createDocumentNotePreview(backend.db),
+		preview: createPublicationPreview(backend.db),
 		restore: createAsyncLogic({
 			run: ({ input }: { input: string }) => {
 				if (!hasRestorer(auth.api)) throw new Error('Publication provider unavailable')
@@ -160,10 +160,10 @@ export function createPublicationPermission(
 					id: 'input',
 					src: 'input',
 					input: ({ context }) => context.request,
-					onDone: ({ event }) =>
-						'noteId' in event.output.source
-							? { target: 'readingAccess', context: { selection: event.output } }
-							: { target: 'unavailable' },
+					onDone: ({ event }) => ({
+						target: 'readingAccess',
+						context: { selection: event.output }
+					}),
 					onError: { target: 'invalid' }
 				}
 			},

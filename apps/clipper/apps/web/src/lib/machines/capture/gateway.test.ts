@@ -211,3 +211,43 @@ it('rejects oversized or non-raster image responses and private redirect targets
 		expect(deps.fetch).toHaveBeenCalledOnce()
 	}
 })
+
+it('returns bounded source bytes without invoking reader extraction', async () => {
+	const cap = fixture(),
+		controller = new AbortController()
+	const actor = createActor(createGatewayMachine(cap), {
+		input: { url: 'https://example.org/article', signal: controller.signal, mode: 'source' }
+	})
+	try {
+		const result = toPromise(actor)
+		actor.start()
+		const value = await result
+		expect(value.kind).toBe('success')
+		if (value.kind !== 'success') throw new Error('Expected source response')
+		expect(value.source).toEqual({ body: new Uint8Array([1]), mediaType: 'text/html' })
+		expect(cap.extract).not.toHaveBeenCalled()
+	} finally {
+		actor.stop()
+	}
+})
+it('aborts a pending source fetch when its invoking owner stops', async () => {
+	const cap = fixture(),
+		entered = Promise.withResolvers<void>(),
+		gate = Promise.withResolvers<Hop>()
+	let signal: AbortSignal | undefined
+	const actor = createActor(
+		createGatewayMachine({
+			...cap,
+			fetch: async (_url, _destination, currentSignal) => {
+				signal = currentSignal
+				entered.resolve()
+				return gate.promise
+			}
+		}),
+		{ input: { url: 'https://example.org/article', mode: 'source' } }
+	).start()
+	await entered.promise
+	actor.stop()
+	expect(signal?.aborted).toBe(true)
+	gate.resolve({ status: 200, location: undefined, mediaType: 'text/html', body: new Uint8Array() })
+})

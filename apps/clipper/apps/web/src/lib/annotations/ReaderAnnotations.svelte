@@ -124,6 +124,15 @@
 					{send}
 				/>{/each}
 			<div class="annotation-actions">
+				<Button
+					disabled={!annotations.enabled ||
+						annotations.pending ||
+						highlight.notes.some((note) => note.drafts.length > 0)}
+					aria-haspopup="dialog"
+					aria-controls={previewDialogId}
+					onclick={() => send({ type: 'PREVIEW_HIGHLIGHT', documentId, id: highlight.id })}
+					>{t('publication.preview_action')}</Button
+				>
 				{#if !highlight.notes.length}<Button
 						disabled={!annotations.enabled}
 						onclick={() => send({ type: 'ADD_NOTE', documentId, highlightId: highlight.id })}

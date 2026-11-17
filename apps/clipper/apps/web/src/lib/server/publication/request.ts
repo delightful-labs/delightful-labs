@@ -6,7 +6,8 @@ import { publicationPreviewSchema } from '../../annotations/publication-preview.
 import type { Publication } from '../../annotations/publication.js'
 import { createPublicationStore } from './store.js'
 import type { PublicationPreview } from '../../annotations/publication-preview.js'
-import { createDocumentNotePreview } from './preview.js'
+import { highlightSourceGateway } from './highlight-preview.js'
+import { createPublicationPreview } from './annotation-preview.js'
 import { createPublicationAccess } from './access.js'
 import type { PublicationAccess, PublicationAuth } from './access.js'
 import {
@@ -28,9 +29,13 @@ type Context = Input & {
 	preview: Preview | undefined
 }
 
-export function createPreviewRequest(auth: PreviewAuth, backend: Pick<Jazz, 'accountFor' | 'db'>) {
+export function createPreviewRequest(
+	auth: PreviewAuth,
+	backend: Pick<Jazz, 'accountFor' | 'db'>,
+	sourceGateway = highlightSourceGateway
+) {
 	const actors = {
-		preview: createDocumentNotePreview(backend.db),
+		preview: createPublicationPreview(backend.db, sourceGateway),
 		access: createPublicationAccess(auth, backend),
 		current: createAsyncLogic({
 			run: ({
@@ -222,9 +227,12 @@ export async function handlePreviewRequest(
 	auth: PreviewAuth,
 	backend: Pick<Jazz, 'accountFor' | 'db'>,
 	request: Request,
-	origin: string
+	origin: string,
+	sourceGateway = highlightSourceGateway
 ) {
-	const actor = createActor(createPreviewRequest(auth, backend), { input: { request, origin } })
+	const actor = createActor(createPreviewRequest(auth, backend, sourceGateway), {
+		input: { request, origin }
+	})
 	const disconnect = () => actor.send({ type: 'DISCONNECT' })
 	request.signal.addEventListener('abort', disconnect, { once: true })
 	try {

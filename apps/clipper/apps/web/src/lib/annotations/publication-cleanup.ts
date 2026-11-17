@@ -9,6 +9,7 @@ type Context = {
 	capability: PublicationCleanupCapability | undefined
 	publications: Publication[]
 	deletedNoteIds: string[]
+	deletedHighlightIds: string[]
 	completed: string[]
 }
 function key(value: Publication) {
@@ -23,14 +24,15 @@ function key(value: Publication) {
 function candidates(context: Context) {
 	return context.publications.filter(
 		(value) =>
-			'noteId' in value.source &&
-			context.deletedNoteIds.includes(value.source.noteId) &&
+			('noteId' in value.source
+				? context.deletedNoteIds.includes(value.source.noteId)
+				: context.deletedHighlightIds.includes(value.source.highlightId)) &&
 			(value.state === 'published' || value.state === 'issued' || value.state === 'unpublishing')
 	)
 }
 function observations(
 	context: Context,
-	patch: { publications?: Publication[]; deletedNoteIds?: string[] }
+	patch: { publications?: Publication[]; deletedNoteIds?: string[]; deletedHighlightIds?: string[] }
 ) {
 	const facts = { ...context, ...patch }
 	return {
@@ -43,6 +45,7 @@ function observations(
 const observe = createCallbackLogic<
 	| { type: 'PUBLICATIONS'; values: Publication[] }
 	| { type: 'DELETIONS'; ids: string[] }
+	| { type: 'HIGHLIGHT_DELETIONS'; ids: string[] }
 	| { type: 'FAILED' },
 	PublicationCleanupCapability
 >(({ input, sendBack }) => {
@@ -50,7 +53,8 @@ const observe = createCallbackLogic<
 		return input.observe(
 			(values) => sendBack({ type: 'PUBLICATIONS', values }),
 			(ids) => sendBack({ type: 'DELETIONS', ids }),
-			() => sendBack({ type: 'FAILED' })
+			() => sendBack({ type: 'FAILED' }),
+			(ids) => sendBack({ type: 'HIGHLIGHT_DELETIONS', ids })
 		)
 	} catch {
 		sendBack({ type: 'FAILED' })
@@ -99,6 +103,7 @@ export const publicationCleanupMachine = setup({
 		events: {
 			PUBLICATIONS: types<{ values: Publication[] }>(),
 			DELETIONS: types<{ ids: string[] }>(),
+			HIGHLIGHT_DELETIONS: types<{ ids: string[] }>(),
 			FAILED: types(),
 			ONLINE: types(),
 			SHUTDOWN: types()
@@ -127,11 +132,23 @@ export const publicationCleanupMachine = setup({
 }).createMachine({
 	id: 'publication-cleanup',
 	initial: 'admitting',
-	context: ({ input }) => ({ ...input, publications: [], deletedNoteIds: [], completed: [] }),
+	context: ({ input }) => ({
+		...input,
+		publications: [],
+		deletedNoteIds: [],
+		deletedHighlightIds: [],
+		completed: []
+	}),
 	on: {
 		SHUTDOWN: {
 			target: '.stopped',
-			context: { capability: undefined, publications: [], deletedNoteIds: [], completed: [] }
+			context: {
+				capability: undefined,
+				publications: [],
+				deletedNoteIds: [],
+				deletedHighlightIds: [],
+				completed: []
+			}
 		}
 	},
 	states: {
@@ -169,6 +186,10 @@ export const publicationCleanupMachine = setup({
 					context.capability.isCurrent()
 						? { context: observations(context, { deletedNoteIds: event.ids }) }
 						: { target: 'stopped' },
+				HIGHLIGHT_DELETIONS: ({ context, event }) =>
+					context.capability.isCurrent()
+						? { context: observations(context, { deletedHighlightIds: event.ids }) }
+						: { target: 'stopped' },
 				FAILED: { target: '.waiting' }
 			},
 			states: {
@@ -195,6 +216,13 @@ export const publicationCleanupMachine = setup({
 												(value) => value.libraryId === context.capability.libraryId
 											)
 										})
+									}
+								: { target: '#publication-cleanup-stopped' },
+						HIGHLIGHT_DELETIONS: ({ context, event }) =>
+							context.capability.isCurrent()
+								? {
+										target: 'choosing',
+										context: observations(context, { deletedHighlightIds: event.ids })
 									}
 								: { target: '#publication-cleanup-stopped' },
 						DELETIONS: ({ context, event }) =>

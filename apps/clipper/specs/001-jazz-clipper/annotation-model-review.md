@@ -482,3 +482,37 @@ reconciliation workflow or claim a global uniqueness guarantee. Native history i
 available through Jazz but has no new history UI. Following the reader demo, the
 user requested that removing a highlight show no Restore option. The reader no
 longer exposes that action; Jazz's native soft-delete/restore capability remains.
+
+## Highlight sharing MVP (2026-11-17)
+
+The sharing flow now accepts the existing highlight source alternative, with or
+without one attached note, alongside document notes. It reuses the approved
+Publication union, native Jazz history and Margin `at.margin.note` projection.
+This slice adds no stored fields, dependencies, public lexicons or product copy.
+
+The backend fetches the original public source through the bounded capture gateway
+and parses its DOM text in the existing isolated Node worker, before Readability
+or reader transformations. Source normalization converts CRLF/CR to LF and leaves
+other whitespace and Unicode intact. Scripts, styles, templates and explicitly
+hidden content are excluded. A missing or repeated exact quotation is unavailable
+for this MVP. A unique match supplies an ephemeral source anchor for the existing
+projection; the saved reader anchor is unchanged. Margin receives a
+TextQuoteSelector with source context and no position selector. The issuance
+transaction rechecks the accepted highlight, quotation and attached commentary
+against the verified record before the existing conditional PDS write.
+
+Preview, Publish, Unpublish and same-address republishing work for highlights.
+Accepted native highlight deletion joins the existing library cleanup workflow;
+it retains the publication address and removes the public record using the same
+content/CID checks as document notes. Removing a private attached note alone does
+not automatically update its published highlight. Automatic content-edit and
+document Trash/restore synchronization remain deferred; Unpublish then Publish
+reflects changed commentary.
+
+Qualification: 1,039 unit/native tests and 31 component tests pass. The built
+Chromium flow selects reader text, publishes a bare highlight, unpublishes it,
+attaches a note, republishes at the same address, then deletes the highlight and
+observes public cleanup. It also retains the existing two full offline browser
+restarts and reconnect cleanup for a deleted document note. Provider, source and
+PDS responses are synthetic; auth, Jazz, parser worker, application worker and UI
+are real. No live grant upgrade, PDS mutation or deployment was performed.

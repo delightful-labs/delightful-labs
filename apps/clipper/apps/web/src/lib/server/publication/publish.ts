@@ -15,7 +15,8 @@ import type { Publication } from '../../annotations/publication.js'
 import type { PublicationPreview } from '../../annotations/publication-preview.js'
 import { authorizePublicationTransaction, createPublicationAccess } from './access.js'
 import type { PublicationAccess, PublicationAuth } from './access.js'
-import { createDocumentNotePreview } from './preview.js'
+import { highlightSourceGateway } from './highlight-preview.js'
+import { createPublicationPreview } from './annotation-preview.js'
 import { createPublicationStore } from './store.js'
 import { hasRestorer, permitsPublication } from './permission.js'
 import { allocatePublicationAddress } from './address.js'
@@ -80,7 +81,8 @@ function binding(input: Input & Selected) {
 export function createPublicationPublish(
 	auth: PublicationAuth,
 	backend: Pick<Jazz, 'accountFor' | 'db'>,
-	mode: Mode = 'publish'
+	mode: Mode = 'publish',
+	sourceGateway = highlightSourceGateway
 ) {
 	const actors = {
 		input: createAsyncLogic({
@@ -101,7 +103,7 @@ export function createPublicationPublish(
 							id: input.publicationId,
 							libraryId: input.selection.libraryId,
 							publishingDid: input.access.did,
-							highlightId: null,
+							highlightId: 'highlightId' in source ? source.highlightId : null,
 							noteId: 'noteId' in source ? source.noteId : null
 						})
 						.orderBy('$acceptedAt', 'desc'),
@@ -115,14 +117,18 @@ export function createPublicationPublish(
 		}),
 		deleted: createAsyncLogic({
 			run: async ({ input }: { input: Selection }) => {
-				if (!('noteId' in input.source)) return false
-				const row = await backend.db.one(
-					app.notes
-						.includeDeleted()
-						.where({ id: input.source.noteId, libraryId: input.libraryId })
-						.select('*', '$deletedAt'),
-					{ tier: ReadTier.Remote }
-				)
+				const source = input.source
+				const query =
+					'noteId' in source
+						? app.notes
+								.includeDeleted()
+								.where({ id: source.noteId, libraryId: input.libraryId })
+								.select('id', '$deletedAt')
+						: app.highlights
+								.includeDeleted()
+								.where({ id: source.highlightId, libraryId: input.libraryId })
+								.select('id', '$deletedAt')
+				const row = await backend.db.one(query, { tier: ReadTier.Remote })
 				return !!row?.$deletedAt
 			}
 		}),
@@ -153,7 +159,7 @@ export function createPublicationPublish(
 				return { status: response.status, redirected: response.redirected }
 			}
 		}),
-		preview: createDocumentNotePreview(backend.db),
+		preview: createPublicationPreview(backend.db, sourceGateway),
 		restore: createAsyncLogic({
 			run: ({ input }: { input: string }) => {
 				if (!hasRestorer(auth.api)) throw new Error('Publication provider unavailable')
@@ -321,10 +327,10 @@ export function createPublicationPublish(
 					id: 'input',
 					src: 'input',
 					input: ({ context }) => context.request,
-					onDone: ({ event }) =>
-						'noteId' in event.output.source
-							? { target: 'readingAccess', context: { selection: event.output } }
-							: { target: 'unavailable' },
+					onDone: ({ event }) => ({
+						target: 'readingAccess',
+						context: { selection: event.output }
+					}),
 					onError: { target: 'invalid' }
 				}
 			},
@@ -538,22 +544,32 @@ export function createPublicationPublish(
 					input: ({ context, input }) => {
 						const scope = binding(context),
 							access = context.access
-						const logic = createPublicationStore(backend.db, scope, async (tx) => {
-							const source = context.selection.source
-							const [authorized, note] = await Promise.all([
-								authorizePublicationTransaction(tx, access),
-								mode === 'cleanup' && 'noteId' in source
-									? tx.one(
-											app.notes
-												.includeDeleted()
-												.where({ id: source.noteId, libraryId: scope.libraryId })
-												.select('*', '$deletedAt'),
-											{ tier: ReadTier.Remote }
-										)
-									: Promise.resolve(undefined)
-							])
-							return authorized && (mode !== 'cleanup' || !!note?.$deletedAt)
-						}).stage
+						const logic = createPublicationStore(
+							backend.db,
+							scope,
+							async (tx) => {
+								const source = context.selection.source
+								const [authorized, note] = await Promise.all([
+									authorizePublicationTransaction(tx, access),
+									mode === 'cleanup'
+										? tx.one(
+												'noteId' in source
+													? app.notes
+															.includeDeleted()
+															.where({ id: source.noteId, libraryId: scope.libraryId })
+															.select('id', '$deletedAt')
+													: app.highlights
+															.includeDeleted()
+															.where({ id: source.highlightId, libraryId: scope.libraryId })
+															.select('id', '$deletedAt'),
+												{ tier: ReadTier.Remote }
+											)
+										: Promise.resolve(undefined)
+								])
+								return authorized && (mode !== 'cleanup' || !!note?.$deletedAt)
+							},
+							'highlightId' in context.selection.source ? context.preview?.record : undefined
+						).stage
 						return {
 							operationId: input.operationId,
 							input: {
@@ -794,9 +810,10 @@ export async function handlePublicationPublish(
 	backend: Pick<Jazz, 'accountFor' | 'db'>,
 	request: Request,
 	origin: string,
-	mode: Mode = 'publish'
+	mode: Mode = 'publish',
+	sourceGateway = highlightSourceGateway
 ) {
-	const actor = createActor(createPublicationPublish(auth, backend, mode), {
+	const actor = createActor(createPublicationPublish(auth, backend, mode, sourceGateway), {
 		input: { request, origin }
 	})
 	const disconnect = () => actor.send({ type: 'DISCONNECT' })

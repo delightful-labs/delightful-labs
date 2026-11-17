@@ -1,3 +1,6 @@
+import { isDeepStrictEqual } from 'node:util'
+import type { MarginRecord } from '../../annotations/margin.js'
+import { highlightRowSchema, READER_TEXT_VERSION } from '../../annotations/schema.js'
 import { ReadTier } from 'jazz-tools'
 import type { Db, Transaction } from 'jazz-tools'
 import { createAsyncLogic, setup, types } from 'xstate'
@@ -33,7 +36,7 @@ type Facts = {
 	contentMatches: boolean
 	authorized: boolean
 }
-type Context = Input & { facts: Facts | undefined }
+type Context = Input & { facts: Facts | undefined; verifiedHighlight: MarginRecord | undefined }
 
 function permitsTransition({ current, publication }: Facts) {
 	if (!current) return publication.state === 'private' || publication.state === 'requested'
@@ -68,6 +71,40 @@ function matchesAcceptedNote(publication: Publication, note: unknown) {
 	}
 }
 
+function matchesAcceptedHighlight(
+	publication: Publication,
+	highlight: unknown,
+	verified: MarginRecord | undefined
+) {
+	if (publication.state !== 'issued') return true
+	const parsed = highlightRowSchema.safeParse(highlight)
+	if (!parsed.success || !verified || !isDeepStrictEqual(publication.record, verified)) return false
+	const value = parsed.data,
+		record = publication.record
+	const anchors = value.anchors.filter(
+		(anchor) => anchor.kind === 'reader' && anchor.normalizationVersion === READER_TEXT_VERSION
+	)
+	const anchor = anchors[0],
+		note = value.notes[0]
+	if (
+		anchors.length !== 1 ||
+		!anchor ||
+		value.notes.length > 1 ||
+		record.target.source !== value.source ||
+		record.target.selector?.exact !== anchor.range.matched
+	)
+		return false
+	if (!note) return record.motivation === 'highlighting'
+	return (
+		note.libraryId === value.libraryId &&
+		note.highlightId === value.id &&
+		note.documentId === null &&
+		note.source === null &&
+		record.motivation === 'commenting' &&
+		record.body.value === note.text
+	)
+}
+
 /** Backend-only persistence capability, not consent, grant admission or a PDS
  * executor. Its verified host owns Publish admission and must confirm the remote
  * write before supplying published. Never dispatch until this chart succeeds. */
@@ -79,12 +116,13 @@ export function createPublicationStore(
 		publishingDid: string
 		isCurrent: () => boolean
 	},
-	authorize: (tx: Transaction<'serializable'>) => Promise<boolean> = () => Promise.resolve(true)
+	authorize: (tx: Transaction<'serializable'>) => Promise<boolean> = () => Promise.resolve(true),
+	verifiedHighlight: MarginRecord | undefined = undefined
 ) {
 	const scope = { ...binding }
 	const actors = {
 		read: createAsyncLogic({
-			run: async ({ input }: { input: Input }): Promise<Facts> => {
+			run: async ({ input }: { input: Context }): Promise<Facts> => {
 				const publication = publicationSchema.parse(input.attempt.draft)
 				const values = publicationValues(publication)
 				const tx = input.resource.tx
@@ -97,7 +135,7 @@ export function createPublicationStore(
 							? tx.one(
 									app.highlights
 										.where({ id: values.highlightId, libraryId: scope.libraryId })
-										.include({ document: true }),
+										.include({ document: true, anchors: true, notes: true }),
 									{ tier: ReadTier.Remote }
 								)
 							: Promise.resolve(null),
@@ -156,7 +194,9 @@ export function createPublicationStore(
 								value.uri === publication.uri
 							)
 						}),
-					contentMatches: matchesAcceptedNote(publication, note)
+					contentMatches: values.highlightId
+						? matchesAcceptedHighlight(publication, highlight, input.verifiedHighlight)
+						: matchesAcceptedNote(publication, note)
 				}
 			}
 		})
@@ -198,7 +238,7 @@ export function createPublicationStore(
 	const domain = model.createMachine({
 		id: 'publication-domain',
 		initial: 'reading',
-		context: ({ input }) => ({ ...input, facts: undefined }),
+		context: ({ input }) => ({ ...input, facts: undefined, verifiedHighlight }),
 		output: ({ context }) => ({ global: context.resource.global }),
 		states: {
 			reading: {

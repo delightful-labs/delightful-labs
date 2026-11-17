@@ -23,7 +23,7 @@
 		client,
 		documentId,
 		requestId: view.requestId,
-		noteId: view.noteId
+		source: view.source
 	}))
 	function close() {
 		binding.client.send({
@@ -56,10 +56,17 @@
 		})
 	}
 	function retry() {
-		if (binding.noteId)
+		if (binding.source)
 			binding.client.send({
 				type: 'ANNOTATION',
-				command: { type: 'PREVIEW_NOTE', documentId: binding.documentId, id: binding.noteId }
+				command:
+					'noteId' in binding.source
+						? { type: 'PREVIEW_NOTE', documentId: binding.documentId, id: binding.source.noteId }
+						: {
+								type: 'PREVIEW_HIGHLIGHT',
+								documentId: binding.documentId,
+								id: binding.source.highlightId
+							}
 			})
 	}
 </script>
@@ -74,6 +81,7 @@
 	}}
 >
 	<div class="preview-content" aria-busy={view.pending}>
+		{#if view.quote}<blockquote>{view.quote}</blockquote>{/if}
 		{#if view.message}<StatusMessage {...view.message} />{/if}
 		{#if view.value}
 			<dl>
@@ -111,7 +119,7 @@
 					>{t('account.atproto.sign_in')}</Button
 				>{/if}
 			<Button onclick={close}>{t('actions.close')}</Button>
-			{#if view.retry && binding.noteId}<Button disabled={!enabled} onclick={retry}
+			{#if view.retry && binding.source}<Button disabled={!enabled} onclick={retry}
 					>{t('actions.retry')}</Button
 				>{/if}
 		</div>

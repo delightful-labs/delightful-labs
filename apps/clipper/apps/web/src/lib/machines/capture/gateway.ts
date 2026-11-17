@@ -16,15 +16,17 @@ export type GatewayResult =
 			provenance: { submittedUrl: string; redirects: Redirect[]; resolvedAt: string }
 			extraction: Extraction | undefined
 			asset?: { bytes: Uint8Array; mediaType: string }
+			source?: Pick<Hop, 'body' | 'mediaType'>
 	  }
 	| { kind: 'failed'; error: unknown }
 export type GatewayInput = {
 	url: string
-	signal: AbortSignal
-	mode: 'resolve' | 'extract' | 'asset'
+	signal?: AbortSignal
+	mode: 'resolve' | 'extract' | 'asset' | 'source'
 }
 type Input = GatewayInput
-type Context = Input & {
+type Context = Omit<Input, 'signal'> & {
+	signal: AbortSignal
 	controller: AbortController
 	current: string
 	visited: string[]
@@ -46,7 +48,7 @@ export function createGatewayMachine(capability: {
 		url: URL,
 		destination: Destination,
 		signal: AbortSignal,
-		mode?: 'resolve' | 'extract' | 'asset'
+		mode?: 'resolve' | 'extract' | 'asset' | 'source'
 	) => Promise<Hop>
 	extract: (
 		body: Uint8Array,
@@ -64,23 +66,23 @@ export function createGatewayMachine(capability: {
 			}
 		}),
 		resolve: createAsyncLogic({
-			run: ({ input }: { input: Context }) =>
-				capability.resolve(sourceUrl(input.current), input.signal)
+			run: ({ input, signal }: { input: Context; signal: AbortSignal }) =>
+				capability.resolve(sourceUrl(input.current), AbortSignal.any([input.signal, signal]))
 		}),
 		fetch: createAsyncLogic({
-			run: async ({ input }: { input: Context }) => {
+			run: async ({ input, signal }: { input: Context; signal: AbortSignal }) => {
 				if (!input.destination) throw new Error('Missing destination')
 				const hop = await capability.fetch(
 					sourceUrl(input.current),
 					input.destination,
-					input.signal,
+					AbortSignal.any([input.signal, signal]),
 					input.mode
 				)
 				return { ...hop, observedAt: new Date().toISOString() }
 			}
 		}),
 		extract: createAsyncLogic({
-			run: async ({ input }: { input: Context }) => {
+			run: async ({ input, signal }: { input: Context; signal: AbortSignal }) => {
 				input.signal.throwIfAborted()
 				if (!input.hop) throw new Error('Missing response')
 				try {
@@ -88,7 +90,7 @@ export function createGatewayMachine(capability: {
 						input.hop.body,
 						input.hop.mediaType,
 						input.current,
-						input.signal
+						AbortSignal.any([input.signal, signal])
 					)
 				} catch (error) {
 					throw error instanceof CaptureError ? error : new CaptureError('parseFailed', 422)
@@ -211,7 +213,9 @@ export function createGatewayMachine(capability: {
 			const controller = new AbortController()
 			return {
 				...input,
-				signal: AbortSignal.any([input.signal, controller.signal]),
+				signal: input.signal
+					? AbortSignal.any([input.signal, controller.signal])
+					: controller.signal,
 				controller,
 				current: input.url,
 				visited: [input.url],
@@ -290,6 +294,24 @@ export function createGatewayMachine(capability: {
 							context = { ...args.context, ...patch }
 							return { target: 'done', context: patch }
 						}
+						if (event.output.status === 200 && args.context.mode === 'source')
+							return {
+								target: 'done',
+								context: {
+									hop: undefined,
+									output: {
+										kind: 'success',
+										finalUrl: args.context.current,
+										provenance: {
+											submittedUrl: args.context.url,
+											redirects: args.context.redirects,
+											resolvedAt: event.output.observedAt
+										},
+										extraction: undefined,
+										source: { body: event.output.body, mediaType: event.output.mediaType }
+									}
+								}
+							}
 						if (args.guards.successfulResponse(args, { hop: event.output })) {
 							return {
 								target: 'extracting',

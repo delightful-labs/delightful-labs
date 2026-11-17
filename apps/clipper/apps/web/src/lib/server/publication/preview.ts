@@ -17,6 +17,7 @@ type Binding = {
 	isCurrent: () => boolean
 }
 type Input = { source: PublicationSource; createdAt: Date; binding: Binding; republish?: boolean }
+export type PreviewInput = Input
 type Context = Input & { preview: PublicationPreview | undefined }
 
 /** Backend-only read capability, not an authenticated request endpoint. The host

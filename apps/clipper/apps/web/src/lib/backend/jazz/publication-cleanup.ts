@@ -18,10 +18,11 @@ export function createPublicationCleanupRecords(
 		observe: (
 			publications: (values: Publication[]) => void,
 			deletions: (ids: string[]) => void,
-			error: () => void
+			error: () => void,
+			highlightDeletions: (ids: string[]) => void
 		) => {
 			const releasePublications = db.subscribe(
-				app.publications.where({ libraryId, highlightId: null }),
+				app.publications.where({ libraryId }),
 				{
 					onUpdate: (rows) => {
 						if (!isCurrent()) return
@@ -50,9 +51,27 @@ export function createPublicationCleanupRecords(
 					},
 					{ tier: ReadTier.Remote }
 				)
+				let releaseHighlights: () => void
+				try {
+					releaseHighlights = db.subscribe(
+						app.highlights.includeDeleted().where({ libraryId }).select('id', '$deletedAt'),
+						{
+							onUpdate: (rows) => {
+								if (isCurrent())
+									highlightDeletions(rows.filter((row) => !!row.$deletedAt).map((row) => row.id))
+							},
+							onError: error
+						},
+						{ tier: ReadTier.Remote }
+					)
+				} catch (cause) {
+					releaseNotes()
+					throw cause
+				}
 				return () => {
 					releasePublications()
 					releaseNotes()
+					releaseHighlights()
 				}
 			} catch (cause) {
 				releasePublications()

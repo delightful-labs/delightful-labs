@@ -12,7 +12,7 @@ import { publicationBaseSchema } from '../../annotations/publication.js'
 import type { Publication } from '../../annotations/publication.js'
 import { authorizePublicationTransaction, createPublicationAccess } from './access.js'
 import type { PublicationAccess, PublicationAuth } from './access.js'
-import { createDocumentNotePreview } from './preview.js'
+import { createPublicationPreview } from './annotation-preview.js'
 import { createPublicationStore } from './store.js'
 import {
 	isJsonRequest,
@@ -55,7 +55,7 @@ export function createPublicationSubmit(
 				readPublicationInput(input, signal, publicationBaseSchema, 4096)
 		}),
 		access: createPublicationAccess(auth, backend),
-		preview: createDocumentNotePreview(backend.db),
+		preview: createPublicationPreview(backend.db),
 		current: createAsyncLogic({
 			run: ({ input }: { input: Input & Selected }) =>
 				createPublicationStore(
@@ -143,10 +143,10 @@ export function createPublicationSubmit(
 							id: 'input',
 							src: 'input',
 							input: ({ context }) => context.request,
-							onDone: ({ event }) =>
-								'noteId' in event.output.source
-									? { target: 'readingAccess', context: { selection: event.output } }
-									: { target: '#publication-submit-unavailable' },
+							onDone: ({ event }) => ({
+								target: 'readingAccess',
+								context: { selection: event.output }
+							}),
 							onError: { target: '#publication-submit-invalid' }
 						}
 					},

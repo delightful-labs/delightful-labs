@@ -28,6 +28,7 @@ const parentFields = { documentId: lowercaseUuidSchema }
 export const annotationCommandSchema = z.discriminatedUnion('type', [
 	z.object({ type: z.literal('OPEN'), ...parentFields, text: z.string().max(8_000_000) }),
 	z.object({ type: z.literal('CLOSE') }),
+	z.object({ type: z.literal('PREVIEW_HIGHLIGHT'), ...parentFields, id: lowercaseUuidSchema }),
 	z.object({ type: z.literal('PREVIEW_NOTE'), ...parentFields, id: lowercaseUuidSchema }),
 	z.object({
 		type: z.enum(['PUBLISH_NOTE', 'UNPUBLISH_NOTE']),
@@ -75,6 +76,7 @@ export type AnnotationMutation = Exclude<
 			| 'CLOSE'
 			| 'KEEP_DRAFT'
 			| 'PREVIEW_NOTE'
+			| 'PREVIEW_HIGHLIGHT'
 			| 'CLOSE_PREVIEW'
 			| 'PUBLISH_NOTE'
 			| 'UNPUBLISH_NOTE'
@@ -118,6 +120,7 @@ export const emptyAnnotationRows: AnnotationRows = { highlights: [], notes: [] }
 /** The browser supplies native textContent/DOM offsets; normalization and range
  * capture belong to the worker, under this explicitly versioned contract. */
 export const READER_TEXT_VERSION = 'clipper-dom-text-v1'
+export const SOURCE_TEXT_VERSION = 'clipper-source-dom-text-v1'
 export function normalizeReaderText(text: string) {
 	return text.replace(/\r\n?/g, '\n')
 }

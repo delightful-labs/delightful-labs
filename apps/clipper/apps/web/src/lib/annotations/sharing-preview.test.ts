@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createActor, SimulatedClock, toPromise, waitFor } from 'xstate'
 import { sharingPreviewMachine, selectSharingPreview } from './sharing-preview.js'
+import { highlightRowSchema } from './schema.js'
 import type { AnnotationNote } from './schema.js'
 import type { PublicationPreview } from './publication-preview.js'
 
@@ -332,4 +333,76 @@ it('keeps an unconfirmed removal retryable without offering another publish', as
 	expect(view.canUnpublish).toBe(true)
 	expect(view.canPublish).toBe(false)
 	expect(view.publication).toBeUndefined()
+})
+
+it('previews a highlight and its commentary using the approved highlight source union', async () => {
+	const a = fixture()
+	const highlightId = crypto.randomUUID()
+	const highlight = {
+		id: highlightId,
+		libraryId: a.note.libraryId,
+		documentId: a.note.documentId ?? crypto.randomUUID(),
+		source: 'https://example.org/source',
+		anchors: [
+			{
+				id: crypto.randomUUID(),
+				highlightId,
+				kind: 'reader',
+				normalizationVersion: 'clipper-dom-text-v1',
+				textHash: 'hash',
+				range: { before: 'Reader before', matched: 'Quoted passage.', after: 'Reader after' }
+			}
+		],
+		notes: [{ ...a.note, highlightId, documentId: null, source: null }]
+	}
+	const value = {
+		...a.value,
+		source: { highlightId: highlight.id },
+		record: {
+			...a.value.record,
+			target: {
+				source: highlight.source,
+				selector: {
+					type: 'TextQuoteSelector',
+					exact: 'Quoted passage.',
+					prefix: 'Original before',
+					suffix: 'Original after'
+				}
+			}
+		}
+	}
+	const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(value))
+	vi.stubGlobal('fetch', fetch)
+	const parsed = highlightRowSchema.parse(highlight)
+	a.actor.send({ type: 'SHOW_HIGHLIGHT', highlight: parsed })
+	await ready(a)
+	const view = selectSharingPreview(a.actor.getSnapshot())
+	expect(view.source).toEqual({ highlightId: highlight.id })
+	expect(view.quote).toBe('Quoted passage.')
+	expect(view.noteText).toBe(a.note.text)
+	expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
+		libraryId: a.note.libraryId,
+		source: { highlightId: highlight.id }
+	})
+	a.actor.send({ type: 'INVALIDATED', noteId: a.note.id })
+	expect(selectSharingPreview(a.actor.getSnapshot()).open).toBe(false)
+})
+it('uses the existing highlight-unavailable message for an unverified source', async () => {
+	const a = fixture(),
+		id = crypto.randomUUID()
+	vi.stubGlobal('fetch', async () => new Response(null, { status: 409 }))
+	a.actor.send({
+		type: 'SHOW_HIGHLIGHT',
+		highlight: {
+			id,
+			libraryId: a.note.libraryId,
+			documentId: a.note.documentId ?? crypto.randomUUID(),
+			source: 'https://example.org/source',
+			anchors: [],
+			notes: []
+		}
+	})
+	await waitFor(a.actor, (s) => s.matches('highlightUnavailable'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).message?.text).toBe('highlight unavailable')
+	expect(selectSharingPreview(a.actor.getSnapshot()).retry).toBe(true)
 })
