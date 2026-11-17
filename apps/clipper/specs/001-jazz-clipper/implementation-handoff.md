@@ -1,5 +1,45 @@
 # Article notes — implementation started
 
+## Frozen owned-content comparison — 2026-11-17
+
+`publication/compare.ts` adds the pure `matchesIssuedContent` guard over the
+existing issued Publication and found PDS record. It needs no new result schema,
+stored fields, dependencies, HTTP endpoint or workflow. The caller retains the
+complete read observation; this guard never rewrites it or changes publication
+state. Native acceptance, current scope/grant, confirmation and dispatch remain
+the future publisher host's responsibilities.
+
+The guard validates the issued snapshot and exact returned URI through the
+existing canonical schemas/reader. Wrong lifecycle/address or unreadable data is
+an error, separate from a false owned-content comparison. notFound remains the
+existing read alternative and never becomes a comparison result or permission
+to recreate. Root owned fields come from the approved Margin projection schema:
+type, motivation, target, body and lifecycle timestamps. They are compared
+structurally, without property-order dependence, coercion or normalization. Added
+or missing body/modifiedAt fields and even timestamp-spelling changes do not match.
+
+Independent root metadata (including unknown fields) stays outside this owned
+comparison and remains intact on the original observation. Within target, only
+title and sourceHash are excluded: [Margin defines them](https://github.com/paddinglabs/margin/blob/main/lexicons/at/margin/note.json)
+as page title and indexing hash. Other target/body/selector additions require
+review instead of being discarded as metadata. This includes body URI, resource
+state and selector refinement; [W3C states](https://www.w3.org/TR/annotation-model/#states)
+describe the representation being annotated. The guard is deliberately not a
+validator for all foreign metadata or a content-digest/whole-record equality proof.
+No facet-removal, remote merge, overwrite or conflict-resolution policy is added.
+
+All 99 publication/auth regressions pass. New cases cover independent metadata,
+reordered fields, missing CIDs, exact body/source/selector/timestamp changes,
+unsupported additions, bare-highlight/commentary distinctions and invalid bindings.
+The native SQLite reopen test compares the retained issued snapshot after a later
+accepted Note edit. The actual restored OAuth-session GET fixture also feeds its
+found record into this guard and retains the foreign metadata. Provider HTTP is
+synthetic; no live PDS write or complete publisher loop is claimed.
+Five final comparison tests pass after making the private-lifecycle refusal case
+use a valid private value. Strict root/web/service-worker/extension types, Clipper
+lint/formatting and whitespace checks pass. No new build/browser/PDS execution
+qualification is claimed for this pure guard.
+
 ## PDS read ownership — 2026-11-17
 
 The user rejected nullable read outcomes and approved the explicit transient

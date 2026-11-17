@@ -12,6 +12,7 @@ import { policySchema } from '../../backend/jazz/schema-permissions.test-support
 import { newDocumentValues } from '../../backend/jazz/document-values.js'
 import { createPublicationStore } from './store.js'
 import { toFirstPublicationWrite } from './first-write.js'
+import { matchesIssuedContent } from './compare.js'
 import {
 	publicationFromRow,
 	publicationSchema,
@@ -389,6 +390,12 @@ it('retains requested/issued state, exact payload, native identity and history t
 			.wait({ tier: 'global' })
 		const retained = await backend.db.one(app.publications.where({ id: before.id }))
 		expect(toFirstPublicationWrite(publicationFromRow(retained))).toEqual(frozenWrite)
+		expect(
+			matchesIssuedContent(publicationFromRow(retained), {
+				uri: `at://${publishingDid}/at.margin.note/${key}`,
+				value: { ...frozenWrite.record, color: 'blue', tags: ['foreign metadata'] }
+			})
+		).toBe(true)
 		expect(
 			(await backend.db.all(app.$history.publications.where({ id: before.id }))).map(
 				publicationFromRow

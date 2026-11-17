@@ -21,6 +21,7 @@ import { origin, requestFixture } from './request.test-support.js'
 import type { PublicationAuth } from './access.js'
 import { pdsRead } from './pds-read.js'
 import type { PdsReadSession } from './pds-read.js'
+import { matchesIssuedContent } from './compare.js'
 
 const pluginRequire = createRequire(import.meta.resolve('@kingironman2011/better-auth-bsky'))
 const oauthPath = pathToFileURL(pluginRequire.resolve('@atcute/oauth-node-client')).href
@@ -474,14 +475,14 @@ for (const found of [true, false])
 	it(`reads an explicit ${found ? 'found' : 'notFound'} outcome through the real restored plugin session`, async () => {
 		const did = 'did:plc:ewvi7nxzyoun6zhxrhs64oiz'
 		const uri = `at://${did}/at.margin.note/3jzfcijpj2z2a`
-		const record = {
-			uri,
-			value: {
-				$type: 'at.margin.note',
-				motivation: 'commenting',
-				foreign: { retained: [true, null] }
-			}
+		const frozenContent = {
+			$type: 'at.margin.note',
+			motivation: 'commenting',
+			createdAt: '2026-11-17T12:00:00Z',
+			target: { source: 'https://example.org/article' },
+			body: { value: 'Private document note', format: 'text/plain' }
 		}
+		const record = { uri, value: { ...frozenContent, foreign: { retained: [true, null] } } }
 		const read = vi.fn((request: Request) => {
 			expect(request.method).toBe('GET')
 			expect(request.headers.has('DPoP')).toBe(true)
@@ -514,9 +515,20 @@ for (const found of [true, false])
 		try {
 			const result = toPromise(actor)
 			actor.start()
-			expect(await result).toEqual(
-				found ? { status: 'found', record } : { status: 'notFound', uri }
-			)
+			const observation = await result
+			expect(observation).toEqual(found ? { status: 'found', record } : { status: 'notFound', uri })
+			if (observation.status === 'found')
+				expect(
+					matchesIssuedContent(
+						{
+							...selection(a),
+							state: 'issued',
+							uri,
+							record: frozenContent
+						},
+						observation.record
+					)
+				).toBe(true)
 			expect(read).toHaveBeenCalledTimes(1)
 			expect(await a.owner.backend.all(app.publications)).toHaveLength(0)
 		} finally {
