@@ -44,6 +44,13 @@ Record SDK gaps and defer them when product requirements permit; the late-close
 finding adds no workaround task. Review the unadopted sign-out work before
 expanding commands. Do not build a generic SDK command surface ahead of callers.
 
+Treat cleanup as part of every upgrade slice: inspect the code being changed for
+native replacements, reusable behavior and superseded adapters/fixtures. Record
+the concrete removals or deferred findings in the existing handoff, and remove
+replaced code when its replacement is adopted and qualified. Follow the
+[continuous simplification requirements](worker-migration-tasks.md#continuous-simplification-during-implementation);
+do not accumulate a second implementation alongside the selected native path.
+
 - [x] **U1 — Qualify the existing persistent-worker bridge on alpha.65 in
       isolation.** The unpatched SDK already fails cold worker data retention.
       Adapt the existing patch's worker detection/Window-hook behavior to the

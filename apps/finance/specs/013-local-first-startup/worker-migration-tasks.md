@@ -190,6 +190,39 @@ namespace boundaries. Then complete C3/C4/C5 as one real read slice, followed by
 C6. Qualification is required before replacing live behavior; the first cleanup
 must not turn into a runtime cutover or a new account-data migration.
 
+### Continuous simplification during implementation
+
+The user reiterated on 2026-11-17 that identifying cleanup is part of every SDK
+upgrade and worker slice. Apply this during U1–U5 and C3–C7, using the shared
+[native-library and integration guidance](../../../../docs/engineering/dependencies.md#prefer-native-library-behavior-and-small-integration-surfaces).
+Keep the seven tasks above; this is how we execute them, rather than a separate
+cleanup phase after migration.
+
+For the code touched by each slice:
+
+- Check the actual installed library APIs and existing app/shared code for a
+  simpler supported solution. Look for wrappers, duplicated lifecycle state,
+  manual schema/type copies and SDK workarounds that native behavior replaces.
+- Concentrate SDK lifecycle/platform differences in thin adapters. Share behavior
+  through Local First when both Finance and Clipper actually need it; keep native
+  domain schemas, permissions and queries in their owning app. Avoid a universal
+  SDK facade or abstractions built for hypothetical future callers.
+- Remove superseded code and implementation-specific fixtures when the replacement
+  is adopted and qualified. Preserve financial identity, settlement, evidence and
+  resource-drain behavior; fewer files alone does not establish a simplification.
+- Add a short note to the existing handoff describing what was reused or removed
+  and what remains. For deferred cleanup or an SDK limitation, record the concrete
+  code/API, evidence and adoption prerequisite. Discuss an uncertain architectural
+  choice with the user before implementing it. A missing SDK feature does not
+  automatically justify another workaround.
+
+The isolated alpha.66 candidate already demonstrates this approach: it removes
+Finance's text-column wrapper, Clipper's reading-column wrapper and Finance's
+per-read previous-schema override, while reusing native transforms/sets, existing
+record codecs and the existing restore charts. The restore probe is shared by the
+old and candidate test harnesses. Keep candidate-only removals distinct from
+active-source adoption, and retain genuinely historical evidence separately.
+
 ## C1: unused grant/call removal
 
 The repository-wide source/configuration reference audit found no active Finance
