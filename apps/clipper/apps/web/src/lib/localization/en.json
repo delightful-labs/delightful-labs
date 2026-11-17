@@ -171,6 +171,7 @@
 		"enter_subject": "Enter {{subject}}"
 	},
 	"status": {
+		"preparing": "Preparing…",
 		"leave_warning": "Changes have not been saved. Leave anyway?",
 		"unavailable_subject": "{{subject}} unavailable",
 		"failed_subject": "{{subject}} failed.",
@@ -182,6 +183,12 @@
 		"conflict": "{{subject}} has conflicting versions. Your changes have been kept.",
 		"too_large_subject": "{{subject}} exceeds the current save limit.",
 		"already_selected_subject_name": "{{subject}} {{name}} is already selected."
+	},
+	"publication": {
+		"preview_action": "Preview sharing",
+		"preview_heading": "Preview",
+		"account": "AT Protocol account",
+		"unavailable": "Sharing preview is unavailable. Check your AT Protocol sign-in and saved note, then try again."
 	},
 	"notes": {
 		"keep_text": "Keep this text"

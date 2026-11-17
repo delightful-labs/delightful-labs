@@ -198,6 +198,8 @@ it('hands pending annotations from scoped transport receipts to worker durabilit
 	f.binding.update(initial)
 	for (const command of [
 		{ type: 'OPEN', documentId: crypto.randomUUID(), text: 'Read only.' },
+		{ type: 'PREVIEW_NOTE', documentId: crypto.randomUUID(), id: crypto.randomUUID() },
+		{ type: 'CLOSE_PREVIEW', documentId: crypto.randomUUID(), requestId: 1 },
 		{ type: 'CLOSE' }
 	] satisfies import('../../annotations/schema.js').AnnotationCommand[]) {
 		f.client.send({ type: 'ANNOTATION', command })

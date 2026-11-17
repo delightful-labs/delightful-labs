@@ -191,7 +191,9 @@ const clientMachine = setup({
 									message.type === 'LIBRARY' &&
 									message.event.type === 'ANNOTATION' &&
 									message.event.command.type !== 'OPEN' &&
-									message.event.command.type !== 'CLOSE'
+									message.event.command.type !== 'CLOSE' &&
+									message.event.command.type !== 'PREVIEW_NOTE' &&
+									message.event.command.type !== 'CLOSE_PREVIEW'
 										? [
 												...context.annotationPending,
 												{ id: message.requestId, scope: message.scope }

@@ -13,18 +13,20 @@ import type { PublicationSource } from '../../annotations/publication-link.js'
 import { publicationPreviewSchema } from '../../annotations/publication-preview.js'
 import type { PublicationPreview } from '../../annotations/publication-preview.js'
 
-type Input = { source: PublicationSource; createdAt: Date }
+type Binding = {
+	libraryId: string
+	accountId: string
+	publishingDid: string
+	isCurrent: () => boolean
+}
+type Input = { source: PublicationSource; createdAt: Date; binding: Binding }
 type Context = Input & { preview: PublicationPreview | undefined }
 
 /** Backend-only read capability, not an authenticated request endpoint. The host
  * supplies its verified binding and owns one chart per preview request. Existing
  * public addresses require reconciliation, so this supports first previews only. */
-export function createDocumentNotePreview(
-	db: Pick<Db, 'one'>,
-	binding: { libraryId: string; accountId: string; publishingDid: string; isCurrent: () => boolean }
-) {
-	const scope = { ...binding }
-	async function readNote(noteId: string, signal: AbortSignal) {
+export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
+	async function readNote(noteId: string, scope: Binding, signal: AbortSignal) {
 		const row = await db.one(
 			app.notes.where({ id: noteId, libraryId: scope.libraryId }).include({
 				document: true,
@@ -48,6 +50,7 @@ export function createDocumentNotePreview(
 	type Facts = Awaited<ReturnType<typeof readNote>>
 	function project(facts: Facts, context: Context) {
 		if (!facts) return undefined
+		const scope = context.binding
 		try {
 			return publicationPreviewSchema.parse({
 				libraryId: scope.libraryId,
@@ -61,8 +64,13 @@ export function createDocumentNotePreview(
 	}
 	const actors = {
 		read: createAsyncLogic({
-			run: ({ input, signal }: { input: { noteId: string }; signal: AbortSignal }) =>
-				readNote(input.noteId, signal)
+			run: ({
+				input,
+				signal
+			}: {
+				input: { noteId: string; binding: Binding }
+				signal: AbortSignal
+			}) => readNote(input.noteId, input.binding, signal)
 		})
 	}
 	const model = setup({
@@ -81,27 +89,29 @@ export function createDocumentNotePreview(
 			unavailable: {}
 		},
 		guards: {
-			validScope: () =>
-				scope.isCurrent() &&
-				publicationPreviewSchema.shape.libraryId.safeParse(scope.libraryId).success &&
-				publicationPreviewSchema.shape.libraryId.safeParse(scope.accountId).success &&
-				publicationPreviewSchema.shape.publishingDid.safeParse(scope.publishingDid).success,
-			eligible: (_, facts: Facts) =>
-				scope.isCurrent() &&
+			validScope: ({ context }: { context: Context }) =>
+				context.binding.isCurrent() &&
+				publicationPreviewSchema.shape.libraryId.safeParse(context.binding.libraryId).success &&
+				publicationPreviewSchema.shape.libraryId.safeParse(context.binding.accountId).success &&
+				publicationPreviewSchema.shape.publishingDid.safeParse(context.binding.publishingDid)
+					.success,
+			eligible: ({ context }: { context: Context }, facts: Facts) =>
+				context.binding.isCurrent() &&
 				facts !== undefined &&
-				facts.ownerId === scope.accountId &&
-				facts.note.libraryId === scope.libraryId &&
+				facts.ownerId === context.binding.accountId &&
+				facts.note.libraryId === context.binding.libraryId &&
 				facts.note.highlightId === null &&
 				facts.note.documentId !== null &&
-				facts.document?.libraryId === scope.libraryId &&
+				facts.document?.libraryId === context.binding.libraryId &&
 				facts.document.status !== 'trashed' &&
-				!facts.links.some((link) => publicationDid(link.uri) === scope.publishingDid)
+				!facts.links.some((link) => publicationDid(link.uri) === context.binding.publishingDid)
 		}
 	})
 	return model.createMachine({
 		id: 'document-note-publication-preview',
 		initial: 'admitting',
 		context: ({ input }) => ({
+			binding: { ...input.binding },
 			source: { ...input.source },
 			createdAt: new Date(input.createdAt),
 			preview: undefined
@@ -113,7 +123,7 @@ export function createDocumentNotePreview(
 				type: 'choice',
 				choice: (args) => {
 					const source = publicationSourceSchema.safeParse(args.context.source)
-					return args.guards.validScope() &&
+					return args.guards.validScope(args) &&
 						source.success &&
 						'noteId' in source.data &&
 						Number.isFinite(args.context.createdAt.getTime())
@@ -125,7 +135,7 @@ export function createDocumentNotePreview(
 				invoke: {
 					id: 'read',
 					src: 'read',
-					input: ({ input }) => input,
+					input: ({ input, context }) => ({ ...input, binding: context.binding }),
 					timeout: 30_000,
 					onTimeout: { target: 'unavailable' },
 					onError: { target: 'unavailable' },
