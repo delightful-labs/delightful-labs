@@ -516,3 +516,22 @@ observes public cleanup. It also retains the existing two full offline browser
 restarts and reconnect cleanup for a deleted document note. Provider, source and
 PDS responses are synthetic; auth, Jazz, parser worker, application worker and UI
 are real. No live grant upgrade, PDS mutation or deployment was performed.
+
+### Live preview preflight and typing correction (2026-11-17)
+
+With explicit user approval, PR #50 now has branch-only auth configuration with
+an independent sensitive secret and its stable preview callback origin. Preview
+deployment `dpl_5chP7165cyfJuyR4ZUN8LJD7nsyJ` serves `2af12aae`; its session and
+client-metadata endpoints return HTTP 200 in the authenticated Vercel browser.
+Cookie-free metadata and service-worker requests still redirect to Vercel login.
+The public-access override was rejected by automatic approval review because it
+has no automatic expiry. No override or live repository grant/write is claimed.
+
+Actual Add link capture saved and extracted the public AT Protocol OAuth article.
+Fast note entry then exposed a UI bug: unrelated worker snapshots repeated the
+unchanged saved text, causing the text adapter to overwrite an in-flight edit.
+The editor now derives the saved text as a primitive, so only changed column
+values reach Jazz's existing adapter. No revision field or custom text merge is
+added. A regression using the real SDK adapter fails before this correction and
+passes afterward; all 32 component cases and four native annotation browser cases,
+including sequential typing and reload persistence, pass.
