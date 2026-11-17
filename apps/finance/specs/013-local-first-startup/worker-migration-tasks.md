@@ -31,8 +31,11 @@ remains open until those consumers are adapted and qualified together.
 U2b's source review found Finance's independent workspace-restore database also
 depends on the removed opaque account handle. Its
 [ownership proposal and qualification gates](worker-restore-session-decision.md)
-are pending review before that boundary changes; this is domain drain work, not
-another field rename or SDK-upgrade leaf to delete.
+now record the user's approval and the shared application Db implementation.
+On alpha.60, strict types, 1,928 unit tests and all 107 restore qualification
+tests pass, including actual native identity replacement with a pending write
+and journal resume without replay. The alpha.65 consumer port remains open;
+this does not complete U2 or qualify an SDK/backend data upgrade.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

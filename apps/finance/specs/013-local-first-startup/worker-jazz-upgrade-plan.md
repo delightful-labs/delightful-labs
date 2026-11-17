@@ -48,8 +48,11 @@ resets or a Finance destination change.
       qualification below. Finance/Clipper caller adoption, provider changes and
       removal of their explicit upgrade phases remain U2b; U2 is not complete.
       U2b source review also found Finance's separate account-handle-based restore
-      client. Resolve its [resource ownership decision](worker-restore-session-decision.md)
-      before replacing that plumbing; public user metadata cannot reopen it.
+      client. The user approved the shared application Db in the
+      [resource ownership decision](worker-restore-session-decision.md).
+      That boundary is now implemented and qualified on alpha.60 (1,928 unit
+      tests and 107 restore tests). The alpha.65 caller port remains open;
+      public user metadata cannot reopen the old independent client.
 - [ ] **U3 — Establish SDK schema history before persistent-backend startup.**
       Both active apps use `migrations: 'none'`; alpha.65 rejects this on SQLite,
       remote and Vercel stores before opening them. Use the SDK's generated
@@ -185,10 +188,15 @@ restore opens and drains its own database using the opaque account handle.
 Alpha.65 removes that public handle and the old top-level `createDb` entry.
 The [decision record](worker-restore-session-decision.md) proposes reusing the
 application session's Db under the existing financial restore/drain charts,
-records the alternative and names the native tests required. This ownership
-change is pending user review; no replacement is implemented.
+records the alternative and names the native tests required. The user approved
+this ownership change. It now uses the application's captured Db on alpha.60,
+with transaction/commit binding checks and the existing drain/journal ownership.
+Strict types, 1,928 unit tests and all 107 restore tests pass, including native
+replacement during an accepted write awaiting acknowledgement and resume without
+replay. The decision record contains the exact scope and remaining alpha.65
+qualification; no additional SDK session or patch was introduced.
 
-After that decision, adapt Finance's layout/recovery integration/session
+Next, adapt Finance's layout/recovery integration/session
 preparation and Clipper's account host/callers, qualify the native Svelte provider
 and retire their SDK-upgrade phases. Alpha.65 imperative session subscribers
 receive notifications without a snapshot argument or initial delivery. Its

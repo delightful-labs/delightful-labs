@@ -3,7 +3,7 @@ import {
 	type JazzClientConfig,
 	type JazzClient
 } from 'jazz-tools/client'
-import { createDb, type DbConfig } from 'jazz-tools'
+import { createDb, exportLocalFirstSecret, type DbConfig } from 'jazz-tools'
 const loadLocalFirst = () => import('jazz-tools/local-first')
 async function openLocalFirstSession({
 	appId,
@@ -37,6 +37,7 @@ import { app as isolationApp } from '../../src/lib/schema.js'
 
 // Test-only SDK bindings. The host test owns every operation and resource lifetime.
 const probe = {
+	exportLocalFirstSecret,
 	openLocalFirstSession,
 	openAccountClient,
 	app: isolationApp
@@ -108,7 +109,8 @@ export function createRecoveryProbe(
 	sample: RecoverySample,
 	archive: IntegrityCheckedArchive,
 	heldWriteId?: string,
-	retain?: RestoreTransactionWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached']
+	retain?: RestoreTransactionWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached'],
+	isCurrent: () => boolean = () => true
 ) {
 	const detached: Parameters<
 		RestoreTransactionWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached']
@@ -117,7 +119,8 @@ export function createRecoveryProbe(
 		db,
 		sample,
 		archive,
-		retain ?? ((receipt) => detached.push(receipt))
+		retain ?? ((receipt) => detached.push(receipt)),
+		isCurrent
 	)
 	const commits: string[] = []
 	const commit = adapter.writer.commit
@@ -273,17 +276,15 @@ declare global {
 		financeRestoreSessionRuntime: {
 			actor: import('xstate').ActorRefFrom<ReturnType<typeof createFinanceRestoreSession>>
 			stats: {
-				acquisitions: number
-				opened: number
-				closeAttempts: number
 				releases: number
+				releaseAttempts: number
 				transactions: number
 				rollbackAttempts: number
 			}
 			transactionOpened: Promise<void>
 			commits(): string[]
-			releaseAcquisition(): void
 			releaseTransaction(): void
+			finishReplacement?: () => Promise<void>
 		}
 		financeRecoveryRuntime: {
 			client: Awaited<ReturnType<typeof openAccountClient>>

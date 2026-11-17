@@ -1,13 +1,14 @@
 # U2b: Finance workspace restore and the native Jazz session
 
-Status: caller review identified an ownership decision; implementation pending. No application source,
-SDK pin, account store or deployment destination changes are made by this record.
+Status: the user approved the shared application database approach on 2026-11-16.
+The implementation is qualified against the existing alpha.60 SDK pin. The
+alpha.65 caller port and coordinated workspace switch remain separate work.
 
-## What the code actually does
+## Previous implementation and SDK boundary
 
-Finance's [workspace restore](../../src/lib/machines/workspaces/workspace-restore.ts)
-is another consumer of the SDK account handle, beyond the recovery adapter ported
-in U2a:
+Before this change, Finance's
+[workspace restore](../../src/lib/machines/workspaces/workspace-restore.ts)
+also consumed the SDK account handle, beyond the recovery adapter ported in U2a:
 
 - `RestoreScope` retains the application session, its `AccountHandle` and client.
 - `createFinanceRestoreSession` opens a separate database using that handle and
@@ -37,14 +38,14 @@ These are inspected package sources, not a claim that the alternative below is
 already qualified. The reproducible exact-version download/integrity check is in
 [the upgrade proof](../../tests/worker-upgrade/README.md).
 
-## Recommended direction to discuss
+## Approved direction
 
 Use the existing application session's `db` for restore. Keep the existing
 restore transaction/journal machine as the domain owner, and keep the application
 session owner responsible for the Db lifetime. This removes the separate restore
 client instead of rebuilding opaque-account access or adding an SDK patch.
 
-Proposed ownership and outcomes, before implementation:
+Approved ownership and outcomes:
 
 1. Admit the restore against the current ready session, public user binding,
    client and Db. Derive its operation identity exactly as today; account-ID
@@ -64,8 +65,8 @@ Proposed ownership and outcomes, before implementation:
    native obligations settle. A session status notification, provider teardown
    or five-second framework acknowledgement is not settlement evidence.
 
-The changed resource boundary needs approval and native qualification: the old
-implementation isolates restore in its own database; the proposed version shares
+The changed resource boundary needs native qualification: the old
+implementation isolates restore in its own database; this version shares
 the application's replica and follows the native session's replacement behavior.
 Do not silently replace `close` with a no-op adapter or remove the existing
 financial drain stages to make the types pass.
@@ -76,7 +77,77 @@ select the same account without altering the application's selection. Device-key
 export alone does not establish a backend-user solution. This direction is not
 implemented or qualified and adds lifetime/selection work; inspect it only if
 the independent restore client remains a product requirement. Do not reach into
-private SDK modules or introduce a patch as the default solution.
+private SDK modules or introduce a patch as the default solution. The user chose
+the shared database approach; this alternative is retained only as decision history.
+
+The reduced restore chart goes from validation through journal discovery directly
+to writing or comparison. It retains transaction acquisition, pending-call drain,
+commit identification/settlement, rollback confirmation, retained-receipt cleanup
+and artifact-release retry. The private client acquisition/close actors and their
+blocked-close states are deleted. No no-op client or close adapter replaces them.
+The application owner already waits for the existing restore `DRAIN` protocol.
+Native scope checks guard transaction opening and commit, while settlement and
+rollback continue against the exact resources already issued on the old binding.
+
+Admission uses the session/user/client/Db binding captured by the application
+owner. It does not compare the browser Db's `appId` with a value previously
+supplied to a private-client constructor: the native browser client uses its
+endpoint/legacy `scope` instead. The intent and journal retain their application,
+environment, identity and operation bindings, and native transaction validation
+still checks the authenticated user. No SDK scope algorithm is copied.
+
+## Current implementation qualification
+
+On the latest-main baseline `437c9cb1`, strict test types and Svelte checking pass
+with zero errors/warnings. All **1,928 Finance unit tests** and the complete
+**107-test restore qualification suite** pass. The latter includes native
+Chromium, Firefox and WebKit cases, permission/isolation controls, exact source
+retention, backup/restore history, interrupted writes and full-process restart
+and resume.
+
+The updated production factory tests use the application's actual Db, restore
+and read retained source data, handle completed journal history and verify that
+the same application session stays usable afterward. All three browsers reject
+confirmation on an old binding after native same-account replacement and
+A → B → A, despite the final account ID matching the original.
+
+The late-acquisition cases now pause a real SDK transaction handle rather than
+an obsolete second-client open. They retain cancellation/shutdown/invalidation
+priority and rollback confirmation. Artifact-release failure replaces the
+deleted private-client-close fault; retry still waits for actual release. The
+unexpected actor-failure test faults the public XState transition on that new
+test instance and verifies the controller's restart path without changing its
+production types or dependencies.
+
+An additional real native identity-switch case holds server acknowledgements
+after the financial batch was accepted. The host forwards native replacement
+as scoped invalidation; the issued write is drained against its original
+resources. Returning to the original identity resumes the same operation and
+only completes its remaining activation, without rewriting the accepted batch.
+Keys stay inside the disposable browser fixture and never enter reports/logs.
+
+From Finance, using the workspace Node/pnpm versions, the direct commands avoid
+catalog generation and user servers:
+
+```sh
+pnpm exec tsc --project tests/tsconfig.json --noEmit
+FINANCE_PREVIEW=true pnpm exec svelte-check --tsconfig ./tsconfig.json
+pnpm exec tsc --project src/service-worker/tsconfig.json --noEmit
+FINANCE_PREVIEW=true pnpm exec vitest run --reporter=dot
+FINANCE_PREVIEW=true pnpm exec vitest run --mode restore-experiment --reporter=verbose
+```
+
+Logs are
+`/private/tmp/finance-restore-shared-db-{types,app-types,unit,full}.log`.
+Formatting, guidance discovery, workspace links and `git diff --check` also pass.
+The production restore implementation removes roughly 100 lines overall; the
+test changes retain meaningful domain coverage instead of the deleted client
+lifecycle assertions. No SDK pin, patch, account store, Vercel destination or
+existing data is changed by this slice.
+
+These are alpha.60 results. Repeat the relevant native/session cases on the
+coordinated alpha.65 candidate; U1/U2a do not qualify the complete Finance restore
+or its existing backend data on that release.
 
 ## Qualification required before adopting the replacement
 
@@ -94,9 +165,8 @@ private SDK modules or introduce a patch as the default solution.
 
 ## Remaining caller work and order
 
-Resolve this ownership decision before retiring Finance's opaque-account restore
-plumbing. Then adapt the coordinated candidate and qualify it before changing
-workspace pins:
+Finish qualification of this ownership change, then adapt the coordinated
+candidate and qualify it before changing workspace pins:
 
 1. Shared native session adapters are already qualified by U2a.
 2. Adopt `initial: 'device'` plus `localFirst: 'now'` in Finance and Clipper;

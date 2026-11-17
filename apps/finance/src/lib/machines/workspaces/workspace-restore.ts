@@ -1,6 +1,6 @@
 import type { ActorFromLogic } from 'xstate'
-import { type AccountHandle, type JazzClient } from 'jazz-tools/client'
-import { createDb, type Db, type DbConfig, type Transaction, type WriteHandle } from 'jazz-tools'
+import type { JazzClient } from 'jazz-tools/client'
+import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
 	RestoreEvent,
@@ -54,13 +54,7 @@ import { createCallbackLogic, setup, types, createAsyncLogic, isMachineSnapshot 
 import type { ActorRefFrom, SnapshotFrom, ActorLogic, EventObject, Snapshot } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type RestoreClient = Pick<JazzClient, 'db' | 'shutdown'>
-/** One account-bound acquisition; the restore chart retains and drains its lifetime. */
-async function openRestoreClient(config: DbConfig): Promise<RestoreClient> {
-	const db = await createDb(config)
-	return { db, shutdown: (options) => db.shutdown(options) }
-}
-export type FinanceRestoreDb = Pick<Db, 'all' | 'getAuthState' | 'getConfig' | 'beginTransaction'>
+export type FinanceRestoreDb = Pick<Db, 'all' | 'getAuthState' | 'beginTransaction'>
 export type FinanceRestoreComparisonInput = {
 	binding: BackupBinding
 	databaseName: string
@@ -104,13 +98,14 @@ const restoreInterruption = (previous: Context['interruption'], event: { type: s
 			? 'invalidated'
 			: 'cancelled'
 type Options = {
-	account: AccountHandle
-	serverUrl: string
+	db: FinanceRestoreDb
+	/** Admission only; the application owner retains and drains the native session. */
+	isCurrent(): boolean
 	binding: BackupBinding
 	intent: RestoreJournalIntent
 	databaseName: string
 	mode: 'new' | 'resume'
-	/** Ownership transfer: called only after the restore client has safely closed. */
+	/** Ownership transfer: called only after restore transactions and issued writes settle. */
 	releaseArtifacts(): void
 }
 const required = <Value>(value: Value | undefined): Value => {
@@ -123,8 +118,7 @@ export function createFinanceWorkspaceRestore(
 		archive: IntegrityCheckedArchive
 		plan: FinanceRestorePlanRequest
 		releaseFile(): void
-	},
-	acquireClient: (config: DbConfig) => Promise<RestoreClient> = openRestoreClient
+	}
 ) {
 	const { archive, plan: planning, releaseFile, ...options } = issued
 	const plan = planning.read()
@@ -138,8 +132,7 @@ export function createFinanceWorkspaceRestore(
 				releaseFile()
 			}
 		},
-		(db, retain) => createFinanceRestoreAdapter(db, plan, archive, retain),
-		acquireClient
+		(db, retain) => createFinanceRestoreAdapter(db, plan, archive, retain, options.isCurrent)
 	)
 }
 /** One factory per operation owner. Send SHUTDOWN and await output before stopping its actor. */
@@ -151,22 +144,14 @@ export function createFinanceRestoreSession<
 	createAdapter: (
 		db: FinanceRestoreDb,
 		retain: Writer['retainDetached']
-	) => FinanceRestoreSessionAdapter<WriteLogic, ComparisonLogic>,
-	acquireClient: (config: DbConfig) => Promise<RestoreClient> = openRestoreClient
+	) => FinanceRestoreSessionAdapter<WriteLogic, ComparisonLogic>
 ) {
 	const options = Object.freeze({ ...issued })
 	const binding = Object.freeze({ ...options.binding }),
 		intent = createRestoreJournalRecord(options.intent).intent
-	let client: RestoreClient | undefined,
-		transaction: Transaction<'mergeable'> | undefined,
-		write: WriteHandle | undefined
+	let transaction: Transaction<'mergeable'> | undefined, write: WriteHandle | undefined
 	const custody: Custody[] = []
-	const db: FinanceRestoreDb = {
-		all: (query, settings) => required(client).db.all(query, settings),
-		getAuthState: () => required(client).db.getAuthState(),
-		getConfig: () => required(client).db.getConfig(),
-		beginTransaction: () => required(client).db.beginTransaction()
-	}
+	const db = options.db
 	const adapter = createAdapter(db, (receipt) => custody.push(receipt))
 	const checkpointWrite = (record: RestoreJournalRecord | undefined) => {
 		const checkpoint = record?.checkpoint
@@ -176,11 +161,10 @@ export function createFinanceRestoreSession<
 	}
 	const journalInput = { binding, databaseName: options.databaseName }
 	const actors = {
-		validate: createAsyncLogic<void>({
+		validate: createAsyncLogic<boolean>({
 			run: () =>
 				Promise.resolve().then(() => {
 					if (
-						options.account.id !== binding.identityId ||
 						intent.operation.identityId !== binding.identityId ||
 						intent.operation.applicationId !== binding.applicationId ||
 						intent.operation.environment !== binding.environment ||
@@ -188,20 +172,10 @@ export function createFinanceRestoreSession<
 						intent.operation.destinationWorkspaceId !== binding.workspaceId
 					)
 						throw new Error('Restore session scope mismatch')
+					return options.isCurrent() && db.getAuthState().session?.user === binding.identityId
 				})
 		}),
 		journal: createRestoreJournalStepMachine(),
-		acquire: createAsyncLogic<void>({
-			run: () =>
-				acquireClient({
-					appId: binding.applicationId,
-					serverUrl: options.serverUrl,
-					account: options.account,
-					driver: { type: 'persistent', dbName: 'restore-' + binding.operationId }
-				}).then((acquired) => {
-					client = acquired
-				})
-		}),
 		restore: adapter.machine,
 		compare: adapter.comparison,
 		acquisition: createAsyncLogic<void>({
@@ -226,7 +200,6 @@ export function createFinanceRestoreSession<
 		rollback: createAsyncLogic<boolean>({
 			run: () => adapter.writer.rollback(required(transaction))
 		}),
-		close: createAsyncLogic<void>({ run: () => required(client).shutdown({ waitForSync: true }) }),
 		release: createAsyncLogic<void>({
 			run: () => Promise.resolve().then(() => options.releaseArtifacts())
 		}),
@@ -262,7 +235,6 @@ export function createFinanceRestoreSession<
 		| import('xstate').DoneActorEvent<
 				| import('xstate').OutputFrom<(typeof actors)['validate']>
 				| import('xstate').OutputFrom<(typeof actors)['journal']>
-				| import('xstate').OutputFrom<(typeof actors)['acquire']>
 				| import('xstate').OutputFrom<(typeof actors)['restore']>
 				| import('xstate').OutputFrom<(typeof actors)['compare']>
 				| import('xstate').OutputFrom<(typeof actors)['acquisition']>
@@ -271,7 +243,6 @@ export function createFinanceRestoreSession<
 				| import('xstate').OutputFrom<(typeof actors)['identify']>
 				| import('xstate').OutputFrom<(typeof actors)['settle']>
 				| import('xstate').OutputFrom<(typeof actors)['rollback']>
-				| import('xstate').OutputFrom<(typeof actors)['close']>
 				| import('xstate').OutputFrom<(typeof actors)['release']>
 				| import('xstate').OutputFrom<(typeof actors)['compare']>
 		  >
@@ -285,7 +256,6 @@ export function createFinanceRestoreSession<
 			children: {
 				validate: types<import('xstate').ActorFromLogic<(typeof actors)['validate']>>(),
 				journal: types<import('xstate').ActorFromLogic<(typeof actors)['journal']>>(),
-				acquire: types<import('xstate').ActorFromLogic<(typeof actors)['acquire']>>(),
 				restore: types<import('xstate').ActorRefFrom<WriteLogic>>(),
 				compare: types<import('xstate').ActorRefFrom<ComparisonLogic>>(),
 				acquisition: types<import('xstate').ActorFromLogic<(typeof actors)['acquisition']>>(),
@@ -294,9 +264,7 @@ export function createFinanceRestoreSession<
 				identify: types<import('xstate').ActorFromLogic<(typeof actors)['identify']>>(),
 				settle: types<import('xstate').ActorFromLogic<(typeof actors)['settle']>>(),
 				rollback: types<import('xstate').ActorFromLogic<(typeof actors)['rollback']>>(),
-				close: types<import('xstate').ActorFromLogic<(typeof actors)['close']>>(),
 				release: types<import('xstate').ActorFromLogic<(typeof actors)['release']>>(),
-				operation: types<import('xstate').ActorRefFrom<ComparisonLogic>>(),
 				forgetReceipt: types<import('xstate').ActorFromLogic<typeof actors.forgetReceipt>>()
 			}
 		},
@@ -304,7 +272,6 @@ export function createFinanceRestoreSession<
 		guards: {
 			interrupted: ({ context }: { context: Context }) => context.interruption !== undefined,
 			retained: () => custody.length > 0,
-			clientAcquired: () => client !== undefined,
 			moreReceipts: () => custody.length > 1,
 			remoteRejected: ({ context, event }: { context: Context; event: NativeEvent3 }) =>
 				'error' in event &&
@@ -315,10 +282,6 @@ export function createFinanceRestoreSession<
 		},
 		actions: {}
 	})
-	const afterPending = [
-		{ guard: () => custody[0]?.commit !== undefined, target: 'waitingForCommit' },
-		{ target: 'rollingBack' }
-	]
 	return model.createMachine({
 		context: {
 			outcome: 'incomplete',
@@ -361,11 +324,17 @@ export function createFinanceRestoreSession<
 					id: 'validate',
 					src: actors.validate,
 					onDone: (args) => {
+						if (!args.event.output)
+							return {
+								target: 'releasingArtifacts',
+								context: {
+									interruption: restoreInterruption(args.context.interruption, {
+										type: 'INVALIDATE'
+									})
+								}
+							}
 						if (args.guards.interrupted(args) && args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.interrupted(args) && args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
 						}
 						if (args.guards.interrupted(args)) {
 							return { target: 'releasingArtifacts' }
@@ -375,9 +344,6 @@ export function createFinanceRestoreSession<
 					onError: (args) => {
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
 						}
 						return { target: 'releasingArtifacts' }
 					}
@@ -395,17 +361,11 @@ export function createFinanceRestoreSession<
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
 						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
-						}
 						return { target: 'releasingArtifacts' }
 					},
 					onError: (args) => {
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
 						}
 						return { target: 'releasingArtifacts' }
 					}
@@ -449,63 +409,19 @@ export function createFinanceRestoreSession<
 								(event.output?.outcome === 'missing' && options.mode === 'new'))
 						) {
 							return {
-								target: 'acquiringClient',
+								target:
+									event.output.record?.checkpoint.kind === 'comparing' ? 'comparing' : 'writing',
 								context: ((args) => ({ record: (({ event }) => event.output?.record)(args) }))(args)
 							}
 						}
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
 						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
-						}
 						return { target: 'releasingArtifacts' }
 					},
 					onError: (args) => {
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
-						}
-						return { target: 'releasingArtifacts' }
-					}
-				})
-			},
-			acquiringClient: {
-				invoke: model.createInvoke({
-					id: 'acquire',
-					src: actors.acquire,
-					onDone: (args) => {
-						if (args.guards.interrupted(args) && args.guards.retained()) {
-							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.interrupted(args) && args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
-						}
-						if (args.guards.interrupted(args)) {
-							return { target: 'releasingArtifacts' }
-						}
-						if (
-							db.getAuthState().session?.user !== binding.identityId ||
-							db.getConfig().appId !== binding.applicationId
-						) {
-							return {
-								target: 'closingClient',
-								context: { interruption: 'invalidated' } satisfies Partial<Context>
-							}
-						}
-						if (args.context.record?.checkpoint.kind === 'comparing') {
-							return { target: 'comparing' }
-						}
-						return { target: 'writing' }
-					},
-					onError: (args) => {
-						if (args.guards.retained()) {
-							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
 						}
 						return { target: 'releasingArtifacts' }
 					}
@@ -549,7 +465,6 @@ export function createFinanceRestoreSession<
 						const patch = patchRememberWrite(args, result)
 						if (args.guards.interrupted(args)) {
 							if (args.guards.retained()) return { target: 'waitingForTransaction', context: patch }
-							if (args.guards.clientAcquired()) return { target: 'closingClient', context: patch }
 							return { target: 'releasingArtifacts', context: patch }
 						}
 						if (
@@ -563,15 +478,11 @@ export function createFinanceRestoreSession<
 						)
 							return { target: 'writing', reenter: true, context: { record: result.record } }
 						if (args.guards.retained()) return { target: 'waitingForTransaction', context: patch }
-						if (args.guards.clientAcquired()) return { target: 'closingClient', context: patch }
 						return { target: 'releasingArtifacts', context: patch }
 					},
 					onError: (args) => {
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
 						}
 						return { target: 'releasingArtifacts' }
 					}
@@ -621,17 +532,11 @@ export function createFinanceRestoreSession<
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
 						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
-						}
 						return { target: 'releasingArtifacts' }
 					},
 					onError: (args) => {
 						if (args.guards.retained()) {
 							return { target: 'waitingForTransaction' }
-						}
-						if (args.guards.clientAcquired()) {
-							return { target: 'closingClient' }
 						}
 						return { target: 'releasingArtifacts' }
 					}
@@ -704,19 +609,6 @@ export function createFinanceRestoreSession<
 					onError: { target: 'rollbackBlocked' }
 				})
 			},
-			closingClient: {
-				invoke: model.createInvoke({
-					id: 'close',
-					src: actors.close,
-					onDone: (args, enq) => {
-						enq(() => {
-							client = undefined
-						})
-						return { target: 'releasingArtifacts' }
-					},
-					onError: { target: 'clientBlocked' }
-				})
-			},
 			releasingArtifacts: {
 				invoke: model.createInvoke({
 					id: 'release',
@@ -738,10 +630,6 @@ export function createFinanceRestoreSession<
 				tags: ['restore-release-blocked'],
 				on: { RETRY_RELEASE: { target: 'rollingBack' } }
 			},
-			clientBlocked: {
-				tags: ['restore-release-blocked'],
-				on: { RETRY_RELEASE: { target: 'closingClient' } }
-			},
 			artifactsBlocked: {
 				tags: ['restore-release-blocked'],
 				on: { RETRY_RELEASE: { target: 'releasingArtifacts' } }
@@ -754,8 +642,6 @@ export function createFinanceRestoreSession<
 					onDone: (args) => {
 						if (args.guards.retained())
 							return { target: 'waitingForTransaction', context: { transactionId: undefined } }
-						if (args.guards.clientAcquired())
-							return { target: 'closingClient', context: { transactionId: undefined } }
 						return { target: 'releasingArtifacts', context: { transactionId: undefined } }
 					},
 					onError: { target: 'settlementBlocked' }
@@ -931,7 +817,8 @@ export function createFinanceRestoreAdapter(
 	db: FinanceRestoreDb,
 	sample: FinanceRestorePlan,
 	archive: IntegrityCheckedArchive,
-	retain: RestoreTransactionWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached']
+	retain: RestoreTransactionWriter<Transaction<'mergeable'>, WriteHandle>['retainDetached'],
+	isCurrent: () => boolean
 ) {
 	const payload = archive.readPayload(),
 		{ intent, graph } = sample
@@ -1152,9 +1039,9 @@ export function createFinanceRestoreAdapter(
 						const { context } = args
 						if (
 							!args.event.output ||
+							!isCurrent() ||
 							db.getAuthState().session?.user !== intent.operation.identityId ||
 							canonicalRecovery(context.input.intent) !== canonicalRecovery(intent) ||
-							db.getConfig().appId !== intent.operation.applicationId ||
 							context.input.binding.workspaceId !== graph.workspace.id ||
 							context.input.binding.operationId !== intent.operation.operationId
 						) {
@@ -1250,8 +1137,14 @@ export function createFinanceRestoreAdapter(
 		}
 	})
 	const writer: RestoreTransactionWriter<Transaction<'mergeable'>, WriteHandle> = {
-		open: () => db.beginTransaction(),
-		commit: (tx) => tx.commit(),
+		open: () => {
+			if (!isCurrent()) throw new Error('Restore scope changed')
+			return db.beginTransaction()
+		},
+		commit: (tx) => {
+			if (!isCurrent()) throw new Error('Restore scope changed')
+			return tx.commit()
+		},
 		transactionId: (write) => write.txId,
 		persistLocal: (write) => write.wait({ tier: 'local' }),
 		acceptRemote: (write) => write.wait({ tier: 'global' }),
@@ -1469,8 +1362,9 @@ export type WorkspaceRestoreConfiguration = {
 }
 type RestoreScope = WorkspaceRestoreConfiguration & {
 	session: JazzSession<JazzClient>
-	account: AccountHandle
-	client: JazzClient
+	identityId: string
+	isCurrent(): boolean
+	db: FinanceRestoreDb
 }
 type RestoreFileData = {
 	file: File
@@ -1511,14 +1405,6 @@ export function workspaceRestoreSessionReady(session: JazzSession<JazzClient> | 
 export function workspaceRestoreFileAvailable(request: WorkspaceRestoreFile) {
 	return restoreFiles.has(request) && restoreFiles.get(request)?.scope === undefined
 }
-function restoreScopeCurrent(scope: RestoreScope) {
-	const state = scope.session.getSnapshot()
-	return (
-		state.status === 'ready' &&
-		state.account?.id === scope.account.id &&
-		state.client === scope.client
-	)
-}
 export function bindWorkspaceRestoreFile(
 	request: WorkspaceRestoreFile,
 	session: JazzSession<JazzClient>,
@@ -1527,7 +1413,24 @@ export function bindWorkspaceRestoreFile(
 	const state = session.getSnapshot()
 	if (state.status !== 'ready' || !state.account || !state.client)
 		throw new Error('Restore session unavailable')
-	restoreFile(request).scope = { ...config, session, account: state.account, client: state.client }
+	const account = state.account,
+		client = state.client,
+		db = client.db
+	restoreFile(request).scope = {
+		...config,
+		session,
+		identityId: account.id,
+		db,
+		isCurrent: () => {
+			const now = session.getSnapshot()
+			return (
+				now.status === 'ready' &&
+				now.account === account &&
+				now.client === client &&
+				now.client.db === db
+			)
+		}
+	}
 }
 const restoreJournalName = 'finance-workspace-restores'
 export type WorkspaceRestoreCommand = {
@@ -1602,7 +1505,7 @@ export function createWorkspaceRestoreController(
 	navigate: (destination: string) => Promise<void> = async () => {
 		throw new Error('Navigation unavailable')
 	},
-	acquireClient: (config: DbConfig) => Promise<RestoreClient> = openRestoreClient
+	createRestore: typeof createFinanceWorkspaceRestore = createFinanceWorkspaceRestore
 ) {
 	const actors = {
 		observe: createCallbackLogic<RestoreControllerEvent, WorkspaceRestoreFile>(
@@ -1610,7 +1513,7 @@ export function createWorkspaceRestoreController(
 				const scope = required(restoreFile(input).scope)
 				const observe = () => {
 					try {
-						if (!restoreScopeCurrent(scope)) sendBack({ type: 'SCOPE_CHANGED' })
+						if (!scope.isCurrent()) sendBack({ type: 'SCOPE_CHANGED' })
 					} catch {
 						sendBack({ type: 'SCOPE_CHANGED' })
 					}
@@ -1681,7 +1584,7 @@ export function createWorkspaceRestoreController(
 					scope = required(value.scope),
 					payload = archive.readPayload()
 				const operationId = await stableUuid(
-						scope.account.id,
+						scope.identityId,
 						JSON.stringify([scope.appId, scope.environment, archive.payloadDigest()])
 					),
 					workspaceId = await stableUuid(
@@ -1691,7 +1594,7 @@ export function createWorkspaceRestoreController(
 				const binding = {
 					applicationId: scope.appId,
 					environment: scope.environment,
-					identityId: scope.account.id,
+					identityId: scope.identityId,
 					operationId,
 					workspaceId,
 					generation: 0
@@ -1723,25 +1626,22 @@ export function createWorkspaceRestoreController(
 			run: ({ input }) => {
 				const value = restoreFile(input),
 					scope = required(value.scope)
-				if (!restoreScopeCurrent(scope)) throw new Error('Restore scope changed')
-				value.logic = createFinanceWorkspaceRestore(
-					{
-						account: scope.account,
-						serverUrl: scope.serverUrl,
-						binding: required(value.binding),
-						databaseName: restoreJournalName,
-						mode: value.previous ? 'resume' : 'new',
-						archive: required(value.archive),
-						plan: required(value.plan),
-						releaseFile() {
-							value.envelope?.release()
-							value.envelope = undefined
-							value.archive = undefined
-							value.plan = undefined
-						}
-					},
-					acquireClient
-				)
+				if (!scope.isCurrent()) throw new Error('Restore scope changed')
+				value.logic = createRestore({
+					db: scope.db,
+					isCurrent: scope.isCurrent,
+					binding: required(value.binding),
+					databaseName: restoreJournalName,
+					mode: value.previous ? 'resume' : 'new',
+					archive: required(value.archive),
+					plan: required(value.plan),
+					releaseFile() {
+						value.envelope?.release()
+						value.envelope = undefined
+						value.archive = undefined
+						value.plan = undefined
+					}
+				})
 				return Promise.resolve()
 			}
 		}),
