@@ -5,14 +5,19 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkClipper } from './clipper.mjs'
-import { checkFinanceSchema } from './schema.mjs'
+import { checkClipper, clipperProofVersions } from './clipper.mjs'
+import { checkSchema } from './schema.mjs'
 
 // Upgrade experiment only: reuse the maintained Finance fixture in a disposable
 // project, with its own dependencies. No workspace pin or installed SDK is edited.
 const finance = fileURLToPath(new URL('../../', import.meta.url))
 const proof = dirname(fileURLToPath(import.meta.url))
-const schemaOnly = process.argv.includes('--schema')
+const schemaScope = process.argv.includes('--clipper-schema')
+	? 'clipper'
+	: process.argv.includes('--schema')
+		? 'finance'
+		: undefined
+const schemaOnly = schemaScope !== undefined
 const sdkVersion = schemaOnly ? '2.0.0-alpha.66' : '2.0.0-alpha.65'
 const directory = mkdtempSync(join(tmpdir(), `finance-jazz-alpha${schemaOnly ? 66 : 65}-`))
 console.log(`Upgrade proof artifacts: ${directory}`)
@@ -86,8 +91,14 @@ const versions = Object.fromEntries(
 	})
 )
 if (schemaOnly) {
-	await checkFinanceSchema(directory, finance, proof, versions)
-	console.log(`Finance schema proof passed; artifacts retained at ${directory}`)
+	await checkSchema(
+		directory,
+		schemaScope === 'clipper' ? join(finance, '../clipper/apps/web') : finance,
+		proof,
+		schemaScope === 'clipper' ? clipperProofVersions(join(finance, '../clipper')) : versions,
+		schemaScope
+	)
+	console.log(`${schemaScope} schema proof passed; artifacts retained at ${directory}`)
 	process.exit(0)
 }
 const app = join(directory, 'app')

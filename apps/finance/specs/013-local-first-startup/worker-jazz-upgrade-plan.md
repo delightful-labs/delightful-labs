@@ -84,8 +84,10 @@ expanding commands. Do not build a generic SDK command surface ahead of callers.
       `defineApp`/callback permissions with the native authoring DSL and generated
       bindings/permissions JSON in isolation. Preserve Finance's prior/current
       restore definitions and permission overrides. Port Finance's 22 validation/
-      amount/count transform columns and Clipper's two reading transforms through
-      native named transforms; the upgrader refuses those TypeScript transforms.
+      amount/count transform columns through native named transforms. Clipper's
+      qualified port keeps a native progress transform and uses native resume
+      sets with its existing record codecs; do not restore the rejected nullable
+      JSON-transform approach. The upgrader refuses the old TypeScript transforms.
       Actual alpha.60 validation passes but emits no required JSON. Reuse the
       disposable alpha.65 compiler output as a comparison baseline, not a live
       intermediate rollout or custom compatibility layer. Verify generated schema
@@ -105,6 +107,16 @@ expanding commands. Do not build a generic SDK command surface ahead of callers.
       [qualified scope](worker-jazz-alpha66-research.md#finance-native-schema-foundation).
       Clipper, full Finance callers/legacy backup-restore experiments and the
       remaining backend/destination gates are still open. U3 is not complete.
+      **Clipper authoring/reading proof now also passes:** all 22 stored tables
+      and the permission bundle retain their identities. Native history/files,
+      selected strict types and 57 cases pass, including native reading-set
+      convergence after two replica restarts and retained alpha.60 SQLite data.
+      Use native resume-position sets plus Clipper's existing record codecs;
+      do not repair the SDK's nullable-transform behavior. The shared fixture
+      rerun keeps Finance's 138 cases green. See the
+      [Clipper qualification](worker-jazz-alpha66-research.md#clipper-native-schema-foundation).
+      Full callers, Finance's historical backup/restore cases, browser-worker
+      and backend/destination qualification remain; U3 is still open.
 - [ ] **U4 — Qualify backend authentication and destinations.** Replace the
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix

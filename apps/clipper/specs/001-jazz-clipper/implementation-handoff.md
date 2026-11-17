@@ -1,5 +1,21 @@
 # Article notes — implementation started
 
+## Isolated Jazz alpha.66 schema qualification — 2026-11-17
+
+Active Clipper remains on alpha.60. The Finance worker-upgrade branch now has an
+isolated native Clipper schema/permission/reading port, recorded in the
+[shared upgrade qualification](../../../finance/specs/013-local-first-startup/worker-jazz-alpha66-research.md#clipper-native-schema-foundation).
+Its unpatched alpha.66 source preserves the stored schema and permission bundle;
+native generation/history, selected strict types and 57 cases pass. These include
+two-replica reading convergence after offline restarts, offline notes and an
+actual alpha.60 SQLite store opened/edited/reopened with alpha.66.
+
+The candidate uses the native resume-position set plus existing Clipper codecs
+at record boundaries. It does not patch nullable transforms or introduce a new
+storage format. It removes the unused auth-only App, reading-column wrapper and
+policy-fixture schema clone. Full app/extension/session and Better Auth/provider
+qualification remain open; this is not an SDK switch or release approval.
+
 ## Reader sharing preview — 2026-11-16
 
 Document Notes now offer `Preview sharing`. The worker owns the request and its

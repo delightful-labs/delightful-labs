@@ -16,6 +16,14 @@ remain unchanged. The [qualified scope](worker-jazz-alpha66-research.md#finance-
 keeps Clipper, broad caller/backup/restore adoption and the remaining upgrade
 gates open. Active app dependencies and source stay alpha.60.
 
+Clipper's isolated native schema/reading port now passes the same pipeline with
+57 cases, unchanged schema/permission identities, actual two-replica offline
+convergence and retained alpha.60 SQLite reading data. It uses native resume
+sets and existing record codecs instead of repairing nullable SDK transforms.
+The [qualified scope](worker-jazz-alpha66-research.md#clipper-native-schema-foundation)
+keeps full adoption and the remaining upgrade gates open; Finance's 138 cases
+also pass after the fixture reuse.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,

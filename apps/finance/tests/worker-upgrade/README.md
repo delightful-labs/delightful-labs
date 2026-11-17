@@ -50,6 +50,48 @@ destinations. In particular, the historical `previousApp` restore experiment and
 backup table typing still need their native caller port. U3 remains open for the
 rest of those boundaries; U4/U5 remain required before any live switch.
 
+## Alpha.66 Clipper schema, reading and retained data
+
+From Finance, using the same runner and current built Local First:
+
+```sh
+node tests/worker-upgrade/run.mjs --clipper-schema
+```
+
+This reuses the Finance proof's isolated install/generation/identity pipeline,
+with Clipper's installed dependency versions, source overlay and native tests.
+The unpatched alpha.66 SDK/native core preserve the alpha.60 stored-schema hash
+and the permission bundle. Native history/generation, `generate --check`, strict
+selected schema/record/reader/fixture types and **57 tests** pass.
+
+`clipper-schema.patch` replaces callback permissions with the native DSL and
+removes the unused auth-only App, reading-column wrapper and policy-fixture clone
+helper. Tests use the generated native App directly. Progress uses a native named
+transform over the existing string grow-only set. Resume positions use the native
+set directly; their existing fold and encode/decode logic lives at Clipper's
+record boundary. Reader/domain values still contain Date instances.
+
+An attempted nullable JSON transform was rejected: Dates cannot be represented
+in its JSON view, and native null passthrough prevents mapping an empty/null view
+back to a required stored array. No special SDK wrapper, sentinel format, schema
+change or patch is added. The stored reading sets and tie-breaking behavior stay
+the same. One JSON write projection omits absent optional anchor keys to satisfy
+the generated native JSON type; it does not change annotation policy or data.
+
+The 57 cases include existing data/permissions, reader-domain checks, offline
+notes, actual two-replica reading convergence after both replicas restart, and an
+alpha.60 SQLite store opened by alpha.66. Furthest progress stays monotonic while
+a later backward resume position wins; Date values reach the actual reader
+subscription. A new alpha.66 reading edit survives another close/reopen. Native
+fixtures retain their original bounds and assertions; raw-row expectations use
+the new native backing shape rather than pretending SDK rows are domain DTOs.
+
+The source-import/fixture changes affect only disposable copies. Active Clipper,
+Finance and dependency pins remain alpha.60. Full app/extension/session adoption,
+Better Auth/provider qualification, persistent browser-worker qualification and
+retained Vercel destinations remain separate gates. This mode does not turn the
+known alpha.65 caller experiment green or complete U3/U4/U5.
+
 ## Alpha.65 worker and session boundary
 
 From Finance, with the workspace's Node/pnpm and installed Playwright browsers:

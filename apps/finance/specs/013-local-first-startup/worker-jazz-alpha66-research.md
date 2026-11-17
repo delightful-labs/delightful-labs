@@ -125,8 +125,10 @@ This affects real source, not hypothetical usage:
 - Clipper's `backend/jazz/schema.ts`, `auth-schema.ts` and `permissions.ts` use
   the removed APIs. `reading-columns.ts` has two real transforms: maximum
   reading progress and last resume position, both stored as string grow-only
-  sets. Alpha.66 requires named transform declarations and implementations in
-  `jazz.computed.ts`. Preserve encoding, merge and ordering semantics.
+  sets. Alpha.66 uses named declarations and implementations in `jazz.computed.ts`.
+  The subsequent [qualified port](#clipper-native-schema-foundation) keeps that
+  mechanism for progress and uses native resume sets plus existing record codecs,
+  preserving encoding, merge and ordering without a nullable-transform repair.
 - The alpha.66 upgrader requires fresh legacy app/permission JSON and runs the
   app's installed legacy validator. Although the release guide discusses
   alpha.64/65, `upgrade/fresh.js` accepts DSL-era versions through alpha.65,
@@ -224,17 +226,80 @@ log: `/private/tmp/finance-alpha66-schema-final.log`. Strict fixture types, nati
 generation/identity checks and all 138 cases pass in that same clean copy. Active
 alpha.60 Finance test types, workspace links and shared guidance checks also pass.
 
+## Clipper native schema foundation
+
+The same [maintained schema runner](../../tests/worker-upgrade/README.md#alpha66-clipper-schema-reading-and-retained-data)
+now accepts `--clipper-schema`. It reuses the Finance fixture pipeline with
+Clipper's own pinned dependencies and the unpatched published alpha.66 SDK/core.
+It preserves all 22 stored tables, native reading sets and compiled permissions.
+Its inactive port removes the standalone auth-schema App, the reading-column
+wrapper and the policy fixture's cloned-SDK-schema helper. Native tests use the
+generated App directly.
+
+The stored-schema hash matches actual alpha.60 compilation:
+`46ef1944edb6705219de47da8dba60c43615078ccf1542199bd5992c330c9ae1`.
+The unchanged permission bundle is
+`371a05e426a5f1f2180d26ad7484c3b858ff4a8dfc926965617d017e7df00c24`.
+Jazz generates initial history and checks its files; no generated JSON is edited.
+
+### Use the native set instead of repairing nullable transforms
+
+The existing progress transform fits the native named-transform contract and
+keeps its string-set storage, numeric maximum and validation. The resume-position
+transform does not fit: its Date-bearing object cannot be expressed as a JSON
+view. An attempted encoded JSON view also failed actual native inserts because
+alpha.66 passes null through before invoking the transform; null cannot stand
+for the empty value of the required stored array.
+
+Do not add an SDK patch, nullable sentinel, alternate schema or compatibility
+layer for this. The selected port reads and writes the native resume-observation
+set directly. The existing timestamp/key fold and position codecs move to the
+Clipper record boundary; reader/domain DTOs keep Date values. Raw SDK row tests
+now assert native backing values. Reader-state assertions go through the actual
+subscription adapter rather than duplicating its conversion in the fixture.
+
+Strict generated JSON types also require absent optional anchor keys to be
+omitted rather than present with undefined. The existing native annotation write
+projects those three optional keys explicitly. It adds no new annotation state,
+validation framework or permission rule.
+
+### Qualification and remaining scope
+
+Native generation/history, `generate --check`, selected strict schema/record/
+reader/native-fixture types and **57 tests pass**. Coverage includes existing
+native data/permission suites, reader-domain behavior, offline note restart,
+two actual persistent replicas closing/reopening offline and reconciling, and
+an actual alpha.60 SQLite reading store opened by alpha.66. Its app identity,
+furthest progress and later backward position survive. A subsequent alpha.66
+edit survives another native close/reopen. Initial empty subscription delivery
+is not treated as proof that the retained document is absent; the test waits
+for that known document and retains the original timeout.
+
+The shared fixture change also reruns Finance successfully: its strict selected
+types, identity/generation checks and all **138 tests pass**. Clipper's successful
+artifact directory is
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-1uP9bj`;
+log: `/private/tmp/clipper-alpha66-schema-final.log`. Finance's corresponding run
+is `finance-jazz-alpha66-3OVEL1`, with
+`/private/tmp/finance-alpha66-schema-shared-runner.log`.
+
+These are source/schema/native-data proofs, not complete app, extension, session,
+Better Auth or persistent browser-worker adoption. Finance's historical backup/
+restore caller port and the remaining U3/U4/U5 gates stay open. Active applications
+and pins remain alpha.60. The old alpha.65 Clipper caller overlay's 15 failures
+remain separate and visible.
+
 ## Execution order
 
 1. Keep the approved private session actor and awaited native factory. Finish
    only commands needed by actual consumer workflows, reusing their existing
    charts and native SDK leaves. Review the unadopted sign-out work before
    expanding it; do not build a general SDK command surface in advance.
-2. Complete the isolated alpha.66 schema/permission/history foundation for both
-   apps, including Finance's validation/amount transforms and Clipper's reading
-   transforms, before expanding consumer ports. Reuse the disposable legacy
-   compiler output as a comparison baseline. Preserve schema and bundle identity
-   through native generated artifacts, not an application compatibility layer.
+2. Keep the now-qualified native schema foundations for both apps. Finish
+   Finance's historical backup/restore schema callers and full consumer
+   qualification before a live switch. Reuse the disposable legacy compiler
+   output as a comparison baseline. Preserve schema and bundle identity through
+   native generated artifacts, not an application compatibility layer.
 3. Requalify the persistent bridge and session/Svelte fixtures on matching
    alpha.66 SDK/Wasm; then adopt the actor in the actual callers. Historical
    alpha.65 passes and its 15 failing Clipper cases remain visible until replaced.

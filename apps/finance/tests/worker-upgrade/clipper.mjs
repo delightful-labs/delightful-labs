@@ -20,36 +20,7 @@ export function checkClipper(directory, proof, clipper) {
 		join(proof, 'clipper-session.patch')
 	])
 	run('git', ['apply', '--directory=apps/web', join(proof, 'clipper-session.patch')])
-	const packages = [
-		'@faker-js/faker',
-		'i18next',
-		'unicode-case-folding',
-		'zod',
-		'xstate',
-		'svelte',
-		'vite',
-		'vitest',
-		'typescript',
-		'@types/node',
-		'@opentelemetry/api'
-	]
-	const installed = ['apps/web', '.'].flatMap((path) =>
-		JSON.parse(
-			execFileSync('pnpm', ['list', ...packages, '--depth', '0', '--json'], {
-				cwd: join(clipper, path),
-				encoding: 'utf8'
-			})
-		)
-	)
-	const versions = Object.fromEntries(
-		packages.map((name) => {
-			const dependency = installed
-				.map((project) => project.dependencies?.[name] ?? project.devDependencies?.[name])
-				.find(Boolean)
-			if (!dependency) throw new Error(`Installed Clipper dependency missing: ${name}`)
-			return [name, dependency.version]
-		})
-	)
+	const versions = clipperProofVersions(clipper)
 	json(join(app, 'package.json'), {
 		name: 'clipper-jazz-upgrade-proof',
 		private: true,
@@ -106,4 +77,38 @@ export function checkClipper(directory, proof, clipper) {
 		'apps/web/src/lib/runtime/worker/host-bindings.test.ts',
 		'apps/web/src/lib/runtime/worker/host-machine.test.ts'
 	])
+}
+
+export function clipperProofVersions(clipper) {
+	const packages = [
+		'@faker-js/faker',
+		'i18next',
+		'unicode-case-folding',
+		'zod',
+		'xstate',
+		'svelte',
+		'vite',
+		'vitest',
+		'typescript',
+		'@types/node',
+		'@opentelemetry/api',
+		'ws'
+	]
+	const installed = ['apps/web', '.'].flatMap((path) =>
+		JSON.parse(
+			execFileSync('pnpm', ['list', ...packages, '--depth', '0', '--json'], {
+				cwd: join(clipper, path),
+				encoding: 'utf8'
+			})
+		)
+	)
+	return Object.fromEntries(
+		packages.map((name) => {
+			const dependency = installed
+				.map((project) => project.dependencies?.[name] ?? project.devDependencies?.[name])
+				.find(Boolean)
+			if (!dependency) throw new Error(`Installed Clipper dependency missing: ${name}`)
+			return [name, dependency.version]
+		})
+	)
 }
