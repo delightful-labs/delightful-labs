@@ -108,6 +108,10 @@ export async function checkSchema(directory, source, proof, versions, scope) {
 		}
 	for (const name of ['tsconfig.schema.json', 'vitest.schema.config.mjs'])
 		cpSync(join(proof, `${prefix}${name}`), join(app, name))
+	if (!clipper) {
+		mkdirSync(join(app, 'tooling'))
+		cpSync(join(source, 'tooling/jazz-wasm.ts'), join(app, 'tooling/jazz-wasm.ts'))
+	}
 	run(
 		['exec', 'jazz-tools', 'migrations', 'create', '--name', 'initial', '--schema-dir', schemaPath],
 		app

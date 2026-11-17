@@ -126,6 +126,15 @@ expanding commands. Do not build a generic SDK command surface ahead of callers.
       of introducing compatibility code. The full restore workflow/browser
       harness, including staging, publication and drains, remains the next
       caller task; retained-file decoding alone does not qualify it.
+      **Shared-Db restore browser slice now passes:** the existing charts run
+      on alpha.66 with only public user metadata and row-type changes. Twelve
+      Chromium/Firefox/WebKit cases bring the fresh combined proof to **188**:
+      actual old-file restoration, exact amounts/attachment/source bytes,
+      completed IndexedDB journal reuse after page reload without replay,
+      cancellation, same-account replacement and A → B → A. These use memory
+      data drivers, not persistent-worker qualification. The full historical
+      suite, accepted-commit interruption/drains, conflict/cleanup recovery and
+      broader policy/role checks remain open.
 - [ ] **U4 — Qualify backend authentication and destinations.** Replace the
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix

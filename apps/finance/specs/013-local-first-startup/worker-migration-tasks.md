@@ -34,6 +34,17 @@ IDs and attachment bytes without a compatibility layer. See the
 The full restore workflow/browser harness remains next; staging/publication and
 identity/write-drain qualification are still required before adoption.
 
+The shared-Db restore slice now passes **12 native browser cases**, four each in
+Chromium/Firefox/WebKit; the combined Finance alpha.66 proof passes **188 tests**.
+It retains the existing charts and ports only public user metadata/row types.
+Real old-file restore, exact attachment/source bytes, journal reuse after page
+reload without repeated writes, cancellation, same-account replacement and
+A → B → A pass with development freezing enabled. See the
+[restore evidence](worker-jazz-alpha66-research.md#finance-shared-db-restore-browser-slice).
+The next restore gate is interruption after authority acceptance, pending-write
+drain/resume without replay, conflict/cleanup recovery and broader policy/role
+checks. Memory-driver browser success does not qualify persistent-worker storage.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,

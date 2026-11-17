@@ -3108,3 +3108,465 @@ new file mode 100644
 +		request.release()
 +	}
 +})
+diff --git a/src/lib/machines/workspaces/workspace-restore.ts b/src/lib/machines/workspaces/workspace-restore.ts
+--- a/src/lib/machines/workspaces/workspace-restore.ts
++++ b/src/lib/machines/workspaces/workspace-restore.ts
+@@ -35,7 +35,7 @@
+ import { payloadLimits } from 'delightful-local-first/backup/archive'
+ import type { JazzSession } from 'jazz-tools/client'
+ import { stableUuid } from '../../domain/stable-uuid.js'
+-import { app } from '../../schema.js'
++import { app } from '../../queries.js'
+ import { validateFinanceBackup } from '../../backup/workspace.js'
+ import {
+ 	canonicalRecovery,
+@@ -1400,7 +1400,7 @@
+ }
+ export function workspaceRestoreSessionReady(session: JazzSession<JazzClient> | undefined) {
+ 	const state = session?.getSnapshot()
+-	return state?.status === 'ready' && state.account !== undefined && state.client !== undefined
++	return state?.status === 'ready' && state.user !== null && state.client !== undefined
+ }
+ export function workspaceRestoreFileAvailable(request: WorkspaceRestoreFile) {
+ 	return restoreFiles.has(request) && restoreFiles.get(request)?.scope === undefined
+@@ -1411,23 +1411,20 @@
+ 	config: WorkspaceRestoreConfiguration
+ ) {
+ 	const state = session.getSnapshot()
+-	if (state.status !== 'ready' || !state.account || !state.client)
++	if (state.status !== 'ready' || !state.user || !state.client)
+ 		throw new Error('Restore session unavailable')
+-	const account = state.account,
++	const user = state.user,
+ 		client = state.client,
+ 		db = client.db
+ 	restoreFile(request).scope = {
+ 		...config,
+ 		session,
+-		identityId: account.id,
++		identityId: user.accountId,
+ 		db,
+ 		isCurrent: () => {
+ 			const now = session.getSnapshot()
+ 			return (
+-				now.status === 'ready' &&
+-				now.account === account &&
+-				now.client === client &&
+-				now.client.db === db
++				now.status === 'ready' && now.user === user && now.client === client && now.client.db === db
+ 			)
+ 		}
+ 	}
+diff --git a/src/lib/machines/workspaces/workspace-restore-plan.ts b/src/lib/machines/workspaces/workspace-restore-plan.ts
+--- a/src/lib/machines/workspaces/workspace-restore-plan.ts
++++ b/src/lib/machines/workspaces/workspace-restore-plan.ts
+@@ -1,5 +1,5 @@
+ import { z } from 'zod'
+-import { schema as s } from 'jazz-tools'
++import type { RowOf } from 'jazz-tools'
+ import type { IntegrityCheckedArchive } from 'delightful-local-first/backup/envelope'
+ import type { ArchivePayload } from 'delightful-local-first/backup/archive'
+ import type { BackupBinding } from 'delightful-local-first/backup/binding'
+@@ -17,7 +17,7 @@
+ 	type Tag,
+ 	type TransactionRow,
+ 	type InternalTransfer
+-} from '../../schema.js'
++} from '../../queries.js'
+ import { stableUuid } from '../../domain/stable-uuid.js'
+ import { setup, types, createAsyncLogic } from 'xstate'
+ import type { EventPayload } from '../../contracts/event-payload.js'
+@@ -30,17 +30,17 @@
+ 	tags: (Omit<Tag, 'archivedAt'> & { archivedAt: string | null })[]
+ 	transactions: TransactionRow[]
+ 	transfers: InternalTransfer[]
+-	checks: s.RowOf<typeof app.checks>[]
+-	transactionTags: s.RowOf<typeof app.transactionTags>[]
+-	batches: s.RowOf<typeof app.transactionBatches>[]
+-	templates: s.RowOf<typeof app.batchTemplates>[]
+-	files: s.RowOf<typeof app.files>[]
+-	links: s.RowOf<typeof app.transactionAttachments>[]
++	checks: RowOf<typeof app.checks>[]
++	transactionTags: RowOf<typeof app.transactionTags>[]
++	batches: RowOf<typeof app.transactionBatches>[]
++	templates: RowOf<typeof app.batchTemplates>[]
++	files: RowOf<typeof app.files>[]
++	links: RowOf<typeof app.transactionAttachments>[]
+ 	parts: { id: string; fileId: string; partIndex: number; sizeBytes: number; data: number[] }[]
+-	member: s.RowOf<typeof app.organizationMembers>
++	member: RowOf<typeof app.organizationMembers>
+ 	source: {
+-		file: s.RowOf<typeof app.files>
+-		parts: Omit<s.RowOf<typeof app.fileParts>, 'data'>[]
++		file: RowOf<typeof app.files>
++		parts: Omit<RowOf<typeof app.fileParts>, 'data'>[]
+ 	}
+ }
+ export type FinanceRestorePlan = { graph: FinanceRestoreGraph; intent: RestoreJournalIntent }
+diff --git a/src/lib/backup/restore-upgrade.browser.ts b/src/lib/backup/restore-upgrade.browser.ts
+new file mode 100644
+--- /dev/null
++++ b/src/lib/backup/restore-upgrade.browser.ts
+@@ -0,0 +1,36 @@
++import { createJazzClient } from 'jazz-tools/client'
++import { createActor, waitFor } from 'xstate'
++import {
++	createWorkspaceRestoreController,
++	prepareWorkspaceRestoreFile,
++	bindWorkspaceRestoreFile,
++	selectWorkspaceRestoreReport,
++	createFinanceWorkspaceRestore
++} from '../machines/workspaces/workspace-restore.js'
++import { app } from '../queries.js'
++
++const api = {
++	open: (serverUrl: string) =>
++		createJazzClient({
++			serverUrl,
++			initial: 'device',
++			driver: { type: 'memory' },
++			client: () => import('jazz-tools/local-first'),
++			localFirst: 'now'
++		}),
++	createActor,
++	waitFor,
++	app,
++	createWorkspaceRestoreController,
++	prepareWorkspaceRestoreFile,
++	bindWorkspaceRestoreFile,
++	selectWorkspaceRestoreReport,
++	createFinanceWorkspaceRestore
++}
++declare global {
++	interface Window {
++		financeRestoreUpgrade: typeof api
++		financeRestoreUpgradeSession: Awaited<ReturnType<typeof api.open>>
++	}
++}
++window.financeRestoreUpgrade = api
+diff --git a/src/lib/backup/restore-upgrade.test.ts b/src/lib/backup/restore-upgrade.test.ts
+new file mode 100644
+--- /dev/null
++++ b/src/lib/backup/restore-upgrade.test.ts
+@@ -0,0 +1,321 @@
++import { readFile } from 'node:fs/promises'
++import { afterAll, beforeAll, expect, it } from 'vitest'
++import { chromium, firefox, webkit } from '@playwright/test'
++import { createServer, type ViteDevServer } from 'vite'
++import { startTestJazz, type TestJazz } from 'jazz-tools/testing'
++import { createActor, toPromise } from 'xstate'
++import { prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
++import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
++import { app } from '../queries.js'
++import permissions from '../jazz.permissions.json' with { type: 'json' }
++import { workerRuntimeBuildConfig } from '../../../tooling/jazz-wasm.js'
++import type {} from './restore-upgrade.browser.js'
++
++let web: ViteDevServer, origin: string, file: number[], sourcePayload: Uint8Array
++beforeAll(async () => {
++	file = [...(await readFile(new URL('../../../retained-backup.dlf', import.meta.url)))]
++	const request = prepareArchiveOpen(new Uint8Array(file))
++	try {
++		const result = await toPromise(
++			createActor(createArchiveEnvelopeMachine(), { input: { request } }).start()
++		)
++		if (result.outcome !== 'integrityChecked') throw new Error('Retained fixture failed opening')
++		try {
++			sourcePayload = result.archive.copyPayloadBytes()
++		} finally {
++			result.archive.release()
++		}
++	} finally {
++		request.release()
++	}
++	web = await createServer({
++		...workerRuntimeBuildConfig(),
++		configFile: false,
++		logLevel: 'error',
++		appType: 'custom',
++		server: { host: '127.0.0.1', port: 0 },
++		optimizeDeps: { entries: ['src/lib/backup/restore-upgrade.browser.ts'] }
++	})
++	web.middlewares.use((request, response, next) => {
++		if (request.url !== '/') return next()
++		response.setHeader('Content-Type', 'text/html')
++		response.end(
++			'<!doctype html><script type="module" src="/src/lib/backup/restore-upgrade.browser.ts"></script>'
++		)
++	})
++	await web.listen()
++	const address = web.httpServer?.address()
++	if (!address || typeof address === 'string') throw new Error('Missing restore fixture listener')
++	origin = `http://127.0.0.1:${address.port}`
++})
++afterAll(async () => {
++	await web?.close()
++})
++const engines = [
++	{ name: 'chromium', engine: chromium },
++	{ name: 'firefox', engine: firefox },
++	{ name: 'webkit', engine: webkit }
++]
++
++it.each(engines)(
++	'$name restores a retained v1 file on the shared Db and recognizes its completed journal after reload',
++	async ({ engine, name }) => {
++		let authority: TestJazz | undefined
++		const browser = await engine.launch({
++			headless: true,
++			...(name === 'chromium' ? { channel: 'chromium' } : {})
++		})
++		try {
++			authority = await startTestJazz({ app, permissions, jazz: { allowedOrigins: [origin] } })
++			const page = await browser.newPage()
++			page.on('pageerror', (error) => console.error(error))
++			await page.goto(origin)
++			await page.waitForFunction(() => Boolean(window.financeRestoreUpgrade))
++			const result = await page.evaluate(
++				async ({ file, serverUrl }) => {
++					const api = window.financeRestoreUpgrade
++					const session = await api.open(serverUrl)
++					window.financeRestoreUpgradeSession = session
++					const selected = session.getSnapshot()
++					if (!selected.user || !selected.client) throw new Error('Missing native restore identity')
++					const db = selected.client.db
++					let starts = 0
++					const controller = api
++						.createActor(
++							api.createWorkspaceRestoreController(undefined, (options) => {
++								starts++
++								if (options.db !== db) throw new Error('Restore did not borrow the application Db')
++								return api.createFinanceWorkspaceRestore(options)
++							})
++						)
++						.start()
++					const request = api.prepareWorkspaceRestoreFile(
++						new File([new Uint8Array(file)], 'retained.dlf'),
++						''
++					)
++					api.bindWorkspaceRestoreFile(request, session, {
++						appId: 'delightful-finances',
++						environment: 'upgrade-proof',
++						serverUrl
++					})
++					controller.send({ type: 'SUBMIT', request })
++					await api.waitFor(
++						controller,
++						(state) =>
++							api.selectWorkspaceRestoreReport(state).view.canConfirm ||
++							!api.selectWorkspaceRestoreReport(state).view.busy
++					)
++					const review = api.selectWorkspaceRestoreReport(controller.getSnapshot()).view
++					if (!review.canConfirm)
++						throw new Error('Restore did not reach review: ' + JSON.stringify(review))
++					controller.send({ type: 'CONFIRM' })
++					await api.waitFor(
++						controller,
++						(state) => !api.selectWorkspaceRestoreReport(state).view.busy
++					)
++					const view = api.selectWorkspaceRestoreReport(controller.getSnapshot()).view
++					const usable =
++						session.getSnapshot().client?.db === db &&
++						(await db.all(api.app.organizations, { tier: 'remote' })).length === 1
++					const frozen = Object.isFrozen(controller.getSnapshot().context)
++					controller.stop()
++					return { view, starts, usable, frozen, identityId: selected.user.accountId }
++				},
++				{ file, serverUrl: authority.url }
++			)
++			expect(result).toMatchObject({
++				starts: 1,
++				usable: true,
++				frozen: true,
++				view: { message: 'done', busy: false, canOpen: true }
++			})
++			const workspaceId = result.view.workspaceId
++			if (!workspaceId) throw new Error('Missing restored workspace')
++			const transactions = await authority.jazz.db.all(
++				app.transactions.where({ organizationId: workspaceId })
++			)
++			expect(transactions).toMatchObject([
++				{ amountMinor: Number.MAX_SAFE_INTEGER, bookedOn: '2026-11-17', source: 'manual' }
++			])
++			const files = await authority.jazz.db.all(
++				app.files.where({ transactionId: { in: transactions.map((row) => row.id) } })
++			)
++			const attachment = files.find((item) => item.fileName === 'historical.bin')
++			if (!attachment) throw new Error('Missing restored attachment')
++			const parts = await authority.jazz.db.all(
++				app.fileParts.where({ fileId: attachment.id }).orderBy('partIndex')
++			)
++			expect(new Uint8Array(parts.flatMap((part) => [...(part.data ?? [])]))).toEqual(
++				new Uint8Array([0, 1, 127, 255])
++			)
++			const sources = await authority.jazz.db.all(app.files.where({ organizationId: workspaceId }))
++			expect(sources).toHaveLength(1)
++			const source = sources[0]
++			if (!source) throw new Error('Missing retained source document')
++			const sourceParts = await authority.jazz.db.all(
++				app.fileParts.where({ fileId: source.id }).orderBy('partIndex')
++			)
++			expect(new Uint8Array(sourceParts.flatMap((part) => [...(part.data ?? [])]))).toEqual(
++				sourcePayload
++			)
++			await page.evaluate(() => window.financeRestoreUpgradeSession.close())
++			await page.reload()
++			await page.waitForFunction(() => Boolean(window.financeRestoreUpgrade))
++			const reopened = await page.evaluate(
++				async ({ file, serverUrl }) => {
++					const api = window.financeRestoreUpgrade,
++						session = await api.open(serverUrl)
++					window.financeRestoreUpgradeSession = session
++					let starts = 0
++					const controller = api
++						.createActor(
++							api.createWorkspaceRestoreController(undefined, (options) => {
++								starts++
++								return api.createFinanceWorkspaceRestore(options)
++							})
++						)
++						.start()
++					const request = api.prepareWorkspaceRestoreFile(
++						new File([new Uint8Array(file)], 'retained.dlf'),
++						''
++					)
++					api.bindWorkspaceRestoreFile(request, session, {
++						appId: 'delightful-finances',
++						environment: 'upgrade-proof',
++						serverUrl
++					})
++					controller.send({ type: 'SUBMIT', request })
++					await api.waitFor(
++						controller,
++						(state) => !api.selectWorkspaceRestoreReport(state).view.busy
++					)
++					const view = api.selectWorkspaceRestoreReport(controller.getSnapshot()).view
++					const identityId = session.getSnapshot().user?.accountId
++					controller.stop()
++					await session.close()
++					return { view, starts, identityId }
++				},
++				{ file, serverUrl: authority.url }
++			)
++			expect(reopened).toMatchObject({
++				starts: 0,
++				identityId: result.identityId,
++				view: { message: 'done', busy: false, workspaceId }
++			})
++			expect(await authority.jazz.db.all(app.organizations)).toHaveLength(1)
++			expect(
++				await authority.jazz.db.all(app.transactions.where({ organizationId: workspaceId }))
++			).toEqual(transactions)
++		} finally {
++			try {
++				await browser.close()
++			} finally {
++				await authority?.stop()
++			}
++		}
++	},
++	60_000
++)
++
++const interruptions = engines.flatMap(({ name, engine }) =>
++	['cancel', 'same-account', 'A-B-A'].map((mode) => ({ name, engine, mode }))
++)
++it.each(interruptions)(
++	'$name rejects confirmation after $mode without writes or closing the application Db',
++	async ({ engine, name, mode }) => {
++		let authority: TestJazz | undefined
++		const browser = await engine.launch({
++			headless: true,
++			...(name === 'chromium' ? { channel: 'chromium' } : {})
++		})
++		try {
++			authority = await startTestJazz({ app, permissions, jazz: { allowedOrigins: [origin] } })
++			const page = await browser.newPage()
++			await page.goto(origin)
++			await page.waitForFunction(() => Boolean(window.financeRestoreUpgrade))
++			const result = await page.evaluate(
++				async ({ file, serverUrl, mode }) => {
++					const api = window.financeRestoreUpgrade,
++						session = await api.open(serverUrl)
++					try {
++						const selected = session.getSnapshot()
++						if (!selected.user || !selected.client)
++							throw new Error('Missing native restore identity')
++						let starts = 0
++						const controller = api
++							.createActor(
++								api.createWorkspaceRestoreController(undefined, (options) => {
++									starts++
++									return api.createFinanceWorkspaceRestore(options)
++								})
++							)
++							.start()
++						const request = api.prepareWorkspaceRestoreFile(
++							new File([new Uint8Array(file)], 'retained.dlf'),
++							''
++						)
++						api.bindWorkspaceRestoreFile(request, session, {
++							appId: 'delightful-finances',
++							environment: 'upgrade-proof',
++							serverUrl
++						})
++						controller.send({ type: 'SUBMIT', request })
++						await api.waitFor(
++							controller,
++							(state) =>
++								api.selectWorkspaceRestoreReport(state).view.canConfirm ||
++								!api.selectWorkspaceRestoreReport(state).view.busy
++						)
++						const ready = api.selectWorkspaceRestoreReport(controller.getSnapshot()).view.canConfirm
++						if (!ready) throw new Error('Restore did not reach review')
++						if (mode === 'cancel') controller.send({ type: 'CANCEL' })
++						else {
++							const key = session.exportDeviceKey()
++							if (mode === 'A-B-A') await session.createDeviceAccount()
++							await session.restoreDeviceAccount(key)
++						}
++						await api.waitFor(
++							controller,
++							(state) => !api.selectWorkspaceRestoreReport(state).view.busy
++						)
++						controller.send({ type: 'CONFIRM' })
++						const current = session.getSnapshot(),
++							view = api.selectWorkspaceRestoreReport(controller.getSnapshot()).view
++						if (!current.client) throw new Error('Application client was closed by restore')
++						const usable =
++							(await current.client.db.all(api.app.organizations, { tier: 'remote' })).length === 0
++						controller.stop()
++						return {
++							starts,
++							usable,
++							view,
++							sameIdentity: current.user?.accountId === selected.user.accountId,
++							replacedClient: current.client !== selected.client
++						}
++					} finally {
++						await session.close()
++					}
++				},
++				{ file, serverUrl: authority.url, mode }
++			)
++			expect(result).toMatchObject({
++				starts: 0,
++				usable: true,
++				sameIdentity: true,
++				replacedClient: mode !== 'cancel',
++				view: { busy: false, canConfirm: false, canOpen: false }
++			})
++			if (mode === 'cancel') expect(result.view.message).toBe('cancelled')
++			expect(await authority.jazz.db.all(app.organizations)).toEqual([])
++			expect(await authority.jazz.db.all(app.restoreOperations)).toEqual([])
++			expect(await authority.jazz.db.all(app.transactions)).toEqual([])
++		} finally {
++			try {
++				await browser.close()
++			} finally {
++				await authority?.stop()
++			}
++		}
++	},
++	60_000
++)

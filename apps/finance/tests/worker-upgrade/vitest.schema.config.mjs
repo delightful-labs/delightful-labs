@@ -10,6 +10,7 @@ export default defineConfig({
 			'src/lib/schema-upgrade.test.ts',
 			'src/lib/backup/workspace.test.ts',
 			'src/lib/backup/backup-upgrade.test.ts',
+			'src/lib/backup/restore-upgrade.test.ts',
 			'src/lib/bank-sync-log-permissions.test.ts',
 			'src/lib/bank-sync-log-retention-permissions.test.ts'
 		],

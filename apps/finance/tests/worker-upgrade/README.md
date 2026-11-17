@@ -29,8 +29,9 @@ text-column wrapper. Source-import changes occur only in copied consumers;
 active application source and dependency pins remain alpha.60.
 
 Strict authoring/query/transform/native-fixture types and `generate --check`
-pass. All **176 tests pass**: 128 existing permission/bank-log cases, ten native
-transform/retention cases, 37 existing backup cases and one retained-archive case.
+pass. All **188 tests pass**: 128 existing permission/bank-log cases, ten native
+transform/retention cases, 37 existing backup cases, one retained-archive case
+and 12 native browser restore cases.
 A real alpha.60 store keeps its app identity,
 maximum-safe minor-unit amount and normalized text after opening with alpha.66;
 an alpha.66 edit survives another close/reopen. The test also distinguishes a
@@ -47,6 +48,18 @@ attachment bytes survive exactly. No old/new-schema Db adapter is introduced.
 Jazz rejects using current-schema queries on a Db already bound to the older
 schema; the old archive must be generated with its own native query bindings.
 
+The existing restore implementation needs only the public `user.accountId` and
+native `RowOf` type changes. Its charts and shared-Db ownership are retained.
+The small browser entry exposes those real workflows and the native SDK factory;
+it adds no account-client/session facade. Chromium, Firefox and WebKit each
+qualify completion from the actual alpha.60 archive, exact financial/attachment/
+source-payload preservation, a completed IndexedDB journal recognized after page
+reload without repeated writes, cancellation at review, same-account replacement
+and A → B → A. Cancellation/replacement rejects stale confirmation without writes
+and leaves the application Db usable. XState development freezing stays enabled.
+These browser clients use memory data drivers and real IndexedDB journals;
+page reload is not a persistent-worker or full-process restart qualification.
+
 The new native tests live in the patch and run/type against the candidate SDK,
 so alpha.66 imports do not enter active alpha.60 test discovery. Svelte's normal
 compiler handles the existing shared data module. The runner adds no runtime
@@ -57,9 +70,9 @@ retained records/store, `retained-backup.dlf`, its fixture IDs and
 
 This does not qualify Clipper, all Finance callers/backup/restore experiments,
 worker durability, backend auth, the full existing SDK patch or Vercel data
-destinations. In particular, the full historical restore experiment and its
-browser/session harness still need their native caller port. Opening a retained
-archive does not prove restore staging, publication, cancellation or drains on
+destinations. The full 107-case historical restore experiment is not ported by
+these 12 browser cases. Interrupted accepted commits, pending-write drains,
+conflict/cleanup recovery and the broader policy/role matrix remain required on
 alpha.66. U3 remains open for the
 rest of those boundaries; U4/U5 remain required before any live switch.
 

@@ -257,6 +257,39 @@ that existing workflow/harness next, retaining its behavioral checks and the
 approved shared application Db. The older independent account-client probes
 must not drive a replacement SDK facade around removed APIs.
 
+### Finance shared-Db restore browser slice
+
+The next inactive port changes two existing implementation files: restore
+binding uses public `user.accountId` and exact user/client/Db replacement checks;
+planning uses the native top-level `RowOf` type. The existing controller,
+planning, journal, destination and transaction charts stay in place. No account
+client is reopened and no SDK patch, replacement session facade or command
+framework is introduced.
+
+The maintained schema mode now runs 12 real browser cases, four each in
+Chromium/Firefox/WebKit, using the real application controller and public awaited
+Jazz factory. The retained alpha.60 v1 archive restores through the same Db as
+the application. The authority confirms maximum-safe minor units, attachment
+bytes and exact retained source-payload bytes. After native close and page reload,
+the completed IndexedDB journal recognizes the same file and destination without
+repeating writes. The shared Db remains usable after completion/cancellation.
+Cancellation at review, native same-account replacement and A → B → A all reject
+old confirmation before destination effects. Development context freezing stays
+enabled; SDK resources remain outside that context.
+
+Fresh combined result: **188 passing tests**, strict selected schema/backup/
+restore/browser types, native generation/check and unchanged schema/permission
+identities. Artifact directory:
+`/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha66-lwveJB`;
+log: `/private/tmp/finance-alpha66-restore-proof-final.log`.
+
+This is not the full 107-case historical suite. The clients use memory data
+drivers with actual browser IndexedDB journals; page reload does not establish
+persistent-worker retention or full browser-process restart. Keep accepted-commit
+interruption/drains, conflict and blocked-cleanup recovery, and the broader
+policy/role matrix open. Reuse the existing authority-delay/proxy tests when
+porting those cases; do not replace them with a simulated SDK transaction.
+
 ## Clipper native schema foundation
 
 The same [maintained schema runner](../../tests/worker-upgrade/README.md#alpha66-clipper-schema-reading-and-retained-data)
