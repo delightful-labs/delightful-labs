@@ -234,25 +234,36 @@ const base = publicationPreviewSchema.pick({
   publishingDid: true
 })
 const addressed = base.extend({ uri: atRecordUriSchema })
+const issuedPublicationSchema = addressed.extend({
+  state: z.literal('issued'),
+  record: marginRecordSchema
+})
 const publicationSchema = z.discriminatedUnion('state', [
   base.extend({ state: z.literal('private') }),
   base.extend({ state: z.literal('requested') }),
-  addressed.extend({ state: z.literal('issued') }),
+  issuedPublicationSchema,
   addressed.extend({ state: z.literal('published') })
 ])
 ```
 
 Private means no sharing choice; requested records the choice, including offline;
-issued means a sent write needs confirmation; published means the PDS write was
-confirmed. The addressed variants require the URI repository to match the exact
-publishing DID. The strict unaddressed variants reject an added URI.
+published means the PDS write was confirmed. The user subsequently approved adding
+the exact validated Margin `record` to issued and clarified its meaning: saved in
+Jazz for dispatch, possibly sent, awaiting confirmation. The future owner must wait
+for durable Jazz acceptance before dispatch and retain that exact payload through
+an uncertain outcome; no atomic Jazz/PDS operation is claimed. Later local edits
+cannot rebuild an unresolved issued request. The addressed variants require the
+URI repository to match the exact publishing DID. The strict unaddressed variants
+reject an added URI, and only issued carries the payload.
 
 The implementation extracts those existing common fields into
 `publicationBaseSchema`, reused by the unchanged preview response. This adds no
 Jazz table or independent address copy. The existing private link store retains
-reservations and cleanup addresses. This union alone is not write-ahead evidence,
-consent/grant admission or a persisted publisher: immutable issuance evidence and
-its native ownership/settlement must be designed before sending a PDS request.
+reservations and cleanup addresses. Requiring the payload in this union does not
+itself persist write-ahead evidence or provide consent/grant admission. Durable
+native Jazz acceptance and XState ownership/settlement must still be implemented
+and qualified before sending a PDS request. Recovery must inspect the PDS before
+retrying an uncertain write; the shape alone is not authority for replay.
 Unpublishing, retained-address restoration and conflict pauses still need their
 reviewed lifecycle extensions; these four variants cover only first publication.
 

@@ -8,20 +8,34 @@ repository DID must match the selected publisher exactly. The existing preview
 and new lifecycle contract share canonical library/source/publisher validation;
 the preview's wire shape and reader behavior are unchanged.
 
+The user subsequently approved requiring the exact validated Margin `record` in
+issued only. Its clarified meaning is saved in Jazz for dispatch, possibly sent,
+awaiting confirmation. The future owner must obtain durable Jazz acceptance
+before sending and retain this payload unchanged while the result is uncertain.
+Later local edits are subsequent work. Recovery inspects the PDS before retrying;
+this does not claim atomicity between Jazz acceptance and a PDS request.
+
 No second Jazz address/state store is introduced. Existing private publication
 links remain reservation/cleanup associations, without implying a confirmed PDS
 write. The lifecycle is a validated contract for the future publisher; it does
-not itself persist transitions, grant permission, capture immutable payloads or
-send/replay PDS requests. Exact issuance evidence and its durable Jazz/XState
-ownership remain the next model/workflow review. Unpublish/paused/restoration
-variants remain outside this approved first-publication union.
+not itself persist transitions, grant permission or send/replay PDS requests.
+Durable Jazz storage, acceptance and XState transition ownership remain to be
+implemented. Unpublish/paused/restoration variants remain outside this approved
+first-publication union.
 
-Verification passes 936 unit/native tests and 31 component tests, strict root/web/
-service-worker/extension types, full Clipper lint/formatting, whitespace checks
-and the web production build. The new boundary check rejects foreign and
+Initial lifecycle verification passed 936 unit/native tests and 31 component
+tests, strict root/web/service-worker/extension types, full Clipper lint/formatting,
+whitespace checks and the web production build. The new boundary check rejects foreign and
 lookalike publisher addresses, missing addresses and malformed URI input without
 throwing from safe parsing. Existing native request/preview regressions verify
 the unchanged preview contract. No new storage, browser or PDS behavior is claimed.
+
+The issued-payload amendment passes 34 targeted publication/Margin/native preview
+and request tests, including serialization without payload loss and rejection of
+missing or invalid Margin records, credential-bearing source URLs and private
+fields. The published variant rejects an attached issued payload. Strict root/web/
+service-worker/extension types, full Clipper lint/formatting and whitespace checks
+also pass for this amendment.
 
 ## Reader sharing preview — 2026-11-16
 
