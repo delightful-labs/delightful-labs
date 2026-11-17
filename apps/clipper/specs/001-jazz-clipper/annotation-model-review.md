@@ -222,6 +222,40 @@ verification and remote-record reconciliation remain prerequisites for other
 paths. The caller supplies a copied candidate creation time for display. Future
 confirmation must recheck accepted content, scope and destination before issuance.
 
+### Approved first-publication lifecycle — 2026-11-17
+
+The user requested a discriminated union instead of the proposed boolean choice,
+then approved this first-publication path:
+
+```ts
+const base = publicationPreviewSchema.pick({
+  libraryId: true,
+  source: true,
+  publishingDid: true
+})
+const addressed = base.extend({ uri: atRecordUriSchema })
+const publicationSchema = z.discriminatedUnion('state', [
+  base.extend({ state: z.literal('private') }),
+  base.extend({ state: z.literal('requested') }),
+  addressed.extend({ state: z.literal('issued') }),
+  addressed.extend({ state: z.literal('published') })
+])
+```
+
+Private means no sharing choice; requested records the choice, including offline;
+issued means a sent write needs confirmation; published means the PDS write was
+confirmed. The addressed variants require the URI repository to match the exact
+publishing DID. The strict unaddressed variants reject an added URI.
+
+The implementation extracts those existing common fields into
+`publicationBaseSchema`, reused by the unchanged preview response. This adds no
+Jazz table or independent address copy. The existing private link store retains
+reservations and cleanup addresses. This union alone is not write-ahead evidence,
+consent/grant admission or a persisted publisher: immutable issuance evidence and
+its native ownership/settlement must be designed before sending a PDS request.
+Unpublishing, retained-address restoration and conflict pauses still need their
+reviewed lifecycle extensions; these four variants cover only first publication.
+
 ### Earlier model review findings
 
 1. Define and qualify text normalization and DOM/code-point/UTF-16 conversion.

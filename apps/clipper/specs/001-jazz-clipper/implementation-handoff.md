@@ -1,5 +1,28 @@
 # Article notes — implementation started
 
+## First-publication lifecycle contract — 2026-11-17
+
+The user approved the discriminated union `private | requested | issued |
+published`. Only issued/published carry a required full Margin record URI, whose
+repository DID must match the selected publisher exactly. The existing preview
+and new lifecycle contract share canonical library/source/publisher validation;
+the preview's wire shape and reader behavior are unchanged.
+
+No second Jazz address/state store is introduced. Existing private publication
+links remain reservation/cleanup associations, without implying a confirmed PDS
+write. The lifecycle is a validated contract for the future publisher; it does
+not itself persist transitions, grant permission, capture immutable payloads or
+send/replay PDS requests. Exact issuance evidence and its durable Jazz/XState
+ownership remain the next model/workflow review. Unpublish/paused/restoration
+variants remain outside this approved first-publication union.
+
+Verification passes 936 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper lint/formatting, whitespace checks
+and the web production build. The new boundary check rejects foreign and
+lookalike publisher addresses, missing addresses and malformed URI input without
+throwing from safe parsing. Existing native request/preview regressions verify
+the unchanged preview contract. No new storage, browser or PDS behavior is claimed.
+
 ## Reader sharing preview — 2026-11-16
 
 Document Notes now offer `Preview sharing`. The worker owns the request and its
