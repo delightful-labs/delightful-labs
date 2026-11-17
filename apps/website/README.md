@@ -86,6 +86,12 @@ environment files, even when they use different ports.
 ## Deployment status and remaining gates
 
 `pnpm build` generates `.vercel/output` with the explicit Node.js 24 adapter.
+
+Vercel installs with `pnpm --filter 'delightful-labs...' install --frozen-lockfile`.
+This retains Website and its UI workspace dependency, including UI packaging,
+while avoiding unrelated apps' installation and preparation scripts. It uses the
+canonical workspace lockfile. CI retains its full workspace installation and checks.
+
 The build is deployable output, not evidence of a hosted release. The repository is linked to the `delightful-labs` Vercel project for preview
 verification. Both custom domains are attached, but DNS still points to Netlify. No Leaflet publishing credentials are stored in the app.
 
