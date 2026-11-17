@@ -1,0 +1,140 @@
+--- a/src/lib/server/gateway-auth.integration.test.ts
++++ b/src/lib/server/gateway-auth.integration.test.ts
+@@ -1,13 +1,12 @@
+-import { extensionOrigin } from '../../../../../tooling/extension-identity.js'
++import { extensionOrigin } from '../../../tooling/extension-identity.js'
+ import { afterAll, beforeAll, expect, it } from 'vitest'
+ import { createServer } from 'node:http'
+ import { createRequire } from 'node:module'
+ import { dirname, join } from 'node:path'
+ import { pathToFileURL } from 'node:url'
+ import { randomBytes } from 'node:crypto'
+-import { exportLocalFirstSecret, ReadTier } from 'jazz-tools'
+ import {
+-	acceptLocalFirstAuth,
++	acceptDeviceAccounts,
+ 	createJazz,
+ 	createJazzClient,
+ 	remote,
+@@ -35,8 +34,7 @@
+ 
+ beforeAll(async () => {
+ 	core = await startLocalJazzServer({
+-		inMemory: true,
+-		allowLocalFirstAuth: true
++		inMemory: true
+ 	})
+ 	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+ 	const address = server.address()
+@@ -46,7 +44,7 @@
+ 		app,
+ 		permissions,
+ 		store: remote({ url: core.url, appId: core.appId, secret: core.adminSecret }),
+-		authenticate: acceptLocalFirstAuth,
++		authenticate: acceptDeviceAccounts,
+ 		publicUrl: endpoint,
+ 		allowedOrigins: [extensionOrigin]
+ 	})
+@@ -66,7 +64,7 @@
+ 		serverUrl: endpoint,
+ 		app,
+ 		permissions,
+-		initial: 'local-first',
++		initial: 'device',
+ 		driver: { type: 'memory' },
+ 		store: {
+ 			read: async () => stored,
+@@ -76,13 +74,17 @@
+ 		}
+ 	})
+ 	clients.push(client)
+-	const { account, client: binding } = client.getSnapshot()
+-	if (!account || !binding) throw new Error('Guest not ready')
++	const { user, client: binding } = client.getSnapshot()
++	if (!user || !binding) throw new Error('Guest not ready')
+ 	await binding.db
+-		.insert(app.libraries, { ownerId: account.id, bootstrapVersion: '1' }, { id: account.id })
++		.insert(
++			app.libraries,
++			{ ownerId: user.accountId, bootstrapVersion: '1' },
++			{ id: user.accountId }
++		)
+ 		.wait({ tier: 'global' })
+-	const seed = authSecretSeedForMinting(exportLocalFirstSecret(account))
+-	return { account, db: binding.db, seed, client }
++	const seed = authSecretSeedForMinting(client.exportDeviceKey())
++	return { user, db: binding.db, seed, client }
+ }
+ function request(token?: string, headers: Record<string, string> = {}) {
+ 	return new Request(`${endpoint.replace('/jazz', '')}/api/capture/resolve`, {
+@@ -100,18 +102,18 @@
+ 	const token = mintLocalFirstTokenFromSeed(owner.seed, endpoint, 300)
+ 	const db = owner.db
+ 	expect(await admission(token)).toBe(200)
+-	expect(await backend.accountFor(request(token))).toBe(owner.account.id)
++	expect(await backend.accountFor(request(token))).toBe(owner.user.accountId)
+ 	await expect(backend.forReqUser(request(token))).rejects.toThrow()
+ 	expect(
+-		(await db.one(app.libraries.where({ id: owner.account.id }), { tier: ReadTier.Remote }))?.id
+-	).toBe(owner.account.id)
++		(await db.one(app.libraries.where({ id: owner.user.accountId }), { tier: 'remote' }))?.id
++	).toBe(owner.user.accountId)
+ 	expect(
+-		await db.one(app.libraries.where({ id: stranger.account.id }), { tier: ReadTier.Remote })
++		await db.one(app.libraries.where({ id: stranger.user.accountId }), { tier: 'remote' })
+ 	).toBeNull()
+ 	await expect(
+ 		db
+-			.upsert(app.libraries, stranger.account.id, {
+-				ownerId: stranger.account.id,
++			.upsert(app.libraries, stranger.user.accountId, {
++				ownerId: stranger.user.accountId,
+ 				bootstrapVersion: '1'
+ 			})
+ 			.wait({ tier: 'global' })
+@@ -143,21 +145,21 @@
+ 	const owner = await guest()
+ 	const token = mintLocalFirstTokenFromSeed(owner.seed, endpoint, 300)
+ 	expect(await admission(token, { origin: extensionOrigin })).toBe(200)
+-	const originStatus = async (origin: string) =>
+-		(
+-			await backend.handle(
+-				new Request(`${endpoint}/apps/${core.appId}/accounts/backend-user`, {
+-					method: 'POST',
+-					headers: { origin }
+-				})
+-			)
+-		).status
+-	// The admitted transport reaches signed-out backend-user handling. A bearer
+-	// API's authorization remains its signed identity, not caller-supplied Origin.
+-	expect(await originStatus(extensionOrigin)).toBe(401)
+-	expect(await originStatus('chrome-extension://' + 'a'.repeat(32))).toBe(403)
+-	expect(await originStatus('null')).toBe(403)
+-	expect(await originStatus('https://foreign.invalid')).toBe(403)
++	const originResponse = (origin: string) =>
++		backend.handle(
++			new Request(`${endpoint}/apps/${core.appId}/accounts/backend-user`, {
++				method: 'POST',
++				headers: { origin }
++			})
++		)
++	// Native alpha.66 reports a signed-out identity as 200 with no identity.
++	// Transport admission does not authenticate a backend user.
++	const configured = await originResponse(extensionOrigin)
++	expect(configured.status).toBe(200)
++	expect(await configured.json()).toEqual({ user: null })
++	expect((await originResponse('chrome-extension://' + 'a'.repeat(32))).status).toBe(403)
++	expect((await originResponse('null')).status).toBe(403)
++	expect((await originResponse('https://foreign.invalid')).status).toBe(403)
+ })
+ 
+ it.each([
+@@ -175,7 +177,7 @@
+ 	const token = mintLocalFirstTokenFromSeed(owner.seed, endpoint, 300)
+ 	expect(await admission(token)).toBe(200)
+ 	await owner.client.close({ timeoutMs: 0 })
+-	const identity = owner.account.identity
++	const identity = owner.user.identity
+ 	const response = await fetch(`${core.url}/apps/${core.appId}/admin/accounts/revoke`, {
+ 		method: 'POST',
+ 		headers: { 'X-Jazz-Admin-Secret': core.adminSecret, 'Content-Type': 'application/json' },

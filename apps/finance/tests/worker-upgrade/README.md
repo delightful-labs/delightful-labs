@@ -140,6 +140,41 @@ Better Auth/provider qualification, persistent browser-worker qualification and
 retained Vercel destinations remain separate gates. This mode does not turn the
 known alpha.65 caller experiment green or complete U3/U4/U5.
 
+## Alpha.66 native gateway admission
+
+After a successful `--clipper-schema` run, reuse its reported artifact directory:
+
+```sh
+node tests/worker-upgrade/backend.mjs /path/to/finance-jazz-alpha66-artifacts
+```
+
+This copies the generated Clipper source into a separate fixture with its own
+dependencies. It ports the existing `gateway-auth.integration.test.ts` to public
+device-user metadata, `exportDeviceKey()` and `acceptDeviceAccounts`; the gateway
+implementation and domain policies stay unchanged. No new auth layer, dependency
+version, app pin, catalog generation or live destination is introduced.
+
+Two unpatched controls establish the current SDK limitations: the configured
+Chrome extension origin is refused at startup, and omitting only that option
+lets registered guests sync but the gateway returns 401 for a valid proof.
+The runner then extracts the two backend hunks from the existing alpha.60 patch
+and applies them to a copied alpha.66 SDK without changing their behavior.
+Strict native types and all **eight existing gateway cases pass**: valid/private
+access, malformed/tampered/expired/foreign/unregistered proofs, configured versus
+denied origins, unsafe configuration and revocation rechecks.
+
+Alpha.66 reports a signed-out backend-user request as 200 with `{ user: null }`.
+The copied assertion checks that body explicitly; all unauthorized-origin and
+private-data denials remain. The old test-core `allowLocalFirstAuth` option is
+removed upstream and is not used. This local proof does not qualify the Vercel
+store, retire every workspace patch responsibility, or establish Better Auth/
+session-expiry and real consumer compatibility. U4/U5 remain open.
+
+Artifacts retain both negative-control logs, independent locks, the API overlay,
+the exact reused backend patch/hash and `backend-qualification.json`. The source
+SDK tarball and preceding unpatched schema proof remain intact. See the
+[backend scope and remaining gates](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#native-gateway-admission-foundation).
+
 ## Alpha.66 persistent worker and session boundary
 
 From a clean checkout with current built public Local First/DUI packages and

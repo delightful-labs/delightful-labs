@@ -460,6 +460,63 @@ restore caller port and the remaining U3/U4/U5 gates stay open. Active applicati
 and pins remain alpha.60. The old alpha.65 Clipper caller overlay's 15 failures
 remain separate and visible.
 
+## Native gateway admission foundation
+
+U4 now reuses Clipper's existing eight-case native gateway suite in a separate
+alpha.66 fixture. The schema proof's generated app/permissions and dependency
+versions are reused; its original unpatched package/store evidence stays intact.
+`tests/worker-upgrade/backend.mjs` repeats this after `--clipper-schema`, without
+generating catalogs or changing active pins.
+
+The copied test uses public `user.accountId` / `user.identity`,
+`session.exportDeviceKey()` and `acceptDeviceAccounts`. Its native core no longer
+takes the removed `allowLocalFirstAuth` option. The actual gateway function and
+Clipper policies are unchanged; SDK utilities still mint and verify test proofs.
+No app-level JWT verifier, session wrapper or identity lookup is added.
+
+Actual unpatched controls establish that alpha.66 still has two existing gaps:
+
+- Its `allowedOrigins` parser rejects Clipper's configured Chrome extension
+  origin before startup.
+- With only that option omitted, registered device accounts sync and seed their
+  native private libraries, but their valid capture proof gets 401: native
+  `accountFor()` resolves authenticated backend users only.
+
+The public backend API provides no equivalent admission-only device-account
+lookup with the same registry/revocation checks. Creating another client or
+registering an account from the capture API would not preserve that contract.
+The proof reuses, byte-for-byte, only the existing two backend hunks from
+`patches/jazz-tools@2.0.0-alpha.60.patch`. Both apply directly to the published
+alpha.66 file. This qualifies existing patch behavior; it adds no patch behavior.
+
+With those hunks, strict selected native types and **all eight cases pass**,
+including private isolation, tampering, expiry, foreign/unregistered proofs,
+denied/unsafe origins and fresh registry admission after revocation. Native
+signed-out `/accounts/backend-user` responses changed from 401 to 200
+`{ user: null }`; the copied test checks that explicit body while retaining all
+403 and private-access assertions. See the tagged
+[backend implementation](https://github.com/garden-co/jazz/blob/v2.0.0-alpha.66/packages/jazz-tools/src/backend/create-jazz.ts).
+
+Cleanup finding: alpha.66's native test-core API removes the old guest-auth boot
+flag, and the real backend/core proof works without it. The Vercel store's native
+core options also omit that flag. Do not blindly carry the alpha.60 Vercel flag
+hunk forward. Actual Vercel workload admission and retained-data access still
+need qualification before declaring that responsibility retired in cloud
+deployments. No existing Finance core or Drive is changed by this proof.
+
+The repeatable run is retained in Clipper schema artifact directory
+`finance-jazz-alpha66-1uP9bj`, fixture `backend-D4lJ01`, with
+`backend-qualification.json`; log: `/private/tmp/clipper-alpha66-backend-repeatable.log`.
+Both unpatched controls are retained there as `backend-unpatched-origin.log` and
+`backend-unpatched-account.log`. The overlay ports the actual suite instead of
+maintaining a parallel auth fixture.
+
+This does not qualify Clipper's real Better Auth session/expiry callback, its
+provider patch against the new peer, live Finance/Clipper Vercel stores or the
+full SDK patch/consumer graph. U4/U5 remain open. Next qualify the existing Better
+Auth lifecycle/provider cases with the required peer and pass the actual session
+expiry through Clipper's thin backend callback.
+
 ## Execution order
 
 1. Keep the approved private session actor and awaited native factory. Finish

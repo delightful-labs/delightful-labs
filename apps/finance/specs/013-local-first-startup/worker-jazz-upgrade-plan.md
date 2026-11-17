@@ -170,12 +170,22 @@ do not accumulate a second implementation alongside the selected native path.
 - [ ] **U4 — Qualify backend authentication and destinations.** Replace the
       throwing `acceptLocalFirstAuth` stub with public `acceptDeviceAccounts`.
       Clipper's authenticated answer must include actual session expiry in Unix
-      seconds. Qualify Better Auth against alpha.65's `~1.7.22` peer and the
+      seconds. Qualify Better Auth against alpha.66's `~1.7.22` peer and the
       existing auth patch. Preserve Finance's existing core/Drive bindings and
       qualify retained-data access; naming equality alone is insufficient. The
       read-only inventory below identifies two matching destinations and one
       custom qualification destination that must stay out of rollout until its
       data-preserving path is verified. Clipper previews may use fresh cores.
+      **Native gateway admission now passes:** reuse the existing eight-case
+      Clipper suite, generated schema and two unchanged backend patch hunks.
+      Unpatched controls prove that extension origins and device-account gateway
+      lookup still need those existing hunks. Native signed-out responses are
+      checked as 200 with `{ user: null }`; denied origins/private access remain
+      refused. The removed local core guest-auth flag is not carried into the
+      candidate; actual Vercel admission still needs qualification. See the
+      [bounded backend evidence](worker-jazz-alpha66-research.md#native-gateway-admission-foundation).
+      Better Auth/provider/session-expiry, retained destinations and full-patch
+      gates remain open; U4 is not complete.
 - [ ] **U5 — Switch and qualify the workspace coherently.** Update SDK, matching
       Wasm/native core, library peer and existing patch bindings as one reviewed
       change; preserve one compatible SDK identity per consumer. Run library
