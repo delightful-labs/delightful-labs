@@ -13,7 +13,7 @@ image-editor cases passed this run.
 The original trace records console objects as shallow previews, omitting the
 nested sanitized error details. Browser offline mode also prevents Vite from
 forwarding those diagnostics to the server log. The precise SDK error therefore
-cannot be recovered from the uploaded artifacts. Do not attribute this failure
+cannot be recovered from those original artifacts. Do not attribute this failure
 to worker callback code or call it a fixture race without further evidence.
 
 ## Diagnostic change
@@ -56,10 +56,90 @@ and error context under the same prefix. Logs are
 `/private/tmp/pr39-offline-edit-pending-seed.log` and
 `/private/tmp/pr39-offline-edit-diagnostics-check.log`.
 
+## Hosted recurrence: native protocol error
+
+At head `85f9e5e1496f1ad8b8bcd8b8092841aaa576dec0`, Finance's
+[application-2 job](https://github.com/delightful-labs/delightful-labs/actions/runs/44134571544/job/134221216791)
+passed 91 cases and failed the corresponding imported-income offline edit at
+`tests/transaction-edit.e2e.ts:254`, waiting for Transaction saved feedback.
+The existing diagnostic attachment now captures a real failure, not a synthetic
+probe. Artifact `14353110354` contains `offline-edit-machine-failures` in the
+income case's trace attachments.
+
+The first captured error has code `protocol` and this sanitized message:
+
+```text
+Protocol: Protocol: a write[value redacted]s commit this store cannot resolve
+```
+
+The persistence chart then attempts rollback. Jazz rejects that attempt with:
+
+```text
+Write error: open transaction [token redacted] is already committed
+```
+
+The final result remains `failed` with settlement `unknown`; the enclosing save
+reports `partial` / `saveUnresolved`. The case stopped before its persisted-field
+assertions, so this recurrence does not establish whether the requested edit
+survived. Do not infer the redacted text or replay the write from this evidence.
+
+### Actual transaction paths inspected
+
+The active application still uses alpha.60. In
+`src/lib/machines/transactions/independent-transaction-persistence.ts`, `commit`
+calls native `tx.commit()` and `settle` calls the resulting handle's
+`wait({ tier: 'local' })`. Both error paths currently enter rollback, preserving
+an unknown outcome unless Jazz explicitly reports a persisted-write rejection.
+
+Published alpha.60 and alpha.66 have the same relevant distinction:
+
+- `dist/runtime/db.js`: `Transaction.commit()` returns a write handle whose
+  transaction ID can settle asynchronously. Obtaining the handle is not local
+  persistence confirmation.
+- `dist/runtime/native-runtime/native-runtime-adapter.js`: `commitTransaction()`
+  records the transaction as committed after native commit returns, before
+  subscription pumping and write-handle registration finish. `waitForTransaction()`
+  observes native settlement separately. `rollbackTransaction()` refuses a
+  transaction already recorded as committed.
+- Native callback transactions also attempt rollback when commit fails, while
+  preserving the original error. Switching to a callback does not by itself
+  establish a fix for this protocol failure.
+
+The second error is consistent with cleanup attempting to roll back a committed
+transaction. It is not evidence that rollback caused the earlier protocol error,
+nor does it prove local durability or authority acceptance. The attachment does
+not identify which internal SDK step produced the first error. Alpha.66's other
+passing worker/schema tests do not establish that it fixes this recurrence.
+
+Cleanup candidate for C6: keep rollback for uncommitted transaction work and
+preserve the original commit/settlement failure when rollback is unavailable.
+Qualify the SDK's actual failure boundaries before changing the chart; do not
+replace this with a generic transaction wrapper, string-matched recovery or an
+automatic retry. No production transaction behavior changed in this investigation.
+
+The downloaded artifact is preserved at
+`/private/tmp/finance-pr46-offline-edit-ci.zip`, with its extracted trace under
+`/private/tmp/finance-pr46-offline-edit-ci/`.
+
+## Separate workspace-settings failure
+
+At head `93f05ee8ab4a65619b3ea5ff86271a2f2233a1d8`, the
+[workspace job](https://github.com/delightful-labs/delightful-labs/actions/runs/44146695541/job/134263783546)
+passed 54 cases and failed the rename/currency/reload case at
+`tests/features/workspace-settings.e2e.ts:55`. The retained page shows failed-save
+and unknown-result feedback, rather than a successful save missed by a locator.
+Its console trace omits the nested cause. This path uses the existing single
+`db.update(...).wait({ tier: 'local' })` adapter, not the multi-write transaction
+above. Do not assign it the same root cause without the actual error.
+
+Artifact `14356618664` is preserved at
+`/private/tmp/finance-pr46-workspace-ci.zip`, extracted under the same prefix.
+
 ## Next step
 
-Inspect hosted results for this diagnostic change. If the failure recurs, read
-the JSON attachment to identify the failing operation/error before proposing an
-application correction. A green run establishes intermittent behavior, not an
-explanation or a fix for the original failure. Keep that qualification separate
-from F4c3's worker/native tests and from production merge/deployment guarantees.
+Use a minimal native reproduction or a subsequent retained diagnostic to locate
+the protocol error before proposing an SDK patch or application recovery policy.
+Retain the existing unknown-save protection and financial identity. A later green
+run establishes intermittent behavior, not an explanation or fix. Keep this
+investigation separate from F4c3's worker/native qualification and from production
+merge/deployment guarantees.

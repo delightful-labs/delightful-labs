@@ -234,6 +234,13 @@ record codecs and the existing restore charts. The restore probe is shared by th
 old and candidate test harnesses. Keep candidate-only removals distinct from
 active-source adoption, and retain genuinely historical evidence separately.
 
+The [offline-edit investigation](worker-pr39-ci-offline-edit.md#hosted-recurrence-native-protocol-error)
+now contains a real hosted native `protocol` error followed by an already-committed
+rollback refusal. Keep the original error and unknown-write protection; review
+uncommitted rollback versus committed settlement during C6 rather than adding
+retry infrastructure. The separate workspace-settings failure still lacks its
+nested cause. Neither failure is established as fixed by the alpha.66 candidate.
+
 ## C1: unused grant/call removal
 
 The repository-wide source/configuration reference audit found no active Finance
