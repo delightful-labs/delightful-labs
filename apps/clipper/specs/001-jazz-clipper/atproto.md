@@ -8,13 +8,16 @@ Shared identity/lifecycle belongs to DLF; Clipper owns annotations and publicati
 The attached-reader shutdown follow-up in [PR #34](https://github.com/delightful-labs/delightful-clipper/pull/34)
 is qualified on preview and awaits review/merge; it is separate from the merged baseline.
 
+Current implementation branch, 2026-11-17: publication storage and per-authorization
+scope additions below are in draft PR #50 and are not yet merged.
+
 ## Implemented identity integration
 
-| Area | Merged behavior |
+| Area | Implemented behavior |
 | --- | --- |
 | Platform | Jazz `2.0.0-alpha.60`, XState `6.0.0-beta.1`, existing Vercel app/backend. |
 | First use | A usable local library without signup. Optional AT Protocol sign-in is available in account settings. |
-| Provider | Better Auth `1.7.18` with `@kingironman2011/better-auth-bsky` `0.3.2`. The previously approved compatibility patch adapts its older account lookup to Better Auth's account-key API. It is not an AT Protocol protocol change. |
+| Provider | Better Auth `1.7.18` with `@kingironman2011/better-auth-bsky` `0.3.2`. The approved patch adapts account lookup/client types to the pinned Better Auth API, forwards per-authorization scopes with an identity-only default, and records the actual returned grant in linked-account metadata. OAuth protocol/session ownership stays with the existing SDK. |
 | Durable auth | Jazz's native Better Auth adapter stores users, sessions, OAuth state and provider sessions in the existing backend store. Six generated auth tables deny all client CRUD; native migration preserves the pre-auth library. No Neon, Postgres driver, SQL migration or browser JWT/JWKS bridge. Old disposable Neon records are neither imported nor deleted. |
 | Account lifecycle | Jazz owns automatic guest linking, existing-user selection and remembered-account persistence. No parallel Clipper identity registry, manual connect/sign-in coordinator or custom selection record. This does not implement local-work transfer/merging. |
 | OAuth ownership | The worker owns provider requests and attempt-bound completion. An old cookie alone is not a new callback receipt. Application drain, acquisition settlement and actual native session close precede navigation. |
@@ -211,7 +214,7 @@ mechanics; it is not a current implementation contract for removed companions.
 | Shared DLF adoption | Extract only evidenced reusable provider/server/lifecycle boundaries, review interfaces, then qualify Finance independently with its existing data/backup obligations. No cross-app session/token transfer. |
 | Local annotations | Saved-reader highlights, document notes and attached notes are implemented in merged PR #38 using native Jazz ranges, text merging and deletion. Concurrent offline note creation reconciliation, bounded-query pagination and original-page annotation remain open. |
 | Public vocabulary | Reuse `at.margin.note`; custom companions and their namespace are removed from scope. Quote/position conversion, source timestamp serialization and the reviewed Margin content mapper are implemented. They enforce public text limits without truncation; Highlight mapping requires verified source capture text and offsets. Public key mapping, source anchoring/version qualification and unsupported retained/imported content handling remain open. |
-| Public authorization | Qualify least-required collection/operation permissions and progressive consent with the existing OAuth integration. Sign-in does not implement publication or prove write permission. |
+| Public authorization | Approved identity-only/default and explicit Margin-note scopes are implemented through the existing OAuth plugin/SDK, with native PAR/PKCE/DPoP and callback/restart tests. Publish UI admission, real provider consent, current restored-session grant checks before dispatch and hosted qualification remain open. Sign-in does not implement publication or prove write permission. |
 | Synchronization design | Approved links evolve into native Jazz publications with library/source/DID bindings and the private/requested/issued/published lifecycle. Backend-only serializable XState transitions retain exact issued payloads and native history; owner reads survive source deletion. User admission, verified PDS outcomes/reconciliation, backend publisher lifetime/scheduling, independent writers and conflict resolution remain open. A backend alone is not an always-running scheduler. |
 | Publication implementation | Implement the reviewed common-record projector, durable public mapping/outcome evidence, conditional writes/deletes, reconciliation, conflict/deletion pauses and user controls. No PDS publication code currently exists. |
 | Publication qualification | Disposable PDS conditional-write and lost-response cases, unknown-field preservation, complete offline restart/reconnect, deletion/Trash/restore conflicts, and real Margin/second-reader interoperability. No production grants/content needed for initial proof. |

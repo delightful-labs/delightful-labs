@@ -304,6 +304,24 @@ The persistence capability requires its trusted backend caller to supply only
 actually confirmed published outcomes. It does not issue or reconcile PDS writes.
 New first-publication transitions for Highlights remain gated on source evidence.
 
+### Approved authorization scope — 2026-11-17
+
+The user approved this shape and the scoped auth-plugin extension needed to
+request different scopes for identity sign-in and publication:
+
+```ts
+const authorizationScopeSchema = z
+  .enum(['atproto', 'atproto repo:at.margin.note'])
+  .default('atproto')
+```
+
+The broader choice permits create/update/delete of Margin notes only. Client
+metadata declares the maximum permissions; ordinary sign-in explicitly requests
+identity alone. Clipper validates this enum before provider I/O, and the existing
+OAuth SDK enforces the declared ceiling. Actual grants belong to the provider's
+OAuth session, not configuration or linked-account metadata. No additional Jazz
+model, public Lexicon or token store is introduced by this authorization choice.
+
 ### Earlier model review findings
 
 1. Define and qualify text normalization and DOM/code-point/UTF-16 conversion.

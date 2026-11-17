@@ -1,5 +1,49 @@
 # Article notes — implementation started
 
+## Per-authorization OAuth scopes — 2026-11-17
+
+The user approved the concrete `authorizationScopeSchema` enum: `atproto` or
+`atproto repo:at.margin.note`, defaulting to `atproto`, and a narrow extension of
+the installed auth plugin. Its existing Better Auth 1.7 compatibility patch now
+also forwards an optional sign-in `scope` to the existing OAuth SDK. The SDK owns
+authorization, PAR/PKCE/DPoP, state/session storage, callbacks and refresh; no
+application OAuth client or duplicate token store is introduced.
+
+Client metadata declares the maximum approved Margin permissions, while an
+omitted sign-in scope explicitly requests identity only. Clipper's pure Better
+Auth admission hook validates the approved enum and requires configured same-origin
+HTTP starts before provider discovery. Existing plugin handle/callback validation
+is retained. Trusted server API calls retain their server invocation boundary.
+The OAuth SDK independently checks requested scopes against client metadata.
+The patched client declaration uses Better Auth's actual public action parameter
+contract and exposes optional scope input without assertions.
+
+The callback records the returned token's scope for new links/accounts and updates
+existing account metadata after reauthorization. Configured metadata is not a
+grant. Linked-account scope is also not current permission authority: the future
+publisher must inspect the restored OAuth session's current DID and
+`getTokenInfo().scope` before dispatch. No PDS dispatcher is added here, and the
+Publish UI/permission-upgrade interaction remains unfinished.
+
+Native tests exercise the actual client/plugin/SDK PAR request path with synthetic
+provider discovery, asserting identity-only defaults, explicit Margin permissions,
+DPoP/PKCE and persisted OAuth state. Unsupported scopes and foreign/missing
+origins are refused before discovery/state allocation. An identity-only plugin
+fixture independently refuses the broader scope at the SDK boundary. Existing
+callback tests now cover identity/Margin/identity grants through backend restarts,
+retaining the same linked account. Real provider consent remains unqualified.
+
+The root lockfile changes only this plugin's patch hash. A frozen offline install
+and workspace link qualification pass; package versions and other dependency
+contexts are unchanged.
+
+Verification passes 946 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, Clipper lint/formatting, vendor verification and
+source/applied-patch whitespace checks. Both production offline fixture builds
+pass. The built authenticated preview, two offline browser-process restarts and
+reconnect reconciliation pass in 8.6 seconds (9.2 including runner startup).
+Provider-facing calls use synthetic fixtures; no live grant or PDS write is made.
+
 ## Durable first-publication storage — 2026-11-17
 
 After reviewing the concrete stored shape and its explanation, the user approved

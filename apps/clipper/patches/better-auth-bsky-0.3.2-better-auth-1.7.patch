@@ -1,6 +1,74 @@
+--- a/README.md
++++ b/README.md
+@@ -66,7 +66,8 @@
+   tosUri: "https://myapp.com/tos",
+   policyUri: "https://myapp.com/privacy",
+ 
+-  // Optional — OAuth scopes (default: "atproto")
++  // Optional — maximum scopes declared in client metadata (default: "atproto")
++  // Each sign-in requests its own scope; omission requests only "atproto".
+   // Accepts a string or array of scope strings (e.g. from @atcute/oauth-types scope builders)
+   // The base "atproto" scope is always included automatically
+   scope: "atproto",
+@@ -236,3 +237,11 @@
+ ## License
+ 
+ [MIT](LICENSE.md)
++
++## Per-authorization scopes (local extension)
++
++`client.signIn.atproto({ handle, callbackURL, scope })` accepts an optional scope
++string. Omitting it requests only `atproto`, even if client metadata declares more
++permissions. The OAuth SDK validates explicit requests against that metadata.
++Linked-account scope metadata records the actual provider grant; inspect the
++restored OAuth session before authorizing resource operations.
+--- a/dist/client.d.ts
++++ b/dist/client.d.ts
+@@ -4,11 +4,13 @@
+ declare const atprotoClient: () => {
+   id: "atproto";
+   $InferServerPlugin: ReturnType<typeof atproto>;
+-  getActions: ($fetch: import("better-auth/client").BetterFetch, $store: import("better-auth").ClientStore, options: import("better-auth").BetterAuthClientOptions | undefined) => {
++  getActions: (...args: Parameters<NonNullable<import("better-auth").BetterAuthClientPlugin["getActions"]>>) => {
+     signIn: {
+       atproto: (data: {
+         handle: string;
+         callbackURL?: string;
++        /** Requested scopes; defaults to identity-only and must fit client metadata. */
++        scope?: string;
+       }) => Promise<{
+         data: unknown;
+         error: null;
 --- a/dist/server-5aI6OwM2.js
 +++ b/dist/server-5aI6OwM2.js
-@@ -761,7 +761,7 @@
+@@ -708,14 +708,16 @@
+ 				method: "POST",
+ 				body: /* @__PURE__ */ object({
+ 					handle: /* @__PURE__ */ pipe(/* @__PURE__ */ string(), /* @__PURE__ */ description("ATProto handle (e.g. user.bsky.social) or DID")),
++					scope: /* @__PURE__ */ optional(/* @__PURE__ */ string(), "atproto"),
+ 					callbackURL: /* @__PURE__ */ optional(/* @__PURE__ */ pipe(/* @__PURE__ */ string(), /* @__PURE__ */ description("URL to redirect to after sign-in")))
+ 				})
+ 			}, async (ctx) => {
+-				const { handle, callbackURL } = ctx.body;
++				const { handle, callbackURL, scope } = ctx.body;
+ 				if (!handle || handle.length < 3) throw APIError.from("BAD_REQUEST", ATPROTO_ERROR_CODES.INVALID_HANDLE);
+ 				try {
+ 					const identifier = handle;
+ 					const result = await oauthClient.authorize({
++						scope,
+ 						target: {
+ 							type: "account",
+ 							identifier
+@@ -754,17 +756,19 @@
+ 					console.log(`[atproto] callback: received code=${!!ctx.query.code} state=${ctx.query.state?.slice(0, 8)}… iss=${ctx.query.iss ?? "none"}`);
+ 					const { session: oauthSession, state: userState } = await oauthClient.callback(params);
+ 					const did = oauthSession.did;
+-					const pdsUrl = (await oauthSession.getTokenInfo(false)).aud;
++					const tokenInfo = await oauthSession.getTokenInfo(false);
++					const pdsUrl = tokenInfo.aud;
+ 					const profile = await fetchAtprotoProfile(oauthClient, did);
+ 					const mappedFields = options.mapProfileToUser ? options.mapProfileToUser(profile) : {
+ 						name: profile.displayName || profile.handle,
  						image: profile.avatar
  					};
  					const email = mappedFields.email || atprotoPlaceholderEmail(did);
@@ -9,3 +77,37 @@
  					let userId;
  					if (existingAccount) {
  						userId = existingAccount.userId;
++						await ctx.context.internalAdapter.updateAccount(existingAccount.id, { scope: tokenInfo.scope });
+ 						await ctx.context.internalAdapter.updateUser(userId, {
+ 							name: mappedFields.name,
+ 							image: mappedFields.image,
+@@ -782,7 +786,7 @@
+ 								accountId: did,
+ 								accessToken: "atproto-session",
+ 								refreshToken: "atproto-session",
+-								scope: normalizeScope(options.scope)
++								scope: tokenInfo.scope
+ 							});
+ 							userId = currentSession.user.id;
+ 							await ctx.context.internalAdapter.updateUser(userId, {
+@@ -808,7 +812,7 @@
+ 								accountId: did,
+ 								accessToken: "atproto-session",
+ 								refreshToken: "atproto-session",
+-								scope: normalizeScope(options.scope)
++								scope: tokenInfo.scope
+ 							});
+ 							userId = newUser.id;
+ 						}
+--- a/dist/server-Bkb39Iy1.d.ts
++++ b/dist/server-Bkb39Iy1.d.ts
+@@ -19,7 +19,8 @@
+   tosUri?: string; /** Privacy policy URL. */
+   policyUri?: string;
+   /**
+-   * OAuth scopes to request. Defaults to "atproto" (identity-only).
++   * Maximum scopes declared in client metadata. Defaults to "atproto" (identity-only).
++   * Each sign-in requests its own scope, defaulting to "atproto".
+    * Accepts a single space-separated string or an array of scope strings
+    * (e.g. from @atcute/oauth-types scope builders like `scope.rpc(...)`, `scope.repo(...)`).
+    * The base "atproto" scope is always included automatically.
