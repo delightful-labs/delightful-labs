@@ -1,11 +1,14 @@
 # Isolated Jazz upgrade proofs
 
-The coordinated upgrade target is now alpha.66. The schema mode below qualifies
+The schema and persistent-worker proofs currently qualify alpha.66. The schema mode below qualifies
 Finance's native authoring boundary on that version; `--worker` also qualifies
 the alpha.66 persistent-worker/session boundary. The historical default
 worker/session suite still targets alpha.65. See the
 [alpha.66 source audit and qualification boundaries](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md).
 The modes have separate qualification scopes.
+The registry now selects alpha.67 as `latest`. The retained-store comparison
+below covers alpha.66 **and alpha.67** against alpha.60; it does not extend the
+other modes' qualification or change workspace pins.
 
 ## Alpha.66 Finance schema, permissions and retained data
 
@@ -240,6 +243,51 @@ The [snapshot inspection evidence](../../specs/013-local-first-startup/worker-ja
 records the exact mounts, bounded Sandbox command, results, cleanup and log hash.
 Snapshot access does not itself qualify alpha.66 schema/auth/data
 access: compare native old/new readers on independent scratch copies afterward.
+
+## Native retained Finance reader comparison
+
+Prepare the readers from a successful Finance `--schema` or `--worker` artifact:
+
+```sh
+node tests/worker-upgrade/retained-prepare.mjs /path/to/finance-jazz-alpha66-artifacts
+```
+
+The printed directory contains independent alpha.60/66/67 installs, locks and
+`readers.tgz`. The script reuses the actual legacy schema/permissions bundles and
+qualified generated Finance bindings, asserting retained-schema identity first.
+Native pnpm optional-platform configuration includes matching Linux binaries;
+the archive omits other platforms, source maps and macOS extended attributes.
+No workspace install, pin, dependency patch, catalog or schema generation occurs.
+
+In the authorized nonpersistent Sandbox, mount the same three existing Drives
+as `snapshot` at `/retained/production`, `/retained/preview` and
+`/retained/qualification`. Upload/extract the archive and run:
+
+```sh
+node /vercel/sandbox/readers/retained-compare.mjs /retained
+```
+
+Each reader opens a new scratch copy with the source app ID and native SQLite
+blob mode, checks SDK/native version equality, and reads all 23 Finance tables
+through native `Db.all`. It compares every returned field including IDs, audit
+values, Dates, BigInts and binary contents. An ephemeral keyed digest avoids
+exporting rows or private values; the key/digests and scratch copies are removed
+in cleanup. Printed results contain only table names, counts and comparison
+booleans. These test scripts add no application persistence/backup abstraction.
+
+The fresh local alpha.60 fixture passes all nine reader opens and six comparisons,
+including a maximum-safe amount and nonempty attachment bytes. An independent
+native one-byte attachment edit is refused despite unchanged row/byte counts.
+The actual Vercel snapshot run also passes every identity/table/binary comparison
+for alpha.66 and alpha.67: production has 987 rows and 1,127,923 binary bytes,
+preview 92 rows with no binary values, and qualification 36 rows and 28,723 bytes.
+Preview attachment retention is unexercised because no attachments are present.
+
+The Sandbox stopped after 64.355 seconds. Original cores/Drives were not opened
+for writes or upgraded. This is retained snapshot read compatibility, not live
+OIDC admission, namespace access to the custom core, schema rollout, writes,
+client adoption or complete alpha.67 qualification. See the
+[exact retained-data evidence](../../specs/013-local-first-startup/worker-jazz-upgrade-plan.md#native-reader-comparison-on-retained-snapshots).
 
 ## Alpha.66 persistent worker and session boundary
 

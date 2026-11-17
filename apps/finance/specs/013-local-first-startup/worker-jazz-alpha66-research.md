@@ -611,6 +611,40 @@ At the preceding auth checkpoint `708ccfe2`, all normal hosted Finance, Clipper
 and Foundation jobs pass. This does not fix the intermittent unknown-save
 failures, qualify live retained destinations or activate the SDK upgrade.
 
+## Actual retained rows and newly released alpha.67
+
+The follow-up now qualifies native readers on actual retained snapshots, beyond
+metadata presence. Independent alpha.60/66/67 SDK/native runtimes open only new
+scratch copies from the same read-only mounts. The old and generated candidate
+Finance schemas are reused unchanged. Retained app identity and all returned
+values across 23 tables match for both newer releases, including audit metadata,
+financial amounts and exact nonempty attachment/profile bytes.
+
+Production has 987 rows and 1,127,923 binary bytes; preview has 92 rows and no
+binary values; the custom qualification snapshot has 36 rows and 28,723 binary
+bytes. No private values are printed/downloaded: canonical row/byte comparisons
+use a per-run secret HMAC key, removed with the scratch copies before shutdown.
+The local native maximum-safe amount/attachment proof passes, and a real
+single-byte change is detected despite identical counts. The Sandbox stops after
+64.355 seconds; originals are not upgraded or mounted writable. The
+[retained reader evidence](worker-jazz-upgrade-plan.md#native-reader-comparison-on-retained-snapshots)
+records exact scope, counts, non-vacuity, artifacts and cleanup.
+
+During preparation npm `latest` moved to **alpha.67** (`alpha` still names .60).
+Its published tarball integrity was verified. Actual `backend/create-jazz.js`,
+`backend/vercel-store.js`, `typed-app.js` and `runtime/db.js` are byte-identical
+to alpha.66. The native fingerprint modules, bundled broker and inspector assets
+changed; these observations are not a complete Rust/Wasm/worker release audit.
+Better Auth's peer remains `~1.7.22`. The same generated Finance bindings work
+with the matching alpha.67 native binary in the bounded read proof; there is no
+reason to reauthor the schema or backend callback for an unchanged API.
+
+Alpha.67 still needs the remaining release/patch responsibility review and
+worker/auth/caller qualification before replacing the coordinated target at
+cutover. This result does not make the 200 schema/restore or 30 worker/session
+cases alpha.67-qualified. Live workload credentials and the custom original core
+name remain separate gaps. No active source, pin, deployment or patch changes.
+
 ## Execution order
 
 1. Keep the approved private session actor and awaited native factory. Finish

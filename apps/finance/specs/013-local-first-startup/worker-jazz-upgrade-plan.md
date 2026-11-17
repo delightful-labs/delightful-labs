@@ -5,14 +5,24 @@ passed every hosted Finance, Clipper and foundation workflow. C1/C2 are complete
 `feat/jazz-native-session-upgrade` starts from that exact merge tree. Workspace
 SDK pins, the active patch, application behavior and deployment settings remain
 unchanged; the worker-only alpha.65 candidate below is an isolated fixture.
-**2026-11-17: the coordinated target is now alpha.66.** npm `latest` selects
-alpha.66; `alpha` still selects alpha.60. Use explicit coordinated pins after
+**Initial 2026-11-17 target: alpha.66.** At that audit npm `latest` selected
+alpha.66; `alpha` selected alpha.60. Use explicit coordinated pins after
 qualification. The [alpha.66 audit](worker-jazz-alpha66-research.md) records its
 breaking schema/permission changes, 24 passing native lifecycle cases and a
 reproduced late-close failure in the new immediate factory. Keep the supported
 awaited factory in the approved private session actor; no new SDK patch.
 The bounded worker/session proof now also passes on alpha.66; the separate
 historical Clipper caller overlay remains unported/incomplete.
+
+**Later November 17 refresh:** npm `latest` now selects alpha.67; `alpha` remains
+alpha.60. The integrity-verified published package has unchanged backend,
+namespace, typed-App and Db JavaScript compared with alpha.66. The retained-data
+reader proof below now passes on both alpha.66 and alpha.67 with their matching
+native binaries. Treat alpha.67 as the latest release candidate for the coherent
+switch, after reviewing the remaining release delta and requalifying worker,
+auth, shared-owner callers and the other affected gates. Do not rewrite the
+qualified schema/permissions or add compatibility code for unchanged APIs.
+Existing alpha.66 evidence remains version-scoped; no live pins are changed.
 
 The branch subsequently merges main `5e78a349` (PR #45's website/deployment-control
 fixes). No SDK, Finance schema, Local First implementation or native fixture
@@ -206,6 +216,14 @@ do not accumulate a second implementation alongside the selected native path.
       [cloud evidence](#retained-drive-inspection-source-preserving-access).
       This does not yet qualify alpha.66 financial rows/attachments or live
       workload admission; compare native readers on disposable copies next.
+      **Native retained reads now also pass:** all 23 Finance tables, app identity
+      and present binary values match alpha.60 on independent alpha.66 and
+      alpha.67 copies of all three actual Drive snapshots. Production includes
+      546 transactions and nonempty attachment/profile bytes. The Sandbox stops
+      after 64.355 seconds; originals are not upgraded. See the
+      [reader comparison](#native-reader-comparison-on-retained-snapshots).
+      Live workload/OIDC admission and the custom core's native addressability
+      remain open; matching reads do not complete U4/U5.
 - [ ] **U5 — Switch and qualify the workspace coherently.** Update SDK, matching
       Wasm/native core, library peer and existing patch bindings as one reviewed
       change; preserve one compatible SDK identity per consumer. Run library
@@ -575,3 +593,80 @@ contents. That result still does not establish live workload/OIDC admission;
 qualify the intended deployment credential boundary separately. Keep the custom
 qualification destination excluded from rollout until a supported way to reach
 its retained data is agreed. U4/U5 stay open; no partial app pin switch is made.
+
+## Native reader comparison on retained snapshots
+
+The user requested continuing from metadata access to actual native old/new
+reads. The bounded comparison now passes, using another one-vCPU nonpersistent
+five-minute Sandbox, `finance-retained-readers-20261117`, with networking denied,
+no published ports and native read-only snapshot mounts of the same three Drives.
+Only package/test code was uploaded. Financial rows and private metadata values
+were neither printed nor downloaded.
+
+`retained-prepare.mjs` reuses the earlier Finance schema artifact: actual legacy
+alpha.60 bundles and native generated candidate schema/permission bindings.
+It preserves the proven stored-schema identity and prepares independent exact
+alpha.60, alpha.66 and newly released alpha.67 installs with matching native
+Linux binaries. Both newer readers use the same qualified generated source; no
+schema rewriting, new migration, application wrapper or SDK patch is introduced.
+The dependency graphs and frozen locks remain in the disposable artifact.
+
+Each native reader copies the snapshot's `store` to a fresh writable scratch
+directory, copies the retained outer `app-id` into that directory, and opens
+`sqlite({ path: scratch, blobs: 'sqlite' })`. This preserves Vercel's native app
+identity and inline blob storage without mounting an original Drive writable.
+It checks SDK/native package version equality and the actual returned app ID,
+then reads all 23 Finance tables using native `Db.all`, including audit fields.
+Canonical comparison includes IDs, Dates, BigInts, every selected scalar/JSON
+value and exact binary contents. Per-run HMAC digests use an ephemeral key kept
+inside the Sandbox; only counts/table names/booleans leave the test. All scratch
+copies, digests and the key are removed before stopping the Sandbox.
+
+Every identity, row and binary comparison matches alpha.60 for **both** candidates:
+
+| Snapshot destination | Rows across 23 tables | Binary cells | Binary bytes |
+| -------------------- | --------------------- | ------------ | ------------ |
+| Production           | 987                   | 6            | 1,127,923    |
+| `mono` preview       | 92                    | 0            | 0            |
+| Custom qualification | 36                    | 2            | 28,723       |
+
+Production includes 546 transactions, five file parts containing 1,118,293
+attachment bytes, and one profile binary value containing 9,630 bytes. The
+qualification snapshot includes four transactions and two file parts. Preview
+has two transactions and no attachment rows, so its empty attachment comparison
+is not evidence of retaining nonempty attachments. This comparison covers
+current returned rows, not every historical version or unsupported schema.
+
+Before the cloud run, the fresh native alpha.60 fixture passed nine reader opens
+and six version comparisons over all 23 tables, including maximum-safe minor
+units and a five-byte attachment. An independent native update flips one byte
+without changing row or byte counts; both row-content and binary comparisons
+correctly refuse it. Initial local setup errors (a missing fixture category and
+an incorrect schema-metadata iteration shape) were corrected before cloud work;
+no app assertions or SDK behavior were weakened.
+
+Cleanup stops the temporary Sandbox after **64.355 seconds** (18.96 seconds active
+CPU). The final native listing confirms stopped status and all three mounts in
+`snapshot` mode. No original core was opened for writes, started/stopped/upgraded,
+or retargeted; no source Drive was forked, renamed or deleted. App pins and
+deployment settings stay unchanged. The original archive emitted harmless macOS
+extended-attribute warnings during Linux extraction; preparation now excludes
+those attributes, verified separately without repeating the data run.
+
+Evidence: `/private/tmp/finance-retained-cloud-comparison.json`, SHA-256
+`13c1eea51e285b8f18137de0c4875847b47248a798d64aff295337a2f9fedd38`;
+raw CLI log `/private/tmp/finance-retained-cloud-comparison.log`, SHA-256
+`a7e347d8229d2f8365734d451523e5995b337d69e6729fb59597cb162acb27c5`;
+cleanup `/private/tmp/finance-retained-compare-stop.log`; final state
+`/private/tmp/finance-retained-compare-final-state.txt`. Repeatable preparation
+artifact: `finance-retained-readers-GKzIwf`; local proof log:
+`/private/tmp/finance-retained-repeatable-local.log`.
+
+This qualifies **retained snapshot read compatibility**, not live deployment
+workload/OIDC admission or a production schema/SDK rollout. The custom
+qualification data is readable on copies but its original name remains outside
+the native namespace form. Keep that destination out of rollout pending a
+supported retention/access decision. Reuse these same readers if needed; do not
+build a data-copy service, automatic replay or a naming patch. Finish live
+credential/destination admission and actual consumer/worker qualification before
+the coherent version switch. U4/U5 remain open.
