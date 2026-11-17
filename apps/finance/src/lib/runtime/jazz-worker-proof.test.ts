@@ -7,9 +7,14 @@ const appId = 'credential-recovery-regression'
 const seed = Buffer.alloc(32, 17).toString('base64url')
 const payloadSchema = z.object({ sub: z.string(), exp: z.number() })
 
-async function fixture() {
+async function fixture(lifetimeSeconds = 60) {
 	const wasm = await loadWasmModule()
-	const token = wasm.mintLocalFirstToken(seed, appId, 1, BigInt(Math.floor(Date.now() / 1000)))
+	const token = wasm.mintLocalFirstToken(
+		seed,
+		appId,
+		lifetimeSeconds,
+		BigInt(Math.floor(Date.now() / 1000))
+	)
 	const payload = payloadSchema.parse(
 		JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString())
 	)
@@ -24,7 +29,9 @@ async function fixture() {
 
 describe('retained Jazz worker credential admission', () => {
 	it('accepts a fresh same-identity proof after the opening proof expires', async () => {
-		const { runtime, wasm, proof, author, expires } = await fixture()
+		// JWT seconds are rounded down. A one-second token can expire during
+		// construction near a clock boundary, before this expiry scenario begins.
+		const { runtime, wasm, proof, author, expires } = await fixture(3)
 		try {
 			await new Promise((resolve) =>
 				setTimeout(resolve, Math.max(0, expires * 1000 - Date.now()) + 100)
