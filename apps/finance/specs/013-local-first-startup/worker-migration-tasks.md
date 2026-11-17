@@ -28,6 +28,11 @@ U2a's shared native recovery/restoration/readiness candidate now passes strict
 types and all 18 native cases. [Its qualification](worker-jazz-upgrade-plan.md#u2a-shared-native-session-adapter-qualification)
 records the scope guarantees and remaining Finance/Clipper caller adoption; U2
 remains open until those consumers are adapted and qualified together.
+U2b's source review found Finance's independent workspace-restore database also
+depends on the removed opaque account handle. Its
+[ownership proposal and qualification gates](worker-restore-session-decision.md)
+are pending review before that boundary changes; this is domain drain work, not
+another field rename or SDK-upgrade leaf to delete.
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

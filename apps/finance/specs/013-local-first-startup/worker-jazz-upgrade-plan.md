@@ -47,6 +47,9 @@ resets or a Finance destination change.
       **In progress:** U2a's selected shared adapters pass public-package/native
       qualification below. Finance/Clipper caller adoption, provider changes and
       removal of their explicit upgrade phases remain U2b; U2 is not complete.
+      U2b source review also found Finance's separate account-handle-based restore
+      client. Resolve its [resource ownership decision](worker-restore-session-decision.md)
+      before replacing that plumbing; public user metadata cannot reopen it.
 - [ ] **U3 — Establish SDK schema history before persistent-backend startup.**
       Both active apps use `migrations: 'none'`; alpha.65 rejects this on SQLite,
       remote and Vercel stores before opening them. Use the SDK's generated
@@ -177,13 +180,23 @@ log: `/private/tmp/finance-alpha65-u2-qualified.log`. The source overlay is
 added-source whitespace are checked with Git's patch parser; diff-context tabs
 are patch data, not indentation changes to application code.
 
-Next is U2b: adapt Finance's layout/recovery integration/session preparation and
-Clipper's account host/callers, then qualify the native Svelte provider and retire
-their SDK-upgrade phases. Alpha.65 session subscribers receive notifications
-without a snapshot argument; use its current snapshot/native Svelte store and
-ensure initial publication. Preserve actual domain initialization and drains.
-Those consumers and the coherent SDK switch remain unimplemented. Workspace
-SDK pins, active adapters/patch, application behavior and Vercel data destinations
+U2b's caller source review found another material boundary: Finance's workspace
+restore opens and drains its own database using the opaque account handle.
+Alpha.65 removes that public handle and the old top-level `createDb` entry.
+The [decision record](worker-restore-session-decision.md) proposes reusing the
+application session's Db under the existing financial restore/drain charts,
+records the alternative and names the native tests required. This ownership
+change is pending user review; no replacement is implemented.
+
+After that decision, adapt Finance's layout/recovery integration/session
+preparation and Clipper's account host/callers, qualify the native Svelte provider
+and retire their SDK-upgrade phases. Alpha.65 imperative session subscribers
+receive notifications without a snapshot argument or initial delivery. Its
+`getJazzSession()` Svelte context already supplies a readable store with bound
+actions and initial publication: existing `fromStore(getJazzSession())` callers
+do not need an extra `sessionState()` wrapper. Preserve actual domain
+initialization and drains. Those consumers and the coherent SDK switch remain
+unimplemented. Workspace SDK pins, active adapters/patch, application behavior and Vercel data destinations
 are unchanged by U2a.
 
 ## Native Vercel naming: additional code proof
