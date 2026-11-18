@@ -19,6 +19,22 @@ export function checkFinanceWorker(directory, finance, proof) {
 		'src/lib/components/workspaces/WorkspaceScopeNotice.svelte',
 		'src/lib/components/navigation/AppLink.svelte',
 		'src/lib/components/navigation/Anchor.svelte',
+		'src/app.d.ts',
+		'src/lib/components/navigation/AppShell.svelte',
+		'src/lib/components/navigation/AppTopMenu.svelte',
+		'src/lib/components/navigation/AppDrawer.svelte',
+		'src/lib/components/navigation/AppDrawerNavigation.svelte',
+		'src/lib/components/navigation/AppDrawerAccounts.svelte',
+		'src/lib/components/navigation/AppDrawerSettings.svelte',
+		'src/lib/components/navigation/AppDrawerContentSection.svelte',
+		'src/lib/components/navigation/AppNavigationLink.svelte',
+		'src/lib/components/navigation/NavigationSpacer.svelte',
+		'src/lib/components/navigation/PageLayout.svelte',
+		'src/lib/components/navigation/page-navigation.ts',
+		'src/lib/components/shared/QueryContent.svelte',
+		'src/lib/components/shared/LoadingContent.svelte',
+		'src/lib/runtime/viewport.ts',
+		'src/lib/assets/delightful-finance-logo.svg',
 		'src/lib/filters/query-links.ts',
 		'src/lib/contracts/worker-recovery.ts',
 		'src/lib/components/worker/WorkerRecovery.svelte',
@@ -110,6 +126,7 @@ export function checkFinanceWorker(directory, finance, proof) {
 				extends: './tsconfig.json',
 				compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler' },
 				include: [
+					'src/app.d.ts',
 					'src/lib/tdesign-icons.d.ts',
 					'src/lib/runtime/worker/application.worker.ts',
 					'src/lib/data/accounts.ts',
@@ -134,5 +151,12 @@ export function checkFinanceWorker(directory, finance, proof) {
 		'./tsconfig.worker-application.json',
 		'--fail-on-warnings'
 	])
-	run('pnpm', ['exec', 'vitest', 'run', '--config', 'vitest.worker-application.config.ts'])
+	run('pnpm', [
+		'exec',
+		'vitest',
+		'run',
+		'--config',
+		'vitest.worker-application.config.ts',
+		'--reporter=verbose'
+	])
 }

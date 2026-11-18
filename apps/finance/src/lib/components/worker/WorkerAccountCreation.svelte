@@ -1,11 +1,14 @@
 <script lang="ts">
 	import AccountForm from '../accounts/AccountForm.svelte'
+	import type { Snippet } from 'svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
 	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
 	let {
 		view,
+		trigger,
 		onsend
 	}: {
+		trigger?: Snippet<[() => void, boolean]> | undefined
 		view: FinanceWorkerView
 		onsend: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
 	} = $props()
@@ -29,6 +32,7 @@
 
 {#if view.accountCreation}
 	<AccountForm
+		{trigger}
 		scope={scopeKey}
 		defaultCurrency={currency}
 		view={view.accountCreation}

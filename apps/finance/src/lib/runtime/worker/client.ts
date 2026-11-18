@@ -53,6 +53,7 @@ export function createFinanceWorkerClient(
 		},
 		open: (url, name) => new SharedWorker(url, { type: 'module', name })
 	})
+	const observedLocation = writable(new URL(location.href))
 	let revision = 0
 	const state = writable<FinanceWorkerView>({
 		type: 'VIEW',
@@ -179,6 +180,7 @@ export function createFinanceWorkerClient(
 		return `${location.pathname}${location.search}${location.hash}`
 	}
 	function observeLocation() {
+		observedLocation.set(new URL(location.href))
 		worker.postMessage(
 			financeWorkerCommand.parse({ type: 'OBSERVE_LOCATION', href: relativeHref() })
 		)
@@ -279,6 +281,7 @@ export function createFinanceWorkerClient(
 	function observeRoute() {
 		const current = get(state)
 		if (current.status === 'closed') return
+		observedLocation.set(new URL(location.href))
 		window.addEventListener('popstate', observeRoute)
 		const command = financeWorkerCommand.parse({
 			type: 'OBSERVE_ROUTE',
@@ -295,6 +298,7 @@ export function createFinanceWorkerClient(
 	}
 
 	return {
+		location: { subscribe: observedLocation.subscribe },
 		view,
 		observeLocation,
 		observeRoute,

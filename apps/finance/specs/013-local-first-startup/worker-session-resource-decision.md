@@ -1352,3 +1352,55 @@ checkout. `/private/tmp/finance-shell-reuse-checks.log` retains the result. The 
 2,013-unit / 57-native-browser result belongs to the account-order checkpoint; no full-suite
 rerun is claimed for this presentation-only cleanup. Actual Worker shell mounting, route-link
 binding, responsive keyboard/focus coverage and the remaining feature parity are still next.
+
+### Worker-bound shared shell — implementation model
+
+Bind the existing AppShell directly around the isolated WorkerAccounts composition, replacing
+its standalone workspace/selection/order controls. Preserve the current Worker root, scoped
+commands, forms, persistence and native navigation receipts. This is a presentation connection,
+not a new routing chart or SDK owner. WorkerAccountCreation forwards AccountForm's existing
+trigger snippet so the drawer uses the same form owner and modal.
+
+Window's existing client exposes a read-only native URL observation alongside the Worker view;
+observeLocation/observeRoute/popstate and native navigation settlement update it. The shell uses
+that URL for current-link presentation and the existing inherited-workspace links. The Worker
+continues to classify route observations and own selection/default/legacy/access decisions.
+AppShell supplies its existing navigation-spacer snippet to children so PageLayout preserves the
+menu space without a second layout. Existing legacy children keep their current behavior.
+
+The host may supply its footer snippet; bank/PWA footer adoption remains with the corresponding
+remaining features and complete-app gate. The isolated candidate is still inactive in production.
+Native fixtures exercise the actual drawer/forms and use a fixture-only native anchor navigation
+adapter where SvelteKit would normally handle same-origin anchors. Modified/new-tab links remain
+native. Expand disclosures using native UI interactions before existing feature cases; qualify
+mobile focus/dismissal, desktop selection/order, current/scoped links, native history and remount
+without changing feature assertions, retries or timeouts. Build audits continue rejecting SDK or
+financial projections in Window and Svelte modules in the Worker.
+
+Status reports must include the remaining-work list, as explicitly requested by the user.
+
+
+Shared shell connection is qualified: **2,013 Finance units**, **63 actual Worker/Svelte browser
+cases** across Chromium/Firefox/WebKit, **22 existing SvelteKit navigation/order/pagination cases**,
+zero-warning full/native static and complete browser-test types, and formatting pass. The actual
+candidate now renders the shared AppShell/PageLayout/drawer controls; there is no second layout,
+router, SDK owner or new state machine. Native scope inheritance, current links, back/forward,
+remount, account creation/selection/order, mobile dismissal/focus/resize and retained drafts pass.
+Build audits still reject SDK/financial projections in Window and UI modules in the Worker.
+
+The first complete run exposed a callback header bug (passing the full view into the selection
+transport's strict header spread) and a remount fixture that attempted its picker inside a closed
+Settings disclosure. Selection callbacks now send only sessionRevision/selection, and the fixture
+opens the native disclosure before the unchanged assertion. All six affected cases pass focused
+verification, followed by the complete 63-case pass. The runner now reports native cases as they
+finish instead of withholding all progress until the end. Existing SVG plugin declarations are
+included for the reused drawer logo, rather than adding a declaration workaround.
+
+Logs: `/private/tmp/finance-worker-shell-native-qualified.log` (complete 63 cases),
+`/private/tmp/finance-worker-shell-native-corrected.log` (six diagnosed cases),
+`/private/tmp/finance-worker-shell-final.log` (2,013 units and 22 legacy browser cases), and
+`/private/tmp/finance-worker-shell-static-qualified.log` (final static/browser types).
+Hosted Finance/Foundation/Clipper qualification is green at preceding head f14ea015; this new
+shell commit needs its own hosted result. The shell uses the Window client's observed native URL;
+actual production SvelteKit route mounting, page-specific feature parity and provider/PWA footer
+adoption remain open, together with the known partial financial-save blocker and activation gates.

@@ -26,6 +26,7 @@ function attach() {
 		target,
 		props: {
 			view: owner.view,
+			location: owner.location,
 			recovery: owner.recovery,
 			onRestore: owner.restoreIdentity,
 			onRetryRecoveryNavigation: owner.retryRecoveryNavigation,
@@ -157,4 +158,29 @@ declare global {
 		financeWorkerReadFixture: typeof fixture
 	}
 }
+document.addEventListener('click', (event) => {
+	if (
+		!routeObserver ||
+		event.defaultPrevented ||
+		event.button !== 0 ||
+		event.metaKey ||
+		event.ctrlKey ||
+		event.shiftKey ||
+		event.altKey
+	)
+		return
+	const anchor = event.target instanceof Element ? event.target.closest('a') : null
+	if (
+		!(anchor instanceof HTMLAnchorElement) ||
+		anchor.hasAttribute('download') ||
+		(anchor.target && anchor.target !== '_self')
+	)
+		return
+	const url = new URL(anchor.href)
+	if (url.origin !== location.origin) return
+	event.preventDefault()
+	history.pushState(null, '', url)
+	current().observeLocation()
+	routeObserver()
+})
 window.financeWorkerReadFixture = fixture

@@ -33,7 +33,7 @@
 		onDoneAccountOrder,
 		onMoveAccount
 	}: {
-		children: Snippet
+		children: Snippet<[Snippet]>
 		accountCreation: Snippet<[Snippet<[() => void, boolean]>]>
 		pathname: string
 		footer: Snippet
@@ -117,7 +117,7 @@
 			</AppDrawerNavigation>
 		</AppDrawer>
 		<div class="content" inert={mainInert}>
-			{@render children()}
+			{@render children(navigationSpacer)}
 		</div>
 		{#if mainInert}
 			<button

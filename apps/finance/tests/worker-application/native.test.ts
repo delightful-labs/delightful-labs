@@ -149,6 +149,15 @@ afterAll(async () => {
 	if (directory && !retained) await rm(directory, { recursive: true, force: true })
 	else if (directory) console.error('Finance Worker read artifacts:', directory)
 })
+async function openDrawerSection(page: Page, name: string) {
+	const toggle = page.getByRole('button', { name: 'Toggle Main navigation', exact: true })
+	if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
+	const section = page
+		.locator('aside details')
+		.filter({ has: page.locator('summary', { hasText: name }) })
+	if ((await section.getAttribute('open')) === null) await section.locator('summary').click()
+	return section
+}
 async function open(page: Page, scope: string, serverUrl = origin + '/jazz') {
 	await page.goto(origin)
 	await page.waitForFunction(() => !!window.financeWorkerReadFixture)
@@ -164,6 +173,8 @@ async function open(page: Page, scope: string, serverUrl = origin + '/jazz') {
 	await browserExpect
 		.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
 		.toBe('ready')
+	await openDrawerSection(page, 'Settings')
+	await openDrawerSection(page, 'Accounts')
 }
 async function close(page: Page) {
 	await page.evaluate(() => window.financeWorkerReadFixture.close())
@@ -172,6 +183,7 @@ async function close(page: Page) {
 		.toBe('closed')
 }
 async function createAccountUI(page: Page, name: string) {
+	await openDrawerSection(page, 'Accounts')
 	await page.getByRole('button', { name: /add account/i, exact: true }).click()
 	const dialog = page.getByRole('dialog', { name: /add account/i })
 	await browserExpect(dialog).toBeVisible()
@@ -195,6 +207,118 @@ async function enterExpenseUI(page: Page, accountId: string, description: string
 }
 for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 	describe(name, () => {
+		it('binds the shared drawer to worker navigation, scoped links and retained native history', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Shell wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate((id) => {
+					window.financeWorkerReadFixture.route('/expenses?workspace=' + id)
+					window.financeWorkerReadFixture.followRoutes()
+				}, workspaceId)
+				const aside = page.locator('aside'),
+					income = aside.getByRole('link', { name: 'Income', exact: true }),
+					expenses = aside.getByRole('link', { name: 'Expenses', exact: true })
+				await browserExpect(expenses).toHaveAttribute('aria-current', 'page')
+				await browserExpect(income).toHaveAttribute('href', '/income?workspace=' + workspaceId)
+				await income.click()
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().transactionKind))
+					.toBe('income')
+				await browserExpect(income).toHaveAttribute('aria-current', 'page')
+				await browserExpect(expenses).not.toHaveAttribute('aria-current', 'page')
+				await browserExpect(
+					aside.getByRole('link', { name: 'Manage Accounts', exact: true })
+				).toHaveAttribute('href', '/accounts?workspace=' + workspaceId)
+				await page.goBack()
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().transactionKind))
+					.toBe('expense')
+				await browserExpect(expenses).toHaveAttribute('aria-current', 'page')
+				await page.goForward()
+				await browserExpect(income).toHaveAttribute('aria-current', 'page')
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().transactionKind))
+					.toBe('income')
+				const identity = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().identityId
+				)
+				await page.evaluate(() => window.financeWorkerReadFixture.detach())
+				await page.evaluate(() => window.financeWorkerReadFixture.attach())
+				await openDrawerSection(page, 'Settings')
+				await browserExpect(page.getByLabel('Current Workspace', { exact: true })).toHaveValue(
+					workspaceId
+				)
+				await browserExpect(
+					aside.getByRole('link', { name: 'Income', exact: true })
+				).toHaveAttribute('aria-current', 'page')
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
+					identity
+				)
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('retains the worker draft through mobile drawer dismissal, focus return and resizing', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage({ viewport: { width: 390, height: 900 } })
+			try {
+				await page.emulateMedia({ reducedMotion: 'reduce' })
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Mobile wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				const toggle = page.getByRole('button', { name: 'Toggle Main navigation', exact: true }),
+					dismiss = page.getByRole('button', { name: 'Close Main navigation', exact: true })
+				await browserExpect(toggle).toHaveAttribute('aria-expanded', 'true')
+				await dismiss.click()
+				await browserExpect(toggle).toBeFocused()
+				await browserExpect(toggle).toHaveAttribute('aria-expanded', 'false')
+				const description = page.getByLabel('Description', { exact: true })
+				await description.fill('Keep mobile draft')
+				await toggle.click()
+				await browserExpect(dismiss).toBeVisible()
+				expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+					390
+				)
+				await dismiss.click()
+				await browserExpect(toggle).toBeFocused()
+				await browserExpect(description).toHaveValue('Keep mobile draft')
+				await toggle.click()
+				await page.setViewportSize({ width: 1280, height: 900 })
+				await browserExpect(dismiss).toBeHidden()
+				await browserExpect(description).toHaveValue('Keep mobile draft')
+				await browserExpect(
+					page.getByRole('checkbox', { name: 'Mobile wallet', exact: true })
+				).toBeChecked()
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('renders only selected accounts and keeps the Worker alive when UI observation detaches', async () => {
 			onTestFailed(() => {
 				retained = true
@@ -496,6 +620,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
 					identity
 				)
+				await openDrawerSection(page, 'Settings')
 				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
