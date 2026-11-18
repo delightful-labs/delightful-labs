@@ -1,7 +1,14 @@
 import { createSessionRuntimeMachine, createSessionRuntimeConnection } from './session-runtime.js'
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, createCallbackLogic, setup, waitFor, types, type ActorRefFrom } from 'xstate'
+import {
+	createActor,
+	createCallbackLogic,
+	setup,
+	waitFor,
+	types,
+	type ActorFromLogic
+} from 'xstate'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import {
 	sessionRecoveryMachine,
@@ -324,7 +331,7 @@ describe('explicit recovery host reports', () => {
 		const runtime = runtimeFixture()
 		await waitFor(runtime.actor, (s) => s.matches({ bound: 'observing' }))
 		const notices: string[] = []
-		let coordinator: ActorRefFrom<typeof sessionRecoveryMachine> | undefined
+		let coordinator: ActorFromLogic<typeof sessionRecoveryMachine> | undefined
 		const recipient = createActor(
 			createCallbackLogic<RecoveryNotice>(({ receive }) => {
 				receive((event) => {
