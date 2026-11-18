@@ -186,6 +186,11 @@
 	},
 	"publication": {
 		"preview_action": "Preview sharing",
+		"publish": "Publish",
+		"unpublish": "Unpublish",
+		"unpublished": "Unpublished",
+		"published": "Published",
+		"failed": "Publishing could not be confirmed. Try again.",
 		"preview_heading": "Preview",
 		"account": "AT Protocol account",
 		"unavailable": "Sharing preview is unavailable. Check your AT Protocol sign-in and saved note, then try again."

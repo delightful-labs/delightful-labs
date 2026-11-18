@@ -3,6 +3,11 @@ import { expectLibrarySynced, openAccountSettings, expectSignedInAccount } from 
 import { authenticateGateway } from '../../src/lib/server/gateway-auth.js'
 import { handleConfiguredAuth } from '../../src/lib/server/auth/completion-handler.js'
 import { handlePreviewRequest } from '../../src/lib/server/publication/request.js'
+import { handlePublicationPublish } from '../../src/lib/server/publication/publish.js'
+import { createGatewayMachine } from '../../src/lib/machines/capture/gateway.js'
+import { cidSchema } from '../../src/lib/annotations/publication-link.js'
+import { publicationSchema } from '../../src/lib/annotations/publication.js'
+import { firstPublicationWriteSchema } from '../../src/lib/server/publication/first-write.js'
 import { chromium, expect, test } from '@playwright/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -33,8 +38,27 @@ for (const mode of ['linked', 'existing', 'expired'])
 		const ui = staticShellServer(
 			fileURLToPath(new URL('../../.offline-test-builds/a/', import.meta.url))
 		)
+		const publicRecords = new Map<string, unknown>()
+		let publicWrites = 0
+		let publicRemovals = 0
+		const publicCid = 'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
+		let publishedUri: string | undefined
 		const signOutResponses: number[] = []
 		let auth: ReturnType<typeof createAuthServer>
+		const sourceGateway = createGatewayMachine({
+			resolve: async () => ({ address: '93.184.216.34', family: 4 }),
+			fetch: async () => ({
+				status: 200,
+				location: undefined,
+				body: new TextEncoder().encode(
+					'<nav>Original page menu.</nav><p>Readable native backend capture.</p><footer>Original footer.</footer>'
+				),
+				mediaType: 'text/html; charset=utf-8'
+			}),
+			extract: async () => {
+				throw new Error('Source verification must use the original response')
+			}
+		})
 		const start = async () => {
 			const authority = await startJazzAuthority({
 				port: 5191,
@@ -48,7 +72,99 @@ for (const mode of ['linked', 'existing', 'expired'])
 			auth = createAuthServer({ db: () => authority.backend.db, schema: app }, { origin, secret })
 			ui.useAuth(async (request) => {
 				if (new URL(request.url).pathname === '/api/publication/preview')
-					return handlePreviewRequest(auth, authority.backend, request, origin)
+					return handlePreviewRequest(auth, authority.backend, request, origin, sourceGateway)
+				if (
+					[
+						'/api/publication/publish',
+						'/api/publication/unpublish',
+						'/api/publication/cleanup'
+					].includes(new URL(request.url).pathname)
+				) {
+					const publicationAuth = {
+						api: {
+							getSession: auth.api.getSession,
+							getAtprotoClient: async () => ({
+								session: {
+									did: 'did:plc:offlinefixture',
+									getTokenInfo: async () => ({
+										sub: 'did:plc:offlinefixture',
+										scope: 'atproto repo:at.margin.note'
+									}),
+									handle: async (path: string, init?: RequestInit) => {
+										if (path === '/xrpc/com.atproto.repo.putRecord') {
+											const write = firstPublicationWriteSchema.parse(
+												JSON.parse(String(init?.body))
+											)
+											const uri = 'at://' + write.repo + '/' + write.collection + '/' + write.rkey
+											const rows = await authority.backend.db.all(
+												app.publications.where({ publishingDid: write.repo })
+											)
+											expect(
+												rows.find((row) => 'uri' in row.lifecycle && row.lifecycle.uri === uri)
+													?.lifecycle
+											).toEqual({
+												state: 'issued',
+												uri,
+												record: write.record
+											})
+											expect(publicRecords.has(uri)).toBe(false)
+											publicRecords.set(uri, write.record)
+											publicWrites++
+											return Response.json({ uri, cid: 'unused-synthetic-write-receipt' })
+										}
+										if (path === '/xrpc/com.atproto.repo.deleteRecord') {
+											const removal = firstPublicationWriteSchema
+												.pick({ repo: true, collection: true, rkey: true })
+												.extend({ swapRecord: cidSchema })
+												.parse(JSON.parse(String(init?.body)))
+											const uri =
+												'at://' + removal.repo + '/' + removal.collection + '/' + removal.rkey
+											const rows = await authority.backend.db.all(
+												app.publications.where({ publishingDid: removal.repo })
+											)
+											expect(
+												rows.find((row) => 'uri' in row.lifecycle && row.lifecycle.uri === uri)
+													?.lifecycle
+											).toEqual({
+												state: 'unpublishing',
+												uri,
+												cid: publicCid
+											})
+											expect(removal.swapRecord).toBe(publicCid)
+											publicRecords.delete(uri)
+											publicRemovals++
+											return Response.json({})
+										}
+										const params = new URL(path, origin).searchParams
+										const uri =
+											'at://' +
+											params.get('repo') +
+											'/' +
+											params.get('collection') +
+											'/' +
+											params.get('rkey')
+										return publicRecords.has(uri)
+											? Response.json({ uri, value: publicRecords.get(uri), cid: publicCid })
+											: Response.json({ error: 'RecordNotFound' }, { status: 400 })
+									}
+								}
+							})
+						}
+					}
+					const path = new URL(request.url).pathname
+					return handlePublicationPublish(
+						publicationAuth,
+						authority.backend,
+						request,
+						origin,
+						path.endsWith('/unpublish')
+							? 'unpublish'
+							: path.endsWith('/cleanup')
+								? 'cleanup'
+								: 'publish',
+						sourceGateway
+					)
+				}
 				const response = await handleConfiguredAuth(auth, request, { origin, secret })
 				if (new URL(request.url).pathname === '/api/auth/sign-out')
 					signOutResponses.push(response.status)
@@ -151,10 +267,11 @@ for (const mode of ['linked', 'existing', 'expired'])
 			expect((await auth!.api.getSession({ headers: request.headers }))?.user.id).toBe(user.id)
 			const accountId = await authority.backend.accountFor(request)
 			expect(accountId).toBeTruthy()
+			if (!accountId) throw new Error('Expected authenticated library')
 			await expect
 				.poll(() =>
 					authority.backend.db
-						.all(app.libraryDocuments.where({ libraryId: accountId! }))
+						.all(app.libraryDocuments.where({ libraryId: accountId }))
 						.then((rows) => rows.map((row) => row.id))
 				)
 				.toContain(id)
@@ -313,6 +430,64 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await preview.getByRole('button', { name: 'Close', exact: true }).click()
 				await expect(preview).not.toBeVisible()
 				checkpoint('authenticated sharing preview verified')
+				await page.getByRole('button', { name: 'Preview sharing', exact: true }).click()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toBeVisible()
+				// A failed submission stays retryable and never claims publication.
+				await page.route('**/api/publication/publish', (route) => route.abort(), { times: 1 })
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(
+					preview.getByText('Publishing could not be confirmed. Try again.', { exact: true })
+				).toBeVisible()
+				expect(publicWrites).toBe(0)
+				const release = Promise.withResolvers<void>()
+				await page.route(
+					'**/api/publication/publish',
+					async (route) => {
+						await release.promise
+						await route.continue()
+					},
+					{ times: 1 }
+				)
+				const publishedResponse = page.waitForResponse((response) =>
+					response.url().endsWith('/api/publication/publish')
+				)
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(preview.getByText('Preparing…', { exact: true })).toBeVisible()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+				release.resolve()
+				const publicationResponse = await publishedResponse
+				expect(publicationResponse.status()).toBe(200)
+				const value: unknown = await publicationResponse.json()
+				const published = publicationSchema.parse(value)
+				if (published.state !== 'published') throw new Error('Expected confirmed publication')
+				publishedUri = published.uri
+				expect(publicWrites).toBe(1)
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toBeVisible()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await expect(preview).not.toBeVisible()
+				await page.getByRole('button', { name: 'Preview sharing', exact: true }).click()
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toBeVisible()
+				await expect(preview.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+				expect(publicWrites).toBe(1)
+				await preview.getByRole('button', { name: 'Unpublish', exact: true }).click()
+				await expect(preview.getByText('Unpublished', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toHaveCount(0)
+				expect(publicRecords.size).toBe(0)
+				expect(publicRemovals).toBe(1)
+				expect((await authority.backend.db.one(app.notes.where({ id: savedNote.id })))?.text).toBe(
+					'Changed on another device.'
+				)
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				await expect(preview.getByText(published.uri, { exact: true })).toBeVisible()
+				expect(publicWrites).toBe(2)
+				expect(publicRecords.size).toBe(1)
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await expect(preview).not.toBeVisible()
+				checkpoint('authenticated publish, unpublish and republish verified')
 			}
 			await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
@@ -389,6 +564,20 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await page.getByRole('link', { name: 'Native authorized article', exact: true }).click()
 				await expect(page.getByRole('article')).toContainText('Readable native backend capture.')
 				await readingControls(page)
+				if (mode === 'linked') {
+					if (restart === 0) {
+						await page.getByRole('button', { name: 'Remove note', exact: true }).click()
+						await expect(
+							page.getByRole('button', { name: 'Remove note', exact: true })
+						).toHaveCount(0)
+						expect(publicRecords.size).toBe(1)
+						expect(publicRemovals).toBe(1)
+					} else {
+						await expect(
+							page.getByRole('button', { name: 'Remove note', exact: true })
+						).toHaveCount(0)
+					}
+				}
 				await page.getByRole('link', { name: 'Open library', exact: true }).click()
 
 				checkpoint('offline reader verified ' + restart)
@@ -418,12 +607,97 @@ for (const mode of ['linked', 'existing', 'expired'])
 			await expect
 				.poll(() =>
 					authority.backend.db
-						.all(app.organizationOperations.where({ libraryId: accountId! }))
+						.all(app.organizationOperations.where({ libraryId: accountId }))
 						.then((rows) => rows.length)
 				)
 				.toBeGreaterThan(0)
 			checkpoint('reconnected and reconciled')
 			if (mode === 'linked') {
+				const publications = await authority.backend.db.all(
+					app.publications.where({ libraryId: accountId })
+				)
+				expect(publications).toHaveLength(1)
+				await expect
+					.poll(
+						async () =>
+							(await authority.backend.db.all(app.publications.where({ libraryId: accountId })))[0]
+								?.lifecycle,
+						{ timeout: 15_000 }
+					)
+					.toEqual({ state: 'unpublished', uri: publishedUri })
+				expect(publications).toHaveLength(1)
+				expect(publicWrites).toBe(2)
+				expect(publicRemovals).toBe(2)
+				expect(publicRecords.size).toBe(0)
+				checkpoint('offline note deletion removed the retained public record after reconnect')
+				await page.getByRole('link', { name: 'Native authorized article', exact: true }).click()
+				checkpoint('highlight reader opened')
+				const quote = await page
+					.getByRole('article')
+					.getByRole('paragraph')
+					.evaluate((node) => {
+						const text = node.firstChild
+						if (!(text instanceof Text)) throw new Error('Expected reader paragraph text')
+						const range = document.createRange()
+						range.selectNodeContents(text)
+						const selection = window.getSelection()
+						if (!selection) throw new Error('Selection unavailable')
+						selection.removeAllRanges()
+						selection.addRange(range)
+						return range.toString()
+					})
+				await page.getByRole('button', { name: 'Add highlight', exact: true }).click()
+				const highlight = page.getByRole('group', { name: 'highlight', exact: true })
+				await expect(highlight.getByRole('blockquote')).toHaveText(quote)
+				checkpoint('highlight saved')
+				const highlightPreview = page.waitForResponse((response) =>
+					response.url().endsWith('/api/publication/preview')
+				)
+				await highlight.getByRole('button', { name: 'Preview sharing', exact: true }).click()
+				expect((await highlightPreview).status()).toBe(200)
+				checkpoint('source highlight preview verified')
+				const preview = page.getByRole('dialog', { name: 'Preview', exact: true })
+				await expect(preview.getByRole('blockquote')).toHaveText(quote)
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				const [highlightUri, highlightRecord] = [...publicRecords.entries()][0] ?? []
+				expect(highlightUri).toBeDefined()
+				expect(highlightRecord).toMatchObject({
+					motivation: 'highlighting',
+					target: { selector: { type: 'TextQuoteSelector', exact: quote } }
+				})
+				await preview.getByRole('button', { name: 'Unpublish', exact: true }).click()
+				await expect(preview.getByText('Unpublished', { exact: true })).toBeVisible()
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await highlight.getByRole('button', { name: 'Add note', exact: true }).click()
+				await highlight
+					.getByRole('textbox', { name: 'note', exact: true })
+					.fill('A public highlight note.')
+				await expect(page.getByText('note synced', { exact: true })).toBeVisible()
+				await highlight.getByRole('button', { name: 'Preview sharing', exact: true }).click()
+				await preview.getByRole('button', { name: 'Publish', exact: true }).click()
+				await expect(preview.getByText('Published', { exact: true })).toBeVisible()
+				expect(publicRecords.size).toBe(1)
+				expect(publicRecords.get(highlightUri ?? '')).toMatchObject({
+					motivation: 'commenting',
+					body: { format: 'text/plain', value: 'A public highlight note.' },
+					target: { selector: { type: 'TextQuoteSelector', exact: quote } }
+				})
+				await preview.getByRole('button', { name: 'Close', exact: true }).click()
+				await highlight.getByRole('button', { name: 'Remove highlight', exact: true }).click()
+				await expect(highlight).toHaveCount(0)
+				await expect.poll(() => publicRecords.size).toBe(0)
+				await expect
+					.poll(async () => {
+						const rows = await authority.backend.db.all(
+							app.publications.where({ libraryId: accountId })
+						)
+						return rows.find((row) => row.highlightId !== null)?.lifecycle
+					})
+					.toEqual({ state: 'unpublished', uri: highlightUri })
+				expect(publicWrites).toBe(4)
+				expect(publicRemovals).toBe(4)
+				checkpoint('highlight publish, commentary republish and deletion cleanup verified')
 				checkpoint('signing out')
 				await test.step('sign out through the real auth handler', async () => {
 					const previous = signOutResponses.length

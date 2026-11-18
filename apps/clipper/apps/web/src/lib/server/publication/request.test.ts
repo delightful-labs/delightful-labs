@@ -90,7 +90,7 @@ it('uses a real native cookie session and returns only the approved private no-s
 		expect(input.query).toEqual({ disableCookieCache: true, disableRefresh: true })
 	expect(scope.accountFor).toHaveBeenCalledTimes(2)
 	expect(
-		await a.owner.backend.all(app.publicationLinks.where({ libraryId: a.owner.libraryId }))
+		await a.owner.backend.all(app.publications.where({ libraryId: a.owner.libraryId }))
 	).toEqual([])
 })
 

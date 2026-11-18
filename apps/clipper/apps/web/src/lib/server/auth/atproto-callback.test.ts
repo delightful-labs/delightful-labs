@@ -10,6 +10,7 @@ import { createJazz, sqlite } from 'jazz-tools/backend'
 import { createAuthServer } from './server.js'
 import { app } from '../../backend/jazz/schema.js'
 import permissions from '../../backend/jazz/permissions.js'
+import { identityAuthorizationScope, publicationAuthorizationScope } from './authorization.js'
 
 const pluginRequire = createRequire(import.meta.resolve('@kingironman2011/better-auth-bsky'))
 const oauthPath = pathToFileURL(pluginRequire.resolve('@atcute/oauth-node-client')).href
@@ -27,10 +28,14 @@ afterEach(() => vi.restoreAllMocks())
 it('persists callback users and sessions in Jazz across backend restart', async () => {
 	const attemptId = crypto.randomUUID()
 	const did = 'did:plc:abcdefghijklmnopqrstuvwx'
-	vi.spyOn(oauth.OAuthClient.prototype, 'callback').mockResolvedValue({
-		session: { did, getTokenInfo: async () => ({ aud: 'https://pds.example.invalid' }) },
+	let grantedScope = identityAuthorizationScope
+	vi.spyOn(oauth.OAuthClient.prototype, 'callback').mockImplementation(async () => ({
+		session: {
+			did,
+			getTokenInfo: async () => ({ aud: 'https://pds.example.invalid', scope: grantedScope })
+		},
 		state: { callbackURL: '/?atproto_attempt=' + attemptId }
-	})
+	}))
 	vi.spyOn(oauth.OAuthClient.prototype, 'restore').mockResolvedValue({
 		handle: async () =>
 			Response.json({ did, handle: 'proof.example.invalid', displayName: 'Callback proof' })
@@ -46,7 +51,12 @@ it('persists callback users and sessions in Jazz across backend restart', async 
 		}
 	)
 	try {
-		for (let attempt = 0; attempt < 2; attempt++) {
+		for (const [attempt, scope] of [
+			identityAuthorizationScope,
+			publicationAuthorizationScope,
+			identityAuthorizationScope
+		].entries()) {
+			grantedScope = scope
 			if (attempt > 0) {
 				await jazz.close()
 				jazz = store()
@@ -79,6 +89,7 @@ it('persists callback users and sessions in Jazz across backend restart', async 
 			).toMatchObject({ attemptId })
 			expect(await jazz.db.all(app.better_auth_user)).toHaveLength(1)
 			expect(await jazz.db.all(app.better_auth_account)).toHaveLength(1)
+			expect((await jazz.db.all(app.better_auth_account))[0]?.scope).toBe(scope)
 			expect(await jazz.db.all(app.better_auth_session)).toHaveLength(attempt + 1)
 		}
 	} finally {

@@ -3,6 +3,8 @@ import { atproto } from '@kingironman2011/better-auth-bsky'
 import { jazzAdapter } from 'jazz-tools/better-auth-adapter'
 import type { Db, BackendSchemaInput } from 'jazz-tools/backend'
 import { z } from 'zod'
+import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { authorizationInputSchema, publicationAuthorizationScope } from './authorization.js'
 
 export const authConfiguration = z.object({
 	origin: z
@@ -36,6 +38,20 @@ export function createAuthServer(
 		baseURL: origin,
 		basePath: '/api/auth',
 		secret,
-		plugins: [atproto({ clientName: 'Delightful Clipper' })]
+		plugins: [atproto({ clientName: 'Delightful Clipper', scope: publicationAuthorizationScope })],
+		hooks: {
+			before: createAuthMiddleware(async (context) => {
+				if (context.path !== '/sign-in/atproto') return
+				if (
+					context.request &&
+					(context.request.headers.get('origin') !== origin ||
+						new URL(context.request.url).origin !== origin)
+				)
+					throw APIError.fromStatus('FORBIDDEN')
+				const input = authorizationInputSchema.safeParse(context.body)
+				if (!input.success) throw APIError.fromStatus('BAD_REQUEST')
+				return { context: { body: input.data } }
+			})
+		}
 	})
 }

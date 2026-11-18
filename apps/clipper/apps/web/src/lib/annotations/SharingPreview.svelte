@@ -23,7 +23,7 @@
 		client,
 		documentId,
 		requestId: view.requestId,
-		noteId: view.noteId
+		source: view.source
 	}))
 	function close() {
 		binding.client.send({
@@ -35,11 +35,38 @@
 			}
 		})
 	}
+	function publish() {
+		binding.client.send({
+			type: 'ANNOTATION',
+			command: {
+				type: 'PUBLISH_NOTE',
+				documentId: binding.documentId,
+				requestId: binding.requestId
+			}
+		})
+	}
+	function unpublish() {
+		binding.client.send({
+			type: 'ANNOTATION',
+			command: {
+				type: 'UNPUBLISH_NOTE',
+				documentId: binding.documentId,
+				requestId: binding.requestId
+			}
+		})
+	}
 	function retry() {
-		if (binding.noteId)
+		if (binding.source)
 			binding.client.send({
 				type: 'ANNOTATION',
-				command: { type: 'PREVIEW_NOTE', documentId: binding.documentId, id: binding.noteId }
+				command:
+					'noteId' in binding.source
+						? { type: 'PREVIEW_NOTE', documentId: binding.documentId, id: binding.source.noteId }
+						: {
+								type: 'PREVIEW_HIGHLIGHT',
+								documentId: binding.documentId,
+								id: binding.source.highlightId
+							}
 			})
 	}
 </script>
@@ -54,27 +81,45 @@
 	}}
 >
 	<div class="preview-content" aria-busy={view.pending}>
+		{#if view.quote}<blockquote>{view.quote}</blockquote>{/if}
 		{#if view.message}<StatusMessage {...view.message} />{/if}
 		{#if view.value}
 			<dl>
 				<dt>{t('publication.account')}</dt>
 				<dd><code>{view.value.publishingDid}</code></dd>
-				<dt>{t('capture.url_label')}</dt>
-				<dd>
-					<a href={view.value.record.target.source} target="_blank" rel="noreferrer"
-						>{view.value.record.target.source}</a
-					>
-				</dd>
+				{#if 'record' in view.value}<dt>{t('capture.url_label')}</dt>
+					<dd>
+						<a href={view.value.record.target.source} target="_blank" rel="noreferrer"
+							>{view.value.record.target.source}</a
+						>
+					</dd>{/if}
 			</dl>
-			{#if view.value.record.motivation === 'commenting'}<Textarea
+			{#if 'record' in view.value && view.value.record.motivation === 'commenting'}<Textarea
 					readonly
 					label={noun('note')}
 					defaultValue={view.value.record.body.value}
+				/>{:else if view.noteText !== undefined}<Textarea
+					readonly
+					label={noun('note')}
+					defaultValue={view.noteText}
 				/>{/if}
 		{/if}
+		{#if view.publication}<output><code>{view.publication.uri}</code></output>{/if}
 		<div class="preview-actions">
+			{#if view.canUnpublish}<Button disabled={!enabled} onclick={unpublish}
+					>{t('publication.unpublish')}</Button
+				>{/if}
+			{#if view.canPublish}<Button disabled={!enabled} onclick={publish}
+					>{t('publication.publish')}</Button
+				>{/if}
+			{#if view.authorize && view.value}<Button
+					disabled={!enabled}
+					onclick={() =>
+						view.value && binding.client.authorizePublication(view.value.publishingDid)}
+					>{t('account.atproto.sign_in')}</Button
+				>{/if}
 			<Button onclick={close}>{t('actions.close')}</Button>
-			{#if view.retry && binding.noteId}<Button disabled={!enabled} onclick={retry}
+			{#if view.retry && binding.source}<Button disabled={!enabled} onclick={retry}
 					>{t('actions.retry')}</Button
 				>{/if}
 		</div>

@@ -7,24 +7,30 @@ import type { WorkerOpen } from '../../machines/capture/parser-worker.js'
 import { CaptureError } from './errors.js'
 import type { ExtractedContent, ParserReply } from './parser-protocol.js'
 /** Node I/O bridge only: the machine decides termination, deadlines and outcome precedence. */
-function workerOpen(body: Uint8Array, mediaType: string, url: string): WorkerOpen {
+export function workerOpen<Value = ExtractedContent>(
+	body: Uint8Array,
+	mediaType: string,
+	url: string,
+	mode: 'extract' | 'source' = 'extract'
+): WorkerOpen<Value> {
 	return (report) => {
-		const relativePath = import.meta.env.DEV
+		const development = import.meta.env?.DEV ?? process.env.NODE_ENV !== 'production'
+		const relativePath = development
 			? '../../../../.clipper-dev/parser/extract-worker.mjs'
 			: '../parser/extract-worker.mjs'
 		const workerUrl = process.env.VERCEL
 			? new URL('../../../../.netlify/v1/parser/extract-worker.mjs', import.meta.url)
-			: import.meta.env.DEV || process.env.LAMBDA_TASK_ROOT
+			: development || process.env.LAMBDA_TASK_ROOT
 				? new URL(relativePath, import.meta.url)
 				: pathToFileURL(resolve('.netlify/v1/parser/extract-worker.mjs'))
 		const payload = new Uint8Array(body)
 		const worker = new Worker(workerUrl, {
 			execArgv: ['--experimental-require-module'],
 			resourceLimits: { maxOldGenerationSizeMb: 128, maxYoungGenerationSizeMb: 32, stackSizeMb: 4 },
-			workerData: { body: payload, mediaType, url },
+			workerData: { body: payload, mediaType, url, ...(mode === 'source' ? { mode } : {}) },
 			transferList: [payload.buffer]
 		})
-		const message = (reply: ParserReply) => report({ type: 'WORKER_RESULT', reply })
+		const message = (reply: ParserReply<Value>) => report({ type: 'WORKER_RESULT', reply })
 		const error = (value: Error & { code?: string }) =>
 			report({ type: 'WORKER_ERROR', code: value.code ?? 'UNKNOWN' })
 		const exit = () => report({ type: 'WORKER_EXIT' })
