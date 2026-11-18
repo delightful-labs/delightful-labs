@@ -1,3 +1,7 @@
+import {
+	createCategoryManagementFormOptions,
+	createTagManagementFormOptions
+} from '../management/classification-forms.js'
 import { createWorkspaceNavigationMachine } from '../workspaces/workspace-navigation.js'
 import type { WorkspaceNavigate } from '../../contracts/workspace-orchestration-contract.js'
 import { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordination'
@@ -76,6 +80,26 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 	const recoveryRead = vi.fn(async () => 'fixture phrase')
 	const navigate = vi.fn<WorkspaceNavigate>(async () => {})
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
+	const createCategoryWrite = vi.fn<
+		Parameters<typeof createCategoryManagementFormOptions>[0]['create']
+	>(async (organizationId, values) => ({
+		...values,
+		id: crypto.randomUUID(),
+		organizationId,
+		isSystem: false,
+		archivedAt: null
+	}))
+	const createTagWrite = vi.fn<Parameters<typeof createTagManagementFormOptions>[0]['create']>(
+		async (organizationId, values) => ({
+			...values,
+			id: crypto.randomUUID(),
+			organizationId,
+			archivedAt: null
+		})
+	)
+	const archiveCategoryWrite = vi.fn(async (_id: string) => {})
+	const archiveTagWrite = vi.fn(async (_id: string) => {})
+
 	const accountOrderRead = vi.fn(async (_key: string): Promise<readonly string[]> => [])
 	const accountOrderWrite = vi.fn(async (_key: string, _ids: readonly string[]) => {})
 	const createWrite = vi.fn(
@@ -186,6 +210,20 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 				createFinanceFormsMachine({
 					binding,
 					accountOrderStorage,
+					classification: {
+						categories: createCategoryManagementFormOptions({
+							binding,
+							observe: () => observe().classification,
+							create: createCategoryWrite,
+							archive: archiveCategoryWrite
+						}),
+						tags: createTagManagementFormOptions({
+							binding,
+							observe: () => observe().classification,
+							create: createTagWrite,
+							archive: archiveTagWrite
+						})
+					},
 					observe,
 					create: createWrite,
 					archive: archiveWrite,
@@ -270,6 +308,10 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		accountOrderRead,
 		accountOrderWrite,
 		archiveWrite,
+		createCategoryWrite,
+		createTagWrite,
+		archiveCategoryWrite,
+		archiveTagWrite,
 		navigate,
 		recoveryRead,
 		createWrite,
@@ -1260,6 +1302,120 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.accountOrderWrite).not.toHaveBeenCalled()
 		} finally {
 			held.resolve([])
+			f.stop()
+		}
+	})
+
+	it('keeps an existing transaction form published while a same-scope input command is handled', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			await vi.waitFor(() => expect(f.view().transactionEntry?.form.canSubmit).toBe(true))
+			const withdrawals: boolean[] = []
+			const subscription = f.actor.subscribe((snapshot) => {
+				withdrawals.push(selectFinanceWorkerView(snapshot).transactionEntry === null)
+			})
+			f.enter({
+				type: 'CHANGE',
+				values: {
+					accountId: row('Wallet').id,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					amount: '25.00',
+					bookedOn: '2026-11-18',
+					tags: []
+				}
+			})
+			subscription.unsubscribe()
+			expect(withdrawals).not.toContain(true)
+		} finally {
+			f.stop()
+		}
+	})
+	it('drains a classification write through local settlement before SDK shutdown', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.createCategoryWrite.mockImplementation(async (organizationId, values) => {
+			await held.promise
+			return {
+				...values,
+				organizationId,
+				id: crypto.randomUUID(),
+				isSystem: false,
+				archivedAt: null
+			}
+		})
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			await vi.waitFor(() =>
+				expect(f.view().classification?.forms.createCategory.canSubmit).toBe(true)
+			)
+			const scope = f.view()
+			f.actor.send({
+				type: 'CLASSIFICATION',
+				form: 'createCategory',
+				command: { type: 'SUBMIT', values: { name: 'Travel', kind: 'expense' } },
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			await vi.waitFor(() => expect(f.createCategoryWrite).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			held.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.closeAccountStore).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('refuses stale classification headers and protected system-category archive intents', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('A')])
+			await vi.waitFor(() => expect(f.view().classification).not.toBeNull())
+			const old = f.view()
+			f.select(b, 2)
+			last(f.queries).publish([row('B')])
+			f.actor.send({
+				type: 'CLASSIFICATION',
+				form: 'createCategory',
+				command: { type: 'SUBMIT', values: { name: 'Wrong scope', kind: 'expense' } },
+				sessionRevision: old.sessionRevision,
+				selection: old.selection
+			})
+			expect(f.createCategoryWrite).not.toHaveBeenCalled()
+			await vi.waitFor(() =>
+				expect(f.view().classification?.forms.archiveCategory.canSubmit).toBe(true)
+			)
+			const scope = f.view()
+			f.actor.send({
+				type: 'CLASSIFICATION',
+				form: 'archiveCategory',
+				command: {
+					type: 'SUBMIT',
+					values: { categoryId: '50000000-0000-4000-8000-000000000001', organizationId: b }
+				},
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			await vi.waitFor(() =>
+				expect(f.view().classification?.forms.archiveCategory.feedback).toMatchObject({
+					kind: 'result',
+					result: { outcome: 'denied', reason: 'protectedRecord' }
+				})
+			)
+			expect(f.archiveCategoryWrite).not.toHaveBeenCalled()
+		} finally {
 			f.stop()
 		}
 	})

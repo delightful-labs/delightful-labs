@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageLayout from '#lib/components/navigation/PageLayout.svelte'
+	import { classificationCounts } from '#lib/domain/classification-counts.js'
 	import { getPageNavigation } from '#lib/components/navigation/page-navigation.js'
 	const navigation = getPageNavigation()
 
@@ -50,20 +51,9 @@
 		const userId = session.current.account?.id
 		return organizationMembershipQuery(organizationId, userId)
 	})
-	const counts = $derived.by(() => {
-		const result = new Map<string, { transactions: number; tags: number }>()
-		for (const category of categories.current ?? [])
-			result.set(category.id, { transactions: 0, tags: 0 })
-		for (const transaction of transactions.current ?? []) {
-			const count = result.get(transaction.categoryId)
-			if (count) count.transactions += 1
-		}
-		for (const tag of tags.current ?? []) {
-			const count = tag.categoryId ? result.get(tag.categoryId) : undefined
-			if (count) count.tags += 1
-		}
-		return result
-	})
+	const counts = $derived(
+		classificationCounts(categories.current ?? [], transactions.current ?? [], tags.current ?? [])
+	)
 
 	const identityId = $derived(session.current.account?.id ?? null)
 	const organizationId = $derived(filters.activeOrganizationId)

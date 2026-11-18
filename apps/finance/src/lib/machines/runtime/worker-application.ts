@@ -1,3 +1,6 @@
+import { classificationCounts } from '../../domain/classification-counts.js'
+import { selectManagementArchiveIds } from '../management/management.js'
+import type { ClassificationForm } from '../../contracts/worker-forms.js'
 import { orderAccounts } from '../accounts/account-order.js'
 import type { AccountOrderStorage } from '../../contracts/worker-forms.js'
 import type { WorkerAccountOrderCommand } from '../../contracts/worker-forms.js'
@@ -215,6 +218,21 @@ function formsObservation(context: Context): FinanceFormsObservation {
 		tags: context.facts?.tags ?? []
 	}
 	return {
+		classification: {
+			binding: creation.binding,
+			identityId: creation.identityId,
+			organizationId: creation.organizationId,
+			sessionReady: creation.sessionReady,
+			membership: creation.membership,
+			loading:
+				!context.facts ||
+				context.facts.membership === undefined ||
+				context.facts.categories === null ||
+				context.facts.tags === null,
+			failed: context.facts?.status === 'failed',
+			categories: context.facts?.categories ?? [],
+			tags: context.facts?.tags ?? []
+		},
 		order: {
 			key:
 				context.ready?.identityId && context.selection.workspaceId
@@ -313,6 +331,9 @@ export function createFinanceWorkerMachine({
 					sessionRevision: number
 					accountId: string
 				}>(),
+				CLASSIFICATION: types<
+					WorkerCommandScope & { form: ClassificationForm; command: WorkerAccountCreationCommand }
+				>(),
 				ACCOUNT_ORDER: types<WorkerCommandScope & { command: WorkerAccountOrderCommand }>(),
 				ACCOUNT_CREATION: types<{
 					selection: WorkerSelection
@@ -763,7 +784,7 @@ export function createFinanceWorkerMachine({
 						}
 						return { context: { ledgerFilters: event.filters, ledgerPage: 1 } }
 					},
-					ACCOUNT_ORDER: ({ context, event }, enq) => {
+					CLASSIFICATION: ({ context, event }, enq) => {
 						if (
 							!sameCommandScope(context, event) ||
 							!context.forms ||
@@ -771,10 +792,18 @@ export function createFinanceWorkerMachine({
 						)
 							return
 						enq.sendTo(context.forms.owner, {
-							type: 'OBSERVE',
-							observation: formsObservation(context),
-							selectionRevision: context.selection.revision
+							type: 'CLASSIFICATION',
+							form: event.form,
+							command: event.command
 						})
+					},
+					ACCOUNT_ORDER: ({ context, event }, enq) => {
+						if (
+							!sameCommandScope(context, event) ||
+							!context.forms ||
+							context.forms.binding !== context.ready?.binding
+						)
+							return
 						enq.sendTo(context.forms.owner, { type: 'ACCOUNT_ORDER', command: event.command })
 					},
 					ACCOUNT_CREATION: ({ context, event }, enq) => {
@@ -784,11 +813,6 @@ export function createFinanceWorkerMachine({
 							context.forms.binding !== context.ready?.binding
 						)
 							return
-						enq.sendTo(context.forms.owner, {
-							type: 'OBSERVE',
-							observation: formsObservation(context),
-							selectionRevision: context.selection.revision
-						})
 						enq.sendTo(context.forms.owner, { type: 'ACCOUNT_CREATION', command: event.command })
 					},
 					TRANSACTION_EDIT: ({ context, event }, enq) => {
@@ -798,11 +822,6 @@ export function createFinanceWorkerMachine({
 							context.forms.binding !== context.ready?.binding
 						)
 							return
-						enq.sendTo(context.forms.owner, {
-							type: 'OBSERVE',
-							observation: formsObservation(context),
-							selectionRevision: context.selection.revision
-						})
 						enq.sendTo(context.forms.owner, { type: 'TRANSACTION_EDIT', command: event.command })
 					},
 					TRANSACTION_ENTRY: ({ context, event }, enq) => {
@@ -812,11 +831,6 @@ export function createFinanceWorkerMachine({
 							context.forms.binding !== context.ready?.binding
 						)
 							return
-						enq.sendTo(context.forms.owner, {
-							type: 'OBSERVE',
-							observation: formsObservation(context),
-							selectionRevision: context.selection.revision
-						})
 						enq.sendTo(context.forms.owner, { type: 'TRANSACTION_ENTRY', command: event.command })
 					},
 					ARCHIVE_ACCOUNT: ({ context, event }, enq) => {
@@ -826,11 +840,6 @@ export function createFinanceWorkerMachine({
 							context.forms.binding !== context.ready?.binding
 						)
 							return
-						enq.sendTo(context.forms.owner, {
-							type: 'OBSERVE',
-							observation: formsObservation(context),
-							selectionRevision: context.selection.revision
-						})
 						enq.sendTo(context.forms.owner, { type: 'ARCHIVE_ACCOUNT', accountId: event.accountId })
 					}
 				},
@@ -1268,6 +1277,33 @@ export function selectFinanceWorkerView(
 				: null,
 		workspaceStartup: forms?.initialization ?? null,
 		accountCreation: forms?.creation ?? null,
+		classification:
+			group?.classification && observations.classification.binding
+				? {
+						forms: group.classification,
+						countsLoading: context.facts?.transactions == null,
+						categories: [...observations.classification.categories],
+						tags: [...observations.classification.tags],
+						categoryOptions: observations.classification.categories.filter((c) => !c.archivedAt),
+						counts: [
+							...classificationCounts(
+								observations.classification.categories,
+								context.facts?.transactions ?? [],
+								observations.classification.tags
+							)
+						],
+						archivableCategoryIds: selectManagementArchiveIds(
+							observations.classification,
+							observations.classification.binding,
+							'archiveCategory'
+						),
+						archivableTagIds: selectManagementArchiveIds(
+							observations.classification,
+							observations.classification.binding,
+							'archiveTag'
+						)
+					}
+				: null,
 		accountOrder: group?.order
 			? {
 					ids: [...group.order.view.ids],
@@ -1365,6 +1401,7 @@ export function selectFinanceFormObservations(
 	const archive = selectFinanceArchiveObservation(undefined)
 	return {
 		order: { key: null, ids: [] },
+		classification: { ...archive, categories: [], tags: [] },
 		navigation: {
 			pathname: '/',
 			search: '',

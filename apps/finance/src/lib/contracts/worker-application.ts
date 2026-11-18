@@ -11,6 +11,8 @@ import {
 	workerAccountOrderCommand,
 	workerAccountOrderView,
 	workerAccountCreationView,
+	classificationForm,
+	workerClassificationForms,
 	workerTransactionEntryView,
 	workerTransactionEntryCommand,
 	workerTransactionCategory,
@@ -73,6 +75,13 @@ export const workerLedgerView = z.strictObject({
 export type WorkerLedgerRecord = z.output<typeof transactionLedgerRecordSchema>
 export type WorkerLedgerView = z.output<typeof workerLedgerView>
 export const financeWorkerCommand = z.discriminatedUnion('type', [
+	z.strictObject({
+		type: z.literal('CLASSIFICATION'),
+		form: classificationForm,
+		command: workerAccountCreationCommand,
+		sessionRevision,
+		selection: workerSelection
+	}),
 	z.strictObject({
 		type: z.literal('ACCOUNT_ORDER'),
 		command: workerAccountOrderCommand,
@@ -221,6 +230,24 @@ export const financeNavigationRequest = z.strictObject({
 	replace: z.boolean()
 })
 export const financeNavigationReply = z.strictObject({ outcome: z.enum(['completed', 'failed']) })
+export const workerClassificationView = z.strictObject({
+	forms: workerClassificationForms,
+	countsLoading: z.boolean(),
+	categories: z.array(workerTransactionCategory),
+	tags: z.array(workerTagRecord),
+	categoryOptions: z.array(workerTransactionCategory),
+	counts: z.array(
+		z.tuple([
+			z.uuid(),
+			z.strictObject({
+				transactions: z.number().int().nonnegative(),
+				tags: z.number().int().nonnegative()
+			})
+		])
+	),
+	archivableCategoryIds: z.array(z.uuid()),
+	archivableTagIds: z.array(z.uuid())
+})
 export const financeWorkerView = z.strictObject({
 	type: z.literal('VIEW'),
 	sessionRevision,
@@ -267,6 +294,7 @@ export const financeWorkerView = z.strictObject({
 	workspaceStartup: z.enum(['checking', 'ready', 'unavailable', 'failed', 'closed']).nullable(),
 	accountCreation: workerAccountCreationView.nullable(),
 	accountOrder: workerAccountOrderView.nullable(),
+	classification: workerClassificationView.nullable(),
 	transactionEntry: workerTransactionEntry.nullable(),
 	transactionEdit: workerTransactionEdit.nullable(),
 	ledger: workerLedgerView.nullable()

@@ -5,15 +5,18 @@ export type ManagementScope = {
 	organizationId: string | null
 	binding: object | null
 }
-export type ManagementReason =
-	| 'sessionUnavailable'
-	| 'selectWorkspace'
-	| 'loading'
-	| 'loadFailed'
-	| 'readOnly'
-	| 'unavailableReference'
-	| 'protectedRecord'
-	| 'duplicateName'
+export const MANAGEMENT_REASON = Object.freeze({
+	sessionUnavailable: 'sessionUnavailable',
+	selectWorkspace: 'selectWorkspace',
+	loading: 'loading',
+	loadFailed: 'loadFailed',
+	readOnly: 'readOnly',
+	unavailableReference: 'unavailableReference',
+	protectedRecord: 'protectedRecord',
+	duplicateName: 'duplicateName'
+})
+export type ManagementReason = (typeof MANAGEMENT_REASON)[keyof typeof MANAGEMENT_REASON]
+
 export type ManagementObservation = ManagementScope & {
 	sessionReady: boolean
 	membership: OrganizationMember | null | undefined

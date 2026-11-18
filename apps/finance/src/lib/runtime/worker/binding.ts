@@ -1,3 +1,13 @@
+import {
+	createCategoryManagementFormOptions,
+	createTagManagementFormOptions
+} from '../../machines/management/classification-forms.js'
+import {
+	createCategory,
+	archiveCategory,
+	createTag,
+	archiveTag
+} from '../../data/classification.js'
 import { createWorkspaceNavigationMachine } from '../../machines/workspaces/workspace-navigation.js'
 import type {
 	RecoveryScope,
@@ -269,6 +279,54 @@ export function createFinanceWorkerBinding({
 				db,
 				initialization: { db, userId: identityId },
 				accountOrderStorage,
+				classification: {
+					categories: createCategoryManagementFormOptions({
+						binding,
+						observe: () => observe().classification,
+						create: async (organizationId, values) => {
+							if (!isCurrent()) throw new Error('Finance classification binding retired')
+							const row = await createCategory(db, organizationId, values.name, values.kind)
+							return workerTransactionCategory.parse({
+								id: row.id,
+								organizationId: row.organizationId,
+								name: row.name,
+								kind: row.kind,
+								isSystem: row.isSystem,
+								archivedAt: row.archivedAt ?? null
+							})
+						},
+						archive: (id) =>
+							isCurrent()
+								? archiveCategory(db, id)
+								: Promise.reject(new Error('Finance classification binding retired'))
+					}),
+					tags: createTagManagementFormOptions({
+						binding,
+						observe: () => observe().classification,
+						create: async (organizationId, values) => {
+							if (!isCurrent()) throw new Error('Finance classification binding retired')
+							const row = await createTag(
+								db,
+								organizationId,
+								values.name,
+								values.kind,
+								values.categoryId
+							)
+							return workerTagRecord.parse({
+								id: row.id,
+								organizationId: row.organizationId,
+								name: row.name,
+								kind: row.kind,
+								categoryId: row.categoryId ?? null,
+								archivedAt: row.archivedAt ?? null
+							})
+						},
+						archive: (id) =>
+							isCurrent()
+								? archiveTag(db, id)
+								: Promise.reject(new Error('Finance classification binding retired'))
+					})
+				},
 				navigation: createWorkspaceNavigationMachine(db, (destination, signal, origin, replace) => {
 					if (!isCurrent()) return Promise.reject(new Error('Finance navigation binding retired'))
 					return navigate(destination, signal, origin, replace)

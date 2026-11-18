@@ -1441,3 +1441,76 @@ slice removes 92 lines from the management chart while preserving its branch ord
 both existing route controllers now bind reusable form options instead of repeating domain
 construction. Keep reviewing remaining custom protocols, adapters and defensive scaffolding
 against actual callers and native library capabilities before extending them.
+
+### Classification Worker binding model
+
+Use the existing SDK-bound forms group as owner of four fixed scoped-form children (category/tag
+create/archive), built from the just-qualified shared factories. Do not add another workflow
+wrapper, dynamic form registry or request-owner protocol. They share the existing category/tag
+and membership observations. Each child owns its existing validation/readiness/write/settlement
+chart. Typed classification commands name one fixed child and carry the current session/selection
+header; Root rejects stale headers and the child rechecks current observations. Group shutdown
+waits for all four native form receipts before SDK replacement/close.
+
+Publish validated bounded form views and project category/tag history counts and archive IDs in
+the Worker from the existing facts. Counts ignore the sidebar account mask, matching current
+management pages. Window reuses CategoryForm/CategoryList/TagForm/TagList and retains only native
+FormData, modal/disclosure and archive-filter presentation. Scope passed to presentation is an
+opaque reset key, not an SDK binding. The isolated route selects which presentation to show;
+the Worker continues owning scope, permissions and effects. No new Jazz patch, migration,
+subscription population or production route activation is introduced. Qualify native create/archive,
+counts/history, scope replacement and held-write SDK shutdown alongside existing legacy coverage.
+
+
+Classification uses the existing native RESET behavior on observed pathname changes: idle form
+feedback/drafts clear while an already-issued write stays owned until settlement. No separate
+page-lifetime supervisor or cancellation registry is added. Count loading is published separately
+from a known empty history, and the shared one-pass count projection is used by both the old page
+and Worker. Category/Tag form presentation now accepts an opaque reset key instead of requiring
+an SDK scope object. Existing scoped-form selectors infer their types, eliminating five repeated
+explicit generic argument lists while full type checks retain the same concrete form contracts.
+
+
+The complete classification matrix exposed two WebKit edit failures (64/66 cases passed), while
+all 2,015 units and 16 legacy classification browser cases passed. Do not record that native
+matrix as green or infer its cause is the earlier SDK partial-save defect. A new focused host
+regression proves an ordinary same-scope CHANGE command publishes a null transaction form
+among its 24 intermediate views. Root was constructing fresh observation objects before every
+command and the SDK group sent another OBSERVE to the target child. This work is redundant:
+queries/session/route changes already forward live observations, and the shared write chart
+refreshes options.observe() before native mutation; archive also retains its fresh observation
+boundary. Remove those 12 command-time sends, retaining all actual observation propagation,
+scoped command guards, operation policy checks and drain behavior. This is the minimal proposed
+edit-stability fix; do not add a queue or a UI snapshot cache. Verify the failing regression,
+concrete DOM node/draft retention and immutable requested account IDs in the two native edit cases.
+
+
+### PR46 scope freeze and merge handoff
+
+The user requested PR46 be ready to merge today and explicitly deferred small visual bugs.
+Finish this classification/edit-stability slice and qualification, then freeze feature additions.
+The candidate's generic **Accounts** heading on composite account/transaction pages is a recorded
+presentation-parity follow-up. Lost drafts, incorrect saves, permissions and close/drain failures
+are functional defects and are not covered by that visual deferral.
+
+The deterministic same-scope CHANGE regression fails before removing the duplicate observation
+sends and passes afterwards. All **2,016 Finance units** (70 host) and zero-warning full static /
+browser-test types pass. The focused native matrix passes **nine cases** across Chromium, Firefox
+and WebKit: classification create/archive with historical counts and offline restart, and both
+transaction-edit scenarios. Edit tests retain the actual input DOM node and compare persisted
+account IDs against the immutable requested destination, rather than the post-save UI selection.
+The existing **16 classification SvelteKit browser cases** also pass. The complete native matrix
+must be recorded separately; a focused pass does not establish its result.
+
+Logs: `/private/tmp/finance-worker-command-withdrawal-before.log`,
+`/private/tmp/finance-worker-observation-cleanup-{static,unit,native}.log`,
+`/private/tmp/finance-worker-merge-{types,units,native}.log`, and
+`/private/tmp/finance-classification-worker-final.log`.
+
+This merge keeps the application-worker candidate isolated and the production SDK at alpha.60.
+The historical SDK partial-save/unknown-save investigation remains an activation blocker; the
+form-withdrawal fix is proven independently and does not establish that every historical native
+save failure has the same cause. After merge, retain production route/page and ordinary-feature
+parity, permissions, files/images, provider flows, backup/administration, coordinated SDK adoption,
+full-app browser/offline/PWA/performance qualification, activation and superseded-code deletion.
+Review latest-head CI rather than relying on the green ff6a4bd0 checkpoint.

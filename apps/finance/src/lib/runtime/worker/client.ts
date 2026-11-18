@@ -25,6 +25,7 @@ import {
 import { EXPENSE, type TransactionKind } from '../../domain/transaction-kind.js'
 import type {
 	WorkerTransactionEntryCommand,
+	ClassificationForm,
 	WorkerAccountOrderCommand,
 	WorkerAccountCreationCommand
 } from '../../contracts/worker-forms.js'
@@ -81,6 +82,7 @@ export function createFinanceWorkerClient(
 		workspaceStartup: null,
 		accountCreation: null,
 		accountOrder: null,
+		classification: null,
 		transactionEntry: null,
 		transactionEdit: null,
 		ledger: null
@@ -109,6 +111,7 @@ export function createFinanceWorkerClient(
 			workspaceStartup: null,
 			accountCreation: null,
 			accountOrder: null,
+			classification: null,
 			transactionEntry: null,
 			transactionEdit: null,
 			ledger: null
@@ -167,6 +170,7 @@ export function createFinanceWorkerClient(
 			workspaceStartup: null,
 			accountCreation: null,
 			accountOrder: null,
+			classification: null,
 			transactionEntry: null,
 			transactionEdit: null,
 			ledger: null
@@ -216,6 +220,7 @@ export function createFinanceWorkerClient(
 			workspaceStartup: null,
 			accountCreation: null,
 			accountOrder: null,
+			classification: null,
 			transactionEntry: null,
 			transactionEdit: null,
 			ledger: null
@@ -374,6 +379,20 @@ export function createFinanceWorkerClient(
 				})
 			)
 		},
+		classificationCommand: (
+			form: ClassificationForm,
+			command: WorkerAccountCreationCommand,
+			scope: WorkerCommandScope
+		) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'CLASSIFICATION',
+					form,
+					command,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
 		accountOrderCommand: (command: WorkerAccountOrderCommand, scope: WorkerCommandScope) =>
 			worker.postMessage(
 				financeWorkerCommand.parse({

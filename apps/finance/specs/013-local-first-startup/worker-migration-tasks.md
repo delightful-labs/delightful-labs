@@ -15,11 +15,11 @@ raw phrases never enter Finance's inspected state. Actual cross-profile restorat
 transactions and survives a full offline process restart. Pending offline uploads preserve Jazz's
 native account-switch refusal and resume ordinary Finance without retrying.
 
-Latest local qualification: **2,013 Finance units** (67 host), zero-warning static/browser types,
+Latest local qualification: **2,016 Finance units** (70 host), zero-warning static/browser types,
 and **63 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
 passes 200 schema/restore and 42 worker/session cases. Shared recovery coordination accepts the typed session connection and an explicit private-root
 recipient; **1,250 Local First units** pass. Hosted Finance/Foundation/Clipper pass at
-`f14ea015` (before this shell connection). Worker routing now reuses the existing workspace-navigation chart, with native default/switch,
+`ff6a4bd0`; the classification/edit-stability commit requires its own hosted result. Worker routing now reuses the existing workspace-navigation chart, with native default/switch,
 denied scope, legacy details and navigation drain qualified. Shared URL filters/pages, non-blocking native
 history replacement, input focus and back/forward are also qualified. Worker account masks now reuse the legacy
 checkbox presentation and selection calculation; exact ledger totals, full balances, all/none,
@@ -29,8 +29,15 @@ the observed detail without retaining its old data. Account ordering now reuses 
 serialized/coalesced writes, shutdown flush and native offline restart qualification. The user
 approved no legacy localStorage migration. The candidate now binds the existing AppShell/PageLayout/drawer to Worker views and commands,
 including scoped/current links and native mobile focus/history behavior. W12/W13/W16 remain
-partial: production route mounting and remaining account/grant/settings/classification/transfers,
+partial: production route mounting and remaining account/grant/settings/transfers,
 provider/PWA footer, attachment and workspace/archive UI parity precede activation.
+Classification now reuses the shared category/tag forms, policy and native leaves in four fixed
+children of that same Worker group. Shared one-pass history counts ignore sidebar selection;
+create/archive, protected-system refusal, held-write shutdown and cold offline history are covered.
+Removing duplicate command-time observations prevents a proven same-scope form withdrawal, without
+adding a queue/cache. See the [merge handoff](worker-session-resource-decision.md#pr46-scope-freeze-and-merge-handoff)
+for exact qualification and remaining work. The user froze feature scope for merge today and
+deferred minor visual defects; the candidate's generic Accounts title is recorded for later polish.
 W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
 The intermittent check/account-move failure remains an explicit activation blocker.
 Finance has no sign-out or explicit new-identity screen; do not add those as parity work.

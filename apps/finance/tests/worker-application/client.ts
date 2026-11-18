@@ -36,6 +36,7 @@ function attach() {
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
 			onAccountOrder: owner.accountOrderCommand,
+			onClassification: owner.classificationCommand,
 			onTransactionEntry: owner.transactionEntryCommand,
 			onTransactionEdit: owner.transactionEditCommand,
 			onSelectTransaction: (id: string | null, scope: WorkerCommandScope) =>

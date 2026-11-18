@@ -37,7 +37,7 @@ beforeAll(async () => {
 						for (const [id, module] of Object.entries(output.modules)) {
 							if (
 								module.renderedLength > 0 &&
-								/\/(?:domain\/(?:account-balances|transaction-groups)|filters\/transaction-list-filters)\.[jt]s$/.test(
+								/\/(?:domain\/(?:account-balances|transaction-groups|classification-counts)|filters\/transaction-list-filters)\.[jt]s$/.test(
 									id
 								)
 							)
@@ -207,6 +207,106 @@ async function enterExpenseUI(page: Page, accountId: string, description: string
 }
 for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 	describe(name, () => {
+		it('creates and archives classifications through the shared UI and retains complete history offline', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const profile = await mkdtemp(join(directory, 'classification-profile-')),
+				scope = crypto.randomUUID(),
+				workspaceId = crypto.randomUUID(),
+				accountId = crypto.randomUUID()
+			let context = await engine.launchPersistentContext(profile, { headless: true })
+			try {
+				let page = await context.newPage()
+				await open(page, scope)
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Classification wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate((id) => {
+					window.financeWorkerReadFixture.route('/settings/categories?workspace=' + id)
+					window.financeWorkerReadFixture.followRoutes()
+				}, workspaceId)
+				await page.getByRole('button', { name: 'Add Category', exact: true }).click()
+				let dialog = page.getByRole('dialog', { name: 'Add Category', exact: true })
+				await dialog.getByLabel('Category name', { exact: true }).fill('Native travel')
+				await dialog.getByLabel('Transaction type', { exact: true }).selectOption('expense')
+				await dialog.getByRole('button', { name: 'Add Category', exact: true }).click()
+				await browserExpect(dialog.getByText(/Native travel.*saved/i)).toBeVisible()
+				await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+				const categoryId = await page.evaluate(
+					() =>
+						window.financeWorkerReadFixture
+							.state()
+							.classification?.categories.find((c) => c.name === 'Native travel')?.id
+				)
+				if (!categoryId) throw new Error('Missing native category')
+				await browserExpect(
+					page.getByRole('button', { name: 'Archive Worker expense', exact: true })
+				).toHaveCount(0)
+				const aside = page.locator('aside')
+				await aside.getByRole('link', { name: 'Expenses', exact: true }).click()
+				await page.getByLabel('Category', { exact: true }).selectOption(categoryId)
+				await page.getByLabel('Amount', { exact: true }).fill('10.00')
+				await page.getByLabel('Date', { exact: true }).fill('2026-11-18')
+				await page.getByLabel('Description', { exact: true }).fill('Classification history')
+				await page.getByRole('button', { name: /save transaction/i }).click()
+				await browserExpect(
+					page.getByRole('status').filter({ hasText: /transaction saved/i })
+				).toBeVisible()
+				await aside.getByRole('link', { name: 'Tags', exact: true }).click()
+				await page.getByRole('button', { name: 'Add Tag', exact: true }).click()
+				dialog = page.getByRole('dialog', { name: 'Add Tag', exact: true })
+				await dialog.getByLabel('Tag name', { exact: true }).fill('Native trip')
+				await dialog.getByLabel('Transaction type', { exact: true }).selectOption('expense')
+				await dialog.getByLabel('Category', { exact: true }).selectOption(categoryId)
+				await dialog.getByRole('button', { name: 'Add Tag', exact: true }).click()
+				await browserExpect(dialog.getByText(/Native trip.*saved/i)).toBeVisible()
+				await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+				await page.getByRole('button', { name: 'Archive Native trip', exact: true }).click()
+				await browserExpect(page.getByRole('row', { name: /Native trip/ })).toHaveCount(0)
+				await aside.getByRole('link', { name: 'Categories', exact: true }).click()
+				await page.getByRole('checkbox', { name: 'All Accounts', exact: true }).uncheck()
+				let row = page.getByRole('row', { name: /Native travel/ })
+				await browserExpect(row.getByRole('cell').nth(1)).toHaveText('1')
+				await browserExpect(row.getByRole('cell').nth(2)).toHaveText('1')
+				await page.getByRole('button', { name: 'Archive Native travel', exact: true }).click()
+				await browserExpect(row).toHaveCount(0)
+				await page.getByRole('radio', { name: 'All', exact: true }).check()
+				await browserExpect(row.getByRole('cell').nth(1)).toHaveText('1')
+				await browserExpect(row.getByRole('cell').nth(2)).toHaveText('1')
+				await close(page)
+				await context.close()
+				context = await engine.launchPersistentContext(profile, { headless: true })
+				page = await context.newPage()
+				await open(page, scope)
+				await page.evaluate((id) => {
+					window.financeWorkerReadFixture.route('/settings/tags?workspace=' + id)
+					window.financeWorkerReadFixture.followRoutes()
+				}, workspaceId)
+				await page.getByRole('radio', { name: 'All', exact: true }).check()
+				await browserExpect(
+					page
+						.getByRole('row', { name: /Native trip/ })
+						.getByRole('cell', { name: 'Native travel', exact: true })
+				).toBeVisible()
+				await page.getByRole('button', { name: 'Add Tag', exact: true }).click()
+				dialog = page.getByRole('dialog', { name: 'Add Tag', exact: true })
+				await browserExpect(
+					dialog
+						.getByLabel('Category', { exact: true })
+						.locator('option')
+						.filter({ hasText: 'Native travel' })
+				).toHaveCount(0)
+				await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+				await close(page)
+			} finally {
+				await context.close()
+			}
+		})
 		it('binds the shared drawer to worker navigation, scoped links and retained native history', async () => {
 			onTestFailed(() => {
 				retained = true
@@ -1029,9 +1129,14 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.getByRole('link', { name: /transaction details/i }).click()
 				await browserExpect(page.locator('[name="checkNumber"]')).toHaveValue('100')
 				await page.locator('[name="checkNumber"]').fill('101')
-				await page
-					.getByLabel('Account', { exact: true })
-					.selectOption({ label: 'Check destination · USD' })
+				const destination = await page.evaluate(
+					() =>
+						window.financeWorkerReadFixture
+							.state()
+							.accounts.find((account) => account.name === 'Check destination')?.id
+				)
+				if (!destination) throw new Error('Missing destination account')
+				await page.getByLabel('Account', { exact: true }).selectOption(destination)
 				await save.click()
 				await browserExpect(save).toBeDisabled()
 				await browserExpect
@@ -1046,8 +1151,8 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					)
 					.toMatchObject({
 						checkNumber: '101',
-						accountId: await page.getByLabel('Account', { exact: true }).inputValue(),
-						checkAccountId: await page.getByLabel('Account', { exact: true }).inputValue()
+						accountId: destination,
+						checkAccountId: destination
 					})
 				await close(page)
 			} finally {
@@ -1079,12 +1184,15 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				const amount = page.getByLabel('Amount', { exact: true }),
 					save = page.getByRole('button', { name: /save transaction/i })
 				await browserExpect(amount).toHaveValue('12.34')
+				const originalInput = await amount.elementHandle()
+				if (!originalInput) throw new Error('Missing edit input')
 				await browserExpect(save).toBeDisabled()
 				await amount.fill('25.00')
 				await browserExpect(save).toBeEnabled()
 				await amount.fill('12.34')
 				await browserExpect(save).toBeDisabled()
 				await amount.fill('25.00')
+				expect(await originalInput.evaluate((element) => element.isConnected)).toBe(true)
 				await save.click()
 				await browserExpect
 					.poll(

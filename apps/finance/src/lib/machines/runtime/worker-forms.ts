@@ -1,4 +1,17 @@
 import {
+	createCategoryManagementFormOptions,
+	createTagManagementFormOptions
+} from '../management/classification-forms.js'
+import {
+	workerCategoryFormView,
+	workerTagFormView,
+	workerClassificationArchiveView,
+	workerClassificationForms,
+	type ClassificationForm,
+	type WorkerClassificationForms
+} from '../../contracts/worker-forms.js'
+import type { ManagementObservation } from '../../contracts/management-contract.js'
+import {
 	createAccountOrderPersistenceMachine,
 	selectPersistedAccountOrder
 } from '../accounts/account-order-persistence.js'
@@ -31,17 +44,10 @@ import {
 } from '../transactions/transaction-entry.js'
 import type {
 	TransactionEntryObservation,
-	TransactionEntryReason,
-	TransactionEntryScope,
 	TransactionEntryView
 } from '../../contracts/transaction-entry-contract.js'
-import type { TransactionSaveValues } from '../../validation/transactions.js'
-import type { Account } from '../../schema.js'
-import type { AccountFormValues } from '../../validation/accounts.js'
 import type {
 	AccountCreationObservation,
-	AccountCreationReason,
-	AccountCreationScope,
 	AccountCreationView
 } from '../../contracts/account-creation-contract.js'
 import {
@@ -58,6 +64,10 @@ import {
 export function createFinanceFormsMachine(
 	dependencies: Omit<Parameters<typeof createAccountCreationFormOptions>[0], 'observe'> & {
 		accountOrderStorage: AccountOrderStorage
+		classification: {
+			categories: ReturnType<typeof createCategoryManagementFormOptions>
+			tags: ReturnType<typeof createTagManagementFormOptions>
+		}
 		navigation: ReturnType<typeof createWorkspaceNavigationMachine>
 		archive: (accountId: string) => Promise<unknown>
 		initialization: InputFrom<typeof workspaceInitialization>
@@ -65,6 +75,10 @@ export function createFinanceFormsMachine(
 		db: Parameters<typeof createTransactionEntryFormOptions>[0]['db']
 	}
 ) {
+	const createCategory = createScopedFormMachine(dependencies.classification.categories.create)
+	const archiveCategory = createScopedFormMachine(dependencies.classification.categories.archive)
+	const createTag = createScopedFormMachine(dependencies.classification.tags.create)
+	const archiveTag = createScopedFormMachine(dependencies.classification.tags.archive)
 	const accountOrder = createAccountOrderPersistenceMachine(dependencies.accountOrderStorage)
 	const archive = createAccountArchiveMachine(
 		(request) => {
@@ -93,26 +107,19 @@ export function createFinanceFormsMachine(
 		observe: () => dependencies.observe().edit
 	})
 	const editTransaction = createScopedFormMachine(editOptions)
-	const enterTransaction = createScopedFormMachine<
-		TransactionSaveValues,
-		void,
-		TransactionEntryReason,
-		TransactionEntryScope,
-		TransactionEntryObservation,
-		SnapshotFrom<typeof transactionOptions.availability>,
-		SnapshotFrom<typeof transactionOptions.operation>
-	>(transactionOptions)
-	const createAccount = createScopedFormMachine<
-		AccountFormValues,
-		Account,
-		AccountCreationReason,
-		AccountCreationScope,
-		AccountCreationObservation,
-		SnapshotFrom<typeof options.availability>,
-		SnapshotFrom<typeof options.operation>
-	>(options)
+	const enterTransaction = createScopedFormMachine(transactionOptions)
+	const createAccount = createScopedFormMachine(options)
 	type Input = { observation: FinanceFormsObservation; selectionRevision: number }
 	type Context = Input & {
+		createCategory: WorkerClassificationForms['createCategory'] | undefined
+		createCategoryObservation: ManagementObservation | undefined
+		archiveCategory: WorkerClassificationForms['archiveCategory'] | undefined
+		archiveCategoryObservation: ManagementObservation | undefined
+		createTag: WorkerClassificationForms['createTag'] | undefined
+		createTagObservation: ManagementObservation | undefined
+		archiveTag: WorkerClassificationForms['archiveTag'] | undefined
+		archiveTagObservation: ManagementObservation | undefined
+
 		order: ReturnType<typeof selectPersistedAccountOrder>
 		navigation: NavigationReport | undefined
 		archive: ReturnType<typeof selectAccountArchiveReport> | undefined
@@ -130,6 +137,11 @@ export function createFinanceFormsMachine(
 			context: types<Context>(),
 			output: types<{ outcome: 'closed' }>(),
 			internalEvents: {
+				CREATECATEGORY_CLOSED: types(),
+				ARCHIVECATEGORY_CLOSED: types(),
+				CREATETAG_CLOSED: types(),
+				ARCHIVETAG_CLOSED: types(),
+
 				CREATION_CLOSED: types(),
 				TRANSACTION_CLOSED: types(),
 				EDIT_CLOSED: types(),
@@ -139,6 +151,10 @@ export function createFinanceFormsMachine(
 				ORDER_CLOSED: types()
 			},
 			events: {
+				CLASSIFICATION: types<{
+					form: ClassificationForm
+					command: WorkerAccountCreationCommand
+				}>(),
 				OBSERVE: types<Input>(),
 				NAVIGATION_STATUS: types<{ report: NavigationReport }>(),
 				SELECT_WORKSPACE: types<{ workspaceId: string }>(),
@@ -152,6 +168,11 @@ export function createFinanceFormsMachine(
 				SHUTDOWN: types()
 			},
 			children: {
+				createCategory: types<import('xstate').ActorRefFrom<typeof createCategory>>(),
+				archiveCategory: types<import('xstate').ActorRefFrom<typeof archiveCategory>>(),
+				createTag: types<import('xstate').ActorRefFrom<typeof createTag>>(),
+				archiveTag: types<import('xstate').ActorRefFrom<typeof archiveTag>>(),
+
 				order: types<import('xstate').ActorRefFrom<typeof accountOrder>>(),
 				navigation:
 					types<
@@ -165,6 +186,11 @@ export function createFinanceFormsMachine(
 			}
 		},
 		actors: {
+			createCategory,
+			archiveCategory,
+			createTag,
+			archiveTag,
+
 			accountOrder,
 			createAccount,
 			enterTransaction,
@@ -178,6 +204,15 @@ export function createFinanceFormsMachine(
 		initial: 'active',
 		context: ({ input }) => ({
 			...input,
+			createCategory: undefined,
+			createCategoryObservation: undefined,
+			archiveCategory: undefined,
+			archiveCategoryObservation: undefined,
+			createTag: undefined,
+			createTagObservation: undefined,
+			archiveTag: undefined,
+			archiveTagObservation: undefined,
+
 			order: undefined,
 			navigation: undefined,
 			archive: undefined,
@@ -191,6 +226,106 @@ export function createFinanceFormsMachine(
 		}),
 		output: () => ({ outcome: 'closed' }),
 		invoke: [
+			{
+				id: 'createCategory',
+				src: 'createCategory',
+				input: ({ context }) => context.observation.classification,
+				onSnapshot: ({ context, event }) => {
+					if (selectScopedFormObservation(event.snapshot) !== context.observation.classification)
+						return
+					const view = workerCategoryFormView.safeParse(
+						selectScopedFormView(event.snapshot, dependencies.classification.categories.create)
+					)
+					return view.success
+						? {
+								context: {
+									createCategory: view.data,
+									createCategoryObservation: context.observation.classification
+								}
+							}
+						: { target: '.failed' }
+				},
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'CREATECATEGORY_CLOSED' })
+				},
+				onError: { target: '.failed' }
+			},
+			{
+				id: 'archiveCategory',
+				src: 'archiveCategory',
+				input: ({ context }) => context.observation.classification,
+				onSnapshot: ({ context, event }) => {
+					if (selectScopedFormObservation(event.snapshot) !== context.observation.classification)
+						return
+					const view = workerClassificationArchiveView.safeParse(
+						selectScopedFormView(event.snapshot, dependencies.classification.categories.archive)
+					)
+					return view.success
+						? {
+								context: {
+									archiveCategory: view.data,
+									archiveCategoryObservation: context.observation.classification
+								}
+							}
+						: { target: '.failed' }
+				},
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'ARCHIVECATEGORY_CLOSED' })
+				},
+				onError: { target: '.failed' }
+			},
+			{
+				id: 'createTag',
+				src: 'createTag',
+				input: ({ context }) => context.observation.classification,
+				onSnapshot: ({ context, event }) => {
+					if (selectScopedFormObservation(event.snapshot) !== context.observation.classification)
+						return
+					const view = workerTagFormView.safeParse(
+						selectScopedFormView(event.snapshot, dependencies.classification.tags.create)
+					)
+					return view.success
+						? {
+								context: {
+									createTag: view.data,
+									createTagObservation: context.observation.classification
+								}
+							}
+						: { target: '.failed' }
+				},
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'CREATETAG_CLOSED' })
+				},
+				onError: { target: '.failed' }
+			},
+			{
+				id: 'archiveTag',
+				src: 'archiveTag',
+				input: ({ context }) => context.observation.classification,
+				onSnapshot: ({ context, event }) => {
+					if (selectScopedFormObservation(event.snapshot) !== context.observation.classification)
+						return
+					const view = workerClassificationArchiveView.safeParse(
+						selectScopedFormView(event.snapshot, dependencies.classification.tags.archive)
+					)
+					return view.success
+						? {
+								context: {
+									archiveTag: view.data,
+									archiveTagObservation: context.observation.classification
+								}
+							}
+						: { target: '.failed' }
+				},
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'ARCHIVETAG_CLOSED' })
+				},
+				onError: { target: '.failed' }
+			},
 			{
 				id: 'order',
 				src: 'accountOrder',
@@ -253,15 +388,7 @@ export function createFinanceFormsMachine(
 						? {
 								context: {
 									creationObservation: context.observation.creation,
-									creation: selectScopedFormView<
-										AccountFormValues,
-										Account,
-										AccountCreationReason,
-										AccountCreationScope,
-										AccountCreationObservation,
-										SnapshotFrom<typeof options.availability>,
-										SnapshotFrom<typeof options.operation>
-									>(event.snapshot, options)
+									creation: selectScopedFormView(event.snapshot, options)
 								}
 							}
 						: undefined,
@@ -280,15 +407,7 @@ export function createFinanceFormsMachine(
 						? {
 								context: {
 									transactionObservation: context.observation.transaction,
-									transaction: selectScopedFormView<
-										TransactionSaveValues,
-										void,
-										TransactionEntryReason,
-										TransactionEntryScope,
-										TransactionEntryObservation,
-										SnapshotFrom<typeof transactionOptions.availability>,
-										SnapshotFrom<typeof transactionOptions.operation>
-									>(event.snapshot, transactionOptions)
+									transaction: selectScopedFormView(event.snapshot, transactionOptions)
 								}
 							}
 						: undefined,
@@ -307,15 +426,7 @@ export function createFinanceFormsMachine(
 						? {
 								context: {
 									editObservation: context.observation.edit,
-									edit: selectScopedFormView<
-										TransactionSaveValues,
-										void,
-										TransactionEntryReason,
-										TransactionEntryScope,
-										TransactionEntryObservation,
-										SnapshotFrom<typeof editOptions.availability>,
-										SnapshotFrom<typeof editOptions.operation>
-									>(event.snapshot, editOptions)
+									edit: selectScopedFormView(event.snapshot, editOptions)
 								}
 							}
 						: undefined,
@@ -337,10 +448,33 @@ export function createFinanceFormsMachine(
 						enq.sendTo('navigation', { type: 'SELECT', workspaceId: event.workspaceId }),
 					NAVIGATE: ({ event }, enq) => enq.sendTo('navigation', event),
 					RETRY_NAVIGATION: (_, enq) => enq.sendTo('navigation', { type: 'RETRY' }),
-					OBSERVE: ({ event }, enq) => {
+					OBSERVE: ({ context, event }, enq) => {
 						enq.sendTo('navigation', { type: 'OBSERVED', facts: event.observation.navigation })
 						enq.sendTo('archive', { type: 'OBSERVE', observation: event.observation.archive })
 						enq.sendTo('order', { type: 'OBSERVE', observation: event.observation.order })
+						if (event.observation.navigation.pathname !== context.observation.navigation.pathname) {
+							enq.sendTo('createCategory', { type: 'RESET' })
+							enq.sendTo('archiveCategory', { type: 'RESET' })
+							enq.sendTo('createTag', { type: 'RESET' })
+							enq.sendTo('archiveTag', { type: 'RESET' })
+						}
+						enq.sendTo('createCategory', {
+							type: 'OBSERVE',
+							observation: event.observation.classification
+						})
+						enq.sendTo('archiveCategory', {
+							type: 'OBSERVE',
+							observation: event.observation.classification
+						})
+						enq.sendTo('createTag', {
+							type: 'OBSERVE',
+							observation: event.observation.classification
+						})
+						enq.sendTo('archiveTag', {
+							type: 'OBSERVE',
+							observation: event.observation.classification
+						})
+
 						enq.sendTo('edit', { type: 'OBSERVE', observation: event.observation.edit })
 						enq.sendTo('creation', { type: 'OBSERVE', observation: event.observation.creation })
 						enq.sendTo('transaction', {
@@ -354,27 +488,22 @@ export function createFinanceFormsMachine(
 							}
 						}
 					},
-					ARCHIVE_ACCOUNT: ({ context, event }, enq) => {
-						enq.sendTo('archive', { type: 'OBSERVE', observation: context.observation.archive })
+					ARCHIVE_ACCOUNT: ({ event }, enq) => {
 						enq.sendTo('archive', { type: 'ARCHIVE', accountId: event.accountId })
 					},
-					ACCOUNT_ORDER: ({ context, event }, enq) => {
-						enq.sendTo('order', { type: 'OBSERVE', observation: context.observation.order })
+					CLASSIFICATION: ({ event }, enq) => {
+						enq.sendTo(event.form, event.command)
+					},
+					ACCOUNT_ORDER: ({ event }, enq) => {
 						enq.sendTo('order', { type: 'COMMAND', command: event.command })
 					},
-					ACCOUNT_CREATION: ({ context, event }, enq) => {
-						enq.sendTo('creation', { type: 'OBSERVE', observation: context.observation.creation })
+					ACCOUNT_CREATION: ({ event }, enq) => {
 						enq.sendTo('creation', event.command)
 					},
-					TRANSACTION_EDIT: ({ context, event }, enq) => {
-						enq.sendTo('edit', { type: 'OBSERVE', observation: context.observation.edit })
+					TRANSACTION_EDIT: ({ event }, enq) => {
 						enq.sendTo('edit', event.command)
 					},
-					TRANSACTION_ENTRY: ({ context, event }, enq) => {
-						enq.sendTo('transaction', {
-							type: 'OBSERVE',
-							observation: context.observation.transaction
-						})
+					TRANSACTION_ENTRY: ({ event }, enq) => {
 						enq.sendTo('transaction', event.command)
 					},
 					SHUTDOWN: ({ self }, enq) => {
@@ -384,6 +513,11 @@ export function createFinanceFormsMachine(
 						enq.sendTo('navigation', { type: 'SHUTDOWN' })
 						enq.sendTo('archive', { type: 'SHUTDOWN' })
 						enq.sendTo('order', { type: 'SHUTDOWN' })
+						enq.sendTo('createCategory', { type: 'SHUTDOWN' })
+						enq.sendTo('archiveCategory', { type: 'SHUTDOWN' })
+						enq.sendTo('createTag', { type: 'SHUTDOWN' })
+						enq.sendTo('archiveTag', { type: 'SHUTDOWN' })
+
 						enq.sendTo('edit', { type: 'SHUTDOWN' })
 						enq.sendTo('creation', { type: 'SHUTDOWN' })
 						enq.sendTo('transaction', { type: 'SHUTDOWN' })
@@ -396,6 +530,34 @@ export function createFinanceFormsMachine(
 				on: { SHUTDOWN: {}, NAVIGATION_STATUS: {} },
 				onDone: { target: 'closed' },
 				states: {
+					createCategory: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { CREATECATEGORY_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
+					archiveCategory: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { ARCHIVECATEGORY_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
+					createTag: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { CREATETAG_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
+					archiveTag: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { ARCHIVETAG_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
 					order: {
 						initial: 'waiting',
 						states: {
@@ -458,6 +620,7 @@ export function createFinanceFormsMachine(
 }
 
 type FormsView = {
+	classification: WorkerClassificationForms | null
 	order: ReturnType<typeof selectPersistedAccountOrder>
 	navigation: NavigationReport | undefined
 	archive: ReturnType<typeof selectAccountArchiveReport> | undefined
@@ -487,6 +650,21 @@ export function selectFinanceFormsView(
 		snapshot.context.order?.key === snapshot.context.observation.order.key
 			? snapshot.context.order
 			: undefined
+	const c = snapshot.context
+	const projected = workerClassificationForms.safeParse({
+		createCategory: c.createCategory,
+		archiveCategory: c.archiveCategory,
+		createTag: c.createTag,
+		archiveTag: c.archiveTag
+	})
+	const classification =
+		c.createCategoryObservation === c.observation.classification &&
+		c.archiveCategoryObservation === c.observation.classification &&
+		c.createTagObservation === c.observation.classification &&
+		c.archiveTagObservation === c.observation.classification &&
+		projected.success
+			? projected.data
+			: null
 	const selectionRevision = snapshot.context.selectionRevision
 	const result = snapshot.context.initialization
 	const initialization =
@@ -501,6 +679,7 @@ export function selectFinanceFormsView(
 						: 'checking'
 	if (snapshot.status !== 'active' || snapshot.matches('failed'))
 		return {
+			classification,
 			order,
 			navigation,
 			archive,
@@ -521,6 +700,7 @@ export function selectFinanceFormsView(
 		context.transactionObservation !== context.observation.transaction
 	)
 		return {
+			classification,
 			order,
 			navigation,
 			archive,
@@ -536,6 +716,7 @@ export function selectFinanceFormsView(
 	const edit = workerTransactionEntryView.safeParse(context.edit)
 	return creation.success && transaction.success && edit.success
 		? {
+				classification,
 				order,
 				navigation,
 				archive,
@@ -547,6 +728,7 @@ export function selectFinanceFormsView(
 				edit: edit.data
 			}
 		: {
+				classification,
 				order,
 				navigation,
 				archive,

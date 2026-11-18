@@ -11,6 +11,7 @@ import type { AccountCreationObservation } from './account-creation-contract.js'
 import { appTagSchema } from '../validation/tags.js'
 import { appCategorySchema } from '../validation/categories.js'
 import { ACCOUNT_CREATION_REASON } from './account-creation-contract.js'
+import { MANAGEMENT_REASON, type ManagementObservation } from './management-contract.js'
 
 export const workerAccountCreationView = createWorkerFormViewSchema(
 	persistedAccountSchema,
@@ -48,6 +49,7 @@ export const workerAccountOrderView = z.strictObject({
 	moves: z.array(z.strictObject({ id: z.uuid(), up: z.boolean(), down: z.boolean() }))
 })
 export type FinanceFormsObservation = {
+	classification: ManagementObservation
 	order: AccountOrderObservation
 	navigation: WorkspaceNavigationFacts
 	archive: ArchiveObservation
@@ -64,3 +66,30 @@ export type AccountOrderStorage = {
 	read: (key: string) => Promise<readonly string[]>
 	write: (key: string, ids: readonly string[]) => Promise<void>
 }
+
+export const classificationForm = z.enum([
+	'createCategory',
+	'archiveCategory',
+	'createTag',
+	'archiveTag'
+])
+export type ClassificationForm = z.output<typeof classificationForm>
+export const workerCategoryFormView = createWorkerFormViewSchema(
+	workerTransactionCategory,
+	z.enum(MANAGEMENT_REASON)
+)
+export const workerTagFormView = createWorkerFormViewSchema(
+	workerTagRecord,
+	z.enum(MANAGEMENT_REASON)
+)
+export const workerClassificationArchiveView = createWorkerFormViewSchema(
+	z.string(),
+	z.enum(MANAGEMENT_REASON)
+)
+export const workerClassificationForms = z.strictObject({
+	createCategory: workerCategoryFormView,
+	archiveCategory: workerClassificationArchiveView,
+	createTag: workerTagFormView,
+	archiveTag: workerClassificationArchiveView
+})
+export type WorkerClassificationForms = z.output<typeof workerClassificationForms>
