@@ -3,6 +3,13 @@
 **Captured**: 2026-11-16  
 **Status**: Initial observations; causal diagnosis and prospective savings pending
 
+**Completion update**: Deployment filtering, first-preview correction, scoped
+installs for all three apps and the approved team overage alert are now released
+or applied. See the [implementation record](implementation.md) for PRs #43–#47,
+production evidence and remaining acceptance work. The observations below are
+historical; no measured savings or Jazz runtime completion is implied. A later
+attributed capture was about $16.52, including $9.76 build CPU, as detailed there.
+
 ## Recorded baseline
 
 Vercel billing exports inspected in this session covered daily charge periods
@@ -23,10 +30,10 @@ Rounded categories may not sum to the precise total. Included credit consumption
 and final invoiced overage are different from effective resource cost. Reconcile
 the original records and complete windows before making a future billing claim.
 
-Deployment history since November 10 contained 439 attempts, including 345
+At the initial capture, deployment history since November 10 contained 439 attempts, including 345
 previews and 94 production attempts; 353 reached Ready. Attempts include canceled
 builds and are not a count of fully billed builds. Many commits triggered Clipper,
-Finance and website deployments together. PR #43 added app scoping; PR #44 adds
+Finance and website deployments together. Merged PR #43 added app scoping; PR #44 added
 test/tooling exclusions. Measure subsequent savings rather than extrapolating
 the historical build total to every future week.
 

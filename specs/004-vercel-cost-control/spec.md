@@ -1,20 +1,40 @@
 # Feature Specification: Predictable Vercel costs and reliable Jazz sync
 
-**Feature Branch**: `fix/vercel-test-only` (current PR #44)
+**Origin**: `fix/vercel-test-only` ([PR #44](https://github.com/delightful-labs/delightful-labs/pull/44), merged)
 
 **Created**: 2026-11-16
 
-**Status**: Draft specification; runtime design and implementation pending
+**Status**: Partially implemented; deployment controls and scoped installs released,
+team overage alerts applied; runtime qualification and measured savings pending
+
+**Last reconciled**: 2026-11-16 (America/New_York), through merged PR #47
 
 **Input**: Investigate and reduce the cost of two lightly used apps, including
 Jazz connection lifetimes and failures, unnecessary builds, and spending controls.
 Add the specification to the current deployment-filter PR.
 
 The [evidence and investigation brief](research.md) separates recorded facts
-from hypotheses. The deployment filter is implemented in this PR; the remaining
-work below is specified, not implemented or production-qualified by this PR.
+from hypotheses. The [implementation record](implementation.md) tracks released
+changes, hosted verification and the remaining work. This feature is not complete:
+successful builds and saved alert settings do not establish runtime correctness
+or monthly savings.
 Existing root and app feature selectors remain unchanged, following the
 [cross-project precedent](../003-shared-workspaces/spec.md).
+
+## Completion status
+
+| Story | Completed evidence | Remaining acceptance work |
+| --- | --- | --- |
+| 1. Attribute spending | Historical project/category baseline; usage distinguished from subscription and overage | Matched workload/environment measurements, complete post-change windows and monthly forecast |
+| 2. Release unused connections | Initial runtime observations recorded | Separate Jazz owner: lifecycle diagnosis, idle/release trials, active/background/multiple-tab/extension and recovery qualification |
+| 3. Compatible schemas | Initialization failures identified for investigation | Separate Jazz owner: supported store histories, migration/refusal and retained-client/rollback qualification |
+| 4. Useful deployments | PRs #43/#44/#45 merged: Markdown/test/recognized-tooling and unaffected-app filtering, Git metadata retention and first-preview comparison; PRs #45/#47 released scoped installs for Website, Finance and Clipper | Matched billable build/cost comparison; size/concurrency or preview-policy changes only if measurements justify them |
+| 5. Useful warnings | Approved $1 team on-demand overage alert budget applied and inspected; automatic pause disabled | Notification delivery not demonstrated; per-project alerts remain optional and unapplied |
+
+SC-001 through SC-004 and SC-006/SC-007 are not satisfied by the deployment work.
+Deployment-selection behavior for SC-005 has local and hosted qualification;
+continue regression coverage rather than treating a canceled Vercel record as a
+zero-cost guarantee. No Jazz upgrade or runtime completion is claimed here.
 
 ## User Scenarios & Testing
 
@@ -112,12 +132,18 @@ deployment decisions, actual hosted decisions, and billable build consumption.
 2. **Given** runtime, shared library, production build configuration, or dependency
    changes, **when** deployment is selected, **then** every affected consumer
    builds. Renames, deletions, and intervening skipped commits cannot hide changes.
-3. **Given** a first deployment, unavailable history, or explicit rebuild,
-   **when** the decision is uncertain, **then** the existing conservative build
-   fallback is preserved. Hosted Storybook changes still deploy Storybook.
+3. **Given** a first Preview branch without a previous deployment SHA,
+   **when** a valid unique merge base with fetched main is available, **then**
+   the complete branch delta is checked. Unavailable or ambiguous history and
+   explicit rebuilds preserve the conservative build fallback. Hosted Storybook
+   changes still deploy Storybook.
 4. **Given** remaining build costs after filtering, **when** preview policy,
    machine sizing, and dependency/build caching are evaluated, **then** measured
    cost and latency tradeoffs are presented before changing hosted settings.
+5. **Given** an affected application build, **when** dependency installation is
+   scoped, **then** unrelated application preparation is excluded while required
+   dependency exports, setup hooks and equivalent deployment artifacts survive;
+   development and CI retain their existing verification coverage.
 
 ### User Story 5 - Receive useful spending warnings (Priority: P2)
 
@@ -233,8 +259,9 @@ any proposed pause/resume procedure without interrupting production.
 - The current 60-second configured idle window is a baseline observation, not a
   proven platform guarantee. Planning will document a measured release margin.
 - Existing credentials, accounts, stores, and preview isolation remain in place.
-- Alert-only budgeting is the default proposal until the owner chooses amounts
-  and any outage-producing action. This document does not enable notifications.
+- The owner approved the applied $1 team overage alert recorded in the
+  implementation record. Further budget changes require scoped approval;
+  outage-producing automatic pause remains disabled.
 - Spec approval does not approve implementation tests, new catalogs, dependency
   changes, production deployment, destructive operations, or hosted settings.
 - Planning must identify evidence owners, bounded test costs, supported SDK
