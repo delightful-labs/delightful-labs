@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { WorkspaceSelector as SharedWorkspaceSelector } from 'delightful-local-first/workspace'
 	import { createWorkspaceSelectorView } from 'delightful-local-first/workspace/presentation'
-	import type { Organization } from '#lib/schema.js'
+	import type { WorkspaceDirectory } from 'delightful-local-first/workspace/contracts'
 	import { workspaceLabel } from '#lib/domain/workspace-routes.js'
 	import { m } from '#lib/paraglide/messages.js'
 
@@ -11,7 +11,7 @@
 		label = m['labels.current_subject']({ subject: m['nouns.workspace']({ count: 1 }) }),
 		onchange
 	}: {
-		organizations: readonly Pick<Organization, 'id' | 'name'>[] | undefined
+		organizations: Extract<WorkspaceDirectory, { status: 'available' }>['entries'] | undefined
 		organizationId: string | null
 		label?: string
 		onchange: (organizationId: string) => void

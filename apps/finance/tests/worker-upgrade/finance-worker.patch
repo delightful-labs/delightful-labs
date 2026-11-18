@@ -1,0 +1,114 @@
+diff --git a/src/lib/runtime/worker/application.worker.ts b/src/lib/runtime/worker/application.worker.ts
+index a769e00..ae2f5fc 100644
+--- a/src/lib/runtime/worker/application.worker.ts
++++ b/src/lib/runtime/worker/application.worker.ts
+@@ -1,31 +1,82 @@
+-import { createJazzClient } from 'jazz-tools/client'
+-import { createJazzSessionAcquisition } from 'delightful-local-first/backend/jazz/session'
+-import { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/startup'
+-import { createSessionAcquisitionMachine } from 'delightful-local-first/session/workflow'
+-import { createWorkerChannel } from 'delightful-local-first/worker/channel/workflow'
+-import { createWorkerEffectDrain } from 'delightful-local-first/worker/effect-drain/workflow'
++import { createActor } from 'xstate'
++import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
++import {
++	createSessionRuntimeMachine,
++	createSessionRuntimeConnection
++} from 'delightful-local-first/session/runtime'
+ import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
++import wasmUrl from '#jazz-wasm-binary?url'
++import brokerUrl from '#jazz-broker-worker?sharedworker&url'
++import sdk from 'jazz-tools/package.json' with { type: 'json' }
++import {
++	financeWorkerCommand,
++	financeWorkerOpen,
++	type FinanceReadCapabilities
++} from '../../contracts/worker-application.js'
++import {
++	financeWorkerMachine,
++	selectFinanceWorkerView
++} from '../../machines/runtime/worker-application.js'
+ import { createFinanceAccountStore } from './account-store.js'
++import { createFinanceReadBinding } from './read-binding.js'
+
+-// W02 build-only entry: no production caller, session, actor, port or storage owner.
+-// Keeping factory values in this diagnostic catalog prevents an empty-worker proof.
+-const factories = {
+-	createJazzClient,
+-	createJazzSessionAcquisition,
+-	createJazzStartupRegistry,
+-	createSessionAcquisitionMachine,
+-	createWorkerChannel,
+-	createWorkerEffectDrain,
+-	brokerHostClient,
+-	createFinanceAccountStore,
+-	loadLocalFirstClient: () => import('jazz-tools/local-first')
+-}
+-
+-// The isolated proof driver is never invoked automatically. If opened manually,
+-// this entry reports import kinds only; it never calls a factory or opens the SDK.
+-self.postMessage({
+-	type: 'FINANCE_WORKER_IMPORTS',
+-	factories: Object.fromEntries(
+-		Object.entries(factories).map(([name, factory]) => [name, typeof factory])
+-	)
++let application: ReturnType<typeof createActor<typeof financeWorkerMachine>> | undefined
++const sessionMachine = createSessionRuntimeMachine<FinanceReadCapabilities>()
++self.addEventListener('message', (event: MessageEvent<unknown>) => {
++	const open = financeWorkerOpen.safeParse(event.data)
++	if (open.success && !application && event.ports.length === 2) {
++		const data = event.ports[0],
++			control = event.ports[1]
++		if (!data || !control) return
++		try {
++			const { serverUrl, scope, environment } = open.data
++			const store = createFinanceAccountStore({ serverUrl, scope, environment })
++			const broker = brokerHostClient(data, control, scope, {
++				onOverdue: () => application?.send({ type: 'NATIVE_FAILED' }),
++				onBlocked: () => application?.send({ type: 'NATIVE_FAILED' })
++			})
++			const native = createJazzSessionRuntime(
++				{
++					serverUrl,
++					scope,
++					env: environment,
++					store,
++					initial: 'device',
++					runtimeSources: {
++						wasmUrl,
++						brokerWorkerUrl: brokerUrl,
++						wasmVersion: sdk.version,
++						browserWorkerHost: broker
++					}
++				},
++				createFinanceReadBinding
++			)
++			const runtime = createActor(sessionMachine, { input: native })
++			runtime.subscribe({ error: () => application?.send({ type: 'NATIVE_FAILED' }) })
++			application = createActor(financeWorkerMachine, {
++				input: {
++					session: createSessionRuntimeConnection(runtime, native.binding),
++					closeAccountStore: () => store.close(),
++					closeBroker: () => broker.close(),
++					brokerIdentity: broker.host.identity
++				}
++			})
++			application.subscribe({
++				next: (snapshot) => self.postMessage(selectFinanceWorkerView(snapshot)),
++				error: () => self.postMessage({ type: 'FAILED' }),
++				complete: () => {
++					if (application?.getSnapshot().output?.outcome === 'closed')
++						self.postMessage({ type: 'CLOSED' })
++				}
++			})
++			application.start()
++			runtime.start()
++		} catch {
++			self.postMessage({ type: 'FAILED' })
++		}
++		return
++	}
++	for (const port of event.ports) port.close()
++	const command = financeWorkerCommand.safeParse(event.data)
++	if (command.success) application?.send(command.data)
+ })

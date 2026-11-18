@@ -432,6 +432,101 @@ worker session and its first bounded read view through these capabilities.
 The independent [unknown-save CI recurrence](worker-pr39-ci-offline-edit.md#pr46-workspace-settings-recurrence-at-42dfaf64)
 remains open; successful restore checks do not establish a fix.
 
+## First Finance Worker and Svelte read slice
+
+The alpha.67 candidate now runs an actual Finance application Worker and renders
+its workspace directory and selected accounts through Svelte. This implements
+the first C3–C5 slice in the isolated candidate. The live alpha.60 layout still
+uses its existing provider; production replacement and U2/U5 remain open.
+
+Ownership and protocol:
+
+- The real Worker entry constructs one shared session-runtime root, the existing
+  IndexedDB AccountStore and broker client, and one Finance read host. The native
+  Jazz adapter supplies inert query capabilities through its existing `bind`
+  function. The native SDK/Db stays inside Worker closures.
+- The Finance host owns waiting, selected reads, read failure and ordered close.
+  Session-ready facts start LocalFirst directory/account subscriptions. A new
+  identity binding immediately withdraws both lists. Each accepted workspace
+  selection has a monotonically increasing revision and a fresh query binding;
+  old A → B → A reports cannot repopulate the view.
+- The wire has validated OPEN, SELECT_WORKSPACE and CLOSE commands, and bounded
+  VIEW/FAILED/CLOSED replies. Views carry workspace ID/name and account
+  ID/name/kind/currency only. SDK rows are projected/copied before entering
+  XState. No raw session, Db, capabilities or actor snapshot crosses to Window.
+- Window constructs native transport and the existing Window-only SharedWorker
+  bridge. Svelte uses an ordinary readable store and the existing shared workspace
+  selector/Table. Detaching the view only unsubscribes rendering; it does not
+  stop the Worker. A malformed reply withdraws data and disables further view
+  delivery, while retaining the native close-receipt listener.
+- Close removes query subscriptions, awaits the existing session-close source,
+  then closes the AccountStore and broker. Only the exact broker scope/request
+  receipt allows final CLOSED and Window termination. Forced actor stop or failed
+  SDK/store/broker closure cannot acknowledge success. A query-disposal failure
+  enters `cleanupFailed`, which refuses subsequent close attempts rather than
+  pretending an unreleased query was disposed. Disposal reports target the live
+  parent directly: installed XState drops callback `sendBack` after callback stop.
+
+Implementation files are `contracts/worker-application.ts`,
+`machines/runtime/worker-application.ts`, `runtime/worker/{read-binding,client}.ts`
+and `components/worker/WorkerAccounts.svelte`. The SDK67 entry is
+`tests/worker-upgrade/finance-worker.patch`; it replaces the SDK60 import catalog
+only in the isolated upgrade runner. Keep this single temporary version boundary
+until coordinated SDK adoption; do not create a parallel SDK60 session adapter.
+The shared workspace selector now uses its existing public directory type rather
+than an SDK authoring row type; its runtime behavior is unchanged.
+
+Both the Window bridge and native adapter use the same compiled broker asset.
+The build alias lives beside the existing Wasm resolution in `tooling/jazz-wasm.ts`.
+Use Vite's `?sharedworker&url`: plain `?url` copies an extra uncompiled broker and
+breaks the one-asset contract. No SDK patch behavior or dependency is added.
+
+Qualification: **13 real-actor host tests** cover selected-query replacement,
+identity replacement, failed reads, late acquisition, held/duplicate close,
+query disposal errors, forced stops and each close-resource failure. **Nine native
+cases pass** across Chromium, Firefox and WebKit. Each engine renders/switches
+selected rows, detaches/remounts the actual Svelte view while a native edit
+continues, rejects malformed view recovery while still closing cleanly, and
+retains local records/an edit through two complete browser-process restarts.
+App/auth/Jazz endpoints are unavailable throughout those persistence cases.
+Test-only seeding/edit controls are injected at the Worker binding import and
+are absent from the product entry/protocol. Development XState remains enabled.
+The emitted Window graph excludes native SDK code; the Worker graph excludes
+Svelte and its SDK integration; exactly one broker asset is emitted. Selected
+candidate TypeScript/Svelte checks pass with zero errors/warnings. The current
+SDK60 checkout also passes full app/browser-test/worker-proof types, all **1,941
+Finance unit tests**, all **12 maintained native Worker cases** and the existing
+Worker bundle proof. That full batch includes the 13 new host cases; earlier
+restore/backup/backend matrices retain their prior version/head qualification.
+
+Logs: `/private/tmp/finance-worker-read-{unit,types,alpha67-native,sdk60-native,sdk60-build}.log`.
+Candidate artifact: `/private/tmp/finance-alpha67-host-4eo19nnx/app`;
+SDK60 checks use the independent `/private/tmp/finance-alpha67-worker-checkout`.
+The maintained `--worker --sdk=2.0.0-alpha.67` runner includes this slice after
+its existing schema/session proofs. Successful prior hosted Foundation, Finance
+and Clipper checks at `4afb8984` do not close the independent unknown-save issue.
+
+### Next: reuse Finance's write workflow and drain
+
+The read host does not own writes yet. Do not add an async archive handler and
+assume exiting its invoke cancels an issued save. Existing
+`createAccountArchiveMachine` / `createAccountArchiveOperation` already own
+canonical validation, membership/grant admission, scope replacement and issued
+write drain through SHUTDOWN. Reuse those charts and their current-observation
+contract; keep the original admitted Db/binding until settlement. SDK close must
+follow their drain, just as in the existing Finance application. Do not rebuild
+that policy in the Worker message listener or introduce a command-owner registry.
+
+Before importing the current archive persistence leaf into a Worker, separate
+its native data access from `data.ts`'s unrelated Svelte-dependent write helpers.
+Keep the current frontend export/callers and one implementation of the existing
+local-tier update. Supply actual membership/grant/account facts inside the Worker;
+never treat a rendered account row as write permission. Reuse existing account
+presentation/action feedback rather than designing another financial form.
+Balances, transactions, other forms, bank workflows, backup/restore UI, recovery,
+remote acquisition, shell/routes and full application drain/parity remain before
+Finance can use this runtime as its production replacement.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing

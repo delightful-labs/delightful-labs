@@ -154,7 +154,13 @@ controller consumes domain capabilities instead of a native session. The
 alpha.67 port changes that module, preserving the chart; all 24 candidate native
 restore cases and nine directly affected alpha.60 native cases pass.
 [Exact binding boundary and remaining worker adoption](worker-session-resource-decision.md#finance-session-binding-isolated-from-the-restore-chart).
-The existing UI still owns its alpha.60 session. C3–C5 and U2 remain open.
+The first actual Finance Worker/Svelte read slice is now qualified on the
+alpha.67 candidate: workspace selection and accounts render through bounded
+views, with 13 host tests and nine three-engine native cases covering stale
+bindings, failed disposal, UI detachment, malformed replies and offline process
+restarts with retained edits. [Implementation and next write boundary](worker-session-resource-decision.md#first-finance-worker-and-svelte-read-slice).
+C3–C5 are implemented for that isolated slice; production activation/full caller
+parity and U2/U5 remain open. The existing UI still owns its alpha.60 session.
 
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
@@ -186,12 +192,15 @@ retain their product/parity requirements, not the abandoned implementation plan.
       The [C2 audit and qualification](#c2-unused-window-account-storage-removal)
       records the removed dependency group, tooling and retained tests.
 - [ ] **C3 — Replace the import catalog with the real application worker.**
-      `application.worker.ts` currently reports factory types rather than running
-      Finance. During cleanup, remove build-proof requirements that keep abandoned
+      **Candidate read slice implemented; production activation pending.**
+      The active alpha.60 `application.worker.ts` reports factory types rather
+      than running Finance. During cleanup, remove build-proof requirements that keep abandoned
       components present. During the read slice, replace the catalog with the
       actual worker entry. Keep meaningful emitted-graph checks for UI isolation,
       SDK/Wasm assets, self-contained worker output and public package boundaries.
-- [ ] **C4 — Give the session lifecycle one owner.** Reuse Local First startup/
+- [ ] **C4 — Give the session lifecycle one owner.** The candidate read host uses
+      the shared owner; remaining Finance workflows/drains and production callers
+      still need adoption. Reuse Local First startup/
       acquisition and the native Jazz session, with one Finance application
       worker/session owner. Use the newer SDK's immediate local-first startup
       and public session operations after a coordinated upgrade is qualified;
@@ -200,15 +209,17 @@ retain their product/parity requirements, not the abandoned implementation plan.
       it must not maintain a matching application/domain lifecycle. Preserve real
       domain drains, identity binding, startup interruption and shutdown outcomes.
 - [ ] **C5 — Move one read-only Finance view before adding infrastructure.**
-      Start with an accounts list scoped to the selected organization, subject to
-      confirming its existing component/query boundary. Send only the bounded
+      **Candidate accounts view implemented and qualified; live route replacement
+      pending.** The view is an accounts list scoped to the selected organization. Send only the bounded
       fields Svelte renders through a small validated command/view union. Keep
       ordinary Svelte subscription/rendering; do not send complete XState
       snapshots or build a generic remote Jazz/actor API. Qualify identity/scope
       replacement, late views, unsubscribe and offline restart.
 - [ ] **C6 — Move one existing financial workflow intact.** After the read slice,
-      move one existing form/workflow's application logic into the worker, reusing
-      its validation, transaction, permissions and outcome handling. Keep DOM,
+      reuse the existing account archive chart/operation and its issued-write
+      drain first; supply membership/grant facts and keep native data helpers free
+      of Svelte. Then move other forms/workflows into the worker, reusing
+      their validation, transaction, permissions and outcome handling. Keep DOM,
       focus and UI interaction behavior with Svelte. Retain operation identity,
       interruption and uncertain-write behavior; do not add a second command-owner
       framework or replay unknown mutations.

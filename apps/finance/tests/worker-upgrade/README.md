@@ -43,6 +43,30 @@ caller adoption, the entire historical restore matrix, live Vercel workload
 admission or the coherent workspace switch. See the
 [alpha.67 source review and evidence](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#alpha67-native-source-review-and-requalification).
 
+## Actual Finance Worker/UI read slice
+
+The maintained `--worker --sdk=2.0.0-alpha.67` command now also copies and checks
+the actual Finance read host, native query binding, Window client and Svelte
+accounts view through `worker-read.mjs`. `finance-worker.patch` replaces the
+current SDK60 import catalog only in that isolated candidate. Active routes,
+SDK pins, existing data and production deployment remain unchanged.
+
+The new slice passes strict TypeScript, zero-warning Svelte checking and **nine
+native cases** (three per browser engine). It checks workspace/account rendering,
+UI detachment without stopping the Worker, malformed-view quarantine with clean
+native close, and retained records/edits across two full process restarts with
+app/auth/Jazz endpoints unavailable. SDK seeding/edit controls are fixture-only
+binding injection; no test commands enter the product protocol. Development
+XState freezing stays enabled. The real output checks exclude native SDK code
+from Window and Svelte modules from the Worker and require one compiled broker.
+
+The SDK-neutral host also has **13 unit cases** in Finance's ordinary unit suite,
+including stale/identity bindings, acquisition/close races and disposal failures.
+Run the native config through the isolated upgrade runner, not directly on the
+active alpha.60 import-catalog build. This is read-slice qualification, not write
+workflow parity, complete application adoption or an SDK cutover.
+[Ownership and remaining work](../../specs/013-local-first-startup/worker-session-resource-decision.md#first-finance-worker-and-svelte-read-slice).
+
 ## Alpha.66 Finance schema, permissions and retained data
 
 From Finance, using the workspace's Node/pnpm and current built Local First:
