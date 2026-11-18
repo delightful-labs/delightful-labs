@@ -285,10 +285,10 @@ index 3a9e18b..be72da6 100644
  			id: noteId,
  			documentId: article.operationId
 diff --git a/src/lib/backend/jazz/permissions.ts b/src/lib/backend/jazz/permissions.ts
-index 09924b6..03bec5c 100644
+index d67e147..e6dc19d 100644
 --- a/src/lib/backend/jazz/permissions.ts
 +++ b/src/lib/backend/jazz/permissions.ts
-@@ -1,226 +1,258 @@
+@@ -1,225 +1,258 @@
 -import { documentReadingStatusSchema } from '../../capture/document-schema.js'
 -import { schema as s } from 'jazz-tools'
 -import type { RowRefValue } from 'jazz-tools/permissions'
@@ -345,13 +345,12 @@ index 09924b6..03bec5c 100644
 -	policy.libraries.allowInsert.where(canonical)
 -	policy.libraries.allowUpdate.whereOld(canonical).whereNew(canonical)
 -	policy.libraries.allowDelete.never()
--	// Publication links are backend-owned association evidence, not client claims
--	// of publication. Keep owner reads available after a source is deleted so the
--	// future publisher can retain the address needed for public removal.
--	policy.publicationLinks.allowRead.where((row) => owns(row.libraryId))
--	policy.publicationLinks.allowInsert.never()
--	policy.publicationLinks.allowUpdate.never()
--	policy.publicationLinks.allowDelete.never()
+-	// Only the backend may advance publication evidence. Owner reads survive
+-	// source deletion so unresolved writes and public cleanup retain their address.
+-	policy.publications.allowRead.where((row) => owns(row.libraryId))
+-	policy.publications.allowInsert.never()
+-	policy.publications.allowUpdate.never()
+-	policy.publications.allowDelete.never()
 -	const documentParent = (row: { libraryId: RowRefValue; documentId: RowRefValue }) =>
 -		allOf([
 -			owns(row.libraryId),
@@ -721,7 +720,7 @@ index 09924b6..03bec5c 100644
 +		update: false,
 +		delete: false
 +	},
-+	publicationLinks: {
++	publications: {
 +		read: (publicationLink) => isMyLibrary(publicationLink.libraryId),
 +		insert: false,
 +		update: false,
@@ -1140,12 +1139,12 @@ index 0000000..a7b84f9
 +	}
 +})
 diff --git a/src/lib/backend/jazz/schema.ts b/src/lib/backend/jazz/schema.ts
-index b75e4f7..8c73f42 100644
+index e420eab..6478eae 100644
 --- a/src/lib/backend/jazz/schema.ts
 +++ b/src/lib/backend/jazz/schema.ts
-@@ -1,9 +1,8 @@
- import { schema as s } from 'jazz-tools'
+@@ -2,9 +2,8 @@ import { schema as s } from 'jazz-tools'
  import { nativeRangeSchema } from '../../annotations/schema.js'
+ import { publicationLifecycleSchema } from '../../annotations/publication.js'
  import { z } from 'zod'
 -import { schema as authSchema } from './auth-schema.js'
 +import { tables as authTables } from './auth-schema.js'
@@ -1154,19 +1153,20 @@ index b75e4f7..8c73f42 100644
  import { documentReadingStatusSchema, documentStatusSchema } from '../../capture/document-schema.js'
  
  function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Value[]] {
-@@ -11,201 +10,198 @@ function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Val
+@@ -12,202 +11,199 @@ function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Val
  	if (first === undefined) throw new Error('Empty enum')
  	return [first, ...rest]
  }
 -export const app = s.defineApp(
 -	{
 -		...authSchema,
--		publicationLinks: s.table(
+-		publications: s.table(
 -			{
 -				libraryId: s.uuid(),
 -				highlightId: s.uuid().optional(),
 -				noteId: s.uuid().optional(),
--				uri: s.string()
+-				publishingDid: s.string(),
+-				lifecycle: s.json(publicationLifecycleSchema)
 -			},
 -			{
 -				library: s.rel('libraries', 'libraryId'),
@@ -1253,12 +1253,13 @@ index b75e4f7..8c73f42 100644
 -				libraryId: s.uuid(),
 +export const schema = s.defineSchema({
 +	...authTables,
-+	publicationLinks: s.table(
++	publications: s.table(
 +		{
 +			libraryId: s.uuid(),
 +			highlightId: s.uuid().optional(),
 +			noteId: s.uuid().optional(),
-+			uri: s.string()
++			publishingDid: s.string(),
++			lifecycle: s.json(publicationLifecycleSchema)
 +		},
 +		{
 +			library: s.rel('libraries', 'libraryId'),
@@ -1446,7 +1447,7 @@ index b75e4f7..8c73f42 100644
 -		),
 -		libraries: s.table(
 -			{ ownerId: s.uuid(), bootstrapVersion: s.string() },
--			{ publicationLinks: s.reverse('publicationLinks', 'library') }
+-			{ publications: s.reverse('publications', 'library') }
 -		),
 -		storageOperations: s.table(
 -			{ libraryId: s.uuid(), payloadHash: s.string() },
@@ -1535,7 +1536,7 @@ index b75e4f7..8c73f42 100644
 +	),
 +	libraries: s.table(
 +		{ ownerId: s.uuid(), bootstrapVersion: s.string() },
-+		{ publicationLinks: s.reverse('publicationLinks', 'library') }
++		{ publications: s.reverse('publications', 'library') }
 +	),
 +	storageOperations: s.table(
 +		{ libraryId: s.uuid(), payloadHash: s.string() },

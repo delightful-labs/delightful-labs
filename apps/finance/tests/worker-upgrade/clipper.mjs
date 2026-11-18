@@ -83,6 +83,8 @@ export function checkClipper(directory, proof, clipper) {
 
 export function clipperProofVersions(clipper) {
 	const packages = [
+		'@atcute/lexicons',
+		'@atcute/tid',
 		'@faker-js/faker',
 		'i18next',
 		'unicode-case-folding',

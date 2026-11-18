@@ -372,6 +372,16 @@ Artifacts: `/private/tmp/clipper-alpha67-host-check/app` and
 The first Clipper log includes 67 passing host cases and a sandbox listener
 restriction; its two native binding cases pass in the separate authorized run.
 
+The branch also incorporates main `f3827565` (the new Clipper publication
+lifecycle and sign-in permissions). The candidate overlays retain the native
+`publications` schema/permissions and forward the new OAuth authorization scope.
+Native schema generation/check, strict candidate types, all 69 candidate tests
+and all 72 active-SDK tests pass on the merged sources. The proof's dependency
+inventory now includes main's two approved AT Protocol packages. This is scoped
+host qualification; the earlier full retained-schema/permission matrix is still
+historical evidence and must be refreshed for the new publication model before
+coordinated SDK adoption.
+
 This completes Clipper's candidate host-custody adoption, not the coordinated SDK
 upgrade. Workspace pins and the active SDK patch remain alpha.60; this adds no
 SDK patch behavior and changes no production destination. Next apply the same

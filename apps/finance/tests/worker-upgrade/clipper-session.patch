@@ -1081,7 +1081,7 @@ index a57c3a3..434fa57 100644
  		expect(delayed.length).toBeGreaterThan(0)
  		closing.resolve()
 diff --git a/src/lib/runtime/worker/host-machine.ts b/src/lib/runtime/worker/host-machine.ts
-index 8741c47..8db7231 100644
+index fe3bfb9..b1955a5 100644
 --- a/src/lib/runtime/worker/host-machine.ts
 +++ b/src/lib/runtime/worker/host-machine.ts
 @@ -1,3 +1,7 @@
@@ -1101,7 +1101,7 @@ index 8741c47..8db7231 100644
  	closeTransport: createAsyncLogic<WorkerHostClosed, () => Promise<WorkerHostClosed>>({
  		run: ({ input }) => input()
  	})
-@@ -652,29 +656,54 @@ export const workerHostMachine = setup({
+@@ -656,29 +660,54 @@ export const workerHostMachine = setup({
  			}
  		},
  		closingSession: {
