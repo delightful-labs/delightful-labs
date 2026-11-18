@@ -10,6 +10,7 @@ let scope = ''
 let navigationFailure = false,
 	navigationReceipt: ReturnType<typeof Promise.withResolvers<void>> | undefined
 let navigationCalls = 0
+let routeObserver: (() => void) | undefined
 function current() {
 	if (!client) throw new Error('Fixture not open')
 	return client
@@ -25,7 +26,9 @@ function attach() {
 			recovery: owner.recovery,
 			onRestore: owner.restoreIdentity,
 			onRetryRecoveryNavigation: owner.retryRecoveryNavigation,
-			onSelectWorkspace: owner.selectWorkspace,
+			onRetryWorkspaceNavigation: owner.retryWorkspaceNavigation,
+			onSelectWorkspace: (id: string) =>
+				routeObserver ? owner.navigateWorkspace(id) : owner.selectWorkspace(id),
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
 			onTransactionEntry: owner.transactionEntryCommand,
@@ -65,6 +68,10 @@ function request(message: unknown) {
 	return result
 }
 const fixture = {
+	followRoutes: () => {
+		routeObserver = () => current().observeRoute()
+		routeObserver()
+	},
 	failNextNavigation: () => {
 		navigationFailure = true
 	},
@@ -79,6 +86,7 @@ const fixture = {
 	route: (href: string) => {
 		history.pushState(null, '', href)
 		current().observeLocation()
+		routeObserver?.()
 	},
 	open(configuration: FinanceWorkerConfiguration) {
 		scope = configuration.scope
@@ -98,6 +106,7 @@ const fixture = {
 					return
 				if (replace) history.replaceState(null, '', destination)
 				else history.pushState(null, '', destination)
+				routeObserver?.()
 			},
 			() => {
 				worker = new Worker(

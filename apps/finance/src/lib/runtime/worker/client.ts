@@ -64,6 +64,7 @@ export function createFinanceWorkerClient(
 		workspaces: null,
 		accounts: [],
 		archiveFeedback: null,
+		workspaceNavigation: null,
 		recoveryAvailable: false,
 		identityRestore: {
 			canSubmit: false,
@@ -95,6 +96,7 @@ export function createFinanceWorkerClient(
 				busy: false,
 				error: true
 			},
+			workspaceNavigation: null,
 			accounts: [],
 			workspaces: null,
 			archiveFeedback: null,
@@ -148,6 +150,7 @@ export function createFinanceWorkerClient(
 				busy: false,
 				error: false
 			},
+			workspaceNavigation: null,
 			accounts: [],
 			workspaces: null,
 			identityId: null,
@@ -195,6 +198,7 @@ export function createFinanceWorkerClient(
 			transactionKind: command.kind,
 			transactionId: command.transactionId ?? null,
 			status: view.status === 'failed' ? 'failed' : 'loading',
+			workspaceNavigation: null,
 			accounts: [],
 			archiveFeedback: null,
 			recoveryAvailable: false,
@@ -265,6 +269,53 @@ export function createFinanceWorkerClient(
 	return {
 		view,
 		observeLocation,
+		observeRoute: () => {
+			const current = get(state)
+			if (current.status === 'closed') return
+			const command = financeWorkerCommand.parse({
+				type: 'OBSERVE_ROUTE',
+				pathname: location.pathname,
+				search: location.search,
+				hash: location.hash,
+				revision: revision + 1
+			})
+			revision += 1
+			state.update((view) => ({
+				...view,
+				selection: { workspaceId: null, revision },
+				status: view.status === 'failed' || view.status === 'closing' ? view.status : 'loading',
+				workspaceNavigation: null,
+				accounts: [],
+				archiveFeedback: null,
+				accountCreation: null,
+				transactionEntry: null,
+				transactionEdit: null,
+				ledger: null
+			}))
+			worker.postMessage(command)
+		},
+		navigateWorkspace: (workspaceId: string) => {
+			const current = get(state)
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'NAVIGATE_WORKSPACE',
+					workspaceId,
+					sessionRevision: current.sessionRevision,
+					selection: current.selection
+				})
+			)
+		},
+		retryWorkspaceNavigation: () => {
+			const current = get(state)
+			if (current.workspaceNavigation?.canRetry)
+				worker.postMessage(
+					financeWorkerCommand.parse({
+						type: 'RETRY_WORKSPACE_NAVIGATION',
+						sessionRevision: current.sessionRevision,
+						selection: current.selection
+					})
+				)
+		},
 		retryRecoveryNavigation: () => {
 			const current = get(state)
 			if (current.identityRestore.canRetryNavigation)

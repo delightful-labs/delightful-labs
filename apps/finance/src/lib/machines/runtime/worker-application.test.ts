@@ -1,3 +1,5 @@
+import { createWorkspaceNavigationMachine } from '../workspaces/workspace-navigation.js'
+import type { WorkspaceNavigate } from '../../contracts/workspace-orchestration-contract.js'
 import { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordination'
 import type { RecoveryRequest } from 'delightful-local-first/recovery/coordination'
 import type { SessionRuntimeIdentityChange } from 'delightful-local-first/session/runtime'
@@ -72,6 +74,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		release: ReturnType<typeof vi.fn>
 	}[] = []
 	const recoveryRead = vi.fn(async () => 'fixture phrase')
+	const navigate = vi.fn<WorkspaceNavigate>(async () => {})
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const createWrite = vi.fn(
 		async (
@@ -177,12 +180,13 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		localFirst: true,
 		capabilities: {
 			...capabilities,
-			createForms: (observe) =>
+			createForms: (observe, _archive, navigate) =>
 				createFinanceFormsMachine({
 					binding,
 					observe,
 					create: createWrite,
 					archive: archiveWrite,
+					navigation: createWorkspaceNavigationMachine({ one: async () => null }, navigate),
 					db: transactionDb.db,
 					initialization: {
 						db: initialization ?? { ...transactionDb.db, getConfig: () => ({ serverUrl: '' }) },
@@ -231,7 +235,8 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 			session: createSessionRuntimeConnection(runtime, binding),
 			closeAccountStore,
 			closeBroker,
-			brokerIdentity
+			brokerIdentity,
+			navigate
 		}
 	})
 	owner = actor
@@ -259,6 +264,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		ledgers,
 		details,
 		archiveWrite,
+		navigate,
 		recoveryRead,
 		createWrite,
 		transactionDb,
@@ -307,6 +313,195 @@ function last<T>(rows: T[]): T {
 }
 
 describe('Finance worker ownership and selected accounts', () => {
+	it('routes an empty directory back to its original entry when a workspace arrives', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?page=2',
+				hash: '#row',
+				revision: 1
+			})
+			last(f.directory).publish([])
+			await vi.waitFor(() =>
+				expect(f.navigate).toHaveBeenLastCalledWith(
+					'/settings/workspace',
+					expect.any(AbortSignal),
+					'/expenses?page=2#row',
+					true
+				)
+			)
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/settings/workspace',
+				search: '',
+				hash: '',
+				revision: 2
+			})
+			expect(f.view().workspaceNavigation?.status).toBe('directory')
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			await vi.waitFor(() =>
+				expect(f.navigate).toHaveBeenLastCalledWith(
+					'/expenses?page=2&workspace=' + a + '#row',
+					expect.any(AbortSignal),
+					'/settings/workspace',
+					true
+				)
+			)
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?page=2&workspace=' + a,
+				hash: '#row',
+				revision: 3
+			})
+			expect(f.view().workspaceNavigation?.status).toBe('scoped')
+			expect(f.view().selection.workspaceId).toBe(a)
+			last(f.memberships).publish(null)
+			expect(f.view().workspaceNavigation).toMatchObject({
+				status: 'unavailable',
+				showContent: false
+			})
+		} finally {
+			f.stop()
+		}
+	})
+	it('switches through native navigation and refuses old selection commands without optimistic workspace changes', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses/' + crypto.randomUUID(),
+				search: '?workspace=' + a + '&page=3&query=rent',
+				hash: '#detail',
+				revision: 1
+			})
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			const scope = f.view()
+			f.actor.send({
+				type: 'NAVIGATE_WORKSPACE',
+				workspaceId: b,
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
+			expect(f.navigate).toHaveBeenLastCalledWith(
+				'/expenses?workspace=' + b + '&query=rent',
+				expect.any(AbortSignal),
+				expect.stringContaining('#detail'),
+				false
+			)
+			expect(f.view().selection.workspaceId).toBe(a)
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?workspace=' + b + '&query=rent',
+				hash: '',
+				revision: 2
+			})
+			expect(f.view().workspaceNavigation?.status).toBe('scoped')
+			f.actor.send({
+				type: 'NAVIGATE_WORKSPACE',
+				workspaceId: a,
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			expect(f.navigate).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('restarts failed subscriptions only after an explicit current routing retry', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?workspace=' + a,
+				hash: '',
+				revision: 1
+			})
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			const scope = f.view(),
+				failedDirectory = last(f.directory)
+			failedDirectory.failed()
+			expect(f.view().workspaceNavigation).toMatchObject({
+				status: 'failed',
+				showContent: false,
+				canRetry: true
+			})
+			expect(failedDirectory.release).toHaveBeenCalledOnce()
+			const count = f.directory.length
+			f.actor.send({
+				type: 'RETRY_WORKSPACE_NAVIGATION',
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			expect(f.directory).toHaveLength(count + 1)
+			expect(f.view().workspaceNavigation?.status).toBe('waiting')
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			expect(f.view().workspaceNavigation?.status).toBe('scoped')
+			expect(f.navigate).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+	it.each(['close', 'replace'])(
+		'retains an issued workspace navigation receipt before %s',
+		async (reason) => {
+			const f = fixture(),
+				held = Promise.withResolvers<void>()
+			f.navigate.mockImplementation(() => held.promise)
+			try {
+				await f.start()
+				f.actor.send({
+					type: 'OBSERVE_ROUTE',
+					pathname: '/expenses',
+					search: '?workspace=' + a,
+					hash: '',
+					revision: 1
+				})
+				last(f.directory).publish([
+					{ id: a, name: 'A' },
+					{ id: b, name: 'B' }
+				])
+				const scope = f.view(),
+					previous = f.actor.getSnapshot().context.forms?.owner
+				f.actor.send({
+					type: 'NAVIGATE_WORKSPACE',
+					workspaceId: b,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+				await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
+				if (reason === 'close') f.actor.send({ type: 'CLOSE' })
+				else f.publishSession(f.ready({}))
+				expect(f.actor.getSnapshot().context.forms?.owner).toBe(previous)
+				expect(f.nativeClose).not.toHaveBeenCalled()
+				held.resolve()
+				if (reason === 'close') {
+					await waitFor(f.actor, (s) => s.status === 'done')
+					expect(f.nativeClose).toHaveBeenCalledOnce()
+				} else {
+					await vi.waitFor(() =>
+						expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
+					)
+					expect(f.nativeClose).not.toHaveBeenCalled()
+				}
+				expect(f.navigate).toHaveBeenCalledOnce()
+			} finally {
+				held.resolve()
+				f.stop()
+			}
+		}
+	)
 	it('keeps missing balances unknown, projects one exact ledger page, and refuses stale filter/page intents', async () => {
 		const f = fixture()
 		try {

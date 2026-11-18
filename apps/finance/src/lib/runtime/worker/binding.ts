@@ -1,3 +1,4 @@
+import { createWorkspaceNavigationMachine } from '../../machines/workspaces/workspace-navigation.js'
 import type {
 	RecoveryScope,
 	RecoveryScopeSource,
@@ -262,11 +263,15 @@ export function createFinanceWorkerBinding({
 			if (!isCurrent()) return Promise.reject(new Error('Finance account binding retired'))
 			return archiveAccount(db, accountId)
 		},
-		createForms: (observe, archive) =>
+		createForms: (observe, archive, navigate) =>
 			createFinanceFormsMachine({
 				binding,
 				db,
 				initialization: { db, userId: identityId },
+				navigation: createWorkspaceNavigationMachine(db, (destination, signal, origin, replace) => {
+					if (!isCurrent()) return Promise.reject(new Error('Finance navigation binding retired'))
+					return navigate(destination, signal, origin, replace)
+				}),
 				archive,
 				observe,
 				create: async (workspaceId, values) => {

@@ -1,3 +1,4 @@
+import type { WorkspaceNavigationFacts } from './workspace-orchestration-contract.js'
 import { z } from 'zod'
 import { createWorkerFormViewSchema } from 'delightful-local-first/forms/worker'
 import { persistedAccountSchema } from '../validation/accounts.js'
@@ -36,6 +37,7 @@ export const workerTransactionEntryCommand = z.discriminatedUnion('type', [
 ])
 export type WorkerTransactionEntryCommand = z.output<typeof workerTransactionEntryCommand>
 export type FinanceFormsObservation = {
+	navigation: WorkspaceNavigationFacts
 	archive: ArchiveObservation
 	creation: AccountCreationObservation
 	transaction: TransactionEntryObservation

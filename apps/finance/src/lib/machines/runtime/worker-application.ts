@@ -1,3 +1,11 @@
+import { workspaceRoute } from '../../domain/workspace-routes.js'
+import { transactionKindForPath } from '../../domain/transaction-kind.js'
+import { z } from 'zod'
+import type {
+	WorkspaceNavigationFacts,
+	WorkspaceRoute,
+	WorkspaceNavigate
+} from '../../contracts/workspace-orchestration-contract.js'
 import type {
 	RecoveryResult,
 	RecoveryNavigation,
@@ -64,6 +72,7 @@ type Input = {
 	closeAccountStore: () => Promise<void>
 	closeBroker: () => Promise<WorkerHostClosed>
 	brokerIdentity: WorkerHostClosed
+	navigate: WorkspaceNavigate
 }
 type RestorationFinished = Omit<FinanceRecoveryFinished, 'type'>
 type RestorationOwner = ActorRef<Snapshot<unknown>, { type: 'SHUTDOWN' | 'WORKSPACE_DRAINED' }>
@@ -73,6 +82,7 @@ type Context = Input & {
 		| undefined
 	recoveryNavigation: RecoveryNavigation | undefined
 	href: string | undefined
+	route: WorkspaceRoute | undefined
 	restorationOutcome: RecoveryResult['outcome'] | undefined
 	restorationAttempt: number
 	settledRestoration: RestorationFinished | undefined
@@ -149,6 +159,33 @@ function creationObservation(context: Context): AccountCreationObservation {
 		error: context.facts?.status === 'failed' ? 'readFailed' : null
 	}
 }
+function navigationObservation(context: Context): WorkspaceNavigationFacts {
+	const route = context.route ?? { pathname: '/', search: '', hash: '' },
+		selected = workspaceRoute(route.search)
+	const member = context.facts?.membership
+	const access =
+		context.facts?.status === 'failed'
+			? 'failed'
+			: selected.scoped && !selected.workspaceId
+				? 'denied'
+				: member === undefined
+					? 'waiting'
+					: member?.userId === context.ready?.identityId &&
+						  member?.organizationId === selected.workspaceId
+						? 'ready'
+						: 'denied'
+	return {
+		...route,
+		generation: context.selection.revision,
+		userId: context.ready?.identityId,
+		ready: context.route !== undefined && context.ready !== undefined,
+		loading: context.facts?.workspaces == null,
+		error: context.facts?.status === 'failed' ? 'readFailed' : undefined,
+		organizations: context.facts?.workspaces ?? [],
+		access
+	}
+}
+
 function formsObservation(context: Context): FinanceFormsObservation {
 	const creation = creationObservation(context),
 		archive = archiveObservation(context)
@@ -167,6 +204,7 @@ function formsObservation(context: Context): FinanceFormsObservation {
 		tags: context.facts?.tags ?? []
 	}
 	return {
+		navigation: navigationObservation(context),
 		archive,
 		creation,
 		transaction,
@@ -228,6 +266,9 @@ export function createFinanceWorkerMachine({
 				RESTORATION_FINISHED: types<RestorationFinished>(),
 				RESTORATION_FAILED: types<RestorationScope>(),
 				OBSERVE_LOCATION: types<{ href: string }>(),
+				OBSERVE_ROUTE: types<WorkspaceRoute & { revision: number }>(),
+				NAVIGATE_WORKSPACE: types<WorkerCommandScope & { workspaceId: string }>(),
+				RETRY_WORKSPACE_NAVIGATION: types<WorkerCommandScope>(),
 				SESSION: types<{ view: SessionRuntimeView<FinanceWorkerCapabilities> }>(),
 				SELECT_CONTEXT: types<{
 					selection: WorkerSelection
@@ -278,6 +319,7 @@ export function createFinanceWorkerMachine({
 			...input,
 			recoveryNavigation: undefined,
 			href: undefined,
+			route: undefined,
 			restoration: undefined,
 			restorationOutcome: undefined,
 			restorationAttempt: 0,
@@ -309,6 +351,22 @@ export function createFinanceWorkerMachine({
 		on: {
 			RECOVERY_VALIDATED: {},
 			OBSERVE_LOCATION: ({ event }) => ({ context: { href: event.href } }),
+			OBSERVE_ROUTE: ({ context, event }, enq) => {
+				if (event.revision <= context.selection.revision) return
+				const route = { pathname: event.pathname, search: event.search, hash: event.hash }
+				const candidate = /^\/(?:expenses|income)\/([^/]+)$/.exec(event.pathname)?.[1]
+				const transaction = z.uuid().safeParse(candidate)
+				enq.raise({
+					type: 'SELECT_CONTEXT',
+					selection: {
+						workspaceId: workspaceRoute(event.search).workspaceId,
+						revision: event.revision
+					},
+					kind: transactionKindForPath(event.pathname),
+					transactionId: transaction.success ? transaction.data : null
+				})
+				return { context: { route, href: `${route.pathname}${route.search}${route.hash}` } }
+			},
 			RESTORATION_FAILED: ({ context, event }) =>
 				sameRestoration(context, event)
 					? {
@@ -524,6 +582,29 @@ export function createFinanceWorkerMachine({
 							context: { ...next, formsView: undefined }
 						}
 					},
+					NAVIGATE_WORKSPACE: ({ context, event }, enq) => {
+						if (
+							!sameCommandScope(context, event) ||
+							!context.route ||
+							!context.forms ||
+							context.forms.binding !== context.ready?.binding
+						)
+							return
+						enq.sendTo(context.forms.owner, {
+							type: 'SELECT_WORKSPACE',
+							workspaceId: event.workspaceId
+						})
+					},
+					RETRY_WORKSPACE_NAVIGATION: ({ context, event }, enq) => {
+						if (
+							!sameCommandScope(context, event) ||
+							!context.route ||
+							!context.forms ||
+							context.forms.binding !== context.ready?.binding
+						)
+							return
+						enq.sendTo(context.forms.owner, { type: 'RETRY_NAVIGATION' })
+					},
 					SET_LEDGER_PAGE: ({ context, event }) =>
 						sameCommandScope(context, event) ? { context: { ledgerPage: event.page } } : undefined,
 					SET_LEDGER_FILTERS: ({ context, event }) =>
@@ -596,7 +677,8 @@ export function createFinanceWorkerMachine({
 							const owner = enq.spawn(
 								context.ready.capabilities.createForms(
 									observeForms,
-									context.ready.capabilities.archiveAccount
+									context.ready.capabilities.archiveAccount,
+									context.navigate
 								),
 								{
 									id: 'forms',
@@ -645,7 +727,17 @@ export function createFinanceWorkerMachine({
 							onError: { target: 'readFailed', context: withdrawn }
 						}
 					},
-					readFailed: {}
+					readFailed: {
+						on: {
+							RETRY_WORKSPACE_NAVIGATION: ({ context, event }) =>
+								sameCommandScope(context, event) && context.route && context.ready
+									? {
+											target: 'ready',
+											context: { facts: undefined, readBinding: {}, formsView: undefined }
+										}
+									: undefined
+						}
+					}
 				}
 			},
 			restoring: {
@@ -927,13 +1019,16 @@ export function selectFinanceWorkerView(
 		...transactionFacts,
 		accounts: context.facts?.accounts ?? []
 	})
-	const forms =
+	const group =
 		snapshot.status === 'active' &&
 		context.forms?.binding === context.ready?.binding &&
-		context.formsView?.status === 'ready' &&
-		context.formsView.selectionRevision === context.selection.revision
+		context.formsView?.selectionRevision === context.selection.revision
 			? context.formsView
 			: undefined
+	const forms = group?.status === 'ready' ? group : undefined
+	const navigation = status === 'failed' ? 'failed' : (group?.navigation?.status ?? 'waiting')
+	const navigationNotice =
+		navigation === 'waiting' || navigation === 'unavailable' || navigation === 'failed'
 
 	const archive = forms?.archive
 
@@ -957,6 +1052,21 @@ export function selectFinanceWorkerView(
 				context.restorationOutcome === 'restorationChildFailed',
 			draftRevision: context.restorationAttempt
 		},
+		workspaceNavigation: context.route
+			? {
+					status: navigation,
+					showContent: !navigationNotice,
+					notice: {
+						active: navigationNotice,
+						loading: navigation === 'waiting',
+						failed: navigation === 'failed'
+					},
+					canRetry:
+						snapshot.matches('running') &&
+						!!context.ready &&
+						(navigation === 'failed' || navigation === 'unavailable')
+				}
+			: null,
 		recoveryAvailable:
 			snapshot.status === 'active' &&
 			snapshot.matches('running') &&
@@ -1064,6 +1174,18 @@ export function selectFinanceFormObservations(
 	if (snapshot?.status === 'active') return formsObservation(snapshot.context)
 	const archive = selectFinanceArchiveObservation(undefined)
 	return {
+		navigation: {
+			pathname: '/',
+			search: '',
+			hash: '',
+			generation: 0,
+			userId: undefined,
+			ready: false,
+			loading: true,
+			error: undefined,
+			organizations: [],
+			access: 'waiting'
+		},
 		archive,
 		creation: { ...archive, error: null },
 		transaction: { ...archive, kind: EXPENSE, categories: [], tags: [] },

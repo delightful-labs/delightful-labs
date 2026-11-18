@@ -1,3 +1,4 @@
+import type { WorkspaceNavigate } from './workspace-orchestration-contract.js'
 import { z } from 'zod'
 import { appAccountSchema, persistedAccountSchema } from '../validation/accounts.js'
 import { appWorkspaceSchema } from '../validation/identity.js'
@@ -68,6 +69,24 @@ export type WorkerLedgerRecord = z.output<typeof transactionLedgerRecordSchema>
 export type WorkerLedgerView = z.output<typeof workerLedgerView>
 export const financeWorkerCommand = z.discriminatedUnion('type', [
 	workerContextCommand,
+	z.strictObject({
+		type: z.literal('OBSERVE_ROUTE'),
+		pathname: z.string().max(8192),
+		search: z.string().max(8192),
+		hash: z.string().max(8192),
+		revision: z.number().int().positive().safe()
+	}),
+	z.strictObject({
+		type: z.literal('NAVIGATE_WORKSPACE'),
+		workspaceId: z.uuid(),
+		sessionRevision,
+		selection: workerSelection
+	}),
+	z.strictObject({
+		type: z.literal('RETRY_WORKSPACE_NAVIGATION'),
+		sessionRevision,
+		selection: workerSelection
+	}),
 	z.strictObject({ type: z.literal('OBSERVE_LOCATION'), href: z.string().max(8192) }),
 	z.strictObject({
 		type: z.literal('ARCHIVE_ACCOUNT'),
@@ -164,7 +183,10 @@ export const financeRecoveryRetry = z.strictObject({
 })
 export const financeNavigationRequest = z.strictObject({
 	type: z.literal('NAVIGATE'),
-	destination: z.literal('/'),
+	destination: z
+		.string()
+		.max(8192)
+		.refine((value) => value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')),
 	origin: z.string().max(8192),
 	replace: z.boolean()
 })
@@ -178,6 +200,14 @@ export const financeWorkerView = z.strictObject({
 	status: z.enum(['starting', 'signed-out', 'loading', 'ready', 'failed', 'closing', 'closed']),
 	identityId: z.uuid().nullable(),
 	recoveryAvailable: z.boolean(),
+	workspaceNavigation: z
+		.strictObject({
+			status: z.enum(['waiting', 'directory', 'global', 'scoped', 'unavailable', 'failed']),
+			showContent: z.boolean(),
+			notice: z.strictObject({ active: z.boolean(), loading: z.boolean(), failed: z.boolean() }),
+			canRetry: z.boolean()
+		})
+		.nullable(),
 	identityRestore: z.strictObject({
 		canSubmit: z.boolean(),
 		busy: z.boolean(),
@@ -258,7 +288,8 @@ export type FinanceWorkerCapabilities = {
 	archiveAccount(accountId: string): Promise<unknown>
 	createForms(
 		observe: () => FinanceFormsObservation,
-		archive: FinanceWorkerCapabilities['archiveAccount']
+		archive: FinanceWorkerCapabilities['archiveAccount'],
+		navigate: WorkspaceNavigate
 	): ReturnType<typeof createFinanceFormsMachine>
 }
 export type FinanceWorkerSession = SessionRuntimeConnection<FinanceWorkerCapabilities>

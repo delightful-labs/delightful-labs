@@ -6,12 +6,12 @@ import type { z } from 'zod'
 import type { WorkspaceNavigate } from '../../contracts/workspace-orchestration-contract.js'
 
 /** One selected Window effect. Its private coordinator retains this receipt through shutdown. */
-export function requestWindowNavigation(destination: string, origin: string) {
+export function requestWindowNavigation(destination: string, origin: string, replace = false) {
 	const request = financeNavigationRequest.parse({
 		type: 'NAVIGATE',
 		destination,
 		origin,
-		replace: false
+		replace
 	})
 	const channel = new MessageChannel()
 	return new Promise<void>((resolve, reject) => {

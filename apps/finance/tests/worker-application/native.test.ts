@@ -262,6 +262,93 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('routes late workspaces, native selection and legacy details, hides denied scope, and drains navigation on close', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				await page.evaluate(() => {
+					window.financeWorkerReadFixture.route('/accounts?query=rent&page=2#row')
+					window.financeWorkerReadFixture.followRoutes()
+				})
+				await browserExpect.poll(() => new URL(page.url()).pathname).toBe('/settings/workspace')
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().workspaceNavigation?.status)
+					)
+					.toBe('directory')
+				const a = crypto.randomUUID(),
+					b = crypto.randomUUID(),
+					accountA = crypto.randomUUID(),
+					accountB = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ a, accountA }) => window.financeWorkerReadFixture.seed(a, accountA, 'Route A'),
+						{ a, accountA }
+					)
+				).toEqual({ ok: true })
+				await browserExpect
+					.poll(() => page.url().slice(origin.length))
+					.toBe('/accounts?query=rent&page=2&workspace=' + a + '#row')
+				await browserExpect(page.getByRole('cell', { name: 'Route A', exact: true })).toBeVisible()
+				await enterExpenseUI(page, accountA, 'Route expense')
+				const transaction = (
+					await page.evaluate((id) => window.financeWorkerReadFixture.transactions(id), a)
+				).transactions?.[0]
+				if (!transaction) throw new Error('Missing routed transaction')
+				expect(
+					await page.evaluate(
+						({ b, accountB }) => window.financeWorkerReadFixture.seed(b, accountB, 'Route B'),
+						{ b, accountB }
+					)
+				).toEqual({ ok: true })
+				const select = page.getByLabel('Current Workspace', { exact: true })
+				await browserExpect(select.locator('option')).toHaveCount(3)
+				await select.selectOption(b)
+				await browserExpect
+					.poll(() => page.url().slice(origin.length))
+					.toBe('/accounts?query=rent&workspace=' + b + '#row')
+				await browserExpect(page.getByRole('cell', { name: 'Route B', exact: true })).toBeVisible()
+				await browserExpect(page.getByRole('cell', { name: 'Route A', exact: true })).toHaveCount(0)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/expenses?workspace=' + id),
+					crypto.randomUUID()
+				)
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().workspaceNavigation)
+					)
+					.toMatchObject({ status: 'unavailable', showContent: false })
+				await browserExpect(page.getByRole('cell', { name: 'Route B', exact: true })).toHaveCount(0)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/expenses/' + id + '?page=2#detail'),
+					transaction.id
+				)
+				await browserExpect
+					.poll(() => page.url().slice(origin.length))
+					.toBe('/expenses/' + transaction.id + '?page=2&workspace=' + a + '#detail')
+				await browserExpect(page.getByRole('cell', { name: 'Route A', exact: true })).toBeVisible()
+				const before = await page.evaluate(() => window.financeWorkerReadFixture.navigationCalls())
+				await page.evaluate(() => window.financeWorkerReadFixture.holdNavigation())
+				await select.selectOption(b)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.navigationCalls()))
+					.toBe(before + 1)
+				await page.evaluate(() => window.financeWorkerReadFixture.close())
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('closing')
+				await page.evaluate(() => window.financeWorkerReadFixture.releaseNavigation())
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('closed')
+			} finally {
+				await browser.close()
+			}
+		})
 		it('creates an account through the existing form with the workspace currency and worker-owned feedback', async () => {
 			onTestFailed(() => {
 				retained = true

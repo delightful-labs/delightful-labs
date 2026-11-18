@@ -1056,3 +1056,46 @@ SvelteKit's actual client also rejects superseded navigation tokens before apply
 (`navigation aborted` checks in `client.js`). Keep that native latest-navigation behavior; do not
 add a producer queue or per-call navigation owner. This change only retains the chart's current
 navigation invocation during explicit shutdown. Full Worker route observation and reuse remain next.
+
+### Worker-owned workspace route observation
+
+Reuse the existing workspace-navigation chart as another fixed child of the SDK-bound workflow
+group. The native binding supplies its real Db and the existing Window navigation capability.
+Group observations contain current route, identity, directory and locally observed access facts;
+the child retains default-workspace/profile and legacy transaction lookup policy. It publishes its
+existing generation/status report, and the group drains it before SDK replacement/close.
+
+Window's router supplies typed pathname/search/hash observations with the same monotonic selection
+revision already used by the client. The Worker parses workspace/transaction context and makes
+navigation decisions; native goto/history remains Window-only. A route observation is required
+before routing starts, allowing existing bounded feature consumers to attach without inventing a
+route or triggering navigation. This is missing input data, not a second SDK owner or runtime flag.
+Explicit workspace navigation and retry commands are scoped to current session/selection. The UI
+receives only bounded navigation status/presentation facts and uses existing scope notices/copy.
+
+Keep current routing policy, late empty-directory/default resolution, denied explicit scope and
+legacy-link behavior. Use native Svelte navigation supersession rather than add a custom producer
+queue or per-call owners. Qualify native default entry, directory changes, explicit switch, denied
+scope, legacy details, actor replacement/drain and existing low-level feature consumers. Full shell,
+URL/filter/back-forward parity and production activation stay separate until their checks pass.
+
+
+Implemented and qualified: **1,989 Finance units**, including **55 host cases**, zero-warning
+Finance static checks and complete browser-test types pass. **42 native application cases** pass
+across Chromium, Firefox and WebKit. Native history observes the actual worker-selected default,
+late directory arrival, explicit workspace switch, denied scope and legacy transaction lookup;
+close retains an issued Window receipt. Focused host coverage also proves same-ID SDK replacement
+waits for that receipt and an explicit current retry restarts failed subscriptions without replay.
+Existing feature consumers without route observations retain their prior behavior.
+
+Latest hosted Finance/Clipper qualification passes at `ea2dddc9`; Local First's full check exposed
+an incorrectly narrowed test-root type in the new explicit-recipient recovery test. `2c1430af`
+changes that annotation to the native concrete actor type; full Local First static/type checks and
+all 12 recovery tests pass. Earlier library-only checks excluded the test file; full config is now
+included for this correction. Runtime code is unchanged by the correction.
+Logs: `/private/tmp/finance-worker-routing-{static,test-types,full-unit,unit,native}.log` and
+`/private/tmp/finance-worker-routing-core-{full-static,full-types,unit}.log`.
+
+Next: reuse existing `q`/date/category/currency and strict positive page URL parsing; preserve native
+replace/push and back/forward observations. The shell is not activated until remaining parity is
+qualified. Do not add another router, session, navigation queue or SDK patch.

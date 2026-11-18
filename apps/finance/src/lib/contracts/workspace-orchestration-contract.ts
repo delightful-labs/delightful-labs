@@ -18,7 +18,7 @@ export type WorkspaceNavigationFacts = WorkspaceRoute & {
 	ready: boolean
 	loading: boolean
 	error: unknown
-	organizations: readonly Organization[]
+	organizations: readonly Pick<Organization, 'id' | 'name'>[]
 	access: NavigationAccess
 }
 export type NavigationStatus =

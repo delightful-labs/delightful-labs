@@ -190,7 +190,11 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 					session: createSessionRuntimeConnection(runtime, native.binding),
 					closeAccountStore: () => store.close(),
 					closeBroker: () => broker.close(),
-					brokerIdentity: broker.host.identity
+					brokerIdentity: broker.host.identity,
+					navigate: (destination, signal, origin, replace) => {
+						signal.throwIfAborted()
+						return requestWindowNavigation(destination, origin, replace)
+					}
 				}
 			})
 			application.subscribe({

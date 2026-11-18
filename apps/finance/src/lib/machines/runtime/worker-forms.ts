@@ -1,3 +1,5 @@
+import type { createWorkspaceNavigationMachine } from '../workspaces/workspace-navigation.js'
+import type { NavigationReport } from '../../contracts/workspace-orchestration-contract.js'
 import {
 	createAccountArchiveMachine,
 	selectAccountArchiveReport
@@ -49,6 +51,7 @@ import {
 /** One SDK-bound workflow owner. Existing charts retain initialization, form policy and settlement. */
 export function createFinanceFormsMachine(
 	dependencies: Omit<Parameters<typeof createAccountCreationFormOptions>[0], 'observe'> & {
+		navigation: ReturnType<typeof createWorkspaceNavigationMachine>
 		archive: (accountId: string) => Promise<unknown>
 		initialization: InputFrom<typeof workspaceInitialization>
 		observe: () => FinanceFormsObservation
@@ -102,6 +105,7 @@ export function createFinanceFormsMachine(
 	>(options)
 	type Input = { observation: FinanceFormsObservation; selectionRevision: number }
 	type Context = Input & {
+		navigation: NavigationReport | undefined
 		archive: ReturnType<typeof selectAccountArchiveReport> | undefined
 		initialization: OutputFrom<typeof workspaceInitialization> | undefined
 		edit: TransactionEntryView | undefined
@@ -121,10 +125,14 @@ export function createFinanceFormsMachine(
 				TRANSACTION_CLOSED: types(),
 				EDIT_CLOSED: types(),
 				INITIALIZATION_CLOSED: types(),
+				NAVIGATION_CLOSED: types(),
 				ARCHIVE_CLOSED: types()
 			},
 			events: {
 				OBSERVE: types<Input>(),
+				NAVIGATION_STATUS: types<{ report: NavigationReport }>(),
+				SELECT_WORKSPACE: types<{ workspaceId: string }>(),
+				RETRY_NAVIGATION: types(),
 				ARCHIVE_ACCOUNT: types<{ accountId: string }>(),
 				ACCOUNT_CREATION: types<{ command: WorkerAccountCreationCommand }>(),
 				TRANSACTION_ENTRY: types<{ command: WorkerTransactionEntryCommand }>(),
@@ -132,6 +140,10 @@ export function createFinanceFormsMachine(
 				SHUTDOWN: types()
 			},
 			children: {
+				navigation:
+					types<
+						import('xstate').ActorRefFrom<ReturnType<typeof createWorkspaceNavigationMachine>>
+					>(),
 				archive: types<import('xstate').ActorRefFrom<typeof archive>>(),
 				initialization: types<import('xstate').ActorRefFrom<typeof workspaceInitialization>>(),
 				edit: types<import('xstate').ActorRefFrom<typeof editTransaction>>(),
@@ -139,12 +151,20 @@ export function createFinanceFormsMachine(
 				transaction: types<import('xstate').ActorRefFrom<typeof enterTransaction>>()
 			}
 		},
-		actors: { createAccount, enterTransaction, editTransaction, workspaceInitialization, archive }
+		actors: {
+			createAccount,
+			enterTransaction,
+			editTransaction,
+			workspaceInitialization,
+			archive,
+			navigation: dependencies.navigation
+		}
 	}).createMachine({
 		id: 'finance-forms',
 		initial: 'active',
 		context: ({ input }) => ({
 			...input,
+			navigation: undefined,
 			archive: undefined,
 			initialization: undefined,
 			edit: undefined,
@@ -156,6 +176,16 @@ export function createFinanceFormsMachine(
 		}),
 		output: () => ({ outcome: 'closed' }),
 		invoke: [
+			{
+				id: 'navigation',
+				src: 'navigation',
+				input: ({ context, self }) => ({ facts: context.observation.navigation, recipient: self }),
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'NAVIGATION_CLOSED' })
+				},
+				onError: { target: '.failed' }
+			},
 			{
 				id: 'archive',
 				src: 'archive',
@@ -268,7 +298,15 @@ export function createFinanceFormsMachine(
 		states: {
 			active: {
 				on: {
+					NAVIGATION_STATUS: ({ context, event }) =>
+						event.report.generation === context.observation.navigation.generation
+							? { context: { navigation: event.report } }
+							: undefined,
+					SELECT_WORKSPACE: ({ event }, enq) =>
+						enq.sendTo('navigation', { type: 'SELECT', workspaceId: event.workspaceId }),
+					RETRY_NAVIGATION: (_, enq) => enq.sendTo('navigation', { type: 'RETRY' }),
 					OBSERVE: ({ event }, enq) => {
+						enq.sendTo('navigation', { type: 'OBSERVED', facts: event.observation.navigation })
 						enq.sendTo('archive', { type: 'OBSERVE', observation: event.observation.archive })
 						enq.sendTo('edit', { type: 'OBSERVE', observation: event.observation.edit })
 						enq.sendTo('creation', { type: 'OBSERVE', observation: event.observation.creation })
@@ -306,6 +344,7 @@ export function createFinanceFormsMachine(
 						const initialization = self.getSnapshot().children.initialization
 						if (initialization?.getSnapshot().status === 'active')
 							enq.sendTo(initialization, { type: 'SHUTDOWN' })
+						enq.sendTo('navigation', { type: 'SHUTDOWN' })
 						enq.sendTo('archive', { type: 'SHUTDOWN' })
 						enq.sendTo('edit', { type: 'SHUTDOWN' })
 						enq.sendTo('creation', { type: 'SHUTDOWN' })
@@ -316,9 +355,16 @@ export function createFinanceFormsMachine(
 			},
 			closing: {
 				type: 'parallel',
-				on: { SHUTDOWN: {} },
+				on: { SHUTDOWN: {}, NAVIGATION_STATUS: {} },
 				onDone: { target: 'closed' },
 				states: {
+					navigation: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { NAVIGATION_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
 					archive: {
 						initial: 'waiting',
 						states: {
@@ -367,6 +413,7 @@ export function createFinanceFormsMachine(
 }
 
 type FormsView = {
+	navigation: NavigationReport | undefined
 	archive: ReturnType<typeof selectAccountArchiveReport> | undefined
 	selectionRevision: number
 	initialization: 'checking' | 'ready' | 'unavailable' | 'failed' | 'closed'
@@ -382,6 +429,10 @@ type FormsView = {
 export function selectFinanceFormsView(
 	snapshot: SnapshotFrom<ReturnType<typeof createFinanceFormsMachine>>
 ): FormsView {
+	const navigation =
+		snapshot.context.navigation?.generation === snapshot.context.observation.navigation.generation
+			? snapshot.context.navigation
+			: undefined
 	const archive =
 		snapshot.context.archive?.binding === snapshot.context.observation.archive.binding
 			? snapshot.context.archive
@@ -400,6 +451,7 @@ export function selectFinanceFormsView(
 						: 'checking'
 	if (snapshot.status !== 'active' || snapshot.matches('failed'))
 		return {
+			navigation,
 			archive,
 			selectionRevision,
 			initialization,
@@ -418,6 +470,7 @@ export function selectFinanceFormsView(
 		context.transactionObservation !== context.observation.transaction
 	)
 		return {
+			navigation,
 			archive,
 			selectionRevision,
 			initialization,
@@ -431,6 +484,7 @@ export function selectFinanceFormsView(
 	const edit = workerTransactionEntryView.safeParse(context.edit)
 	return creation.success && transaction.success && edit.success
 		? {
+				navigation,
 				archive,
 				selectionRevision,
 				initialization,
@@ -440,6 +494,7 @@ export function selectFinanceFormsView(
 				edit: edit.data
 			}
 		: {
+				navigation,
 				archive,
 				selectionRevision,
 				initialization,
