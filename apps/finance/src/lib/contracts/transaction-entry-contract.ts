@@ -16,20 +16,23 @@ export type TransactionEntryScope = {
 	kind: TransactionDetail['kind']
 	transactionId?: TransactionDetail['id'] | null
 }
+export const TRANSACTION_ENTRY_REASON = Object.freeze({
+	sessionUnavailable: 'sessionUnavailable',
+	selectWorkspace: 'selectWorkspace',
+	loadFailed: 'loadFailed',
+	loading: 'loading',
+	readOnly: 'readOnly',
+	noAccounts: 'noAccounts',
+	noCategories: 'noCategories',
+	unavailableReference: 'unavailableReference',
+	ambiguousTagName: 'ambiguousTagName',
+	checkRetained: 'checkRetained',
+	saveUnresolved: 'saveUnresolved',
+	attachmentsFailed: 'attachmentsFailed',
+	linkedTransferRequiresUnlink: 'linkedTransferRequiresUnlink'
+})
 export type TransactionEntryReason =
-	| 'sessionUnavailable'
-	| 'selectWorkspace'
-	| 'loadFailed'
-	| 'loading'
-	| 'readOnly'
-	| 'noAccounts'
-	| 'noCategories'
-	| 'unavailableReference'
-	| 'ambiguousTagName'
-	| 'checkRetained'
-	| 'saveUnresolved'
-	| 'attachmentsFailed'
-	| 'linkedTransferRequiresUnlink'
+	(typeof TRANSACTION_ENTRY_REASON)[keyof typeof TRANSACTION_ENTRY_REASON]
 export type TransactionEntryObservation = TransactionEntryScope & {
 	sessionReady: boolean
 	loading: boolean

@@ -10,7 +10,7 @@ import {
 	createFinanceWorkerMachine,
 	selectFinanceWorkerView,
 	selectFinanceArchiveObservation,
-	selectFinanceAccountCreationObservation,
+	selectFinanceFormObservations,
 	selectFinanceArchiveWriter
 } from './worker-application.js'
 import type {
@@ -19,8 +19,13 @@ import type {
 	WorkerAccountRecord,
 	WorkerWorkspace
 } from '../../contracts/worker-application.js'
+import { creationFixture } from '../transactions/transaction-create.fixture.js'
 import { createFinanceFormsMachine } from './worker-forms.js'
-import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+import { app } from '../../schema.js'
+import type {
+	WorkerTransactionEntryCommand,
+	WorkerAccountCreationCommand
+} from '../../contracts/worker-forms.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 
 const userId = '10000000-0000-4000-8000-000000000001',
@@ -51,6 +56,7 @@ function fixture() {
 		failed: () => void
 	}[] = []
 	const grants: { publish: (rows: ArchiveObservation['grants']) => void; failed: () => void }[] = []
+	const transactionDb = creationFixture()
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const createWrite = vi.fn(
 		async (
@@ -109,6 +115,31 @@ function fixture() {
 				order.push('grants')
 			}
 		},
+		observeCategories: (organizationId, publish) => {
+			publish([
+				{
+					id: '50000000-0000-4000-8000-000000000001',
+					organizationId,
+					name: 'Expense',
+					kind: 'expense',
+					archivedAt: null,
+					isSystem: true
+				},
+				{
+					id: '50000000-0000-4000-8000-000000000002',
+					organizationId,
+					name: 'Income',
+					kind: 'income',
+					archivedAt: null,
+					isSystem: true
+				}
+			])
+			return () => {}
+		},
+		observeTags: (_id, publish) => {
+			publish([])
+			return () => {}
+		},
 		archiveAccount: archiveWrite
 	}
 	const ready = (binding: object): SessionRuntimeObservation<FinanceWorkerCapabilities> => ({
@@ -119,7 +150,8 @@ function fixture() {
 		localFirst: true,
 		capabilities: {
 			...capabilities,
-			createForms: (observe) => createFinanceFormsMachine({ binding, observe, create: createWrite })
+			createForms: (observe) =>
+				createFinanceFormsMachine({ binding, observe, create: createWrite, db: transactionDb.db })
 		}
 	})
 	const nativeClose = vi.fn(async () => {
@@ -152,7 +184,7 @@ function fixture() {
 	let owner: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
 	const machine = createFinanceWorkerMachine({
 		observe: () => selectFinanceArchiveObservation(owner?.getSnapshot()),
-		observeCreation: () => selectFinanceAccountCreationObservation(owner?.getSnapshot()),
+		observeForms: () => selectFinanceFormObservations(owner?.getSnapshot()),
 		persist: (request) => {
 			const write = selectFinanceArchiveWriter(owner?.getSnapshot(), request)
 			return write ? write(request.accountId) : Promise.reject(new Error('Binding retired'))
@@ -173,7 +205,7 @@ function fixture() {
 		await waitFor(actor, (s) => !!s.context.ready)
 	}
 	const select = (workspaceId: string, revision: number) =>
-		actor.send({ type: 'SELECT_WORKSPACE', selection: { workspaceId, revision } })
+		actor.send({ type: 'SELECT_CONTEXT', selection: { workspaceId, revision }, kind: 'expense' })
 	return {
 		actor,
 		runtime,
@@ -189,6 +221,23 @@ function fixture() {
 		grants,
 		archiveWrite,
 		createWrite,
+		transactionDb,
+		enter: (
+			command: WorkerTransactionEntryCommand,
+			scope = selectFinanceWorkerView(actor.getSnapshot())
+		) =>
+			actor.send({
+				type: 'TRANSACTION_ENTRY',
+				command,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			}),
+		selectKind: (kind: 'income' | 'expense', revision: number) =>
+			actor.send({
+				type: 'SELECT_CONTEXT',
+				kind,
+				selection: { ...selectFinanceWorkerView(actor.getSnapshot()).selection, revision }
+			}),
 		create: (
 			command: WorkerAccountCreationCommand,
 			scope = selectFinanceWorkerView(actor.getSnapshot())
@@ -218,6 +267,177 @@ function last<T>(rows: T[]): T {
 }
 
 describe('Finance worker ownership and selected accounts', () => {
+	it.each(['expense', 'income'])(
+		'reuses native transaction policy and staged persistence for %s',
+		async (kind) => {
+			const f = fixture()
+			try {
+				await f.start()
+				last(f.directory).publish([{ id: a, name: 'A' }])
+				f.select(a, 1)
+				if (kind === 'income') f.selectKind('income', 2)
+				last(f.queries).publish([row('Wallet')])
+				expect(f.view().transactionEntry?.form.canSubmit).toBe(true)
+				f.enter({
+					type: 'SUBMIT',
+					values: {
+						accountId: row('Wallet').id,
+						categoryId:
+							kind === 'expense'
+								? '50000000-0000-4000-8000-000000000001'
+								: '50000000-0000-4000-8000-000000000002',
+						amount: '10.23',
+						bookedOn: '2026-11-18',
+						tags: []
+					}
+				})
+				await vi.waitFor(() => expect(f.view().transactionEntry?.form.content.kind).toBe('success'))
+				expect(f.transactionDb.insert).toHaveBeenCalledWith(
+					app.transactions,
+					expect.objectContaining({
+						kind,
+						amountMinor: 1023,
+						currency: 'USD',
+						organizationId: a,
+						accountId: row('Wallet').id,
+						source: 'manual'
+					}),
+					expect.anything()
+				)
+				expect(f.transactionDb.commit).toHaveBeenCalledOnce()
+				expect(structuredClone(f.view())).toEqual(f.view())
+			} finally {
+				f.stop()
+			}
+		}
+	)
+	it.each(['amount', 'account'])('refuses invalid transaction %s before staging', async (field) => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.enter({
+				type: 'SUBMIT',
+				values: {
+					accountId: field === 'account' ? crypto.randomUUID() : row('Wallet').id,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					amount: field === 'amount' ? '-1' : '10.23',
+					bookedOn: '2026-11-18',
+					tags: []
+				}
+			})
+			await vi.waitFor(() =>
+				expect(f.view().transactionEntry?.form.feedback).toMatchObject({
+					kind: 'result',
+					result: { outcome: 'invalid' }
+				})
+			)
+			expect(f.transactionDb.commit).not.toHaveBeenCalled()
+			expect(f.transactionDb.insert).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+	it('refuses stale transaction commands after expense → income → expense', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			const old = f.view()
+			f.selectKind('income', 2)
+			last(f.queries).publish([row('Wallet')])
+			f.selectKind('expense', 3)
+			last(f.queries).publish([row('Wallet')])
+			const command = {
+				type: 'SUBMIT',
+				values: {
+					accountId: row('Wallet').id,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					amount: '10.23',
+					bookedOn: '2026-11-18',
+					tags: []
+				}
+			} satisfies WorkerTransactionEntryCommand
+			f.enter(command, old)
+			expect(f.transactionDb.insert).not.toHaveBeenCalled()
+			f.enter(command)
+			await vi.waitFor(() => expect(f.view().transactionEntry?.form.content.kind).toBe('success'))
+			expect(f.transactionDb.commit).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('keeps the original transaction through local settlement before host shutdown', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.transactionDb.wait.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.enter({
+				type: 'SUBMIT',
+				values: {
+					accountId: row('Wallet').id,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					amount: '10.23',
+					bookedOn: '2026-11-18',
+					tags: []
+				}
+			})
+			await vi.waitFor(() => expect(f.transactionDb.wait).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			held.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.transactionDb.commit).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('drains a pending transaction on SDK replacement without replay or old feedback', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.transactionDb.wait.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.enter({
+				type: 'SUBMIT',
+				values: {
+					accountId: row('Wallet').id,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					amount: '10.23',
+					bookedOn: '2026-11-18',
+					tags: []
+				}
+			})
+			await vi.waitFor(() => expect(f.transactionDb.wait).toHaveBeenCalledOnce())
+			f.publishSession(f.ready({}))
+			expect(f.view().transactionEntry).toBeNull()
+			expect(f.queries).toHaveLength(1)
+			held.resolve()
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([row('Wallet')])
+			expect(f.view().transactionEntry?.form.content.kind).toBe('fields')
+			expect(f.view().transactionEntry?.form.feedback.kind).toBe('none')
+			expect(f.transactionDb.commit).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
 	it('validates creation in the existing worker form and publishes a cloneable success', async () => {
 		const f = fixture()
 		try {
@@ -403,7 +623,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			second.publish([row('B')])
 			first.publish([row('late first A')])
 			if (!firstBinding) throw new Error('Missing retired binding')
-			f.actor.send({
+			f.actor.getSnapshot().children.queries?.send({
 				type: 'ACCOUNTS',
 				binding: firstBinding,
 				rows: [{ ...row('stale report'), organizationId: a, archivedAt: null }]

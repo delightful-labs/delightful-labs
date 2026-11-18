@@ -43,6 +43,26 @@ caller adoption, the entire historical restore matrix, live Vercel workload
 admission or the coherent workspace switch. See the
 [alpha.67 source review and evidence](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#alpha67-native-source-review-and-requalification).
 
+## Current manual transaction entry
+
+The maintained worker proof also runs the existing transaction-entry policy and
+staged persistence through the real TransactionForm for income and expense.
+One fixed query owner publishes copied workspace/account/member/grant/category/tag
+facts. Both form children drain before SDK teardown/replacement. Window owns DOM,
+FormData and translations; attachments remain outside this first transaction slice.
+
+All **1,961 Finance units** (32 host), full Finance static checks, and **18 native
+Worker/UI cases** pass. The native cases include both directions, payment metadata,
+and an expense retained through two complete offline process restarts. A fresh
+maintained run passes 200 schema/permission/backup/restore and 42 existing session
+cases before those 18 application cases. See [the current resource model and
+qualification](../../specs/013-local-first-startup/worker-session-resource-decision.md#worker-owned-manual-transaction-entry-without-attachments).
+
+The actual browser slice uses Vite/Bundler TypeScript resolution, matching the
+application; SDK/Node fixtures retain NodeNext. Pica uses Finance's already-installed
+exact version, without adding a workspace dependency. Active SDK pins/routes and
+full application parity remain open.
+
 ## Current Finance account creation and form transport
 
 The same maintained `--worker --sdk=2.0.0-alpha.67` command includes the existing

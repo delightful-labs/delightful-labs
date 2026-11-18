@@ -21,14 +21,27 @@ function attach() {
 			view: owner.view,
 			onSelectWorkspace: owner.selectWorkspace,
 			onArchive: owner.archiveAccount,
-			onAccountCreation: owner.accountCreationCommand
+			onAccountCreation: owner.accountCreationCommand,
+			onTransactionEntry: owner.transactionEntryCommand
 		}
 	})
 }
 function request(message: unknown) {
 	if (!worker) throw new Error('Fixture Worker unavailable')
 	const channel = new MessageChannel()
-	const result = new Promise<{ ok: boolean; error?: string }>((resolve) => {
+	const result = new Promise<{
+		ok: boolean
+		error?: string
+		transactions?: {
+			id: string
+			amountMinor: number
+			currency: string
+			kind: string
+			description: string | null
+			paymentMethod: string | null
+			checkId: string | null
+		}[]
+	}>((resolve) => {
 		channel.port1.onmessage = ({ data }) => {
 			channel.port1.close()
 			resolve(data)
@@ -53,9 +66,11 @@ const fixture = {
 	seed: (workspaceId: string, accountId: string, name: string, currency: 'USD' | 'TZS' = 'USD') =>
 		request({ type: 'TEST_SEED', workspaceId, accountId, name, currency }),
 	edit: (accountId: string, name: string) => request({ type: 'TEST_EDIT', accountId, name }),
+	transactions: (workspaceId: string) => request({ type: 'TEST_TRANSACTIONS', workspaceId }),
 	archive: (accountId: string) => current().archiveAccount(accountId, get(current().view)),
 	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),
 	releaseArchive: () => request({ type: 'TEST_RELEASE_ARCHIVE' }),
+	selectKind: (kind: 'income' | 'expense') => current().selectTransactionKind(kind),
 	select: (workspaceId: string) => current().selectWorkspace(workspaceId),
 	async detach() {
 		if (component) await unmount(component)

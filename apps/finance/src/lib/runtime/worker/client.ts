@@ -5,12 +5,16 @@ import {
 	financeWorkerOpen,
 	financeWorkerCommand,
 	financeWorkerReply,
-	workerSelection,
+	workerContextCommand,
 	type FinanceWorkerView,
 	type WorkerCommandScope,
 	type FinanceWorkerOpen
 } from '../../contracts/worker-application.js'
-import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+import { EXPENSE, type TransactionKind } from '../../domain/transaction-kind.js'
+import type {
+	WorkerTransactionEntryCommand,
+	WorkerAccountCreationCommand
+} from '../../contracts/worker-forms.js'
 
 /** Window owns native transport and rendering only. Domain state stays in the Worker. */
 export function createFinanceWorkerClient(
@@ -35,13 +39,15 @@ export function createFinanceWorkerClient(
 	const state = writable<FinanceWorkerView>({
 		type: 'VIEW',
 		sessionRevision: 0,
+		transactionKind: EXPENSE,
 		selection: { workspaceId: null, revision },
 		status: 'starting',
 		identityId: null,
 		workspaces: null,
 		accounts: [],
 		archiveFeedback: null,
-		accountCreation: null
+		accountCreation: null,
+		transactionEntry: null
 	})
 	const fail = () => {
 		// Keep the close receipt listener: a data fault never authorizes termination.
@@ -52,7 +58,8 @@ export function createFinanceWorkerClient(
 			accounts: [],
 			workspaces: null,
 			archiveFeedback: null,
-			accountCreation: null
+			accountCreation: null,
+			transactionEntry: null
 		}))
 	}
 	const receiveView = (event: MessageEvent<unknown>) => {
@@ -84,7 +91,8 @@ export function createFinanceWorkerClient(
 			workspaces: null,
 			identityId: null,
 			archiveFeedback: null,
-			accountCreation: null
+			accountCreation: null,
+			transactionEntry: null
 		}))
 	}
 	worker.addEventListener('message', receiveView)
@@ -93,22 +101,32 @@ export function createFinanceWorkerClient(
 	worker.addEventListener('messageerror', fail)
 	worker.postMessage(open, [data.port2, control.port2])
 	const view: Readable<FinanceWorkerView> = { subscribe: state.subscribe }
+	function selectContext(workspaceId: string | null, kind: TransactionKind) {
+		if (get(state).status === 'closed') return
+		const command = workerContextCommand.parse({
+			type: 'SELECT_CONTEXT',
+			selection: { workspaceId, revision: revision + 1 },
+			kind
+		})
+		revision = command.selection.revision
+		state.update((view) => ({
+			...view,
+			selection: command.selection,
+			transactionKind: command.kind,
+			status: view.status === 'failed' ? 'failed' : 'loading',
+			accounts: [],
+			archiveFeedback: null,
+			accountCreation: null,
+			transactionEntry: null
+		}))
+		worker.postMessage(command)
+	}
 	return {
 		view,
-		selectWorkspace: (workspaceId: string | null) => {
-			if (get(state).status === 'closed') return
-			const selection = workerSelection.parse({ workspaceId, revision: revision + 1 })
-			revision = selection.revision
-			state.update((view) => ({
-				...view,
-				selection,
-				status: view.status === 'failed' ? 'failed' : 'loading',
-				accounts: [],
-				archiveFeedback: null,
-				accountCreation: null
-			}))
-			worker.postMessage({ type: 'SELECT_WORKSPACE', selection })
-		},
+		selectWorkspace: (workspaceId: string | null) =>
+			selectContext(workspaceId, get(state).transactionKind),
+		selectTransactionKind: (kind: TransactionKind) =>
+			selectContext(get(state).selection.workspaceId, kind),
 		archiveAccount: (accountId: string, scope: WorkerCommandScope) => {
 			const current = get(state)
 			if (current.status !== 'ready') return
@@ -132,6 +150,26 @@ export function createFinanceWorkerClient(
 			worker.postMessage(
 				financeWorkerCommand.parse({
 					type: 'ACCOUNT_CREATION',
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection,
+					command
+				})
+			)
+		},
+		transactionEntryCommand: (
+			command: WorkerTransactionEntryCommand,
+			scope: WorkerCommandScope
+		) => {
+			const current = get(state)
+			if (
+				current.status === 'closed' ||
+				current.status === 'closing' ||
+				current.status === 'failed'
+			)
+				return
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'TRANSACTION_ENTRY',
 					sessionRevision: scope.sessionRevision,
 					selection: scope.selection,
 					command

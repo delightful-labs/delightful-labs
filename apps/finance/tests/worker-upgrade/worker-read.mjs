@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { portRuntimeImports } from './schema.mjs'
 
 /** Actual Finance Worker/UI slice on the same isolated native SDK and generated schema. */
 export function checkFinanceWorker(directory, finance, proof) {
@@ -9,6 +10,11 @@ export function checkFinanceWorker(directory, finance, proof) {
 	for (const name of [
 		'src/lib/contracts/worker-application.ts',
 		'src/lib/contracts/worker-forms.ts',
+		'src/lib/contracts/transaction-entry-contract.ts',
+		'src/lib/machines/runtime/worker-queries.ts',
+		'src/lib/machines/transactions/transaction-entry.ts',
+		'src/lib/components/worker/WorkerTransactionEntry.svelte',
+		'src/lib/components/transactions/TransactionForm.svelte',
 		'src/lib/contracts/account-creation-contract.ts',
 		'src/lib/contracts/form-contract.ts',
 		'src/lib/validation/accounts.ts',
@@ -45,23 +51,19 @@ export function checkFinanceWorker(directory, finance, proof) {
 	}
 	run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'finance-worker.patch')])
 	run('git', ['apply', join(proof, 'finance-worker.patch')])
-	for (const name of [
-		'src/lib/runtime/worker/binding.ts',
-		'src/lib/data/accounts.ts',
-		'src/lib/machines/accounts/account-archive-operation.ts',
-		'src/lib/machines/runtime/worker-forms.ts',
-		'src/lib/contracts/account-creation-contract.ts',
-		'src/lib/machines/accounts/account-creation-access.ts',
-		'tests/worker-application/read-binding.ts'
-	]) {
-		const path = join(app, name)
-		writeFileSync(path, readFileSync(path, 'utf8').replace(/schema\.js/g, 'queries.js'))
-	}
+	portRuntimeImports(join(app, 'src/lib'), join(app, 'src/lib'), 'queries.js', false)
+	portRuntimeImports(
+		join(app, 'tests/worker-application'),
+		join(app, 'src/lib'),
+		'queries.js',
+		false
+	)
 	writeFileSync(
 		join(app, 'tsconfig.worker-application.json'),
 		JSON.stringify(
 			{
 				extends: './tsconfig.json',
+				compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler' },
 				include: [
 					'src/lib/tdesign-icons.d.ts',
 					'src/lib/runtime/worker/application.worker.ts',

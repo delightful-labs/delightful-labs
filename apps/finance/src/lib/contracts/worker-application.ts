@@ -4,8 +4,16 @@ import { appWorkspaceSchema } from '../validation/identity.js'
 import type { SessionRuntimeConnection } from 'delightful-local-first/session/runtime'
 import type { ArchiveObservation } from '../machines/accounts/account-archive-operation.js'
 import { accountArchiveFeedback } from './account-archive-feedback.js'
-import { workerAccountCreationCommand, workerAccountCreationView } from './worker-forms.js'
-import type { AccountCreationObservation } from './account-creation-contract.js'
+import {
+	workerAccountCreationCommand,
+	workerAccountCreationView,
+	workerTransactionEntryView,
+	workerTransactionEntryCommand,
+	workerTransactionCategory,
+	workerTagRecord,
+	type FinanceFormsObservation
+} from './worker-forms.js'
+import { INCOME, EXPENSE } from '../domain/transaction-kind.js'
 import type { createFinanceFormsMachine } from '../machines/runtime/worker-forms.js'
 
 export const workerSelection = z.strictObject({
@@ -19,8 +27,14 @@ export const workerAccount = appAccountSchema
 export const workerWorkspace = appWorkspaceSchema
 	.pick({ name: true, defaultCurrency: true })
 	.extend({ id: z.uuid() })
+export const workerTransactionKind = z.enum([INCOME, EXPENSE])
+export const workerContextCommand = z.strictObject({
+	type: z.literal('SELECT_CONTEXT'),
+	selection: workerSelection,
+	kind: workerTransactionKind
+})
 export const financeWorkerCommand = z.discriminatedUnion('type', [
-	z.strictObject({ type: z.literal('SELECT_WORKSPACE'), selection: workerSelection }),
+	workerContextCommand,
 	z.strictObject({
 		type: z.literal('ARCHIVE_ACCOUNT'),
 		sessionRevision,
@@ -33,6 +47,12 @@ export const financeWorkerCommand = z.discriminatedUnion('type', [
 		selection: workerSelection,
 		command: workerAccountCreationCommand
 	}),
+	z.strictObject({
+		type: z.literal('TRANSACTION_ENTRY'),
+		sessionRevision,
+		selection: workerSelection,
+		command: workerTransactionEntryCommand
+	}),
 	z.strictObject({ type: z.literal('CLOSE') })
 ])
 export const financeWorkerOpen = z.strictObject({
@@ -41,9 +61,19 @@ export const financeWorkerOpen = z.strictObject({
 	scope: z.string().trim().min(1).max(8192),
 	environment: z.string().min(1).max(8192)
 })
+export const workerTransactionEntry = z.strictObject({
+	kind: workerTransactionKind,
+	form: workerTransactionEntryView,
+	accounts: z.array(persistedAccountSchema),
+	categories: z.array(workerTransactionCategory),
+	tagSuggestions: z.array(z.string()),
+	defaultAccountId: z.uuid().nullable(),
+	defaultCategoryId: z.uuid().nullable()
+})
 export const financeWorkerView = z.strictObject({
 	type: z.literal('VIEW'),
 	sessionRevision,
+	transactionKind: workerTransactionKind,
 	selection: workerSelection,
 	status: z.enum(['starting', 'signed-out', 'loading', 'ready', 'failed', 'closing', 'closed']),
 	identityId: z.uuid().nullable(),
@@ -54,7 +84,8 @@ export const financeWorkerView = z.strictObject({
 		})
 	),
 	archiveFeedback: accountArchiveFeedback.nullable(),
-	accountCreation: workerAccountCreationView.nullable()
+	accountCreation: workerAccountCreationView.nullable(),
+	transactionEntry: workerTransactionEntry.nullable()
 })
 export const financeWorkerReply = z.discriminatedUnion('type', [
 	financeWorkerView,
@@ -86,9 +117,17 @@ export type FinanceWorkerCapabilities = {
 		publish: (rows: ArchiveObservation['grants']) => void,
 		failed: () => void
 	): () => void
+	observeCategories(
+		workspaceId: string,
+		publish: (rows: z.output<typeof workerTransactionCategory>[]) => void,
+		failed: () => void
+	): () => void
+	observeTags(
+		workspaceId: string,
+		publish: (rows: z.output<typeof workerTagRecord>[]) => void,
+		failed: () => void
+	): () => void
 	archiveAccount(accountId: string): Promise<unknown>
-	createForms(
-		observe: () => AccountCreationObservation
-	): ReturnType<typeof createFinanceFormsMachine>
+	createForms(observe: () => FinanceFormsObservation): ReturnType<typeof createFinanceFormsMachine>
 }
 export type FinanceWorkerSession = SessionRuntimeConnection<FinanceWorkerCapabilities>

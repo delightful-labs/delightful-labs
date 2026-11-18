@@ -6,17 +6,21 @@
 	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
 	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+	import WorkerTransactionEntry from './WorkerTransactionEntry.svelte'
+	import type { WorkerTransactionEntryCommand } from '../../contracts/worker-forms.js'
 	import WorkerAccountCreation from './WorkerAccountCreation.svelte'
 	import { m } from '#lib/paraglide/messages.js'
 	let {
 		view,
 		onSelectWorkspace,
 		onArchive,
-		onAccountCreation
+		onAccountCreation,
+		onTransactionEntry
 	}: {
 		view: Readable<FinanceWorkerView>
 		onSelectWorkspace: (id: string) => void
 		onArchive: (id: string, scope: WorkerCommandScope) => void
+		onTransactionEntry: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 		onAccountCreation: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
 	} = $props()
 	const live = $derived(fromStore(view))
@@ -84,3 +88,5 @@
 		>
 	</Table>
 {/if}
+
+<WorkerTransactionEntry view={live.current} onsend={onTransactionEntry} />

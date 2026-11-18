@@ -159,6 +159,17 @@ async function createAccountUI(page: Page, name: string) {
 	await dialog.getByRole('button', { name: 'Close', exact: true }).click()
 	await browserExpect(page.getByRole('cell', { name, exact: true })).toBeVisible()
 }
+async function enterExpenseUI(page: Page, accountId: string, description: string) {
+	await page.getByLabel('Account', { exact: true }).selectOption(accountId)
+	await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Worker expense' })
+	await page.getByLabel('Amount', { exact: true }).fill('12.34')
+	await page.getByLabel('Date', { exact: true }).fill('2026-11-18')
+	await page.getByLabel('Description', { exact: true }).fill(description)
+	await page.getByRole('button', { name: /save transaction/i }).click()
+	await browserExpect(
+		page.getByRole('status').filter({ hasText: /transaction saved/i })
+	).toBeVisible()
+}
 for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 	describe(name, () => {
 		it('renders only selected accounts and keeps the Worker alive when UI observation detaches', async () => {
@@ -222,7 +233,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().archiveFeedback))
 					.toMatchObject({ outcome: 'succeeded', name: 'Edited B' })
-				await browserExpect(page.getByText(/Edited B/)).toBeVisible()
+				await browserExpect(page.getByRole('status').filter({ hasText: 'Edited B' })).toBeVisible()
 				await close(page)
 			} finally {
 				await browser.close()
@@ -305,6 +316,71 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('saves expense and income through the real transaction form in the application Worker', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Ledger'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await browserExpect(page.getByRole('cell', { name: 'Ledger', exact: true })).toBeVisible()
+				await browserExpect(page.getByLabel('Account', { exact: true })).toHaveValue(accountId)
+
+				await enterExpenseUI(page, accountId, 'Worker expense record')
+				expect(
+					await page.evaluate((id) => window.financeWorkerReadFixture.transactions(id), workspaceId)
+				).toMatchObject({
+					ok: true,
+					transactions: [
+						{
+							amountMinor: 1234,
+							currency: 'USD',
+							kind: 'expense',
+							description: 'Worker expense record',
+							paymentMethod: null,
+							checkId: null
+						}
+					]
+				})
+				await page.evaluate(() => window.financeWorkerReadFixture.selectKind('income'))
+				await browserExpect(
+					page
+						.getByLabel('Category', { exact: true })
+						.locator('option', { hasText: 'Worker income' })
+				).toHaveCount(1)
+				await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Worker income' })
+				await page.getByLabel('Amount', { exact: true }).fill('50.00')
+				await page.getByLabel('Date', { exact: true }).fill('2026-11-19')
+				await page.getByLabel('Payment method', { exact: true }).selectOption('cash')
+				await page.getByRole('button', { name: /save transaction/i }).click()
+				await browserExpect(
+					page.getByRole('status').filter({ hasText: /transaction saved/i })
+				).toBeVisible()
+				expect(
+					await page.evaluate((id) => window.financeWorkerReadFixture.transactions(id), workspaceId)
+				).toMatchObject({
+					ok: true,
+					transactions: [
+						{ amountMinor: 1234, kind: 'expense' },
+						{ amountMinor: 5000, kind: 'income', paymentMethod: 'cash' }
+					]
+				})
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('keeps data failed after a malformed view and still waits for clean native close', async () => {
 			onTestFailed(() => {
 				retained = true
@@ -367,6 +443,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					page.getByRole('cell', { name: 'Retained wallet', exact: true })
 				).toBeVisible()
 				await createAccountUI(page, 'Offline created wallet')
+				await enterExpenseUI(page, accountId, 'Retained expense')
 				await close(page)
 				await context.close()
 				context = await engine.launchPersistentContext(profile, { headless: true })
@@ -400,6 +477,14 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect(
 					page.getByRole('cell', { name: 'Offline created wallet', exact: true })
 				).toBeVisible()
+				expect(
+					await page.evaluate((id) => window.financeWorkerReadFixture.transactions(id), workspaceId)
+				).toMatchObject({
+					ok: true,
+					transactions: [
+						{ amountMinor: 1234, currency: 'USD', kind: 'expense', description: 'Retained expense' }
+					]
+				})
 				await close(page)
 			} finally {
 				await context.close()

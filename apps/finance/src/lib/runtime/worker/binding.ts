@@ -7,6 +7,7 @@ import {
 import { observeRow } from '../observations.js'
 import { archiveAccount, createAccount } from '../../data/accounts.js'
 import { persistedAccountSchema } from '../../validation/accounts.js'
+import { workerTransactionCategory, workerTagRecord } from '../../contracts/worker-forms.js'
 import { createFinanceFormsMachine } from '../../machines/runtime/worker-forms.js'
 
 /** Inert native construction: no subscription starts until its owning chart invokes it. */
@@ -108,6 +109,54 @@ export function createFinanceWorkerBinding({
 				},
 				{ tier: ReadTier.LocalFirst }
 			),
+		observeCategories: (workspaceId, publish, failed) =>
+			db.subscribe(
+				app.categories
+					.where({ organizationId: workspaceId, archivedAt: { isNull: true } })
+					.orderBy('name'),
+				{
+					onUpdate: (rows) => {
+						const decoded = workerTransactionCategory.array().safeParse(
+							rows.map(({ id, organizationId, name, kind, isSystem, archivedAt }) => ({
+								id,
+								organizationId,
+								name,
+								kind,
+								isSystem,
+								archivedAt
+							}))
+						)
+						if (isCurrent() && decoded.success) publish(decoded.data)
+						else failed()
+					},
+					onError: failed
+				},
+				{ tier: ReadTier.LocalFirst }
+			),
+		observeTags: (workspaceId, publish, failed) =>
+			db.subscribe(
+				app.tags
+					.where({ organizationId: workspaceId, archivedAt: { isNull: true } })
+					.orderBy('name'),
+				{
+					onUpdate: (rows) => {
+						const decoded = workerTagRecord.array().safeParse(
+							rows.map(({ id, organizationId, name, kind, categoryId, archivedAt }) => ({
+								id,
+								organizationId,
+								name,
+								kind,
+								categoryId,
+								archivedAt
+							}))
+						)
+						if (isCurrent() && decoded.success) publish(decoded.data)
+						else failed()
+					},
+					onError: failed
+				},
+				{ tier: ReadTier.LocalFirst }
+			),
 		archiveAccount: (accountId) => {
 			if (!isCurrent()) return Promise.reject(new Error('Finance account binding retired'))
 			return archiveAccount(db, accountId)
@@ -115,6 +164,7 @@ export function createFinanceWorkerBinding({
 		createForms: (observe) =>
 			createFinanceFormsMachine({
 				binding,
+				db,
 				observe,
 				create: async (workspaceId, values) => {
 					if (!isCurrent()) throw new Error('Finance account binding retired')

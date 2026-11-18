@@ -1,5 +1,5 @@
 diff --git a/src/lib/runtime/worker/application.worker.ts b/src/lib/runtime/worker/application.worker.ts
-index a769e00..cc4990b 100644
+index a769e00..b88e3cd 100644
 --- a/src/lib/runtime/worker/application.worker.ts
 +++ b/src/lib/runtime/worker/application.worker.ts
 @@ -1,31 +1,116 @@
@@ -28,7 +28,7 @@ index a769e00..cc4990b 100644
 +	createFinanceWorkerMachine,
 +	selectFinanceArchiveObservation,
 +	selectFinanceArchiveWriter,
-+	selectFinanceAccountCreationObservation,
++	selectFinanceFormObservations,
 +	selectFinanceWorkerView
 +} from '../../machines/runtime/worker-application.js'
  import { createFinanceAccountStore } from './account-store.js'
@@ -110,7 +110,7 @@ index a769e00..cc4990b 100644
 +			})
 +			const machine = createFinanceWorkerMachine({
 +				observe: () => selectFinanceArchiveObservation(application?.getSnapshot()),
-+				observeCreation: () => selectFinanceAccountCreationObservation(application?.getSnapshot()),
++				observeForms: () => selectFinanceFormObservations(application?.getSnapshot()),
 +				persist: (request) => {
 +					const write = selectFinanceArchiveWriter(application?.getSnapshot(), request)
 +					return write

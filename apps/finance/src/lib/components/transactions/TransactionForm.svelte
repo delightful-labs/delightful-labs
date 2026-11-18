@@ -50,6 +50,7 @@
 		oncancel,
 		oninput,
 		onattachmentschange,
+		attachmentsEnabled = true,
 		savedImages,
 		attachmentPickerRevision = 0,
 		onaddcategory,
@@ -102,6 +103,7 @@
 		createdCategory?: Category | undefined
 		oninput?: (event: Event) => void
 		savedImages?: Snippet
+		attachmentsEnabled?: boolean
 		onattachmentschange?: (files: readonly File[]) => void
 		attachmentPickerRevision?: number
 		transferSuggestions?: readonly (InternalTransferCandidate & {
@@ -398,7 +400,7 @@
 			{/if}
 		{/snippet}
 		{#snippet supplemental(form)}
-			{#if form.content.kind !== 'success'}
+			{#if attachmentsEnabled && form.content.kind !== 'success'}
 				{#key attachmentPickerRevision}
 					<TransactionImageInput
 						disabled={!form.fieldsEditable}

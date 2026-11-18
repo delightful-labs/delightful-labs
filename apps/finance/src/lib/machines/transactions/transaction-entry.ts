@@ -49,11 +49,16 @@ export function sameTransactionEntryScope(a: TransactionEntryScope, b: Transacti
 		a.transactionId === b.transactionId
 	)
 }
-export function writableTransactionAccounts(
-	f: Pick<
-		TransactionEntryObservation,
-		'accounts' | 'organizationId' | 'membership' | 'identityId' | 'grants'
-	>
+export function writableTransactionAccounts<
+	AccountRow extends TransactionEntryObservation['accounts'][number]
+>(
+	f: Omit<
+		Pick<
+			TransactionEntryObservation,
+			'accounts' | 'organizationId' | 'membership' | 'identityId' | 'grants'
+		>,
+		'accounts'
+	> & { accounts: readonly AccountRow[] }
 ) {
 	return f.accounts.filter(
 		(a) =>

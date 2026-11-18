@@ -632,6 +632,60 @@ alpha.67 SDK/Wasm tarballs and the built public packages. Its artifacts are
 activated by these results. Continue with the existing manual transaction workflow and its copied
 reference facts, then the remaining domain/identity/provider/backup flows and coordinated rollout.
 
+## Worker-owned manual transaction entry without attachments
+
+The candidate now reuses `createTransactionEntryFormOptions`, its availability actor, staged
+transaction/check/tag persistence and local-settlement/uncertain-outcome handling. The SDK-bound
+forms group invokes one fixed transaction-entry child alongside account creation. Its active state
+forwards copied workspace/member/grant/account/category/tag facts and scoped intents. Closing sends
+SHUTDOWN to both children; independent parallel regions await both actual completions. Unexpected
+child failure stays a failure. Replacement retains the original Db and issued effects until the
+old group settles. No second transaction dispatcher, SDK patch or workflow copy was introduced.
+
+Window reuses the actual TransactionForm and existing feedback for inputs, focus and FormData.
+As in the existing integration, it mounts the form only when worker-owned readiness is ready, so
+native defaults are present at mount. Attachments are absent in this first slice, as W15 specifies;
+the existing form's optional attachment presentation defaults to enabled for all legacy callers.
+Domain selectors choose writable accounts, categories/tags and defaults in the Worker. The existing
+selection revision now scopes selected workspace plus income/expense context; no additional owner
+or generation registry is required. SessionRevision separately rejects retired native bindings.
+
+Native observations are consolidated under one fixed XState query owner. It owns six fixed native
+subscription actors and running → failed cleanup, reusing one small callback implementation for
+subscription/report/disposal. This replaces repeated observer and forwarding blocks in the host.
+It publishes one bounded immutable fact report; it makes no financial/access decisions. A new
+selection retains the same-session directory and withdraws selected account/member/grant/reference
+facts. A new native session withdraws everything. Obsolete callbacks/reports are rejected by the
+owned binding, and disposal failure goes directly to the live parent so stopping an observer cannot
+drop its failure report. Actual synchronous unsubscribe still precedes native close.
+
+All **1,961 Finance unit tests**, including **32 host cases**, and full Finance static checks pass.
+The focused host/transaction batch passes 107 cases, including expense/income staging, invalid
+amount/reference refusal, expense → income → expense command rejection, held local settlement on
+host close, and SDK replacement without replay or old feedback. All **18 native Worker/UI cases**
+pass in Chromium, Firefox and WebKit. The real forms save both transaction directions and cash
+payment metadata; a UI-created account, expense and account edit survive two complete browser
+process restarts while app/auth/Jazz endpoints are unavailable. Existing native archive/drain,
+workspace switching, UI detach and malformed-view cases remain intact. Window/Worker graph and
+one-broker checks still pass with development XState freezing enabled.
+
+The fresh maintained `--worker --sdk=2.0.0-alpha.67` run also passes all **200 schema/permission/
+backup/restore** and **42 existing worker/session** cases before those 18 application cases.
+The runner copies the current source and shares one native query-import rewrite for TypeScript
+and Svelte callers. The actual browser slice uses the application's native Vite/Bundler TypeScript
+resolution; the SDK/session/Node proofs retain NodeNext. Pica is the exact existing workspace
+version, added only to the proof's dependency inventory, with no workspace dependency change.
+Artifacts: `finance-jazz-alpha67-SLh38i` in the system temporary directory. Logs:
+`/private/tmp/finance-worker-transaction-{types,unit,full-unit}.log`,
+`/private/tmp/finance-transaction-{alpha67-native,fresh-alpha67}.log`.
+
+Production routes/pins and full Finance parity remain open. Continue with worker-owned balances
+and bounded ledger views, then remaining domain/identity/provider/backup flows and coordinated SDK
+activation. Hosted Finance and Clipper passed at the prior account-creation checkpoint. Foundation's
+format failure was corrected at `01ed521c`; the separate unchanged UI native swipe case failed once
+in CI and passed its focused local reproduction with tracing. That does not establish a product
+fix or a clean hosted Foundation run; keep checking the next CI result.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing

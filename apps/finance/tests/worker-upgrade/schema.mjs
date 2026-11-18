@@ -5,6 +5,42 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+export function portRuntimeImports(path, lib, runtimeEntry, clipper) {
+	for (const item of readdirSync(path, { withFileTypes: true })) {
+		const file = join(path, item.name)
+		if (item.isDirectory()) portRuntimeImports(file, lib, runtimeEntry, clipper)
+		else if (
+			(file.endsWith('.ts') || file.endsWith('.svelte')) &&
+			!['schema.ts', 'permissions.ts'].includes(item.name)
+		) {
+			const text = readFileSync(file, 'utf8').replace(
+				/'([^']*schema\.js)'/g,
+				(matched, specifier) =>
+					specifier === '#lib/schema.js'
+						? "'#lib/queries.js'"
+						: resolve(dirname(file), specifier) === join(lib, 'schema.js')
+							? `'${specifier.replace(/schema\.js$/, runtimeEntry)}'`
+							: matched
+			)
+			writeFileSync(
+				file,
+				clipper
+					? text
+							.replace(
+								/^import \{ policySchema \} from '[^']+schema-permissions.test-support.js'\n/gm,
+								''
+							)
+							.replaceAll('policySchema()', 'app')
+							.replace(
+								/import permissions from '([^']*)permissions.js'/g,
+								"import permissions from '$1jazz.permissions.json' with { type: 'json' }"
+							)
+					: text
+			)
+		}
+	}
+}
+
 /** Isolated native schema port, not an application migration or compatibility layer. */
 export async function checkSchema(directory, source, proof, versions, scope, sdkVersion) {
 	const run = (args, cwd) => execFileSync('pnpm', args, { cwd, stdio: 'inherit' })
@@ -56,39 +92,8 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 	// Only copied callers move from authoring schema.ts to native runtime queries.
 	const lib = join(app, schemaPath)
 	const runtimeEntry = clipper ? 'jazz.generated.js' : 'queries.js'
-	function updateImports(path) {
-		for (const item of readdirSync(path, { withFileTypes: true })) {
-			const file = join(path, item.name)
-			if (item.isDirectory()) updateImports(file)
-			else if (file.endsWith('.ts') && !['schema.ts', 'permissions.ts'].includes(item.name)) {
-				const text = readFileSync(file, 'utf8').replace(
-					/'([^']*schema\.js)'/g,
-					(matched, specifier) =>
-						specifier === '#lib/schema.js'
-							? "'#lib/queries.js'"
-							: resolve(dirname(file), specifier) === join(lib, 'schema.js')
-								? `'${specifier.replace(/schema\.js$/, runtimeEntry)}'`
-								: matched
-				)
-				writeFileSync(
-					file,
-					clipper
-						? text
-								.replace(
-									/^import \{ policySchema \} from '[^']+schema-permissions.test-support.js'\n/gm,
-									''
-								)
-								.replaceAll('policySchema()', 'app')
-								.replace(
-									/import permissions from '([^']*)permissions.js'/g,
-									"import permissions from '$1jazz.permissions.json' with { type: 'json' }"
-								)
-						: text
-				)
-			}
-		}
-	}
-	updateImports(join(app, 'src/lib'))
+
+	portRuntimeImports(join(app, 'src/lib'), lib, runtimeEntry, clipper)
 	if (!clipper)
 		for (const name of [
 			'permissions.test.ts',

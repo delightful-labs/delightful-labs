@@ -227,6 +227,13 @@ retain their product/parity requirements, not the abandoned implementation plan.
       session plus workspace revisions reject stale commands. All 1,954 units
       (25 host), 54 shared form cases, public consumers and 15 three-engine native
       cases pass. See the [form transport and resource model](worker-session-resource-decision.md#worker-owned-account-creation-and-form-transport).
+      **Manual entry also implemented in the candidate:** existing transaction
+      policy/staged persistence and real TransactionForm now save income/expense
+      without attachments. One query owner replaces duplicated observer/forwarding
+      blocks. Both fixed forms drain before SDK replacement/close. All 1,961 units
+      (32 host) and 18 native cases pass, including retained UI-created expenses
+      through two offline process restarts; the fresh 200-schema/42-session proof
+      also passes. [Current transaction/query ownership](worker-session-resource-decision.md#worker-owned-manual-transaction-entry-without-attachments).
       Continue to
       reuse the existing account archive chart/operation and its issued-write
       drain first; supply membership/grant facts. Native create/archive leaves

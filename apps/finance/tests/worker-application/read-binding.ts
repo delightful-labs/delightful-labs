@@ -1,6 +1,7 @@
 import { createFinanceWorkerBinding as nativeBinding } from '../../src/lib/runtime/worker/binding.js'
 import { app } from '../../src/lib/schema.js'
 import { z } from 'zod'
+import { ReadTier } from 'jazz-tools'
 
 let captured: Parameters<typeof nativeBinding>[0] | undefined
 let archiveReceipt: ReturnType<typeof Promise.withResolvers<void>> | undefined
@@ -31,6 +32,7 @@ const edit = z.strictObject({
 const command = z.discriminatedUnion('type', [
 	seed,
 	edit,
+	z.strictObject({ type: z.literal('TEST_TRANSACTIONS'), workspaceId: z.uuid() }),
 	z.strictObject({ type: z.literal('TEST_HOLD_ARCHIVE') }),
 	z.strictObject({ type: z.literal('TEST_RELEASE_ARCHIVE') }),
 	z.strictObject({ type: z.literal('TEST_BAD_VIEW') })
@@ -52,6 +54,27 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 			if (c.type === 'TEST_BAD_VIEW') {
 				self.postMessage({ type: 'VIEW', accounts: 'invalid' })
 				reply.postMessage({ ok: true })
+				return
+			}
+			if (c.type === 'TEST_TRANSACTIONS') {
+				const rows = await db.all(
+					app.transactions.where({ organizationId: c.workspaceId }).orderBy('bookedOn'),
+					{ tier: ReadTier.LocalFirst }
+				)
+				reply.postMessage({
+					ok: true,
+					transactions: rows.map(
+						({ id, amountMinor, currency, kind, description, paymentMethod, checkId }) => ({
+							id,
+							amountMinor,
+							currency,
+							kind,
+							description,
+							paymentMethod,
+							checkId
+						})
+					)
+				})
 				return
 			}
 			if (c.type === 'TEST_HOLD_ARCHIVE') archiveReceipt = Promise.withResolvers<void>()
@@ -83,6 +106,23 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 						accountAccessMode: 'all'
 					})
 					.wait({ tier: 'local' })
+				await db
+					.insert(app.categories, {
+						organizationId: c.workspaceId,
+						name: 'Worker expense',
+						kind: 'expense',
+						isSystem: true
+					})
+					.wait({ tier: 'local' })
+				await db
+					.insert(app.categories, {
+						organizationId: c.workspaceId,
+						name: 'Worker income',
+						kind: 'income',
+						isSystem: true
+					})
+					.wait({ tier: 'local' })
+
 				await db
 					.insert(
 						app.accounts,
