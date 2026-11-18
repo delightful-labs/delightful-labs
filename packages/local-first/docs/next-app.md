@@ -27,6 +27,13 @@ uses `restoration/workflow` and `backend/jazz/restoration`. `recovery/coordinati
 validate → request host drain → restore → check navigation facts → navigate sequence. Its host sends
 `WORKSPACE_DRAINED` after its own resources settle. Navigation remains a supplied capability.
 
+The coordinator's `session` input also accepts the library's `SessionRuntimeConnection`. Worker
+hosts pass that connection directly; they do not recreate a Jazz `getSnapshot().account` facade.
+Its navigation-facts leaf reads the current typed identity and requires an active runtime before
+navigation. Existing SDK-shaped session callers remain supported. Navigation-only retry does not
+repeat restoration. Keep phrase-bearing coordinator actors private and retain them through issued
+native navigation; Window supplies only the native navigation effect.
+
 ## Foreground data
 
 ```ts

@@ -1,3 +1,4 @@
+import { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordination'
 import { createActor, waitFor } from 'xstate'
 import {
 	createJazzSessionRuntime,
@@ -91,6 +92,47 @@ function closeSession() {
 		}
 	})
 	closing.start()
+}
+/** Actual worker/native session connection; navigation itself is a selected fixture leaf. */
+async function qualifyRecoveryNavigation(identity: string) {
+	let navigations = 0
+	const before = { created, restored }
+	const navigate = async () => {
+		navigations += 1
+		if (navigations === 1) throw new Error('Fixture navigation refusal')
+	}
+	const input = {
+		attempt: 1,
+		request: { kind: 'navigate', origin: '/from', destination: '/to', identity },
+		session: connection(),
+		restorationBinding: undefined,
+		readHref: () => '/from',
+		navigate
+	} satisfies import('xstate').InputFrom<typeof sessionRecoveryMachine>
+	const first = createActor(sessionRecoveryMachine, { input }).start()
+	try {
+		await waitFor(first, (s) => s.status === 'done')
+		const result = first.getSnapshot().output
+		if (result?.outcome !== 'navigationFailed' || !result.navigation)
+			throw new Error('Recovery navigation failure not retained')
+		const retry = createActor(sessionRecoveryMachine, {
+			input: { ...input, attempt: 2, request: { kind: 'navigate', ...result.navigation } }
+		}).start()
+		try {
+			await waitFor(retry, (s) => s.status === 'done')
+			if (
+				retry.getSnapshot().output?.outcome !== 'restored' ||
+				navigations !== 2 ||
+				before.created !== created ||
+				before.restored !== restored
+			)
+				throw new Error('Recovery navigation retry repeated identity mutation')
+		} finally {
+			retry.stop()
+		}
+	} finally {
+		first.stop()
+	}
 }
 export const actorFixture = {
 	open(
@@ -261,6 +303,7 @@ export const actorFixture = {
 				throw new Error('Native recovery unavailable')
 			credential = RecoveryPhrase.toSecret(view.phrase)
 			recoveryScope = scope
+			await qualifyRecoveryNavigation(observation.identityId)
 			phrase.send({ type: 'HIDE' })
 			return (
 				selectRecoveryPhraseView(phrase.getSnapshot()).kind === 'hidden' &&

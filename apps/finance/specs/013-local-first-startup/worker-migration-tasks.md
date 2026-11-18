@@ -18,10 +18,12 @@ native account-switch refusal and resume ordinary Finance without retrying.
 Latest local qualification: **1,978 Finance units** (46 host), zero-warning static/browser types,
 and **39 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
 passes 200 schema/restore and 42 worker/session cases. Hosted Finance/Foundation/Clipper pass at
-`cef5aa4b`. W12/W16 remain partial: sign-out/new-account and full shell/chooser/navigation precede
+`cef5aa4b`. W12/W16 remain partial: full shell/chooser/navigation precedes
 remaining settings/classification/transfers, provider, attachment and workspace/archive UI parity.
 W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
 The intermittent check/account-move failure remains an explicit activation blocker.
+Finance has no sign-out or explicit new-identity screen; do not add those as parity work.
+Automatic native identity creation is already qualified at startup.
 
 ## Historical qualification snapshots
 

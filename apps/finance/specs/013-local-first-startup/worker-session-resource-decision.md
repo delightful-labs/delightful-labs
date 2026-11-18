@@ -948,3 +948,33 @@ Hosted Finance, Foundation and Clipper all pass at preceding checkpoint `cef5aa4
 intermittent check/account-move and extension-toolbar failures remain recorded, not declared fixed.
 Sign-out/new-account commands, complete shell/navigation and remaining domain/provider/file/backup
 parity and coordinated activation are still open. Active SDK pins and production routes stay unchanged.
+
+## Next shell foundation: reuse the recovery coordinator's navigation
+
+Actual source inspection finds no Finance sign-out or explicit new-identity screen. Automatic
+native account creation is already part of startup. Do not add new sign-out/create UI or make
+new commands a Finance parity gate. Earlier follow-up lists overstated that scope. Existing
+workspace chooser, route/default selection and post-recovery navigation are the next required flow.
+
+Reuse Finance's workspace-navigation chart and Local First's session-recovery coordinator. The
+latter already separates successful restoration from navigation failure and navigation-only retry,
+and retains issued navigation during shutdown. Its navigation-facts leaf currently accepts only
+the legacy `getSnapshot().account.id` shape. Add the library's own typed SessionRuntimeConnection
+as an input variant and normalize that observation in this one leaf; preserve legacy callers and
+all existing state transitions. A non-active runtime must never qualify as a ready identity just
+because it retains an old observation. No SDK facade, SDK-shaped proxy or new navigation workflow
+is needed. Qualify actual session-actor identity facts, refusal during closing/replacement and
+navigation-only retry without another identity mutation before wiring the Worker/Window navigation
+capability. Native goto/history stays a narrow Window effect; route/eligibility decisions stay in
+the existing Worker-owned charts. Production routes remain untouched while shell parity is built.
+
+The additive coordinator connection is now qualified: **1,249 Local First units**, full library
+static checks, strict package validation and existing public consumer checks pass. Finance's
+existing readiness/navigation plus worker ownership tests pass (**165 cases**), with zero static
+warnings. All **42 actual native worker/session browser cases** pass against the updated built
+coordinator. The native fixture now exercises a navigation failure and a navigation-only retry
+through its real Jazz session connection, and verifies no identity mutation was repeated. Its
+navigation callback is deliberately a fixture leaf; native Window goto is the next integration.
+No coordinator lifecycle or legacy caller behavior changed. Logs:
+`/private/tmp/finance-worker-recovery-connection-{unit,full-unit,static,package,consumer,native,finance-static,finance-unit}.log`.
+Hosted Finance, Foundation and Clipper also pass at restoration checkpoint `7778311e`.

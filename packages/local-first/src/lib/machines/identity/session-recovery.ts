@@ -1,3 +1,4 @@
+import type { SessionRuntimeConnection } from '../../contracts/session-runtime.js'
 import { types, createAsyncLogic, matchesState, setup } from 'xstate'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
@@ -7,16 +8,18 @@ function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new Error('Missing recovery resource')
 	return value
 }
-export type RecoverySession = {
-	getSnapshot: () => {
-		status: string
-		account?:
-			| {
-					id: string
-			  }
-			| undefined
-	}
-}
+export type RecoverySession =
+	| SessionRuntimeConnection
+	| {
+			getSnapshot: () => {
+				status: string
+				account?:
+					| {
+							id: string
+					  }
+					| undefined
+			}
+	  }
 type Session = RecoverySession
 export type RecoveryRestorationBinding = Readonly<{
 	binding: object
@@ -119,6 +122,14 @@ const actors = {
 				readHref: () => string
 			}
 		}) => {
+			if ('view' in input.session) {
+				const view = input.session.view.get()
+				return {
+					status: view.stage === 'active' ? view.status : 'unavailable',
+					identity: view.observation?.status === 'ready' ? view.observation.identityId : undefined,
+					href: input.readHref()
+				}
+			}
 			const snapshot = input.session.getSnapshot()
 			return { status: snapshot.status, identity: snapshot.account?.id, href: input.readHref() }
 		}
