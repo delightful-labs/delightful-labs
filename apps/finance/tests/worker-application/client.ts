@@ -22,7 +22,9 @@ function attach() {
 			onSelectWorkspace: owner.selectWorkspace,
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
-			onTransactionEntry: owner.transactionEntryCommand
+			onTransactionEntry: owner.transactionEntryCommand,
+			onLedgerPage: owner.selectLedgerPage,
+			onLedgerFilters: owner.setLedgerFilters
 		}
 	})
 }
@@ -66,6 +68,8 @@ const fixture = {
 	seed: (workspaceId: string, accountId: string, name: string, currency: 'USD' | 'TZS' = 'USD') =>
 		request({ type: 'TEST_SEED', workspaceId, accountId, name, currency }),
 	edit: (accountId: string, name: string) => request({ type: 'TEST_EDIT', accountId, name }),
+	seedLedger: (workspaceId: string, accountId: string) =>
+		request({ type: 'TEST_SEED_LEDGER', workspaceId, accountId }),
 	transactions: (workspaceId: string) => request({ type: 'TEST_TRANSACTIONS', workspaceId }),
 	archive: (accountId: string) => current().archiveAccount(accountId, get(current().view)),
 	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),

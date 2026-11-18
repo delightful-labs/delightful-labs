@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TransactionRow } from '../schema.js'
-import { groupTransactionsByDate } from './transaction-groups.js'
+import { groupTransactionsByDate, paginateTransactionGroups } from './transaction-groups.js'
 
 function row(id: string, bookedOn: string, amountMinor: number, currency = 'USD'): TransactionRow {
 	return {
@@ -50,14 +50,38 @@ describe('transaction date grouping', () => {
 			row('old', '2026-10-13', 100)
 		])
 		expect([...groups[0]!.totals]).toEqual([
-			['USD', 30],
-			['EUR', 15]
+			['USD', 30n],
+			['EUR', 15n]
 		])
-		expect([...groups[1]!.totals]).toEqual([['USD', 100]])
+		expect([...groups[1]!.totals]).toEqual([['USD', 100n]])
 	})
 	it('totals only the supplied filtered transactions including zero amounts', () => {
 		const groups = groupTransactionsByDate([row('visible', '2026-10-14', 0)])
-		expect(groups[0]?.totals.get('USD')).toBe(0)
+		expect(groups[0]?.totals.get('USD')).toBe(0n)
 		expect(groups[0]?.transactions).toHaveLength(1)
 	})
+})
+
+it('keeps exact day totals above Number precision and retains them across page splits', () => {
+	const values = Array.from({ length: 30 }, (_, i) =>
+		row(String(i), '2026-11-18', Number.MAX_SAFE_INTEGER)
+	)
+	const groups = groupTransactionsByDate(values)
+	expect(groups[0]?.totals.get('USD')).toBe(270215977642229730n)
+	const first = paginateTransactionGroups(groups, 1),
+		last = paginateTransactionGroups(groups, 99)
+	expect(first.groups.flatMap((g) => g.transactions).map((t) => t.id)).toEqual(
+		Array.from({ length: 25 }, (_, i) => String(i))
+	)
+	expect(last.page).toBe(2)
+	expect(last.pageCount).toBe(2)
+	expect(last.groups.flatMap((g) => g.transactions).map((t) => t.id)).toEqual([
+		'25',
+		'26',
+		'27',
+		'28',
+		'29'
+	])
+	expect(last.groups[0]?.totals.get('USD')).toBe(270215977642229730n)
+	expect(values).toHaveLength(30)
 })

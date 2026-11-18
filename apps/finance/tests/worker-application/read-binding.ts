@@ -31,6 +31,11 @@ const edit = z.strictObject({
 })
 const command = z.discriminatedUnion('type', [
 	seed,
+	z.strictObject({
+		type: z.literal('TEST_SEED_LEDGER'),
+		workspaceId: z.uuid(),
+		accountId: z.uuid()
+	}),
 	edit,
 	z.strictObject({ type: z.literal('TEST_TRANSACTIONS'), workspaceId: z.uuid() }),
 	z.strictObject({ type: z.literal('TEST_HOLD_ARCHIVE') }),
@@ -56,6 +61,34 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 				reply.postMessage({ ok: true })
 				return
 			}
+			if (c.type === 'TEST_SEED_LEDGER') {
+				const category = (
+					await db.all(app.categories.where({ organizationId: c.workspaceId, kind: 'expense' }), {
+						tier: ReadTier.LocalFirst
+					})
+				)[0]
+				if (!category) throw new Error('Fixture category unavailable')
+				const tx = db.beginTransaction()
+				for (let i = 0; i < 40; i++)
+					tx.insert(app.transactions, {
+						organizationId: c.workspaceId,
+						accountId: c.accountId,
+						categoryId: category.id,
+						amountMinor: 100,
+						currency: 'USD',
+						kind: 'expense',
+						bookedOn: '2026-11-18',
+						source: 'manual',
+						description: 'Ledger record ' + i,
+						memo: i === 39 ? 'ledger memo needle' : null,
+						paymentMethod: null,
+						checkId: null
+					})
+				await tx.commit().wait({ tier: 'local' })
+				reply.postMessage({ ok: true })
+				return
+			}
+
 			if (c.type === 'TEST_TRANSACTIONS') {
 				const rows = await db.all(
 					app.transactions.where({ organizationId: c.workspaceId }).orderBy('bookedOn'),

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Text, ScreenReaderText } from 'delightful-ui'
-	import type { TransactionRow } from '#lib/schema.js'
+	import type { TransactionListRow } from '../../domain/transaction-groups.js'
 	import { formatMoney } from '#lib/domain/money.js'
 	import { getLocale } from '#lib/paraglide/runtime.js'
 	import { m } from '#lib/paraglide/messages.js'
@@ -14,7 +14,7 @@
 		tagNames = []
 	}: {
 		href: string
-		transaction: TransactionRow
+		transaction: TransactionListRow
 		categoryName: string | undefined
 		tagNames?: readonly string[]
 	} = $props()

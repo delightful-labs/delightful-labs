@@ -8,8 +8,13 @@ export type TransactionListFilters = {
 	query: string
 }
 
-export function filterTransactions(
-	transactions: readonly TransactionRow[],
+export function filterTransactions<
+	Row extends Pick<
+		TransactionRow,
+		'bookedOn' | 'categoryId' | 'currency' | 'description' | 'memo' | 'id'
+	>
+>(
+	transactions: readonly Row[],
 	filters: TransactionListFilters,
 	categoryNames: ReadonlyMap<string, string>,
 	tagNames: ReadonlyMap<string, readonly string[]>

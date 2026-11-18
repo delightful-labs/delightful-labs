@@ -90,7 +90,7 @@ describe('transaction list filtering', () => {
 			query: 'lunch'
 		})
 		expect(result.map((r) => r.id)).toEqual(['match'])
-		expect([...groupTransactionsByDate(result)[0]!.totals]).toEqual([['USD', 123]])
+		expect([...groupTransactionsByDate(result)[0]!.totals]).toEqual([['USD', 123n]])
 	})
 	it('matches all words across descriptions, memos, category names and tags regardless of case or spacing', () => {
 		const rows = [

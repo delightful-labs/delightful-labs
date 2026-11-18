@@ -234,6 +234,12 @@ retain their product/parity requirements, not the abandoned implementation plan.
       (32 host) and 18 native cases pass, including retained UI-created expenses
       through two offline process restarts; the fresh 200-schema/42-session proof
       also passes. [Current transaction/query ownership](worker-session-resource-decision.md#worker-owned-manual-transaction-entry-without-attachments).
+      **Balances and ledger also implemented in the candidate:** reuse existing
+      filters, exact bigint grouping and shared list rendering. Native Worker
+      queries project at most 25 rows; Window sends scoped page/filter intents.
+      All 1,965 Finance units (33 host), 21 three-engine native cases and the
+      fresh 200-schema/42-session proof pass. Two existing full-app pagination
+      cases preserve legacy behavior. [Ledger ownership and qualification](worker-session-resource-decision.md#worker-owned-balances-and-bounded-ledger-projection).
       Continue to
       reuse the existing account archive chart/operation and its issued-write
       drain first; supply membership/grant facts. Native create/archive leaves

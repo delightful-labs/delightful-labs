@@ -6,6 +6,10 @@
 	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
 	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+	import WorkerLedger from './WorkerLedger.svelte'
+	import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
+	import { formatSignedMoney } from '../../domain/money.js'
+	import { getLocale } from '../../paraglide/runtime.js'
 	import WorkerTransactionEntry from './WorkerTransactionEntry.svelte'
 	import type { WorkerTransactionEntryCommand } from '../../contracts/worker-forms.js'
 	import WorkerAccountCreation from './WorkerAccountCreation.svelte'
@@ -15,11 +19,15 @@
 		onSelectWorkspace,
 		onArchive,
 		onAccountCreation,
-		onTransactionEntry
+		onTransactionEntry,
+		onLedgerPage,
+		onLedgerFilters
 	}: {
 		view: Readable<FinanceWorkerView>
 		onSelectWorkspace: (id: string) => void
 		onArchive: (id: string, scope: WorkerCommandScope) => void
+		onLedgerPage: (page: number, scope: WorkerCommandScope) => void
+		onLedgerFilters: (filters: TransactionListFilters, scope: WorkerCommandScope) => void
 		onTransactionEntry: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 		onAccountCreation: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
 	} = $props()
@@ -60,6 +68,7 @@
 					>{m['labels.subject_type']({ subject: m['nouns.account']({ count: 1 }) })}</th
 				>
 				<th scope="col">{m['labels.currency']()}</th>
+				<th scope="col">{m['labels.calculated_balance']()}</th>
 				<th scope="col">{m['labels.actions']()}</th>
 			</tr></thead
 		>
@@ -74,6 +83,11 @@
 								: m['accounts.type.card']()}</td
 					>
 					<td>{account.currency}</td>
+					<td
+						>{account.balanceMinor === null
+							? '—'
+							: formatSignedMoney(account.balanceMinor, account.currency, getLocale())}</td
+					>
 					<td
 						><AccountArchiveButton
 							action={account.archiveAction}
@@ -90,3 +104,5 @@
 {/if}
 
 <WorkerTransactionEntry view={live.current} onsend={onTransactionEntry} />
+
+<WorkerLedger view={live.current} onPage={onLedgerPage} onFilters={onLedgerFilters} />

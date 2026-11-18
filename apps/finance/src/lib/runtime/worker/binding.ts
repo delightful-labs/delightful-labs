@@ -6,6 +6,8 @@ import {
 } from '../../contracts/worker-application.js'
 import { observeRow } from '../observations.js'
 import { archiveAccount, createAccount } from '../../data/accounts.js'
+import { transactionTagNames } from '../../domain/transaction-tags.js'
+import { transactionLedgerRecordSchema } from '../../validation/transactions.js'
 import { persistedAccountSchema } from '../../validation/accounts.js'
 import { workerTransactionCategory, workerTagRecord } from '../../contracts/worker-forms.js'
 import { createFinanceFormsMachine } from '../../machines/runtime/worker-forms.js'
@@ -111,9 +113,7 @@ export function createFinanceWorkerBinding({
 			),
 		observeCategories: (workspaceId, publish, failed) =>
 			db.subscribe(
-				app.categories
-					.where({ organizationId: workspaceId, archivedAt: { isNull: true } })
-					.orderBy('name'),
+				app.categories.where({ organizationId: workspaceId }).orderBy('name'),
 				{
 					onUpdate: (rows) => {
 						const decoded = workerTransactionCategory.array().safeParse(
@@ -135,9 +135,7 @@ export function createFinanceWorkerBinding({
 			),
 		observeTags: (workspaceId, publish, failed) =>
 			db.subscribe(
-				app.tags
-					.where({ organizationId: workspaceId, archivedAt: { isNull: true } })
-					.orderBy('name'),
+				app.tags.where({ organizationId: workspaceId }).orderBy('name'),
 				{
 					onUpdate: (rows) => {
 						const decoded = workerTagRecord.array().safeParse(
@@ -149,6 +147,66 @@ export function createFinanceWorkerBinding({
 								categoryId,
 								archivedAt
 							}))
+						)
+						if (isCurrent() && decoded.success) publish(decoded.data)
+						else failed()
+					},
+					onError: failed
+				},
+				{ tier: ReadTier.LocalFirst }
+			),
+		observeTransactions: (workspaceId, publish, failed) =>
+			db.subscribe(
+				app.transactions
+					.where({ organizationId: workspaceId })
+					.select(
+						'id',
+						'organizationId',
+						'accountId',
+						'categoryId',
+						'amountMinor',
+						'currency',
+						'kind',
+						'bookedOn',
+						'description',
+						'memo'
+					)
+					.include({ tags: { tag: true } })
+					.orderBy('bookedOn', 'desc'),
+				{
+					onUpdate: (rows) => {
+						const decoded = transactionLedgerRecordSchema.array().safeParse(
+							rows.map(
+								({
+									id,
+									organizationId,
+									accountId,
+									categoryId,
+									amountMinor,
+									currency,
+									kind,
+									bookedOn,
+									description,
+									memo,
+									tags
+								}) => ({
+									id,
+									organizationId,
+									accountId,
+									categoryId,
+									amountMinor,
+									currency,
+									kind,
+									bookedOn,
+									description,
+									memo,
+									tagNames:
+										transactionTagNames(
+											tags.flatMap((link) => (link.tag ? [link.tag] : [])),
+											tags
+										).get(id) ?? []
+								})
+							)
 						)
 						if (isCurrent() && decoded.success) publish(decoded.data)
 						else failed()

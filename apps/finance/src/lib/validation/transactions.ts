@@ -222,3 +222,26 @@ export function transactionSchemaFor(_transaction: z.input<typeof transactionSav
 		? transactionSaveSchema.options[0]
 		: transactionSaveSchema.options[1]
 }
+
+/** Copied native ledger facts; write intent and SDK rows never cross the UI boundary. */
+export const transactionLedgerRecordSchema = z.strictObject({
+	id: z.uuid(),
+	organizationId: z.uuid(),
+	accountId: z.uuid(),
+	categoryId: z.uuid(),
+	amountMinor: amountMinorValue,
+	currency: currencyText,
+	bookedOn: dateOnlyText,
+	kind: z.enum([INCOME, EXPENSE]),
+	description: z.string().nullable(),
+	memo: z.string().nullable(),
+	tagNames: z.array(appTagSchema.shape.name)
+})
+export const transactionListRowSchema = transactionLedgerRecordSchema.pick({
+	id: true,
+	bookedOn: true,
+	amountMinor: true,
+	currency: true,
+	categoryId: true,
+	description: true
+})

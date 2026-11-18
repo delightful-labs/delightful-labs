@@ -686,6 +686,54 @@ format failure was corrected at `01ed521c`; the separate unchanged UI native swi
 in CI and passed its focused local reproduction with tracing. That does not establish a product
 fix or a clean hosted Foundation run; keep checking the next CI result.
 
+## Worker-owned balances and bounded ledger projection
+
+Extend the same fixed query owner with one native transaction/tag observation for the selected
+workspace. Keep both directions in that Worker snapshot so the existing exact account-balance
+calculation can use all transactions while the ledger selects the current direction. Reuse the
+existing filter/date-grouping/pagination behavior in worker-side pure projections. Native category
+and tag observations include archived names for historical records; the existing form selectors
+continue to offer only active references, avoiding duplicate native subscriptions.
+
+The host owns filter and requested-page facts. Scoped filter/page intents use the existing session
+and selection revision; they never issue financial writes or start another SDK owner. Scope
+replacement withdraws ledger/balances with the other query facts. Query failure retains the existing
+failed-read behavior and does not stop issued financial effects. Pending native reads are loading,
+not zero balances. Send at most 25 visible transaction rows, whole-day totals and the metadata that
+presentation needs; do not send the unbounded transaction snapshot to Window.
+
+Separate the existing TransactionList's pagination calculation from its reusable rendering so the
+Worker can supply the selected page directly. Preserve the existing controls/labels, native links,
+focus and locale formatting. Date grouping uses exact bigint totals and the existing bigint money
+formatter, keeping totals safe when several individually safe amounts exceed Number precision.
+Existing callers use the same extracted paging helper until their own worker adoption. No new
+catalog, dependency, data migration, layout design or SDK patch is required.
+
+Qualify live balances after expense/income, date/currency/text filtering, page bounds and whole-day
+totals across page splits, stale intents/reports, exact large sums, and native retained ledger data.
+Continue existing no-replay and close/replacement checks. Account ordering/sidebar preferences,
+transaction details/edit routes and complete app activation remain separate parity work.
+
+Implemented and qualified in the candidate. The shared list is split into a pure rendering view
+and its existing legacy paging wrapper. Window receives at most 25 minimal rows, visible metadata,
+whole-day bigint totals and filter choices. Native queries, search, grouping, exact balances and
+page selection stay in the Worker. Missing reads remain unknown; observed empty reads yield zero.
+
+Qualification: **1,965 Finance units** (including **33 host cases**), complete Finance static
+checks with zero errors/warnings, and **21 native application cases** across Chromium, Firefox and
+WebKit pass. Native cases exercise real SDK writes, live balances, page changes, memo search without
+sending memo text to Window, whole-day totals, local retention and shutdown. The fresh maintained
+Jazz alpha.67 run also passes **200 schema/permission/backup/restore** and **42 worker/session**
+cases before those 21 application cases. Two existing full-application pagination browser cases
+pass against the legacy wrapper, covering URL/history/filter resets and full-day totals across
+pages. Shared form static/unit/public-consumer checks and Core lint pass after the presentation-only
+feedback export fix. Hosted CI must still be checked independently.
+
+Fresh artifact: `finance-jazz-alpha67-Kh1iTf`. Logs:
+`/private/tmp/finance-ledger-{fresh-alpha67,alpha67-native,legacy-pagination}.log` and
+`/private/tmp/finance-feedback-presentation-{types,unit,consumer}.log`.
+Production activation, details/edit and remaining Finance parity stay open.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing

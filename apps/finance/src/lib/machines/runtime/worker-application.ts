@@ -19,7 +19,8 @@ import type {
 	FinanceWorkerCapabilities,
 	FinanceWorkerSession,
 	FinanceWorkerView,
-	WorkerSelection
+	WorkerSelection,
+	WorkerCommandScope
 } from '../../contracts/worker-application.js'
 import {
 	createAccountArchiveMachine,
@@ -40,6 +41,9 @@ import {
 	applicableTransactionCategories,
 	applicableTransactionTags
 } from '../transactions/transaction-entry.js'
+import { calculateAccountBalances } from '../../domain/account-balances.js'
+import { emptyLedgerFilters, selectWorkerLedger } from './worker-ledger.js'
+import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
 import { defaultTransactionCategory } from '../../validation/transactions.js'
 import {
 	financeQueriesMachine,
@@ -62,6 +66,8 @@ type Context = Input & {
 	ready: Ready | undefined
 	selection: WorkerSelection
 	transactionKind: TransactionKind
+	ledgerPage: number
+	ledgerFilters: TransactionListFilters
 	sessionRevision: number
 	facts: FinanceQueryFacts | undefined
 	archive: ReturnType<typeof selectAccountArchiveReport> | undefined
@@ -151,6 +157,14 @@ function formsObservation(context: Context): FinanceFormsObservation {
 	}
 }
 
+function sameCommandScope(context: Context, scope: WorkerCommandScope) {
+	return (
+		scope.sessionRevision === context.sessionRevision &&
+		scope.selection.revision === context.selection.revision &&
+		scope.selection.workspaceId === context.selection.workspaceId
+	)
+}
+
 function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Finance worker resource unavailable')
 	return value
@@ -199,6 +213,8 @@ export function createFinanceWorkerMachine({
 				FORMS_VIEW: types<{ binding: object; view: ReturnType<typeof selectFinanceFormsView> }>(),
 				FORMS_CLOSED: types<{ binding: object }>(),
 				FORMS_FAILED: types<{ binding: object }>(),
+				SET_LEDGER_PAGE: types<WorkerCommandScope & { page: number }>(),
+				SET_LEDGER_FILTERS: types<WorkerCommandScope & { filters: TransactionListFilters }>(),
 				CLOSE: types(),
 				NATIVE_FAILED: types(),
 				READ_DISPOSAL_FAILED: types()
@@ -225,6 +241,8 @@ export function createFinanceWorkerMachine({
 			ready: undefined,
 			selection: { workspaceId: null, revision: 0 },
 			transactionKind: EXPENSE,
+			ledgerPage: 1,
+			ledgerFilters: emptyLedgerFilters,
 			sessionRevision: 0,
 			facts: undefined,
 			archive: undefined,
@@ -375,6 +393,8 @@ export function createFinanceWorkerMachine({
 							...withdrawn,
 							readBinding: {},
 							sessionRevision: context.sessionRevision + 1,
+							ledgerFilters: emptyLedgerFilters,
+							ledgerPage: 1,
 							sessionStatus: view.status
 						}
 						enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
@@ -391,6 +411,7 @@ export function createFinanceWorkerMachine({
 							...context,
 							selection: event.selection,
 							transactionKind: event.kind,
+							ledgerPage: 1,
 							archive: undefined,
 							readBinding,
 							facts: context.facts
@@ -402,7 +423,8 @@ export function createFinanceWorkerMachine({
 										membership: undefined,
 										grants: null,
 										categories: null,
-										tags: null
+										tags: null,
+										transactions: null
 									} satisfies FinanceQueryFacts)
 								: undefined
 						}
@@ -419,11 +441,15 @@ export function createFinanceWorkerMachine({
 							context: { ...next, formsView: undefined }
 						}
 					},
+					SET_LEDGER_PAGE: ({ context, event }) =>
+						sameCommandScope(context, event) ? { context: { ledgerPage: event.page } } : undefined,
+					SET_LEDGER_FILTERS: ({ context, event }) =>
+						sameCommandScope(context, event)
+							? { context: { ledgerFilters: event.filters, ledgerPage: 1 } }
+							: undefined,
 					ACCOUNT_CREATION: ({ context, event }, enq) => {
 						if (
-							event.sessionRevision !== context.sessionRevision ||
-							event.selection.revision !== context.selection.revision ||
-							event.selection.workspaceId !== context.selection.workspaceId ||
+							!sameCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -437,9 +463,7 @@ export function createFinanceWorkerMachine({
 					},
 					TRANSACTION_ENTRY: ({ context, event }, enq) => {
 						if (
-							event.sessionRevision !== context.sessionRevision ||
-							event.selection.revision !== context.selection.revision ||
-							event.selection.workspaceId !== context.selection.workspaceId ||
+							!sameCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -452,12 +476,7 @@ export function createFinanceWorkerMachine({
 						enq.sendTo(context.forms.owner, { type: 'TRANSACTION_ENTRY', command: event.command })
 					},
 					ARCHIVE_ACCOUNT: ({ context, event }, enq) => {
-						if (
-							event.sessionRevision !== context.sessionRevision ||
-							event.selection.revision !== context.selection.revision ||
-							event.selection.workspaceId !== context.selection.workspaceId
-						)
-							return
+						if (!sameCommandScope(context, event)) return
 						enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(context) })
 						enq.sendTo('archive', { type: 'ARCHIVE', accountId: event.accountId })
 					}
@@ -529,6 +548,12 @@ export function createFinanceWorkerMachine({
 						return {
 							context: {
 								ready,
+								ledgerFilters:
+									ready && ready.binding !== context.ready?.binding
+										? emptyLedgerFilters
+										: context.ledgerFilters,
+								ledgerPage:
+									ready && ready.binding !== context.ready?.binding ? 1 : context.ledgerPage,
 								...withdrawn,
 								formsView: undefined,
 								readBinding: {},
@@ -661,6 +686,10 @@ export function selectFinanceWorkerView(
 					: context.sessionStatus === 'signed-out'
 						? 'signed-out'
 						: 'starting'
+	const balances =
+		context.facts?.accounts && context.facts.transactions
+			? calculateAccountBalances(context.facts.accounts, context.facts.transactions)
+			: null
 	const transactionFacts = formsObservation(context).transaction
 	const transactionAccounts = writableTransactionAccounts({
 		...transactionFacts,
@@ -689,6 +718,7 @@ export function selectFinanceWorkerView(
 						name,
 						kind,
 						currency,
+						balanceMinor: balances?.get(id) ?? null,
 						archiveAction:
 							context.archive && context.archive.binding === context.readBinding
 								? (context.archive.view.rows.find((row) => row.account.id === id)?.action ??
@@ -703,6 +733,15 @@ export function selectFinanceWorkerView(
 				? projectAccountArchiveFeedback(context.archive.view.feedback)
 				: null,
 		accountCreation: forms?.creation ?? null,
+		ledger:
+			snapshot.status === 'active'
+				? selectWorkerLedger(
+						context.facts,
+						context.transactionKind,
+						context.ledgerFilters,
+						context.ledgerPage
+					)
+				: null,
 		transactionEntry: forms
 			? {
 					kind: context.transactionKind,

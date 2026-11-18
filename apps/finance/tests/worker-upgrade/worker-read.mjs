@@ -8,6 +8,13 @@ export function checkFinanceWorker(directory, finance, proof) {
 	const app = join(directory, 'app')
 	const run = (command, args) => execFileSync(command, args, { cwd: app, stdio: 'inherit' })
 	for (const name of [
+		'src/lib/machines/runtime/worker-ledger.ts',
+		'src/lib/components/worker/WorkerLedger.svelte',
+		'src/lib/components/transactions/TransactionListView.svelte',
+		'src/lib/components/transactions/TransactionListItem.svelte',
+		'src/lib/domain/transaction-groups.ts',
+		'src/lib/filters/transaction-list-filters.ts',
+		'src/lib/validation/transactions.ts',
 		'src/lib/contracts/worker-application.ts',
 		'src/lib/contracts/worker-forms.ts',
 		'src/lib/contracts/transaction-entry-contract.ts',

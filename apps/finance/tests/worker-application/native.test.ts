@@ -34,6 +34,13 @@ beforeAll(async () => {
 						for (const [id, module] of Object.entries(output.modules)) {
 							if (
 								module.renderedLength > 0 &&
+								/\/(?:domain\/(?:account-balances|transaction-groups)|filters\/transaction-list-filters)\.[jt]s$/.test(
+									id
+								)
+							)
+								this.error('Finance projection in Window output: ' + id)
+							if (
+								module.renderedLength > 0 &&
 								/\/jazz-tools\//.test(id) &&
 								!id.includes('jazz-broker-worker.js?')
 							)
@@ -376,6 +383,76 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ amountMinor: 5000, kind: 'income', paymentMethod: 'cash' }
 					]
 				})
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('renders bounded ledger pages, exact live balances and worker-owned text filtering', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Pagination wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seedLedger(workspaceId, accountId),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().accounts[0]?.balanceMinor)
+					)
+					.toBe(-4000n)
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(25)
+				await browserExpect(page.getByText('$40.00', { exact: true })).toBeVisible()
+				const originalUrl = page.url()
+				await page.getByRole('link', { name: /next page/i }).click()
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
+				await browserExpect(page.getByText('$40.00', { exact: true })).toBeVisible()
+				expect(page.url()).toBe(originalUrl)
+				expect(
+					await page.evaluate(
+						() =>
+							window.financeWorkerReadFixture.state().ledger?.groups.flatMap((g) => g.transactions)
+								.length
+					)
+				).toBe(15)
+				await page.getByRole('button', { name: /search transactions/i }).click()
+				await page
+					.getByRole('searchbox', { name: /search transactions/i })
+					.fill('ledger memo needle')
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(1)
+				await browserExpect(page.getByText('Ledger record 39', { exact: true })).toBeVisible()
+				expect(
+					await page.evaluate(() => window.financeWorkerReadFixture.state().ledger?.page)
+				).toBe(1)
+				expect(
+					await page.evaluate(
+						() => window.financeWorkerReadFixture.state().accounts[0]?.balanceMinor
+					)
+				).toBe(-4000n)
+				expect(
+					await page.evaluate(() =>
+						Object.keys(
+							window.financeWorkerReadFixture.state().ledger?.groups[0]?.transactions[0] ?? {}
+						)
+					)
+				).not.toContain('memo')
 				await close(page)
 			} finally {
 				await browser.close()

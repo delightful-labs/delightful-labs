@@ -1,3 +1,4 @@
+import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
 import { get, writable, type Readable } from 'svelte/store'
 import { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/worker-broker'
 import brokerUrl from '#jazz-broker-worker?sharedworker&url'
@@ -47,7 +48,8 @@ export function createFinanceWorkerClient(
 		accounts: [],
 		archiveFeedback: null,
 		accountCreation: null,
-		transactionEntry: null
+		transactionEntry: null,
+		ledger: null
 	})
 	const fail = () => {
 		// Keep the close receipt listener: a data fault never authorizes termination.
@@ -59,7 +61,8 @@ export function createFinanceWorkerClient(
 			workspaces: null,
 			archiveFeedback: null,
 			accountCreation: null,
-			transactionEntry: null
+			transactionEntry: null,
+			ledger: null
 		}))
 	}
 	const receiveView = (event: MessageEvent<unknown>) => {
@@ -92,7 +95,8 @@ export function createFinanceWorkerClient(
 			identityId: null,
 			archiveFeedback: null,
 			accountCreation: null,
-			transactionEntry: null
+			transactionEntry: null,
+			ledger: null
 		}))
 	}
 	worker.addEventListener('message', receiveView)
@@ -117,7 +121,8 @@ export function createFinanceWorkerClient(
 			accounts: [],
 			archiveFeedback: null,
 			accountCreation: null,
-			transactionEntry: null
+			transactionEntry: null,
+			ledger: null
 		}))
 		worker.postMessage(command)
 	}
@@ -173,6 +178,26 @@ export function createFinanceWorkerClient(
 					sessionRevision: scope.sessionRevision,
 					selection: scope.selection,
 					command
+				})
+			)
+		},
+		selectLedgerPage: (page: number, scope: WorkerCommandScope) => {
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'SET_LEDGER_PAGE',
+					page,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			)
+		},
+		setLedgerFilters: (filters: TransactionListFilters, scope: WorkerCommandScope) => {
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'SET_LEDGER_FILTERS',
+					filters,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
 				})
 			)
 		},

@@ -4,7 +4,8 @@ import type {
 	FinanceWorkerCapabilities,
 	WorkerSelection,
 	WorkerWorkspace,
-	WorkerAccountRecord
+	WorkerAccountRecord,
+	WorkerLedgerRecord
 } from '../../contracts/worker-application.js'
 import type { Category, Tag } from '../../schema.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
@@ -26,7 +27,8 @@ const empty = {
 	membership: undefined,
 	grants: null,
 	categories: null,
-	tags: null
+	tags: null,
+	transactions: null
 }
 type Rows = {
 	workspaces: WorkerWorkspace[] | null
@@ -35,12 +37,14 @@ type Rows = {
 	grants: ArchiveObservation['grants'] | null
 	categories: Category[] | null
 	tags: Tag[] | null
+	transactions: WorkerLedgerRecord[] | null
 }
 export type FinanceQueryFacts = Rows & { binding: object; status: 'loading' | 'ready' | 'failed' }
 
 /** One native subscription per invoked actor; failures and release stay with its owner. */
 function observeQuery<Result>(
-	event: 'WORKSPACES' | 'ACCOUNTS' | 'MEMBERSHIP' | 'GRANTS' | 'CATEGORIES' | 'TAGS'
+	event:
+		'WORKSPACES' | 'ACCOUNTS' | 'MEMBERSHIP' | 'GRANTS' | 'CATEGORIES' | 'TAGS' | 'TRANSACTIONS'
 ) {
 	return createCallbackLogic<
 		never,
@@ -75,6 +79,7 @@ const membership = observeQuery<ArchiveObservation['membership']>('MEMBERSHIP')
 const grants = observeQuery<ArchiveObservation['grants']>('GRANTS')
 const categories = observeQuery<Category[]>('CATEGORIES')
 const tags = observeQuery<Tag[]>('TAGS')
+const transactions = observeQuery<WorkerLedgerRecord[]>('TRANSACTIONS')
 
 export const financeQueriesMachine = setup({
 	schemas: {
@@ -87,10 +92,11 @@ export const financeQueriesMachine = setup({
 			GRANTS: types<{ binding: object; rows: ArchiveObservation['grants'] }>(),
 			CATEGORIES: types<{ binding: object; rows: Category[] }>(),
 			TAGS: types<{ binding: object; rows: Tag[] }>(),
+			TRANSACTIONS: types<{ binding: object; rows: WorkerLedgerRecord[] }>(),
 			READ_FAILED: types<{ binding: object }>()
 		}
 	},
-	actors: { workspaces, accounts, membership, grants, categories, tags }
+	actors: { workspaces, accounts, membership, grants, categories, tags, transactions }
 }).createMachine({
 	id: 'finance-queries',
 	initial: 'running',
@@ -161,6 +167,19 @@ export const financeQueriesMachine = setup({
 							: undefined
 					}),
 					onError: { target: 'failed', context: empty }
+				},
+				{
+					src: 'transactions',
+					input: ({ context }) => ({
+						...context,
+						observe: context.selection.workspaceId
+							? context.ready.capabilities.observeTransactions.bind(
+									null,
+									context.selection.workspaceId
+								)
+							: undefined
+					}),
+					onError: { target: 'failed', context: empty }
 				}
 			],
 			on: {
@@ -176,6 +195,8 @@ export const financeQueriesMachine = setup({
 					event.binding === context.binding ? { context: { categories: event.rows } } : undefined,
 				TAGS: ({ context, event }) =>
 					event.binding === context.binding ? { context: { tags: event.rows } } : undefined,
+				TRANSACTIONS: ({ context, event }) =>
+					event.binding === context.binding ? { context: { transactions: event.rows } } : undefined,
 				READ_FAILED: ({ context, event }) =>
 					event.binding === context.binding ? { target: 'failed', context: empty } : undefined
 			}
@@ -202,6 +223,7 @@ export function selectFinanceQueryFacts(
 		membership: rows.membership,
 		grants: rows.grants,
 		categories: rows.categories,
-		tags: rows.tags
+		tags: rows.tags,
+		transactions: rows.transactions
 	}
 }

@@ -13,6 +13,10 @@ import {
 	workerTagRecord,
 	type FinanceFormsObservation
 } from './worker-forms.js'
+import {
+	transactionLedgerRecordSchema,
+	transactionListRowSchema
+} from '../validation/transactions.js'
 import { INCOME, EXPENSE } from '../domain/transaction-kind.js'
 import type { createFinanceFormsMachine } from '../machines/runtime/worker-forms.js'
 
@@ -33,6 +37,32 @@ export const workerContextCommand = z.strictObject({
 	selection: workerSelection,
 	kind: workerTransactionKind
 })
+export const workerLedgerFilters = z.strictObject({
+	start: z.string(),
+	end: z.string(),
+	categoryId: z.string(),
+	currency: z.string(),
+	query: z.string()
+})
+export const workerLedgerView = z.strictObject({
+	filters: workerLedgerFilters,
+	rangeValid: z.boolean(),
+	page: z.number().int().positive().safe(),
+	pageCount: z.number().int().positive().safe(),
+	groups: z.array(
+		z.strictObject({
+			bookedOn: z.string(),
+			transactions: z.array(transactionListRowSchema),
+			totals: z.array(z.tuple([z.string(), z.bigint()]))
+		})
+	),
+	categories: z.array(z.tuple([z.string(), z.string()])),
+	tags: z.array(z.tuple([z.string(), z.array(z.string())])),
+	filterCategories: z.array(z.tuple([z.string(), z.string().nullable()])),
+	currencies: z.array(z.string())
+})
+export type WorkerLedgerRecord = z.output<typeof transactionLedgerRecordSchema>
+export type WorkerLedgerView = z.output<typeof workerLedgerView>
 export const financeWorkerCommand = z.discriminatedUnion('type', [
 	workerContextCommand,
 	z.strictObject({
@@ -52,6 +82,18 @@ export const financeWorkerCommand = z.discriminatedUnion('type', [
 		sessionRevision,
 		selection: workerSelection,
 		command: workerTransactionEntryCommand
+	}),
+	z.strictObject({
+		type: z.literal('SET_LEDGER_PAGE'),
+		sessionRevision,
+		selection: workerSelection,
+		page: z.number().int().positive().safe()
+	}),
+	z.strictObject({
+		type: z.literal('SET_LEDGER_FILTERS'),
+		sessionRevision,
+		selection: workerSelection,
+		filters: workerLedgerFilters
 	}),
 	z.strictObject({ type: z.literal('CLOSE') })
 ])
@@ -80,12 +122,14 @@ export const financeWorkerView = z.strictObject({
 	workspaces: z.array(workerWorkspace).nullable(),
 	accounts: z.array(
 		workerAccount.extend({
-			archiveAction: z.enum(['available', 'archiving', 'disabled', 'unavailable'])
+			archiveAction: z.enum(['available', 'archiving', 'disabled', 'unavailable']),
+			balanceMinor: z.bigint().nullable()
 		})
 	),
 	archiveFeedback: accountArchiveFeedback.nullable(),
 	accountCreation: workerAccountCreationView.nullable(),
-	transactionEntry: workerTransactionEntry.nullable()
+	transactionEntry: workerTransactionEntry.nullable(),
+	ledger: workerLedgerView.nullable()
 })
 export const financeWorkerReply = z.discriminatedUnion('type', [
 	financeWorkerView,
@@ -125,6 +169,11 @@ export type FinanceWorkerCapabilities = {
 	observeTags(
 		workspaceId: string,
 		publish: (rows: z.output<typeof workerTagRecord>[]) => void,
+		failed: () => void
+	): () => void
+	observeTransactions(
+		workspaceId: string,
+		publish: (rows: WorkerLedgerRecord[]) => void,
 		failed: () => void
 	): () => void
 	archiveAccount(accountId: string): Promise<unknown>

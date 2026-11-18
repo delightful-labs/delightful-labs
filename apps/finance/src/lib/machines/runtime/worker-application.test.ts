@@ -17,7 +17,8 @@ import type {
 	FinanceWorkerCapabilities,
 	WorkerAccount,
 	WorkerAccountRecord,
-	WorkerWorkspace
+	WorkerWorkspace,
+	WorkerLedgerRecord
 } from '../../contracts/worker-application.js'
 import { creationFixture } from '../transactions/transaction-create.fixture.js'
 import { createFinanceFormsMachine } from './worker-forms.js'
@@ -57,6 +58,7 @@ function fixture() {
 	}[] = []
 	const grants: { publish: (rows: ArchiveObservation['grants']) => void; failed: () => void }[] = []
 	const transactionDb = creationFixture()
+	const ledgers: { publish: (rows: WorkerLedgerRecord[]) => void; failed: () => void }[] = []
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const createWrite = vi.fn(
 		async (
@@ -140,6 +142,12 @@ function fixture() {
 			publish([])
 			return () => {}
 		},
+		observeTransactions: (_id, publish, failed) => {
+			ledgers.push({ publish, failed })
+			return () => {
+				order.push('ledger')
+			}
+		},
 		archiveAccount: archiveWrite
 	}
 	const ready = (binding: object): SessionRuntimeObservation<FinanceWorkerCapabilities> => ({
@@ -219,6 +227,7 @@ function fixture() {
 		queries,
 		memberships,
 		grants,
+		ledgers,
 		archiveWrite,
 		createWrite,
 		transactionDb,
@@ -267,6 +276,83 @@ function last<T>(rows: T[]): T {
 }
 
 describe('Finance worker ownership and selected accounts', () => {
+	it('keeps missing balances unknown, projects one exact ledger page, and refuses stale filter/page intents', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			expect(f.view().accounts[0]?.balanceMinor).toBeNull()
+			const values: WorkerLedgerRecord[] = Array.from({ length: 30 }, (_, i) => ({
+				id: crypto.randomUUID(),
+				organizationId: a,
+				accountId: row('Wallet').id,
+				categoryId: '50000000-0000-4000-8000-000000000001',
+				kind: 'expense',
+				currency: 'USD',
+				amountMinor: Number.MAX_SAFE_INTEGER,
+				bookedOn: '2026-11-18',
+				description: 'Record ' + i,
+				memo: null,
+				tagNames: i === 29 ? ['Tail'] : []
+			}))
+			last(f.ledgers).publish(values)
+			expect(f.view().accounts[0]?.balanceMinor).toBe(-270215977642229730n)
+			expect(f.view().ledger?.groups.flatMap((g) => g.transactions)).toHaveLength(25)
+			expect(f.view().ledger?.groups[0]?.totals).toEqual([['USD', 270215977642229730n]])
+			const scope = f.view()
+			f.actor.send({
+				type: 'SET_LEDGER_PAGE',
+				page: 2,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.view().ledger?.groups.flatMap((g) => g.transactions)).toHaveLength(5)
+			expect(f.view().ledger?.page).toBe(2)
+			f.actor.send({
+				type: 'SET_LEDGER_FILTERS',
+				filters: { start: '', end: '', categoryId: '', currency: '', query: 'tail' },
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(
+				f
+					.view()
+					.ledger?.groups.flatMap((g) => g.transactions)
+					.map((t) => t.description)
+			).toEqual(['Record 29'])
+			expect(f.view().ledger?.page).toBe(1)
+			f.select(b, 2)
+			expect(f.view().ledger).toBeNull()
+			f.actor.send({
+				type: 'SET_LEDGER_PAGE',
+				page: 2,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			f.actor.send({
+				type: 'SET_LEDGER_FILTERS',
+				filters: {
+					...scope.ledger?.filters,
+					start: '',
+					end: '',
+					categoryId: '',
+					currency: '',
+					query: 'stale'
+				},
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.actor.getSnapshot().context.ledgerPage).toBe(1)
+			expect(f.actor.getSnapshot().context.ledgerFilters.query).toBe('tail')
+		} finally {
+			f.stop()
+		}
+	})
 	it.each(['expense', 'income'])(
 		'reuses native transaction policy and staged persistence for %s',
 		async (kind) => {
