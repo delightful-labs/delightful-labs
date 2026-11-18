@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createJazz, sqlite } from 'jazz-tools/backend'
 
 const require = createRequire(import.meta.url)
@@ -28,6 +28,24 @@ const { validateProject } = await import(
 const { schema } = await validateProject({ schemaDir })
 const target = process.argv[2]
 if (!target) throw new Error('Retained fixture output directory required')
+// Seed the historical production root with the SDK that actually published it.
+// The candidate later opens this same SQLite store through its native generated bindings.
+const productionDirectory = await mkdtemp(join(target, 'retained-production-alpha60-'))
+const productionSchema = JSON.parse(
+	await readFile(join(schemaDir, 'migrations/snapshots/20261118T024230-8a5130d42577.json'), 'utf8')
+)
+const production = createJazz({
+	app: { wasmSchema: productionSchema },
+	permissions: {},
+	store: sqlite({ path: productionDirectory })
+})
+let productionAppId
+try {
+	await production.ready()
+	productionAppId = production.appId
+} finally {
+	await production.close()
+}
 const directory = await mkdtemp(join(target, 'retained-alpha60-'))
 const jazz = createJazz({
 	app,
@@ -77,6 +95,7 @@ try {
 				schemaHash: schema.hash,
 				appId: jazz.appId,
 				directory,
+				production: { directory: productionDirectory, appId: productionAppId },
 				libraryId,
 				documentId,
 				earlier,

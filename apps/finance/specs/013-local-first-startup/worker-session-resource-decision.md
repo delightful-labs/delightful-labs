@@ -1148,3 +1148,35 @@ Logs: `/private/tmp/finance-worker-url-{unit,static,test-types,full-unit,native-
 the diagnosed three-engine input-unmount failure remains in `finance-worker-url-native.log`, and
 the focused corrected cases are in `finance-worker-url-native-focused.log`.
 Next: shared shell account selection/order and remaining feature parity. No production cutover.
+
+
+### Reconcile merged PR51 before further coordinated SDK work
+
+Latest main `1de0ea1a` contains the approved Clipper production lineage repair. It was merged
+without changing its active schema/policies; both implementation handoffs were retained. The
+isolated Clipper authoring port now preserves required `notes.documentId`, requires its Highlight
+to share the same document/library, and discovers the exact existing native migration/snapshots.
+No new SDK patch, data reset or application migration was added. Finance's qualified source is
+unchanged by this reconciliation.
+
+The legacy fixture first runs the alpha.60 native validator to build its migration index. It seeds
+both the current reading store and the actual historical production `8a5130d42577` SQLite store
+with alpha.60. Alpha.67 then opens the historical store through native generated bindings and
+retains its app ID. This avoids using the new backend's rejected raw-schema configuration for old
+fixture setup. The direct native text-range producer also removes an unnecessary parse/type
+adaptation in a test; JSON imports and permission-file shape follow the SDK's native contracts.
+
+A **fresh published alpha.67 proof passes all 61 native cases**, strict selected types (now including
+migration and annotation tests), native generation and generate --check. The SDK's own
+`artifactIdentity`/`identityDifferences` comparison confirms both schema versions
+`8a5130d42577` and `5734b944387b` and bundle `be225472245b…` are exactly unchanged.
+Existing policy checks include required document and cross-document Highlight refusal, reading
+convergence, retained alpha.60 dates/sets and local notes after restart.
+Artifacts: `/var/folders/qb/xn1lqlhn4234zgfwy1r17cdc0000gp/T/finance-jazz-alpha67-GDSK2h`;
+log: `/private/tmp/clipper-pr51-native-schema-final.log`.
+Earlier failures remain in `clipper-pr51-native-schema.log` / `clipper-pr51-native-tests.log`.
+
+Alpha.67's stock upgrader source still refuses computed/transform markers (`dist/upgrade/index.js`);
+Clipper's legacy reading columns contain those markers. Keep the already bounded native authoring
+port and native transform declarations. Do not patch that SDK refusal or invent a general migration
+framework. Full Clipper session/backend/provider adoption remains a separate gate.

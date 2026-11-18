@@ -1,5 +1,26 @@
+diff --git a/src/lib/backend/jazz/annotations.test.ts b/src/lib/backend/jazz/annotations.test.ts
+index 4f24b27..b576c2a 100644
+--- a/src/lib/backend/jazz/annotations.test.ts
++++ b/src/lib/backend/jazz/annotations.test.ts
+@@ -14,7 +14,6 @@ import { toMarginDocumentNote, toMarginHighlight } from '../../annotations/margi
+ import {
+ 	annotationNoteRowSchema,
+ 	highlightRowSchema,
+-	nativeRangeSchema,
+ 	textFingerprint
+ } from '../../annotations/schema.js'
+ let fixture: PolicyTestApp
+@@ -207,7 +206,7 @@ it('projects native document notes and verified source anchors while refusing re
+ 				kind: 'source',
+ 				normalizationVersion: 'source-fixture-v1',
+ 				textHash: await textFingerprint(text),
+-				range: nativeRangeSchema.parse(a.db.textAnchors().captureRange(text, 2, 18)),
++				range: a.db.textAnchors().captureRange(text, 2, 18),
+ 				sourceDate: createdAt,
+ 				textLengthCodePoints: Array.from(text).length,
+ 				sourceCodePointPosition: { start: 2, end: 17 }
 diff --git a/src/lib/backend/jazz/annotations.ts b/src/lib/backend/jazz/annotations.ts
-index c8aaa51..339876d 100644
+index 0b743bb..9996a2f 100644
 --- a/src/lib/backend/jazz/annotations.ts
 +++ b/src/lib/backend/jazz/annotations.ts
 @@ -1,7 +1,7 @@
@@ -11,7 +32,7 @@ index c8aaa51..339876d 100644
  import { createAnnotationDomain } from '../../annotations/domain.js'
  import { createDomainTransaction } from '../../machines/storage/domain-transaction.js'
  import { transactionLifecycle, transactionReceipt } from './transaction.js'
-@@ -125,7 +125,14 @@ export function createAnnotationRecords(
+@@ -121,7 +121,14 @@ export function createAnnotationRecords(
  								kind: 'reader',
  								normalizationVersion: READER_TEXT_VERSION,
  								textHash: draft.textHash,
@@ -192,6 +213,60 @@ index bbd6f11..e06552d 100644
  		status: document.status,
  		favorite: document.favorite,
  		previousStatus: document.status === 'trashed' ? document.previousStatus : null,
+diff --git a/src/lib/backend/jazz/migration.test.ts b/src/lib/backend/jazz/migration.test.ts
+index 1ce65fb..432616b 100644
+--- a/src/lib/backend/jazz/migration.test.ts
++++ b/src/lib/backend/jazz/migration.test.ts
+@@ -1,39 +1,22 @@
+ import { expect, it } from 'vitest'
+-import { readFile, mkdtemp, rm } from 'node:fs/promises'
+-import { tmpdir } from 'node:os'
+-import { join } from 'node:path'
+ import { createJazz, sqlite } from 'jazz-tools/backend'
+-import { app } from './schema.js'
+-import permissions from './permissions.js'
++import { app } from './jazz.generated.js'
++import permissions from './jazz.permissions.json' with { type: 'json' }
++import retained from '../../../../retained-baseline.json' with { type: 'json' }
+ 
+ it('opens the existing production store with the native annotation migration', async () => {
+-	const directory = await mkdtemp(join(tmpdir(), 'clipper-schema-upgrade-'))
+-	// Trusted, generated production snapshot; Jazz validates it on publication.
+-	const wasmSchema: typeof app.wasmSchema = JSON.parse(
+-		await readFile(
+-			new URL('./migrations/snapshots/20261118T024230-8a5130d42577.json', import.meta.url),
+-			'utf8'
+-		)
+-	)
+-	let backend: ReturnType<typeof createJazz> | undefined
++	const backend = createJazz({
++		app,
++		permissions,
++		store: sqlite({ path: retained.production.directory })
++	})
+ 	try {
+-		backend = createJazz({
+-			app: { wasmSchema },
+-			permissions: {},
+-			store: sqlite({ path: directory })
+-		})
+ 		await backend.ready()
+-		const appId = backend.appId
+-		await backend.close()
+-		backend = undefined
+-		backend = createJazz({ app, permissions, store: sqlite({ path: directory }) })
+-		await backend.ready()
+-		expect(backend.appId).toBe(appId)
++		expect(backend.appId).toBe(retained.production.appId)
+ 		expect(await backend.db.all(app.notes)).toEqual([])
+ 		expect(await backend.db.all(app.highlights)).toEqual([])
+ 		expect(await backend.db.all(app.publications)).toEqual([])
+ 	} finally {
+-		await backend?.close()
+-		await rm(directory, { recursive: true, force: true })
++		await backend.close()
+ 	}
+ })
 diff --git a/src/lib/backend/jazz/note-offline.test.ts b/src/lib/backend/jazz/note-offline.test.ts
 index 3a9e18b..be72da6 100644
 --- a/src/lib/backend/jazz/note-offline.test.ts
@@ -255,10 +330,10 @@ index 3a9e18b..be72da6 100644
  			id: noteId,
  			documentId: article.operationId
 diff --git a/src/lib/backend/jazz/permissions.ts b/src/lib/backend/jazz/permissions.ts
-index d67e147..e6dc19d 100644
+index 815c08a..d6522d1 100644
 --- a/src/lib/backend/jazz/permissions.ts
 +++ b/src/lib/backend/jazz/permissions.ts
-@@ -1,225 +1,258 @@
+@@ -1,223 +1,255 @@
 -import { documentReadingStatusSchema } from '../../capture/document-schema.js'
 -import { schema as s } from 'jazz-tools'
 -import type { RowRefValue } from 'jazz-tools/permissions'
@@ -333,16 +408,14 @@ index d67e147..e6dc19d 100644
 -		highlightId: RowRefValue
 -	}) =>
 -		allOf([
--			owns(row.libraryId),
+-			documentParent(row),
 -			anyOf([
--				allOf([
--					{ highlightId: null },
--					policy.libraryDocuments.exists.where({ id: row.documentId, libraryId: row.libraryId })
--				]),
--				allOf([
--					{ documentId: null },
--					policy.highlights.exists.where({ id: row.highlightId, libraryId: row.libraryId })
--				])
+-				{ highlightId: null },
+-				policy.highlights.exists.where({
+-					id: row.highlightId,
+-					libraryId: row.libraryId,
+-					documentId: row.documentId
+-				})
 -			])
 -		])
 -	policy.notes.allowInsert.where(noteParent)
@@ -460,23 +533,6 @@ index d67e147..e6dc19d 100644
 -				policy.sites.exists.where({ id: row.siteId, libraryId: row.libraryId })
 -			])
 -		])
--	)
--	policy.articles.allowUpdate.never()
--	policy.articles.allowDelete.never()
--	policy.documentCaptures.allowRead.where((row) => owns(row.libraryId))
--	policy.documentCaptures.allowInsert.where((row) => documentParent(row))
--	policy.documentCaptures.allowUpdate
--		.whereOld((row) => owns(row.libraryId))
--		.whereNew((row) => documentParent(row))
--	policy.documentCaptures.allowDelete.never()
--	const imageParent = (row: { libraryId: RowRefValue; articleId: RowRefValue }) =>
--		allOf([
--			owns(row.libraryId),
--			policy.articles.exists.where({ id: row.articleId, libraryId: row.libraryId })
--		])
--	policy.articleImages.allowRead.where((row) => owns(row.libraryId))
--	policy.articleImages.allowInsert.where((row) =>
--		allOf([imageParent(row), { status: 'pending' }, { assetId: null }])
 +const storageOperationMatches = (operationId: s.Uuid, libraryId: s.Uuid) =>
 +	exists.storageOperations({ id: operationId, libraryId })
 +
@@ -509,6 +565,28 @@ index d67e147..e6dc19d 100644
 +		),
 +		anyOf({ attachmentId: null }, articleMatches(attachmentId, libraryId))
  	)
+-	policy.articles.allowUpdate.never()
+-	policy.articles.allowDelete.never()
+-	policy.documentCaptures.allowRead.where((row) => owns(row.libraryId))
+-	policy.documentCaptures.allowInsert.where((row) => documentParent(row))
+-	policy.documentCaptures.allowUpdate
+-		.whereOld((row) => owns(row.libraryId))
+-		.whereNew((row) => documentParent(row))
+-	policy.documentCaptures.allowDelete.never()
+-	const imageParent = (row: { libraryId: RowRefValue; articleId: RowRefValue }) =>
+-		allOf([
+-			owns(row.libraryId),
+-			policy.articles.exists.where({ id: row.articleId, libraryId: row.libraryId })
+-		])
+-	policy.articleImages.allowRead.where((row) => owns(row.libraryId))
+-	policy.articleImages.allowInsert.where((row) =>
+-		allOf([imageParent(row), { status: 'pending' }, { assetId: null }])
++
++const validNoteParent = (libraryId: s.Uuid, documentId: s.Uuid, highlightId: s.Uuid) =>
++	allOf(
++		ownedDocument(libraryId, documentId),
++		anyOf({ highlightId: null }, exists.highlights({ id: highlightId, libraryId, documentId }))
+ 	)
 -	policy.articleImages.allowUpdate
 -		.whereOld((row) =>
 -			allOf([owns(row.libraryId), anyOf([{ status: 'pending' }, { status: 'failed' }])])
@@ -524,16 +602,8 @@ index d67e147..e6dc19d 100644
 -					])
 -				])
 -			])
-+
-+const validNoteParent = (libraryId: s.Uuid, documentId: s.Uuid, highlightId: s.Uuid) =>
-+	allOf(
-+		isMyLibrary(libraryId),
-+		anyOf(
-+			allOf({ highlightId: null }, libraryDocumentMatches(documentId, libraryId)),
-+			allOf({ documentId: null }, exists.highlights({ id: highlightId, libraryId }))
- 		)
+-		)
 -	policy.articleImages.allowDelete.never()
-+	)
 +
 +const validSite = (libraryId: s.Uuid, faviconId: s.Uuid) =>
 +	allOf(isMyLibrary(libraryId), anyOf({ faviconId: null }, assetMatches(faviconId, libraryId)))
@@ -1028,10 +1098,10 @@ index de21790..0000000
 -	return { wasmSchema: structuredClone(app.wasmSchema) }
 -}
 diff --git a/src/lib/backend/jazz/schema.ts b/src/lib/backend/jazz/schema.ts
-index e420eab..6478eae 100644
+index 9cf899e..7cfd59d 100644
 --- a/src/lib/backend/jazz/schema.ts
 +++ b/src/lib/backend/jazz/schema.ts
-@@ -2,9 +2,8 @@ import { schema as s } from 'jazz-tools'
+@@ -2,213 +2,208 @@ import { schema as s } from 'jazz-tools'
  import { nativeRangeSchema } from '../../annotations/schema.js'
  import { publicationLifecycleSchema } from '../../annotations/publication.js'
  import { z } from 'zod'
@@ -1040,9 +1110,10 @@ index e420eab..6478eae 100644
  import { captureSourceSchema } from '../../capture/article-schema.js'
 -import { readingProgressColumn, resumePositionColumn } from './reading-columns.js'
  import { documentReadingStatusSchema, documentStatusSchema } from '../../capture/document-schema.js'
+-import { migrations } from './migrations/index.js'
  
  function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Value[]] {
-@@ -12,202 +11,199 @@ function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Val
+ 	const [first, ...rest] = values
  	if (first === undefined) throw new Error('Empty enum')
  	return [first, ...rest]
  }
@@ -1066,7 +1137,7 @@ index e420eab..6478eae 100644
 -		notes: s.table(
 -			{
 -				libraryId: s.uuid(),
--				documentId: s.uuid().optional(),
+-				documentId: s.uuid(),
 -				source: s.string().optional(),
 -				highlightId: s.uuid().optional(),
 -				text: s.string().merge('text').default('')
@@ -1159,7 +1230,7 @@ index e420eab..6478eae 100644
 +	notes: s.table(
 +		{
 +			libraryId: s.uuid(),
-+			documentId: s.uuid().optional(),
++			documentId: s.uuid(),
 +			source: s.string().optional(),
 +			highlightId: s.uuid().optional(),
 +			text: s.string().merge('text').default('')
@@ -1350,7 +1421,7 @@ index e420eab..6478eae 100644
 -			}
 -		)
 -	},
--	{ migrations: 'none' }
+-	{ migrations }
 -)
 +			documentId: s.uuid(),
 +			field: s.string(),
@@ -1439,6 +1510,18 @@ index e420eab..6478eae 100644
 +		}
 +	)
 +})
+diff --git a/src/lib/localization/index.ts b/src/lib/localization/index.ts
+index 590939c..b1c18b9 100644
+--- a/src/lib/localization/index.ts
++++ b/src/lib/localization/index.ts
+@@ -1,6 +1,6 @@
+ import { createInstance } from 'i18next'
+ import type { RecoveryMessages } from 'delightful-local-first/recovery/messages'
+-import english from './en.json'
++import english from './en.json' with { type: 'json' }
+ 
+ type LeafKeys<T> = {
+ 	[K in keyof T & string]: T[K] extends string ? K : `${K}.${LeafKeys<T[K]>}`
 diff --git a/src/lib/reader/schema.ts b/src/lib/reader/schema.ts
 index 888ce53..b08b742 100644
 --- a/src/lib/reader/schema.ts

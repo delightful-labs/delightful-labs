@@ -20,6 +20,12 @@ with the approved required `notes.documentId`, same-document policy and native m
 history below before the coordinated SDK upgrade; it must not restore the earlier optional
 Note document model. Active alpha.60 production repair is retained unchanged.
 
+The maintained alpha.67 candidate is now reconciled with that repair: a fresh native run passes
+61 cases, strict annotation/migration types, exact schema/permission identity and an actual
+alpha.60 historical production-store reopen with retained app ID. See the
+[reconciliation evidence](../../../finance/specs/013-local-first-startup/worker-session-resource-decision.md#reconcile-merged-pr51-before-further-coordinated-sdk-work).
+This supersedes the overlay conflict, while full session/backend adoption remains open.
+
 ## Production schema lineage repair — test profiles disposable
 
 Production PR #50 (`f3827565`) returns Jazz 503 and sign-in 500 because its store

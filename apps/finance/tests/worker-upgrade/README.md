@@ -55,9 +55,11 @@ Svelte and native test checks instead.
 
 The remaining schema/session/fixture patches adapt existing alpha.60 source while
 both SDK versions coexist. They remain maintenance debt, rather than becoming
-shared compatibility APIs. The Clipper schema overlay currently does not apply
-on PR #51's repaired migration schema; reconcile that authoring port with the
-merged schema and requalify native identity before adoption.
+shared compatibility APIs. The Clipper schema overlay now preserves merged PR51's required note document,
+same-document highlight policies and native migration history. A fresh alpha.67
+run passes 61 cases, including an actual alpha.60 historical store opened with
+new native bindings. Both schema hashes and the permission bundle match exactly;
+this qualifies the schema port, not complete Clipper session/backend adoption.
 
 ## Dependency changes and qualification limits
 

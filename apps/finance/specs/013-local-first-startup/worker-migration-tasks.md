@@ -29,6 +29,11 @@ The intermittent check/account-move failure remains an explicit activation block
 Finance has no sign-out or explicit new-identity screen; do not add those as parity work.
 Automatic native identity creation is already qualified at startup.
 
+Latest main `1de0ea1a` / merged PR51 is preserved. Its Clipper schema-lineage repair is now
+reconciled in the alpha.67 candidate: **61 fresh native cases**, strict annotation/migration
+types, exact two-schema/permission identity and actual alpha.60 historical SQLite reopen pass.
+Full Clipper session/backend adoption and remaining Finance shell parity are still open.
+
 ## Historical qualification snapshots
 
 **2026-11-17 release update:** target alpha.66 for the coordinated upgrade.

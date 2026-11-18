@@ -22,6 +22,8 @@
 		"src/lib/backend/jazz/reader.test.ts",
 		"src/lib/backend/jazz/reader-offline.test.ts",
 		"src/lib/backend/jazz/note-offline.test.ts",
-		"src/lib/backend/jazz/schema-upgrade.test.ts"
+		"src/lib/backend/jazz/schema-upgrade.test.ts",
+		"src/lib/backend/jazz/migration.test.ts",
+		"src/lib/backend/jazz/annotations.test.ts"
 	]
 }
