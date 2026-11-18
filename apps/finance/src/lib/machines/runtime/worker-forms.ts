@@ -5,7 +5,10 @@ import {
 	selectScopedFormView,
 	selectScopedFormObservation
 } from '../forms/scoped-form.js'
-import { createTransactionEntryFormOptions } from '../transactions/transaction-entry.js'
+import {
+	createTransactionEntryFormOptions,
+	createTransactionEditFormOptions
+} from '../transactions/transaction-entry.js'
 import type {
 	TransactionEntryObservation,
 	TransactionEntryReason,
@@ -46,6 +49,11 @@ export function createFinanceFormsMachine(
 		...dependencies,
 		observe: () => dependencies.observe().transaction
 	})
+	const editOptions = createTransactionEditFormOptions({
+		...dependencies,
+		observe: () => dependencies.observe().edit
+	})
+	const editTransaction = createScopedFormMachine(editOptions)
 	const enterTransaction = createScopedFormMachine<
 		TransactionSaveValues,
 		void,
@@ -66,6 +74,8 @@ export function createFinanceFormsMachine(
 	>(options)
 	type Input = { observation: FinanceFormsObservation; selectionRevision: number }
 	type Context = Input & {
+		edit: TransactionEntryView | undefined
+		editObservation: TransactionEntryObservation | undefined
 		creation: AccountCreationView | undefined
 		creationObservation: AccountCreationObservation | undefined
 		transaction: TransactionEntryView | undefined
@@ -76,24 +86,32 @@ export function createFinanceFormsMachine(
 			input: types<Input>(),
 			context: types<Context>(),
 			output: types<{ outcome: 'closed' }>(),
-			internalEvents: { CREATION_CLOSED: types(), TRANSACTION_CLOSED: types() },
+			internalEvents: {
+				CREATION_CLOSED: types(),
+				TRANSACTION_CLOSED: types(),
+				EDIT_CLOSED: types()
+			},
 			events: {
 				OBSERVE: types<Input>(),
 				ACCOUNT_CREATION: types<{ command: WorkerAccountCreationCommand }>(),
 				TRANSACTION_ENTRY: types<{ command: WorkerTransactionEntryCommand }>(),
+				TRANSACTION_EDIT: types<{ command: WorkerTransactionEntryCommand }>(),
 				SHUTDOWN: types()
 			},
 			children: {
+				edit: types<import('xstate').ActorRefFrom<typeof editTransaction>>(),
 				creation: types<import('xstate').ActorRefFrom<typeof createAccount>>(),
 				transaction: types<import('xstate').ActorRefFrom<typeof enterTransaction>>()
 			}
 		},
-		actors: { createAccount, enterTransaction }
+		actors: { createAccount, enterTransaction, editTransaction }
 	}).createMachine({
 		id: 'finance-forms',
 		initial: 'active',
 		context: ({ input }) => ({
 			...input,
+			edit: undefined,
+			editObservation: undefined,
 			creation: undefined,
 			creationObservation: undefined,
 			transaction: undefined,
@@ -154,12 +172,40 @@ export function createFinanceFormsMachine(
 					enq.raise({ type: 'TRANSACTION_CLOSED' })
 				},
 				onError: { target: '.failed', context: { transaction: undefined } }
+			},
+			{
+				id: 'edit',
+				src: 'editTransaction',
+				input: ({ context }) => context.observation.edit,
+				onSnapshot: ({ context, event }) =>
+					selectScopedFormObservation(event.snapshot) === context.observation.edit
+						? {
+								context: {
+									editObservation: context.observation.edit,
+									edit: selectScopedFormView<
+										TransactionSaveValues,
+										void,
+										TransactionEntryReason,
+										TransactionEntryScope,
+										TransactionEntryObservation,
+										SnapshotFrom<typeof editOptions.availability>,
+										SnapshotFrom<typeof editOptions.operation>
+									>(event.snapshot, editOptions)
+								}
+							}
+						: undefined,
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'EDIT_CLOSED' })
+				},
+				onError: { target: '.failed', context: { edit: undefined } }
 			}
 		],
 		states: {
 			active: {
 				on: {
 					OBSERVE: ({ event }, enq) => {
+						enq.sendTo('edit', { type: 'OBSERVE', observation: event.observation.edit })
 						enq.sendTo('creation', { type: 'OBSERVE', observation: event.observation.creation })
 						enq.sendTo('transaction', {
 							type: 'OBSERVE',
@@ -176,6 +222,10 @@ export function createFinanceFormsMachine(
 						enq.sendTo('creation', { type: 'OBSERVE', observation: context.observation.creation })
 						enq.sendTo('creation', event.command)
 					},
+					TRANSACTION_EDIT: ({ context, event }, enq) => {
+						enq.sendTo('edit', { type: 'OBSERVE', observation: context.observation.edit })
+						enq.sendTo('edit', event.command)
+					},
 					TRANSACTION_ENTRY: ({ context, event }, enq) => {
 						enq.sendTo('transaction', {
 							type: 'OBSERVE',
@@ -184,6 +234,7 @@ export function createFinanceFormsMachine(
 						enq.sendTo('transaction', event.command)
 					},
 					SHUTDOWN: (_, enq) => {
+						enq.sendTo('edit', { type: 'SHUTDOWN' })
 						enq.sendTo('creation', { type: 'SHUTDOWN' })
 						enq.sendTo('transaction', { type: 'SHUTDOWN' })
 						return { target: 'closing' }
@@ -195,6 +246,13 @@ export function createFinanceFormsMachine(
 				on: { SHUTDOWN: {} },
 				onDone: { target: 'closed' },
 				states: {
+					edit: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { EDIT_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
 					creation: {
 						initial: 'waiting',
 						states: {
@@ -218,11 +276,12 @@ export function createFinanceFormsMachine(
 }
 
 type FormsView = { selectionRevision: number } & (
-	| { status: 'loading' | 'failed'; creation: null; transaction: null }
+	| { status: 'loading' | 'failed'; creation: null; transaction: null; edit: null }
 	| {
 			status: 'ready'
 			creation: WorkerAccountCreationView
 			transaction: WorkerTransactionEntryView
+			edit: WorkerTransactionEntryView
 	  }
 )
 export function selectFinanceFormsView(
@@ -230,18 +289,27 @@ export function selectFinanceFormsView(
 ): FormsView {
 	const selectionRevision = snapshot.context.selectionRevision
 	if (snapshot.status !== 'active' || snapshot.matches('failed'))
-		return { selectionRevision, status: 'failed', creation: null, transaction: null }
+		return { selectionRevision, status: 'failed', creation: null, transaction: null, edit: null }
 	const { context } = snapshot
 	if (
+		!context.edit ||
+		context.editObservation !== context.observation.edit ||
 		!context.creation ||
 		!context.transaction ||
 		context.creationObservation !== context.observation.creation ||
 		context.transactionObservation !== context.observation.transaction
 	)
-		return { selectionRevision, status: 'loading', creation: null, transaction: null }
+		return { selectionRevision, status: 'loading', creation: null, transaction: null, edit: null }
 	const creation = workerAccountCreationView.safeParse(context.creation)
 	const transaction = workerTransactionEntryView.safeParse(context.transaction)
-	return creation.success && transaction.success
-		? { selectionRevision, status: 'ready', creation: creation.data, transaction: transaction.data }
-		: { selectionRevision, status: 'failed', creation: null, transaction: null }
+	const edit = workerTransactionEntryView.safeParse(context.edit)
+	return creation.success && transaction.success && edit.success
+		? {
+				selectionRevision,
+				status: 'ready',
+				creation: creation.data,
+				transaction: transaction.data,
+				edit: edit.data
+			}
+		: { selectionRevision, status: 'failed', creation: null, transaction: null, edit: null }
 }

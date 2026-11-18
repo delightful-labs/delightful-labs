@@ -1,8 +1,24 @@
+import type { InspectionEvent } from 'xstate'
+import { diagnosticError } from '../../src/lib/diagnostics/error-details.js'
 import { createFinanceWorkerBinding as nativeBinding } from '../../src/lib/runtime/worker/binding.js'
 import { app } from '../../src/lib/schema.js'
 import { z } from 'zod'
 import { ReadTier } from 'jazz-tools'
 
+export function inspectWorkerFailure(event: InspectionEvent) {
+	if (event.type !== '@xstate.transition') return
+	const error =
+		event.snapshot.status === 'error'
+			? event.snapshot.error
+			: event.eventType === 'xstate.error.actor'
+				? event.event.error
+				: undefined
+	if (error !== undefined)
+		console.error(
+			'Native worker actor error',
+			JSON.stringify({ actorSessionId: event.actorRef.sessionId, error: diagnosticError(error) })
+		)
+}
 let captured: Parameters<typeof nativeBinding>[0] | undefined
 let archiveReceipt: ReturnType<typeof Promise.withResolvers<void>> | undefined
 export function createFinanceWorkerBinding(input: Parameters<typeof nativeBinding>[0]) {
@@ -91,13 +107,29 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 
 			if (c.type === 'TEST_TRANSACTIONS') {
 				const rows = await db.all(
-					app.transactions.where({ organizationId: c.workspaceId }).orderBy('bookedOn'),
+					app.transactions
+						.where({ organizationId: c.workspaceId })
+						.include({ check: true })
+						.orderBy('bookedOn'),
 					{ tier: ReadTier.LocalFirst }
 				)
 				reply.postMessage({
 					ok: true,
 					transactions: rows.map(
-						({ id, amountMinor, currency, kind, description, paymentMethod, checkId }) => ({
+						({
+							id,
+							accountId,
+							amountMinor,
+							currency,
+							kind,
+							description,
+							paymentMethod,
+							checkId,
+							check
+						}) => ({
+							accountId,
+							checkNumber: check?.checkNumber ?? null,
+							checkAccountId: check?.accountId ?? null,
 							id,
 							amountMinor,
 							currency,

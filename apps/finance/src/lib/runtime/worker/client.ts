@@ -41,6 +41,7 @@ export function createFinanceWorkerClient(
 		type: 'VIEW',
 		sessionRevision: 0,
 		transactionKind: EXPENSE,
+		transactionId: null,
 		selection: { workspaceId: null, revision },
 		status: 'starting',
 		identityId: null,
@@ -49,6 +50,7 @@ export function createFinanceWorkerClient(
 		archiveFeedback: null,
 		accountCreation: null,
 		transactionEntry: null,
+		transactionEdit: null,
 		ledger: null
 	})
 	const fail = () => {
@@ -62,6 +64,7 @@ export function createFinanceWorkerClient(
 			archiveFeedback: null,
 			accountCreation: null,
 			transactionEntry: null,
+			transactionEdit: null,
 			ledger: null
 		}))
 	}
@@ -96,6 +99,7 @@ export function createFinanceWorkerClient(
 			archiveFeedback: null,
 			accountCreation: null,
 			transactionEntry: null,
+			transactionEdit: null,
 			ledger: null
 		}))
 	}
@@ -105,23 +109,30 @@ export function createFinanceWorkerClient(
 	worker.addEventListener('messageerror', fail)
 	worker.postMessage(open, [data.port2, control.port2])
 	const view: Readable<FinanceWorkerView> = { subscribe: state.subscribe }
-	function selectContext(workspaceId: string | null, kind: TransactionKind) {
+	function selectContext(
+		workspaceId: string | null,
+		kind: TransactionKind,
+		transactionId: string | null = null
+	) {
 		if (get(state).status === 'closed') return
 		const command = workerContextCommand.parse({
 			type: 'SELECT_CONTEXT',
 			selection: { workspaceId, revision: revision + 1 },
-			kind
+			kind,
+			transactionId
 		})
 		revision = command.selection.revision
 		state.update((view) => ({
 			...view,
 			selection: command.selection,
 			transactionKind: command.kind,
+			transactionId: command.transactionId ?? null,
 			status: view.status === 'failed' ? 'failed' : 'loading',
 			accounts: [],
 			archiveFeedback: null,
 			accountCreation: null,
 			transactionEntry: null,
+			transactionEdit: null,
 			ledger: null
 		}))
 		worker.postMessage(command)
@@ -130,6 +141,8 @@ export function createFinanceWorkerClient(
 		view,
 		selectWorkspace: (workspaceId: string | null) =>
 			selectContext(workspaceId, get(state).transactionKind),
+		selectTransaction: (transactionId: string | null) =>
+			selectContext(get(state).selection.workspaceId, get(state).transactionKind, transactionId),
 		selectTransactionKind: (kind: TransactionKind) =>
 			selectContext(get(state).selection.workspaceId, kind),
 		archiveAccount: (accountId: string, scope: WorkerCommandScope) => {
@@ -155,6 +168,23 @@ export function createFinanceWorkerClient(
 			worker.postMessage(
 				financeWorkerCommand.parse({
 					type: 'ACCOUNT_CREATION',
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection,
+					command
+				})
+			)
+		},
+		transactionEditCommand: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => {
+			const current = get(state)
+			if (
+				current.status === 'closed' ||
+				current.status === 'closing' ||
+				current.status === 'failed'
+			)
+				return
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'TRANSACTION_EDIT',
 					sessionRevision: scope.sessionRevision,
 					selection: scope.selection,
 					command

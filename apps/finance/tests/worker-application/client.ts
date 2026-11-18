@@ -23,6 +23,8 @@ function attach() {
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
 			onTransactionEntry: owner.transactionEntryCommand,
+			onTransactionEdit: owner.transactionEditCommand,
+			onSelectTransaction: owner.selectTransaction,
 			onLedgerPage: owner.selectLedgerPage,
 			onLedgerFilters: owner.setLedgerFilters
 		}
@@ -36,6 +38,9 @@ function request(message: unknown) {
 		error?: string
 		transactions?: {
 			id: string
+			accountId: string
+			checkNumber: string | null
+			checkAccountId: string | null
 			amountMinor: number
 			currency: string
 			kind: string
@@ -74,6 +79,7 @@ const fixture = {
 	archive: (accountId: string) => current().archiveAccount(accountId, get(current().view)),
 	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),
 	releaseArchive: () => request({ type: 'TEST_RELEASE_ARCHIVE' }),
+	selectTransaction: (id: string | null) => current().selectTransaction(id),
 	selectKind: (kind: 'income' | 'expense') => current().selectTransactionKind(kind),
 	select: (workspaceId: string) => current().selectWorkspace(workspaceId),
 	async detach() {

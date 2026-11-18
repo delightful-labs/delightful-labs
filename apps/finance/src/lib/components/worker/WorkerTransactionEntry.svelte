@@ -8,8 +8,10 @@
 	import { m } from '../../paraglide/messages.js'
 	let {
 		view,
+		entry = view.transactionEntry,
 		onsend
 	}: {
+		entry?: FinanceWorkerView['transactionEntry'] | FinanceWorkerView['transactionEdit']
 		view: FinanceWorkerView
 		onsend: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 	} = $props()
@@ -42,8 +44,7 @@
 	}
 </script>
 
-{#if view.transactionEntry}
-	{@const entry = view.transactionEntry}
+{#if entry}
 	<FormFeedback
 		view={entry.form}
 		subject={m['nouns.transaction']({ count: 1 })}
@@ -52,9 +53,13 @@
 		section={entry.form.readiness.kind === 'ready' ? 'readiness' : 'all'}
 		onRetryReadiness={() => send({ type: 'RETRY_READINESS' })}
 	/>
-	{#if entry.form.readiness.kind === 'ready'}
+	{#if entry.form.readiness.kind === 'ready' || ('initialTransaction' in entry && entry.initialTransaction)}
 		{#key scopeKey}
 			<TransactionForm
+				mode={'transactionId' in entry ? 'edit' : 'create'}
+				initialTransaction={'initialTransaction' in entry
+					? (entry.initialTransaction ?? undefined)
+					: undefined}
 				kind={entry.kind}
 				paymentEntry={transactionPages[entry.kind].paymentEntry}
 				organizationId={view.selection.workspaceId}

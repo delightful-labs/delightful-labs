@@ -78,16 +78,19 @@
 		kind: TransactionKind
 		paymentEntry: TransactionPaymentEntry
 		mode?: 'create' | 'edit'
-		initialTransaction?: Pick<
-			TransactionDetail,
-			'accountId' | 'categoryId' | 'amountMinor' | 'currency' | 'bookedOn'
-		> &
-			Partial<Pick<TransactionDetail, 'description' | 'memo' | 'paymentMethod' | 'checkId'>> & {
-				accountName?: Account['name'] | undefined
-				categoryName?: Category['name'] | undefined
-				check?: Pick<NonNullable<TransactionDetail['check']>, 'checkNumber' | 'checkDate'>
-				tags: readonly Tag['name'][]
-			}
+		initialTransaction?:
+			| (Pick<
+					TransactionDetail,
+					'accountId' | 'categoryId' | 'amountMinor' | 'currency' | 'bookedOn'
+			  > &
+					Partial<Pick<TransactionDetail, 'description' | 'memo' | 'paymentMethod' | 'checkId'>> & {
+						accountName?: Account['name'] | undefined
+						categoryName?: Category['name'] | undefined
+						check?:
+							Pick<NonNullable<TransactionDetail['check']>, 'checkNumber' | 'checkDate'> | undefined
+						tags: readonly Tag['name'][]
+					})
+			| undefined
 		organizationId: TransactionDetail['organizationId'] | null
 		accounts: readonly Account[]
 		defaultAccountId: Account['id'] | undefined

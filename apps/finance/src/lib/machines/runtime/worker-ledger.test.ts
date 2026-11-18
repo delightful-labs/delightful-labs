@@ -9,6 +9,7 @@ function facts(): FinanceQueryFacts {
 	return {
 		binding: {},
 		status: 'ready',
+		transaction: undefined,
 		workspaces: [],
 		accounts: [],
 		membership: null,

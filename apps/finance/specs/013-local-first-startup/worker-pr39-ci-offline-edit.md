@@ -322,3 +322,33 @@ unknown-save investigation remains open. A local workspace-test invocation
 selected no cases because its grep was incorrectly anchored; it is not a local
 reproduction or passing qualification. Do not rerun the hosted shard merely to
 turn this failure green without another hypothesis.
+
+## PR46 check-edit failure at cbf87cea
+
+Finance run `44300074975`, application shard 2, passes 91 cases and fails the
+income check edit/account-move case. Its retained readback confirms the check
+number changed to 101 while both transaction and check account remained at the
+original account. The UI snapshot shows the requested destination selected.
+The native independent-transaction persistence and rollback actors report error;
+this is a partial staged save, not a locator-only failure. The trace does not
+supply the underlying native error code, so its cause is not established as the
+same protocol error as earlier failures. Foundation and Clipper pass at this head.
+
+Artifact `14427135846` is retained locally as
+`/private/tmp/finance-check-edit-ci.zip`, with extracted trace/context under the
+same prefix. A focused unchanged local reproduction on the isolated alpha.60
+application passes; that does not resolve the hosted failure. No retries,
+timeouts, assertions or financial recovery semantics were changed. The alpha.67
+worker candidate also needs the exact income/check account-move operation covered
+before relying on the existing workflow there.
+
+The alpha.67 worker's new income/check browser case reproduces the same partial-result
+shape once in WebKit: check number updated, both account IDs unchanged. It is not
+proof of a shared root cause. Native fixture artifacts are retained at
+`finance-jazz-alpha67-Kh1iTf/app/.svelte-kit/finance-worker-read-jqFVxC` in the system
+temporary directory; `/private/tmp/finance-worker-edit-native.log` retains the
+failed readback. The subsequent 27-case matrix and eight independent WebKit
+samples pass with sanitized native XState error capture attached. No error was
+captured in those passing samples. Leave this issue open for actual error evidence;
+alpha.67 does not establish a fix. Full hosted Finance/Foundation/Clipper pass at
+ledger checkpoint `05ce9fb5`, independently of this unresolved native recurrence.

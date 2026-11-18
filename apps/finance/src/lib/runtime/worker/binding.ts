@@ -215,6 +215,27 @@ export function createFinanceWorkerBinding({
 				},
 				{ tier: ReadTier.LocalFirst }
 			),
+		observeTransaction: (organizationId, id, publish, failed) =>
+			db.subscribe(
+				app.transactions
+					.where({ organizationId, id })
+					.select('*', '$createdBy', '$createdAt', '$updatedBy', '$updatedAt')
+					.include({
+						account: true,
+						category: true,
+						tags: { tag: true },
+						check: true,
+						attachments: true
+					}),
+				{
+					onUpdate: (rows) => {
+						if (isCurrent()) publish(observeRow(rows[0]) ?? null)
+						else failed()
+					},
+					onError: failed
+				},
+				{ tier: ReadTier.LocalFirst }
+			),
 		archiveAccount: (accountId) => {
 			if (!isCurrent()) return Promise.reject(new Error('Finance account binding retired'))
 			return archiveAccount(db, accountId)

@@ -17,7 +17,10 @@
 		creatorProfile,
 		editorProfile
 	}: {
-		transaction: TransactionDetail | undefined | null
+		transaction:
+			| Pick<TransactionDetail, '$createdBy' | '$createdAt' | '$updatedBy' | '$updatedAt'>
+			| undefined
+			| null
 		form: Snippet
 		actions?: Snippet
 		attachments?: Snippet

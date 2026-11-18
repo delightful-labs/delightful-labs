@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { StatusMessage } from 'delightful-ui'
+	import TransactionListItem from '../transactions/TransactionListItem.svelte'
 	import TransactionListView from '../transactions/TransactionListView.svelte'
 	import TransactionListFilters from '../filters/TransactionListFilters.svelte'
 	import type { TransactionListFilters as Filters } from '../../filters/transaction-list-filters.js'
@@ -10,10 +11,12 @@
 	import { m } from '../../paraglide/messages.js'
 	let {
 		view,
+		onOpen,
 		onPage,
 		onFilters
 	}: {
 		view: FinanceWorkerView
+		onOpen: (id: string) => void
 		onPage: (page: number, scope: WorkerCommandScope) => void
 		onFilters: (filters: Filters, scope: WorkerCommandScope) => void
 	} = $props()
@@ -31,6 +34,18 @@
 		)
 	)
 	const scope = $derived({ sessionRevision: view.sessionRevision, selection: view.selection })
+	function transactionHref(id: string) {
+		return workspaceHref(
+			view.selection.workspaceId,
+			`${transactionPages[view.transactionKind].path}/${encodeURIComponent(id)}`
+		)
+	}
+	function open(event: MouseEvent, id: string) {
+		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+			return
+		event.preventDefault()
+		onOpen(id)
+	}
 	function pageHref(page: number) {
 		return withQueryParams(
 			workspaceHref(view.selection.workspaceId, transactionPages[view.transactionKind].path),
@@ -57,13 +72,19 @@
 			page={view.ledger.page}
 			pageCount={view.ledger.pageCount}
 			{pageHref}
-			transactionHref={(id) =>
-				workspaceHref(
-					view.selection.workspaceId,
-					`${transactionPages[view.transactionKind].path}/${encodeURIComponent(id)}`
-				)}
+			{transactionHref}
 			onPage={(page) => onPage(page, scope)}
-		/>
+		>
+			{#snippet item(transaction)}
+				<TransactionListItem
+					{transaction}
+					href={transactionHref(transaction.id)}
+					categoryName={categoryNames.get(transaction.categoryId)}
+					tagNames={tagNames.get(transaction.id) ?? []}
+					onclick={(event) => open(event, transaction.id)}
+				/>
+			{/snippet}
+		</TransactionListView>
 	{/if}
 {:else if view.status === 'ready' && view.selection.workspaceId}
 	<StatusMessage

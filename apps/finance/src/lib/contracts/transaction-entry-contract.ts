@@ -43,6 +43,7 @@ export type TransactionEntryObservation = TransactionEntryScope & {
 	categories: readonly Category[]
 	tags: readonly Tag[]
 	intent?: TransactionSaveValues
-	transaction?: TransactionDetail | null
+	transaction?:
+		(Omit<TransactionDetail, 'attachments'> & { attachments: readonly { id: string }[] }) | null
 }
 export type TransactionEntryView = ScopedFormView<unknown, TransactionEntryReason>

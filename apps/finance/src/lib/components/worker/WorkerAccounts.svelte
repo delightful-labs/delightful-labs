@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fromStore, type Readable } from 'svelte/store'
-	import { Table, StatusMessage } from 'delightful-ui'
+	import { Table, StatusMessage, Button } from 'delightful-ui'
 	import WorkspaceSelector from '../workspaces/WorkspaceSelector.svelte'
 	import AccountArchiveButton from '../accounts/AccountArchiveButton.svelte'
 	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
@@ -19,6 +19,8 @@
 		onSelectWorkspace,
 		onArchive,
 		onAccountCreation,
+		onTransactionEdit,
+		onSelectTransaction,
 		onTransactionEntry,
 		onLedgerPage,
 		onLedgerFilters
@@ -28,6 +30,8 @@
 		onArchive: (id: string, scope: WorkerCommandScope) => void
 		onLedgerPage: (page: number, scope: WorkerCommandScope) => void
 		onLedgerFilters: (filters: TransactionListFilters, scope: WorkerCommandScope) => void
+		onSelectTransaction: (id: string | null) => void
+		onTransactionEdit: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 		onTransactionEntry: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 		onAccountCreation: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
 	} = $props()
@@ -103,6 +107,22 @@
 	</Table>
 {/if}
 
-<WorkerTransactionEntry view={live.current} onsend={onTransactionEntry} />
+{#if live.current.transactionId}
+	<Button type="button" onclick={() => onSelectTransaction(null)}
+		>{m['actions.back_to_subject']({ subject: m['nouns.list']({ count: 1 }) })}</Button
+	>
+	<WorkerTransactionEntry
+		view={live.current}
+		entry={live.current.transactionEdit}
+		onsend={onTransactionEdit}
+	/>
+{:else}
+	<WorkerTransactionEntry view={live.current} onsend={onTransactionEntry} />
+{/if}
 
-<WorkerLedger view={live.current} onPage={onLedgerPage} onFilters={onLedgerFilters} />
+<WorkerLedger
+	view={live.current}
+	onPage={onLedgerPage}
+	onFilters={onLedgerFilters}
+	onOpen={onSelectTransaction}
+/>

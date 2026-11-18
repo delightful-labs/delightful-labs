@@ -240,6 +240,12 @@ retain their product/parity requirements, not the abandoned implementation plan.
       All 1,965 Finance units (33 host), 21 three-engine native cases and the
       fresh 200-schema/42-session proof pass. Two existing full-app pagination
       cases preserve legacy behavior. [Ledger ownership and qualification](worker-session-resource-decision.md#worker-owned-balances-and-bounded-ledger-projection).
+      **Selected editing implemented in the candidate:** existing edit policy,
+      draft comparison and staged save run under a third fixed drained form.
+      Native detail reads include check/tag and attachment metadata without bytes.
+      All 1,966 units (34 host) and 27 native cases pass, including cold retained
+      edits. The check/account-move failure reproduced once and remains an open
+      activation blocker; later passing runs do not resolve it. [Editing evidence](worker-session-resource-decision.md#worker-owned-selected-transaction-editing).
       Continue to
       reuse the existing account archive chart/operation and its issued-write
       drain first; supply membership/grant facts. Native create/archive leaves

@@ -20,6 +20,7 @@ import type {
 	WorkerWorkspace,
 	WorkerLedgerRecord
 } from '../../contracts/worker-application.js'
+import type { TransactionEntryObservation } from '../../contracts/transaction-entry-contract.js'
 import { creationFixture } from '../transactions/transaction-create.fixture.js'
 import { createFinanceFormsMachine } from './worker-forms.js'
 import { app } from '../../schema.js'
@@ -59,6 +60,10 @@ function fixture() {
 	const grants: { publish: (rows: ArchiveObservation['grants']) => void; failed: () => void }[] = []
 	const transactionDb = creationFixture()
 	const ledgers: { publish: (rows: WorkerLedgerRecord[]) => void; failed: () => void }[] = []
+	const details: {
+		publish: (row: TransactionEntryObservation['transaction']) => void
+		release: ReturnType<typeof vi.fn>
+	}[] = []
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const createWrite = vi.fn(
 		async (
@@ -148,6 +153,11 @@ function fixture() {
 				order.push('ledger')
 			}
 		},
+		observeTransaction: (_workspaceId, _id, publish) => {
+			const release = vi.fn()
+			details.push({ publish, release })
+			return release
+		},
 		archiveAccount: archiveWrite
 	}
 	const ready = (binding: object): SessionRuntimeObservation<FinanceWorkerCapabilities> => ({
@@ -228,6 +238,7 @@ function fixture() {
 		memberships,
 		grants,
 		ledgers,
+		details,
 		archiveWrite,
 		createWrite,
 		transactionDb,
@@ -349,6 +360,63 @@ describe('Finance worker ownership and selected accounts', () => {
 			})
 			expect(f.actor.getSnapshot().context.ledgerPage).toBe(1)
 			expect(f.actor.getSnapshot().context.ledgerFilters.query).toBe('tail')
+		} finally {
+			f.stop()
+		}
+	})
+	it('withdraws selected detail on A → B → A and rejects old edit commands and reports', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			const open = (id: string, revision: number) =>
+				f.actor.send({
+					type: 'SELECT_CONTEXT',
+					kind: 'expense',
+					transactionId: id,
+					selection: { workspaceId: a, revision }
+				})
+			const firstId = '60000000-0000-4000-8000-000000000001'
+			open(firstId, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.actor.send({
+				type: 'SET_LEDGER_PAGE',
+				page: 2,
+				sessionRevision: f.view().sessionRevision,
+				selection: f.view().selection
+			})
+			open(firstId, 2)
+			last(f.queries).publish([row('Wallet')])
+			expect(f.actor.getSnapshot().context.ledgerPage).toBe(2)
+			const old = last(f.details),
+				scope = f.view()
+			expect(scope.transactionEdit?.form.readiness).toEqual({ kind: 'blocked', reason: 'loading' })
+			old.publish(null)
+			expect(f.view().transactionEdit?.form.readiness).toEqual({
+				kind: 'blocked',
+				reason: 'unavailableReference'
+			})
+			open('60000000-0000-4000-8000-000000000002', 3)
+			open(firstId, 4)
+			last(f.queries).publish([row('Wallet')])
+			expect(old.release).toHaveBeenCalledOnce()
+			old.publish(null)
+			expect(f.view().transactionEdit?.form.readiness).toEqual({
+				kind: 'blocked',
+				reason: 'loading'
+			})
+			f.actor.send({
+				type: 'TRANSACTION_EDIT',
+				command: { type: 'SUBMIT', values: {} },
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			expect(f.transactionDb.beginTransaction).not.toHaveBeenCalled()
+			last(f.details).publish(null)
+			expect(f.view().transactionEdit?.initialTransaction).toBeNull()
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(last(f.details).release).toHaveBeenCalledOnce()
 		} finally {
 			f.stop()
 		}

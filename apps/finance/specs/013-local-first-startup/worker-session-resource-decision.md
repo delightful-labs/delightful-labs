@@ -757,3 +757,44 @@ Qualify real signed-out/starting/ready SDK sessions against
 development XState, acquisition retry and interrupted attachment, same-account
 and A → B → A replacement, and actual SDK close after domain drain. Keep the
 production native restart/Svelte proof as separate coverage. U2 remains open.
+
+## Worker-owned selected transaction editing
+
+Keep one selected transaction ID in the application's existing context selection. Opening or
+leaving an editor advances the same selection revision, withdrawing old views and rejecting stale
+form commands. The existing query owner invokes one native selected-row subscription alongside its
+reference observations; an absent selection starts no detail read. Copy the selected transaction,
+check and tag references without fetching attachment bytes. Pending, missing and failed reads remain
+distinct observations and use the existing form availability policy.
+
+Invoke a third fixed form under the SDK-bound forms owner using the existing edit form options and
+transaction submission chart. It owns draft comparison, validation, authorization, staged writes,
+settlement, scope interruption and unknown outcomes. Drain all three form children before native
+session replacement/close. No new save implementation or call-owner population is needed. The
+ordinary edit form shares the existing TransactionForm presentation and sends only scoped intents;
+Window receives one bounded initial-value projection, never SDK rows or a query API. Transfer and
+attachment controls remain pending their existing workflow adoption; this slice cannot activate the
+production replacement. Qualify expense/income edits, unchanged/reset behavior, stale selected-row
+reports and intents, reference loss, pending-write scope replacement and native offline retention.
+
+Selected editing is implemented in the candidate with the existing edit policy/save chart,
+one additional fixed form and one metadata-only native detail observation. The shared form UI also
+renders observed read-only values. Selected IDs, reference snapshots and scoped commands withdraw
+on context replacement; all three forms drain before native SDK close. The ledger keeps its page
+when opening/leaving a detail in the same workspace/direction.
+
+Qualification: all **1,966 Finance units** (34 host), complete
+Finance/browser-test types and static checks, and **27 actual worker browser cases** pass. The native
+matrix covers expense/income/check editing, unchanged/reverted drafts, repeated edits, account moves
+and edited transactions through two offline process restarts. Ledger checkpoint `05ce9fb5` passes
+all hosted Finance/Foundation/Clipper workflows.
+
+The check/account-move operation also failed once on WebKit before native error instrumentation,
+matching the partial-result shape of the separately retained alpha.60 hosted failure. A later full
+27-case run and eight bounded WebKit diagnostic samples pass; they do not establish a fix. Retain
+that failure as an open activation blocker. Fixture-only XState inspection now reuses the existing
+sanitized error projection, extracted unchanged from environment-bound logging so it can run in a
+Worker. It never exports actor snapshots, draft data or credentials. No automatic retries, timeout
+changes or financial recovery behavior were introduced. Logs:
+`/private/tmp/finance-worker-edit-{static,tests-types,full-unit,native,diagnostic}.log` and
+`/private/tmp/finance-worker-check-move-probe.log`.

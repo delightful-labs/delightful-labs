@@ -7,6 +7,7 @@ import type {
 	WorkerAccountRecord,
 	WorkerLedgerRecord
 } from '../../contracts/worker-application.js'
+import type { TransactionEntryObservation } from '../../contracts/transaction-entry-contract.js'
 import type { Category, Tag } from '../../schema.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 
@@ -17,6 +18,7 @@ export type FinanceWorkerReady = Extract<
 type Input = {
 	ready: FinanceWorkerReady
 	initialWorkspaces: WorkerWorkspace[] | null
+	transactionId: string | null
 	selection: WorkerSelection
 	binding: object
 	reportDisposalFailure: () => void
@@ -28,6 +30,7 @@ const empty = {
 	grants: null,
 	categories: null,
 	tags: null,
+	transaction: undefined,
 	transactions: null
 }
 type Rows = {
@@ -37,6 +40,7 @@ type Rows = {
 	grants: ArchiveObservation['grants'] | null
 	categories: Category[] | null
 	tags: Tag[] | null
+	transaction: TransactionEntryObservation['transaction']
 	transactions: WorkerLedgerRecord[] | null
 }
 export type FinanceQueryFacts = Rows & { binding: object; status: 'loading' | 'ready' | 'failed' }
@@ -44,7 +48,14 @@ export type FinanceQueryFacts = Rows & { binding: object; status: 'loading' | 'r
 /** One native subscription per invoked actor; failures and release stay with its owner. */
 function observeQuery<Result>(
 	event:
-		'WORKSPACES' | 'ACCOUNTS' | 'MEMBERSHIP' | 'GRANTS' | 'CATEGORIES' | 'TAGS' | 'TRANSACTIONS'
+		| 'WORKSPACES'
+		| 'ACCOUNTS'
+		| 'MEMBERSHIP'
+		| 'GRANTS'
+		| 'CATEGORIES'
+		| 'TAGS'
+		| 'TRANSACTIONS'
+		| 'TRANSACTION'
 ) {
 	return createCallbackLogic<
 		never,
@@ -79,6 +90,7 @@ const membership = observeQuery<ArchiveObservation['membership']>('MEMBERSHIP')
 const grants = observeQuery<ArchiveObservation['grants']>('GRANTS')
 const categories = observeQuery<Category[]>('CATEGORIES')
 const tags = observeQuery<Tag[]>('TAGS')
+const transaction = observeQuery<TransactionEntryObservation['transaction']>('TRANSACTION')
 const transactions = observeQuery<WorkerLedgerRecord[]>('TRANSACTIONS')
 
 export const financeQueriesMachine = setup({
@@ -92,11 +104,12 @@ export const financeQueriesMachine = setup({
 			GRANTS: types<{ binding: object; rows: ArchiveObservation['grants'] }>(),
 			CATEGORIES: types<{ binding: object; rows: Category[] }>(),
 			TAGS: types<{ binding: object; rows: Tag[] }>(),
+			TRANSACTION: types<{ binding: object; rows: TransactionEntryObservation['transaction'] }>(),
 			TRANSACTIONS: types<{ binding: object; rows: WorkerLedgerRecord[] }>(),
 			READ_FAILED: types<{ binding: object }>()
 		}
 	},
-	actors: { workspaces, accounts, membership, grants, categories, tags, transactions }
+	actors: { workspaces, accounts, membership, grants, categories, tags, transactions, transaction }
 }).createMachine({
 	id: 'finance-queries',
 	initial: 'running',
@@ -169,6 +182,21 @@ export const financeQueriesMachine = setup({
 					onError: { target: 'failed', context: empty }
 				},
 				{
+					src: 'transaction',
+					input: ({ context }) => ({
+						...context,
+						observe:
+							context.selection.workspaceId && context.transactionId
+								? context.ready.capabilities.observeTransaction.bind(
+										null,
+										context.selection.workspaceId,
+										context.transactionId
+									)
+								: undefined
+					}),
+					onError: { target: 'failed', context: empty }
+				},
+				{
 					src: 'transactions',
 					input: ({ context }) => ({
 						...context,
@@ -195,6 +223,8 @@ export const financeQueriesMachine = setup({
 					event.binding === context.binding ? { context: { categories: event.rows } } : undefined,
 				TAGS: ({ context, event }) =>
 					event.binding === context.binding ? { context: { tags: event.rows } } : undefined,
+				TRANSACTION: ({ context, event }) =>
+					event.binding === context.binding ? { context: { transaction: event.rows } } : undefined,
 				TRANSACTIONS: ({ context, event }) =>
 					event.binding === context.binding ? { context: { transactions: event.rows } } : undefined,
 				READ_FAILED: ({ context, event }) =>
@@ -224,6 +254,7 @@ export function selectFinanceQueryFacts(
 		grants: rows.grants,
 		categories: rows.categories,
 		tags: rows.tags,
+		transaction: rows.transaction,
 		transactions: rows.transactions
 	}
 }

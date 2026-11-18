@@ -10,10 +10,12 @@
 	let {
 		transaction,
 		href,
+		onclick,
 		categoryName,
 		tagNames = []
 	}: {
 		href: string
+		onclick?: ((event: MouseEvent) => void) | undefined
 		transaction: TransactionListRow
 		categoryName: string | undefined
 		tagNames?: readonly string[]
@@ -33,6 +35,7 @@
 		>
 		<AppLink
 			{href}
+			{onclick}
 			component={TransactionListItemButton}
 			aria-label={`${m['labels.subject_details']({ subject: m['nouns.transaction']({ count: 1 }) })}: ${categoryName ?? m['status.unavailable_subject']({ subject: m['nouns.category']({ count: 1 }) })}, ${transaction.description ? `${transaction.description}, ` : ''}${formatMoney(transaction.amountMinor, transaction.currency, getLocale())}`}
 			><ScreenReaderText

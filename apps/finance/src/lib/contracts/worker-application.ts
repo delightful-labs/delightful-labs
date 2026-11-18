@@ -17,6 +17,8 @@ import {
 	transactionLedgerRecordSchema,
 	transactionListRowSchema
 } from '../validation/transactions.js'
+import { PAYMENT_METHOD } from '../domain/payment-method.js'
+import type { TransactionEntryObservation } from './transaction-entry-contract.js'
 import { INCOME, EXPENSE } from '../domain/transaction-kind.js'
 import type { createFinanceFormsMachine } from '../machines/runtime/worker-forms.js'
 
@@ -35,7 +37,8 @@ export const workerTransactionKind = z.enum([INCOME, EXPENSE])
 export const workerContextCommand = z.strictObject({
 	type: z.literal('SELECT_CONTEXT'),
 	selection: workerSelection,
-	kind: workerTransactionKind
+	kind: workerTransactionKind,
+	transactionId: z.uuid().nullable().optional()
 })
 export const workerLedgerFilters = z.strictObject({
 	start: z.string(),
@@ -84,6 +87,12 @@ export const financeWorkerCommand = z.discriminatedUnion('type', [
 		command: workerTransactionEntryCommand
 	}),
 	z.strictObject({
+		type: z.literal('TRANSACTION_EDIT'),
+		sessionRevision,
+		selection: workerSelection,
+		command: workerTransactionEntryCommand
+	}),
+	z.strictObject({
 		type: z.literal('SET_LEDGER_PAGE'),
 		sessionRevision,
 		selection: workerSelection,
@@ -112,10 +121,31 @@ export const workerTransactionEntry = z.strictObject({
 	defaultAccountId: z.uuid().nullable(),
 	defaultCategoryId: z.uuid().nullable()
 })
+export const workerTransactionInitial = transactionLedgerRecordSchema
+	.pick({
+		accountId: true,
+		categoryId: true,
+		amountMinor: true,
+		currency: true,
+		bookedOn: true,
+		description: true,
+		memo: true
+	})
+	.extend({
+		paymentMethod: z.enum(PAYMENT_METHOD).nullable(),
+		checkId: z.uuid().nullable(),
+		check: z.object({ checkNumber: z.string(), checkDate: z.string() }).optional(),
+		tags: z.array(z.string())
+	})
+export const workerTransactionEdit = workerTransactionEntry.extend({
+	transactionId: z.uuid(),
+	initialTransaction: workerTransactionInitial.nullable()
+})
 export const financeWorkerView = z.strictObject({
 	type: z.literal('VIEW'),
 	sessionRevision,
 	transactionKind: workerTransactionKind,
+	transactionId: z.uuid().nullable(),
 	selection: workerSelection,
 	status: z.enum(['starting', 'signed-out', 'loading', 'ready', 'failed', 'closing', 'closed']),
 	identityId: z.uuid().nullable(),
@@ -129,6 +159,7 @@ export const financeWorkerView = z.strictObject({
 	archiveFeedback: accountArchiveFeedback.nullable(),
 	accountCreation: workerAccountCreationView.nullable(),
 	transactionEntry: workerTransactionEntry.nullable(),
+	transactionEdit: workerTransactionEdit.nullable(),
 	ledger: workerLedgerView.nullable()
 })
 export const financeWorkerReply = z.discriminatedUnion('type', [
@@ -174,6 +205,12 @@ export type FinanceWorkerCapabilities = {
 	observeTransactions(
 		workspaceId: string,
 		publish: (rows: WorkerLedgerRecord[]) => void,
+		failed: () => void
+	): () => void
+	observeTransaction(
+		workspaceId: string,
+		transactionId: string,
+		publish: (row: TransactionEntryObservation['transaction']) => void,
 		failed: () => void
 	): () => void
 	archiveAccount(accountId: string): Promise<unknown>

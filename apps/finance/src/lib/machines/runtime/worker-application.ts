@@ -65,6 +65,7 @@ type Input = {
 type Context = Input & {
 	ready: Ready | undefined
 	selection: WorkerSelection
+	transactionId: string | null
 	transactionKind: TransactionKind
 	ledgerPage: number
 	ledgerFilters: TransactionListFilters
@@ -139,20 +140,34 @@ function creationObservation(context: Context): AccountCreationObservation {
 function formsObservation(context: Context): FinanceFormsObservation {
 	const creation = creationObservation(context),
 		archive = archiveObservation(context)
+	const selected = context.facts?.transaction
+	const transaction = {
+		...archive,
+		binding: creation.binding,
+		kind: context.transactionKind,
+		loading:
+			archive.loading ||
+			!context.facts ||
+			context.facts.categories === null ||
+			context.facts.tags === null,
+		failed: context.facts?.status === 'failed',
+		categories: context.facts?.categories ?? [],
+		tags: context.facts?.tags ?? []
+	}
 	return {
 		creation,
-		transaction: {
-			...archive,
-			binding: creation.binding,
-			kind: context.transactionKind,
+		transaction,
+		edit: {
+			...transaction,
+			transactionId: context.transactionId,
+			transaction:
+				selected?.id === context.transactionId &&
+				selected.organizationId === context.selection.workspaceId &&
+				selected.kind === context.transactionKind
+					? selected
+					: null,
 			loading:
-				archive.loading ||
-				!context.facts ||
-				context.facts.categories === null ||
-				context.facts.tags === null,
-			failed: context.facts?.status === 'failed',
-			categories: context.facts?.categories ?? [],
-			tags: context.facts?.tags ?? []
+				transaction.loading || (!!context.transactionId && context.facts?.transaction === undefined)
 		}
 	}
 }
@@ -194,12 +209,17 @@ export function createFinanceWorkerMachine({
 			internalEvents: { ARCHIVE_DRAINED: types() },
 			events: {
 				SESSION: types<{ view: SessionRuntimeView<FinanceWorkerCapabilities> }>(),
-				SELECT_CONTEXT: types<{ selection: WorkerSelection; kind: TransactionKind }>(),
+				SELECT_CONTEXT: types<{
+					selection: WorkerSelection
+					kind: TransactionKind
+					transactionId?: string | null | undefined
+				}>(),
 				TRANSACTION_ENTRY: types<{
 					selection: WorkerSelection
 					sessionRevision: number
 					command: WorkerTransactionEntryCommand
 				}>(),
+				TRANSACTION_EDIT: types<WorkerCommandScope & { command: WorkerTransactionEntryCommand }>(),
 				ARCHIVE_ACCOUNT: types<{
 					selection: WorkerSelection
 					sessionRevision: number
@@ -240,6 +260,7 @@ export function createFinanceWorkerMachine({
 			...input,
 			ready: undefined,
 			selection: { workspaceId: null, revision: 0 },
+			transactionId: null,
 			transactionKind: EXPENSE,
 			ledgerPage: 1,
 			ledgerFilters: emptyLedgerFilters,
@@ -393,6 +414,7 @@ export function createFinanceWorkerMachine({
 							...withdrawn,
 							readBinding: {},
 							sessionRevision: context.sessionRevision + 1,
+							transactionId: null,
 							ledgerFilters: emptyLedgerFilters,
 							ledgerPage: 1,
 							sessionStatus: view.status
@@ -411,7 +433,12 @@ export function createFinanceWorkerMachine({
 							...context,
 							selection: event.selection,
 							transactionKind: event.kind,
-							ledgerPage: 1,
+							transactionId: event.transactionId ?? null,
+							ledgerPage:
+								event.selection.workspaceId === context.selection.workspaceId &&
+								event.kind === context.transactionKind
+									? context.ledgerPage
+									: 1,
 							archive: undefined,
 							readBinding,
 							facts: context.facts
@@ -424,6 +451,7 @@ export function createFinanceWorkerMachine({
 										grants: null,
 										categories: null,
 										tags: null,
+										transaction: undefined,
 										transactions: null
 									} satisfies FinanceQueryFacts)
 								: undefined
@@ -460,6 +488,20 @@ export function createFinanceWorkerMachine({
 							selectionRevision: context.selection.revision
 						})
 						enq.sendTo(context.forms.owner, { type: 'ACCOUNT_CREATION', command: event.command })
+					},
+					TRANSACTION_EDIT: ({ context, event }, enq) => {
+						if (
+							!sameCommandScope(context, event) ||
+							!context.forms ||
+							context.forms.binding !== context.ready?.binding
+						)
+							return
+						enq.sendTo(context.forms.owner, {
+							type: 'OBSERVE',
+							observation: formsObservation(context),
+							selectionRevision: context.selection.revision
+						})
+						enq.sendTo(context.forms.owner, { type: 'TRANSACTION_EDIT', command: event.command })
 					},
 					TRANSACTION_ENTRY: ({ context, event }, enq) => {
 						if (
@@ -512,6 +554,7 @@ export function createFinanceWorkerMachine({
 								ready: required(context.ready),
 								initialWorkspaces: context.facts?.workspaces ?? null,
 								selection: context.selection,
+								transactionId: context.transactionId,
 								binding: required(context.readBinding),
 								reportDisposalFailure: () => self.send({ type: 'READ_DISPOSAL_FAILED' })
 							}),
@@ -576,6 +619,7 @@ export function createFinanceWorkerMachine({
 									context: {
 										selection: event.selection,
 										transactionKind: event.kind,
+										transactionId: event.transactionId ?? null,
 										formsView: undefined
 									}
 								}
@@ -690,7 +734,9 @@ export function selectFinanceWorkerView(
 		context.facts?.accounts && context.facts.transactions
 			? calculateAccountBalances(context.facts.accounts, context.facts.transactions)
 			: null
-	const transactionFacts = formsObservation(context).transaction
+	const observations = formsObservation(context)
+	const transactionFacts = observations.transaction
+	const edited = observations.edit.transaction
 	const transactionAccounts = writableTransactionAccounts({
 		...transactionFacts,
 		accounts: context.facts?.accounts ?? []
@@ -707,6 +753,7 @@ export function selectFinanceWorkerView(
 		type: 'VIEW',
 		sessionRevision: context.sessionRevision,
 		transactionKind: context.transactionKind,
+		transactionId: context.transactionId,
 		selection: context.selection,
 		status,
 		identityId: snapshot.status === 'active' ? (context.ready?.identityId ?? null) : null,
@@ -741,6 +788,41 @@ export function selectFinanceWorkerView(
 						context.ledgerFilters,
 						context.ledgerPage
 					)
+				: null,
+		transactionEdit:
+			forms && context.transactionId
+				? {
+						transactionId: context.transactionId,
+						kind: context.transactionKind,
+						form: forms.edit,
+						accounts: transactionAccounts,
+						categories: applicableTransactionCategories(transactionFacts),
+						tagSuggestions: applicableTransactionTags(transactionFacts).map((tag) => tag.name),
+						defaultAccountId: edited?.accountId ?? null,
+						defaultCategoryId: edited?.categoryId ?? null,
+						initialTransaction: edited
+							? {
+									accountId: edited.accountId,
+									categoryId: edited.categoryId,
+									amountMinor: edited.amountMinor,
+									currency: edited.currency,
+									bookedOn: edited.bookedOn,
+									description: edited.description,
+									memo: edited.memo,
+									paymentMethod: edited.paymentMethod,
+									checkId: edited.checkId,
+									...(edited.check
+										? {
+												check: {
+													checkNumber: edited.check.checkNumber,
+													checkDate: edited.check.checkDate
+												}
+											}
+										: {}),
+									tags: edited.tags?.flatMap((link) => (link.tag ? [link.tag.name] : [])) ?? []
+								}
+							: null
+					}
 				: null,
 		transactionEntry: forms
 			? {
@@ -795,6 +877,14 @@ export function selectFinanceFormObservations(
 	const archive = selectFinanceArchiveObservation(undefined)
 	return {
 		creation: { ...archive, error: null },
-		transaction: { ...archive, kind: EXPENSE, categories: [], tags: [] }
+		transaction: { ...archive, kind: EXPENSE, categories: [], tags: [] },
+		edit: {
+			...archive,
+			kind: EXPENSE,
+			categories: [],
+			tags: [],
+			transactionId: null,
+			transaction: null
+		}
 	}
 }

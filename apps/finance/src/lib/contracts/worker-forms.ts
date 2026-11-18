@@ -37,6 +37,7 @@ export type WorkerTransactionEntryCommand = z.output<typeof workerTransactionEnt
 export type FinanceFormsObservation = {
 	creation: AccountCreationObservation
 	transaction: TransactionEntryObservation
+	edit: TransactionEntryObservation
 }
 export const workerTransactionCategory = appCategorySchema.extend({ id: z.uuid() })
 

@@ -64,6 +64,18 @@ beforeAll(async () => {
 						)
 							return resolve('tests/worker-application/read-binding.ts')
 					},
+					transform(code, id) {
+						if (!/\/runtime\/worker\/application\.worker\.ts$/.test(id)) return
+						return code
+							.replace(
+								'import { createFinanceWorkerBinding }',
+								'import { createFinanceWorkerBinding, inspectWorkerFailure }'
+							)
+							.replace(
+								'application = createActor(machine, {',
+								'application = createActor(machine, { inspect: inspectWorkerFailure,'
+							)
+					},
 					generateBundle() {
 						const modules = [...this.getModuleIds()]
 						if (
@@ -388,6 +400,139 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('edits income check details and moves its check and ledger account together', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			page.on('console', (message) => {
+				if (message.type() === 'error' && message.text().startsWith('Native worker actor error'))
+					console.error(message.text())
+			})
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Check origin'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await createAccountUI(page, 'Check destination')
+				await page.evaluate(() => window.financeWorkerReadFixture.selectKind('income'))
+				await browserExpect(
+					page
+						.getByLabel('Category', { exact: true })
+						.locator('option', { hasText: 'Worker income' })
+				).toHaveCount(1)
+				await page.getByLabel('Account', { exact: true }).selectOption(accountId)
+				await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Worker income' })
+				await page.getByLabel('Amount', { exact: true }).fill('50.00')
+				await page.getByLabel('Date', { exact: true }).fill('2026-11-19')
+				await page.getByLabel('Payment method', { exact: true }).selectOption('check')
+				await page.locator('[name="checkNumber"]').fill('100')
+				await page.locator('[name="checkDate"]').fill('2026-11-19')
+				const save = page.getByRole('button', { name: /save transaction/i })
+				await save.click()
+				await browserExpect(
+					page.getByRole('status').filter({ hasText: /transaction saved/i })
+				).toBeVisible()
+				await page.getByRole('link', { name: /transaction details/i }).click()
+				await browserExpect(page.locator('[name="checkNumber"]')).toHaveValue('100')
+				await page.locator('[name="checkNumber"]').fill('101')
+				await page
+					.getByLabel('Account', { exact: true })
+					.selectOption({ label: 'Check destination · USD' })
+				await save.click()
+				await browserExpect(save).toBeDisabled()
+				await browserExpect
+					.poll(
+						async () =>
+							(
+								await page.evaluate(
+									(id) => window.financeWorkerReadFixture.transactions(id),
+									workspaceId
+								)
+							).transactions?.[0]
+					)
+					.toMatchObject({
+						checkNumber: '101',
+						accountId: await page.getByLabel('Account', { exact: true }).inputValue(),
+						checkAccountId: await page.getByLabel('Account', { exact: true }).inputValue()
+					})
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('edits an existing expense through the worker form and discards a replaced editor draft', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Edit wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await enterExpenseUI(page, accountId, 'Worker editable expense')
+				await page
+					.getByRole('link', { name: /transaction details.*Worker editable expense/i })
+					.click()
+				const amount = page.getByLabel('Amount', { exact: true }),
+					save = page.getByRole('button', { name: /save transaction/i })
+				await browserExpect(amount).toHaveValue('12.34')
+				await browserExpect(save).toBeDisabled()
+				await amount.fill('25.00')
+				await browserExpect(save).toBeEnabled()
+				await amount.fill('12.34')
+				await browserExpect(save).toBeDisabled()
+				await amount.fill('25.00')
+				await save.click()
+				await browserExpect
+					.poll(
+						async () =>
+							(
+								await page.evaluate(
+									(id) => window.financeWorkerReadFixture.transactions(id),
+									workspaceId
+								)
+							).transactions?.[0]?.amountMinor
+					)
+					.toBe(2500)
+				await browserExpect(save).toBeDisabled()
+				await page
+					.getByLabel('Memo (additional notes)', { exact: true })
+					.fill('Repeated worker edit')
+				await save.click()
+				await browserExpect(save).toBeDisabled()
+				const id = await page.evaluate(() => window.financeWorkerReadFixture.state().transactionId)
+				expect(id).not.toBeNull()
+				await amount.fill('99.00')
+				await page.evaluate(() => window.financeWorkerReadFixture.selectTransaction(null))
+				await page.evaluate((id) => window.financeWorkerReadFixture.selectTransaction(id), id)
+				await browserExpect(amount).toHaveValue('25.00')
+				await browserExpect(
+					page.getByLabel('Memo (additional notes)', { exact: true })
+				).toHaveValue('Repeated worker edit')
+				await browserExpect(save).toBeDisabled()
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('renders bounded ledger pages, exact live balances and worker-owned text filtering', async () => {
 			onTestFailed(() => {
 				retained = true
@@ -425,6 +570,16 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
 				await browserExpect(page.getByText('$40.00', { exact: true })).toBeVisible()
 				expect(page.url()).toBe(originalUrl)
+				await page
+					.getByRole('link', { name: /transaction details/i })
+					.first()
+					.click()
+				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('1.00')
+				expect(
+					await page.evaluate(() => window.financeWorkerReadFixture.state().ledger?.page)
+				).toBe(2)
+				await page.getByRole('button', { name: 'Back to List', exact: true }).click()
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
 				expect(
 					await page.evaluate(
 						() =>
@@ -521,6 +676,21 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				).toBeVisible()
 				await createAccountUI(page, 'Offline created wallet')
 				await enterExpenseUI(page, accountId, 'Retained expense')
+				await page.getByRole('link', { name: /transaction details.*Retained expense/i }).click()
+				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('12.34')
+				await page.getByLabel('Amount', { exact: true }).fill('45.67')
+				await page.getByRole('button', { name: /save transaction/i }).click()
+				await browserExpect
+					.poll(
+						async () =>
+							(
+								await page.evaluate(
+									(id) => window.financeWorkerReadFixture.transactions(id),
+									workspaceId
+								)
+							).transactions?.[0]?.amountMinor
+					)
+					.toBe(4567)
 				await close(page)
 				await context.close()
 				context = await engine.launchPersistentContext(profile, { headless: true })
@@ -559,7 +729,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				).toMatchObject({
 					ok: true,
 					transactions: [
-						{ amountMinor: 1234, currency: 'USD', kind: 'expense', description: 'Retained expense' }
+						{ amountMinor: 4567, currency: 'USD', kind: 'expense', description: 'Retained expense' }
 					]
 				})
 				await close(page)
