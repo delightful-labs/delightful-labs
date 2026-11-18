@@ -1,3 +1,4 @@
+import { publicationCleanupMachine } from '../../annotations/publication-cleanup.js'
 import { annotationsMachine, selectAnnotations } from '../../annotations/machine.js'
 import { documentReadingProgress } from '../../reader/schema.js'
 import type { EventPayload } from '../events.js'
@@ -115,6 +116,7 @@ function organizationStatuses(context: Context, documentId: string) {
 }
 const actors = {
 	annotations: annotationsMachine,
+	publicationCleanup: publicationCleanupMachine,
 	readerExperience: readerExperienceMachine,
 	images: imageQueueMachine,
 	search: createSearchMachine(),
@@ -193,6 +195,7 @@ export const libraryMachine = setup({
 		tags: types<string>(),
 		children: {
 			annotations: types<import('xstate').ActorRefFrom<typeof annotationsMachine>>(),
+			publicationCleanup: types<import('xstate').ActorRefFrom<typeof publicationCleanupMachine>>(),
 			readerExperience: types<import('xstate').ActorRefFrom<(typeof actors)['readerExperience']>>(),
 			images: types<import('xstate').ActorRefFrom<(typeof actors)['images']>>(),
 			search: types<import('xstate').ActorRefFrom<(typeof actors)['search']>>(),
@@ -305,6 +308,8 @@ export const libraryMachine = setup({
 					!(
 						matchesState({ running: { control: 'closing' } }, args.value) &&
 						matchesState({ running: { annotationLifecycle: 'closed' } }, args.value) &&
+						(matchesState({ running: { publicationLifecycle: 'closed' } }, args.value) ||
+							matchesState({ running: { publicationLifecycle: 'failed' } }, args.value)) &&
 						matchesState({ running: { fakeDataLifecycle: 'closed' } }, args.value) &&
 						(matchesState({ running: { searchLifecycle: 'closed' } }, args.value) ||
 							matchesState({ running: { searchLifecycle: 'unsupported' } }, args.value)) &&
@@ -869,6 +874,25 @@ export const libraryMachine = setup({
 								SHUTDOWN: (_args, enq) => {
 									enq.sendTo('annotations', { type: 'SHUTDOWN' })
 								}
+							}
+						},
+						closed: {},
+						failed: {}
+					}
+				},
+				publicationLifecycle: {
+					initial: 'active',
+					invoke: {
+						id: 'publicationCleanup',
+						src: 'publicationCleanup',
+						input: ({ context }) => ({ capability: context.capability?.publicationCleanup }),
+						onDone: { target: '.closed' },
+						onError: { target: '.failed' }
+					},
+					states: {
+						active: {
+							on: {
+								SHUTDOWN: (_args, enq) => enq.sendTo('publicationCleanup', { type: 'SHUTDOWN' })
 							}
 						},
 						closed: {},

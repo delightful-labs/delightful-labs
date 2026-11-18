@@ -19,7 +19,7 @@ export async function fetchHop(
 	url: URL,
 	destination: { address: string; family: number },
 	signal: AbortSignal,
-	mode: 'resolve' | 'extract' | 'asset' = 'extract'
+	mode: 'resolve' | 'extract' | 'asset' | 'source' = 'extract'
 ): Promise<Hop> {
 	const bodyLimit = mode === 'asset' ? 4 * 1024 * 1024 : BODY_LIMIT
 	const response = await new Promise<Hop>((resolve, reject) => {

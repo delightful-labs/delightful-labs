@@ -127,7 +127,7 @@ it('previews accepted document-note content without changing the note or allocat
 			createdAt: '2026-11-16T15:00:00.000Z'
 		}
 	})
-	expect(await a.backend.all(app.publicationLinks.where({ libraryId: a.libraryId }))).toEqual([])
+	expect(await a.backend.all(app.publications.where({ libraryId: a.libraryId }))).toEqual([])
 	expect((await a.backend.one(app.notes.where({ id: a.noteId })))?.text).toBe('My private note 🦊')
 	await a.backend.update(app.notes, a.noteId, { text: '' }).wait({ tier: 'global' })
 	expect((await preview(a))?.record).toMatchObject({ body: { value: '' } })
@@ -200,21 +200,47 @@ it('refuses trashed, missing or cross-library documents', async () => {
 it('leaves an existing same-publisher association to the future reconciliation workflow', async () => {
 	const a = await owner('preview-linked')
 	await a.backend
-		.insert(app.publicationLinks, {
+		.insert(app.publications, {
 			libraryId: a.libraryId,
 			highlightId: null,
 			noteId: a.noteId,
-			uri: 'at://did:web:another.example/at.margin.note/other-publisher'
+			publishingDid: 'did:web:another.example',
+			lifecycle: {
+				state: 'published',
+				uri: 'at://did:web:another.example/at.margin.note/other-publisher'
+			}
 		})
 		.wait({ tier: 'global' })
 	expect(await preview(a)).toBeDefined()
+	const id = crypto.randomUUID()
 	await a.backend
-		.insert(app.publicationLinks, {
-			libraryId: a.libraryId,
-			highlightId: null,
-			noteId: a.noteId,
-			uri: `at://${publishingDid}/at.margin.note/existing`
+		.insert(
+			app.publications,
+			{
+				libraryId: a.libraryId,
+				highlightId: null,
+				noteId: a.noteId,
+				publishingDid,
+				lifecycle: { state: 'private' }
+			},
+			{ id }
+		)
+		.wait({ tier: 'global' })
+	expect(await preview(a)).toBeDefined()
+	await a.backend
+		.update(app.publications, id, { lifecycle: { state: 'requested' } })
+		.wait({ tier: 'global' })
+	const candidate = await preview(a)
+	if (!candidate) throw new Error('Expected a preview before issuance')
+	const uri = `at://${publishingDid}/at.margin.note/existing`
+	await a.backend
+		.update(app.publications, id, {
+			lifecycle: { state: 'issued', uri, record: candidate.record }
 		})
+		.wait({ tier: 'global' })
+	expect(await preview(a)).toBeUndefined()
+	await a.backend
+		.update(app.publications, id, { lifecycle: { state: 'published', uri } })
 		.wait({ tier: 'global' })
 	expect(await preview(a)).toBeUndefined()
 })

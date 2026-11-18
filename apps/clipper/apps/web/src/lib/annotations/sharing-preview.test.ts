@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createActor, SimulatedClock, toPromise, waitFor } from 'xstate'
 import { sharingPreviewMachine, selectSharingPreview } from './sharing-preview.js'
+import { highlightRowSchema } from './schema.js'
 import type { AnnotationNote } from './schema.js'
 import type { PublicationPreview } from './publication-preview.js'
 
@@ -184,4 +185,224 @@ it('contains errors, permits a fresh retry and aborts timeout or shutdown', asyn
 	expect(signal?.aborted).toBe(true)
 	expect(selectSharingPreview(a.actor.getSnapshot()).value).toBeUndefined()
 	pending.resolve(Response.json(a.value))
+})
+
+it('publishes the displayed selection once and exposes an address only after confirmation', async () => {
+	const a = fixture()
+	const published = {
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid,
+		state: 'published',
+		uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a'
+	}
+	const gate = Promise.withResolvers<Response>()
+	const fetch = vi.fn<typeof globalThis.fetch>(async (path) =>
+		path === '/api/publication/preview' ? Response.json(a.value) : gate.promise
+	)
+	vi.stubGlobal('fetch', fetch)
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	const requestId = selectSharingPreview(a.actor.getSnapshot()).requestId
+	a.actor.send({ type: 'PUBLISH', requestId: requestId - 1 })
+	expect(fetch).toHaveBeenCalledTimes(1)
+	a.actor.send({ type: 'PUBLISH', requestId })
+	a.actor.send({ type: 'PUBLISH', requestId })
+	expect(selectSharingPreview(a.actor.getSnapshot()).pending).toBe(true)
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+	const [url, init] = fetch.mock.calls[1] ?? []
+	expect(url).toBe('/api/publication/publish')
+	expect(JSON.parse(String(init?.body))).toEqual({
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid
+	})
+	expect(fetch).toHaveBeenCalledTimes(2)
+	gate.resolve(Response.json(published))
+	await waitFor(a.actor, (s) => s.matches('published'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toEqual(published)
+	expect(selectSharingPreview(a.actor.getSnapshot()).message).toEqual({
+		text: 'Published',
+		variant: 'info'
+	})
+	expect(selectSharingPreview(a.actor.getSnapshot()).canPublish).toBe(false)
+})
+it('offers provider sign-in after missing permission and keeps failed publishing retryable', async () => {
+	const a = fixture()
+	let status = 403
+	vi.stubGlobal('fetch', async (path: unknown) =>
+		path === '/api/publication/preview' ? Response.json(a.value) : new Response(null, { status })
+	)
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	a.actor.send({
+		type: 'PUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	await waitFor(a.actor, (s) => s.matches('authorize'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).authorize).toBe(true)
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	status = 503
+	a.actor.send({
+		type: 'PUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	await waitFor(a.actor, (s) => s.matches('publishFailed'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).canPublish).toBe(true)
+	expect(selectSharingPreview(a.actor.getSnapshot()).message).toEqual({
+		text: 'Publishing could not be confirmed. Try again.',
+		variant: 'error'
+	})
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+})
+it('dismisses in-flight publishing and ignores its late successful result', async () => {
+	const a = fixture(),
+		gate = Promise.withResolvers<Response>()
+	let signal: AbortSignal | null | undefined
+	vi.stubGlobal('fetch', async (path: unknown, init?: RequestInit) => {
+		if (path === '/api/publication/preview') return Response.json(a.value)
+		signal = init?.signal
+		return gate.promise
+	})
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await ready(a)
+	a.actor.send({
+		type: 'PUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	a.actor.send({ type: 'DISMISS' })
+	expect(signal?.aborted).toBe(true)
+	gate.resolve(
+		Response.json({
+			...a.value,
+			state: 'published',
+			uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a'
+		})
+	)
+	await Promise.resolve()
+	expect(selectSharingPreview(a.actor.getSnapshot()).open).toBe(false)
+	expect(selectSharingPreview(a.actor.getSnapshot()).publication).toBeUndefined()
+})
+
+it('unpublishes the current record and hides its address while retaining republish', async () => {
+	const a = fixture()
+	const published = {
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid,
+		state: 'published',
+		uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a'
+	}
+	const fetch = vi.fn<typeof globalThis.fetch>(async (path) =>
+		path === '/api/publication/preview'
+			? Response.json(published)
+			: Response.json({ ...published, state: 'unpublished' })
+	)
+	vi.stubGlobal('fetch', fetch)
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await waitFor(a.actor, (s) => s.matches('published'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).canUnpublish).toBe(true)
+	a.actor.send({
+		type: 'UNPUBLISH',
+		requestId: selectSharingPreview(a.actor.getSnapshot()).requestId
+	})
+	await waitFor(a.actor, (s) => s.matches('unpublished'))
+	const view = selectSharingPreview(a.actor.getSnapshot())
+	expect(view.message).toEqual({ text: 'Unpublished', variant: 'info' })
+	expect(view.publication).toBeUndefined()
+	expect(view.canPublish).toBe(true)
+	expect(view.canUnpublish).toBe(false)
+	expect(fetch.mock.calls[1]?.[0]).toBe('/api/publication/unpublish')
+})
+it('keeps an unconfirmed removal retryable without offering another publish', async () => {
+	const a = fixture()
+	const value = {
+		libraryId: a.value.libraryId,
+		source: a.value.source,
+		publishingDid: a.value.publishingDid,
+		state: 'unpublishing',
+		uri: 'at://did:web:fixture.example/at.margin.note/3jzfcijpj2z2a',
+		cid: 'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
+	}
+	vi.stubGlobal('fetch', async () => Response.json(value))
+	a.actor.send({ type: 'SHOW', note: a.note })
+	await waitFor(a.actor, (s) => s.matches('unpublishFailed'))
+	const view = selectSharingPreview(a.actor.getSnapshot())
+	expect(view.canUnpublish).toBe(true)
+	expect(view.canPublish).toBe(false)
+	expect(view.publication).toBeUndefined()
+})
+
+it('previews a highlight and its commentary using the approved highlight source union', async () => {
+	const a = fixture()
+	const highlightId = crypto.randomUUID()
+	const highlight = {
+		id: highlightId,
+		libraryId: a.note.libraryId,
+		documentId: a.note.documentId ?? crypto.randomUUID(),
+		source: 'https://example.org/source',
+		anchors: [
+			{
+				id: crypto.randomUUID(),
+				highlightId,
+				kind: 'reader',
+				normalizationVersion: 'clipper-dom-text-v1',
+				textHash: 'hash',
+				range: { before: 'Reader before', matched: 'Quoted passage.', after: 'Reader after' }
+			}
+		],
+		notes: [{ ...a.note, highlightId, documentId: null, source: null }]
+	}
+	const value = {
+		...a.value,
+		source: { highlightId: highlight.id },
+		record: {
+			...a.value.record,
+			target: {
+				source: highlight.source,
+				selector: {
+					type: 'TextQuoteSelector',
+					exact: 'Quoted passage.',
+					prefix: 'Original before',
+					suffix: 'Original after'
+				}
+			}
+		}
+	}
+	const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(value))
+	vi.stubGlobal('fetch', fetch)
+	const parsed = highlightRowSchema.parse(highlight)
+	a.actor.send({ type: 'SHOW_HIGHLIGHT', highlight: parsed })
+	await ready(a)
+	const view = selectSharingPreview(a.actor.getSnapshot())
+	expect(view.source).toEqual({ highlightId: highlight.id })
+	expect(view.quote).toBe('Quoted passage.')
+	expect(view.noteText).toBe(a.note.text)
+	expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
+		libraryId: a.note.libraryId,
+		source: { highlightId: highlight.id }
+	})
+	a.actor.send({ type: 'INVALIDATED', noteId: a.note.id })
+	expect(selectSharingPreview(a.actor.getSnapshot()).open).toBe(false)
+})
+it('uses the existing highlight-unavailable message for an unverified source', async () => {
+	const a = fixture(),
+		id = crypto.randomUUID()
+	vi.stubGlobal('fetch', async () => new Response(null, { status: 409 }))
+	a.actor.send({
+		type: 'SHOW_HIGHLIGHT',
+		highlight: {
+			id,
+			libraryId: a.note.libraryId,
+			documentId: a.note.documentId ?? crypto.randomUUID(),
+			source: 'https://example.org/source',
+			anchors: [],
+			notes: []
+		}
+	})
+	await waitFor(a.actor, (s) => s.matches('highlightUnavailable'))
+	expect(selectSharingPreview(a.actor.getSnapshot()).message?.text).toBe('highlight unavailable')
+	expect(selectSharingPreview(a.actor.getSnapshot()).retry).toBe(true)
 })

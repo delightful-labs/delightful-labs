@@ -104,14 +104,16 @@ test('autosaves a document note through the native text adapter without a select
 	await seed(page)
 	await page.getByRole('button', { name: 'Add note', exact: true }).click()
 	const field = page.getByRole('textbox', { name: 'note', exact: true })
-	await field.pressSequentially('A document note.')
+	const text = 'A document note typed while reader updates are arriving.'
+	await field.pressSequentially(text)
+	await expect(field).toHaveValue(text)
 	await expect(page.getByText('note synced', { exact: true })).toBeVisible()
 	await expect(page.getByRole('region', { name: 'highlights', exact: true })).toHaveAttribute(
 		'aria-busy',
 		'false'
 	)
 	await page.reload()
-	await expect(field).toHaveValue('A document note.')
+	await expect(field).toHaveValue(text)
 })
 
 test('retains oversized input locally across reload, then saves an explicitly shortened recovery', async ({

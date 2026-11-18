@@ -4,11 +4,8 @@ import { createAsyncLogic, setup, types } from 'xstate'
 import { app } from '../../backend/jazz/schema.js'
 import { annotationNoteRowSchema } from '../../annotations/schema.js'
 import { toMarginDocumentNote } from '../../annotations/margin.js'
-import {
-	publicationDid,
-	publicationLinkFromRow,
-	publicationSourceSchema
-} from '../../annotations/publication-link.js'
+import { publicationSourceSchema } from '../../annotations/publication-link.js'
+import { publicationFromRow } from '../../annotations/publication.js'
 import type { PublicationSource } from '../../annotations/publication-link.js'
 import { publicationPreviewSchema } from '../../annotations/publication-preview.js'
 import type { PublicationPreview } from '../../annotations/publication-preview.js'
@@ -19,7 +16,8 @@ type Binding = {
 	publishingDid: string
 	isCurrent: () => boolean
 }
-type Input = { source: PublicationSource; createdAt: Date; binding: Binding }
+type Input = { source: PublicationSource; createdAt: Date; binding: Binding; republish?: boolean }
+export type PreviewInput = Input
 type Context = Input & { preview: PublicationPreview | undefined }
 
 /** Backend-only read capability, not an authenticated request endpoint. The host
@@ -31,7 +29,7 @@ export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
 			app.notes.where({ id: noteId, libraryId: scope.libraryId }).include({
 				document: true,
 				library: app.libraries.where({ id: scope.libraryId, ownerId: scope.accountId }).include({
-					publicationLinks: app.publicationLinks.where({ highlightId: null, noteId })
+					publications: app.publications.where({ highlightId: null, noteId })
 				})
 			}),
 			{ tier: ReadTier.Remote }
@@ -44,7 +42,7 @@ export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
 			document: row.document
 				? { libraryId: row.document.libraryId, status: row.document.status }
 				: undefined,
-			links: (row.library?.publicationLinks ?? []).map(publicationLinkFromRow)
+			publications: (row.library?.publications ?? []).map(publicationFromRow)
 		}
 	}
 	type Facts = Awaited<ReturnType<typeof readNote>>
@@ -104,7 +102,12 @@ export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
 				facts.note.documentId !== null &&
 				facts.document?.libraryId === context.binding.libraryId &&
 				facts.document.status !== 'trashed' &&
-				!facts.links.some((link) => publicationDid(link.uri) === context.binding.publishingDid)
+				!facts.publications.some(
+					(publication) =>
+						publication.publishingDid === context.binding.publishingDid &&
+						'uri' in publication &&
+						!(context.republish && publication.state === 'unpublished')
+				)
 		}
 	})
 	return model.createMachine({
@@ -114,6 +117,7 @@ export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
 			binding: { ...input.binding },
 			source: { ...input.source },
 			createdAt: new Date(input.createdAt),
+			republish: input.republish ?? false,
 			preview: undefined
 		}),
 		output: ({ context }) => context.preview,

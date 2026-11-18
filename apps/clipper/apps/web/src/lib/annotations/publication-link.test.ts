@@ -1,13 +1,6 @@
 import { expect, it } from 'vitest'
-import {
-	atRecordUriSchema,
-	publicationDid,
-	publicationLinkSchema,
-	publicationLinkFromRow,
-	publicationLinkValues
-} from './publication-link.js'
+import { atRecordUriSchema, publicationDid, publicationSourceSchema } from './publication-link.js'
 
-const libraryId = crypto.randomUUID()
 const highlightId = crypto.randomUUID()
 const noteId = crypto.randomUUID()
 const uri = 'at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/at.margin.note/3jzfcijpj2z2a'
@@ -38,18 +31,11 @@ it('admits only full DID-based Margin record URIs, without selecting a DID metho
 	}
 })
 
-it('preserves the approved source union through native Jazz FK columns', () => {
+it('requires exactly one annotation root', () => {
 	for (const source of [{ highlightId }, { noteId }]) {
-		const link = publicationLinkSchema.parse({ libraryId, source, uri })
-		expect(publicationLinkFromRow(publicationLinkValues(link))).toEqual(link)
+		expect(publicationSourceSchema.parse(source)).toEqual(source)
 	}
 	for (const source of [{}, { highlightId, noteId }]) {
-		expect(publicationLinkSchema.safeParse({ libraryId, source, uri }).success).toBe(false)
-	}
-	for (const row of [
-		{ libraryId, highlightId: null, noteId: null, uri },
-		{ libraryId, highlightId, noteId, uri }
-	]) {
-		expect(() => publicationLinkFromRow(row)).toThrow()
+		expect(publicationSourceSchema.safeParse(source).success).toBe(false)
 	}
 })

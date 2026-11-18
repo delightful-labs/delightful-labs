@@ -90,6 +90,7 @@ function fixture() {
 	const leases: { root: HTMLElement; documentId: string; release: ReturnType<typeof vi.fn> }[] = []
 	const send = vi.fn<LibraryClient['send']>((event) => order.push(event.type))
 	const client: LibraryClient = {
+		authorizePublication: vi.fn(),
 		getView: () => current,
 		subscribe: (changed) => {
 			listeners.add(changed)

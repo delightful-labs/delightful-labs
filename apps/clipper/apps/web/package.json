@@ -14,6 +14,8 @@
 		"build:parser-worker": "esbuild src/lib/server/capture/extract-worker.ts --bundle --platform=node --format=esm --target=node24 --external:jsdom --external:@mozilla/readability --external:dompurify --outfile=.netlify/v1/parser/extract-worker.mjs"
 	},
 	"dependencies": {
+		"@atcute/lexicons": "2.1.1",
+		"@atcute/tid": "1.1.4",
 		"@faker-js/faker": "10.6.0",
 		"@mozilla/readability": "0.6.0",
 		"@vercel/functions": "3.11.0",

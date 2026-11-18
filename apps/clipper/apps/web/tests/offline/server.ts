@@ -23,7 +23,11 @@ export function staticShellServer(initialRoot: string) {
 		const url = new URL(req.url ?? '/', 'http://127.0.0.1:5190')
 		if (
 			auth &&
-			(url.pathname.startsWith('/api/auth/') || url.pathname === '/api/publication/preview')
+			(url.pathname.startsWith('/api/auth/') ||
+				url.pathname === '/api/publication/preview' ||
+				url.pathname === '/api/publication/publish' ||
+				url.pathname === '/api/publication/unpublish' ||
+				url.pathname === '/api/publication/cleanup')
 		) {
 			const chunks: Buffer[] = []
 			for await (const chunk of req) chunks.push(Buffer.from(chunk))

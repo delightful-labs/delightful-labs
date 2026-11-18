@@ -17,7 +17,9 @@
 		send: (command: AnnotationCommand) => void
 	} = $props()
 	let element = $state.raw<HTMLTextAreaElement>()
-	let sync: ReturnType<typeof textFieldSync> | undefined
+	// Status-only worker views can repeat an older value while local edits travel.
+	// Forward column changes to the native adapter, not repeated row snapshots.
+	const savedText = $derived(note.text)
 	const initial = untrack(() => note.text)
 	$effect(() => {
 		const field = element
@@ -26,16 +28,8 @@
 			onChange: (text, { editedFrom }) =>
 				send({ type: 'EDIT_NOTE', documentId, id: note.id, text, editedFrom })
 		})
-		sync = owner
-		return () => {
-			sync = undefined
-			owner.destroy()
-		}
-	})
-	$effect(() => {
-		const text = note.text
-		const field = element
-		if (field && sync) sync.apply(text)
+		$effect(() => owner.apply(savedText))
+		return () => owner.destroy()
 	})
 </script>
 

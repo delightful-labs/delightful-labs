@@ -113,7 +113,10 @@ const model = setup({
 		events: {
 			OPEN: types<Extract<Event, { type: 'OPEN' }>>(),
 			CLOSE: types(),
+			PREVIEW_HIGHLIGHT: types<{ documentId: string; id: string }>(),
 			PREVIEW_NOTE: types<{ documentId: string; id: string }>(),
+			PUBLISH_NOTE: types<{ documentId: string; requestId: number }>(),
+			UNPUBLISH_NOTE: types<{ documentId: string; requestId: number }>(),
 			CLOSE_PREVIEW: types<{ documentId: string; requestId: number }>(),
 			HIGHLIGHT: types<Extract<Event, { type: 'HIGHLIGHT' }>>(),
 			ADD_NOTE: types<Extract<Event, { type: 'ADD_NOTE' }>>(),
@@ -222,6 +225,41 @@ export const annotationsMachine = model.createMachine({
 						return
 					enq.sendTo('sharingPreview', { type: 'SHOW', note })
 				},
+				PREVIEW_HIGHLIGHT: (args, enq) => {
+					if (
+						!args.guards.accepting(args) ||
+						!args.guards.currentDocument(args, args.event) ||
+						args.context.prepared ||
+						args.context.queue.length ||
+						!matchesState({ active: { writer: 'idle' } }, args.value)
+					)
+						return
+					const highlight = args.context.visibleRows.highlights.find(
+						(value) => value.id === args.event.id
+					)
+					const recovery = selectAnnotationRecovery(
+						args.self.getSnapshot().children.recovery?.getSnapshot()
+					)
+					if (
+						!highlight ||
+						!recovery.ready ||
+						highlight.notes.some(
+							(note) =>
+								args.context.invalidNotes[note.id] !== undefined ||
+								recovery.records.some((record) => record.draft.noteId === note.id)
+						)
+					)
+						return
+					enq.sendTo('sharingPreview', { type: 'SHOW_HIGHLIGHT', highlight })
+				},
+				PUBLISH_NOTE: (args, enq) => {
+					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', { type: 'PUBLISH', requestId: args.event.requestId })
+				},
+				UNPUBLISH_NOTE: (args, enq) => {
+					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', { type: 'UNPUBLISH', requestId: args.event.requestId })
+				},
 				CLOSE_PREVIEW: (args, enq) => {
 					if (!args.guards.currentDocument(args, args.event)) return
 					enq.sendTo('sharingPreview', { type: 'DISMISS', requestId: args.event.requestId })
@@ -310,6 +348,10 @@ export const annotationsMachine = model.createMachine({
 				},
 				DELETE_HIGHLIGHT: (args, enq) => {
 					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
+					enq.sendTo('sharingPreview', {
+						type: 'INVALIDATED_HIGHLIGHT',
+						highlightId: args.event.id
+					})
 					enq.raise({ type: 'QUEUED' })
 					return args.actions.enqueue(args, { command: args.event })
 				},
@@ -345,10 +387,10 @@ export const annotationsMachine = model.createMachine({
 									if (
 										event.documentId !== context.documentId ||
 										event.generation !== context.observationGeneration ||
-										!event.rows.notes
+										(!event.rows.notes && !event.rows.highlights)
 									)
 										return
-									enq.sendTo('sharingPreview', { type: 'OBSERVED', notes: event.rows.notes })
+									enq.sendTo('sharingPreview', { type: 'OBSERVED', ...event.rows })
 								},
 								OBSERVATION_FAILED: ({ context, event }, enq) => {
 									if (

@@ -87,6 +87,7 @@ function fixture(title = 'First article') {
 	const more = vi.fn()
 	const editTags = vi.fn<LibraryClient['editTags']>()
 	const client: LibraryClient = {
+		authorizePublication: vi.fn(),
 		getView: () => current,
 		subscribe: (changed) => {
 			listeners.add(changed)

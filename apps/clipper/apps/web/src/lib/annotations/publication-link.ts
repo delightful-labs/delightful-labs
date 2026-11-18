@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { isCid } from '@atcute/lexicons/syntax'
+
+export const cidSchema = z.string().refine(isCid)
 import { lowercaseUuidSchema } from '../validation/values.js'
 
 // AT's generic DID syntax: https://atproto.com/specs/did#did-identifier-syntax
@@ -30,39 +33,7 @@ export const publicationSourceSchema = z.union([
 	z.strictObject({ highlightId: lowercaseUuidSchema }),
 	z.strictObject({ noteId: lowercaseUuidSchema })
 ])
-export const publicationLinkSchema = z.object({
-	libraryId: lowercaseUuidSchema,
-	source: publicationSourceSchema,
-	uri: atRecordUriSchema
-})
-export type PublicationLink = z.infer<typeof publicationLinkSchema>
 export type PublicationSource = z.infer<typeof publicationSourceSchema>
-
-export function publicationLinkValues(link: PublicationLink) {
-	const parsed = publicationLinkSchema.parse(link)
-	return {
-		libraryId: parsed.libraryId,
-		highlightId: 'highlightId' in parsed.source ? parsed.source.highlightId : null,
-		noteId: 'noteId' in parsed.source ? parsed.source.noteId : null,
-		uri: parsed.uri
-	}
-}
-
-const rowBaseSchema = publicationLinkSchema.omit({ source: true })
-const linkRowSchema = z.union([
-	rowBaseSchema.extend({ highlightId: lowercaseUuidSchema, noteId: z.null() }),
-	rowBaseSchema.extend({ highlightId: z.null(), noteId: lowercaseUuidSchema })
-])
-/** Native FK columns describe the approved source union through Jazz joins. */
-export function publicationLinkFromRow(row: unknown): PublicationLink {
-	const parsed = linkRowSchema.parse(row)
-	return publicationLinkSchema.parse({
-		libraryId: parsed.libraryId,
-		source:
-			parsed.highlightId === null ? { noteId: parsed.noteId } : { highlightId: parsed.highlightId },
-		uri: parsed.uri
-	})
-}
 
 export function publicationDid(uri: string) {
 	return recordUriPartsSchema.parse(atRecordUriSchema.parse(uri).split('/'))[2]

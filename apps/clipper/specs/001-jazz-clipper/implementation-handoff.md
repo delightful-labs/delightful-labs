@@ -16,6 +16,447 @@ storage format. It removes the unused auth-only App, reading-column wrapper and
 policy-fixture schema clone. Full app/extension/session and Better Auth/provider
 qualification remain open; this is not an SDK switch or release approval.
 
+## Approved TID address allocation — 2026-11-17
+
+The user approved adding `@atcute/tid@1.1.4` after reviewing why a retained address
+must be allocated before a PDS write. The direct dependency and its clock helper
+`@atcute/time-ms@1.3.3` are now locked. Existing package versions, workspace peer
+bindings and dependency snapshots are unchanged; unrelated pnpm peer-reference
+rewrites were removed, then frozen offline installation and workspace links passed.
+
+`publication/address.ts` exports one invoked `allocatePublicationAddress` async
+logic for the selected allocation effect. It accepts the existing publisher DID,
+validates it before calling the library, validates the generated TID through the
+existing first-write field schema and returns the existing full record-URI value.
+There are no new data models, storage fields, revision counters, token stores or
+application clock codecs. Allocation belongs in a selected owner invocation,
+never a guard, selector or output calculation. The library owns clock/random
+generation; Jazz owns accepted URI custody, uniqueness and history.
+
+The value is a candidate until the existing store accepts its issued Publication.
+The future publisher must perform scope/grant/source admission, wait for that
+acceptance before network dispatch and reuse an already-issued address on resume.
+The allocator itself neither stores intent nor proves control, uniqueness, native
+acceptance or remote absence. The existing store prevents retargeting issued
+addresses; remote collisions still require conditional writes/reconciliation.
+No production publisher owner invokes this allocation logic yet.
+
+All 103 publication/auth regressions pass. The native SQLite reopen test now uses
+a real generated address and confirms that the accepted issued URI survives the
+restart unchanged, including its later request/comparison use. Unit cases cover
+wire/schema compatibility, invalid publishers before generation and malformed
+generator output. The 2,500-allocation burst uses the clock helper's fake-Date
+fallback, verifying its timestamp and no duplicate candidates in that bounded
+sample, without assuming global uniqueness or ordering across clock corrections.
+The normal Node process reports native precision available and passes allocation/
+native-store tests; unsupported-platform/hosted native precision is not claimed.
+The helper packages its native prebuilds and falls back to Date.now when unavailable.
+No live PDS read/write, new UI wording or complete publisher loop is added.
+Strict root/web/service-worker/extension types, Clipper lint/formatting, vendor
+integrity, workspace links, frozen offline installation, whitespace and the
+production web/server/service-worker build pass. Existing package versions and
+peer bindings remain unchanged outside the two approved new package entries.
+
+## Frozen owned-content comparison — 2026-11-17
+
+`publication/compare.ts` adds the pure `matchesIssuedContent` guard over the
+existing issued Publication and found PDS record. It needs no new result schema,
+stored fields, dependencies, HTTP endpoint or workflow. The caller retains the
+complete read observation; this guard never rewrites it or changes publication
+state. Native acceptance, current scope/grant, confirmation and dispatch remain
+the future publisher host's responsibilities.
+
+The guard validates the issued snapshot and exact returned URI through the
+existing canonical schemas/reader. Wrong lifecycle/address or unreadable data is
+an error, separate from a false owned-content comparison. notFound remains the
+existing read alternative and never becomes a comparison result or permission
+to recreate. Root owned fields come from the approved Margin projection schema:
+type, motivation, target, body and lifecycle timestamps. They are compared
+structurally, without property-order dependence, coercion or normalization. Added
+or missing body/modifiedAt fields and even timestamp-spelling changes do not match.
+
+Independent root metadata (including unknown fields) stays outside this owned
+comparison and remains intact on the original observation. Within target, only
+title and sourceHash are excluded: [Margin defines them](https://github.com/paddinglabs/margin/blob/main/lexicons/at/margin/note.json)
+as page title and indexing hash. Other target/body/selector additions require
+review instead of being discarded as metadata. This includes body URI, resource
+state and selector refinement; [W3C states](https://www.w3.org/TR/annotation-model/#states)
+describe the representation being annotated. The guard is deliberately not a
+validator for all foreign metadata or a content-digest/whole-record equality proof.
+No facet-removal, remote merge, overwrite or conflict-resolution policy is added.
+
+All 99 publication/auth regressions pass. New cases cover independent metadata,
+reordered fields, missing CIDs, exact body/source/selector/timestamp changes,
+unsupported additions, bare-highlight/commentary distinctions and invalid bindings.
+The native SQLite reopen test compares the retained issued snapshot after a later
+accepted Note edit. The actual restored OAuth-session GET fixture also feeds its
+found record into this guard and retains the foreign metadata. Provider HTTP is
+synthetic; no live PDS write or complete publisher loop is claimed.
+Five final comparison tests pass after making the private-lifecycle refusal case
+use a valid private value. Strict root/web/service-worker/extension types, Clipper
+lint/formatting and whitespace checks pass. No new build/browser/PDS execution
+qualification is claimed for this pure guard.
+
+## PDS read ownership — 2026-11-17
+
+The user rejected nullable read outcomes and approved the explicit transient
+`found { record } | notFound { uri }` result. A finite backend XState child now
+binds one retained URI to an already-restored SDK session and a current-scope
+predicate. Admission validates the URI and exact session DID before network I/O.
+One invoked GET adapter owns acquisition, bounded native body reading and release,
+so a Response is never transferred between actor lifetimes. Its observed HTTP
+facts are consumed by the chart: exact-URI parsed 200 becomes found; a JSON
+RecordNotFound on 400/404 becomes notFound; other observations fail. No additional
+attempt/revision/storage model is introduced.
+
+The parent owns invocation and replacement of this child. The child owns its
+30-second deadline and CANCEL event, aborts the read on timeout/cancellation/stop,
+releases any acquired or late body and suppresses late results. The SDK/auth host
+continues to own the session and any SDK-managed token refresh; no sign-out or
+application retry loop is added. Caller scope is checked at admission and result
+consumption. The child cannot authorize a write or interpret notFound as proof
+of deletion/absence: the reference PDS also uses that response for takedowns.
+Reconciliation and explicit recreation remain later publisher decisions.
+
+Implementation is `publication/pds-read.ts`, with the reviewed result schema in
+`pds-record.ts`. Native GET options disable caching and redirects; response content
+must be JSON with valid UTF-8, bounded to 1 MiB without truncation. The adapter
+observes elapsed wall time as well as the chart-owned timeout, refusing late
+completion even if timer delivery was delayed. HTTP 200 must pass the complete
+exact-URI reader; generic 404, authentication/server errors, unsupported bodies,
+scope loss and malformed data cannot become notFound. Failures are sanitized;
+timeout/cancellation use native TimeoutError/AbortError paths rather than another
+result variant. No production HTTP endpoint or publication loop invokes this child
+yet; it is ready for the future verified publisher host.
+
+All 94 publication/auth tests pass. Controlled native Response/ReadableStream cases
+exercise acquisition, cancellation, external stop, stalled/oversized/unsupported
+bodies, delayed timers and late SDK response release. Two native Jazz/auth cases
+restore the actual plugin OAuth session and verify bound DPoP-authenticated GETs
+return both approved alternatives through synthetic PDS responses, without changing
+publication intent. An independent @xstate/test contract campaign uses seed 61117,
+100 runs and at most 20 commands per run, requiring full model state/event/transition
+coverage and retaining the standard failure-artifact location. This bounded
+campaign is not proof of all platform schedules. No live PDS read/write is made.
+Thirteen final read/campaign regressions pass after tightening address-whitespace
+admission. Strict root/web/service-worker/extension types, Clipper lint/formatting,
+whitespace and the production web/server/service-worker build pass. Installed v6
+serialization diagnostics were inspected: code expressions, runtime schemas and
+the SDK-bound read/guard implementations require their original runtime sources.
+This ephemeral child is not persisted/revived from JSON; no serialized actor or
+live-session portability claim is made.
+
+## Approved PDS record reader — 2026-11-17
+
+`publication/pds-record.ts` implements the reviewed `getRecord` response schema
+and inferred `PdsRecord`. Its pure `parsePdsRecord` reader checks that the returned
+URI exactly matches the retained address and preserves the complete JSON value,
+including unfamiliar fields at every level. It does not run remote records through
+Clipper's narrow Margin serializer. Unknown motivations/foreign metadata remain
+available to a future reconciliation policy rather than being stripped.
+
+Supplied CIDs use the existing AT library's syntax check; absent CIDs remain absent.
+Neither case verifies a content digest, proves freshness or selects a write.
+Malformed/error bodies are refused with a sanitized error, never interpreted as
+record absence. The reader also compares the parsed value with the input using
+Node's supported deep equality helper: Zod intentionally drops `__proto__` keys,
+so a lossy parse is refused instead of exposing metadata that a later write could
+silently erase. No custom JSON validator or vendor patch is introduced.
+
+The user approved making `@atcute/lexicons@2.1.1` a direct web-app dependency after
+clarifying that it already comes from the existing auth plugin/OAuth SDK. Its
+exact version is reused. Only that importer declaration changes in the lockfile;
+package versions and dependency snapshots remain unchanged. A frozen offline
+installation and workspace link check pass. The dependency's presence does not
+introduce another OAuth client or alter credential/session ownership.
+
+Eleven focused PDS-reader/first-write tests pass, covering full unknown-field
+preservation, lossy-parse refusal, optional/invalid CIDs, exact destination binding,
+unsupported content and malformed/non-JSON values. Actual HTTP reads, absence/error
+classification, content comparison, PDS writes/reconciliation and the publisher's
+XState lifetime remain separate work. No new stored data or UI wording is added.
+After linking the dependency, all 79 publication/auth regressions pass, including
+the real OAuth client/native Jazz cases. Strict root/web/service-worker/extension
+types, Clipper lint/formatting, vendor integrity, workspace links, whitespace and
+the production web/server/service-worker build pass. Provider HTTP in the native
+regressions remains synthetic; no new browser or live PDS evidence is claimed.
+
+## Approved first-write request preparation — 2026-11-17
+
+Following the user's approval of the concrete Zod body, backend
+`publication/first-write.ts` now owns `firstPublicationWriteSchema` and its inferred
+DTO for `com.atproto.repo.putRecord`. `toFirstPublicationWrite` validates an issued
+Publication, derives its repository and TID key from the same retained destination,
+copies the exact approved Margin payload and always includes `swapRecord: null`.
+Private/requested/published values, mismatched publishers, other collections,
+non-TID keys, guard omission and extra/private wire fields are refused. Errors
+contain no rejected input. TID length is checked explicitly as well as by the
+approved alphabet/leading-bit regex, rejecting final line breaks.
+
+This pure projector has no authority, clock, key allocation, persistence, grant,
+network, retry or confirmation effects. Its caller must read the accepted issued
+value, verify current scope/grant/source eligibility and reconcile the retained
+PDS address before dispatch or replay. The generic retained record-URI contract
+is unchanged; existing/imported non-TID addresses still parse but cannot become
+new first-write requests through this projector. Highlight wire payloads reuse
+the same approved record shape; source-page evidence/issuance remains gated by
+the existing store.
+
+Focused qualification passes 22 first-write/publication contract and native store
+tests. The SQLite restart regression prepares the request from a natively accepted
+issued row after reopening the backend, then verifies that a later accepted Note
+edit leaves that request unchanged. Contract tests cover exact timestamp/text,
+detached payload values, TID bounds, destination/lifecycle refusal and mandatory
+absence guard. This is preparation evidence, not PDS conditional-write or lost-
+response qualification. No new UI, stored fields, dependency or live write is added.
+Strict root/web/service-worker/extension type checks, Clipper lint/formatting and
+whitespace checks pass. The changed production code is a pure preparer; no new
+build, browser, hosted provider or PDS execution evidence is claimed for this slice.
+
+## Historical publication permission observation — 2026-11-17
+
+Removed during the MVP simplification: this intermediate endpoint had no UI
+caller. Actual grant validation and the relevant SDK tests now belong to Publish.
+
+`POST /api/publication/permission` reuses the approved `publicationBaseSchema`
+and returns an empty HTTP 204 when an eligible document Note's selected publisher
+has the full Margin-note grant in the restored OAuth SDK session. It introduces
+no stored model, grant flag, public payload, UI wording, dependency or vendor
+patch. This is an observation for the future consent interaction, not authority
+to issue a later write. An executor must independently check its current grant
+and source at issuance/dispatch; this endpoint does not close that gate.
+
+The HTTP host owns a finite XState root, its abort listener and a 30-second
+deadline. States own bounded input reading, app access, source preview, provider
+restoration, current token-information reading and a final app-access recheck.
+Only a valid same-origin cookie-only request for an owned, eligible document Note
+can reach the provider. The same session, DID, native account and linked provider
+must still be selected when the observation returns. Sources already issued or
+published remain outside this first-publication endpoint.
+
+Restoration calls the existing plugin's server-only `getAtprotoClient` capability
+with the verified DID, then the actual session's `getTokenInfo()` with the SDK's
+default automatic refresh. Configuration and linked-account scope are never
+used as grant evidence. Both session DID and TokenInfo subject must match. The
+check recognizes the exact full `repo:at.margin.note` scope token alongside
+`atproto`, independent of token ordering. It refuses expired/invalid expiry
+observations, similarly named collections and attenuated action-only grants;
+those do not establish the full lifecycle permission this app requests. This
+follows the [repository permission definition](https://atproto.com/specs/permission#repo),
+where an omitted action permits create/update/delete. No general permission-set,
+wildcard or legacy-scope evaluator is introduced.
+
+HTTP 400/403/401 retain input/origin/app-auth refusal; 409 means an inspected source
+or grant is unavailable. Missing/revoked SDK sessions and unexpected provider
+errors return empty 503, without claiming the absence is permanent or initiating
+reauthorization. Every response is private/no-store and varies on Cookie. It
+does not return token information, credentials or SDK handles. Existing requested
+intent and history are untouched by the observation.
+
+The auth host retains the shared SDK session. Cancellation/deadline suppresses
+late results and never revokes that session. The SDK has no request-level abort
+parameter on restoration/token inspection; an already-started refresh may still
+settle into its existing auth store. No repository XRPC request is issued. The
+returned observation is not authorization-server introspection or proof that a
+provider has not independently revoked an otherwise unexpired token.
+
+Focused qualification passes 68 publication/auth tests using native Jazz signed
+cookies and the real plugin/OAuth client, with synthetic discovery/refresh HTTP.
+It covers contrary linked-account metadata, fresh and refreshed grants including
+reduction, native refresh revocation, missing sessions, source/proof admission,
+session/DID/link replacement, exact requested-state/history preservation, SDK
+failures, cancellation and late completion after the deadline. SDK prototype
+doubles are limited to malformed observations and controlled lifetime races.
+Each case owns an isolated provider store so the same fixture DID cannot select
+another case's grant. Live provider consent and the future Publish UI remain open.
+Strict root/web/service-worker/extension type checks, Clipper lint/formatting,
+whitespace checks and the production web/server/service-worker build also pass.
+No new browser or live-provider qualification is claimed for this endpoint.
+
+## Historical intermediate publication request — 2026-11-17
+
+Removed during the MVP simplification: Publish already owns native intent
+admission, so the separate request-only endpoint and statechart are unnecessary.
+
+`POST /api/publication/request` accepts the existing strict
+`publicationBaseSchema` (`libraryId`, `source`, `publishingDid`) and acknowledges
+only an authority-accepted `requested` Publication with HTTP 202. No new stored
+shape, public record, copy, dependency or publication URI is introduced. This
+online admission endpoint supports document Notes only; it does not yet implement
+an offline Publish interaction, permission upgrade, PDS write or Publish control.
+
+The request chart checks same-origin cookie-only JSON input, fresh Better Auth
+session/profile and native canonical Jazz account/provider linking, selected DID,
+and the accepted active Note through the existing preview projector. It rechecks
+the same session/destination/account before writing. Session, profile DID and
+provider-account reads also participate in the native serializable publication
+transaction, so observed revocation/link changes invalidate acceptance. Current
+session expiry is assessed by that read; no PDS grant is inferred from it.
+
+Preview and consent share a read-only XState access child and bounded stream
+reader; preview's response/cancellation behavior remains unchanged. Consent uses
+DLF's existing owned-operation child around the existing publication transaction
+chart, keeping dynamic scoped construction, cancellation, drain and uncertain
+native custody with qualified library owners. Preparation is bounded at 30 seconds;
+save and drain each have a 10-second deadline. A final deadline returns 503 with
+native unresolved custody retained through the existing DLF mechanism. It is not
+proof that nothing was stored. Retained write capabilities capture only the native
+abort signal and scoped identity facts, not request headers/cookies.
+
+An already-requested source/publisher is acknowledged without another write or
+history version. Concurrent contenders may receive 409 for a domain refusal or
+503 for native commit rejection; there is no automatic write replay. A subsequent
+explicit retry reads the accepted row first. Issued/published rows are never
+rewritten to requested. Responses are private/no-store and vary on Cookie, with
+no refresh cookie or private error payload.
+
+Native qualification covers strict input/proof refusal, real signed cookies,
+source ownership and eligibility, destination/session/link changes, revocation
+after the transaction read, concurrent requests, idempotent observation, stalled
+body release, cancellation/drain and suppressed late completion after deadline.
+Backend execution remains single-authority qualified; independent writers,
+current PDS grants/issuance and user-facing publication remain separate work.
+
+Verification passes 956 unit/native tests and 31 component tests, plus 32 final
+targeted request/preview/store regressions after tightening retained capabilities.
+Strict root/web/service-worker/extension types, Clipper lint/formatting, whitespace
+checks and both production offline fixture builds pass. The built browser checks
+use real cookies and native account mapping to submit twice, retain one requested
+row, complete two offline process restarts and reconnect with that row intact
+(8.6 seconds, 9.3 including runner startup). This is direct API qualification;
+no Publish button, offline request queue or PDS effect is claimed. Native owned-
+operation tests can report a late automatic `xstate.done.actor` after the already
+correlated terminal report settled its controller; no acknowledgement remains
+outstanding and such a delivery cannot restart the completed request.
+
+## Per-authorization OAuth scopes — 2026-11-17
+
+The user approved the concrete `authorizationScopeSchema` enum: `atproto` or
+`atproto repo:at.margin.note`, defaulting to `atproto`, and a narrow extension of
+the installed auth plugin. Its existing Better Auth 1.7 compatibility patch now
+also forwards an optional sign-in `scope` to the existing OAuth SDK. The SDK owns
+authorization, PAR/PKCE/DPoP, state/session storage, callbacks and refresh; no
+application OAuth client or duplicate token store is introduced.
+
+Client metadata declares the maximum approved Margin permissions, while an
+omitted sign-in scope explicitly requests identity only. Clipper's pure Better
+Auth admission hook validates the approved enum and requires configured same-origin
+HTTP starts before provider discovery. Existing plugin handle/callback validation
+is retained. Trusted server API calls retain their server invocation boundary.
+The OAuth SDK independently checks requested scopes against client metadata.
+The patched client declaration uses Better Auth's actual public action parameter
+contract and exposes optional scope input without assertions.
+
+The callback records the returned token's scope for new links/accounts and updates
+existing account metadata after reauthorization. Configured metadata is not a
+grant. Linked-account scope is also not current permission authority: the future
+publisher must inspect the restored OAuth session's current DID and
+`getTokenInfo().scope` before dispatch. No PDS dispatcher is added here, and the
+Publish UI/permission-upgrade interaction remains unfinished.
+
+Native tests exercise the actual client/plugin/SDK PAR request path with synthetic
+provider discovery, asserting identity-only defaults, explicit Margin permissions,
+DPoP/PKCE and persisted OAuth state. Unsupported scopes and foreign/missing
+origins are refused before discovery/state allocation. An identity-only plugin
+fixture independently refuses the broader scope at the SDK boundary. Existing
+callback tests now cover identity/Margin/identity grants through backend restarts,
+retaining the same linked account. Real provider consent remains unqualified.
+
+The root lockfile changes only this plugin's patch hash. A frozen offline install
+and workspace link qualification pass; package versions and other dependency
+contexts are unchanged.
+
+Verification passes 946 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, Clipper lint/formatting, vendor verification and
+source/applied-patch whitespace checks. Both production offline fixture builds
+pass. The built authenticated preview, two offline browser-process restarts and
+reconnect reconciliation pass in 8.6 seconds (9.2 including runner startup).
+Provider-facing calls use synthetic fixtures; no live grant or PDS write is made.
+
+## Durable first-publication storage — 2026-11-17
+
+After reviewing the concrete stored shape and its explanation, the user approved
+evolving `publicationLinks` into `publications`. One native row binds a library,
+exactly one Highlight/document Note and publishing DID. A single validated JSON
+`lifecycle` contains the approved state-specific fields; URI and issued payload
+are not separately duplicated. Native library/highlight/note joins remain intact,
+and Jazz owns row identity, creation metadata and accepted version history.
+
+The backend-only store uses the existing DLF transaction lifecycle and a local
+XState domain child: read a serializable snapshot, assess transition/ownership,
+prepare, insert or update, then wait for native authority acceptance. It admits
+new private/requested choices, private to requested, requested to private/issued,
+and issued to published at the same URI. No repeated issuance, URI replacement,
+skipped states or erasure of an unresolved address is admitted. Source/publisher
+and URI collision checks share the transaction. Updating a lifecycle retains the
+same Jazz row identity.
+
+Document-note issuance must match the accepted Note through the reviewed Margin
+projector. Unsupported/oversized content is refused without truncation. Highlight
+issuance remains blocked pending source-page evidence and publisher admission.
+An issued payload remains unchanged when its Note is edited or deleted. The
+trusted backend may record a matching PDS confirmation after source deletion so
+public cleanup obligations retain evidence. That host must actually confirm the
+PDS write; this persistence capability is not an HTTP consent/confirmation API.
+
+Owner reads, including history, survive source deletion; foreign reads and all
+client inserts/updates/deletes are refused by native policies. Preview still
+works for private/requested choices and leaves issued/published records to future
+reconciliation. Its response shape and UI copy are unchanged.
+
+Native qualification covers same-authority concurrent request/issuance conflicts,
+two complete SQLite backend restarts, exact issued payload retention, stable
+native identity/creation metadata, accepted history after confirmation, and
+history access control. This does not qualify independent backend writers or
+provide a scheduler, progressive OAuth grants, user Publish admission, PDS I/O,
+unknown-outcome reconciliation or ongoing public synchronization. Schema changes
+use the accepted disposable-development-data scope; no existing hosted store is
+reset or migrated by this work.
+
+Verification passes 942 unit/native tests and 31 component tests, strict root/web/
+service-worker/extension types, full Clipper lint/formatting and whitespace checks.
+Both production offline fixture builds pass. The built authenticated preview,
+two full offline browser restarts and reconnect reconciliation pass in 8.4 seconds
+(9.1 seconds including test-runner startup). These browser checks qualify the
+existing preview/read path against the new schema, not a user Publish flow.
+
+## Earlier first-publication lifecycle contract — 2026-11-17
+
+The user approved the discriminated union `private | requested | issued |
+published`. Only issued/published carry a required full Margin record URI, whose
+repository DID must match the selected publisher exactly. The existing preview
+and new lifecycle contract share canonical library/source/publisher validation;
+the preview's wire shape and reader behavior are unchanged.
+
+The user subsequently approved requiring the exact validated Margin `record` in
+issued only. Its clarified meaning is saved in Jazz for dispatch, possibly sent,
+awaiting confirmation. The future owner must obtain durable Jazz acceptance
+before sending and retain this payload unchanged while the result is uncertain.
+Later local edits are subsequent work. Recovery inspects the PDS before retrying;
+this does not claim atomicity between Jazz acceptance and a PDS request.
+
+No second Jazz address/state store is introduced. Existing private publication
+links remain reservation/cleanup associations, without implying a confirmed PDS
+write. The lifecycle is a validated contract for the future publisher; it does
+not itself persist transitions, grant permission or send/replay PDS requests.
+Durable Jazz storage, acceptance and XState transition ownership remain to be
+implemented. Unpublish/paused/restoration variants remain outside this approved
+first-publication union.
+
+Initial lifecycle verification passed 936 unit/native tests and 31 component
+tests, strict root/web/service-worker/extension types, full Clipper lint/formatting,
+whitespace checks and the web production build. The new boundary check rejects foreign and
+lookalike publisher addresses, missing addresses and malformed URI input without
+throwing from safe parsing. Existing native request/preview regressions verify
+the unchanged preview contract. No new storage, browser or PDS behavior is claimed.
+
+The issued-payload amendment passes 34 targeted publication/Margin/native preview
+and request tests, including serialization without payload loss and rejection of
+missing or invalid Margin records, credential-bearing source URLs and private
+fields. The published variant rejects an attached issued payload. Strict root/web/
+service-worker/extension types, full Clipper lint/formatting and whitespace checks
+also pass for this amendment.
+
 ## Reader sharing preview — 2026-11-16
 
 Document Notes now offer `Preview sharing`. The worker owns the request and its

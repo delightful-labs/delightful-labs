@@ -32,7 +32,9 @@
 
 ## Review Notes
 
-Ready for owner review and technical planning. The quality check is a document
-review, not proof of runtime correctness or approval of the proposed behavior.
-Existing feature selectors and PR branch are intentionally preserved per the
-workspace rules and the user's instruction to add this spec to the current PR.
+This is the original specification quality review, not an execution checklist or
+proof of runtime correctness. The [current implementation record](../implementation.md)
+and [story completion status](../spec.md#completion-status) now distinguish
+released cost controls from outstanding runtime qualification and savings
+measurement. Existing feature selectors remain unchanged. The specification
+originated in merged PR #44 and has continued through merged PRs #45 and #47.

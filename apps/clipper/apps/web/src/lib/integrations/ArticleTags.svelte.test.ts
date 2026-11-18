@@ -74,6 +74,7 @@ function fixture(options: { error?: string; selected?: string; enabled?: boolean
 	const release = vi.fn()
 	const tags = vi.fn<LibraryClient['tags']>()
 	const client: LibraryClient = {
+		authorizePublication: vi.fn(),
 		getView: () => view,
 		subscribe: (changed) => {
 			listeners.add(changed)

@@ -1,3 +1,4 @@
+import { createPublicationCleanupRecords } from './publication-cleanup.js'
 import { createAnnotationRecords } from './annotations.js'
 import { newDocumentValues } from './document-values.js'
 import { captureDocumentRecord, documentRecord } from './document-record.js'
@@ -148,6 +149,7 @@ export function createLibraryRecords(
 		...records,
 		reader: createReaderRecords(db, libraryId, isCurrent),
 		annotations: createAnnotationRecords(db, libraryId, isCurrent),
+		publicationCleanup: createPublicationCleanupRecords(db, libraryId, isCurrent),
 		notes: createNoteRecords(db, libraryId, isCurrent),
 		images: createImageRecords(db, libraryId, isCurrent),
 		fakeData: createFakeDataRecords(db, libraryId, isCurrent),
