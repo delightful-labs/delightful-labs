@@ -1499,8 +1499,9 @@ browser-test types pass. The focused native matrix passes **nine cases** across 
 and WebKit: classification create/archive with historical counts and offline restart, and both
 transaction-edit scenarios. Edit tests retain the actual input DOM node and compare persisted
 account IDs against the immutable requested destination, rather than the post-save UI selection.
-The existing **16 classification SvelteKit browser cases** also pass. The complete native matrix
-must be recorded separately; a focused pass does not establish its result.
+The existing **16 classification SvelteKit browser cases** also pass. The subsequent complete native matrix passes **all 66 cases**, including both previously failing
+WebKit edits with the stronger DOM/account-ID assertions. Native strict types and Svelte checks
+also pass with zero warnings; bundle audits retain the Window/Worker ownership boundary.
 
 Logs: `/private/tmp/finance-worker-command-withdrawal-before.log`,
 `/private/tmp/finance-worker-observation-cleanup-{static,unit,native}.log`,
