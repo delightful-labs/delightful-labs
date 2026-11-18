@@ -1,5 +1,41 @@
 # Coordinated Jazz upgrade after PR #39
 
+## Current candidate maintenance — November 18
+
+The maintained runner now targets only alpha.67, with an explicit `--worker`,
+`--schema` or `--clipper-schema` mode. Earlier alpha.65/66 commands and results
+below are historical checkpoints. The alpha.65-only Clipper session runner and
+its 1,175-line source overlay have been retired; the complete Clipper session
+adoption gate remains open. Active workspace pins and production remain alpha.60.
+
+New native adapter/worker implementations and qualification cases now live in
+normal candidate source files, rather than added-file hunks. The candidate
+worker entry replaces only the isolated build catalog. Newly added candidate
+files refuse to overwrite maintained files, preserving the former patch conflict
+check. Remaining patches still adapt modified alpha.60 source; they are debt,
+not a new application compatibility API. Patch text drops from 9,197 to 5,930
+lines, including moved code rather than claiming all those lines were removed.
+
+Source assembly comparisons match the prior Finance, Clipper, fixture, adapter
+and worker code byte for byte. Fresh alpha.67 checks pass 200 Finance
+schema/permission/backup/restore, 42 worker/session, 30 actual Finance Worker/UI
+and 59 Clipper schema/reading cases, including strict TypeScript and zero-warning
+Svelte checks. The three-engine financial/offline/drain checks remain intact.
+The latest application checks include the concurrent workspace initialization
+and distinct broker identity changes from `fdcaadb5`; the candidate worker entry
+matches that commit's patched entry byte for byte.
+
+The PR #46/#51 merge preview has a handoff-document conflict. More importantly,
+the Clipper schema overlay fails against #51's repaired schema/permissions.
+That authoring port must be reconciled with the final approved schema and native
+identity requalified before coordinated adoption; a clean application-source
+merge alone would not prove candidate compatibility. These checks do not activate
+the SDK, change data models or qualify the merged #51 candidate.
+
+See the [current commands and source boundaries](../../tests/worker-upgrade/README.md).
+
+## Historical baseline and qualification
+
 Baseline: PR #39 merged at `fb380114` on 2026-11-16. Its final head `d8c0820e`
 passed every hosted Finance, Clipper and foundation workflow. C1/C2 are complete.
 `feat/jazz-native-session-upgrade` starts from that exact merge tree. Workspace

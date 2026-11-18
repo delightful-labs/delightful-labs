@@ -1,5 +1,10 @@
 # Jazz alpha.66: release audit and revised upgrade order
 
+**Maintenance update, November 18:** the active proof runner now targets only
+alpha.67. The alpha.65/66 commands below record historical qualification;
+use the [current candidate instructions](../../tests/worker-upgrade/README.md).
+Workspace pins remain alpha.60, and complete Clipper/session adoption is open.
+
 Researched 2026-11-17 against the published package, not just the release notes.
 The upgrade target is now **2.0.0-alpha.66**. Live workspace pins and the active
 patch remain alpha.60. The maintained schema and `--worker` modes now qualify

@@ -59,8 +59,10 @@ export function checkFinanceWorker(directory, finance, proof) {
 		mkdirSync(dirname(join(app, name)), { recursive: true })
 		cpSync(join(finance, name), join(app, name), { recursive: true })
 	}
-	run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'finance-worker.patch')])
-	run('git', ['apply', join(proof, 'finance-worker.patch')])
+	cpSync(
+		join(proof, 'candidate/worker/application.worker.ts'),
+		join(app, 'src/lib/runtime/worker/application.worker.ts')
+	)
 	portRuntimeImports(join(app, 'src/lib'), join(app, 'src/lib'), 'queries.js', false)
 	portRuntimeImports(
 		join(app, 'tests/worker-application'),
@@ -71,9 +73,15 @@ export function checkFinanceWorker(directory, finance, proof) {
 	// This maintained browser fixture also compiles with the active alpha.60 types.
 	// The isolated candidate uses the corresponding native device-account API/policies.
 	const nativeTests = join(app, 'tests/worker-application/native.test.ts')
-	writeFileSync(nativeTests, readFileSync(nativeTests, 'utf8')
-		.replaceAll('acceptLocalFirstAuth', 'acceptDeviceAccounts')
-		.replace("import permissions from '../../src/lib/permissions.js'", "import permissions from '../../src/lib/jazz.permissions.json' with { type: 'json' }"))
+	writeFileSync(
+		nativeTests,
+		readFileSync(nativeTests, 'utf8')
+			.replaceAll('acceptLocalFirstAuth', 'acceptDeviceAccounts')
+			.replace(
+				"import permissions from '../../src/lib/permissions.js'",
+				"import permissions from '../../src/lib/jazz.permissions.json' with { type: 'json' }"
+			)
+	)
 	writeFileSync(
 		join(app, 'tsconfig.worker-application.json'),
 		JSON.stringify(

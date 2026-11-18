@@ -5,9 +5,10 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkClipper, clipperProofVersions } from './clipper.mjs'
+import { clipperProofVersions } from './clipper-versions.mjs'
 import { checkSchema } from './schema.mjs'
 import { checkFinanceWorker } from './worker-read.mjs'
+import { copyCandidate } from './copy-candidate.mjs'
 
 // Upgrade experiment only: reuse the maintained Finance fixture in a disposable
 // project, with its own dependencies. No workspace pin or installed SDK is edited.
@@ -20,15 +21,15 @@ const schemaScope = process.argv.includes('--clipper-schema')
 		: undefined
 const schemaOnly = schemaScope !== undefined
 const workerOnly = process.argv.includes('--worker')
-if (schemaOnly && workerOnly) throw new Error('Choose either a schema or worker proof')
-const selectedVersion = process.argv.find((argument) => argument.startsWith('--sdk='))?.slice(6)
 if (
-	selectedVersion !== undefined &&
-	(!(schemaOnly || workerOnly) || !['2.0.0-alpha.66', '2.0.0-alpha.67'].includes(selectedVersion))
+	Number(schemaOnly) + Number(workerOnly) !== 1 ||
+	(process.argv.includes('--schema') && process.argv.includes('--clipper-schema'))
 )
-	throw new Error('--sdk selects alpha.66 or alpha.67 for a schema/worker proof')
-const sdkVersion =
-	selectedVersion ?? (schemaOnly || workerOnly ? '2.0.0-alpha.66' : '2.0.0-alpha.65')
+	throw new Error('Choose --schema, --clipper-schema or --worker')
+const selectedVersion = process.argv.find((argument) => argument.startsWith('--sdk='))?.slice(6)
+if (selectedVersion !== undefined && selectedVersion !== '2.0.0-alpha.67')
+	throw new Error('The maintained candidate is jazz-tools@2.0.0-alpha.67')
+const sdkVersion = '2.0.0-alpha.67'
 const directory = mkdtempSync(
 	join(tmpdir(), `finance-jazz-${sdkVersion.replace('2.0.0-alpha.', 'alpha')}-`)
 )
@@ -142,6 +143,7 @@ for (const path of [
 }
 run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'fixture.patch')], app)
 run('git', ['apply', join(proof, 'fixture.patch')], app)
+copyCandidate(join(proof, 'candidate/fixture'), app)
 if (workerOnly) {
 	for (const path of ['sdk-session.worker.ts', 'actor/session.ts']) {
 		const worker = join(app, 'tests/worker-bindings', path)
@@ -217,6 +219,7 @@ run(
 	sources
 )
 run('git', ['apply', join(proof, 'session-adapters.patch')], sources)
+copyCandidate(join(proof, 'candidate/local-first'), sources)
 const adapted = join(directory, 'adapted-local-first')
 mkdirSync(adapted)
 run('tar', ['-xzf', join(directory, 'local-first.tgz'), '-C', adapted])
@@ -269,8 +272,5 @@ json(join(directory, 'versions.json'), {
 run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.json'], app)
 run('pnpm', ['exec', 'svelte-check', '--tsconfig', './tsconfig.json', '--fail-on-warnings'], app)
 run('pnpm', ['exec', 'vitest', 'run', '--config', 'vitest.worker-bindings.config.ts'], app)
-if (workerOnly) checkFinanceWorker(directory, finance, proof)
-else checkClipper(directory, proof, join(finance, '../clipper'))
-console.log(
-	`${workerOnly ? `Finance ${sdkVersion} worker` : 'Upgrade'} proof passed; artifacts retained at ${directory}`
-)
+checkFinanceWorker(directory, finance, proof)
+console.log(`Finance ${sdkVersion} worker proof passed; artifacts retained at ${directory}`)

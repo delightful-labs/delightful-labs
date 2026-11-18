@@ -4,6 +4,7 @@ import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'nod
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { copyCandidate } from './copy-candidate.mjs'
 
 export function portRuntimeImports(path, lib, runtimeEntry, clipper) {
 	for (const item of readdirSync(path, { withFileTypes: true })) {
@@ -89,6 +90,7 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 		cwd: app,
 		stdio: 'inherit'
 	})
+	copyCandidate(join(proof, 'candidate', scope), app)
 	// Only copied callers move from authoring schema.ts to native runtime queries.
 	const lib = join(app, schemaPath)
 	const runtimeEntry = clipper ? 'jazz.generated.js' : 'queries.js'
