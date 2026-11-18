@@ -139,14 +139,13 @@ for (const path of [
 run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'fixture.patch')], app)
 run('git', ['apply', join(proof, 'fixture.patch')], app)
 if (workerOnly) {
-	const worker = join(app, 'tests/worker-bindings/sdk-session.worker.ts')
-	writeFileSync(
-		worker,
-		readFileSync(worker, 'utf8').replace(
-			"from '../../src/lib/schema.js'",
-			"from '../../src/lib/queries.js'"
+	for (const path of ['sdk-session.worker.ts', 'actor/session.ts']) {
+		const worker = join(app, 'tests/worker-bindings', path)
+		writeFileSync(
+			worker,
+			readFileSync(worker, 'utf8').replace(/src\/lib\/schema\.js/g, 'src/lib/queries.js')
 		)
-	)
+	}
 }
 run(
 	'git',

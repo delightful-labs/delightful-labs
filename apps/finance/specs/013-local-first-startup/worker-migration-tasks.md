@@ -127,6 +127,17 @@ actual SDK/development-XState cases. Identity/recovery commands and actual calle
 adoption remain next; the raw-session Clipper overlay still fails 15/67 cases.
 Keep application domain drains, and do not add an SDK patch or hide that failure
 in a fixture. U2 remains open, and active alpha.60 behavior is unchanged.
+The approved shared app-binding extension is now implemented: the private Jazz
+adapter supplies the ready Db/identity to an inert app construction function,
+and the generic session actor publishes only its returned capability record.
+Clipper's active account adapter and candidate constructor reuse one extracted
+root/library/capture builder. Shared types/tests, active Clipper tests/full types,
+alpha.67 candidate constructor/native tests and focused three-engine Worker
+checks pass. [Exact boundary and next batch](worker-session-resource-decision.md#app-binding-function-approved-and-implemented).
+Actual worker-host adoption remains open; finish its required create/restore/
+recovery commands before replacing raw-session startup/close. Do not introduce
+another facade to retain Finance's legacy Svelte provider.
+
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

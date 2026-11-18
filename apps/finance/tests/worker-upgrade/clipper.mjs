@@ -51,6 +51,7 @@ export function checkClipper(directory, proof, clipper) {
 			'apps/web/src/app.d.ts',
 			'apps/web/src/lib/localization/i18next.d.ts',
 			'apps/web/src/lib/backend/jazz/account.ts',
+			'apps/web/src/lib/backend/jazz/library-binding.test.ts',
 			'apps/web/src/lib/machines/runtime/application-readiness.test.ts',
 			'apps/web/src/lib/runtime/worker/host-bindings.test.ts',
 			'apps/web/src/lib/runtime/worker/host-machine.test.ts'
@@ -71,6 +72,7 @@ export function checkClipper(directory, proof, clipper) {
 		'run',
 		'--config',
 		'vitest.config.ts',
+		'apps/web/src/lib/backend/jazz/library-binding.test.ts',
 		'apps/web/src/lib/machines/runtime/application-readiness.test.ts',
 		'apps/web/src/lib/machines/runtime/root-bootstrap.test.ts',
 		'apps/web/src/lib/machines/runtime/sign-out.test.ts',

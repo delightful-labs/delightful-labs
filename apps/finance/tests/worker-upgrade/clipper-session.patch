@@ -1,8 +1,16 @@
 diff --git a/src/lib/backend/jazz/account.ts b/src/lib/backend/jazz/account.ts
-index cb9162a..dc7d8df 100644
+index aae803e..c731473 100644
 --- a/src/lib/backend/jazz/account.ts
 +++ b/src/lib/backend/jazz/account.ts
-@@ -22,16 +22,13 @@ import { app } from './schema.js'
+@@ -2,6 +2,7 @@ import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
+ import { createLibraryCapability } from './library.js'
+ import { createLibraryRecords } from './records.js'
+ import { readConnection } from './read-connection.js'
++import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
+ import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
+ import wasmUrl from '#jazz-wasm-binary?url'
+ import type { JazzSession, JazzClientConfig } from 'jazz-tools/client'
+@@ -21,16 +22,13 @@ import type {
  export type Session = JazzSession<JazzClient>
  
  export type LibraryFactory = typeof createLibraryCapability
@@ -20,7 +28,7 @@ index cb9162a..dc7d8df 100644
  	const identities = new WeakMap<object, object>()
  	const candidates = new WeakMap<ReadyAccountObservation, () => AccountBinding>()
  	const identity = (resource: object) => {
-@@ -44,18 +41,18 @@ function bindHost(
+@@ -43,18 +41,18 @@ function bindHost(
  	}
  	const read = (): AccountObservation => {
  		const snapshot = session.getSnapshot()
@@ -43,9 +51,18 @@ index cb9162a..dc7d8df 100644
  				now.client !== client ||
  				now.client?.db !== db
  			)
-@@ -68,48 +65,43 @@ function bindHost(
+@@ -67,7 +65,7 @@ function bindHost(
  			}
- 			return {
+ 			const domain = createLibraryBinding({
+ 				db,
+-				identityId: account.id,
++				identityId: user.accountId,
+ 				isCurrent: () => {
+ 					check()
+ 					return live()
+@@ -77,39 +75,34 @@ function bindHost(
+ 			})
+ 			const observation: ReadyAccountObservation = {
  				status: 'ready',
 -				localFirst: db.isLocalFirst(),
 -				binding: identity(account),
@@ -81,29 +98,8 @@ index cb9162a..dc7d8df 100644
 -				signedIn: externallySignedIn(account),
 +				accountId: user.accountId,
 +				signedIn: user.kind === 'backend',
- 				root: {
- 					read: async () => {
- 						admitted()
--						const row = await db.one(app.libraries.where({ id: account.id }), {
-+						const row = await db.one(app.libraries.where({ id: user.accountId }), {
- 							tier: ReadTier.LocalFirst
- 						})
- 						if (!row) return 'missing'
--						return row.ownerId === account.id && row.bootstrapVersion === '1'
-+						return row.ownerId === user.accountId && row.bootstrapVersion === '1'
- 							? 'compatible'
- 							: 'incompatible'
- 					},
- 					ensure: () => {
- 						admitted()
--						const write = db.upsert(app.libraries, account.id, {
--							ownerId: account.id,
-+						const write = db.upsert(app.libraries, user.accountId, {
-+							ownerId: user.accountId,
- 							bootstrapVersion: '1'
- 						})
- 						return {
-@@ -122,7 +114,7 @@ function bindHost(
+ 				root: domain.root,
+ 				recovery: {
  					capability: recovery.capability,
  					source: {
  						subscribe: (notify) => {
@@ -112,25 +108,7 @@ index cb9162a..dc7d8df 100644
  							publish()
  							return session.subscribe(publish)
  						}
-@@ -140,7 +132,7 @@ function bindHost(
- 				library: libraryFactory(
- 					createLibraryRecords(
- 						db,
--						account.id,
-+						user.accountId,
- 						() => {
- 							try {
- 								check()
-@@ -152,7 +144,7 @@ function bindHost(
- 						},
- 						readConnection(db)
- 					),
--					account.id,
-+					user.accountId,
- 					requestCapture,
- 					cacheNamespace
- 				)
-@@ -176,7 +168,7 @@ function bindHost(
+@@ -144,7 +137,7 @@ function bindHost(
  			return create()
  		},
  		readiness,
@@ -139,7 +117,7 @@ index cb9162a..dc7d8df 100644
  		signOut: async () => {
  			const response = await fetch('/api/auth/sign-out', {
  				method: 'POST',
-@@ -188,7 +180,7 @@ function bindHost(
+@@ -156,7 +149,7 @@ function bindHost(
  			})
  			if (!response.ok) throw new Error('Provider sign-out failed')
  		},
@@ -148,7 +126,7 @@ index cb9162a..dc7d8df 100644
  		release: () => {
  			recovery.invalidate()
  			restored.invalidate()
-@@ -210,7 +202,8 @@ export function accountInput(
+@@ -178,7 +171,8 @@ export function accountInput(
  		startup: registry.getJazzStartupBinding({
  			...config,
  			client: localFirst,
@@ -158,7 +136,34 @@ index cb9162a..dc7d8df 100644
  			runtimeSources: config.runtimeSources ?? runtimeSources
  		}),
  		bind: (session) =>
-@@ -231,6 +224,7 @@ export function existingAccountInput(
+@@ -190,6 +184,26 @@ export function accountInput(
+ 	}
+ }
+ 
++/** Candidate worker binding; actual readiness/drain adoption follows identity commands. */
++export function accountSessionRuntime(
++	config: JazzClientConfig,
++	libraryFactory: LibraryFactory = createLibraryCapability
++) {
++	return createJazzSessionRuntime(
++		{
++			...config,
++			initial: 'device',
++			runtimeSources: config.runtimeSources ?? runtimeSources
++		},
++		(ready) =>
++			createLibraryBinding({
++				...ready,
++				libraryFactory,
++				cacheNamespace: JSON.stringify([config.scope, config.serverUrl, config.env])
++			})
++	)
++}
++
+ /** Existing identities/restoration only; extension sign-in must not create an unrelated account. */
+ export function existingAccountInput(
+ 	config: JazzClientConfig,
+@@ -199,6 +213,7 @@ export function existingAccountInput(
  		startup: registry.getJazzStartupBinding({
  			...config,
  			client: localFirst,
@@ -166,7 +171,7 @@ index cb9162a..dc7d8df 100644
  			runtimeSources: config.runtimeSources ?? runtimeSources
  		}),
  		bind: (session) =>
-@@ -246,15 +240,15 @@ export function existingAccountInput(
+@@ -214,15 +229,15 @@ export function existingAccountInput(
  export function currentLibraryRecords() {
  	const session = registry.getCurrentJazzSession()
  	const snapshot = session?.getSnapshot()
@@ -186,7 +191,7 @@ index cb9162a..dc7d8df 100644
  		},
  		readConnection(client.db)
  	)
-@@ -268,9 +262,9 @@ export async function requestCapture(
+@@ -236,15 +251,15 @@ export async function requestCapture(
  ) {
  	const session = registry.getCurrentJazzSession()
  	const snapshot = session?.getSnapshot()
@@ -195,18 +200,16 @@ index cb9162a..dc7d8df 100644
  		throw new Error('Account scope unavailable')
 -	const { account, client } = snapshot
 +	const { user, client } = snapshot
- 	const token = client.db.getConfig().jwtToken
- 	const response = await fetch(`/api/capture/${operation}`, {
- 		method: 'POST',
-@@ -285,7 +279,7 @@ export async function requestCapture(
- 		body: JSON.stringify(body)
- 	})
- 	const now = session.getSnapshot()
--	if (now.status !== 'ready' || now.account !== account || now.client !== client) {
-+	if (now.status !== 'ready' || now.user !== user || now.client !== client) {
- 		await response.body?.cancel()
- 		throw new Error('Account scope expired')
- 	}
+ 	const db = client.db
+ 	return createLibraryCapture(db, () => {
+ 		const now = session.getSnapshot()
+ 		return (
+ 			now.status === 'ready' &&
+-			now.account === account &&
++			now.user === user &&
+ 			now.client === client &&
+ 			now.client.db === db
+ 		)
 diff --git a/src/lib/contracts/account.ts b/src/lib/contracts/account.ts
 index cc83019..4d5f14b 100644
 --- a/src/lib/contracts/account.ts

@@ -194,6 +194,73 @@ owners, then add the bounded recovery/restore commands needed by those callers.
 Finance's legacy Svelte provider and Clipper's raw-session host must be replaced
 at their real application boundary; changing only fixtures does not complete U2.
 
+## App binding function: approved and implemented
+
+The user approved this shared extension to keep both apps similar and limit SDK
+upgrade contacts. `createJazzSessionRuntime(config, bind)` calls an app-supplied,
+synchronous construction function with the ready Db, identity ID/kind, opaque
+binding and `isCurrent` predicate. It returns app capability functions, not the
+Db, SDK session or live query rows. Construction must be inert: no subscriptions,
+actor starts, acquired resources or I/O. Existing app charts still own readiness,
+adoption, domain drains and resource release.
+
+The native adapter reuses that constructed record for the exact user/client/Db
+binding. Nonready observations invalidate the old binding; a later ready binding
+gets a new record, including A → B → A. Each capability can use the adjacent
+native `isCurrent` check. Construction errors follow the existing observation
+failure path. There is no new fallback, SDK proxy, session getter or registry.
+
+`createSessionRuntimeMachine<Capabilities>()` carries the typed record in ready
+observations; the existing default machine remains available. The same selector
+withdraws the record during mutation, close or observation failure. These are
+worker-local capability records, never UI-thread view messages.
+
+Clipper's existing account adapter now reuses `createLibraryBinding` for native
+root access and library construction. Its current public capture function and
+the constructed library reuse `createLibraryCapture`: the latter captures its
+own admitted Db and liveness check rather than reading the old global registry.
+Provider cookies/native proof handling are unchanged. Replaced responses are
+cancelled and rejected. The alpha.65+ caller overlay exposes
+`accountSessionRuntime` using the same builder and shared binding function.
+**This constructor is not yet wired into the real worker host**; identity and
+recovery commands and old raw-session startup/close replacement remain next.
+
+Qualification for this batch:
+
+- **34 shared tests**, full library types, packaging and changed-source lint pass.
+- **72 active Clipper tests** pass: the existing 70 account/root/sign-out/worker
+  cases and two new native binding/capture cases. Full Clipper Svelte/TypeScript
+  checking reports zero errors/warnings. The extraction preserves shared-Db
+  ownership and refuses stale access before network or writes.
+- Alpha.67 compiles the actual candidate account constructor and extracted
+  builder with strict types. The same two native binding/capture cases pass
+  against its real disposable authority; this is not application-host adoption.
+- **15 focused native browser cases** pass in Chromium/Firefox/WebKit. The
+  development-XState actor invokes the binding function and reads actual Finance
+  data through its returned capability inside a Worker. Records are withdrawn
+  and retained native checks refuse the old binding after sign-out/close. The
+  existing held-open/sign-out drain coverage remains intact; 21 unrelated native
+  cases were omitted, and the larger schema/backend suites were not repeated.
+
+Artifacts: `/private/tmp/finance-alpha67-bindings-0hii5wgh`,
+`/private/tmp/clipper-alpha67-bindings-ow0swt3k`; logs:
+`/private/tmp/finance-alpha67-bindings-native.log`,
+`/private/tmp/clipper-alpha67-bindings-native.log`,
+`/private/tmp/clipper-library-binding-native.log`,
+`/private/tmp/clipper-library-binding-types.log`.
+Native patches pass strict apply/whitespace checks; source formatting passes.
+Active SDK pins remain alpha.60. All hosted Finance/Clipper/Foundation checks
+passed for the preceding sign-out checkpoint `f464f7c1`.
+
+Next batch: add the bounded create/restore/recovery operations the actual host
+requires, reusing existing restoration validation and domain drains. Then replace
+Clipper's startup/host-close custody of raw sessions with this actor and binding
+constructor. Retire the corresponding old registry path on qualified adoption.
+Finance should reuse this boundary for its worker-owned capabilities; retain the
+legacy Svelte provider until the worker UI replacement rather than adding an SDK
+facade to satisfy it. Do not turn the historical raw-session fixture green by
+changing only mocks or disabling development freezing.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing

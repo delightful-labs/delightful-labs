@@ -148,10 +148,10 @@ index f15347c..a322805 100644
  		}
 diff --git a/src/lib/backend/jazz/session-runtime.ts b/src/lib/backend/jazz/session-runtime.ts
 new file mode 100644
-index 0000000..5e3c89b
+index 0000000..a2ce122
 --- /dev/null
 +++ b/src/lib/backend/jazz/session-runtime.ts
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,115 @@
 +import { createJazzClient } from 'jazz-tools/client'
 +import type { JazzClient, JazzClientConfig, JazzSessionSnapshot } from 'jazz-tools/client'
 +import type {
@@ -161,10 +161,26 @@ index 0000000..5e3c89b
 +
 +const loadLocalFirstClient = () => import('jazz-tools/local-first')
 +
-+/** Only this native adapter retains the SDK facade. Session operations belong to its actor. */
-+export function createJazzSessionRuntime(
-+	config: Omit<JazzClientConfig, 'client' | 'localFirst'>
-+): SessionRuntimeInput {
++/** Native construction input only; never place db in an actor context or UI view. */
++export type JazzSessionBindingInput = Readonly<{
++	db: JazzClient['db']
++	identityId: string
++	identityKind: 'device' | 'backend'
++	binding: object
++	isCurrent: () => boolean
++}>
++
++/** Only this native adapter retains the SDK facade. App bindings retain selected leaves. */
++type Configuration = Omit<JazzClientConfig, 'client' | 'localFirst'>
++export function createJazzSessionRuntime(config: Configuration): SessionRuntimeInput
++export function createJazzSessionRuntime<Capabilities>(
++	config: Configuration,
++	bind: (input: JazzSessionBindingInput) => Capabilities
++): SessionRuntimeInput<Capabilities>
++export function createJazzSessionRuntime<Capabilities>(
++	config: Configuration,
++	bind?: (input: JazzSessionBindingInput) => Capabilities
++): SessionRuntimeInput<Capabilities | undefined> {
 +	const captured: JazzClientConfig = { ...config, client: loadLocalFirstClient, localFirst: 'now' }
 +	return {
 +		binding: Object.freeze({}),
@@ -173,28 +189,56 @@ index 0000000..5e3c89b
 +				const session = await createJazzClient(captured)
 +				let previous: JazzSessionSnapshot<JazzClient> | undefined
 +				let binding: object = Object.freeze({})
-+				const read = (): SessionRuntimeObservation => {
++				let selected: { capabilities: Capabilities | undefined } | undefined
++				const read = (): SessionRuntimeObservation<Capabilities | undefined> => {
 +					const snapshot = session.getSnapshot()
 +					if (snapshot.status !== 'ready') {
 +						previous = snapshot
++						binding = Object.freeze({})
++						selected = undefined
 +						return { status: snapshot.status }
 +					}
 +					if (!snapshot.user || !snapshot.client)
 +						throw new Error('Jazz ready session resources unavailable')
 +					if (
++						!selected ||
 +						previous?.status !== 'ready' ||
 +						previous.user !== snapshot.user ||
 +						previous.client !== snapshot.client ||
 +						previous.client?.db !== snapshot.client.db
-+					)
++					) {
 +						binding = Object.freeze({})
++						const currentBinding = binding
++						const user = snapshot.user,
++							client = snapshot.client,
++							db = client.db
++						selected = {
++							capabilities: bind?.({
++								db,
++								binding: currentBinding,
++								identityId: user.accountId,
++								identityKind: user.kind,
++								isCurrent: () => {
++									const now = session.getSnapshot()
++									return (
++										binding === currentBinding &&
++										now.status === 'ready' &&
++										now.user === user &&
++										now.client === client &&
++										now.client.db === db
++									)
++								}
++							})
++						}
++					}
 +					previous = snapshot
 +					return {
 +						status: 'ready',
 +						binding,
 +						identityId: snapshot.user.accountId,
 +						identityKind: snapshot.user.kind,
-+						localFirst: snapshot.localFirst
++						localFirst: snapshot.localFirst,
++						capabilities: selected.capabilities
 +					}
 +				}
 +				return {

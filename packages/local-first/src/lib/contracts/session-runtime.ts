@@ -20,21 +20,23 @@ export type SessionRuntimeSignOutRequest = Readonly<{
 	replyTo: ActorRef<Snapshot<unknown>, SessionRuntimeSignOutReport>
 }>
 
-/** Native observations only. Application/domain readiness remains with its owner. */
-export type SessionRuntimeObservation =
+/** Worker-local native facts and app capabilities. Domain readiness remains app-owned. */
+export type SessionRuntimeObservation<Capabilities = undefined> =
 	| Readonly<{
 			status: 'ready'
 			binding: object
 			identityId: string
 			identityKind: 'device' | 'backend'
 			localFirst: boolean
+			/** App-owned capability record; native handles remain in adapter closures. */
+			capabilities: Capabilities
 	  }>
 	| Readonly<{ status: Exclude<SessionStatus, 'ready'> | 'starting' }>
 
 /** Private native leaves. Their closures retain SDK resources; consumers use the actor. */
-export type SessionRuntimeResource = Readonly<{
+export type SessionRuntimeResource<Capabilities = undefined> = Readonly<{
 	observe: (
-		publish: (observation: SessionRuntimeObservation) => void,
+		publish: (observation: SessionRuntimeObservation<Capabilities>) => void,
 		failed: () => void
 	) => () => void
 	close: () => Promise<void>
@@ -42,9 +44,9 @@ export type SessionRuntimeResource = Readonly<{
 	signOut: (identityBinding: object) => Promise<'completed' | 'bindingChanged'>
 }>
 
-export type SessionRuntimeInput = Readonly<{
+export type SessionRuntimeInput<Capabilities = undefined> = Readonly<{
 	binding: object
-	capability: SessionOpenCapability<SessionRuntimeResource>
+	capability: SessionOpenCapability<SessionRuntimeResource<Capabilities>>
 }>
 export type SessionRuntimeResult =
 	| Readonly<{ outcome: 'closed' }>

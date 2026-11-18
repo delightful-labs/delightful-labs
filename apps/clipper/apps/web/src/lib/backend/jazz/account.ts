@@ -2,7 +2,7 @@ import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
 import { createLibraryCapability } from './library.js'
 import { createLibraryRecords } from './records.js'
 import { readConnection } from './read-connection.js'
-import { ReadTier } from 'jazz-tools'
+import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
 import wasmUrl from '#jazz-wasm-binary?url'
 import type { JazzSession, JazzClientConfig } from 'jazz-tools/client'
 import type { JazzClient } from 'jazz-tools/client'
@@ -17,7 +17,6 @@ import type {
 	AccountBinding,
 	ReadyAccountObservation
 } from '../../contracts/account.js'
-import { app } from './schema.js'
 
 export type Session = JazzSession<JazzClient>
 
@@ -61,12 +60,22 @@ function bindHost(
 			)
 				throw new Error('Account scope expired')
 		}
-		const build = (live: () => boolean): ReadyAccountObservation => {
+		const build = (live: () => boolean) => {
 			const admitted = () => {
 				check()
 				if (!live()) throw new Error('Account scope expired')
 			}
-			return {
+			const domain = createLibraryBinding({
+				db,
+				identityId: account.id,
+				isCurrent: () => {
+					check()
+					return live()
+				},
+				libraryFactory,
+				cacheNamespace
+			})
+			const observation: ReadyAccountObservation = {
 				status: 'ready',
 				localFirst: db.isLocalFirst(),
 				binding: identity(account),
@@ -95,29 +104,7 @@ function bindHost(
 				},
 				accountId: account.id,
 				signedIn: externallySignedIn(account),
-				root: {
-					read: async () => {
-						admitted()
-						const row = await db.one(app.libraries.where({ id: account.id }), {
-							tier: ReadTier.LocalFirst
-						})
-						if (!row) return 'missing'
-						return row.ownerId === account.id && row.bootstrapVersion === '1'
-							? 'compatible'
-							: 'incompatible'
-					},
-					ensure: () => {
-						admitted()
-						const write = db.upsert(app.libraries, account.id, {
-							ownerId: account.id,
-							bootstrapVersion: '1'
-						})
-						return {
-							local: () => write.wait({ tier: 'local' }),
-							global: () => write.wait({ tier: 'global' })
-						}
-					}
-				},
+				root: domain.root,
 				recovery: {
 					capability: recovery.capability,
 					source: {
@@ -129,34 +116,15 @@ function bindHost(
 					}
 				}
 			}
+			return { observation, createLibrary: domain.createLibrary }
 		}
-		const observation = build(() => true)
+		const { observation } = build(() => true)
 		candidates.set(observation, () => {
 			check()
 			let released = false
 			const live = () => !released
-			const adopted = {
-				...build(live),
-				library: libraryFactory(
-					createLibraryRecords(
-						db,
-						account.id,
-						() => {
-							try {
-								check()
-								if (!live()) return false
-								return true
-							} catch {
-								return false
-							}
-						},
-						readConnection(db)
-					),
-					account.id,
-					requestCapture,
-					cacheNamespace
-				)
-			}
+			const scoped = build(live)
+			const adopted = { ...scoped.observation, library: scoped.createLibrary() }
 			return {
 				observation: adopted,
 				release: () => {
@@ -271,23 +239,14 @@ export async function requestCapture(
 	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
 		throw new Error('Account scope unavailable')
 	const { account, client } = snapshot
-	const token = client.db.getConfig().jwtToken
-	const response = await fetch(`/api/capture/${operation}`, {
-		method: 'POST',
-		credentials: 'same-origin',
-		redirect: 'error',
-		cache: 'no-store',
-		signal: signal ?? null,
-		headers: {
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(body)
-	})
-	const now = session.getSnapshot()
-	if (now.status !== 'ready' || now.account !== account || now.client !== client) {
-		await response.body?.cancel()
-		throw new Error('Account scope expired')
-	}
-	return response
+	const db = client.db
+	return createLibraryCapture(db, () => {
+		const now = session.getSnapshot()
+		return (
+			now.status === 'ready' &&
+			now.account === account &&
+			now.client === client &&
+			now.client.db === db
+		)
+	})(operation, body, signal)
 }

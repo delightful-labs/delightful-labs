@@ -1,9 +1,9 @@
 diff --git a/tests/worker-bindings/actor/client.ts b/tests/worker-bindings/actor/client.ts
 new file mode 100644
-index 0000000..55516a6
+index 0000000..c348c95
 --- /dev/null
 +++ b/tests/worker-bindings/actor/client.ts
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,27 @@
 +import { fixture as sdk } from '../sdk-session.js'
 +
 +const fixture = {
@@ -13,6 +13,11 @@ index 0000000..55516a6
 +		const reply = await sdk.command({ type: 'ACTOR_STATE' })
 +		if (reply.kind !== 'actor-state') throw new Error('Unexpected actor state reply')
 +		return reply.state
++	},
++	async readBinding() {
++		const reply = await sdk.command({ type: 'READ_ACTOR_BINDING' })
++		if (reply.kind !== 'actor-binding') throw new Error('Unexpected binding reply')
++		return reply.rows
 +	},
 +	close: () => sdk.command({ type: 'CLOSE_ACTOR' }),
 +	signOut: (stale = false, hold = false) => sdk.command({ type: 'SIGN_OUT_ACTOR', stale, hold }),
@@ -44,20 +49,24 @@ index 0000000..6edd339
 +</html>
 diff --git a/tests/worker-bindings/actor/session.ts b/tests/worker-bindings/actor/session.ts
 new file mode 100644
-index 0000000..408a20c
+index 0000000..352169d
 --- /dev/null
 +++ b/tests/worker-bindings/actor/session.ts
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,199 @@
 +import { createActor, createCallbackLogic, waitFor } from 'xstate'
 +import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
 +import {
-+	sessionRuntimeMachine,
++	createSessionRuntimeMachine,
 +	selectSessionRuntimeObservation,
 +	type SessionRuntimeSignOutReport
 +} from 'delightful-local-first/session/runtime'
 +import { createFinanceAccountStore } from '../../../src/lib/runtime/worker/account-store.js'
 +import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
 +import wasmUrl from '#jazz-wasm-binary?url'
++import { app } from '../../../src/lib/schema.js'
++
++type Capabilities = { isCurrent: () => boolean; read: () => Promise<number> }
++const sessionRuntimeMachine = createSessionRuntimeMachine<Capabilities>()
 +
 +let broker: ReturnType<typeof brokerHostClient> | undefined
 +let actor: ReturnType<typeof createActor<typeof sessionRuntimeMachine>> | undefined
@@ -70,6 +79,8 @@ index 0000000..408a20c
 +})
 +let caller: ReturnType<typeof createActor<typeof receiveReport>> | undefined
 +let sessionBinding: object | undefined
++let bound = 0
++let capabilities: Capabilities | undefined
 +let acquired = 0,
 +	subscribed = 0,
 +	unsubscribed = 0,
@@ -102,19 +113,29 @@ index 0000000..408a20c
 +		const serverUrl = location.origin + '/jazz'
 +		const selected = createFinanceAccountStore({ serverUrl, scope, environment: 'actor-proof' })
 +		store = selected
-+		const native = createJazzSessionRuntime({
-+			serverUrl,
-+			scope,
-+			env: 'actor-proof',
-+			store: selected,
-+			initial,
-+			runtimeSources: {
-+				wasmUrl,
-+				brokerWorkerUrl,
-+				wasmVersion: 'finance-sdk-proof-1',
-+				browserWorkerHost: broker
++		const native = createJazzSessionRuntime(
++			{
++				serverUrl,
++				scope,
++				env: 'actor-proof',
++				store: selected,
++				initial,
++				runtimeSources: {
++					wasmUrl,
++					brokerWorkerUrl,
++					wasmVersion: 'finance-sdk-proof-1',
++					browserWorkerHost: broker
++				}
++			},
++			({ db, isCurrent }) => {
++				bound++
++				capabilities = {
++					isCurrent,
++					read: async () => (await db.all(app.organizations, { tier: 'local-first' })).length
++				}
++				return capabilities
 +			}
-+		})
++		)
 +		sessionBinding = native.binding
 +		caller = createActor(receiveReport).start()
 +		if (hold) held = Promise.withResolvers<void>()
@@ -170,6 +191,8 @@ index 0000000..408a20c
 +			subscribed,
 +			unsubscribed,
 +			closed,
++			bound,
++			bindingCurrent: capabilities?.isCurrent() ?? false,
 +			signOutStarted,
 +			signOutCompleted,
 +			reports: [...reports],
@@ -179,6 +202,11 @@ index 0000000..408a20c
 +			identityId: observation?.status === 'ready' ? observation.identityId : undefined,
 +			localFirst: observation?.status === 'ready' ? observation.localFirst : undefined
 +		}
++	},
++	async readBinding() {
++		const observation = selectSessionRuntimeObservation(owner().getSnapshot())
++		if (observation?.status !== 'ready') throw new Error('Binding unavailable')
++		return observation.capabilities.read()
 +	},
 +	close() {
 +		owner().send({ type: 'CLOSE' })
@@ -225,7 +253,7 @@ index 0000000..408a20c
 +	}
 +}
 diff --git a/tests/worker-bindings/native.test.ts b/tests/worker-bindings/native.test.ts
-index eb4c31d..6b6e3a0 100644
+index eb4c31d..957bc02 100644
 --- a/tests/worker-bindings/native.test.ts
 +++ b/tests/worker-bindings/native.test.ts
 @@ -4,6 +4,9 @@ import { join, resolve, extname } from 'node:path'
@@ -337,7 +365,7 @@ index eb4c31d..6b6e3a0 100644
  	server = listener
  	await new Promise<void>((resolve, reject) => {
  		listener.once('error', reject)
-@@ -106,6 +145,184 @@ function retainOnFailure() {
+@@ -106,6 +145,195 @@ function retainOnFailure() {
  
  for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
  	describe(engine, () => {
@@ -375,13 +403,24 @@ index eb4c31d..6b6e3a0 100644
 +					if (initial === 'device') {
 +						expect(observed.localFirst).toBe(true)
 +						expect(observed.identityId).toMatch(/\S/)
++						expect(observed.bound).toBe(1)
++						expect(observed.bindingCurrent).toBe(true)
++						expect(
++							await actorPage.evaluate(() => window.financeSessionActorFixture.readBinding())
++						).toBe(0)
 +					}
 +					await actorPage.evaluate(() => window.financeSessionActorFixture.close())
 +					await expect
 +						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()), {
 +							timeout: 10000
 +						})
-+						.toMatchObject({ done: true, clean: true, closed: 1, unsubscribed: 1 })
++						.toMatchObject({
++							done: true,
++							clean: true,
++							closed: 1,
++							unsubscribed: 1,
++							bindingCurrent: false
++						})
 +					expect(
 +						await actorPage.evaluate(() => window.financeSessionActorFixture.dispose())
 +					).toEqual({ sdkClosed: true, storeClosed: true, hostClosed: true })
@@ -522,7 +561,7 @@ index eb4c31d..6b6e3a0 100644
  		it('isolates native Window SDK startup from the worker bridge', async () => {
  			retainOnFailure()
  			const browser = await browserType.launch({ headless: true })
-@@ -121,6 +338,152 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
+@@ -121,6 +349,152 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
  				await browser.close()
  			}
  		})
@@ -809,10 +848,10 @@ index a968589..2520fa3 100644
  	command,
  	stats: () => ({ ...active?.stats }),
 diff --git a/tests/worker-bindings/sdk-session.worker.ts b/tests/worker-bindings/sdk-session.worker.ts
-index f8a8f90..6248a9c 100644
+index f8a8f90..5eecc79 100644
 --- a/tests/worker-bindings/sdk-session.worker.ts
 +++ b/tests/worker-bindings/sdk-session.worker.ts
-@@ -1,11 +1,35 @@
+@@ -1,11 +1,36 @@
 +import { actorFixture } from './actor/session.js'
  import { createJazzClient } from 'jazz-tools/client'
  import wasmUrl from '#jazz-wasm-binary?url'
@@ -833,6 +872,7 @@ index f8a8f90..6248a9c 100644
 +			control: MessagePort
 +	  }
 +	| { type: 'ACTOR_STATE' }
++	| { type: 'READ_ACTOR_BINDING' }
 +	| { type: 'CLOSE_ACTOR' }
 +	| { type: 'SIGN_OUT_ACTOR'; stale: boolean; hold: boolean }
 +	| { type: 'RELEASE_ACTOR_SIGN_OUT' }
@@ -849,13 +889,14 @@ index f8a8f90..6248a9c 100644
  	| { type: 'READ'; organizationId: string }
  	| {
  			type: 'SEED'
-@@ -16,10 +40,15 @@ export type SdkCommand =
+@@ -16,10 +41,16 @@ export type SdkCommand =
  	  }
  	| { type: 'EDIT'; transactionId: string; amountMinor: number }
  	| { type: 'CLOSE' }
 +	| { type: 'QUALIFY_SESSION' }
  export type SdkReply =
 +	| { kind: 'actor-started' }
++	| { kind: 'actor-binding'; rows: number }
 +	| { kind: 'actor-state'; state: ReturnType<typeof actorFixture.state> }
 +	| { kind: 'actor-disposed'; receipt: Awaited<ReturnType<typeof actorFixture.dispose>> }
  	| { kind: 'opened'; accountId: string; localFirst: boolean; windowPresent: boolean }
@@ -865,7 +906,7 @@ index f8a8f90..6248a9c 100644
  	| { kind: 'closed'; sdkClosed: boolean; hostClosed: boolean }
  	| { kind: 'failed'; message: string; stack?: string }
  
-@@ -28,13 +57,40 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
+@@ -28,13 +59,42 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
  let broker: ReturnType<typeof brokerHostClient> | undefined
  function current() {
  	const snapshot = session?.getSnapshot()
@@ -889,6 +930,8 @@ index f8a8f90..6248a9c 100644
 +		)
 +		return { kind: 'actor-started' }
 +	}
++	if (command.type === 'READ_ACTOR_BINDING')
++		return { kind: 'actor-binding', rows: await actorFixture.readBinding() }
 +	if (command.type === 'DISPOSE_ACTOR')
 +		return { kind: 'actor-disposed', receipt: await actorFixture.dispose() }
 +	if (
@@ -908,7 +951,7 @@ index f8a8f90..6248a9c 100644
  	if (command.type === 'OPEN') {
  		if (session || store || broker) throw new Error('SDK fixture already open')
  		const serverUrl = new URL('/jazz', location.origin).href
-@@ -48,7 +104,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -48,7 +108,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  			scope: command.scope,
  			env: 'sdk-proof',
  			store,
@@ -922,7 +965,7 @@ index f8a8f90..6248a9c 100644
  			runtimeSources: {
  				wasmUrl,
  				brokerWorkerUrl: command.brokerUrl,
-@@ -57,7 +118,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -57,7 +122,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  			}
  		})
  		const { db, accountId } = current()
@@ -930,7 +973,7 @@ index f8a8f90..6248a9c 100644
  		return {
  			kind: 'opened',
  			accountId,
-@@ -66,9 +126,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -66,9 +130,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  		}
  	}
  	if (command.type === 'CLOSE') {
@@ -943,7 +986,7 @@ index f8a8f90..6248a9c 100644
  		await store.close()
  		const receipt = await broker.close()
  		return {
-@@ -79,6 +139,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -79,6 +143,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  				receipt.requestId === broker.host.identity.requestId
  		}
  	}

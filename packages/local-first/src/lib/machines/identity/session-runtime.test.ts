@@ -62,7 +62,8 @@ async function readyForSignOut(f: ReturnType<typeof fixture>, identityBinding: o
 		binding: identityBinding,
 		identityId: 'original',
 		identityKind: 'device',
-		localFirst: true
+		localFirst: true,
+		capabilities: undefined
 	})
 }
 
@@ -244,7 +245,8 @@ describe('session runtime ownership', () => {
 				binding: {},
 				identityId: 'device',
 				identityKind: 'device',
-				localFirst: true
+				localFirst: true,
+				capabilities: undefined
 			})
 			expect(selectSessionRuntimeObservation(f.actor.getSnapshot())?.status).toBe('ready')
 			f.actor.send({ type: 'CLOSE' })
@@ -256,7 +258,8 @@ describe('session runtime ownership', () => {
 				binding: {},
 				identityId: 'late',
 				identityKind: 'device',
-				localFirst: true
+				localFirst: true,
+				capabilities: undefined
 			})
 			expect(selectSessionRuntimeObservation(f.actor.getSnapshot())).toBeUndefined()
 			pending.resolve()
