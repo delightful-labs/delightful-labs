@@ -10,9 +10,7 @@ import {
 	createFinanceWorkerMachine,
 	selectFinanceWorkerView,
 	selectFinanceRecoveryReader,
-	selectFinanceArchiveObservation,
-	selectFinanceFormObservations,
-	selectFinanceArchiveWriter
+	selectFinanceFormObservations
 } from './worker-application.js'
 import type {
 	FinanceWorkerCapabilities,
@@ -179,6 +177,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 					binding,
 					observe,
 					create: createWrite,
+					archive: archiveWrite,
 					db: transactionDb.db,
 					initialization: {
 						db: initialization ?? { ...transactionDb.db, getConfig: () => ({ serverUrl: '' }) },
@@ -216,12 +215,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 	})
 	let owner: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
 	const machine = createFinanceWorkerMachine({
-		observe: () => selectFinanceArchiveObservation(owner?.getSnapshot()),
-		observeForms: () => selectFinanceFormObservations(owner?.getSnapshot()),
-		persist: (request) => {
-			const write = selectFinanceArchiveWriter(owner?.getSnapshot(), request)
-			return write ? write(request.accountId) : Promise.reject(new Error('Binding retired'))
-		}
+		observeForms: () => selectFinanceFormObservations(owner?.getSnapshot())
 	})
 	const actor = createActor(machine, {
 		input: {
@@ -831,7 +825,12 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.nativeClose).not.toHaveBeenCalled()
 			archived.resolve()
 			await vi.waitFor(() =>
-				expect(f.actor.getSnapshot().matches({ draining: { archive: 'closed' } })).toBe(true)
+				expect(
+					f.actor
+						.getSnapshot()
+						.context.forms?.owner.getSnapshot()
+						.matches({ closing: { archive: 'closed' } })
+				).toBe(true)
 			)
 			expect(f.nativeClose).not.toHaveBeenCalled()
 			created.resolve({ ...row('New save'), organizationId: a, archivedAt: null })
@@ -1084,6 +1083,42 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+	it('drains an issued archive before replacing the SDK-bound financial group', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.archiveWrite.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			const previous = f.actor.getSnapshot().context.forms?.owner
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			f.publishSession(f.ready({}))
+			expect(f.view().accounts).toEqual([])
+			expect(f.view().archiveFeedback).toBeNull()
+			expect(f.actor.getSnapshot().context.forms?.owner).toBe(previous)
+			expect(f.queries).toHaveLength(1)
+			held.resolve()
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([row('Wallet')])
+			expect(f.view().accounts[0]?.archiveAction).toBe('available')
+			expect(f.view().archiveFeedback).toBeNull()
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			expect(f.nativeClose).not.toHaveBeenCalled()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
 	it('uses actual membership and scoped grants rather than the presence of a rendered row as archive permission', async () => {
 		const f = fixture()
 		try {
@@ -1175,7 +1210,10 @@ describe('Finance worker ownership and selected accounts', () => {
 		const f = fixture()
 		try {
 			await f.start()
-			f.actor.getSnapshot().children.archive?.send({ type: 'SHUTDOWN' })
+			f.actor
+				.getSnapshot()
+				.context.forms?.owner.getSnapshot()
+				.children.archive?.send({ type: 'SHUTDOWN' })
 			await waitFor(f.actor, (snapshot) => snapshot.matches('drainFailed'))
 			f.actor.send({ type: 'CLOSE' })
 			expect(f.nativeClose).not.toHaveBeenCalled()

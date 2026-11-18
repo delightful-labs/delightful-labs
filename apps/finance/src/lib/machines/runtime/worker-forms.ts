@@ -1,4 +1,8 @@
 import {
+	createAccountArchiveMachine,
+	selectAccountArchiveReport
+} from '../accounts/account-archive.js'
+import {
 	setup,
 	types,
 	matchesState,
@@ -45,11 +49,26 @@ import {
 /** One SDK-bound workflow owner. Existing charts retain initialization, form policy and settlement. */
 export function createFinanceFormsMachine(
 	dependencies: Omit<Parameters<typeof createAccountCreationFormOptions>[0], 'observe'> & {
+		archive: (accountId: string) => Promise<unknown>
 		initialization: InputFrom<typeof workspaceInitialization>
 		observe: () => FinanceFormsObservation
 		db: Parameters<typeof createTransactionEntryFormOptions>[0]['db']
 	}
 ) {
+	const archive = createAccountArchiveMachine(
+		(request) => {
+			const current = dependencies.observe()
+			if (
+				current.creation.binding !== dependencies.binding ||
+				current.archive.binding !== request.binding ||
+				current.archive.identityId !== request.identityId ||
+				current.archive.organizationId !== request.organizationId
+			)
+				return Promise.reject(new Error('Finance archive scope retired'))
+			return dependencies.archive(request.accountId)
+		},
+		() => dependencies.observe().archive
+	)
 	const options = createAccountCreationFormOptions({
 		...dependencies,
 		observe: () => dependencies.observe().creation
@@ -83,6 +102,7 @@ export function createFinanceFormsMachine(
 	>(options)
 	type Input = { observation: FinanceFormsObservation; selectionRevision: number }
 	type Context = Input & {
+		archive: ReturnType<typeof selectAccountArchiveReport> | undefined
 		initialization: OutputFrom<typeof workspaceInitialization> | undefined
 		edit: TransactionEntryView | undefined
 		editObservation: TransactionEntryObservation | undefined
@@ -100,28 +120,32 @@ export function createFinanceFormsMachine(
 				CREATION_CLOSED: types(),
 				TRANSACTION_CLOSED: types(),
 				EDIT_CLOSED: types(),
-				INITIALIZATION_CLOSED: types()
+				INITIALIZATION_CLOSED: types(),
+				ARCHIVE_CLOSED: types()
 			},
 			events: {
 				OBSERVE: types<Input>(),
+				ARCHIVE_ACCOUNT: types<{ accountId: string }>(),
 				ACCOUNT_CREATION: types<{ command: WorkerAccountCreationCommand }>(),
 				TRANSACTION_ENTRY: types<{ command: WorkerTransactionEntryCommand }>(),
 				TRANSACTION_EDIT: types<{ command: WorkerTransactionEntryCommand }>(),
 				SHUTDOWN: types()
 			},
 			children: {
+				archive: types<import('xstate').ActorRefFrom<typeof archive>>(),
 				initialization: types<import('xstate').ActorRefFrom<typeof workspaceInitialization>>(),
 				edit: types<import('xstate').ActorRefFrom<typeof editTransaction>>(),
 				creation: types<import('xstate').ActorRefFrom<typeof createAccount>>(),
 				transaction: types<import('xstate').ActorRefFrom<typeof enterTransaction>>()
 			}
 		},
-		actors: { createAccount, enterTransaction, editTransaction, workspaceInitialization }
+		actors: { createAccount, enterTransaction, editTransaction, workspaceInitialization, archive }
 	}).createMachine({
 		id: 'finance-forms',
 		initial: 'active',
 		context: ({ input }) => ({
 			...input,
+			archive: undefined,
 			initialization: undefined,
 			edit: undefined,
 			editObservation: undefined,
@@ -132,6 +156,23 @@ export function createFinanceFormsMachine(
 		}),
 		output: () => ({ outcome: 'closed' }),
 		invoke: [
+			{
+				id: 'archive',
+				src: 'archive',
+				onSnapshot: ({ context, event }) => {
+					if (event.snapshot.status === 'error' || event.snapshot.status === 'stopped')
+						return { target: '.failed' }
+					const archive = selectAccountArchiveReport(event.snapshot)
+					return archive.binding === context.observation.archive.binding
+						? { context: { archive } }
+						: undefined
+				},
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'ARCHIVE_CLOSED' })
+				},
+				onError: { target: '.failed' }
+			},
 			{
 				id: 'initialization',
 				src: 'workspaceInitialization',
@@ -228,6 +269,7 @@ export function createFinanceFormsMachine(
 			active: {
 				on: {
 					OBSERVE: ({ event }, enq) => {
+						enq.sendTo('archive', { type: 'OBSERVE', observation: event.observation.archive })
 						enq.sendTo('edit', { type: 'OBSERVE', observation: event.observation.edit })
 						enq.sendTo('creation', { type: 'OBSERVE', observation: event.observation.creation })
 						enq.sendTo('transaction', {
@@ -240,6 +282,10 @@ export function createFinanceFormsMachine(
 								selectionRevision: event.selectionRevision
 							}
 						}
+					},
+					ARCHIVE_ACCOUNT: ({ context, event }, enq) => {
+						enq.sendTo('archive', { type: 'OBSERVE', observation: context.observation.archive })
+						enq.sendTo('archive', { type: 'ARCHIVE', accountId: event.accountId })
 					},
 					ACCOUNT_CREATION: ({ context, event }, enq) => {
 						enq.sendTo('creation', { type: 'OBSERVE', observation: context.observation.creation })
@@ -260,6 +306,7 @@ export function createFinanceFormsMachine(
 						const initialization = self.getSnapshot().children.initialization
 						if (initialization?.getSnapshot().status === 'active')
 							enq.sendTo(initialization, { type: 'SHUTDOWN' })
+						enq.sendTo('archive', { type: 'SHUTDOWN' })
 						enq.sendTo('edit', { type: 'SHUTDOWN' })
 						enq.sendTo('creation', { type: 'SHUTDOWN' })
 						enq.sendTo('transaction', { type: 'SHUTDOWN' })
@@ -272,6 +319,13 @@ export function createFinanceFormsMachine(
 				on: { SHUTDOWN: {} },
 				onDone: { target: 'closed' },
 				states: {
+					archive: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { ARCHIVE_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
 					initialization: {
 						initial: 'assessing',
 						states: {
@@ -313,6 +367,7 @@ export function createFinanceFormsMachine(
 }
 
 type FormsView = {
+	archive: ReturnType<typeof selectAccountArchiveReport> | undefined
 	selectionRevision: number
 	initialization: 'checking' | 'ready' | 'unavailable' | 'failed' | 'closed'
 } & (
@@ -327,6 +382,10 @@ type FormsView = {
 export function selectFinanceFormsView(
 	snapshot: SnapshotFrom<ReturnType<typeof createFinanceFormsMachine>>
 ): FormsView {
+	const archive =
+		snapshot.context.archive?.binding === snapshot.context.observation.archive.binding
+			? snapshot.context.archive
+			: undefined
 	const selectionRevision = snapshot.context.selectionRevision
 	const result = snapshot.context.initialization
 	const initialization =
@@ -341,6 +400,7 @@ export function selectFinanceFormsView(
 						: 'checking'
 	if (snapshot.status !== 'active' || snapshot.matches('failed'))
 		return {
+			archive,
 			selectionRevision,
 			initialization,
 			status: 'failed',
@@ -358,6 +418,7 @@ export function selectFinanceFormsView(
 		context.transactionObservation !== context.observation.transaction
 	)
 		return {
+			archive,
 			selectionRevision,
 			initialization,
 			status: 'loading',
@@ -370,6 +431,7 @@ export function selectFinanceFormsView(
 	const edit = workerTransactionEntryView.safeParse(context.edit)
 	return creation.success && transaction.success && edit.success
 		? {
+				archive,
 				selectionRevision,
 				initialization,
 				status: 'ready',
@@ -378,6 +440,7 @@ export function selectFinanceFormsView(
 				edit: edit.data
 			}
 		: {
+				archive,
 				selectionRevision,
 				initialization,
 				status: 'failed',

@@ -17,8 +17,6 @@ import {
 } from '../../contracts/worker-application.js'
 import {
 	createFinanceWorkerMachine,
-	selectFinanceArchiveObservation,
-	selectFinanceArchiveWriter,
 	selectFinanceFormObservations,
 	selectFinanceWorkerView,
 	selectFinanceRecoveryReader
@@ -91,14 +89,7 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 				error: () => application?.send({ type: 'NATIVE_FAILED' })
 			})
 			const machine = createFinanceWorkerMachine({
-				observe: () => selectFinanceArchiveObservation(application?.getSnapshot()),
-				observeForms: () => selectFinanceFormObservations(application?.getSnapshot()),
-				persist: (request) => {
-					const write = selectFinanceArchiveWriter(application?.getSnapshot(), request)
-					return write
-						? write(request.accountId)
-						: Promise.reject(new Error('Finance archive binding retired'))
-				}
+				observeForms: () => selectFinanceFormObservations(application?.getSnapshot())
 			})
 			application = createActor(machine, {
 				input: {

@@ -874,3 +874,28 @@ changed. Logs: `/private/tmp/finance-worker-recovery-{combined-static,test-types
 Startup's preceding fresh qualification remains 200 schema/restore + 42 session + 30 application
 cases at `finance-jazz-alpha67-6UPXKy`; the extended 33-case application run uses that same native
 artifact. Restoration/sign-out, complete shell navigation and remaining parity/activation stay open.
+
+## Next foundation: one restartable SDK-bound financial group
+
+Before identity writes, move the existing archive chart into the same SDK-bound workflow group as
+initialization and the fixed forms. Keep its existing observation, permission, write and settlement
+logic. The group forwards its public report and rejects an issue against replaced SDK/selection
+facts. It closes archive in a fixed parallel region alongside its other children.
+
+Remove the permanent archive child and duplicate archive-close region from the application root.
+The root then drains one financial group before SDK closure; a later identity operation can drain
+that group and create a fresh one after settlement. This avoids adding another identity-specific
+archive lifecycle or restarting the whole application/SDK owner. Preserve stale-command/report
+refusal, same-ID SDK replacement, receipt-held archive shutdown and known local usability.
+
+Implemented and qualified without changing archive policy or persistence. Its existing binding
+correlation is retained: completion refreshes the observation, so object-reference correlation
+would incorrectly discard its result. The application now drains one SDK-bound group, and that
+group drains archive, initialization and the three forms together. Same-ID SDK replacement waits
+for a held archive receipt, creates a fresh group, and publishes no old feedback or replay.
+
+All **1,970 Finance units** (38 host), full browser-test types, zero-warning Finance static checks
+and **33 native application browser cases** pass. Native cases retain receipt-held shutdown,
+selection/access replacement, offline restarts and the recovery dialog. Logs:
+`/private/tmp/finance-worker-financial-group-{static,unit,full-unit,test-types,native}.log`.
+This is the foundation for restoration; it does not activate the candidate or change SDK pins.

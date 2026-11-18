@@ -262,11 +262,12 @@ export function createFinanceWorkerBinding({
 			if (!isCurrent()) return Promise.reject(new Error('Finance account binding retired'))
 			return archiveAccount(db, accountId)
 		},
-		createForms: (observe) =>
+		createForms: (observe, archive) =>
 			createFinanceFormsMachine({
 				binding,
 				db,
 				initialization: { db, userId: identityId },
+				archive,
 				observe,
 				create: async (workspaceId, values) => {
 					if (!isCurrent()) throw new Error('Finance account binding retired')

@@ -5,6 +5,7 @@ import {
 	TRANSACTION_ENTRY_REASON,
 	type TransactionEntryObservation
 } from './transaction-entry-contract.js'
+import type { ArchiveObservation } from '../machines/accounts/account-archive-operation.js'
 import type { AccountCreationObservation } from './account-creation-contract.js'
 import { appTagSchema } from '../validation/tags.js'
 import { appCategorySchema } from '../validation/categories.js'
@@ -35,6 +36,7 @@ export const workerTransactionEntryCommand = z.discriminatedUnion('type', [
 ])
 export type WorkerTransactionEntryCommand = z.output<typeof workerTransactionEntryCommand>
 export type FinanceFormsObservation = {
+	archive: ArchiveObservation
 	creation: AccountCreationObservation
 	transaction: TransactionEntryObservation
 	edit: TransactionEntryObservation

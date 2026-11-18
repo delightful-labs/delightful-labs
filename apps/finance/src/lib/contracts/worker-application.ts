@@ -227,6 +227,9 @@ export type FinanceWorkerCapabilities = {
 	): () => void
 	readRecoveryPhrase(): Promise<string>
 	archiveAccount(accountId: string): Promise<unknown>
-	createForms(observe: () => FinanceFormsObservation): ReturnType<typeof createFinanceFormsMachine>
+	createForms(
+		observe: () => FinanceFormsObservation,
+		archive: FinanceWorkerCapabilities['archiveAccount']
+	): ReturnType<typeof createFinanceFormsMachine>
 }
 export type FinanceWorkerSession = SessionRuntimeConnection<FinanceWorkerCapabilities>

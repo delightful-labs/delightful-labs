@@ -263,5 +263,8 @@ export function selectAccountArchiveView(
 export function selectAccountArchiveReport(
 	snapshot: SnapshotFrom<ReturnType<typeof createAccountArchiveMachine>>
 ) {
-	return { binding: snapshot.context.observation.binding, view: selectAccountArchiveView(snapshot) }
+	return {
+		binding: snapshot.context.observation.binding,
+		view: selectAccountArchiveView(snapshot)
+	}
 }
