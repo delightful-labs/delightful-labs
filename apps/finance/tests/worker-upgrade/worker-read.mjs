@@ -8,6 +8,8 @@ export function checkFinanceWorker(directory, finance, proof) {
 	const app = join(directory, 'app')
 	const run = (command, args) => execFileSync(command, args, { cwd: app, stdio: 'inherit' })
 	for (const name of [
+		'src/lib/machines/workspaces/workspace-initialization.ts',
+		'src/lib/machines/workspaces/workspace-creation-transaction.ts',
 		'src/lib/diagnostics/error-details.ts',
 		'src/lib/machines/runtime/worker-ledger.ts',
 		'src/lib/components/worker/WorkerLedger.svelte',
@@ -66,6 +68,12 @@ export function checkFinanceWorker(directory, finance, proof) {
 		'queries.js',
 		false
 	)
+	// This maintained browser fixture also compiles with the active alpha.60 types.
+	// The isolated candidate uses the corresponding native device-account API/policies.
+	const nativeTests = join(app, 'tests/worker-application/native.test.ts')
+	writeFileSync(nativeTests, readFileSync(nativeTests, 'utf8')
+		.replaceAll('acceptLocalFirstAuth', 'acceptDeviceAccounts')
+		.replace("import permissions from '../../src/lib/permissions.js'", "import permissions from '../../src/lib/jazz.permissions.json' with { type: 'json' }"))
 	writeFileSync(
 		join(app, 'tsconfig.worker-application.json'),
 		JSON.stringify(

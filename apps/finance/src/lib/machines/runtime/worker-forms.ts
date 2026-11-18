@@ -1,4 +1,12 @@
-import { setup, types, matchesState, type SnapshotFrom } from 'xstate'
+import {
+	setup,
+	types,
+	matchesState,
+	type SnapshotFrom,
+	type InputFrom,
+	type OutputFrom
+} from 'xstate'
+import { workspaceInitialization } from '../workspaces/workspace-initialization.js'
 import { createAccountCreationFormOptions } from '../accounts/account-creation-access.js'
 import {
 	createScopedFormMachine,
@@ -34,9 +42,10 @@ import {
 	type WorkerAccountCreationCommand
 } from '../../contracts/worker-forms.js'
 
-/** One SDK-bound forms owner. Existing form actors retain all policy, validation and settlement. */
+/** One SDK-bound workflow owner. Existing charts retain initialization, form policy and settlement. */
 export function createFinanceFormsMachine(
 	dependencies: Omit<Parameters<typeof createAccountCreationFormOptions>[0], 'observe'> & {
+		initialization: InputFrom<typeof workspaceInitialization>
 		observe: () => FinanceFormsObservation
 		db: Parameters<typeof createTransactionEntryFormOptions>[0]['db']
 	}
@@ -74,6 +83,7 @@ export function createFinanceFormsMachine(
 	>(options)
 	type Input = { observation: FinanceFormsObservation; selectionRevision: number }
 	type Context = Input & {
+		initialization: OutputFrom<typeof workspaceInitialization> | undefined
 		edit: TransactionEntryView | undefined
 		editObservation: TransactionEntryObservation | undefined
 		creation: AccountCreationView | undefined
@@ -89,7 +99,8 @@ export function createFinanceFormsMachine(
 			internalEvents: {
 				CREATION_CLOSED: types(),
 				TRANSACTION_CLOSED: types(),
-				EDIT_CLOSED: types()
+				EDIT_CLOSED: types(),
+				INITIALIZATION_CLOSED: types()
 			},
 			events: {
 				OBSERVE: types<Input>(),
@@ -99,17 +110,19 @@ export function createFinanceFormsMachine(
 				SHUTDOWN: types()
 			},
 			children: {
+				initialization: types<import('xstate').ActorRefFrom<typeof workspaceInitialization>>(),
 				edit: types<import('xstate').ActorRefFrom<typeof editTransaction>>(),
 				creation: types<import('xstate').ActorRefFrom<typeof createAccount>>(),
 				transaction: types<import('xstate').ActorRefFrom<typeof enterTransaction>>()
 			}
 		},
-		actors: { createAccount, enterTransaction, editTransaction }
+		actors: { createAccount, enterTransaction, editTransaction, workspaceInitialization }
 	}).createMachine({
 		id: 'finance-forms',
 		initial: 'active',
 		context: ({ input }) => ({
 			...input,
+			initialization: undefined,
 			edit: undefined,
 			editObservation: undefined,
 			creation: undefined,
@@ -119,6 +132,16 @@ export function createFinanceFormsMachine(
 		}),
 		output: () => ({ outcome: 'closed' }),
 		invoke: [
+			{
+				id: 'initialization',
+				src: 'workspaceInitialization',
+				input: () => dependencies.initialization,
+				onDone: ({ value, event }, enq) => {
+					if (matchesState('closing', value)) enq.raise({ type: 'INITIALIZATION_CLOSED' })
+					return { context: { initialization: event.output } }
+				},
+				onError: { target: '.failed' }
+			},
 			{
 				id: 'creation',
 				src: 'createAccount',
@@ -233,7 +256,10 @@ export function createFinanceFormsMachine(
 						})
 						enq.sendTo('transaction', event.command)
 					},
-					SHUTDOWN: (_, enq) => {
+					SHUTDOWN: ({ self }, enq) => {
+						const initialization = self.getSnapshot().children.initialization
+						if (initialization?.getSnapshot().status === 'active')
+							enq.sendTo(initialization, { type: 'SHUTDOWN' })
 						enq.sendTo('edit', { type: 'SHUTDOWN' })
 						enq.sendTo('creation', { type: 'SHUTDOWN' })
 						enq.sendTo('transaction', { type: 'SHUTDOWN' })
@@ -246,6 +272,17 @@ export function createFinanceFormsMachine(
 				on: { SHUTDOWN: {} },
 				onDone: { target: 'closed' },
 				states: {
+					initialization: {
+						initial: 'assessing',
+						states: {
+							assessing: {
+								type: 'choice',
+								choice: ({ context }) => ({ target: context.initialization ? 'closed' : 'waiting' })
+							},
+							waiting: { on: { INITIALIZATION_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
 					edit: {
 						initial: 'waiting',
 						states: {
@@ -275,7 +312,10 @@ export function createFinanceFormsMachine(
 	})
 }
 
-type FormsView = { selectionRevision: number } & (
+type FormsView = {
+	selectionRevision: number
+	initialization: 'checking' | 'ready' | 'unavailable' | 'failed' | 'closed'
+} & (
 	| { status: 'loading' | 'failed'; creation: null; transaction: null; edit: null }
 	| {
 			status: 'ready'
@@ -288,8 +328,26 @@ export function selectFinanceFormsView(
 	snapshot: SnapshotFrom<ReturnType<typeof createFinanceFormsMachine>>
 ): FormsView {
 	const selectionRevision = snapshot.context.selectionRevision
+	const result = snapshot.context.initialization
+	const initialization =
+		result?.outcome === 'ready'
+			? 'ready'
+			: result?.outcome === 'failed'
+				? 'failed'
+				: result?.outcome === 'closed' || result?.outcome === 'cancelled'
+					? 'closed'
+					: result
+						? 'unavailable'
+						: 'checking'
 	if (snapshot.status !== 'active' || snapshot.matches('failed'))
-		return { selectionRevision, status: 'failed', creation: null, transaction: null, edit: null }
+		return {
+			selectionRevision,
+			initialization,
+			status: 'failed',
+			creation: null,
+			transaction: null,
+			edit: null
+		}
 	const { context } = snapshot
 	if (
 		!context.edit ||
@@ -299,17 +357,32 @@ export function selectFinanceFormsView(
 		context.creationObservation !== context.observation.creation ||
 		context.transactionObservation !== context.observation.transaction
 	)
-		return { selectionRevision, status: 'loading', creation: null, transaction: null, edit: null }
+		return {
+			selectionRevision,
+			initialization,
+			status: 'loading',
+			creation: null,
+			transaction: null,
+			edit: null
+		}
 	const creation = workerAccountCreationView.safeParse(context.creation)
 	const transaction = workerTransactionEntryView.safeParse(context.transaction)
 	const edit = workerTransactionEntryView.safeParse(context.edit)
 	return creation.success && transaction.success && edit.success
 		? {
 				selectionRevision,
+				initialization,
 				status: 'ready',
 				creation: creation.data,
 				transaction: transaction.data,
 				edit: edit.data
 			}
-		: { selectionRevision, status: 'failed', creation: null, transaction: null, edit: null }
+		: {
+				selectionRevision,
+				initialization,
+				status: 'failed',
+				creation: null,
+				transaction: null,
+				edit: null
+			}
 }

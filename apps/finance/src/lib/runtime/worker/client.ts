@@ -9,7 +9,7 @@ import {
 	workerContextCommand,
 	type FinanceWorkerView,
 	type WorkerCommandScope,
-	type FinanceWorkerOpen
+	type FinanceWorkerConfiguration
 } from '../../contracts/worker-application.js'
 import { EXPENSE, type TransactionKind } from '../../domain/transaction-kind.js'
 import type {
@@ -19,15 +19,19 @@ import type {
 
 /** Window owns native transport and rendering only. Domain state stays in the Worker. */
 export function createFinanceWorkerClient(
-	configuration: Omit<FinanceWorkerOpen, 'type'>,
+	configuration: FinanceWorkerConfiguration,
 	createWorker: () => Worker = () =>
 		new Worker(new URL('./application.worker.ts', import.meta.url), { type: 'module' })
 ) {
-	const open = financeWorkerOpen.parse({ type: 'OPEN', ...configuration })
+	const open = financeWorkerOpen.parse({
+		type: 'OPEN',
+		...configuration,
+		hostId: crypto.randomUUID()
+	})
 	const worker = createWorker()
 	const data = new MessageChannel(),
 		control = new MessageChannel()
-	const releaseBroker = serveBrowserWorkerHost(data.port1, control.port1, open.scope, {
+	const releaseBroker = serveBrowserWorkerHost(data.port1, control.port1, open.hostId, {
 		origin: location.origin,
 		brokerWorkerUrl: new URL(brokerUrl, location.href).href,
 		storage: {
@@ -48,6 +52,7 @@ export function createFinanceWorkerClient(
 		workspaces: null,
 		accounts: [],
 		archiveFeedback: null,
+		workspaceStartup: null,
 		accountCreation: null,
 		transactionEntry: null,
 		transactionEdit: null,
@@ -62,6 +67,7 @@ export function createFinanceWorkerClient(
 			accounts: [],
 			workspaces: null,
 			archiveFeedback: null,
+			workspaceStartup: null,
 			accountCreation: null,
 			transactionEntry: null,
 			transactionEdit: null,
@@ -97,6 +103,7 @@ export function createFinanceWorkerClient(
 			workspaces: null,
 			identityId: null,
 			archiveFeedback: null,
+			workspaceStartup: null,
 			accountCreation: null,
 			transactionEntry: null,
 			transactionEdit: null,
@@ -130,6 +137,7 @@ export function createFinanceWorkerClient(
 			status: view.status === 'failed' ? 'failed' : 'loading',
 			accounts: [],
 			archiveFeedback: null,
+			workspaceStartup: null,
 			accountCreation: null,
 			transactionEntry: null,
 			transactionEdit: null,

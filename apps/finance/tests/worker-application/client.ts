@@ -2,7 +2,7 @@ import { mount, unmount } from 'svelte'
 import { get } from 'svelte/store'
 import WorkerAccounts from '../../src/lib/components/worker/WorkerAccounts.svelte'
 import { createFinanceWorkerClient } from '../../src/lib/runtime/worker/client.js'
-import type { FinanceWorkerOpen } from '../../src/lib/contracts/worker-application.js'
+import type { FinanceWorkerConfiguration } from '../../src/lib/contracts/worker-application.js'
 
 let worker: Worker | undefined, client: ReturnType<typeof createFinanceWorkerClient> | undefined
 let component: ReturnType<typeof mount> | undefined
@@ -58,7 +58,7 @@ function request(message: unknown) {
 	return result
 }
 const fixture = {
-	open(configuration: Omit<FinanceWorkerOpen, 'type'>) {
+	open(configuration: FinanceWorkerConfiguration) {
 		scope = configuration.scope
 		client = createFinanceWorkerClient(configuration, () => {
 			worker = new Worker(

@@ -1,3 +1,6 @@
+import { createJazz, memory, acceptLocalFirstAuth } from 'jazz-tools/backend'
+import { app } from '../../src/lib/schema.js'
+import permissions from '../../src/lib/permissions.js'
 import svg from '@poppanator/sveltekit-svg'
 import { createServer } from 'node:http'
 import { glob, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
@@ -145,17 +148,17 @@ afterAll(async () => {
 	if (directory && !retained) await rm(directory, { recursive: true, force: true })
 	else if (directory) console.error('Finance Worker read artifacts:', directory)
 })
-async function open(page: Page, scope: string) {
+async function open(page: Page, scope: string, serverUrl = origin + '/jazz') {
 	await page.goto(origin)
 	await page.waitForFunction(() => !!window.financeWorkerReadFixture)
 	await page.evaluate(
-		(scope) =>
+		({ scope, serverUrl }) =>
 			window.financeWorkerReadFixture.open({
 				scope,
-				serverUrl: location.origin + '/jazz',
+				serverUrl,
 				environment: 'worker-read-proof'
 			}),
-		scope
+		{ scope, serverUrl }
 	)
 	await browserExpect
 		.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
@@ -292,6 +295,75 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await close(page)
 			} finally {
 				await browser.close()
+			}
+		})
+		it('initializes a real workspace without fixture writes and reuses its marker offline', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const authority = createJazz({
+				app,
+				permissions,
+				store: memory(),
+				authenticate: acceptLocalFirstAuth,
+				allowedOrigins: [origin]
+			})
+			const endpoint = createServer((request, response) => authority.nodeHandler(request, response))
+			await authority.attach(endpoint)
+			await authority.ready()
+			await new Promise<void>((resolve) => endpoint.listen(0, '127.0.0.1', resolve))
+			const address = endpoint.address()
+			if (!address || typeof address === 'string')
+				throw new Error('Missing native initialization authority')
+			const serverUrl = `http://127.0.0.1:${address.port}/jazz`,
+				scope = serverUrl
+			const profile = await mkdtemp(join(directory, 'initialization-'))
+			let context = await engine.launchPersistentContext(profile, { headless: true })
+			try {
+				let page = await context.newPage()
+				await open(page, scope, serverUrl)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().workspaceStartup))
+					.toBe('ready')
+				const workspaces = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().workspaces
+				)
+				expect(workspaces).toHaveLength(1)
+				const workspace = workspaces?.[0]
+				if (!workspace) throw new Error('Native initialization did not create a workspace')
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await createAccountUI(page, 'Initialized wallet')
+				await browserExpect(
+					page.getByRole('cell', { name: 'Initialized wallet', exact: true })
+				).toBeVisible()
+				await close(page)
+				await context.close()
+				await authority.close()
+				endpoint.closeAllConnections()
+				await new Promise<void>((resolve, reject) =>
+					endpoint.close((error) => (error ? reject(error) : resolve()))
+				)
+				context = await engine.launchPersistentContext(profile, { headless: true })
+				page = await context.newPage()
+				await open(page, scope, serverUrl)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().workspaceStartup))
+					.toBe('ready')
+				expect(
+					await page.evaluate(() => window.financeWorkerReadFixture.state().workspaces)
+				).toEqual(workspaces)
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Initialized wallet', exact: true })
+				).toBeVisible()
+				await close(page)
+			} finally {
+				await context.close()
+				await authority.close()
+				if (endpoint.listening) {
+					endpoint.closeAllConnections()
+					await new Promise<void>((resolve) => endpoint.close(() => resolve()))
+				}
 			}
 		})
 		it('drains an archive issued through the real UI before closing its native SDK', async () => {

@@ -13,10 +13,7 @@ import {
 	type WorkspacePersistenceResult
 } from './workspace-creation-transaction.js'
 
-type Db = Pick<
-	ReturnType<typeof getDb>,
-	'all' | 'beginTransaction' | 'beginSerializableTransaction' | 'getConfig'
->
+type Db = Pick<ReturnType<typeof getDb>, 'all' | 'beginTransaction' | 'getConfig'>
 type Input = { db: Db; userId: string }
 
 type ReadInput = Input & { tier: typeof ReadTier.LocalFirst | typeof ReadTier.Remote }

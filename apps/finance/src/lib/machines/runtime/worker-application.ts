@@ -779,6 +779,7 @@ export function selectFinanceWorkerView(
 			context.archive.binding === context.readBinding
 				? projectAccountArchiveFeedback(context.archive.view.feedback)
 				: null,
+		workspaceStartup: forms?.initialization ?? null,
 		accountCreation: forms?.creation ?? null,
 		ledger:
 			snapshot.status === 'active'

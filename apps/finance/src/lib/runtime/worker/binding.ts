@@ -244,6 +244,7 @@ export function createFinanceWorkerBinding({
 			createFinanceFormsMachine({
 				binding,
 				db,
+				initialization: { db, userId: identityId },
 				observe,
 				create: async (workspaceId, values) => {
 					if (!isCurrent()) throw new Error('Finance account binding retired')

@@ -21,6 +21,9 @@ import type {
 	WorkerLedgerRecord
 } from '../../contracts/worker-application.js'
 import type { TransactionEntryObservation } from '../../contracts/transaction-entry-contract.js'
+import { creationFixture as workspaceCreationFixture } from '../workspaces/workspace-creation.fixture.js'
+import type { InputFrom } from 'xstate'
+import type { workspaceInitialization } from '../workspaces/workspace-initialization.js'
 import { creationFixture } from '../transactions/transaction-create.fixture.js'
 import { createFinanceFormsMachine } from './worker-forms.js'
 import { app } from '../../schema.js'
@@ -39,7 +42,7 @@ const row = (name: string): WorkerAccount => ({
 	kind: 'cash',
 	currency: 'USD'
 })
-function fixture() {
+function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db']) {
 	const order: string[] = []
 	let observed = (_: SessionRuntimeObservation<FinanceWorkerCapabilities>) => {}
 	const directory: {
@@ -169,7 +172,16 @@ function fixture() {
 		capabilities: {
 			...capabilities,
 			createForms: (observe) =>
-				createFinanceFormsMachine({ binding, observe, create: createWrite, db: transactionDb.db })
+				createFinanceFormsMachine({
+					binding,
+					observe,
+					create: createWrite,
+					db: transactionDb.db,
+					initialization: {
+						db: initialization ?? { ...transactionDb.db, getConfig: () => ({ serverUrl: '' }) },
+						userId
+					}
+				})
 		}
 	})
 	const nativeClose = vi.fn(async () => {
@@ -360,6 +372,64 @@ describe('Finance worker ownership and selected accounts', () => {
 			})
 			expect(f.actor.getSnapshot().context.ledgerPage).toBe(1)
 			expect(f.actor.getSnapshot().context.ledgerFilters.query).toBe('tail')
+		} finally {
+			f.stop()
+		}
+	})
+	it('keeps known local finance usable while initialization authority is unanswered and drains on close', async () => {
+		const initial = workspaceCreationFixture(),
+			remote = Promise.withResolvers<never[]>()
+		const read = vi
+			.fn()
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce([])
+			.mockReturnValue(remote.promise)
+		const f = fixture({
+			...initial.db,
+			all: read,
+			getConfig: () => ({ serverUrl: 'https://unanswered.invalid' })
+		})
+		try {
+			await f.start()
+			await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(4))
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			expect(f.view().workspaceStartup).toBe('checking')
+			expect(f.view().accounts[0]?.name).toBe('Wallet')
+			expect(f.view().transactionEntry?.form.canSubmit).toBe(true)
+			f.select(b, 2)
+			expect(read).toHaveBeenCalledTimes(4)
+			expect(initial.beginTransaction).not.toHaveBeenCalled()
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			remote.resolve([])
+			await Promise.resolve()
+			expect(initial.beginTransaction).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+	it('retains issued initialization writes until local settlement before closing the SDK', async () => {
+		const initial = workspaceCreationFixture(),
+			pending = Promise.withResolvers<void>()
+		const read = vi.fn().mockResolvedValue([])
+		initial.one.mockReset().mockResolvedValue(null)
+		initial.wait.mockReturnValue(pending.promise)
+		const f = fixture({
+			...initial.db,
+			all: read,
+			getConfig: () => ({ serverUrl: 'https://authority.invalid' })
+		})
+		try {
+			await f.start()
+			await vi.waitFor(() => expect(initial.wait).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			pending.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
 		} finally {
 			f.stop()
 		}

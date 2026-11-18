@@ -246,6 +246,13 @@ retain their product/parity requirements, not the abandoned implementation plan.
       All 1,966 units (34 host) and 27 native cases pass, including cold retained
       edits. The check/account-move failure reproduced once and remains an open
       activation blocker; later passing runs do not resolve it. [Editing evidence](worker-session-resource-decision.md#worker-owned-selected-transaction-editing).
+      **Workspace initialization implemented in the candidate:** reuse the finite
+      initialization chart independently of local finance usability, and drain
+      its issued writes with the three forms. Broker host UUID and native Jazz
+      app scope are now separate. All 1,968 units (36 host), 30 native cases and
+      a fresh 200-schema/42-session proof pass. Actual authority cases create the
+      first workspace without fixture writes and retain it/account after an offline
+      process restart. [Startup evidence](worker-session-resource-decision.md#worker-owned-native-workspace-initialization).
       Continue to
       reuse the existing account archive chart/operation and its issued-write
       drain first; supply membership/grant facts. Native create/archive leaves

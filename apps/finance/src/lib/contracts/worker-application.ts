@@ -108,6 +108,7 @@ export const financeWorkerCommand = z.discriminatedUnion('type', [
 ])
 export const financeWorkerOpen = z.strictObject({
 	type: z.literal('OPEN'),
+	hostId: z.uuid(),
 	serverUrl: z.url().max(8192),
 	scope: z.string().trim().min(1).max(8192),
 	environment: z.string().min(1).max(8192)
@@ -157,6 +158,7 @@ export const financeWorkerView = z.strictObject({
 		})
 	),
 	archiveFeedback: accountArchiveFeedback.nullable(),
+	workspaceStartup: z.enum(['checking', 'ready', 'unavailable', 'failed', 'closed']).nullable(),
 	accountCreation: workerAccountCreationView.nullable(),
 	transactionEntry: workerTransactionEntry.nullable(),
 	transactionEdit: workerTransactionEdit.nullable(),
@@ -175,6 +177,7 @@ export type FinanceWorkerView = z.infer<typeof financeWorkerView>
 export type WorkerCommandScope = Pick<FinanceWorkerView, 'sessionRevision' | 'selection'>
 export type FinanceWorkerCommand = z.infer<typeof financeWorkerCommand>
 export type FinanceWorkerOpen = z.infer<typeof financeWorkerOpen>
+export type FinanceWorkerConfiguration = Omit<FinanceWorkerOpen, 'type' | 'hostId'>
 export type FinanceWorkerCapabilities = {
 	observeWorkspaces(publish: (rows: WorkerWorkspace[]) => void, failed: () => void): () => void
 	observeAccounts(

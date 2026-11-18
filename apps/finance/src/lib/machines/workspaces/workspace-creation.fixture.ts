@@ -92,7 +92,7 @@ export function creationFixture() {
 		const getConfig = vi.fn().mockReturnValue({ serverUrl: 'https://unused.invalid' })
 		const actor = createActor(workspaceInitialization, {
 			input: {
-				db: { beginTransaction, beginSerializableTransaction, all: discover, getConfig },
+				db: { beginTransaction, all: discover, getConfig },
 				userId
 			}
 		})

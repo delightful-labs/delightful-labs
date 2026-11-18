@@ -798,3 +798,43 @@ Worker. It never exports actor snapshots, draft data or credentials. No automati
 changes or financial recovery behavior were introduced. Logs:
 `/private/tmp/finance-worker-edit-{static,tests-types,full-unit,native,diagnostic}.log` and
 `/private/tmp/finance-worker-check-move-probe.log`.
+
+## Worker-owned native workspace initialization
+
+Reuse Finance's existing finite workspace initialization chart under the SDK-bound workflow owner,
+alongside the fixed forms. It captures the native Db and identity once for that SDK binding, reads
+local profile/workspace markers first, and requires confirmed authoritative emptiness before initial
+creation. Empty or missing offline reads never authorize a replacement workspace. Initialization is
+independent of foreground account/ledger usability; known local data remains usable while an optional
+authority read is unanswered. Do not add a second startup policy or seed fake data in this slice.
+
+Retain the initialization child through scope changes. SDK replacement/close sends its existing
+SHUTDOWN command and waits for its finite terminal outcome alongside the three forms. Completed
+initialization is a fact, so shutdown does not send commands to a completed child. Unexpected child
+failure uses the existing failed-drain path. Publish only a bounded startup observation, keeping
+native resources/results in the Worker. Root routes/chooser behavior and retry presentation remain
+with the later shell integration; this chart does not infer a selected workspace from partial rows.
+Qualify warm marker reuse, unknown/empty offline reads, initial creation with an actual native
+authority, no duplicate initialization on workspace selection, interrupted native writes and close.
+
+Implemented and qualified. A real native authority exposed a candidate configuration bug: the
+broker's UUID was also used as Jazz's app scope. Window now creates a dedicated host UUID for
+broker messages/close receipts; SDK scope remains the configured canonical endpoint/namespace.
+The native authority accepts that device proof without relaxing origin or authentication checks.
+The existing shared broker and SDK patch are unchanged. The candidate entry overlay only changes
+which host ID it passes to the broker. AccountStore binding still uses the native SDK app scope.
+
+All **1,968 Finance units** (36 host), full Finance static/browser-test checks, and **30 native
+application cases** pass. The new three-engine cases initialize a workspace against actual Jazz
+without fixture writes, create an account through the UI, stop the authority, and retain the same
+workspace/account/profile marker after a complete browser-process restart. Existing cases preserve
+known local usability, edits, pages and drain behavior. Host tests prove that an unanswered authority
+read does not block finance, workspace changes do not restart initialization, late reads do not create
+workspaces after closure, and issued initialization writes settle before SDK close.
+
+A fresh maintained alpha.67 run from published SDK/Wasm packages and packed libraries passes
+**200 schema/permission/backup/restore**, **42 worker/session**, then those **30 application** cases.
+Artifact: `finance-jazz-alpha67-6UPXKy`. Logs:
+`/private/tmp/finance-worker-startup-{static,test-types,unit,full-unit,native,fresh-alpha67}.log`.
+The active alpha.60 app is unchanged. Identity UI, shell/chooser navigation, optional seeding,
+initialization retry presentation and remaining domain/provider/backup parity remain open.

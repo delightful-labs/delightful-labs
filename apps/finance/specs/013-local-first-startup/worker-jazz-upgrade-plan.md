@@ -733,3 +733,18 @@ identity. The released field allowlist excludes bank secrets, profile avatars
 and operational jobs; memberships and bank metadata are inert references, not
 live grants/credentials. Reconnect banks and re-establish sharing as needed.
 That is distinct from preserving the existing production core in place.
+
+## PR46 hosted checkpoint at d495c6da
+
+Finance qualification and Foundation checks pass at the selected-editor commit.
+Clipper run `44309598650` passes 11 packaged-extension cases and fails the first
+clip in the account-restoration case because the toolbar never appears within
+its existing 20-second assertion. The captured application/restoration charts
+reach ready/restored/connected; connection-store notification separately reports
+`Could not establish connection. Receiving end does not exist.` The trace does
+not establish that this notification causes the missing toolbar. Preserve the
+actual extension assertion and investigate its native background/content-script
+handoff; do not attribute it to Finance's changes or call it fixed from a later
+passing run. Ledger checkpoint `05ce9fb5` passed Finance, Foundation and Clipper.
+The Finance ledger/editor commits change no Clipper product source. Full Clipper
+extension qualification remains an activation gate.
