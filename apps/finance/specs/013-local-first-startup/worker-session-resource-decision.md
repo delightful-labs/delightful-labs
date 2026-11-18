@@ -1099,3 +1099,52 @@ Logs: `/private/tmp/finance-worker-routing-{static,test-types,full-unit,unit,nat
 Next: reuse existing `q`/date/category/currency and strict positive page URL parsing; preserve native
 replace/push and back/forward observations. The shell is not activated until remaining parity is
 qualified. Do not add another router, session, navigation queue or SDK patch.
+
+
+### URL filters and browser history
+
+Reuse the legacy transaction list's pure URL parsing in the existing filter module. Both the
+legacy Svelte integration and Worker consume the same `q`, start/end, category/currency and
+strict positive safe page semantics. An observed route remains the source of the Worker list
+selection; default routing must retain a directly requested page until records arrive.
+
+When a routed consumer requests a page/filter change, the Worker selects a destination using
+existing query helpers and sends one NAVIGATE command to its fixed navigation child. Native
+replace semantics match existing shallow list updates; filter changes remove page. Only a later
+Window route observation changes the Worker selection. Non-router feature consumers retain their
+bounded direct commands. No second router, custom history stack, request owner or optimistic URL
+state is introduced. The existing navigation child owns failures/retry/close settlement.
+
+Window reports browser popstate and router observations using the existing monotonic revision;
+closing clients must retain their closing status and still accept the terminal close receipt.
+Qualify direct page/filter URLs, replacement history, back/forward, stale intents, invalid page
+values, and preservation of unrelated query/fragment values before shell integration.
+
+
+Native typing qualification found that reusing blocking workspace navigation for a filter update
+unmounted the search control in all three engines (42 existing cases pass; the three new typing
+cases fail). Add `navigating.updating` beside the existing active/closing states. It owns the same
+native invocation and drain but reports `updating`, preserving content while replacing history.
+Worker-generated list updates select this state; workspace/default routing retains blocking
+`active`. Changed identity/route observations still reenter assessment. This is a real distinct UI
+outcome in the existing chart, not an optimistic cache or second navigation owner.
+
+
+Qualified URL/history implementation: **1,998 Finance units** (62 Worker host cases) and all
+**45 native Chromium/Firefox/WebKit application cases** pass. Focused native typing/focus and
+back/forward checks pass independently in all three engines. Eight existing pagination cases
+and three actual SvelteKit workspace-navigation cases pass after extracting the shared parser
+and making newer explicit navigation requests reenter the existing invocation. Current static,
+complete browser-test types and native candidate types pass with zero warnings.
+
+Filter-only observations retain the same query binding; workspace, kind or selected-detail
+replacement still withdraws and rebinds it. Window retains the last bounded rendering until the
+Worker classifies the route. The monotonic route revision rejects older reports, and stale command
+headers cannot mutate the Worker. Native popstate registration is idempotent and is released with
+the host. Pure history updates preserve content; failed updates still use the chart's existing
+failure path. Root state does not claim the URL changed before Window reports it.
+
+Logs: `/private/tmp/finance-worker-url-{unit,static,test-types,full-unit,native-final,legacy-browser,legacy-navigation}.log`;
+the diagnosed three-engine input-unmount failure remains in `finance-worker-url-native.log`, and
+the focused corrected cases are in `finance-worker-url-native-focused.log`.
+Next: shared shell account selection/order and remaining feature parity. No production cutover.

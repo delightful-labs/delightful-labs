@@ -136,6 +136,7 @@ export function createFinanceWorkerClient(
 		worker.removeEventListener('error', fail)
 		worker.removeEventListener('messageerror', fail)
 		window.removeEventListener('popstate', observeLocation)
+		window.removeEventListener('popstate', observeRoute)
 		worker.terminate()
 		releaseBroker()
 		state.update((view) => ({
@@ -266,34 +267,28 @@ export function createFinanceWorkerClient(
 			})
 		}
 	}
+	function observeRoute() {
+		const current = get(state)
+		if (current.status === 'closed') return
+		window.addEventListener('popstate', observeRoute)
+		const command = financeWorkerCommand.parse({
+			type: 'OBSERVE_ROUTE',
+			pathname: location.pathname,
+			search: location.search,
+			hash: location.hash,
+			revision: revision + 1
+		})
+		revision += 1
+		// Keep the last bounded render until the Worker classifies the new route.
+		// Older views and commands are rejected by their selection revision.
+
+		worker.postMessage(command)
+	}
+
 	return {
 		view,
 		observeLocation,
-		observeRoute: () => {
-			const current = get(state)
-			if (current.status === 'closed') return
-			const command = financeWorkerCommand.parse({
-				type: 'OBSERVE_ROUTE',
-				pathname: location.pathname,
-				search: location.search,
-				hash: location.hash,
-				revision: revision + 1
-			})
-			revision += 1
-			state.update((view) => ({
-				...view,
-				selection: { workspaceId: null, revision },
-				status: view.status === 'failed' || view.status === 'closing' ? view.status : 'loading',
-				workspaceNavigation: null,
-				accounts: [],
-				archiveFeedback: null,
-				accountCreation: null,
-				transactionEntry: null,
-				transactionEdit: null,
-				ledger: null
-			}))
-			worker.postMessage(command)
-		},
+		observeRoute,
 		navigateWorkspace: (workspaceId: string) => {
 			const current = get(state)
 			worker.postMessage(

@@ -346,6 +346,38 @@ describe('workspace navigation public contract', () => {
 		expect(f.reports().at(-1)?.report).toEqual({ generation: 2, status: 'unavailable' })
 		expect(f.navigate).not.toHaveBeenCalled()
 	})
+	it.each(['history', 'workspace'])(
+		'starts the latest %s navigation using native supersession and drains its receipt',
+		async (kind) => {
+			const held = Promise.withResolvers<void>(),
+				f = fixture(
+					{ ...facts, search: '?workspace=' + scope.organizationId },
+					undefined,
+					() => held.promise
+				)
+			try {
+				if (kind === 'history')
+					f.actor.send({ type: 'NAVIGATE', destination: '/?q=a', replace: true })
+				else f.actor.send({ type: 'SELECT', workspaceId: scope.profileId })
+				await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
+				const previous = f.navigate.mock.calls[0]?.[1]
+				if (kind === 'history')
+					f.actor.send({ type: 'NAVIGATE', destination: '/?q=ab', replace: true })
+				else f.actor.send({ type: 'SELECT', workspaceId: scope.organizationId })
+				await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledTimes(2))
+				expect(previous?.aborted).toBe(true)
+				expect(f.navigate.mock.calls[1]?.[1].aborted).toBe(false)
+				f.actor.send({ type: 'SHUTDOWN' })
+				expect(f.actor.getSnapshot().status).toBe('active')
+				expect(f.navigate.mock.calls[1]?.[1].aborted).toBe(false)
+				held.resolve()
+				await waitFor(f.actor, (s) => s.status === 'done')
+				expect(f.navigate).toHaveBeenCalledTimes(2)
+			} finally {
+				held.resolve()
+			}
+		}
+	)
 	it.each(['fulfilled', 'rejected'])(
 		'waits for a %s native navigation during shutdown without issuing another',
 		async (outcome) => {

@@ -1073,6 +1073,78 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('preserves direct filtered pages and input focus through native replacement and back/forward', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'URL wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seedLedger(workspaceId, accountId),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate((id) => {
+					window.financeWorkerReadFixture.route(
+						'/expenses?workspace=' + id + '&page=2&q=ledger&keep=yes#row'
+					)
+					window.financeWorkerReadFixture.followRoutes()
+				}, workspaceId)
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
+				await page.getByRole('link', { name: /previous page/i }).click()
+				await browserExpect.poll(() => new URL(page.url()).searchParams.has('page')).toBe(false)
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(25)
+				await page.getByRole('button', { name: /search transactions/i }).click()
+				const input = page.getByRole('searchbox', { name: /search transactions/i })
+				await input.fill('')
+				await browserExpect.poll(() => new URL(page.url()).searchParams.has('q')).toBe(false)
+				await input.pressSequentially('ledger memo needle', { delay: 25 })
+				await browserExpect(input).toHaveValue('ledger memo needle')
+				await browserExpect(input).toBeFocused()
+				await browserExpect(page.getByText('Ledger record 39', { exact: true })).toBeVisible()
+				await browserExpect
+					.poll(() => new URL(page.url()).searchParams.get('q'))
+					.toBe('ledger memo needle')
+				expect(new URL(page.url()).searchParams.get('keep')).toBe('yes')
+				expect(new URL(page.url()).hash).toBe('#row')
+				await page.evaluate(
+					(id) =>
+						window.financeWorkerReadFixture.route(
+							'/expenses?workspace=' + id + '&page=2&q=ledger#other'
+						),
+					workspaceId
+				)
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
+				await page.goBack()
+				await browserExpect(page.getByText('Ledger record 39', { exact: true })).toBeVisible()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().ledger?.filters.query)
+					)
+					.toBe('ledger memo needle')
+				await page.goForward()
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().ledger?.page))
+					.toBe(2)
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('keeps data failed after a malformed view and still waits for clean native close', async () => {
 			onTestFailed(() => {
 				retained = true

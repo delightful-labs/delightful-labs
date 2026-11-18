@@ -22,7 +22,7 @@ export type WorkspaceNavigationFacts = WorkspaceRoute & {
 	access: NavigationAccess
 }
 export type NavigationStatus =
-	'waiting' | 'directory' | 'global' | 'scoped' | 'unavailable' | 'failed'
+	'waiting' | 'updating' | 'directory' | 'global' | 'scoped' | 'unavailable' | 'failed'
 export type NavigationReport = { generation: number; status: NavigationStatus }
 export type NavigationStatusEvent = { type: 'NAVIGATION_STATUS'; report: NavigationReport }
 export type NavigationRecipient = ActorRef<Snapshot<unknown>, NavigationStatusEvent>

@@ -202,7 +202,15 @@ export const financeWorkerView = z.strictObject({
 	recoveryAvailable: z.boolean(),
 	workspaceNavigation: z
 		.strictObject({
-			status: z.enum(['waiting', 'directory', 'global', 'scoped', 'unavailable', 'failed']),
+			status: z.enum([
+				'waiting',
+				'updating',
+				'directory',
+				'global',
+				'scoped',
+				'unavailable',
+				'failed'
+			]),
 			showContent: z.boolean(),
 			notice: z.strictObject({ active: z.boolean(), loading: z.boolean(), failed: z.boolean() }),
 			canRetry: z.boolean()

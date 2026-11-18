@@ -1,3 +1,5 @@
+import { transactionListLocation } from '../../filters/transaction-list-filters.js'
+import { withQueryParams } from '../../domain/query-params.js'
 import { workspaceRoute } from '../../domain/workspace-routes.js'
 import { transactionKindForPath } from '../../domain/transaction-kind.js'
 import { z } from 'zod'
@@ -543,32 +545,46 @@ export function createFinanceWorkerMachine({
 					},
 					SELECT_CONTEXT: ({ context, event }, enq) => {
 						if (event.selection.revision <= context.selection.revision) return
-						const readBinding = {}
+						const retainReads =
+							context.route !== undefined &&
+							context.facts !== undefined &&
+							context.facts.status !== 'failed' &&
+							event.selection.workspaceId === context.selection.workspaceId &&
+							event.kind === context.transactionKind &&
+							(event.transactionId ?? null) === context.transactionId
+						const readBinding = retainReads ? required(context.readBinding) : {}
+						const location = context.route
+							? transactionListLocation(context.route.search)
+							: undefined
 						const next = {
 							...context,
 							selection: event.selection,
 							transactionKind: event.kind,
 							transactionId: event.transactionId ?? null,
+							ledgerFilters: location?.filters ?? context.ledgerFilters,
 							ledgerPage:
-								event.selection.workspaceId === context.selection.workspaceId &&
+								location?.requestedPage ??
+								(event.selection.workspaceId === context.selection.workspaceId &&
 								event.kind === context.transactionKind
 									? context.ledgerPage
-									: 1,
+									: 1),
 							readBinding,
-							facts: context.facts
-								? ({
-										...context.facts,
-										binding: readBinding,
-										status: 'loading',
-										accounts: null,
-										membership: undefined,
-										grants: null,
-										categories: null,
-										tags: null,
-										transaction: undefined,
-										transactions: null
-									} satisfies FinanceQueryFacts)
-								: undefined
+							facts: retainReads
+								? context.facts
+								: context.facts
+									? ({
+											...context.facts,
+											binding: readBinding,
+											status: 'loading',
+											accounts: null,
+											membership: undefined,
+											grants: null,
+											categories: null,
+											tags: null,
+											transaction: undefined,
+											transactions: null
+										} satisfies FinanceQueryFacts)
+									: undefined
 						}
 						if (context.forms)
 							enq.sendTo(context.forms.owner, {
@@ -576,6 +592,7 @@ export function createFinanceWorkerMachine({
 								observation: formsObservation(next),
 								selectionRevision: next.selection.revision
 							})
+						if (retainReads) return { context: next }
 						return {
 							target: context.ready ? '.ready' : '.waiting',
 							reenter: true,
@@ -605,12 +622,43 @@ export function createFinanceWorkerMachine({
 							return
 						enq.sendTo(context.forms.owner, { type: 'RETRY_NAVIGATION' })
 					},
-					SET_LEDGER_PAGE: ({ context, event }) =>
-						sameCommandScope(context, event) ? { context: { ledgerPage: event.page } } : undefined,
-					SET_LEDGER_FILTERS: ({ context, event }) =>
-						sameCommandScope(context, event)
-							? { context: { ledgerFilters: event.filters, ledgerPage: 1 } }
-							: undefined,
+					SET_LEDGER_PAGE: ({ context, event }, enq) => {
+						if (!sameCommandScope(context, event)) return
+						if (context.route && context.forms) {
+							enq.sendTo(context.forms.owner, {
+								type: 'NAVIGATE',
+								replace: true,
+								destination: withQueryParams(
+									`${context.route.pathname}${context.route.search}${context.route.hash}`,
+									{ page: event.page > 1 ? event.page : null }
+								)
+							})
+							return
+						}
+						return { context: { ledgerPage: event.page } }
+					},
+					SET_LEDGER_FILTERS: ({ context, event }, enq) => {
+						if (!sameCommandScope(context, event)) return
+						if (context.route && context.forms) {
+							enq.sendTo(context.forms.owner, {
+								type: 'NAVIGATE',
+								replace: true,
+								destination: withQueryParams(
+									`${context.route.pathname}${context.route.search}${context.route.hash}`,
+									{
+										start: event.filters.start || null,
+										end: event.filters.end || null,
+										category: event.filters.categoryId || null,
+										currency: event.filters.currency || null,
+										q: event.filters.query || null,
+										page: null
+									}
+								)
+							})
+							return
+						}
+						return { context: { ledgerFilters: event.filters, ledgerPage: 1 } }
+					},
 					ACCOUNT_CREATION: ({ context, event }, enq) => {
 						if (
 							!sameCommandScope(context, event) ||

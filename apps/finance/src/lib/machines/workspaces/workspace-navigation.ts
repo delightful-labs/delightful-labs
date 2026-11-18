@@ -37,6 +37,7 @@ function defaultWorkspaceHref(context: Context, workspaceId: string | null) {
 type Event =
 	| { type: 'OBSERVED'; facts: WorkspaceNavigationFacts }
 	| { type: 'SELECT'; workspaceId: string }
+	| { type: 'NAVIGATE'; destination: string; replace: boolean }
 	| { type: 'REEVALUATE' | 'RETRY' | 'SHUTDOWN' }
 export function createWorkspaceNavigationMachine(
 	db: Pick<ReturnType<typeof getDb>, 'one'>,
@@ -63,6 +64,7 @@ export function createWorkspaceNavigationMachine(
 	const events0 = {
 		OBSERVED: types<EventPayload<Event, 'OBSERVED'>>(),
 		SELECT: types<EventPayload<Event, 'SELECT'>>(),
+		NAVIGATE: types<EventPayload<Event, 'NAVIGATE'>>(),
 		REEVALUATE: types<EventPayload<Event, 'REEVALUATE'>>(),
 		RETRY: types<EventPayload<Event, 'RETRY'>>(),
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
@@ -102,10 +104,16 @@ export function createWorkspaceNavigationMachine(
 		initial: 'assessing',
 		on: {
 			SHUTDOWN: { target: '.closed' },
+			NAVIGATE: ({ event }) => ({
+				target: '.navigating.updating',
+				reenter: true,
+				context: { emptyEntry: undefined, destination: event.destination, replace: event.replace }
+			}),
 			SELECT: (args) => {
 				const { context } = args
 				return {
 					target: '.navigating',
+					reenter: true,
 					context: {
 						emptyEntry: undefined,
 						replace: false,
@@ -343,23 +351,25 @@ export function createWorkspaceNavigationMachine(
 			navigating: {
 				initial: 'active',
 				states: {
-					active: {},
-					closing: { on: { SHUTDOWN: {}, OBSERVED: {}, REEVALUATE: {}, SELECT: {}, RETRY: {} } }
-				},
-				entry: (args, enq) => {
-					let context = args.context
-					let patch = {}
-					patch = {
-						...patch,
-						...((args) => ({ resolving: (({ context }) => context.facts)(args) }))(args)
+					active: {
+						entry: ({ context }, enq) =>
+							enq.sendTo(context.recipient, {
+								type: 'NAVIGATION_STATUS',
+								report: { generation: context.facts.generation, status: 'waiting' }
+							})
+					},
+					updating: {
+						entry: ({ context }, enq) =>
+							enq.sendTo(context.recipient, {
+								type: 'NAVIGATION_STATUS',
+								report: { generation: context.facts.generation, status: 'updating' }
+							})
+					},
+					closing: {
+						on: { SHUTDOWN: {}, OBSERVED: {}, REEVALUATE: {}, SELECT: {}, NAVIGATE: {}, RETRY: {} }
 					}
-					context = { ...args.context, ...patch }
-					enq.sendTo(context.recipient, {
-						type: 'NAVIGATION_STATUS',
-						report: { generation: context.facts.generation, status: 'waiting' }
-					})
-					return { context: patch }
 				},
+				entry: ({ context }) => ({ context: { resolving: context.facts } }),
 				on: {
 					SHUTDOWN: { target: '.closing' },
 					REEVALUATE: (args, enq) => {
@@ -376,7 +386,12 @@ export function createWorkspaceNavigationMachine(
 						}
 						enq.sendTo(context.recipient, {
 							type: 'NAVIGATION_STATUS',
-							report: { generation: context.facts.generation, status: 'waiting' }
+							report: {
+								generation: context.facts.generation,
+								status: matchesState({ navigating: 'updating' }, args.value)
+									? 'updating'
+									: 'waiting'
+							}
 						})
 						return {}
 					}

@@ -132,6 +132,7 @@ export function createFinanceFormsMachine(
 				OBSERVE: types<Input>(),
 				NAVIGATION_STATUS: types<{ report: NavigationReport }>(),
 				SELECT_WORKSPACE: types<{ workspaceId: string }>(),
+				NAVIGATE: types<{ destination: string; replace: boolean }>(),
 				RETRY_NAVIGATION: types(),
 				ARCHIVE_ACCOUNT: types<{ accountId: string }>(),
 				ACCOUNT_CREATION: types<{ command: WorkerAccountCreationCommand }>(),
@@ -304,6 +305,7 @@ export function createFinanceFormsMachine(
 							: undefined,
 					SELECT_WORKSPACE: ({ event }, enq) =>
 						enq.sendTo('navigation', { type: 'SELECT', workspaceId: event.workspaceId }),
+					NAVIGATE: ({ event }, enq) => enq.sendTo('navigation', event),
 					RETRY_NAVIGATION: (_, enq) => enq.sendTo('navigation', { type: 'RETRY' }),
 					OBSERVE: ({ event }, enq) => {
 						enq.sendTo('navigation', { type: 'OBSERVED', facts: event.observation.navigation })

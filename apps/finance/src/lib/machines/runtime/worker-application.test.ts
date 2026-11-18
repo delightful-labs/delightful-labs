@@ -502,6 +502,130 @@ describe('Finance worker ownership and selected accounts', () => {
 			}
 		}
 	)
+	it('reads direct URL filters/pages and changes them only after native history observations', async () => {
+		const f = fixture(),
+			history = Promise.withResolvers<void>()
+		f.navigate.mockImplementationOnce(() => history.promise)
+		try {
+			await f.start()
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?workspace=' + a + '&q=rent&page=2&keep=yes',
+				hash: '#row',
+				revision: 1
+			})
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([row('Wallet')])
+			const records: WorkerLedgerRecord[] = Array.from({ length: 30 }, (_, i) => ({
+				id: crypto.randomUUID(),
+				organizationId: a,
+				accountId: row('Wallet').id,
+				categoryId: '50000000-0000-4000-8000-000000000001',
+				kind: 'expense',
+				currency: 'USD',
+				amountMinor: 100,
+				bookedOn: '2026-11-18',
+				description: 'Rent ' + i,
+				memo: null,
+				tagNames: []
+			}))
+			last(f.ledgers).publish(records)
+			expect(f.view().ledger).toMatchObject({ page: 2, pageCount: 2, filters: { query: 'rent' } })
+			expect(f.view().ledger?.groups.flatMap((g) => g.transactions)).toHaveLength(5)
+			const scope = f.view()
+			f.actor.send({
+				type: 'SET_LEDGER_FILTERS',
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision,
+				filters: { start: '2026-11-18', end: '', categoryId: '', currency: 'USD', query: 'rent 29' }
+			})
+			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
+			expect(f.navigate).toHaveBeenLastCalledWith(
+				'/expenses?workspace=' + a + '&q=rent+29&keep=yes&start=2026-11-18&currency=USD#row',
+				expect.any(AbortSignal),
+				expect.stringContaining('page=2'),
+				true
+			)
+			expect(f.view().ledger?.page).toBe(2)
+			expect(f.view().workspaceNavigation).toMatchObject({ status: 'updating', showContent: true })
+			const subscriptions = f.directory.length
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?workspace=' + a + '&q=rent+29&start=2026-11-18&currency=USD',
+				hash: '#row',
+				revision: 2
+			})
+			expect(f.directory).toHaveLength(subscriptions)
+			history.resolve()
+			await vi.waitFor(() => expect(f.view().workspaceNavigation?.status).toBe('scoped'))
+			last(f.queries).publish([row('Wallet')])
+			last(f.ledgers).publish(records)
+			expect(f.view().ledger).toMatchObject({
+				page: 1,
+				filters: { query: 'rent 29', currency: 'USD' }
+			})
+			expect(
+				f
+					.view()
+					.ledger?.groups.flatMap((g) => g.transactions)
+					.map((t) => t.description)
+			).toEqual(['Rent 29'])
+			f.actor.send({
+				type: 'SET_LEDGER_PAGE',
+				page: 2,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.navigate).toHaveBeenCalledOnce()
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?workspace=' + a + '&q=rent&page=2&keep=yes',
+				hash: '#row',
+				revision: 3
+			})
+			last(f.queries).publish([row('Wallet')])
+			last(f.ledgers).publish(records)
+			expect(f.view().ledger).toMatchObject({ page: 2, filters: { query: 'rent', currency: '' } })
+			f.actor.send({
+				type: 'SET_LEDGER_PAGE',
+				page: 1,
+				selection: f.view().selection,
+				sessionRevision: f.view().sessionRevision
+			})
+			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledTimes(2))
+			expect(f.navigate).toHaveBeenLastCalledWith(
+				'/expenses?workspace=' + a + '&q=rent&keep=yes#row',
+				expect.any(AbortSignal),
+				expect.any(String),
+				true
+			)
+		} finally {
+			history.resolve()
+			f.stop()
+		}
+	})
+	it.each(['0', '-1', '1.5', '1e2', '9007199254740992', 'nope'])(
+		'uses page one for an invalid direct page %s',
+		async (page) => {
+			const f = fixture()
+			try {
+				await f.start()
+				f.actor.send({
+					type: 'OBSERVE_ROUTE',
+					pathname: '/expenses',
+					search: '?workspace=' + a + '&page=' + page,
+					hash: '',
+					revision: 1
+				})
+				expect(f.actor.getSnapshot().context.ledgerPage).toBe(1)
+			} finally {
+				f.stop()
+			}
+		}
+	)
 	it('keeps missing balances unknown, projects one exact ledger page, and refuses stale filter/page intents', async () => {
 		const f = fixture()
 		try {

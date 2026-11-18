@@ -23,6 +23,7 @@
 	import TransactionListFilters from '../filters/TransactionListFilters.svelte'
 	import {
 		filterTransactions,
+		transactionListLocation,
 		type TransactionListFilters as ListFilters
 	} from '#lib/filters/transaction-list-filters.js'
 
@@ -43,13 +44,8 @@
 	} = $props()
 	const filters = getContext<FinanceFilters>(financeFiltersKey)
 	const currentUrl = $derived(page.shallow?.url ?? page.url)
-	const listFilters = $derived<ListFilters>({
-		start: currentUrl.searchParams.get('start') ?? '',
-		end: currentUrl.searchParams.get('end') ?? '',
-		categoryId: currentUrl.searchParams.get('category') ?? '',
-		currency: currentUrl.searchParams.get('currency') ?? '',
-		query: currentUrl.searchParams.get('q') ?? ''
-	})
+	const location = $derived(transactionListLocation(currentUrl.search))
+	const listFilters = $derived(location.filters)
 	function changeListFilters(value: ListFilters) {
 		replaceState(
 			withQueryParams(`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`, {
@@ -67,11 +63,7 @@
 		!listFilters.start || !listFilters.end || listFilters.start <= listFilters.end
 	)
 
-	const requestedPage = $derived.by(() => {
-		const value = currentUrl.searchParams.get('page') ?? '1'
-		const number = Number(value)
-		return /^\d+$/.test(value) && Number.isSafeInteger(number) && number > 0 ? number : 1
-	})
+	const requestedPage = $derived(location.requestedPage)
 	function pageHref(number: number) {
 		return withQueryParams(`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`, {
 			page: number > 1 ? number : null
