@@ -13,24 +13,27 @@ normal candidate source files, rather than added-file hunks. The candidate
 worker entry replaces only the isolated build catalog. Newly added candidate
 files refuse to overwrite maintained files, preserving the former patch conflict
 check. Remaining patches still adapt modified alpha.60 source; they are debt,
-not a new application compatibility API. Patch text drops from 9,197 to 5,930
-lines, including moved code rather than claiming all those lines were removed.
+not a new application compatibility API. At this cleanup checkpoint, patch text
+dropped from 9,197 to 5,930 lines, including moved code rather than claiming all
+those lines were removed.
 
 Source assembly comparisons match the prior Finance, Clipper, fixture, adapter
-and worker code byte for byte. Fresh alpha.67 checks pass 200 Finance
+and worker code byte for byte. The cleanup's alpha.67 checks passed 200 Finance
 schema/permission/backup/restore, 42 worker/session, 30 actual Finance Worker/UI
 and 59 Clipper schema/reading cases, including strict TypeScript and zero-warning
 Svelte checks. The three-engine financial/offline/drain checks remain intact.
-The latest application checks include the concurrent workspace initialization
+Those application checks include the concurrent workspace initialization
 and distinct broker identity changes from `fdcaadb5`; the candidate worker entry
 matches that commit's patched entry byte for byte.
 
-The PR #46/#51 merge preview has a handoff-document conflict. More importantly,
-the Clipper schema overlay fails against #51's repaired schema/permissions.
-That authoring port must be reconciled with the final approved schema and native
-identity requalified before coordinated adoption; a clean application-source
-merge alone would not prove candidate compatibility. These checks do not activate
-the SDK, change data models or qualify the merged #51 candidate.
+PR #51 is now merged into main and incorporated into PR #46. Commit `94cd21ae`
+reconciles the Clipper candidate with the approved required Note document,
+same-document Highlight policy and native migration history. A fresh alpha.67
+verification passes all 61 schema/reading cases, including reopening the historical
+alpha.60 production-schema store with its app identity retained. This resolves the
+earlier handoff-document conflict and schema-overlay blocker. Full Clipper
+session/backend adoption and coordinated SDK activation remain open; see the
+[reconciliation evidence](worker-session-resource-decision.md#reconcile-merged-pr51-before-further-coordinated-sdk-work).
 
 See the [current commands and source boundaries](../../tests/worker-upgrade/README.md).
 
