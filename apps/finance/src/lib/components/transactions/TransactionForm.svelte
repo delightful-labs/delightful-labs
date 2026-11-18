@@ -1,18 +1,8 @@
 <script lang="ts">
 	import { PAYMENT_METHOD } from '#lib/domain/payment-method.js'
 	import type { TransactionKind, TransactionPaymentEntry } from '#lib/domain/transaction-kind.js'
-	import {
-		Button,
-		InputText,
-		InputDate,
-		Select,
-		Textarea,
-		InputCurrency,
-		FieldFeedback
-	} from 'delightful-ui'
+	import { Button, Select, Textarea, FieldFeedback } from 'delightful-ui'
 	import { untrack, tick, type Snippet } from 'svelte'
-	import { amountInputPattern, minorUnitsToInput } from '#lib/domain/money.js'
-	import { todayDateOnly } from '#lib/domain/date-only.js'
 	import type { Account, Category, Tag, TransactionDetail } from '#lib/schema.js'
 	import type { InternalTransferCandidate } from '#lib/domain/internal-transfer.js'
 	import type {
@@ -28,6 +18,7 @@
 	import { formReasonText } from '#lib/forms/form-messages.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import FormContent from '../forms/FormContent.svelte'
+	import TransactionFields from './TransactionFields.svelte'
 	import TransactionCheckFields from './TransactionCheckFields.svelte'
 	import TransactionTagInput from './TransactionTagInput.svelte'
 	import InternalTransferSuggestions from '../transfers/InternalTransferSuggestions.svelte'
@@ -130,11 +121,7 @@
 	const resetRevision = $derived(view.draftRevision)
 	let activeCheckFieldsKey = $state('')
 	let selectedAccountId = $state('')
-	const selectedAccountCurrency = $derived(
-		accounts.find((account) => account.id === selectedAccountId)?.currency ??
-			initialTransaction?.currency ??
-			'USD'
-	)
+
 	let appliedCategoryId = $state<string>()
 	let categorySelect: HTMLSelectElement | undefined = $state()
 	$effect(() => {
@@ -187,208 +174,147 @@
 	<FormContent {view} {onsubmit} {onreset} {oninput}>
 		{#snippet fields(form)}
 			{#if form.content.kind !== 'success'}
-				<Select
-					label={m['nouns.account']({ count: 1 })}
-					id="transaction-account"
-					aria-describedby="transaction-account-feedback"
-					aria-invalid={fieldInvalid(issues, 'accountId') || undefined}
-					name="accountId"
-					required
-					defaultValue={initialTransaction?.accountId ?? defaultAccountId ?? ''}
-					bind:value={selectedAccountId}
+				<TransactionFields
+					{accounts}
+					{initialTransaction}
+					{defaultAccountId}
+					{issues}
+					bind:selectedAccountId
 				>
-					<option value="" disabled
-						>{m['actions.select_subject']({ subject: m['nouns.account']({ count: 1 }) })}</option
-					>
-					{#if initialTransaction && !accounts.some((account) => account.id === initialTransaction?.accountId)}
-						<option value={initialTransaction.accountId} disabled
-							>{initialTransaction.accountName ??
-								m['status.unavailable_subject']({
-									subject: m['nouns.account']({ count: 1 })
-								})} · {initialTransaction.currency}</option
+					{#snippet afterAccount()}
+						<Select
+							label={m['nouns.category']({ count: 1 })}
+							id="transaction-category"
+							{@attach (element) => {
+								categorySelect = element
+								return () => {
+									categorySelect = undefined
+								}
+							}}
+							aria-describedby="transaction-category-feedback"
+							aria-invalid={fieldInvalid(issues, 'categoryId') || undefined}
+							name="categoryId"
+							required
+							defaultValue={initialTransaction?.categoryId ?? defaultCategoryId ?? ''}
 						>
-					{/if}
-					{#each accounts as account (account.id)}
-						<option value={account.id}>{account.name} · {account.currency}</option>
-					{/each}
-				</Select>
-				<FieldFeedback
-					id="transaction-account-feedback"
-					errorMessage={fieldInvalid(issues, 'accountId')
-						? m['forms.select_subject']({ subject: m['nouns.account']({ count: 1 }) })
-						: ''}
-				/>
-
-				<Select
-					label={m['nouns.category']({ count: 1 })}
-					id="transaction-category"
-					{@attach (element) => {
-						categorySelect = element
-						return () => {
-							categorySelect = undefined
-						}
-					}}
-					aria-describedby="transaction-category-feedback"
-					aria-invalid={fieldInvalid(issues, 'categoryId') || undefined}
-					name="categoryId"
-					required
-					defaultValue={initialTransaction?.categoryId ?? defaultCategoryId ?? ''}
-				>
-					<option value="" disabled>
-						{m['actions.select_subject']({ subject: m['nouns.category']({ count: 1 }) })}
-					</option>
-					{#if initialTransaction && !categories.some((category) => category.id === initialTransaction?.categoryId)}
-						<option value={initialTransaction.categoryId} disabled
-							>{initialTransaction.categoryName ??
-								m['status.unavailable_subject']({
-									subject: m['nouns.category']({ count: 1 })
-								})}</option
-						>
-					{/if}
-					{#each categories as category (category.id)}
-						<option value={category.id}>
-							{category.name}
-						</option>
-					{/each}
-				</Select>
-				{#if onaddcategory}
-					<Button type="button" disabled={!canAddCategory} onclick={onaddcategory}>
-						{m['actions.add_subject']({ subject: m['nouns.category']({ count: 1 }) })}
-					</Button>
-				{/if}
-				<FieldFeedback
-					id="transaction-category-feedback"
-					errorMessage={fieldInvalid(issues, 'categoryId')
-						? m['forms.select_subject']({ subject: m['nouns.category']({ count: 1 }) })
-						: ''}
-				/>
-
-				<InputCurrency
-					label={m['labels.amount']()}
-					currencyLabel={selectedAccountCurrency}
-					id="transaction-amount"
-					aria-describedby="transaction-amount-feedback"
-					aria-invalid={fieldInvalid(issues, 'amount') || undefined}
-					name="amount"
-					inputmode="decimal"
-					autocomplete="off"
-					pattern={amountInputPattern(selectedAccountCurrency)}
-					defaultValue={initialTransaction
-						? minorUnitsToInput(initialTransaction.amountMinor, initialTransaction.currency)
-						: ''}
-					required
-				/>
-				<FieldFeedback
-					id="transaction-amount-feedback"
-					errorMessage={fieldInvalid(issues, 'amount')
-						? m['forms.enter_subject']({ subject: m['labels.amount']() })
-						: ''}
-				/>
-
-				<InputDate
-					label={m['nouns.date']({ count: 1 })}
-					id="transaction-date"
-					aria-describedby="transaction-date-feedback"
-					aria-invalid={fieldInvalid(issues, 'bookedOn') || undefined}
-					name="bookedOn"
-					defaultValue={initialTransaction?.bookedOn ?? todayDateOnly()}
-					required
-				/>
-				<FieldFeedback
-					id="transaction-date-feedback"
-					errorMessage={fieldInvalid(issues, 'bookedOn')
-						? m['forms.enter_subject']({ subject: m['nouns.date']({ count: 1 }) })
-						: ''}
-				/>
-
-				{#if paymentEntry === 'inline'}
-					<Select
-						label={m['labels.subject_method']({ subject: m['nouns.payment']({ count: 1 }) })}
-						id="transaction-payment-method"
-						aria-describedby="transaction-payment-method-feedback"
-						aria-invalid={fieldInvalid(issues, 'paymentMethod') || undefined}
-						name="paymentMethod"
-						defaultValue={initialTransaction?.paymentMethod ?? ''}
-						{@attach syncPaymentMethod}
-						onchange={(event) => syncPaymentMethod(event.currentTarget)}
-					>
-						<option value="">{m['labels.unspecified']()}</option>
-						<option value={PAYMENT_METHOD.CASH}>{m['labels.cash']()}</option>
-						<option value={PAYMENT_METHOD.CHECK}>{m['nouns.check']({ count: 1 })}</option>
-						<option value={PAYMENT_METHOD.TRANSFER}>{m['transactions.payment.transfer']()}</option>
-						<option value={PAYMENT_METHOD.ELECTRONIC}
-							>{m['transactions.payment.electronic']()}</option
-						>
-					</Select>
-					<FieldFeedback
-						id="transaction-payment-method-feedback"
-						errorMessage={fieldInvalid(issues, 'paymentMethod')
-							? m['forms.enter_subject']({
-									subject: m['labels.subject_method']({ subject: m['nouns.payment']({ count: 1 }) })
-								})
-							: ''}
-					/>
-
-					{#key resetRevision}
-						<TransactionCheckFields
-							active={activeCheckFieldsKey === PAYMENT_METHOD.CHECK}
-							{issues}
-							initialCheck={initialTransaction?.checkId && initialTransaction.check
-								? { id: initialTransaction.checkId, ...initialTransaction.check }
-								: undefined}
+							<option value="" disabled>
+								{m['actions.select_subject']({ subject: m['nouns.category']({ count: 1 }) })}
+							</option>
+							{#if initialTransaction && !categories.some((category) => category.id === initialTransaction?.categoryId)}
+								<option value={initialTransaction.categoryId} disabled
+									>{initialTransaction.categoryName ??
+										m['status.unavailable_subject']({
+											subject: m['nouns.category']({ count: 1 })
+										})}</option
+								>
+							{/if}
+							{#each categories as category (category.id)}
+								<option value={category.id}>
+									{category.name}
+								</option>
+							{/each}
+						</Select>
+						{#if onaddcategory}
+							<Button type="button" disabled={!canAddCategory} onclick={onaddcategory}>
+								{m['actions.add_subject']({ subject: m['nouns.category']({ count: 1 }) })}
+							</Button>
+						{/if}
+						<FieldFeedback
+							id="transaction-category-feedback"
+							errorMessage={fieldInvalid(issues, 'categoryId')
+								? m['forms.select_subject']({ subject: m['nouns.category']({ count: 1 }) })
+								: ''}
 						/>
-					{/key}
-				{/if}
+					{/snippet}
+					{#snippet afterDate()}
+						{#if paymentEntry === 'inline'}
+							<Select
+								label={m['labels.subject_method']({ subject: m['nouns.payment']({ count: 1 }) })}
+								id="transaction-payment-method"
+								aria-describedby="transaction-payment-method-feedback"
+								aria-invalid={fieldInvalid(issues, 'paymentMethod') || undefined}
+								name="paymentMethod"
+								defaultValue={initialTransaction?.paymentMethod ?? ''}
+								{@attach syncPaymentMethod}
+								onchange={(event) => syncPaymentMethod(event.currentTarget)}
+							>
+								<option value="">{m['labels.unspecified']()}</option>
+								<option value={PAYMENT_METHOD.CASH}>{m['labels.cash']()}</option>
+								<option value={PAYMENT_METHOD.CHECK}>{m['nouns.check']({ count: 1 })}</option>
+								<option value={PAYMENT_METHOD.TRANSFER}
+									>{m['transactions.payment.transfer']()}</option
+								>
+								<option value={PAYMENT_METHOD.ELECTRONIC}
+									>{m['transactions.payment.electronic']()}</option
+								>
+							</Select>
+							<FieldFeedback
+								id="transaction-payment-method-feedback"
+								errorMessage={fieldInvalid(issues, 'paymentMethod')
+									? m['forms.enter_subject']({
+											subject: m['labels.subject_method']({
+												subject: m['nouns.payment']({ count: 1 })
+											})
+										})
+									: ''}
+							/>
 
-				{#if paymentEntry === 'preserve' && initialTransaction?.paymentMethod}
-					<input type="hidden" name="paymentMethod" value={initialTransaction.paymentMethod} />
-					{#if initialTransaction.checkId}<input
-							type="hidden"
-							name="checkId"
-							value={initialTransaction.checkId}
-						/>{/if}
-				{/if}
-				{#if organizationId}
-					<TransactionTagInput
-						{organizationId}
-						suggestions={tagSuggestions}
-						initialTags={initialTransaction?.tags ?? []}
-						disabled={!form.fieldsEditable}
-					/>
-				{/if}
-				{#if mode === 'edit' && onLinkCounterpart && transferEditorState !== 'linked' && transferEditorState !== 'conflicted' && !transferConflict}
-					<label>
-						<input
-							type="checkbox"
-							checked={transferSearchEnabled}
-							onchange={(event) => onTransferSearchEnabledChange?.(event.currentTarget.checked)}
-						/>
-						{m['transfers.convert_to_transfer']()}
-					</label>
-				{/if}
-				{#if mode === 'edit' && onLinkCounterpart && transferEditorState !== 'unselected'}
-					<InternalTransferSuggestions
-						suggestions={transferSuggestions}
-						writableSuggestionIds={writableTransferSuggestionIds}
-						editorState={transferConflict ? 'conflicted' : transferEditorState}
-						selectedId={selectedTransferCandidateId}
-						onSelect={onSelectTransferCandidate}
-						pending={transferLinkPending}
-						statusLabel={transferStatusLabel}
-						unlinkAvailable={transferUnlinkAvailable}
-						unlinkWritable={transferUnlinkWritable}
-						unlinkPending={transferUnlinkPending}
-						{linkedCounterpartHref}
-						onLink={onLinkCounterpart}
-						onUnlink={onUnlinkTransfer}
-					/>
-				{/if}
-				<InputText
-					label={m['labels.description']()}
-					id="transaction-description"
-					name="description"
-					defaultValue={initialTransaction?.description ?? ''}
-				/>
+							{#key resetRevision}
+								<TransactionCheckFields
+									active={activeCheckFieldsKey === PAYMENT_METHOD.CHECK}
+									{issues}
+									initialCheck={initialTransaction?.checkId && initialTransaction.check
+										? { id: initialTransaction.checkId, ...initialTransaction.check }
+										: undefined}
+								/>
+							{/key}
+						{/if}
+
+						{#if paymentEntry === 'preserve' && initialTransaction?.paymentMethod}
+							<input type="hidden" name="paymentMethod" value={initialTransaction.paymentMethod} />
+							{#if initialTransaction.checkId}<input
+									type="hidden"
+									name="checkId"
+									value={initialTransaction.checkId}
+								/>{/if}
+						{/if}
+						{#if organizationId}
+							<TransactionTagInput
+								{organizationId}
+								suggestions={tagSuggestions}
+								initialTags={initialTransaction?.tags ?? []}
+								disabled={!form.fieldsEditable}
+							/>
+						{/if}
+						{#if mode === 'edit' && onLinkCounterpart && transferEditorState !== 'linked' && transferEditorState !== 'conflicted' && !transferConflict}
+							<label>
+								<input
+									type="checkbox"
+									checked={transferSearchEnabled}
+									onchange={(event) => onTransferSearchEnabledChange?.(event.currentTarget.checked)}
+								/>
+								{m['transfers.convert_to_transfer']()}
+							</label>
+						{/if}
+						{#if mode === 'edit' && onLinkCounterpart && transferEditorState !== 'unselected'}
+							<InternalTransferSuggestions
+								suggestions={transferSuggestions}
+								writableSuggestionIds={writableTransferSuggestionIds}
+								editorState={transferConflict ? 'conflicted' : transferEditorState}
+								selectedId={selectedTransferCandidateId}
+								onSelect={onSelectTransferCandidate}
+								pending={transferLinkPending}
+								statusLabel={transferStatusLabel}
+								unlinkAvailable={transferUnlinkAvailable}
+								unlinkWritable={transferUnlinkWritable}
+								unlinkPending={transferUnlinkPending}
+								{linkedCounterpartHref}
+								onLink={onLinkCounterpart}
+								onUnlink={onUnlinkTransfer}
+							/>
+						{/if}
+					{/snippet}
+				</TransactionFields>
 				<Textarea
 					label={m['labels.memo']()}
 					id="transaction-memo"
