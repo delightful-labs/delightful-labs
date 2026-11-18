@@ -110,7 +110,6 @@ echoes the admitted observation at an explicit parent/report boundary, so a pare
 retired child views without inspecting private workflow state. Keep DOM/FormData extraction and
 translation on Window, and validation, policy, submission and settlement in the worker actor.
 
-
 `profile/workflow` assembles name/avatar forms with your schemas, local save adapters and image
 processing actor. `profile/avatar` owns processing → validation → write → cleanup and interruption;
 image resizing/cropping is a host/DUI platform capability. `profile/name-view`, `profile/avatar-form`
