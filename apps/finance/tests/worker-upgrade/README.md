@@ -459,3 +459,15 @@ outside this probe.
 
 See the [upgrade plan and qualification](../../specs/013-local-first-startup/worker-jazz-upgrade-plan.md#u1-isolated-worker-qualification)
 before broadening or adopting this candidate.
+
+The Clipper candidate now uses the shared actor connection at its actual account
+host, including creation, restoration, SDK retry, ordered sign-out and realm
+close. Its existing attachment and domain-drain protocols remain in place;
+no SDK facade enters XState context. Strict candidate types and 69 Clipper tests
+pass, clearing the original 15 getter/freezing failures. The current alpha.60
+Clipper batch passes 72 tests. The 21 focused three-engine Worker cases also
+pass using the shared change/close invocations with actual Jazz sessions and
+development freezing. The corresponding shared identity/backend batch passes
+272 tests. See the [current host qualification](../../specs/013-local-first-startup/worker-session-resource-decision.md#clipper-host-adoption-qualified-in-the-candidate).
+Finance caller adoption and the coordinated SDK upgrade remain open; pins and
+production destinations are unchanged.

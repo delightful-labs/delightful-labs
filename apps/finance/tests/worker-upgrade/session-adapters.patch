@@ -127,10 +127,10 @@ index 2819104..846ef3d 100644
  		}
  	}
 diff --git a/src/lib/backend/jazz/restoration.ts b/src/lib/backend/jazz/restoration.ts
-index f15347c..a322805 100644
+index 7a2514b..d7771ed 100644
 --- a/src/lib/backend/jazz/restoration.ts
 +++ b/src/lib/backend/jazz/restoration.ts
-@@ -38,12 +38,12 @@ export function createJazzRestorationAdapter(
+@@ -42,12 +42,12 @@ export function createJazzRestorationAdapter(
  				const current = currentSession(scope.binding)
  				if (!current) throw new Error('Restoration binding unavailable')
  				// Adjacent invariant recheck followed by exactly one host-session SDK operation.
@@ -146,12 +146,34 @@ index f15347c..a322805 100644
  					: { kind: 'unavailable' }
  			}
  		}
+diff --git a/src/lib/backend/jazz/session-readiness.ts b/src/lib/backend/jazz/session-readiness.ts
+index 9a903e8..febe12c 100644
+--- a/src/lib/backend/jazz/session-readiness.ts
++++ b/src/lib/backend/jazz/session-readiness.ts
+@@ -1,15 +1,10 @@
+ import type { JazzSession } from 'jazz-tools/client'
+-import type {
+-	SessionReadinessBinding,
+-	SessionReadinessCapability
+-} from '../../contracts/session.js'
++import type { SessionReadinessBinding, SessionReadinessCapability } from '../../contracts/session.js'
+ 
+ /** Bind the host's acquired session without reading, subscribing, creating, or replacing it. */
+ export function createJazzSessionReadinessAdapter<Client>(
+ 	session: JazzSession<Client>
+-): SessionReadinessBinding & {
+-	capability: Extract<SessionReadinessCapability, { retry: () => Promise<void> }>
+-} {
++): SessionReadinessBinding & { capability: Extract<SessionReadinessCapability, { retry: () => Promise<void> }> } {
+ 	return {
+ 		binding: Object.freeze({}),
+ 		capability: {
 diff --git a/src/lib/backend/jazz/session-runtime.ts b/src/lib/backend/jazz/session-runtime.ts
 new file mode 100644
-index 0000000..fbf192e
+index 0000000..17aef82
 --- /dev/null
 +++ b/src/lib/backend/jazz/session-runtime.ts
-@@ -0,0 +1,147 @@
+@@ -0,0 +1,152 @@
 +import { createJazzClient } from 'jazz-tools/client'
 +import { createJazzRecoveryAdapter } from './recovery-phrase.js'
 +import type {
@@ -281,8 +303,13 @@ index 0000000..fbf192e
 +						await session.close()
 +					},
 +					changeIdentity: async (change) => {
++						if (change.operation === 'retry') {
++							await session.retry()
++							return 'completed'
++						}
 +						const current = read()
 +						if (
++							!change.before ||
 +							(current.status !== 'ready' && current.status !== 'signed-out') ||
 +							current.status !== change.before.status ||
 +							current.binding !== change.before.binding
@@ -299,22 +326,3 @@ index 0000000..fbf192e
 +		}
 +	}
 +}
-diff --git a/src/lib/contracts/session.ts b/src/lib/contracts/session.ts
-index 86ce088..8b56980 100644
---- a/src/lib/contracts/session.ts
-+++ b/src/lib/contracts/session.ts
-@@ -30,7 +30,13 @@ export type SessionStartupReport<Session extends object> =
- export type SessionStartupOutput = Readonly<{ outcome: 'closed' }>
- 
- /** SDK status only: never a workspace permission, remote freshness, or retry-settlement claim. */
--export type SessionStatus = 'ready' | 'signed-out' | 'transitioning' | 'error' | 'closed'
-+export type SessionStatus =
-+	| 'starting'
-+	| 'ready'
-+	| 'signed-out'
-+	| 'transitioning'
-+	| 'error'
-+	| 'closed'
- export type SessionReadinessScope = Readonly<{ binding: object; attachment: object }>
- export type SessionReadinessCapability = Readonly<{
- 	readStatus: () => SessionStatus

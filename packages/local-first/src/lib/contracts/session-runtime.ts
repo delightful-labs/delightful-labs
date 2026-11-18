@@ -1,5 +1,5 @@
 import type { SessionOpenCapability, SessionStatus } from './session.js'
-import type { ActorRef, Snapshot } from 'xstate'
+import type { ActorRef, Readable, Snapshot } from 'xstate'
 import type { RestorationScope } from './restoration.js'
 
 /** Captured native identity; an unavailable/transitioning session cannot admit mutation. */
@@ -7,9 +7,20 @@ export type SessionRuntimeIdentity =
 	| Readonly<{ status: 'ready'; binding: object }>
 	| Readonly<{ status: 'signed-out'; binding: object }>
 export type SessionRuntimeIdentityChange =
-	| Readonly<{ operation: 'create'; before: Readonly<{ status: 'signed-out'; binding: object }> }>
-	| Readonly<{ operation: 'restore'; before: SessionRuntimeIdentity; credential: string }>
-	| Readonly<{ operation: 'signOut'; before: Readonly<{ status: 'ready'; binding: object }> }>
+	| Readonly<{
+			operation: 'create'
+			before: Readonly<{ status: 'signed-out'; binding: object }> | undefined
+	  }>
+	| Readonly<{
+			operation: 'restore'
+			before: SessionRuntimeIdentity | undefined
+			credential: string
+	  }>
+	| Readonly<{
+			operation: 'signOut'
+			before: Readonly<{ status: 'ready'; binding: object }> | undefined
+	  }>
+	| Readonly<{ operation: 'retry' }>
 export type SessionRuntimeChangeOutcome =
 	| 'completed'
 	| 'failed'
@@ -27,6 +38,26 @@ export type SessionRuntimeChangeRequest = Readonly<{
 	scope: RestorationScope
 	change: SessionRuntimeIdentityChange
 	replyTo: ActorRef<Snapshot<unknown>, SessionRuntimeChangeReport>
+}>
+
+export type SessionRuntimeView<Capabilities = unknown> = Readonly<{
+	stage: 'acquiring' | 'openFailed' | 'observerFailed' | 'active' | 'closing' | 'closed' | 'failed'
+	status: SessionStatus | 'starting'
+	observation: SessionRuntimeObservation<Capabilities> | undefined
+}>
+/** Native XState reference and selection, local to the owning worker/host. */
+export type SessionRuntimeConnection<Capabilities = unknown> = Readonly<{
+	owner: ActorRef<
+		Snapshot<unknown>,
+		({ type: 'CHANGE_IDENTITY' } & SessionRuntimeChangeRequest) | { type: 'CLOSE' | 'RETRY' }
+	>
+	binding: object
+	view: Readable<SessionRuntimeView<Capabilities>>
+}>
+export type SessionRuntimeChangeInput = Readonly<{
+	session: SessionRuntimeConnection
+	scope: RestorationScope
+	change: SessionRuntimeIdentityChange
 }>
 
 /** Worker-local native facts and app capabilities. Domain readiness remains app-owned. */

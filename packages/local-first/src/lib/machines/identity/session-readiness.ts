@@ -1,7 +1,7 @@
+import { createSessionChangeMachine } from './session-change.js'
 import type { ActorRefFrom } from 'xstate'
 import {
 	types,
-	createAsyncLogic,
 	matchesState,
 	createCallbackLogic,
 	setup,
@@ -53,7 +53,10 @@ type ObservationEvent =
 			observation: number
 			reason: SessionObservationFailure
 	  }
-type Event = SessionReadinessEvent | ObservationEvent
+type Event =
+	| SessionReadinessEvent
+	| ObservationEvent
+	| { type: 'RETRY_SETTLED'; outcome: 'resolved' | 'rejected' }
 type Context = {
 	reportTo: SessionReadinessInput['reportTo']
 	scope: SessionReadinessScope | undefined
@@ -135,9 +138,18 @@ const actors = {
 			}
 		}
 	}),
-	retry: createAsyncLogic({
-		run: ({ input }: { input: SessionReadinessCapability }) => input.retry()
-	})
+	retry: createSessionChangeMachine(
+		(input: { capability: SessionReadinessCapability; attempt: number }) => {
+			const session = input.capability.runtime
+			return session
+				? {
+						session,
+						scope: { binding: session.binding, attempt: input.attempt },
+						change: { operation: 'retry' }
+					}
+				: { operation: 'retry', native: required(input.capability.retry) }
+		}
+	)
 }
 /** Host authorizes RETRY only after its workspace drain and mutual exclusion with restoration. */
 export function createSessionReadinessMachine() {
@@ -156,6 +168,7 @@ export function createSessionReadinessMachine() {
 				OBSERVED: types<EventPayload<Event, 'OBSERVED'>>(),
 				OBSERVATION_FAILED: types<EventPayload<Event, 'OBSERVATION_FAILED'>>()
 			},
+			internalEvents: { RETRY_SETTLED: types<{ outcome: 'resolved' | 'rejected' }>() },
 			input: types<SessionReadinessInput>(),
 			output: types<{
 				outcome: 'closed'
@@ -358,67 +371,37 @@ export function createSessionReadinessMachine() {
 						invoke: {
 							id: 'retry',
 							src: actors.retry,
-							input: ({ context }) => required(context.capability),
-							onDone: (args, enq) => {
-								const { context } = args
-								if (matchesState({ bound: { retrying: 'closing' } }, args.value)) {
-									enq.sendTo(context.reportTo, {
-										type: 'SESSION_RETRY_SETTLED',
-										scope: required(context.scope),
-										attempt: context.attempt,
-										outcome: 'resolved'
-									})
-
-									return { target: '#session-readiness.closed' }
-								}
-								if (matchesState({ bound: { retrying: 'observerFailed' } }, args.value)) {
-									enq.sendTo(context.reportTo, {
-										type: 'SESSION_RETRY_SETTLED',
-										scope: required(context.scope),
-										attempt: context.attempt,
-										outcome: 'resolved'
-									})
-									return { target: '#session-readiness.bound.observerFailed' }
-								}
-								enq.sendTo(context.reportTo, {
-									type: 'SESSION_RETRY_SETTLED',
-									scope: required(context.scope),
-									attempt: context.attempt,
-									outcome: 'resolved'
-								})
-								return { target: '#session-readiness.bound.refreshing' }
-							},
-							onError: (args, enq) => {
-								const { context } = args
-								if (matchesState({ bound: { retrying: 'closing' } }, args.value)) {
-									enq.sendTo(context.reportTo, {
-										type: 'SESSION_RETRY_SETTLED',
-										scope: required(context.scope),
-										attempt: context.attempt,
-										outcome: 'rejected'
-									})
-
-									return { target: '#session-readiness.closed' }
-								}
-								if (matchesState({ bound: { retrying: 'observerFailed' } }, args.value)) {
-									enq.sendTo(context.reportTo, {
-										type: 'SESSION_RETRY_SETTLED',
-										scope: required(context.scope),
-										attempt: context.attempt,
-										outcome: 'rejected'
-									})
-									return { target: '#session-readiness.bound.observerFailed' }
-								}
-								enq.sendTo(context.reportTo, {
-									type: 'SESSION_RETRY_SETTLED',
-									scope: required(context.scope),
-									attempt: context.attempt,
-									outcome: 'rejected'
-								})
-								return { target: '#session-readiness.bound.retryFailed' }
-							}
+							input: ({ context }) => ({
+								capability: required(context.capability),
+								attempt: context.attempt
+							}),
+							onDone: ({ event }, enq) =>
+								enq.raise({
+									type: 'RETRY_SETTLED',
+									outcome: event.output.outcome !== 'completed' ? 'rejected' : 'resolved'
+								}),
+							onError: (_, enq) => enq.raise({ type: 'RETRY_SETTLED', outcome: 'rejected' })
 						},
 						on: {
+							RETRY_SETTLED: (args, enq) => {
+								const { context } = args
+								enq.sendTo(context.reportTo, {
+									type: 'SESSION_RETRY_SETTLED',
+									scope: required(context.scope),
+									attempt: context.attempt,
+									outcome: args.event.outcome
+								})
+								if (matchesState({ bound: { retrying: 'closing' } }, args.value))
+									return { target: '#session-readiness.closed' }
+								if (matchesState({ bound: { retrying: 'observerFailed' } }, args.value))
+									return { target: '#session-readiness.bound.observerFailed' }
+								return {
+									target:
+										args.event.outcome === 'resolved'
+											? '#session-readiness.bound.refreshing'
+											: '#session-readiness.bound.retryFailed'
+								}
+							},
 							RETRY: {},
 							REOBSERVE: {},
 							OBSERVATION_FAILED: (args, enq) => {

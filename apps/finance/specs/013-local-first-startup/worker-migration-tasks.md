@@ -138,10 +138,15 @@ The shared create/restore/sign-out path and reused recovery capability now also
 pass 132 shared tests and 21 focused native cases, including an actual Worker
 create → recover/hide → sign-out → same-identity restore and close during a held
 restore receipt. [Current command contract and exact evidence](worker-session-resource-decision.md#create-restore-and-recovery-implemented-host-wiring-pending).
-Actual worker-host adoption remains open. Next replace Clipper's raw-session
-account/readiness/realm-close custody, preserve its native SDK retry behavior,
-and reuse existing restoration/sign-out/drain charts. Do not introduce another
-facade to retain Finance's legacy Svelte provider.
+Clipper's actual candidate worker host now uses the shared actor connection,
+identity-change source and close invocation. Strict candidate types, all 69
+Clipper candidate tests, 72 active-SDK Clipper tests, 272 shared identity/backend
+tests and 21 focused three-engine native cases pass. This clears the prior 15
+raw-SDK getter failures without weakening development freezing or adding an SDK
+facade. [Current ownership and exact evidence](worker-session-resource-decision.md#clipper-host-adoption-qualified-in-the-candidate).
+Next port Finance's actual worker/UI callers to that same boundary, retaining
+its independent workspace/restore Db and application domain drains. U2 remains
+open; pins stay alpha.60 and the coordinated U3–U5 gates still apply.
 
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.

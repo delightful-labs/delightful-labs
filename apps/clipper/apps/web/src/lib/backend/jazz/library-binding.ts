@@ -50,14 +50,20 @@ export function createLibraryBinding(
 			}
 		}
 	}
+	const createRecords = (live: () => boolean = () => true) => {
+		admitted()
+		return createLibraryRecords(db, identityId, () => isCurrent() && live(), readConnection(db))
+	}
 	return {
 		root,
-		createLibrary: () => {
+		createRecords,
+		capture: createLibraryCapture(db, isCurrent),
+		createLibrary: (live: () => boolean = () => true) => {
 			admitted()
 			return input.libraryFactory(
-				createLibraryRecords(db, identityId, isCurrent, readConnection(db)),
+				createRecords(live),
 				identityId,
-				createLibraryCapture(db, isCurrent),
+				createLibraryCapture(db, () => isCurrent() && live()),
 				input.cacheNamespace
 			)
 		}

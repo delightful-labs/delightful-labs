@@ -1,8 +1,13 @@
 export {
 	createSessionRuntimeMachine,
+	createSessionRuntimeConnection,
 	sessionRuntimeMachine,
-	selectSessionRuntimeObservation
+	selectSessionRuntimeObservation,
+	selectSessionRuntimeView,
+	selectSessionRuntimeIdentity
 } from './machines/identity/session-runtime.js'
+export { createSessionChangeMachine } from './machines/identity/session-change.js'
+export { sessionCloseMachine, selectSessionCloseStage } from './machines/identity/session-close.js'
 export type { SessionRuntimeSnapshot } from './machines/identity/session-runtime.js'
 export type {
 	SessionRuntimeInput,
@@ -11,6 +16,9 @@ export type {
 	SessionRuntimeResult,
 	SessionRuntimeIdentity,
 	SessionRuntimeIdentityChange,
+	SessionRuntimeView,
+	SessionRuntimeConnection,
+	SessionRuntimeChangeInput,
 	SessionRuntimeChangeRequest,
 	SessionRuntimeChangeReport,
 	SessionRuntimeChangeOutcome

@@ -4,6 +4,7 @@ import {
 	matchesState,
 	setup,
 	types,
+	type ActorFromLogic,
 	type SnapshotFrom
 } from 'xstate'
 import {
@@ -16,7 +17,9 @@ import type {
 	SessionRuntimeObservation,
 	SessionRuntimeResource,
 	SessionRuntimeResult,
-	SessionRuntimeChangeRequest
+	SessionRuntimeChangeRequest,
+	SessionRuntimeConnection,
+	SessionRuntimeView
 } from '../../contracts/session-runtime.js'
 
 function required<Value>(value: Value | undefined): Value {
@@ -33,6 +36,7 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 		observation: SessionRuntimeObservation<Capabilities> | undefined
 		observationBinding: object | undefined
 		failure: 'acquisition' | 'observation' | undefined
+		retryRequest: Omit<SessionRuntimeChangeRequest, 'change'> | undefined
 	}
 	type Event =
 		| SessionOwnerReply<SessionRuntimeResource<Capabilities>>
@@ -185,7 +189,8 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 			resource: undefined,
 			observation: undefined,
 			observationBinding: undefined,
-			failure: undefined
+			failure: undefined,
+			retryRequest: undefined
 		}),
 		initial: 'acquiring',
 		on: {
@@ -203,10 +208,21 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 			id: 'acquisition',
 			src: 'acquisition',
 			input: ({ context }) => context.input,
-			onError: (args) =>
-				args.guards.changingIdentity(args)
-					? { context: { observation: undefined, failure: 'acquisition' } }
-					: { target: '.ownerFailed', context: { observation: undefined, failure: 'acquisition' } },
+			onError: (args, enq) => {
+				if (args.context.retryRequest)
+					enq.sendTo(args.context.retryRequest.replyTo, {
+						type: 'SESSION_CHANGE_SETTLED',
+						scope: args.context.retryRequest.scope,
+						operation: 'retry',
+						outcome: 'failed'
+					})
+				return args.guards.changingIdentity(args)
+					? { context: { observation: undefined, retryRequest: undefined, failure: 'acquisition' } }
+					: {
+							target: '.ownerFailed',
+							context: { observation: undefined, retryRequest: undefined, failure: 'acquisition' }
+						}
+			},
 			onSnapshot: (args, enq) => {
 				if (
 					args.guards.closingAcquisition(args) &&
@@ -230,21 +246,49 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 					}),
 				on: {
 					CLOSE: { target: '.stopping' },
-					ACQUIRED: (args) => {
+					ACQUIRED: (args, enq) => {
 						if (!args.guards.currentAcquisition(args)) return
+						if (args.context.retryRequest)
+							enq.sendTo(args.context.retryRequest.replyTo, {
+								type: 'SESSION_CHANGE_SETTLED',
+								scope: args.context.retryRequest.scope,
+								operation: 'retry',
+								outcome: 'completed'
+							})
 						return {
 							target: args.guards.closingAcquisition(args) ? 'closing' : 'bound',
-							context: { resource: args.event.session, observationBinding: {} }
+							context: {
+								resource: args.event.session,
+								observationBinding: {},
+								retryRequest: undefined
+							}
 						}
 					},
-					ACQUISITION_FAILED: (args) => {
+					ACQUISITION_FAILED: (args, enq) => {
 						if (!args.guards.currentAcquisition(args)) return
-						return { target: args.guards.closingAcquisition(args) ? 'closed' : 'openFailed' }
+						if (args.context.retryRequest)
+							enq.sendTo(args.context.retryRequest.replyTo, {
+								type: 'SESSION_CHANGE_SETTLED',
+								scope: args.context.retryRequest.scope,
+								operation: 'retry',
+								outcome: 'failed'
+							})
+						return {
+							target: args.guards.closingAcquisition(args) ? 'closed' : 'openFailed',
+							context: { retryRequest: undefined }
+						}
 					},
-					RELEASED: (args) => {
+					RELEASED: (args, enq) => {
 						if (!args.guards.currentAcquisition(args) || !args.guards.closingAcquisition(args))
 							return
-						return { target: 'closed' }
+						if (args.context.retryRequest)
+							enq.sendTo(args.context.retryRequest.replyTo, {
+								type: 'SESSION_CHANGE_SETTLED',
+								scope: args.context.retryRequest.scope,
+								operation: 'retry',
+								outcome: 'failed'
+							})
+						return { target: 'closed', context: { retryRequest: undefined } }
 					}
 				},
 				states: {
@@ -261,6 +305,28 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 			},
 			openFailed: {
 				on: {
+					CHANGE_IDENTITY: (args, enq) => {
+						if (args.event.change.operation !== 'retry') return
+						if (
+							!args.guards.validChangeScope(args, args.event) ||
+							args.context.scope.generation >= Number.MAX_SAFE_INTEGER
+						) {
+							enq.sendTo(args.event.replyTo, {
+								type: 'SESSION_CHANGE_SETTLED',
+								scope: args.event.scope,
+								operation: 'retry',
+								outcome: 'invalidRequest'
+							})
+							return {}
+						}
+						return {
+							target: 'acquiring',
+							context: {
+								retryRequest: { scope: args.event.scope, replyTo: args.event.replyTo },
+								scope: { ...args.context.scope, generation: args.context.scope.generation + 1 }
+							}
+						}
+					},
 					CLOSE: { target: 'closed' },
 					RETRY: ({ context }) => {
 						if (context.scope.generation >= Number.MAX_SAFE_INTEGER) return
@@ -280,11 +346,19 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 						resource: required(context.resource),
 						binding: required(context.observationBinding)
 					}),
-					onError: (args) =>
-						args.guards.changingIdentity(args)
+					onError: (args, enq) => {
+						if (args.context.retryRequest)
+							enq.sendTo(args.context.retryRequest.replyTo, {
+								type: 'SESSION_CHANGE_SETTLED',
+								scope: args.context.retryRequest.scope,
+								operation: 'retry',
+								outcome: 'failed'
+							})
+						return args.guards.changingIdentity(args)
 							? {
 									context: {
 										observation: undefined,
+										retryRequest: undefined,
 										failure: args.context.failure ?? 'observation'
 									}
 								}
@@ -292,11 +366,27 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 									target: '#session-runtime-observerOwnerFailed',
 									context: {
 										observation: undefined,
+										retryRequest: undefined,
 										failure: args.context.failure ?? 'observation'
 									}
 								}
+					}
 				},
-				on: { CLOSE: { target: '.stopping', context: { observation: undefined } } },
+				on: {
+					CLOSE: (args, enq) => {
+						if (args.context.retryRequest)
+							enq.sendTo(args.context.retryRequest.replyTo, {
+								type: 'SESSION_CHANGE_SETTLED',
+								scope: args.context.retryRequest.scope,
+								operation: 'retry',
+								outcome: 'failed'
+							})
+						return {
+							target: '.stopping',
+							context: { observation: undefined, retryRequest: undefined }
+						}
+					}
+				},
 				states: {
 					observing: {
 						on: {
@@ -311,8 +401,10 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 									return {}
 								}
 								if (
-									args.context.observation?.status !== 'ready' &&
-									args.context.observation?.status !== 'signed-out'
+									args.event.change.operation !== 'retry' &&
+									(!args.event.change.before ||
+										(args.context.observation?.status !== 'ready' &&
+											args.context.observation?.status !== 'signed-out'))
 								) {
 									enq.sendTo(args.event.replyTo, {
 										type: 'SESSION_CHANGE_SETTLED',
@@ -323,8 +415,12 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 									return {}
 								}
 								if (
-									args.context.observation.status !== args.event.change.before.status ||
-									args.context.observation.binding !== args.event.change.before.binding
+									args.event.change.operation !== 'retry' &&
+									(!args.event.change.before ||
+										!args.context.observation ||
+										!('binding' in args.context.observation) ||
+										args.context.observation.status !== args.event.change.before.status ||
+										args.context.observation.binding !== args.event.change.before.binding)
 								) {
 									enq.sendTo(args.event.replyTo, {
 										type: 'SESSION_CHANGE_SETTLED',
@@ -343,14 +439,31 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 									}
 								}
 							},
-							OBSERVED: (args) =>
-								args.guards.currentObserver(args)
-									? { context: { observation: args.event.observation } }
-									: undefined,
-							OBSERVATION_FAILED: (args) =>
-								args.guards.currentObserver(args)
-									? { target: 'observerFailed', context: { observation: undefined } }
-									: undefined
+							OBSERVED: (args, enq) => {
+								if (!args.guards.currentObserver(args)) return
+								if (args.context.retryRequest)
+									enq.sendTo(args.context.retryRequest.replyTo, {
+										type: 'SESSION_CHANGE_SETTLED',
+										scope: args.context.retryRequest.scope,
+										operation: 'retry',
+										outcome: 'completed'
+									})
+								return { context: { observation: args.event.observation, retryRequest: undefined } }
+							},
+							OBSERVATION_FAILED: (args, enq) => {
+								if (!args.guards.currentObserver(args)) return
+								if (args.context.retryRequest)
+									enq.sendTo(args.context.retryRequest.replyTo, {
+										type: 'SESSION_CHANGE_SETTLED',
+										scope: args.context.retryRequest.scope,
+										operation: 'retry',
+										outcome: 'failed'
+									})
+								return {
+									target: 'observerFailed',
+									context: { observation: undefined, retryRequest: undefined }
+								}
+							}
 						}
 					},
 					changingIdentity: {
@@ -401,7 +514,29 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 							onError: (_, enq) => enq.raise({ type: 'CHANGE_SETTLED', outcome: 'failed' })
 						}
 					},
-					observerFailed: { on: { RETRY: { target: 'reobserving' } } },
+					observerFailed: {
+						on: {
+							RETRY: { target: 'reobserving' },
+							CHANGE_IDENTITY: (args, enq) => {
+								if (args.event.change.operation !== 'retry') return
+								if (!args.guards.validChangeScope(args, args.event)) {
+									enq.sendTo(args.event.replyTo, {
+										type: 'SESSION_CHANGE_SETTLED',
+										scope: args.event.scope,
+										operation: 'retry',
+										outcome: 'invalidRequest'
+									})
+									return {}
+								}
+								return {
+									target: 'reobserving',
+									context: {
+										retryRequest: { scope: args.event.scope, replyTo: args.event.replyTo }
+									}
+								}
+							}
+						}
+					},
 					reobserving: {
 						entry: (_, enq) => enq.sendTo('observe', { type: 'CLOSE' }),
 						on: {
@@ -413,8 +548,17 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 											context: { observationBinding: {} }
 										}
 									: undefined,
-							OBSERVER_CLOSE_FAILED: (args) =>
-								args.guards.currentObserver(args) ? { target: 'closeFailed' } : undefined
+							OBSERVER_CLOSE_FAILED: (args, enq) => {
+								if (!args.guards.currentObserver(args)) return
+								if (args.context.retryRequest)
+									enq.sendTo(args.context.retryRequest.replyTo, {
+										type: 'SESSION_CHANGE_SETTLED',
+										scope: args.context.retryRequest.scope,
+										operation: 'retry',
+										outcome: 'failed'
+									})
+								return { target: 'closeFailed', context: { retryRequest: undefined } }
+							}
 						}
 					},
 					stopping: {
@@ -460,5 +604,76 @@ export type SessionRuntimeSnapshot<Capabilities = undefined> = SnapshotFrom<
 export function selectSessionRuntimeObservation<Capabilities = undefined>(
 	snapshot: SessionRuntimeSnapshot<Capabilities>
 ) {
-	return snapshot.matches({ bound: 'observing' }) ? snapshot.context.observation : undefined
+	return snapshot.status === 'active' && snapshot.matches({ bound: 'observing' })
+		? snapshot.context.observation
+		: undefined
+}
+
+/** Public host boundary; projects native facts without exposing private resources. */
+export function selectSessionRuntimeView<Capabilities>(
+	snapshot: SessionRuntimeSnapshot<Capabilities>
+): SessionRuntimeView<Capabilities> {
+	const observation = selectSessionRuntimeObservation(snapshot)
+	const stage =
+		snapshot.status === 'error' ||
+		snapshot.status === 'stopped' ||
+		snapshot.output?.outcome === 'failed' ||
+		snapshot.matches('ownerFailed') ||
+		snapshot.matches('observerOwnerFailed') ||
+		snapshot.matches('closeFailed') ||
+		snapshot.matches({ bound: 'closeFailed' })
+			? 'failed'
+			: snapshot.status === 'done'
+				? 'closed'
+				: snapshot.matches('acquiring')
+					? 'acquiring'
+					: snapshot.matches('openFailed')
+						? 'openFailed'
+						: snapshot.matches({ bound: 'observerFailed' }) ||
+							  snapshot.matches({ bound: 'reobserving' })
+							? 'observerFailed'
+							: snapshot.matches('closing') ||
+								  snapshot.matches({ bound: 'stopping' }) ||
+								  snapshot.matches({ bound: { changingIdentity: 'stopping' } })
+								? 'closing'
+								: 'active'
+	return {
+		stage,
+		status:
+			observation?.status ??
+			(stage === 'failed' || stage === 'openFailed' || stage === 'observerFailed'
+				? 'error'
+				: stage === 'closed' || stage === 'closing'
+					? 'closed'
+					: stage === 'active'
+						? 'transitioning'
+						: 'starting'),
+		observation
+	}
+}
+
+export function createSessionRuntimeConnection<Capabilities>(
+	owner: ActorFromLogic<ReturnType<typeof createSessionRuntimeMachine<Capabilities>>>,
+	binding: object
+): SessionRuntimeConnection<Capabilities> {
+	return {
+		owner,
+		binding,
+		view: owner.select(
+			(snapshot) => selectSessionRuntimeView(snapshot),
+			(left, right) =>
+				left.stage === right.stage &&
+				left.status === right.status &&
+				left.observation === right.observation
+		)
+	}
+}
+
+export function selectSessionRuntimeIdentity(
+	view: SessionRuntimeView
+): import('../../contracts/session-runtime.js').SessionRuntimeIdentity | undefined {
+	const observation = view.observation
+	return observation?.status === 'ready' || observation?.status === 'signed-out'
+		? { status: observation.status, binding: observation.binding }
+		: undefined
 }

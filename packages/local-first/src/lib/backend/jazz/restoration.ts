@@ -1,13 +1,17 @@
 import { RecoveryPhrase } from 'jazz-tools/passphrase'
 import type { JazzSession } from 'jazz-tools/client'
-import type { RestorationCapability, RestorationScope } from '../../contracts/restoration.js'
+import type { NativeRestorationCapability, RestorationScope } from '../../contracts/restoration.js'
 
 export type JazzRestorationAdapter = Readonly<{
 	binding: object
-	capability: RestorationCapability
+	capability: NativeRestorationCapability
 	/** Host also sends BINDING_INVALIDATED; keep issued attempts alive until their output. */
 	invalidate: () => void
 }>
+
+export async function parseJazzRecoveryPhrase(phrase: string) {
+	return RecoveryPhrase.toSecret(phrase)
+}
 
 /** Host serializes identity-changing calls. No provider, observer, or credential cache is created. */
 export function createJazzRestorationAdapter(
@@ -32,7 +36,7 @@ export function createJazzRestorationAdapter(
 			boundSession = undefined
 		},
 		capability: {
-			parsePhrase: async (phrase) => RecoveryPhrase.toSecret(phrase),
+			parsePhrase: parseJazzRecoveryPhrase,
 			isCurrentBinding: (captured) => currentSession(captured) !== undefined,
 			restoreIdentity: async (scope: RestorationScope, credential) => {
 				const current = currentSession(scope.binding)

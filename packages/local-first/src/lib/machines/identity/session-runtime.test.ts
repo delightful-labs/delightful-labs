@@ -1,13 +1,21 @@
 import { createActor, createCallbackLogic, waitFor } from 'xstate'
 import { describe, expect, it, vi } from 'vitest'
-import { sessionRuntimeMachine, selectSessionRuntimeObservation } from './session-runtime.js'
+import {
+	sessionRuntimeMachine,
+	selectSessionRuntimeObservation,
+	createSessionRuntimeConnection
+} from './session-runtime.js'
+import { createSessionChangeMachine } from './session-change.js'
+import { sessionCloseMachine } from './session-close.js'
 import type {
+	SessionRuntimeChangeInput,
 	SessionRuntimeInput,
 	SessionRuntimeObservation,
 	SessionRuntimeResource,
 	SessionRuntimeChangeReport,
 	SessionRuntimeChangeRequest,
-	SessionRuntimeIdentityChange
+	SessionRuntimeIdentityChange,
+	SessionRuntimeIdentity
 } from '../../contracts/session-runtime.js'
 
 function fixture() {
@@ -269,7 +277,7 @@ describe('session identity changes', () => {
 				await waitFor(f.actor, (s) => !!selectSessionRuntimeObservation(s))
 			}
 			const before = ready
-				? ({ status: 'ready', binding } satisfies SessionRuntimeIdentityChange['before'])
+				? ({ status: 'ready', binding } satisfies SessionRuntimeIdentity)
 				: f.signedOut
 			if (before.status !== 'ready' && before.status !== 'signed-out')
 				throw new Error('Fixture identity unavailable')
@@ -611,6 +619,162 @@ describe('session runtime ownership', () => {
 			expect(f.close).not.toHaveBeenCalled()
 		} finally {
 			actor.stop()
+		}
+	})
+})
+
+describe('workflow connection to the session owner', () => {
+	const changeMachine = createSessionChangeMachine<SessionRuntimeChangeInput>((input) => input)
+	function command(f: ReturnType<typeof fixture>, change: SessionRuntimeIdentityChange) {
+		return createActor(changeMachine, {
+			input: {
+				session: createSessionRuntimeConnection(f.actor, f.input.binding),
+				scope: { binding: f.input.binding, attempt: 1 },
+				change
+			}
+		}).start()
+	}
+	it('releases the command payload while retaining an issued identity change through shutdown', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.changeIdentity.mockImplementation(async () => {
+			await held.promise
+			return 'completed'
+		})
+		f.actor.start()
+		await waitFor(f.actor, (s) => !!selectSessionRuntimeObservation(s))
+		const caller = command(f, {
+			operation: 'restore',
+			before: f.signedOut,
+			credential: 'fixture-only'
+		})
+		try {
+			expect(caller.getSnapshot().context.request).toBeUndefined()
+			caller.send({ type: 'SHUTDOWN' })
+			expect(caller.getSnapshot().status).toBe('active')
+			caller.send({
+				type: 'SESSION_CHANGE_SETTLED',
+				scope: { binding: {}, attempt: 1 },
+				operation: 'restore',
+				outcome: 'completed'
+			})
+			expect(caller.getSnapshot().status).toBe('active')
+			held.resolve()
+			await waitFor(caller, (s) => s.status === 'done')
+			expect(caller.getSnapshot().output).toEqual({ outcome: 'completed' })
+			expect(f.changeIdentity).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			caller.stop()
+			f.actor.stop()
+		}
+	})
+	it('settles a waiting workflow as failed when its session owner is forcibly stopped', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.changeIdentity.mockImplementation(async () => {
+			await held.promise
+			return 'completed'
+		})
+		f.actor.start()
+		await waitFor(f.actor, (s) => !!selectSessionRuntimeObservation(s))
+		const caller = command(f, { operation: 'create', before: f.signedOut })
+		try {
+			f.actor.stop()
+			await waitFor(caller, (s) => s.status === 'done')
+			expect(caller.getSnapshot().output).toEqual({ outcome: 'failed' })
+			expect(f.close).not.toHaveBeenCalled()
+		} finally {
+			held.resolve()
+			caller.stop()
+			f.actor.stop()
+		}
+	})
+	it.each(['native', 'acquisition', 'observation'])(
+		'routes %s retry to its actual owner',
+		async (kind) => {
+			const f = fixture()
+			if (kind === 'acquisition') f.open.mockRejectedValueOnce(new Error('Synthetic open failure'))
+			f.actor.start()
+			if (kind === 'acquisition') await waitFor(f.actor, (s) => s.matches('openFailed'))
+			else {
+				await waitFor(f.actor, (s) => !!selectSessionRuntimeObservation(s))
+				if (kind === 'observation') {
+					f.fail()
+					await waitFor(f.actor, (s) => s.matches({ bound: 'observerFailed' }))
+				}
+			}
+			const caller = command(f, { operation: 'retry' })
+			try {
+				await waitFor(caller, (s) => s.status === 'done')
+				expect(caller.getSnapshot().output).toEqual({ outcome: 'completed' })
+				expect(f.open).toHaveBeenCalledTimes(kind === 'acquisition' ? 2 : 1)
+				expect(f.observe).toHaveBeenCalledTimes(kind === 'observation' ? 2 : 1)
+				expect(f.changeIdentity).toHaveBeenCalledTimes(kind === 'native' ? 1 : 0)
+				if (kind === 'native') expect(f.changeIdentity).toHaveBeenCalledWith({ operation: 'retry' })
+			} finally {
+				caller.stop()
+				f.actor.stop()
+			}
+		}
+	)
+	it('settles a failed typed acquisition retry instead of stranding its workflow', async () => {
+		const f = fixture()
+		f.open.mockRejectedValue(new Error('Synthetic open failure'))
+		f.actor.start()
+		await waitFor(f.actor, (s) => s.matches('openFailed'))
+		const caller = command(f, { operation: 'retry' })
+		try {
+			await waitFor(caller, (s) => s.status === 'done')
+			expect(caller.getSnapshot().output).toEqual({ outcome: 'failed' })
+			expect(f.open).toHaveBeenCalledTimes(2)
+		} finally {
+			caller.stop()
+			f.actor.stop()
+		}
+	})
+	it('waits for late acquisition and actual native close before returning a clean receipt', async () => {
+		const f = fixture(),
+			acquisition = Promise.withResolvers<SessionRuntimeResource>(),
+			closing = Promise.withResolvers<void>()
+		f.open.mockImplementation(() => acquisition.promise)
+		f.close.mockImplementation(() => closing.promise)
+		f.actor.start()
+		const close = createActor(sessionCloseMachine, {
+			input: createSessionRuntimeConnection(f.actor, f.input.binding)
+		}).start()
+		try {
+			expect(close.getSnapshot().context.stage).toBe('acquisition')
+			acquisition.resolve(f.resource)
+			await vi.waitFor(() => expect(f.close).toHaveBeenCalledOnce())
+			expect(close.getSnapshot().status).toBe('active')
+			expect(f.observe).not.toHaveBeenCalled()
+			closing.resolve()
+			await waitFor(close, (s) => s.status === 'done')
+			expect(close.getSnapshot().output).toEqual({ outcome: 'closed' })
+		} finally {
+			acquisition.resolve(f.resource)
+			closing.resolve()
+			close.stop()
+			f.actor.stop()
+		}
+	})
+	it.each(['native failure', 'forced stop'])('refuses a clean receipt after %s', async (fault) => {
+		const f = fixture()
+		f.actor.start()
+		await waitFor(f.actor, (s) => !!selectSessionRuntimeObservation(s))
+		if (fault === 'forced stop') f.actor.stop()
+		else f.close.mockRejectedValue(new Error('Synthetic close failure'))
+		const close = createActor(sessionCloseMachine, {
+			input: createSessionRuntimeConnection(f.actor, f.input.binding)
+		}).start()
+		try {
+			await waitFor(close, (s) => s.status === 'done')
+			expect(close.getSnapshot().output).toEqual({ outcome: 'failed' })
+			expect(f.close).toHaveBeenCalledTimes(fault === 'forced stop' ? 0 : 1)
+		} finally {
+			close.stop()
+			f.actor.stop()
 		}
 	})
 })

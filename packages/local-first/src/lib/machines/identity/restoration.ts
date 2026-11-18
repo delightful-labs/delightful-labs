@@ -1,3 +1,5 @@
+import { selectSessionRuntimeIdentity } from './session-runtime.js'
+import { createSessionChangeMachine } from './session-change.js'
 import { types, createAsyncLogic, matchesState, setup, type ActorRef, type Snapshot } from 'xstate'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
@@ -45,14 +47,30 @@ function defineRestorationMachine<Input extends RestorationInput>(
 				phrase: string
 			}
 		>({ run: ({ input }) => input.capability.parsePhrase(input.phrase) }),
-		restore: createAsyncLogic<
-			void,
-			{
+		restore: createSessionChangeMachine(
+			(input: {
 				capability: RestorationCapability
 				scope: RestorationScope
 				credential: string
+			}) => {
+				const session = input.capability.runtime
+				return session
+					? {
+							session,
+							scope: input.scope,
+							change: {
+								operation: 'restore',
+								before: selectSessionRuntimeIdentity(session.view.get()),
+								credential: input.credential
+							}
+						}
+					: {
+							operation: 'restore',
+							native: () =>
+								required(input.capability.restoreIdentity)(input.scope, input.credential)
+						}
 			}
-		>({ run: ({ input }) => input.capability.restoreIdentity(input.scope, input.credential) }),
+		),
 		identity: createAsyncLogic<
 			RestorationIdentity,
 			{
@@ -273,6 +291,8 @@ function defineRestorationMachine<Input extends RestorationInput>(
 								context: patches.settled(args) satisfies Partial<Context>
 							}
 						}
+						if (args.event.output.outcome !== 'completed')
+							return { target: 'failed', context: patches.settled(args) satisfies Partial<Context> }
 						return {
 							target: 'readingIdentity',
 							context: patches.settled(args) satisfies Partial<Context>

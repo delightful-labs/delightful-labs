@@ -424,7 +424,13 @@ caller port and persistent backend upgrade remain unqualified on alpha.65.
 
 ## U2b: Clipper startup caller and resource-custody blocker
 
-`clipper-session.patch` stages the actual Clipper account host/contract and
+The original blocker below is resolved by the
+[qualified Clipper host adoption](worker-session-resource-decision.md#clipper-host-adoption-qualified-in-the-candidate):
+the actual host now retains the shared actor connection and all 69 candidate
+tests pass. Finance adoption and the coordinated upgrade gates remain open.
+The following records the initial diagnostic, not a current failing test.
+
+`clipper-session.patch` originally staged the actual Clipper account host/contract and
 readiness chart while the workspace remains on alpha.60. Native startup uses
 `localFirst: 'now'`; only web startup adds `initial: 'device'`. The extension's
 existing-account admission remains intact. Public user metadata/device methods

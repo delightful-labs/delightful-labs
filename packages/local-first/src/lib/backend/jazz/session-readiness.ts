@@ -1,10 +1,15 @@
 import type { JazzSession } from 'jazz-tools/client'
-import type { SessionReadinessBinding } from '../../contracts/session.js'
+import type {
+	SessionReadinessBinding,
+	SessionReadinessCapability
+} from '../../contracts/session.js'
 
 /** Bind the host's acquired session without reading, subscribing, creating, or replacing it. */
 export function createJazzSessionReadinessAdapter<Client>(
 	session: JazzSession<Client>
-): SessionReadinessBinding {
+): SessionReadinessBinding & {
+	capability: Extract<SessionReadinessCapability, { retry: () => Promise<void> }>
+} {
 	return {
 		binding: Object.freeze({}),
 		capability: {

@@ -1,156 +1,66 @@
 diff --git a/src/lib/backend/jazz/account.ts b/src/lib/backend/jazz/account.ts
-index aae803e..bc8582c 100644
+index aae803e..442d4a1 100644
 --- a/src/lib/backend/jazz/account.ts
 +++ b/src/lib/backend/jazz/account.ts
-@@ -2,6 +2,7 @@ import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
- import { createLibraryCapability } from './library.js'
- import { createLibraryRecords } from './records.js'
- import { readConnection } from './read-connection.js'
+@@ -1,150 +1,160 @@
++import { createActor } from 'xstate'
++import type { JazzClientConfig } from 'jazz-tools/client'
++import { createSessionAcquisitionMachine } from 'delightful-local-first/session/workflow'
 +import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
- import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
- import wasmUrl from '#jazz-wasm-binary?url'
- import type { JazzSession, JazzClientConfig } from 'jazz-tools/client'
-@@ -21,16 +22,13 @@ import type {
- export type Session = JazzSession<JazzClient>
++import { parseJazzRecoveryPhrase } from 'delightful-local-first/backend/jazz/restoration'
++import {
++	createSessionRuntimeMachine,
++	createSessionRuntimeConnection,
++	type SessionRuntimeConnection
++} from 'delightful-local-first/session/runtime'
++import wasmUrl from '#jazz-wasm-binary?url'
+ import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
++import { machineDiagnostics } from '../../diagnostics/inspect.js'
++import { createLogger } from '../../diagnostics/logger.js'
+ import { createLibraryCapability } from './library.js'
+-import { createLibraryRecords } from './records.js'
+-import { readConnection } from './read-connection.js'
+-import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
+-import wasmUrl from '#jazz-wasm-binary?url'
+-import type { JazzSession, JazzClientConfig } from 'jazz-tools/client'
+-import type { JazzClient } from 'jazz-tools/client'
+-import { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/startup'
+-import { createJazzSessionReadinessAdapter } from 'delightful-local-first/backend/jazz/session-readiness'
+-import { createJazzRecoveryAdapter } from 'delightful-local-first/backend/jazz/recovery'
+-import { createJazzRestorationAdapter } from 'delightful-local-first/backend/jazz/restoration'
++import { createLibraryBinding } from './library-binding.js'
+ import type {
+-	AccountHost,
+ 	AccountInput,
+-	AccountObservation,
++	AccountHost,
+ 	AccountBinding,
+-	ReadyAccountObservation
++	AccountObservation,
++	ReadyAccountObservation,
++	RecoveryBinding
+ } from '../../contracts/account.js'
  
+-export type Session = JazzSession<JazzClient>
+-
++export type AccountSessionCapabilities = ReturnType<typeof createLibraryBinding> & {
++	recovery: import('../../contracts/account.js').RecoveryBinding
++}
++export type Session = SessionRuntimeConnection<AccountSessionCapabilities>
  export type LibraryFactory = typeof createLibraryCapability
 -function externallySignedIn(account: { identity: { issuer: string } }) {
 -	return !['urn:jazz:local-first', 'urn:jazz:anonymous'].includes(account.identity.issuer)
--}
- function bindHost(
- 	session: Session,
- 	libraryFactory: LibraryFactory,
- 	cacheNamespace: string
- ): AccountHost {
- 	const readiness = createJazzSessionReadinessAdapter(session)
--	const recovery = createJazzRecoveryAdapter(() => session.getSnapshot().account)
-+	const recovery = createJazzRecoveryAdapter(() => session)
- 	const identities = new WeakMap<object, object>()
- 	const candidates = new WeakMap<ReadyAccountObservation, () => AccountBinding>()
- 	const identity = (resource: object) => {
-@@ -43,18 +41,18 @@ function bindHost(
- 	}
- 	const read = (): AccountObservation => {
- 		const snapshot = session.getSnapshot()
--		recovery.observeAccount(snapshot.account)
--		if (snapshot.status !== 'ready' || !snapshot.account || !snapshot.client) {
-+		recovery.observeSession()
-+		if (snapshot.status !== 'ready' || !snapshot.user || !snapshot.client) {
- 			return { status: snapshot.status === 'ready' ? 'error' : snapshot.status }
- 		}
--		const account = snapshot.account
-+		const user = snapshot.user
- 		const client = snapshot.client
- 		const db = client.db
- 		const check = () => {
- 			const now = session.getSnapshot()
- 			if (
- 				now.status !== 'ready' ||
--				now.account !== account ||
-+				now.user !== user ||
- 				now.client !== client ||
- 				now.client?.db !== db
- 			)
-@@ -67,7 +65,7 @@ function bindHost(
- 			}
- 			const domain = createLibraryBinding({
- 				db,
--				identityId: account.id,
-+				identityId: user.accountId,
- 				isCurrent: () => {
- 					check()
- 					return live()
-@@ -77,39 +75,34 @@ function bindHost(
- 			})
- 			const observation: ReadyAccountObservation = {
- 				status: 'ready',
--				localFirst: db.isLocalFirst(),
--				binding: identity(account),
-+				binding: identity(user),
- 				clientBinding: identity(client),
- 				databaseBinding: identity(db),
--				prepare: () => {
--					admitted()
--					return db.upgradeToLocalFirst(localFirst)
--				},
- 				logout: () => {
- 					// Native mutation admission stays bound to the selected identity.
- 					admitted()
--					return session.logout()
-+					return session.signOut()
- 				},
- 				logoutStatus: () => {
- 					const now = session.getSnapshot()
- 					if (
- 						now.status === 'signed-out' ||
--						(now.status === 'ready' && now.account && !externallySignedIn(now.account))
-+						(now.status === 'ready' && now.user && now.user.kind === 'device')
- 					)
- 						return 'signed-out'
--					if (now.status !== 'ready' || !now.account || !now.client) return 'unavailable'
--					return now.account === account && now.client === client && now.client.db === db && live()
-+					if (now.status !== 'ready' || !now.user || !now.client) return 'unavailable'
-+					return now.user === user && now.client === client && now.client.db === db && live()
- 						? 'current'
- 						: 'replaced'
- 				},
--				accountId: account.id,
--				signedIn: externallySignedIn(account),
-+				accountId: user.accountId,
-+				signedIn: user.kind === 'backend',
- 				root: domain.root,
- 				recovery: {
- 					capability: recovery.capability,
- 					source: {
- 						subscribe: (notify) => {
--							const publish = () => notify(recovery.observeAccount(session.getSnapshot().account))
-+							const publish = () => notify(recovery.observeSession())
- 							publish()
- 							return session.subscribe(publish)
- 						}
-@@ -144,7 +137,7 @@ function bindHost(
- 			return create()
- 		},
- 		readiness,
--		create: () => session.createLocalFirst(),
-+		create: () => session.createDeviceAccount(),
- 		signOut: async () => {
- 			const response = await fetch('/api/auth/sign-out', {
- 				method: 'POST',
-@@ -156,7 +149,7 @@ function bindHost(
- 			})
- 			if (!response.ok) throw new Error('Provider sign-out failed')
- 		},
--		logout: () => session.logout(),
-+		logout: () => session.signOut(),
- 		release: () => {
- 			recovery.invalidate()
- 			restored.invalidate()
-@@ -178,7 +171,8 @@ export function accountInput(
- 		startup: registry.getJazzStartupBinding({
- 			...config,
- 			client: localFirst,
--			initial: 'local-first',
-+			initial: 'device',
-+			localFirst: 'now',
- 			runtimeSources: config.runtimeSources ?? runtimeSources
- 		}),
- 		bind: (session) =>
-@@ -190,6 +184,28 @@ export function accountInput(
- 	}
- }
- 
-+/** Candidate worker binding; actual readiness/drain adoption follows identity commands. */
++const machine = createSessionRuntimeMachine<AccountSessionCapabilities>()
++const attachments = createSessionAcquisitionMachine<Session>()
++const runtimeSources = Object.freeze({ wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION })
++const logger = createLogger('clipper:session')
++
 +export function accountSessionRuntime(
 +	config: JazzClientConfig,
 +	libraryFactory: LibraryFactory = createLibraryCapability
 +) {
 +	return createJazzSessionRuntime(
-+		{
-+			...config,
-+			initial: 'device',
-+			runtimeSources: config.runtimeSources ?? runtimeSources
-+		},
++		{ ...config, runtimeSources: config.runtimeSources ?? runtimeSources },
 +		(ready) => ({
 +			...createLibraryBinding({
 +				...ready,
@@ -160,62 +70,381 @@ index aae803e..bc8582c 100644
 +			recovery: ready.recovery
 +		})
 +	)
-+}
+ }
+-function bindHost(
+-	session: Session,
+-	libraryFactory: LibraryFactory,
+-	cacheNamespace: string
+-): AccountHost {
+-	const readiness = createJazzSessionReadinessAdapter(session)
+-	const recovery = createJazzRecoveryAdapter(() => session.getSnapshot().account)
+-	const identities = new WeakMap<object, object>()
+-	const candidates = new WeakMap<ReadyAccountObservation, () => AccountBinding>()
+-	const identity = (resource: object) => {
+-		let token = identities.get(resource)
+-		if (!token) {
+-			token = Object.freeze({})
+-			identities.set(resource, token)
 +
- /** Existing identities/restoration only; extension sign-in must not create an unrelated account. */
++function bindHost(session: Session): AccountHost {
++	let released = false
++	const recoveryCapability: RecoveryBinding['capability'] = {
++		isCurrentScope: (scope) => {
++			const now = session.view.get().observation
++			return (
++				!released &&
++				now?.status === 'ready' &&
++				now.capabilities.recovery.capability.isCurrentScope(scope)
++			)
++		},
++		readPhrase: (scope) => {
++			const now = session.view.get().observation
++			if (released || now?.status !== 'ready') throw new Error('Recovery scope unavailable')
++			return now.capabilities.recovery.capability.readPhrase(scope)
+ 		}
+-		return token
+ 	}
++	const candidates = new WeakMap<ReadyAccountObservation, () => AccountBinding>()
+ 	const read = (): AccountObservation => {
+-		const snapshot = session.getSnapshot()
+-		recovery.observeAccount(snapshot.account)
+-		if (snapshot.status !== 'ready' || !snapshot.account || !snapshot.client) {
+-			return { status: snapshot.status === 'ready' ? 'error' : snapshot.status }
++		const view = session.view.get(),
++			native = view.observation
++		if (native?.status !== 'ready') {
++			if (view.status === 'ready') throw new Error('Ready session binding unavailable')
++			return { status: view.status }
+ 		}
+-		const account = snapshot.account
+-		const client = snapshot.client
+-		const db = client.db
+-		const check = () => {
+-			const now = session.getSnapshot()
+-			if (
+-				now.status !== 'ready' ||
+-				now.account !== account ||
+-				now.client !== client ||
+-				now.client?.db !== db
+-			)
+-				throw new Error('Account scope expired')
++		const current = () => {
++			const now = session.view.get().observation
++			return !released && now?.status === 'ready' && now.binding === native.binding
+ 		}
+-		const build = (live: () => boolean) => {
++		const build = (live: () => boolean): ReadyAccountObservation => {
+ 			const admitted = () => {
+-				check()
+-				if (!live()) throw new Error('Account scope expired')
++				if (!current() || !live()) throw new Error('Account scope expired')
+ 			}
+-			const domain = createLibraryBinding({
+-				db,
+-				identityId: account.id,
+-				isCurrent: () => {
+-					check()
+-					return live()
+-				},
+-				libraryFactory,
+-				cacheNamespace
+-			})
+-			const observation: ReadyAccountObservation = {
++			return {
+ 				status: 'ready',
+-				localFirst: db.isLocalFirst(),
+-				binding: identity(account),
+-				clientBinding: identity(client),
+-				databaseBinding: identity(db),
+-				prepare: () => {
+-					admitted()
+-					return db.upgradeToLocalFirst(localFirst)
+-				},
+-				logout: () => {
+-					// Native mutation admission stays bound to the selected identity.
+-					admitted()
+-					return session.logout()
++				binding: native.binding,
++				accountId: native.identityId,
++				signedIn: native.identityKind === 'backend',
++				root: {
++					read: () => {
++						admitted()
++						return native.capabilities.root.read()
++					},
++					ensure: () => {
++						admitted()
++						return native.capabilities.root.ensure()
++					}
+ 				},
+ 				logoutStatus: () => {
+-					const now = session.getSnapshot()
++					const now = session.view.get().observation
+ 					if (
+-						now.status === 'signed-out' ||
+-						(now.status === 'ready' && now.account && !externallySignedIn(now.account))
++						now?.status === 'signed-out' ||
++						(now?.status === 'ready' && now.identityKind === 'device')
+ 					)
+ 						return 'signed-out'
+-					if (now.status !== 'ready' || !now.account || !now.client) return 'unavailable'
+-					return now.account === account && now.client === client && now.client.db === db && live()
+-						? 'current'
+-						: 'replaced'
++					return now?.status !== 'ready'
++						? 'unavailable'
++						: current() && live()
++							? 'current'
++							: 'replaced'
+ 				},
+-				accountId: account.id,
+-				signedIn: externallySignedIn(account),
+-				root: domain.root,
+-				recovery: {
+-					capability: recovery.capability,
+-					source: {
+-						subscribe: (notify) => {
+-							const publish = () => notify(recovery.observeAccount(session.getSnapshot().account))
+-							publish()
+-							return session.subscribe(publish)
+-						}
+-					}
+-				}
++				recovery: { source: native.capabilities.recovery.source, capability: recoveryCapability }
+ 			}
+-			return { observation, createLibrary: domain.createLibrary }
+ 		}
+-		const { observation } = build(() => true)
++		const observation = build(() => true)
+ 		candidates.set(observation, () => {
+-			check()
+-			let released = false
+-			const live = () => !released
+-			const scoped = build(live)
+-			const adopted = { ...scoped.observation, library: scoped.createLibrary() }
++			if (!current()) throw new Error('Account scope expired')
++			let live = true
+ 			return {
+-				observation: adopted,
++				observation: {
++					...build(() => live),
++					library: native.capabilities.createLibrary(() => current() && live)
++				},
+ 				release: () => {
+-					released = true
++					live = false
+ 				}
+ 			}
+ 		})
+ 		return observation
+ 	}
+-	const restored = createJazzRestorationAdapter(session, () => session)
+ 	return {
+ 		read,
+ 		adopt: (observation) => {
+-			const create = candidates.get(observation)
+-			if (!create) throw new Error('Account scope unavailable')
++			const adopt = candidates.get(observation)
++			if (!adopt) throw new Error('Account scope unavailable')
+ 			candidates.delete(observation)
+-			return create()
++			return adopt()
+ 		},
+-		readiness,
+-		create: () => session.createLocalFirst(),
++		readiness: {
++			binding: session.binding,
++			capability: {
++				runtime: session,
++				readStatus: () => session.view.get().status,
++				subscribe: (notify) => {
++					const subscription = session.view.subscribe({
++						next: () => notify(),
++						error: () => notify(),
++						complete: () => notify()
++					})
++					return () => subscription.unsubscribe()
++				}
++			}
++		},
++		create: session,
++		logout: session,
+ 		signOut: async () => {
+ 			const response = await fetch('/api/auth/sign-out', {
+ 				method: 'POST',
+@@ -156,97 +166,95 @@ function bindHost(
+ 			})
+ 			if (!response.ok) throw new Error('Provider sign-out failed')
+ 		},
+-		logout: () => session.logout(),
+ 		release: () => {
+-			recovery.invalidate()
+-			restored.invalidate()
++			released = true
+ 		},
+-		restoration: restored
++		restoration: {
++			binding: session.binding,
++			capability: {
++				runtime: session,
++				parsePhrase: parseJazzRecoveryPhrase,
++				isCurrentBinding: (binding) =>
++					!released &&
++					binding === session.binding &&
++					session.owner.getSnapshot().status === 'active',
++				readIdentity: async () => {
++					const now = session.view.get().observation
++					return now?.status === 'ready'
++						? { kind: 'ready', identityId: now.identityId }
++						: { kind: 'unavailable' }
++				}
++			}
++		}
+ 	}
+ }
+ 
+-// Constructing the registry is inert; only browser mount requests an attachment.
+-const registry = createJazzStartupRegistry()
+-const localFirst = () => import('jazz-tools/local-first')
+-const runtimeSources = Object.freeze({ wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION })
+-export function accountInput(
+-	config: JazzClientConfig,
+-	libraryFactory: LibraryFactory = createLibraryCapability
+-): AccountInput<Session> {
+-	// Match Finance: provision a local identity silently when no saved identity exists.
++let current:
++	| {
++			config: JazzClientConfig
++			factory: LibraryFactory
++			session: Session
++			owner: ReturnType<typeof createActor<typeof attachments>>
++	  }
++	| undefined
++function input(config: JazzClientConfig, libraryFactory: LibraryFactory): AccountInput<Session> {
++	if (current) {
++		const before: Record<string, unknown> = { ...current.config },
++			after: Record<string, unknown> = { ...config }
++		if (
++			current.factory !== libraryFactory ||
++			Object.keys(before).length !== Object.keys(after).length ||
++			Object.keys(before).some((key) => before[key] !== after[key])
++		)
++			throw new Error('Jazz environment replacement requires coordinated cleanup')
++	} else {
++		const native = accountSessionRuntime(config, libraryFactory)
++		const runtime = createActor(machine, { input: native, ...machineDiagnostics })
++		runtime.subscribe({ error: () => logger.error('Session owner failed') })
++		const session = createSessionRuntimeConnection(runtime, native.binding)
++		// Preserve the existing attachment protocol; it leases a connection, never an SDK facade.
++		const owner = createActor(attachments, {
++			input: {
++				binding: native.binding,
++				existing: session,
++				capability: { open: async () => session }
++			}
++		}).start()
++		current = { config: { ...config }, factory: libraryFactory, session, owner }
++		runtime.start()
++	}
+ 	return {
+-		startup: registry.getJazzStartupBinding({
+-			...config,
+-			client: localFirst,
+-			initial: 'local-first',
+-			runtimeSources: config.runtimeSources ?? runtimeSources
+-		}),
+-		bind: (session) =>
+-			bindHost(
+-				session,
+-				libraryFactory,
+-				JSON.stringify([config.scope, config.serverUrl, config.env])
+-			)
++		startup: {
++			owner: current.owner,
++			scope: { binding: current.session.binding, attachment: {}, generation: 0 }
++		},
++		bind: bindHost
+ 	}
+ }
+-
+-/** Existing identities/restoration only; extension sign-in must not create an unrelated account. */
++export function accountInput(
++	config: JazzClientConfig,
++	factory: LibraryFactory = createLibraryCapability
++) {
++	return input({ ...config, initial: 'device' }, factory)
++}
++/** Extension capture must attach to an existing identity. */
  export function existingAccountInput(
  	config: JazzClientConfig,
-@@ -199,6 +215,7 @@ export function existingAccountInput(
- 		startup: registry.getJazzStartupBinding({
- 			...config,
- 			client: localFirst,
-+			localFirst: 'now',
- 			runtimeSources: config.runtimeSources ?? runtimeSources
- 		}),
- 		bind: (session) =>
-@@ -214,15 +231,15 @@ export function existingAccountInput(
+-	libraryFactory: LibraryFactory = createLibraryCapability
+-): AccountInput<Session> {
+-	return {
+-		startup: registry.getJazzStartupBinding({
+-			...config,
+-			client: localFirst,
+-			runtimeSources: config.runtimeSources ?? runtimeSources
+-		}),
+-		bind: (session) =>
+-			bindHost(
+-				session,
+-				libraryFactory,
+-				JSON.stringify([config.scope, config.serverUrl, config.env])
+-			)
+-	}
++	factory: LibraryFactory = createLibraryCapability
++) {
++	return input(config, factory)
+ }
+-
+-/** A consuming integration owns/drains the returned record actors before identity changes. */
  export function currentLibraryRecords() {
- 	const session = registry.getCurrentJazzSession()
- 	const snapshot = session?.getSnapshot()
+-	const session = registry.getCurrentJazzSession()
+-	const snapshot = session?.getSnapshot()
 -	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
-+	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
- 		throw new Error('Library scope unavailable')
+-		throw new Error('Library scope unavailable')
 -	const { account, client } = snapshot
-+	const { user, client } = snapshot
- 	return createLibraryRecords(
- 		client.db,
+-	return createLibraryRecords(
+-		client.db,
 -		account.id,
-+		user.accountId,
- 		() => {
- 			const now = session.getSnapshot()
+-		() => {
+-			const now = session.getSnapshot()
 -			return now.status === 'ready' && now.account === account && now.client === client
-+			return now.status === 'ready' && now.user === user && now.client === client
- 		},
- 		readConnection(client.db)
- 	)
-@@ -236,17 +253,14 @@ export async function requestCapture(
+-		},
+-		readConnection(client.db)
+-	)
++	const observation = current?.session.view.get().observation
++	if (observation?.status !== 'ready') throw new Error('Library scope unavailable')
++	return observation.capabilities.createRecords()
+ }
+-
+-/** Guests send their native proof; backend users send their same-origin cookie. */
+ export async function requestCapture(
+ 	operation: 'resolve' | 'extract' | 'asset',
+ 	body: unknown,
+ 	signal?: AbortSignal
  ) {
- 	const session = registry.getCurrentJazzSession()
- 	const snapshot = session?.getSnapshot()
+-	const session = registry.getCurrentJazzSession()
+-	const snapshot = session?.getSnapshot()
 -	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
-+	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
- 		throw new Error('Account scope unavailable')
+-		throw new Error('Account scope unavailable')
 -	const { account, client } = snapshot
-+	const { user, client } = snapshot
- 	const db = client.db
- 	return createLibraryCapture(db, () => {
- 		const now = session.getSnapshot()
- 		return (
+-	const db = client.db
+-	return createLibraryCapture(db, () => {
+-		const now = session.getSnapshot()
+-		return (
 -			now.status === 'ready' &&
 -			now.account === account &&
 -			now.client === client &&
 -			now.client.db === db
-+			now.status === 'ready' && now.user === user && now.client === client && now.client.db === db
- 		)
- 	})(operation, body, signal)
+-		)
+-	})(operation, body, signal)
++	const observation = current?.session.view.get().observation
++	if (observation?.status !== 'ready') throw new Error('Account scope unavailable')
++	return observation.capabilities.capture(operation, body, signal)
  }
 diff --git a/src/lib/contracts/account.ts b/src/lib/contracts/account.ts
-index cc83019..4d5f14b 100644
+index cc83019..5d5784a 100644
 --- a/src/lib/contracts/account.ts
 +++ b/src/lib/contracts/account.ts
 @@ -26,11 +26,9 @@ export type RecoveryBinding = Readonly<{
@@ -239,16 +468,26 @@ index cc83019..4d5f14b 100644
  export type ReadyAccountObservation = Extract<AccountObservation, { status: 'ready' }>
  export type AccountBindingIdentity = Pick<
  	ReadyAccountObservation,
-@@ -81,7 +79,6 @@ export function sameAccountBinding(
+@@ -81,11 +79,14 @@ export function sameAccountBinding(
  export type AccountHost = Readonly<{
  	read: () => AccountObservation
  	adopt?: (observation: ReadyAccountObservation) => AccountBinding
 -	prepare?: () => Promise<void>
  	readiness: SessionReadinessBinding
- 	create: () => Promise<void>
+-	create: () => Promise<void>
++	create:
++		| (() => Promise<void>)
++		| import('delightful-local-first/session/runtime').SessionRuntimeConnection
  	signOut?: () => Promise<void>
+-	logout: () => Promise<void>
++	logout:
++		| (() => Promise<void>)
++		| import('delightful-local-first/session/runtime').SessionRuntimeConnection
+ 	release: () => void
+ 	restoration: Readonly<{ binding: object; capability: RestorationCapability }>
+ }>
 diff --git a/src/lib/machines/runtime/application-readiness.test.ts b/src/lib/machines/runtime/application-readiness.test.ts
-index bd417ed..c91a05e 100644
+index 5649ae4..fe9772e 100644
 --- a/src/lib/machines/runtime/application-readiness.test.ts
 +++ b/src/lib/machines/runtime/application-readiness.test.ts
 @@ -306,87 +306,68 @@ describe('account/root ownership', () => {
@@ -483,21 +722,42 @@ index bd417ed..c91a05e 100644
  		...ready('stable', { read: async () => 'compatible', ensure: vi.fn() }),
  		clientBinding: {},
 diff --git a/src/lib/machines/runtime/application-readiness.ts b/src/lib/machines/runtime/application-readiness.ts
-index 9424980..79b9b3d 100644
+index 9424980..5367107 100644
 --- a/src/lib/machines/runtime/application-readiness.ts
 +++ b/src/lib/machines/runtime/application-readiness.ts
-@@ -203,10 +203,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -1,3 +1,7 @@
++import {
++	createSessionChangeMachine,
++	selectSessionRuntimeIdentity
++} from 'delightful-local-first/session/runtime'
+ import { signOutMachine, signOutInput, type SignOutStage } from './sign-out.js'
+ import type { EventPayload } from '../events.js'
+ import {
+@@ -203,11 +207,19 @@ export function createApplicationReadinessMachine<Session extends object>(
  		library: libraryMachine,
  		startup: createSessionStartupMachine<Session>(),
  		readiness: createSessionReadinessMachine(),
 -		prepare: createAsyncLogic({
 -			run: ({ input }: { input: { host: AccountHost; observation: ReadyAccountObservation } }) =>
 -				(input.observation.prepare ?? required(input.host.prepare))()
--		}),
- 		create: createAsyncLogic({ run: ({ input }: { input: AccountHost }) => input.create() }),
++		create: createSessionChangeMachine((input: AccountHost) => {
++			if (typeof input.create === 'function') return { operation: 'create', native: input.create }
++			const session = input.create,
++				identity = selectSessionRuntimeIdentity(session.view.get())
++			return {
++				session,
++				scope: { binding: session.binding, attempt: 0 },
++				change: {
++					operation: 'create',
++					before: identity?.status === 'signed-out' ? identity : undefined
++				}
++			}
+ 		}),
+-		create: createAsyncLogic({ run: ({ input }: { input: AccountHost }) => input.create() }),
  		logout: signOutMachine,
  		bootstrap: rootBootstrapMachine,
-@@ -265,7 +261,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 		global: createAsyncLogic({ run: ({ input }: { input: RootWrite }) => input.global() }),
+@@ -265,7 +277,6 @@ export function createApplicationReadinessMachine<Session extends object>(
  				readiness: types<import('xstate').ActorRefFrom<(typeof accountActors)['readiness']>>(),
  				bindingCustody: types<import('xstate').ActorRefFrom<typeof accountActors.bindingCustody>>(),
  				libraryBinding: types<import('xstate').ActorRefFrom<typeof accountActors.libraryBinding>>(),
@@ -505,7 +765,7 @@ index 9424980..79b9b3d 100644
  				create: types<import('xstate').ActorRefFrom<(typeof accountActors)['create']>>(),
  				logout: types<import('xstate').ActorRefFrom<(typeof accountActors)['logout']>>(),
  				bootstrap: types<import('xstate').ActorRefFrom<(typeof accountActors)['bootstrap']>>(),
-@@ -330,15 +325,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -330,15 +341,6 @@ export function createApplicationReadinessMachine<Session extends object>(
  										},
  										states: { waiting: {}, accepting: {}, stopping: {} }
  									},
@@ -521,7 +781,7 @@ index 9424980..79b9b3d 100644
  									signedOut: {},
  									waiting: {},
  									unavailable: {},
-@@ -473,22 +459,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -473,22 +475,6 @@ export function createApplicationReadinessMachine<Session extends object>(
  				'observation' in event &&
  				event.observation === context.observationAttempt,
  
@@ -544,7 +804,7 @@ index 9424980..79b9b3d 100644
  			stoppingCreate: ({ value }: { value: import('xstate').StateValue }) =>
  				matchesState({ active: { flow: { running: { creating: 'stopping' } } } }, value),
  			stoppingRestore: ({ value }: { value: import('xstate').StateValue }) =>
-@@ -503,8 +473,7 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -503,8 +489,7 @@ export function createApplicationReadinessMachine<Session extends object>(
  				event.type === 'OBSERVED' &&
  				event.observation.status === 'ready' &&
  				context.observation.status === 'ready' &&
@@ -554,7 +814,7 @@ index 9424980..79b9b3d 100644
  		},
  		actions: {
  			refreshBinding: ({ context, event }: { context: Context<Session>; event: Event<Session> }) =>
-@@ -830,16 +799,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -830,16 +815,6 @@ export function createApplicationReadinessMachine<Session extends object>(
  													context: { observation: { status: 'error' } }
  												}
  											}
@@ -571,7 +831,7 @@ index 9424980..79b9b3d 100644
  											if (context.observation.status === 'ready') {
  												if (
  													context.host.adopt &&
-@@ -857,9 +816,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -857,9 +832,6 @@ export function createApplicationReadinessMachine<Session extends object>(
  														observation: context.adoption
  															? {
  																	...context.adoption.observation,
@@ -581,7 +841,7 @@ index 9424980..79b9b3d 100644
  																	...(context.observation.signedIn === undefined
  																		? {}
  																		: { signedIn: context.observation.signedIn })
-@@ -873,7 +829,10 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -873,7 +845,10 @@ export function createApplicationReadinessMachine<Session extends object>(
  											if (context.observation.status === 'signed-out') {
  												return { target: 'signedOut', context: { adoption: undefined } }
  											}
@@ -593,7 +853,7 @@ index 9424980..79b9b3d 100644
  												return { target: 'waiting', context: { adoption: undefined } }
  											}
  											return { target: 'unavailable', context: { adoption: undefined } }
-@@ -944,42 +903,6 @@ export function createApplicationReadinessMachine<Session extends object>(
+@@ -944,42 +919,6 @@ export function createApplicationReadinessMachine<Session extends object>(
  											}
  										}
  									},
@@ -636,6 +896,48 @@ index 9424980..79b9b3d 100644
  									signedOut: {
  										meta: accountStatus('signedOut', t('account.status.signedOut')),
  										on: {
+@@ -1103,6 +1042,8 @@ export function createApplicationReadinessMachine<Session extends object>(
+ 													}
+ 												}
+ 
++												if (args.event.output.outcome !== 'completed')
++													_enq.raise({ type: 'IDENTITY_FAILED' })
+ 												return { target: 'refreshing' }
+ 											},
+ 											onError: (args, enq) => {
+diff --git a/src/lib/machines/runtime/sign-out.ts b/src/lib/machines/runtime/sign-out.ts
+index c56c1e6..821b765 100644
+--- a/src/lib/machines/runtime/sign-out.ts
++++ b/src/lib/machines/runtime/sign-out.ts
+@@ -16,11 +16,26 @@ export function signOutInput(
+ ): OrderedSignOutInput {
+ 	const provider = host.signOut
+ 	const observeSession = observation.status === 'ready' ? observation.logoutStatus : undefined
++	const selected =
++		observation.status === 'ready' && observation.logout ? observation.logout : host.logout
++	const session =
++		typeof selected === 'function'
++			? selected
++			: {
++					session: selected,
++					scope: { binding: selected.binding, attempt: 0 },
++					change: {
++						operation: 'signOut',
++						before:
++							observation.status === 'ready'
++								? { status: 'ready', binding: observation.binding }
++								: undefined
++					} satisfies import('delightful-local-first/session/runtime').SessionRuntimeIdentityChange
++				}
+ 	return {
+ 		...(provider ? { provider } : {}),
+ 		...(observeSession ? { observeSession } : {}),
+-		session:
+-			observation.status === 'ready' && observation.logout ? observation.logout : host.logout,
++		session,
+ 		...(onOverdue ? { onOverdue } : {})
+ 	}
+ }
 diff --git a/src/lib/runtime/worker/host-bindings.test.ts b/src/lib/runtime/worker/host-bindings.test.ts
 index 8112d41..02a2c67 100644
 --- a/src/lib/runtime/worker/host-bindings.test.ts
@@ -649,33 +951,225 @@ index 8112d41..02a2c67 100644
  		recovery: {
  			capability: { isCurrentScope: () => false, readPhrase: async () => '' },
 diff --git a/src/lib/runtime/worker/host-machine.test-support.ts b/src/lib/runtime/worker/host-machine.test-support.ts
-index a4e8c37..a0a6082 100644
+index a4e8c37..fab5277 100644
 --- a/src/lib/runtime/worker/host-machine.test-support.ts
 +++ b/src/lib/runtime/worker/host-machine.test-support.ts
-@@ -21,13 +21,20 @@ export function createWorkerHostFixture(
+@@ -2,7 +2,12 @@ import { bindWorkerConnectivity } from '../../offline/connectivity.js'
+ import { createActor, type ActorOptions } from 'xstate'
+ import { vi } from 'vitest'
+ import { createSessionAcquisitionMachine } from 'delightful-local-first/session/workflow'
+-import type { Session } from '../../backend/jazz/account.js'
++import {
++	createSessionRuntimeMachine,
++	createSessionRuntimeConnection,
++	type SessionRuntimeResource
++} from 'delightful-local-first/session/runtime'
++import type { Session, AccountSessionCapabilities } from '../../backend/jazz/account.js'
+ import type { WorkerHostClosed } from 'delightful-local-first/worker/channel/contracts'
+ import type { AccountInput, AccountHost } from '../../contracts/account.js'
+ import { workerHostMachine } from './host-machine.js'
+@@ -20,30 +25,43 @@ export function createWorkerHostFixture(
+ 	bindWorkerConnectivity(true)
  	const unused = vi.fn(async () => {})
  	const close = vi.fn(async () => {})
- 	const session: Session = {
--		getSnapshot: () => ({ status: 'signed-out' }),
-+		getSnapshot: () => ({ status: 'signed-out', user: null, localFirst: false }),
-+		get db(): Session['db'] {
-+			throw new Error('Fixture session is signed out')
-+		},
- 		subscribe: () => () => {},
+-	const session: Session = {
++	let getterReads = 0
++	// The throwing SDK getter remains private to native leaf closures.
++	const native = {
+ 		getSnapshot: () => ({ status: 'signed-out' }),
+-		subscribe: () => () => {},
 -		createLocalFirst: unused,
 -		restoreLocalFirst: unused,
 -		loginWithBackend: unused,
 -		linkWithBackend: unused,
 -		logout: unused,
-+		createDeviceAccount: unused,
-+		restoreDeviceAccount: unused,
-+		reopenDeviceAccount: unused,
-+		linkDeviceAccount: unused,
-+		refresh: unused,
-+		exportDeviceKey: () => {
-+			throw new Error('Fixture session has no device key')
+-		retry: unused,
++		get db(): never {
++			getterReads++
++			throw new Error('Fixture session is signed out')
 +		},
-+		signOut: unused,
- 		retry: unused,
  		close
  	}
++	const resource: SessionRuntimeResource<AccountSessionCapabilities> = {
++		observe: (publish) => {
++			native.getSnapshot()
++			publish({ status: 'signed-out', binding: {} })
++			return () => {}
++		},
++		changeIdentity: async () => 'completed',
++		close: () => native.close()
++	}
+ 	const binding = {}
+-	const owner = createActor(createSessionAcquisitionMachine<Session>(), {
++	const runtime = createActor(createSessionRuntimeMachine<AccountSessionCapabilities>(), {
+ 		input: {
+ 			binding,
+ 			capability: {
+ 				open: async () => {
+ 					await acquisition
+-					return session
++					return resource
+ 				}
+-			},
+-			...(acquisition ? {} : { existing: session })
++			}
+ 		}
+ 	}).start()
++	const session = createSessionRuntimeConnection(runtime, binding)
++	const owner = createActor(createSessionAcquisitionMachine<Session>(), {
++		input: { binding, capability: { open: async () => session }, existing: session }
++	}).start()
++	// Administrative fixture teardown is not a native close receipt.
++	owner.subscribe({ complete: () => runtime.stop() })
+ 	const input: AccountInput<Session> = {
+ 		startup: { owner, scope: { binding, attachment: {}, generation: 0 } },
+ 		bind: () =>
+@@ -76,6 +94,7 @@ export function createWorkerHostFixture(
+ 	return {
+ 		close,
+ 		owner,
++		nativeGetterReads: () => getterReads,
+ 		actor: createActor(workerHostMachine, {
+ 			...(options?.clock ? { clock: options.clock } : {}),
+ 			input: {
+diff --git a/src/lib/runtime/worker/host-machine.test.ts b/src/lib/runtime/worker/host-machine.test.ts
+index a57c3a3..434fa57 100644
+--- a/src/lib/runtime/worker/host-machine.test.ts
++++ b/src/lib/runtime/worker/host-machine.test.ts
+@@ -26,6 +26,7 @@ it('closes the SDK only after the application has acknowledged clean shutdown',
+ 			timeout: 1000
+ 		})
+ 		expect(f.actor.getSnapshot().value).toBe('closed')
++		expect(f.nativeGetterReads()).toBe(0)
+ 		expect(f.actor.getSnapshot().output).toEqual({ outcome: 'closed', redirect: undefined })
+ 		expect(f.close).toHaveBeenCalledOnce()
+ 	} finally {
+@@ -51,7 +52,7 @@ it('holds provider navigation until application drain and native SDK close settl
+ 			scope: f.actor.getSnapshot().context.scope,
+ 			handle: 'derocher.me'
+ 		})
+-		await waitFor(f.actor, (snapshot) => snapshot.matches('closingSession'))
++		await vi.waitFor(() => expect(f.close).toHaveBeenCalledOnce())
+ 		expect(f.actor.getSnapshot().status).toBe('active')
+ 		expect(f.actor.getSnapshot().context.redirect).toBe(
+ 			'https://provider.example.invalid/authorize'
+@@ -185,7 +186,7 @@ it('reports overdue SDK acquisition without losing the late session or acknowled
+ 	try {
+ 		f.actor.start()
+ 		f.actor.send({ type: 'SHUTDOWN' })
+-		await waitFor(f.actor, (s) => s.matches('settlingAcquisition'), { timeout: 1000 })
++		await waitFor(f.actor, (s) => s.matches({ closingSession: 'acquisition' }), { timeout: 1000 })
+ 		clock.increment(5)
+ 		expect(f.actor.getSnapshot().context.closeIssue).toEqual({
+ 			stage: 'acquisition',
+@@ -210,7 +211,7 @@ it('retains the original SDK close through overdue feedback and consumes its lat
+ 	try {
+ 		f.actor.start()
+ 		f.actor.send({ type: 'SHUTDOWN' })
+-		await waitFor(f.actor, (s) => s.matches('closingSession'), { timeout: 1000 })
++		await vi.waitFor(() => expect(f.close).toHaveBeenCalledOnce())
+ 		clock.increment(5)
+ 		expect(f.actor.getSnapshot().context.closeIssue).toEqual({
+ 			stage: 'session',
+@@ -247,7 +248,7 @@ it('an already queued deadline cannot override actual SDK closure when native ti
+ 	try {
+ 		f.actor.start()
+ 		f.actor.send({ type: 'SHUTDOWN' })
+-		await waitFor(f.actor, (s) => s.matches('closingSession'), { timeout: 1000 })
++		await vi.waitFor(() => expect(f.close).toHaveBeenCalledOnce())
+ 		const delayed = [...scheduled.values()]
+ 		expect(delayed.length).toBeGreaterThan(0)
+ 		closing.resolve()
+diff --git a/src/lib/runtime/worker/host-machine.ts b/src/lib/runtime/worker/host-machine.ts
+index 8741c47..8db7231 100644
+--- a/src/lib/runtime/worker/host-machine.ts
++++ b/src/lib/runtime/worker/host-machine.ts
+@@ -1,3 +1,7 @@
++import {
++	sessionCloseMachine,
++	selectSessionCloseStage
++} from 'delightful-local-first/session/runtime'
+ import { atprotoMachine } from '../../machines/runtime/atproto.js'
+ import type { EventPayload } from '../../machines/events.js'
+ import {
+@@ -134,7 +138,7 @@ const actors = {
+ 	application,
+ 	owner,
+ 	tagForm: tagFormMachine,
+-	close: createAsyncLogic({ run: ({ input }: { input: Session }) => input.close() }),
++	close: sessionCloseMachine,
+ 	closeTransport: createAsyncLogic<WorkerHostClosed, () => Promise<WorkerHostClosed>>({
+ 		run: ({ input }) => input()
+ 	})
+@@ -652,29 +656,54 @@ export const workerHostMachine = setup({
+ 			}
+ 		},
+ 		closingSession: {
+-			initial: 'waiting',
++			initial: 'acquisition',
+ 			states: {
+-				waiting: { timeout: 'sessionCloseDeadline', onTimeout: { target: 'overdue' } },
+-				overdue: {
+-					entry: ({ context }) => ({
+-						context: { closeIssue: context.closeIssue ?? { stage: 'session', reason: 'overdue' } }
+-					})
++				acquisition: {
++					initial: 'waiting',
++					states: {
++						waiting: { timeout: 'acquisitionDeadline', onTimeout: { target: 'overdue' } },
++						overdue: {
++							entry: ({ context }) => ({
++								context: {
++									closeIssue: context.closeIssue ?? { stage: 'acquisition', reason: 'overdue' }
++								}
++							})
++						}
++					}
++				},
++				session: {
++					initial: 'waiting',
++					states: {
++						waiting: { timeout: 'sessionCloseDeadline', onTimeout: { target: 'overdue' } },
++						overdue: {
++							entry: ({ context }) => ({
++								context: {
++									closeIssue: context.closeIssue ?? { stage: 'session', reason: 'overdue' }
++								}
++							})
++						}
++					}
+ 				}
+ 			},
+ 			invoke: {
+ 				id: 'close',
+ 				src: 'close',
+-				input: ({ context }: { context: Context }) => {
+-					if (!context.session) throw new Error('Worker session unavailable')
+-					return context.session
+-				},
+-				onDone: (args) => ({
+-					target: args.guards.hasAccountStore(args)
+-						? 'closingAccountStore'
+-						: args.guards.hasBroker(args)
+-							? 'closingBroker'
+-							: 'closed'
+-				}),
++				input: ({ context }) => required(context.session),
++				onSnapshot: (args) =>
++					selectSessionCloseStage(args.event.snapshot) === 'session' &&
++					matchesState({ closingSession: 'acquisition' }, args.value)
++						? { target: '.session' }
++						: undefined,
++				onDone: (args) =>
++					args.event.output.outcome !== 'closed'
++						? { target: 'failed', context: { closeIssue: { stage: 'session', reason: 'failed' } } }
++						: {
++								target: args.guards.hasAccountStore(args)
++									? 'closingAccountStore'
++									: args.guards.hasBroker(args)
++										? 'closingBroker'
++										: 'closed'
++							},
+ 				onError: {
+ 					target: 'failed',
+ 					context: { closeIssue: { stage: 'session', reason: 'failed' } }

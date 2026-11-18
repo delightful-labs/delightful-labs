@@ -56,17 +56,21 @@ index 0000000..6edd339
 +</html>
 diff --git a/tests/worker-bindings/actor/session.ts b/tests/worker-bindings/actor/session.ts
 new file mode 100644
-index 0000000..fc4ecb0
+index 0000000..f67214c
 --- /dev/null
 +++ b/tests/worker-bindings/actor/session.ts
-@@ -0,0 +1,289 @@
-+import { createActor, createCallbackLogic, waitFor } from 'xstate'
+@@ -0,0 +1,318 @@
++import { createActor, waitFor } from 'xstate'
 +import {
 +	createJazzSessionRuntime,
 +	type JazzSessionBindingInput
 +} from 'delightful-local-first/backend/jazz/session-runtime'
 +import {
 +	createSessionRuntimeMachine,
++	createSessionRuntimeConnection,
++	createSessionChangeMachine,
++	sessionCloseMachine,
++	type SessionRuntimeChangeInput,
 +	selectSessionRuntimeObservation,
 +	type SessionRuntimeChangeReport,
 +	type SessionRuntimeIdentityChange
@@ -95,10 +99,9 @@ index 0000000..fc4ecb0
 +let held: ReturnType<typeof Promise.withResolvers<void>> | undefined
 +let changeHeld: ReturnType<typeof Promise.withResolvers<void>> | undefined
 +const reports: { attempt: number; outcome: SessionRuntimeChangeReport['outcome'] }[] = []
-+const receiveReport = createCallbackLogic<SessionRuntimeChangeReport>(({ receive }) => {
-+	receive((event) => reports.push({ attempt: event.scope.attempt, outcome: event.outcome }))
-+})
-+let caller: ReturnType<typeof createActor<typeof receiveReport>> | undefined
++const command = createSessionChangeMachine<SessionRuntimeChangeInput>((input) => input)
++let caller: ReturnType<typeof createActor<typeof command>> | undefined
++let closing: ReturnType<typeof createActor<typeof sessionCloseMachine>> | undefined
 +let sessionBinding: object | undefined
 +let bound = 0
 +let capabilities: Capabilities | undefined
@@ -118,14 +121,38 @@ index 0000000..fc4ecb0
 +	if (!actor) throw new Error('Native session actor not open')
 +	return actor
 +}
++function connection() {
++	if (!sessionBinding) throw new Error('Session binding unavailable')
++	return createSessionRuntimeConnection(owner(), sessionBinding)
++}
 +function request(change: SessionRuntimeIdentityChange) {
-+	if (!sessionBinding || !caller) throw new Error('Session command unavailable')
-+	owner().send({
-+		type: 'CHANGE_IDENTITY',
-+		scope: { binding: sessionBinding, attempt: reports.length + 1 },
-+		change,
-+		replyTo: caller
++	if (!sessionBinding || caller?.getSnapshot().status === 'active')
++		throw new Error('Session command unavailable')
++	caller?.stop()
++	const attempt = reports.length + 1
++	caller = createActor(command, {
++		input: { session: connection(), scope: { binding: sessionBinding, attempt }, change }
 +	})
++	caller.subscribe({
++		complete: () => {
++			const output = caller?.getSnapshot().output
++			if (output) reports.push({ attempt, outcome: output.outcome })
++		},
++		error: () => {
++			actorFailed = true
++		}
++	})
++	caller.start()
++}
++function closeSession() {
++	if (closing) return
++	closing = createActor(sessionCloseMachine, { input: connection() })
++	closing.subscribe({
++		error: () => {
++			actorFailed = true
++		}
++	})
++	closing.start()
 +}
 +export const actorFixture = {
 +	open(
@@ -174,7 +201,6 @@ index 0000000..fc4ecb0
 +			}
 +		)
 +		sessionBinding = native.binding
-+		caller = createActor(receiveReport).start()
 +		if (hold) held = Promise.withResolvers<void>()
 +		actor = createActor(sessionRuntimeMachine, {
 +			input: {
@@ -243,7 +269,9 @@ index 0000000..fc4ecb0
 +			signOutCompleted,
 +			reports: [...reports],
 +			done: snapshot.status === 'done',
-+			clean: snapshot.output?.outcome === 'closed',
++			clean:
++				snapshot.output?.outcome === 'closed' &&
++				closing?.getSnapshot().output?.outcome === 'closed',
 +			status: observation?.status,
 +			identityId: observation?.status === 'ready' ? observation.identityId : undefined,
 +			localFirst: observation?.status === 'ready' ? observation.localFirst : undefined
@@ -255,21 +283,16 @@ index 0000000..fc4ecb0
 +		return observation.capabilities.read()
 +	},
 +	close() {
-+		owner().send({ type: 'CLOSE' })
++		closeSession()
 +	},
 +	signOut(stale: boolean, hold: boolean) {
 +		const observation = selectSessionRuntimeObservation(owner().getSnapshot())
-+		if (observation?.status !== 'ready' || !sessionBinding || !caller)
++		if (observation?.status !== 'ready' || !sessionBinding)
 +			throw new Error('Native session actor identity unavailable')
 +		if (hold) changeHeld = Promise.withResolvers<void>()
-+		owner().send({
-+			type: 'CHANGE_IDENTITY',
-+			scope: { binding: sessionBinding, attempt: reports.length + 1 },
-+			change: {
-+				operation: 'signOut',
-+				before: { status: 'ready', binding: stale ? {} : observation.binding }
-+			},
-+			replyTo: caller
++		request({
++			operation: 'signOut',
++			before: { status: 'ready', binding: stale ? {} : observation.binding }
 +		})
 +	},
 +	releaseChange() {
@@ -330,7 +353,11 @@ index 0000000..fc4ecb0
 +		held?.resolve()
 +		changeHeld?.resolve()
 +		const current = owner()
-+		if (current.getSnapshot().status !== 'done') current.send({ type: 'CLOSE' })
++		closeSession()
++		if (!closing) throw new Error('Close invocation unavailable')
++		await waitFor(closing, (snapshot) => snapshot.status === 'done', { timeout: 5000 })
++		if (closing.getSnapshot().output?.outcome !== 'closed')
++			throw new Error('Close invocation failed')
 +		await waitFor(current, (snapshot) => snapshot.status === 'done', { timeout: 5000 })
 +		if (current.getSnapshot().output?.outcome !== 'closed')
 +			throw new Error('Native session close failed')
@@ -346,6 +373,8 @@ index 0000000..fc4ecb0
 +		held = undefined
 +		broker = undefined
 +		caller?.stop()
++		closing?.stop()
++		closing = undefined
 +		return { sdkClosed: true, storeClosed: true, hostClosed }
 +	}
 +}

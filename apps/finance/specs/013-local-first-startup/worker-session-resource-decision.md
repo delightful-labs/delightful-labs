@@ -325,6 +325,62 @@ Remove old raw-session custody on qualified adoption and keep the documented
 legacy regression visible until then. Finance reuses the same binding/identity
 boundary as its actual worker/UI callers move over. U2 remains open.
 
+## Clipper host adoption qualified in the candidate
+
+The actual Clipper candidate now starts the shared session root at its account
+host boundary. Its attachment chart leases a native XState actor reference and
+`actor.select()` readable; no SDK session, Db getter or SDK-shaped replacement
+enters application context. The private Jazz adapter remains the sole SDK owner.
+App capabilities come from the existing inert library binding function.
+
+The existing application chart still owns domain drain, creation admission,
+restoration and ordered provider sign-out. Their fixed invocation source is now
+the shared `createSessionChangeMachine`: it sends a scoped typed command and
+awaits the matching result, or invokes the current alpha.60 native leaf for
+compatibility. It releases the command payload after dispatch, preserves issued
+work through shutdown and reports unexpected session-owner failure. There is no
+promise bridge, dynamic actor population, result registry or another SDK facade.
+Readiness uses the same source for SDK retry. Native retry, failed acquisition
+retry and failed observation retry remain separate routes in the owning chart.
+
+Realm close invokes `sessionCloseMachine`, which requests close and observes
+actual owner completion. Clipper retains application drain, acquisition/native
+close deadlines, AccountStore close and exact broker receipts in their original
+order. Late acquisition remains owned and is closed without observation. An
+actor stop, failed close or failed owner cannot produce a clean close receipt.
+The existing reference-acquisition chart remains temporarily for attachment
+correlation; it cannot acquire another SDK session. Removing that chart is not
+required for this adoption and is not part of this batch.
+
+Qualification: **272 affected shared identity/backend tests**, full library types
+and selected unit-test types pass. The actual candidate Clipper account and
+workflow/host tests pass strict types and **69 tests**, including the 15 cases
+that previously failed on the SDK getter. The native getter remains private and
+is not read by the host. The active alpha.60 Clipper batch passes **72 tests**.
+**21 focused native cases** pass in Chromium/Firefox/WebKit, now using the same
+shared command and close invocations against real Jazz sessions inside Workers
+with development XState freezing enabled. They cover startup, late acquisition,
+create/recover/hide/sign-out/restore and close during held operation settlement.
+The maintained suite still contains 42 cases; 21 unrelated cases were not rerun.
+Strict patch application passes against the maintained sources.
+
+Artifacts: `/private/tmp/clipper-alpha67-host-check/app` and
+`/private/tmp/finance-alpha67-host-4eo19nnx/app`; logs:
+`/private/tmp/clipper-session-host.log`,
+`/private/tmp/clipper-session-host-native.log` and
+`/private/tmp/finance-session-host-native.log`.
+The first Clipper log includes 67 passing host cases and a sandbox listener
+restriction; its two native binding cases pass in the separate authorized run.
+
+This completes Clipper's candidate host-custody adoption, not the coordinated SDK
+upgrade. Workspace pins and the active SDK patch remain alpha.60; this adds no
+SDK patch behavior and changes no production destination. Next apply the same
+shared actor/binding boundary to Finance's actual worker/UI integration. Preserve
+Finance's independent workspace/restore Db ownership and all existing routes;
+do not retain a legacy Svelte provider through an SDK-shaped facade. U2 stays
+open until those actual consumers are qualified. U3–U5 and the later worker UI
+and financial workflow slices retain their recorded gates.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing
