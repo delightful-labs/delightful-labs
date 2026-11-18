@@ -5,12 +5,9 @@
 
 	import { observeRow, observeRows } from '#lib/runtime/observations.js'
 	import { createScopedFormController } from '#lib/forms/forms.svelte.js'
-	import { tagArchiveSchema, tagFormSchema } from '#lib/validation/tags.js'
-	import {
-		createManagementFormOptions,
-		selectManagementArchiveIds
-	} from '#lib/machines/management/management.js'
+	import { selectManagementArchiveIds } from '#lib/machines/management/management.js'
 	import type { ManagementObservation } from '#lib/contracts/management-contract.js'
+	import { createTagManagementFormOptions } from '#lib/machines/management/classification-forms.js'
 	import { archiveTag, createTag } from '#lib/data.js'
 	import { app } from '#lib/schema.js'
 	import { getDb, getJazzSession } from 'jazz-tools/svelte'
@@ -74,46 +71,14 @@
 			tags: observeRows(tags.current)
 		}
 	}
-	const formOptions = createManagementFormOptions({ binding: db, observe })
-
-	const options = formOptions({
-		schema: tagFormSchema,
-		successContent: 'replace',
-		assessmentObservation: ({ request, observation }) => ({
-			...observation.facts,
-			intent: {
-				kind: 'createTag',
-				name: request.values.name,
-				tagKind: request.values.kind,
-				categoryId: request.values.categoryId
-			}
-		}),
-		write: async ({ request }) => {
-			const id = request.scope.organizationId
-			if (id === null) throw new Error('Missing authorized workspace')
-			return createTag(db, id, request.values.name, request.values.kind, request.values.categoryId)
-		}
+	const options = createTagManagementFormOptions({
+		binding: db,
+		observe,
+		create: (id, values) => createTag(db, id, values.name, values.kind, values.categoryId),
+		archive: (id) => archiveTag(db, id)
 	})
-	const form = createScopedFormController(options)
-	const archiveOptions = formOptions({
-		schema: tagArchiveSchema,
-		successContent: 'retain',
-		assessmentObservation: ({ request, observation }) => ({
-			...observation.facts,
-			intent: {
-				kind: 'archiveTag',
-				id: request.values.tagId,
-				organizationId: request.values.organizationId
-			}
-		}),
-		write: async ({ request, observation }) => {
-			const row = observation.facts.tags.find((row) => row.id === request.values.tagId)
-			if (!row) throw new Error('Missing authorized record')
-			await archiveTag(db, row.id)
-			return row.name
-		}
-	})
-	const archive = createScopedFormController(archiveOptions)
+	const form = createScopedFormController(options.create)
+	const archive = createScopedFormController(options.archive)
 	const archivableIds = $derived(selectManagementArchiveIds(observe(), db, 'archiveTag'))
 	function onArchive(id: string) {
 		archive.submitValues({ tagId: id, organizationId: filters.activeOrganizationId })

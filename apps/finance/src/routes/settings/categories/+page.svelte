@@ -5,12 +5,9 @@
 
 	import { observeRow, observeRows } from '#lib/runtime/observations.js'
 	import { createScopedFormController } from '#lib/forms/forms.svelte.js'
-	import {
-		createManagementFormOptions,
-		selectManagementArchiveIds
-	} from '#lib/machines/management/management.js'
+	import { selectManagementArchiveIds } from '#lib/machines/management/management.js'
 	import type { ManagementObservation } from '#lib/contracts/management-contract.js'
-	import { categoryArchiveSchema, categoryFormSchema } from '#lib/validation/categories.js'
+	import { createCategoryManagementFormOptions } from '#lib/machines/management/classification-forms.js'
 	import { archiveCategory, createCategory } from '#lib/data.js'
 	import { app, transactionSummaryQuery } from '#lib/schema.js'
 	import { getDb, getJazzSession } from 'jazz-tools/svelte'
@@ -85,45 +82,14 @@
 			tags: observeRows(tags.current)
 		}
 	}
-	const formOptions = createManagementFormOptions({ binding: db, observe })
-
-	const options = formOptions({
-		schema: categoryFormSchema,
-		successContent: 'replace',
-		assessmentObservation: ({ request, observation }) => ({
-			...observation.facts,
-			intent: {
-				kind: 'createCategory',
-				name: request.values.name,
-				categoryKind: request.values.kind
-			}
-		}),
-		write: async ({ request }) => {
-			const id = request.scope.organizationId
-			if (id === null) throw new Error('Missing authorized workspace')
-			return createCategory(db, id, request.values.name, request.values.kind)
-		}
+	const options = createCategoryManagementFormOptions({
+		binding: db,
+		observe,
+		create: (id, values) => createCategory(db, id, values.name, values.kind),
+		archive: (id) => archiveCategory(db, id)
 	})
-	const form = createScopedFormController(options)
-	const archiveOptions = formOptions({
-		schema: categoryArchiveSchema,
-		successContent: 'retain',
-		assessmentObservation: ({ request, observation }) => ({
-			...observation.facts,
-			intent: {
-				kind: 'archiveCategory',
-				id: request.values.categoryId,
-				organizationId: request.values.organizationId
-			}
-		}),
-		write: async ({ request, observation }) => {
-			const row = observation.facts.categories.find((row) => row.id === request.values.categoryId)
-			if (!row) throw new Error('Missing authorized record')
-			await archiveCategory(db, row.id)
-			return row.name
-		}
-	})
-	const archive = createScopedFormController(archiveOptions)
+	const form = createScopedFormController(options.create)
+	const archive = createScopedFormController(options.archive)
 	const archivableIds = $derived(selectManagementArchiveIds(observe(), db, 'archiveCategory'))
 	function onArchive(id: string) {
 		archive.submitValues({ categoryId: id, organizationId: filters.activeOrganizationId })

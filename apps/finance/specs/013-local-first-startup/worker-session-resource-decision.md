@@ -1404,3 +1404,40 @@ Hosted Finance/Foundation/Clipper qualification is green at preceding head f14ea
 shell commit needs its own hosted result. The shell uses the Window client's observed native URL;
 actual production SvelteKit route mounting, page-specific feature parity and provider/PWA footer
 adoption remain open, together with the known partial financial-save blocker and activation gates.
+
+### Classification reuse before worker binding
+
+Category/tag create/archive policy already lives in the management availability and scoped-form
+charts. Their route components still duplicate domain form construction and directly bind the
+SDK leaves. Extract the four existing native writes to data/classification.ts (matching the
+existing accounts leaf boundary) and re-export them from data.ts. Extract category and tag form
+option factories, retaining the same management charts, schemas, intents, authorization/scope
+checks, archive result names and local settlement. Both existing routes consume those factories;
+the future SDK-bound Worker group will consume the same factories instead of copying the route
+logic. SDK reads stay at the existing observation boundary; this preparation adds no subscription,
+form workflow, SDK patch or activation. Existing management policy and classification browser
+flows are the behavioral checks. Worker projection of counts, archive capabilities and forms
+remains a separate binding step after this reuse is qualified.
+
+
+Cleanup within this slice removes the management policy's generated immediate-function wrappers,
+unused native-event union and archive-ID helper. A native XState choice retains the exact branch
+order and outcomes, with all conditions visible in the chart. No permission/reference/duplicate
+check is removed, and no new policy layer is added. Review and test the real existing management
+chart and both existing classification routes together before using these factories in the Worker.
+
+Classification reuse/cleanup passes **all 2,013 Finance units**, all **16 existing classification
+browser cases** (category/tag management, permissions, loading, historical counts and transaction
+tag integrations), full zero-warning Svelte/browser-test types, and formatting. In the isolated
+alpha.67 artifact, both factories and native classification leaves pass strict selected types,
+and the existing **24 management policy cases** pass. That last result is a native source probe,
+not qualification of a Worker classification UI, which remains next. Logs:
+`/private/tmp/finance-classification-reuse-checks.log`,
+`/private/tmp/finance-classification-reuse-full-unit.log`, and
+`/private/tmp/finance-classification-reuse-native.log`.
+
+The user explicitly requested deletion and simplification throughout the remaining work. This
+slice removes 92 lines from the management chart while preserving its branch order and behavior;
+both existing route controllers now bind reusable form options instead of repeating domain
+construction. Keep reviewing remaining custom protocols, adapters and defensive scaffolding
+against actual callers and native library capabilities before extending them.
