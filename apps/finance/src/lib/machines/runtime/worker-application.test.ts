@@ -1,3 +1,5 @@
+import { restorationMachine } from 'delightful-local-first/restoration/workflow'
+import type { SessionRuntimeIdentityChange } from 'delightful-local-first/session/runtime'
 import { createActor, waitFor, type ActorFromLogic } from 'xstate'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -9,6 +11,7 @@ import {
 import {
 	createFinanceWorkerMachine,
 	selectFinanceWorkerView,
+	selectFinanceRestorationAdmission,
 	selectFinanceRecoveryReader,
 	selectFinanceFormObservations
 } from './worker-application.js'
@@ -189,6 +192,10 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 	const nativeClose = vi.fn(async () => {
 		order.push('sdk')
 	})
+	const changeIdentity = vi.fn(
+		async (_change: SessionRuntimeIdentityChange): Promise<'completed' | 'bindingChanged'> =>
+			'completed'
+	)
 	const resource: SessionRuntimeResource<FinanceWorkerCapabilities> = {
 		observe: (publish) => {
 			observed = publish
@@ -198,7 +205,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 			}
 		},
 		close: nativeClose,
-		changeIdentity: async () => 'completed'
+		changeIdentity
 	}
 	const open = vi.fn(async () => resource)
 	const binding = {},
@@ -237,6 +244,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		actor,
 		runtime,
 		resource,
+		changeIdentity,
 		open,
 		nativeClose,
 		closeAccountStore,
@@ -1290,6 +1298,277 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.nativeClose).not.toHaveBeenCalled()
 			expect(f.closeAccountStore).not.toHaveBeenCalled()
 		} finally {
+			f.stop()
+		}
+	})
+})
+
+function restoreFixture(
+	f: ReturnType<typeof fixture>,
+	parse = vi.fn(async (_phrase: string) => 'synthetic-secret')
+) {
+	const admitted = selectFinanceRestorationAdmission(
+		f.actor.getSnapshot(),
+		f.view().sessionRevision
+	)
+	if (!admitted) throw new Error('Restoration not admitted')
+	const { session, scope } = admitted
+	const actor = createActor(restorationMachine, {
+		input: {
+			scope,
+			phrase: 'private input',
+			reportTo: f.actor,
+			capability: {
+				runtime: session,
+				parsePhrase: parse,
+				isCurrentBinding: (binding) =>
+					binding === session.binding && session.view.get().stage === 'active',
+				readIdentity: async () => {
+					const observation = session.view.get().observation
+					return observation?.status === 'ready'
+						? { kind: 'ready', identityId: observation.identityId }
+						: { kind: 'unavailable' }
+				}
+			}
+		}
+	})
+	actor.subscribe({
+		complete: () => {
+			const result = actor.getSnapshot().output
+			if (result) f.actor.send({ type: 'RESTORATION_FINISHED', result, view: session.view.get() })
+		}
+	})
+	f.actor.send({
+		type: 'REGISTER_RESTORATION',
+		scope,
+		owner: actor,
+		sessionRevision: f.view().sessionRevision
+	})
+	actor.start()
+	return { actor, scope, parse }
+}
+describe('worker restoration and financial drain', () => {
+	it('rejects an invalid phrase without replacing finance or issuing SDK mutation', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			const previous = f.actor.getSnapshot().context.forms?.owner
+			const r = restoreFixture(
+				f,
+				vi.fn(async () => {
+					throw new Error('Invalid phrase')
+				})
+			)
+			await waitFor(r.actor, (s) => s.status === 'done')
+			expect(f.view().identityRestore).toMatchObject({ busy: false, error: true })
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+			expect(f.actor.getSnapshot().context.forms?.owner).toBe(previous)
+			expect(f.queries).toHaveLength(1)
+			expect(f.view().accounts[0]?.name).toBe('Wallet')
+		} finally {
+			f.stop()
+		}
+	})
+	it('waits for an issued archive, restores once and replaces finance without old feedback', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.archiveWrite.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			const previous = f.actor.getSnapshot().context.forms?.owner,
+				revision = f.view().sessionRevision
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				sessionRevision: revision,
+				selection: f.view().selection
+			})
+			const r = restoreFixture(f)
+			await waitFor(f.actor, (s) => s.matches('restoring'))
+			expect(f.view().identityRestore.busy).toBe(true)
+			expect(f.view().accounts).toEqual([])
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+			expect(f.view().sessionRevision).toBeGreaterThan(revision)
+			held.resolve()
+			await waitFor(r.actor, (s) => s.status === 'done')
+			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
+			expect(f.changeIdentity).toHaveBeenCalledOnce()
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
+			expect(f.view().identityRestore).toMatchObject({ busy: false, error: false })
+			expect(f.view().archiveFeedback).toBeNull()
+			expect(f.view().selection.workspaceId).toBeNull()
+			expect(
+				JSON.stringify(f.view(), (_key, value: unknown) =>
+					typeof value === 'bigint' ? String(value) : value
+				)
+			).not.toContain('synthetic-secret')
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('resumes with a new financial group after a same-binding SDK failure without retrying', async () => {
+		const f = fixture()
+		f.changeIdentity.mockRejectedValueOnce(new Error('SDK refused restore'))
+		try {
+			await f.start()
+			const previous = f.actor.getSnapshot().context.forms?.owner
+			const r = restoreFixture(f)
+			await waitFor(r.actor, (s) => s.status === 'done')
+			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
+			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
+			expect(f.view().identityRestore).toMatchObject({ busy: false, error: true })
+			expect(f.changeIdentity).toHaveBeenCalledOnce()
+			f.actor.send({
+				type: 'RESTORATION_FINISHED',
+				result: { ...r.scope, mutation: 'settled', outcome: 'restored', identityId: userId },
+				view: f.actor.getSnapshot().context.session.view.get()
+			})
+			expect(f.view().identityRestore.error).toBe(true)
+			expect(f.changeIdentity).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('closes during preparation without issuing restoration and waits for the financial receipt', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.archiveWrite.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				sessionRevision: f.view().sessionRevision,
+				selection: f.view().selection
+			})
+			const r = restoreFixture(f)
+			await waitFor(f.actor, (s) => s.matches('restoring'))
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			held.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(r.actor.getSnapshot().output).toMatchObject({
+				outcome: 'cancelled',
+				mutation: 'notStarted'
+			})
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('finishes a cancelled preparation drain before resuming without issuing native restore', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.archiveWrite.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				sessionRevision: f.view().sessionRevision,
+				selection: f.view().selection
+			})
+			const r = restoreFixture(f)
+			await waitFor(f.actor, (s) => s.matches('restoring'))
+			r.actor.send({ type: 'CANCEL' })
+			await waitFor(r.actor, (s) => s.status === 'done')
+			expect(f.actor.getSnapshot().matches('restoring')).toBe(true)
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+			f.actor.send({
+				type: 'SELECT_CONTEXT',
+				selection: { workspaceId: b, revision: 2 },
+				kind: 'income'
+			})
+			held.resolve()
+			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
+			expect(f.view().selection).toEqual({ workspaceId: null, revision: 2 })
+			expect(f.view().identityRestore).toMatchObject({ busy: false, error: false, canSubmit: true })
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('does not cancel signed-out validation on a repeated signed-out observation', async () => {
+		const f = fixture(),
+			parsed = Promise.withResolvers<string>()
+		try {
+			await f.start()
+			const signedOut = {
+				status: 'signed-out',
+				binding: {}
+			} satisfies SessionRuntimeObservation<FinanceWorkerCapabilities>
+			f.publishSession(signedOut)
+			await waitFor(f.actor, (s) => s.matches({ running: 'waiting' }))
+			const r = restoreFixture(
+				f,
+				vi.fn(() => parsed.promise)
+			)
+			f.publishSession(signedOut)
+			expect(r.actor.getSnapshot().status).toBe('active')
+			expect(f.view().identityRestore.busy).toBe(true)
+			r.actor.send({ type: 'CANCEL' })
+			await waitFor(r.actor, (s) => s.status === 'done')
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+			expect(f.view().identityRestore.canSubmit).toBe(true)
+		} finally {
+			parsed.resolve('late-secret')
+			f.stop()
+		}
+	})
+	it('cancels validation if the SDK binding changes before preparation', async () => {
+		const f = fixture(),
+			parsed = Promise.withResolvers<string>()
+		try {
+			await f.start()
+			const r = restoreFixture(
+				f,
+				vi.fn(() => parsed.promise)
+			)
+			expect(f.view().identityRestore.busy).toBe(true)
+			f.publishSession(f.ready({}))
+			await waitFor(r.actor, (s) => s.status === 'done')
+			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
+			parsed.resolve('late-secret')
+			expect(f.view().identityRestore).toMatchObject({ busy: false, error: false })
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+		} finally {
+			parsed.resolve('late-secret')
+			f.stop()
+		}
+	})
+	it('retains an issued native restore across close before releasing the SDK and storage', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<'completed'>()
+		f.changeIdentity.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			const r = restoreFixture(f)
+			await vi.waitFor(() => expect(f.changeIdentity).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			held.resolve('completed')
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.closeAccountStore).toHaveBeenCalledOnce()
+			expect(r.actor.getSnapshot().output?.outcome).toBe('cancelled')
+			expect(f.view().status).toBe('closed')
+		} finally {
+			held.resolve('completed')
 			f.stop()
 		}
 	})

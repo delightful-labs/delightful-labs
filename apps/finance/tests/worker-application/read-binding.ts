@@ -1,3 +1,5 @@
+import type { SessionRuntimeInput } from 'delightful-local-first/session/runtime'
+import type { FinanceWorkerCapabilities } from '../../src/lib/contracts/worker-application.js'
 import type { InspectionEvent } from 'xstate'
 import { diagnosticError } from '../../src/lib/diagnostics/error-details.js'
 import { createFinanceWorkerBinding as nativeBinding } from '../../src/lib/runtime/worker/binding.js'
@@ -59,7 +61,11 @@ const command = z.discriminatedUnion('type', [
 	}),
 	edit,
 	z.strictObject({ type: z.literal('TEST_RECOVERY_READS') }),
-	z.strictObject({ type: z.literal('TEST_TRANSACTIONS'), workspaceId: z.uuid() }),
+	z.strictObject({
+		type: z.literal('TEST_TRANSACTIONS'),
+		workspaceId: z.uuid(),
+		authority: z.boolean().optional()
+	}),
 	z.strictObject({ type: z.literal('TEST_HOLD_ARCHIVE') }),
 	z.strictObject({ type: z.literal('TEST_RELEASE_ARCHIVE') }),
 	z.strictObject({ type: z.literal('TEST_BAD_VIEW') })
@@ -121,7 +127,7 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 						.where({ organizationId: c.workspaceId })
 						.include({ check: true })
 						.orderBy('bookedOn'),
-					{ tier: ReadTier.LocalFirst }
+					{ tier: c.authority ? ReadTier.Remote : ReadTier.LocalFirst }
 				)
 				reply.postMessage({
 					ok: true,
@@ -217,3 +223,28 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 		}
 	})()
 })
+
+/** Fixture-only native leaf diagnostics. Private actor input/context is never inspected. */
+export function traceSessionInput(
+	input: SessionRuntimeInput<FinanceWorkerCapabilities>
+): SessionRuntimeInput<FinanceWorkerCapabilities> {
+	return {
+		...input,
+		capability: {
+			open: async () => {
+				const resource = await input.capability.open()
+				return {
+					...resource,
+					changeIdentity: async (change) => {
+						try {
+							return await resource.changeIdentity(change)
+						} catch (error) {
+							console.error('Native session change error', JSON.stringify(diagnosticError(error)))
+							throw error
+						}
+					}
+				}
+			}
+		}
+	}
+}

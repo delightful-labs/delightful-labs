@@ -3,6 +3,7 @@
 	import { m } from '#lib/paraglide/messages.js'
 
 	let {
+		canSubmit = true,
 		restoring,
 		navigationOnly,
 		restoreError,
@@ -13,6 +14,7 @@
 		onRetryNavigation,
 		onsubmit
 	}: {
+		canSubmit?: boolean
 		restoring: boolean
 		navigationOnly: boolean
 		restoreError: boolean
@@ -48,7 +50,7 @@
 	{:else if sessionError || restoreError}
 		<p role="alert">{restoreError ? m['login.restore_error']() : m['login.session_error']()}</p>
 	{/if}
-	<Button type="submit" disabled={restoring}>
+	<Button type="submit" disabled={restoring || !canSubmit}>
 		{restoring
 			? navigationOnly
 				? m['login.opening_destination']()

@@ -10,6 +10,7 @@ import brokerUrl from '#jazz-broker-worker?sharedworker&url'
 import {
 	financeWorkerOpen,
 	financeRecoveryRead,
+	financeIdentityRestore,
 	financeRecoveryReply,
 	financeWorkerCommand,
 	financeWorkerReply,
@@ -60,6 +61,7 @@ export function createFinanceWorkerClient(
 		accounts: [],
 		archiveFeedback: null,
 		recoveryAvailable: false,
+		identityRestore: { canSubmit: false, busy: false, error: false, draftRevision: 0 },
 		workspaceStartup: null,
 		accountCreation: null,
 		transactionEntry: null,
@@ -72,6 +74,7 @@ export function createFinanceWorkerClient(
 		state.update((view) => ({
 			...view,
 			status: 'failed',
+			identityRestore: { ...view.identityRestore, canSubmit: false, busy: false, error: true },
 			accounts: [],
 			workspaces: null,
 			archiveFeedback: null,
@@ -108,6 +111,7 @@ export function createFinanceWorkerClient(
 		state.update((view) => ({
 			...view,
 			status: 'closed',
+			identityRestore: { ...view.identityRestore, canSubmit: false, busy: false, error: false },
 			accounts: [],
 			workspaces: null,
 			identityId: null,
@@ -214,6 +218,17 @@ export function createFinanceWorkerClient(
 	}
 	return {
 		view,
+		restoreIdentity: (phrase: string) => {
+			const current = get(state)
+			if (!current.identityRestore.canSubmit) return
+			worker.postMessage(
+				financeIdentityRestore.parse({
+					type: 'RESTORE_IDENTITY',
+					sessionRevision: current.sessionRevision,
+					phrase
+				})
+			)
+		},
 		recovery: { source: recoverySource, capability: recoveryCapability },
 		selectWorkspace: (workspaceId: string | null) =>
 			selectContext(workspaceId, get(state).transactionKind),

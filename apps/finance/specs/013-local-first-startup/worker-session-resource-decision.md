@@ -899,3 +899,52 @@ and **33 native application browser cases** pass. Native cases retain receipt-he
 selection/access replacement, offline restarts and the recovery dialog. Logs:
 `/private/tmp/finance-worker-financial-group-{static,unit,full-unit,test-types,native}.log`.
 This is the foundation for restoration; it does not activate the candidate or change SDK pins.
+
+## Private restoration through the existing session actor
+
+At the actual Worker host boundary, create one private finite Local First restoration actor per
+explicit restore request. Never inspect or persist that actor, its phrase, parsed credential or
+native session commands. Reuse its phrase parser, validation, preparation permit, native session
+change child, cancellation and terminal output. Keep one active operation reference and a monotonic
+attempt within the session-host binding; no per-financial-call registry or replacement SDK wrapper.
+
+Register only the operation's non-secret scope/reference with Finance before starting it. Validation
+may fail without draining Finance. On its existing PREPARE request, Finance withdraws admission and
+queries, advances the public revision, and drains the SDK-bound financial group. Grant PREPARED only
+after that group's actual terminal receipt. During mutation, SDK observations cannot restart domain
+work. On the private actor's terminal output, observe the existing SDK connection and create a fresh
+financial group even if a recoverable failure retains the same SDK binding. Cancellation during the
+drain retains that drain before resuming; close takes precedence, cancels the private workflow and
+uses the SDK owner's existing issued-mutation drain before storage/broker closure.
+
+Window forwards an explicitly submitted phrase directly to the host decoder, clears the input,
+and renders bounded progress/error facts through the existing LoginForm. No phrase enters the
+ordinary Finance command schema, public snapshots or financial inspection tree. Reuse existing
+localized copy. Qualify invalid phrases without mutation, no automatic retries, same-ID recovery,
+restoration of existing remote finance, delayed financial receipts, close/cancellation, stale
+completion refusal and persistent offline restart. This remains an isolated candidate until the
+remaining parity and activation blockers have been resolved.
+
+Implemented using the existing Local First restoration and private session actors. All **1,978
+Finance units** (46 host), full Finance/browser-test types with zero static warnings and **39
+native application cases** pass. New three-engine cases restore a real account from a different
+browser profile, recover its existing workspace/transaction, and retain that identity and transaction
+after a full process restart with the authority stopped. Invalid phrases clear the input without
+changing identity. A held archive blocks the mutation; UI detachment/remount does not lose custody.
+
+Native alpha.67 `session/state.js` calls `shutdown({ waitForSync: true })` before account replacement.
+With pending writes and an unreachable authority it returns `GracefulShutdownSyncError` and keeps
+the old client usable. The fixture now captures that exact sanitized native error at the I/O leaf,
+without inspecting private actor input or context. Finance resumes with a fresh financial group,
+withdraws old feedback and never retries the restore automatically. This native refusal is preserved;
+there is no forced shutdown, data reset, SDK patch or application sync workaround. Ordinary local
+finance and cold-reopened restored identities remain available offline.
+
+Host cases cover invalid input, drain-before-mutation, same-binding SDK rejection and resume,
+cancellation while draining, SDK replacement during validation, repeated signed-out observations,
+selection revision during the drain, stale terminal output and close during an issued native restore.
+Logs: `/private/tmp/finance-worker-restoration-{static,test-types,unit,full-unit,native,native-final}.log`.
+Hosted Finance, Foundation and Clipper all pass at preceding checkpoint `cef5aa4b`; the earlier
+intermittent check/account-move and extension-toolbar failures remain recorded, not declared fixed.
+Sign-out/new-account commands, complete shell/navigation and remaining domain/provider/file/backup
+parity and coordinated activation are still open. Active SDK pins and production routes stay unchanged.

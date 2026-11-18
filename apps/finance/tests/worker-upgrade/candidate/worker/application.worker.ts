@@ -1,3 +1,5 @@
+import { restorationMachine } from 'delightful-local-first/restoration/workflow'
+import { parseJazzRecoveryPhrase } from 'delightful-local-first/backend/jazz/restoration'
 import { replyWithRecoveryPhrase } from './recovery.js'
 import { createActor, type ActorFromLogic } from 'xstate'
 import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
@@ -12,6 +14,7 @@ import sdk from 'jazz-tools/package.json' with { type: 'json' }
 import {
 	financeWorkerCommand,
 	financeRecoveryRead,
+	financeIdentityRestore,
 	financeWorkerOpen,
 	type FinanceWorkerCapabilities
 } from '../../contracts/worker-application.js'
@@ -19,12 +22,14 @@ import {
 	createFinanceWorkerMachine,
 	selectFinanceFormObservations,
 	selectFinanceWorkerView,
+	selectFinanceRestorationAdmission,
 	selectFinanceRecoveryReader
 } from '../../machines/runtime/worker-application.js'
 import { createFinanceAccountStore } from './account-store.js'
 import { createFinanceWorkerBinding } from './binding.js'
 
 let application: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
+let restoration: ActorFromLogic<typeof restorationMachine> | undefined
 let viewScheduled = false
 function publishView() {
 	if (viewScheduled) return
@@ -42,6 +47,58 @@ function publishView() {
 }
 const sessionMachine = createSessionRuntimeMachine<FinanceWorkerCapabilities>()
 self.addEventListener('message', (event: MessageEvent<unknown>) => {
+	const restore = financeIdentityRestore.safeParse(event.data)
+	if (restore.success) {
+		for (const port of event.ports) port.close()
+		const admitted = selectFinanceRestorationAdmission(
+			application?.getSnapshot(),
+			restore.data.sessionRevision
+		)
+		if (!admitted || !application || restoration?.getSnapshot().status === 'active') return
+		const { session, scope } = admitted
+		const current = (binding: object) =>
+			binding === session.binding && session.view.get().stage === 'active'
+		const owner = createActor(restorationMachine, {
+			input: {
+				scope,
+				phrase: restore.data.phrase,
+				reportTo: application,
+				capability: {
+					runtime: session,
+					parsePhrase: parseJazzRecoveryPhrase,
+					isCurrentBinding: current,
+					readIdentity: async () => {
+						const view = session.view.get(),
+							observation = view.observation
+						return view.stage === 'active' && observation?.status === 'ready'
+							? { kind: 'ready', identityId: observation.identityId }
+							: { kind: 'unavailable' }
+					}
+				}
+			}
+		})
+		restoration = owner
+		owner.subscribe({
+			complete: () => {
+				const result = owner.getSnapshot().output
+				if (restoration === owner) restoration = undefined
+				if (result)
+					application?.send({ type: 'RESTORATION_FINISHED', result, view: session.view.get() })
+			},
+			error: () => {
+				if (restoration === owner) restoration = undefined
+				application?.send({ type: 'NATIVE_FAILED' })
+			}
+		})
+		application.send({
+			type: 'REGISTER_RESTORATION',
+			scope,
+			owner,
+			sessionRevision: restore.data.sessionRevision
+		})
+		owner.start()
+		return
+	}
 	const recovery = financeRecoveryRead.safeParse(event.data)
 	if (recovery.success && event.ports.length === 1) {
 		const reply = event.ports[0]

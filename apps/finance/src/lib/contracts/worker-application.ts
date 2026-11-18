@@ -150,6 +150,12 @@ export const workerTransactionEdit = workerTransactionEntry.extend({
 	transactionId: z.uuid(),
 	initialTransaction: workerTransactionInitial.nullable()
 })
+/** Private host input: excluded from ordinary commands and inspected application events. */
+export const financeIdentityRestore = z.strictObject({
+	type: z.literal('RESTORE_IDENTITY'),
+	sessionRevision,
+	phrase: z.string().max(8192)
+})
 export const financeWorkerView = z.strictObject({
 	type: z.literal('VIEW'),
 	sessionRevision,
@@ -159,6 +165,12 @@ export const financeWorkerView = z.strictObject({
 	status: z.enum(['starting', 'signed-out', 'loading', 'ready', 'failed', 'closing', 'closed']),
 	identityId: z.uuid().nullable(),
 	recoveryAvailable: z.boolean(),
+	identityRestore: z.strictObject({
+		canSubmit: z.boolean(),
+		busy: z.boolean(),
+		error: z.boolean(),
+		draftRevision: z.number().int().nonnegative()
+	}),
 	workspaces: z.array(workerWorkspace).nullable(),
 	accounts: z.array(
 		workerAccount.extend({

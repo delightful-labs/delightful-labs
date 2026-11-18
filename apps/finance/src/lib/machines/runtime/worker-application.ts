@@ -1,8 +1,15 @@
+import type {
+	RestorationEvent,
+	RestorationReport,
+	RestorationResult,
+	RestorationScope
+} from 'delightful-local-first/restoration/contracts'
 import {
 	createAsyncLogic,
 	createCallbackLogic,
 	setup,
 	types,
+	matchesState,
 	type SnapshotFrom,
 	type ActorRefFrom,
 	type ActorRef,
@@ -57,7 +64,16 @@ type Input = {
 	closeBroker: () => Promise<WorkerHostClosed>
 	brokerIdentity: WorkerHostClosed
 }
+type RestorationFinished = {
+	result: RestorationResult
+	view: SessionRuntimeView<FinanceWorkerCapabilities>
+}
+type RestorationOwner = ActorRef<Snapshot<unknown>, RestorationEvent>
 type Context = Input & {
+	restoration: { scope: RestorationScope; owner: RestorationOwner } | undefined
+	restorationOutcome: RestorationResult['outcome'] | undefined
+	restorationAttempt: number
+	settledRestoration: RestorationFinished | undefined
 	ready: Ready | undefined
 	selection: WorkerSelection
 	transactionId: string | null
@@ -197,6 +213,18 @@ export function createFinanceWorkerMachine({
 			context: types<Context>(),
 			output: types<{ outcome: 'closed' }>(),
 			events: {
+				REGISTER_RESTORATION: types<{
+					scope: RestorationScope
+					owner: RestorationOwner
+					sessionRevision: number
+				}>(),
+				RESTORATION_VALIDATED:
+					types<Omit<Extract<RestorationReport, { type: 'RESTORATION_VALIDATED' }>, 'type'>>(),
+				RESTORATION_PREPARE_REQUESTED:
+					types<
+						Omit<Extract<RestorationReport, { type: 'RESTORATION_PREPARE_REQUESTED' }>, 'type'>
+					>(),
+				RESTORATION_FINISHED: types<RestorationFinished>(),
 				SESSION: types<{ view: SessionRuntimeView<FinanceWorkerCapabilities> }>(),
 				SELECT_CONTEXT: types<{
 					selection: WorkerSelection
@@ -245,6 +273,10 @@ export function createFinanceWorkerMachine({
 		initial: 'running',
 		context: ({ input }) => ({
 			...input,
+			restoration: undefined,
+			restorationOutcome: undefined,
+			restorationAttempt: 0,
+			settledRestoration: undefined,
 			ready: undefined,
 			selection: { workspaceId: null, revision: 0 },
 			transactionId: null,
@@ -270,11 +302,22 @@ export function createFinanceWorkerMachine({
 			}
 		],
 		on: {
+			RESTORATION_VALIDATED: {},
+			RESTORATION_FINISHED: ({ context, event }) => {
+				if (!sameRestoration(context, event.result)) return
+				return { context: { restoration: undefined, restorationOutcome: event.result.outcome } }
+			},
 			CLOSE: ({ context }, enq) => {
+				if (context.restoration) enq.sendTo(context.restoration.owner, { type: 'SHUTDOWN' })
 				if (context.forms) enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
 				return {
 					target: '.draining',
-					context: { ready: undefined, facts: undefined }
+					context: {
+						ready: undefined,
+						facts: undefined,
+						restoration: undefined,
+						settledRestoration: undefined
+					}
 				}
 			},
 			FORMS_VIEW: ({ context, event }) =>
@@ -332,9 +375,47 @@ export function createFinanceWorkerMachine({
 			running: {
 				initial: 'waiting',
 				on: {
+					REGISTER_RESTORATION: ({ context, event }) => {
+						if (
+							context.restoration ||
+							event.scope.binding !== context.session.binding ||
+							event.sessionRevision !== context.sessionRevision ||
+							event.scope.attempt <= context.restorationAttempt
+						)
+							return
+						return {
+							context: {
+								restoration: { scope: event.scope, owner: event.owner },
+								restorationAttempt: event.scope.attempt,
+								restorationOutcome: undefined
+							}
+						}
+					},
+					RESTORATION_VALIDATED: {},
+					RESTORATION_PREPARE_REQUESTED: ({ context, event }, enq) => {
+						if (!sameRestoration(context, event)) return
+						if (context.forms) enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
+						return {
+							target: '#finance-worker.restoring.draining',
+							context: {
+								ready: undefined,
+								facts: undefined,
+								formsView: undefined,
+								readBinding: undefined,
+								sessionRevision: context.sessionRevision + 1
+							}
+						}
+					},
 					SESSION: ({ context, event }, enq) => {
 						const view = event.view,
 							ready = view.observation
+						if (
+							context.restoration &&
+							(context.ready
+								? ready?.status !== 'ready' || ready.binding !== context.ready.binding
+								: view.status !== context.sessionStatus)
+						)
+							enq.sendTo(context.restoration.owner, { type: 'BINDING_INVALIDATED' })
 						if (
 							view.stage === 'failed' ||
 							view.stage === 'closed' ||
@@ -546,6 +627,101 @@ export function createFinanceWorkerMachine({
 					readFailed: {}
 				}
 			},
+			restoring: {
+				initial: 'draining',
+				on: {
+					SESSION: {},
+					SELECT_CONTEXT: ({ context, event }) =>
+						event.selection.revision > context.selection.revision
+							? {
+									context: {
+										selection: { workspaceId: null, revision: event.selection.revision },
+										transactionKind: event.kind
+									}
+								}
+							: undefined,
+					FORMS_VIEW: {},
+					RESTORATION_VALIDATED: {},
+					RESTORATION_PREPARE_REQUESTED: {},
+					RESTORATION_FINISHED: ({ context, event, value }) => {
+						if (!sameRestoration(context, event.result)) return
+						return matchesState({ restoring: 'mutating' }, value)
+							? { target: '.resuming', context: { settledRestoration: event } }
+							: { context: { settledRestoration: event } }
+					}
+				},
+				states: {
+					draining: {
+						initial: 'assessing',
+						states: {
+							assessing: {
+								type: 'choice',
+								choice: ({ context }) => ({
+									target: context.forms ? 'waiting' : '#finance-worker.restoring.prepared'
+								})
+							},
+							waiting: {
+								on: {
+									FORMS_CLOSED: ({ context, event }, enq) => {
+										if (!context.forms || event.binding !== context.forms.binding) return
+										enq.stop(context.forms.observer)
+										return {
+											target: '#finance-worker.restoring.prepared',
+											context: { forms: undefined, formsView: undefined }
+										}
+									}
+								}
+							}
+						}
+					},
+					prepared: {
+						type: 'choice',
+						choice: ({ context }) => ({
+							target: context.settledRestoration ? 'resuming' : 'mutating'
+						})
+					},
+					mutating: {
+						entry: ({ context }, enq) => {
+							if (context.restoration)
+								enq.sendTo(context.restoration.owner, {
+									type: 'PREPARED',
+									...context.restoration.scope
+								})
+						}
+					},
+					resuming: {
+						type: 'choice',
+						choice: ({ context }) => {
+							const settled = required(context.settledRestoration),
+								view = settled.view
+							const ready =
+								view.stage === 'active' && view.observation?.status === 'ready'
+									? view.observation
+									: undefined
+							return {
+								target:
+									view.stage === 'active'
+										? ready
+											? '#finance-worker.running.ready'
+											: '#finance-worker.running.waiting'
+										: '#finance-worker.failed',
+								context: {
+									ready,
+									sessionStatus: view.status,
+									readBinding: {},
+									restoration: undefined,
+									settledRestoration: undefined,
+									restorationOutcome: settled.result.outcome,
+									selection: { workspaceId: null, revision: context.selection.revision },
+									transactionId: null,
+									ledgerPage: 1,
+									ledgerFilters: emptyLedgerFilters
+								}
+							}
+						}
+					}
+				}
+			},
 			retiringForms: {
 				on: {
 					FORMS_VIEW: {},
@@ -681,13 +857,15 @@ export function selectFinanceWorkerView(
 				  snapshot.matches('closingAccountStore') ||
 				  snapshot.matches('closingBroker')
 				? 'closing'
-				: context.ready
-					? context.facts?.status !== 'ready'
-						? 'loading'
-						: 'ready'
-					: context.sessionStatus === 'signed-out'
-						? 'signed-out'
-						: 'starting'
+				: snapshot.matches('restoring')
+					? 'loading'
+					: context.ready
+						? context.facts?.status !== 'ready'
+							? 'loading'
+							: 'ready'
+						: context.sessionStatus === 'signed-out'
+							? 'signed-out'
+							: 'starting'
 	const balances =
 		context.facts?.accounts && context.facts.transactions
 			? calculateAccountBalances(context.facts.accounts, context.facts.transactions)
@@ -716,6 +894,19 @@ export function selectFinanceWorkerView(
 		transactionId: context.transactionId,
 		selection: context.selection,
 		status,
+		identityRestore: {
+			canSubmit:
+				snapshot.status === 'active' &&
+				snapshot.matches('running') &&
+				!context.restoration &&
+				(context.ready !== undefined || context.sessionStatus === 'signed-out'),
+			busy: context.restoration !== undefined,
+			error:
+				context.restorationOutcome === 'invalid' ||
+				context.restorationOutcome === 'failed' ||
+				context.restorationOutcome === 'identityUnavailable',
+			draftRevision: context.restorationAttempt
+		},
 		recoveryAvailable:
 			snapshot.status === 'active' &&
 			snapshot.matches('running') &&
@@ -847,5 +1038,31 @@ export function selectFinanceRecoveryReader(
 		snapshot.context.sessionRevision === sessionRevision &&
 		snapshot.context.ready?.identityKind === 'device'
 		? snapshot.context.ready.capabilities.readRecoveryPhrase
+		: undefined
+}
+
+function sameRestoration(context: Context, scope: RestorationScope) {
+	return (
+		context.restoration?.scope.binding === scope.binding &&
+		context.restoration.scope.attempt === scope.attempt
+	)
+}
+/** Host admission before constructing any private phrase-bearing actor. */
+export function selectFinanceRestorationAdmission(
+	snapshot: SnapshotFrom<ReturnType<typeof createFinanceWorkerMachine>> | undefined,
+	revision: number
+) {
+	return snapshot?.status === 'active' &&
+		snapshot.matches('running') &&
+		!snapshot.context.restoration &&
+		snapshot.context.sessionRevision === revision &&
+		(snapshot.context.ready !== undefined || snapshot.context.sessionStatus === 'signed-out')
+		? {
+				session: snapshot.context.session,
+				scope: {
+					binding: snapshot.context.session.binding,
+					attempt: snapshot.context.restorationAttempt + 1
+				}
+			}
 		: undefined
 }

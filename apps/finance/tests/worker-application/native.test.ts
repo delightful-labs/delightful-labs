@@ -72,8 +72,9 @@ beforeAll(async () => {
 						return code
 							.replace(
 								'import { createFinanceWorkerBinding }',
-								'import { createFinanceWorkerBinding, inspectWorkerFailure }'
+								'import { createFinanceWorkerBinding, inspectWorkerFailure, traceSessionInput }'
 							)
+							.replace('input: native', 'input: traceSessionInput(native)')
 							.replace(
 								'application = createActor(machine, {',
 								'application = createActor(machine, { inspect: inspectWorkerFailure,'
@@ -342,6 +343,216 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect(phrase).toHaveCount(0)
 			} finally {
 				await browser.close()
+			}
+		})
+		it('resumes finance after native offline restoration refusal following a held archive and UI remount', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			const failures: string[] = []
+			page.on('console', (message) => {
+				if (message.type() === 'error' && message.text().startsWith('Native session change error'))
+					failures.push(message.text())
+			})
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Before restore'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Before restore', exact: true })
+				).toBeVisible()
+				const identity = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().identityId
+				)
+				await page.getByRole('button', { name: /show recovery phrase/i }).click()
+				const phrase = await page
+					.getByRole('dialog')
+					.getByRole('textbox', { name: /recovery phrase/i })
+					.inputValue()
+				await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click()
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.holdArchive())).toEqual({
+					ok: true
+				})
+				await page.getByRole('button', { name: 'Archive', exact: true }).click()
+				await page.locator('summary').filter({ hasText: 'Login' }).click()
+				await page.getByRole('textbox', { name: /recovery phrase/i }).fill(phrase)
+				await page.getByRole('button', { name: 'Login', exact: true }).click()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore.busy)
+					)
+					.toBe(true)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('loading')
+				await page.evaluate(() => window.financeWorkerReadFixture.detach())
+				await page.evaluate(() => window.financeWorkerReadFixture.attach())
+				await page.locator('summary').filter({ hasText: 'Login' }).click()
+				await browserExpect(page.getByRole('textbox', { name: /recovery phrase/i })).toHaveValue('')
+				await browserExpect(page.getByRole('textbox', { name: /recovery phrase/i })).toBeDisabled()
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.releaseArchive())).toEqual(
+					{ ok: true }
+				)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
+					.toMatchObject({ busy: false, error: true })
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
+					identity
+				)
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('ready')
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().accounts)).toEqual(
+					[]
+				)
+				expect(
+					await page.evaluate(() => window.financeWorkerReadFixture.state().archiveFeedback)
+				).toBeNull()
+				expect(failures).toHaveLength(1)
+				expect(failures[0]).toContain('GracefulShutdownSyncError')
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('restores existing finance from another browser profile and retains its transactions offline', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const authority = createJazz({
+				app,
+				permissions,
+				store: memory(),
+				authenticate: acceptLocalFirstAuth,
+				allowedOrigins: [origin]
+			})
+			const endpoint = createServer((request, response) => authority.nodeHandler(request, response))
+			await authority.attach(endpoint)
+			await authority.ready()
+			await new Promise<void>((resolve) => endpoint.listen(0, '127.0.0.1', resolve))
+			const address = endpoint.address()
+			if (!address || typeof address === 'string') throw new Error('Missing restoration authority')
+			const serverUrl = `http://127.0.0.1:${address.port}/jazz`,
+				scope = serverUrl
+			const sourceProfile = await mkdtemp(join(directory, 'restore-source-')),
+				restoredProfile = await mkdtemp(join(directory, 'restored-'))
+			let context = await engine.launchPersistentContext(sourceProfile, { headless: true })
+			try {
+				let page = await context.newPage()
+				await open(page, scope, serverUrl)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().workspaceStartup))
+					.toBe('ready')
+				const original = await page.evaluate(() => window.financeWorkerReadFixture.state())
+				const workspace = original.workspaces?.[0]
+				if (!workspace) throw new Error('Missing source workspace')
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await createAccountUI(page, 'Recovered wallet')
+				await page
+					.getByLabel('Account', { exact: true })
+					.selectOption({ label: 'Recovered wallet · USD' })
+				await page.getByLabel('Category', { exact: true }).selectOption({ index: 1 })
+				await page.getByLabel('Amount', { exact: true }).fill('12.34')
+				await page.getByLabel('Date', { exact: true }).fill('2026-11-18')
+				await page.getByLabel('Description', { exact: true }).fill('Existing recovered expense')
+				await page.getByRole('button', { name: /save transaction/i }).click()
+				await browserExpect(
+					page.getByRole('status').filter({ hasText: /transaction saved/i })
+				).toBeVisible()
+				await browserExpect
+					.poll(async () => {
+						const result = await page.evaluate(
+							(id) => window.financeWorkerReadFixture.transactions(id, true),
+							workspace.id
+						)
+						return result.transactions?.map((row) => row.description)
+					})
+					.toEqual(['Existing recovered expense'])
+				await page.getByRole('button', { name: /show recovery phrase/i }).click()
+				const phrase = await page
+					.getByRole('dialog')
+					.getByRole('textbox', { name: /recovery phrase/i })
+					.inputValue()
+				await close(page)
+				await context.close()
+				context = await engine.launchPersistentContext(restoredProfile, { headless: true })
+				page = await context.newPage()
+				await open(page, scope, serverUrl)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().workspaceStartup))
+					.toBe('ready')
+				const temporary = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().identityId
+				)
+				expect(temporary).not.toBe(original.identityId)
+				await page.locator('summary').filter({ hasText: 'Login' }).click()
+				const input = page.getByRole('textbox', { name: /recovery phrase/i })
+				await input.fill('not a recovery phrase')
+				await page.getByRole('button', { name: 'Login', exact: true }).click()
+				await browserExpect(
+					page.getByRole('alert').filter({ hasText: /check the recovery phrase/i })
+				).toBeVisible()
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
+					temporary
+				)
+				await browserExpect(input).toHaveValue('')
+				await input.fill(phrase)
+				await page.getByRole('button', { name: 'Login', exact: true }).click()
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityId))
+					.toBe(original.identityId)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
+					.toMatchObject({ busy: false, error: false })
+				await browserExpect(input).toHaveValue('')
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture.state().workspaces?.map((w) => w.id)
+						)
+					)
+					.toEqual([workspace.id])
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Recovered wallet', exact: true })
+				).toBeVisible()
+				await browserExpect(
+					page.getByRole('link', { name: /transaction details.*Existing recovered expense/i })
+				).toBeVisible()
+				await close(page)
+				await context.close()
+				await authority.close()
+				endpoint.closeAllConnections()
+				await new Promise<void>((resolve) => endpoint.close(() => resolve()))
+				context = await engine.launchPersistentContext(restoredProfile, { headless: true })
+				page = await context.newPage()
+				await open(page, scope, serverUrl)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
+					original.identityId
+				)
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await browserExpect(
+					page.getByRole('link', { name: /transaction details.*Existing recovered expense/i })
+				).toBeVisible()
+				await close(page)
+			} finally {
+				await context.close()
+				await authority.close()
+				if (endpoint.listening) {
+					endpoint.closeAllConnections()
+					await new Promise<void>((resolve) => endpoint.close(() => resolve()))
+				}
 			}
 		})
 		it('initializes a real workspace without fixture writes and reuses its marker offline', async () => {

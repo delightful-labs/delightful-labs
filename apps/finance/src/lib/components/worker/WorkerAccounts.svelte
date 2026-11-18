@@ -11,6 +11,7 @@
 	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
 	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+	import WorkerLogin from './WorkerLogin.svelte'
 	import WorkerRecovery from './WorkerRecovery.svelte'
 	import WorkerLedger from './WorkerLedger.svelte'
 	import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
@@ -23,6 +24,7 @@
 	let {
 		view,
 		recovery,
+		onRestore,
 		onSelectWorkspace,
 		onArchive,
 		onAccountCreation,
@@ -33,6 +35,7 @@
 		onLedgerFilters
 	}: {
 		recovery: { source: RecoveryScopeSource; capability: RecoveryPhraseCapability }
+		onRestore: (phrase: string) => void
 		view: Readable<FinanceWorkerView>
 		onSelectWorkspace: (id: string) => void
 		onArchive: (id: string, scope: WorkerCommandScope) => void
@@ -47,6 +50,7 @@
 </script>
 
 <WorkerRecovery binding={recovery} />
+<WorkerLogin view={live.current} {onRestore} />
 <WorkspaceSelector
 	organizations={live.current.workspaces ?? undefined}
 	organizationId={live.current.selection.workspaceId}

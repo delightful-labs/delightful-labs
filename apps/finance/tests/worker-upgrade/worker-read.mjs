@@ -10,6 +10,8 @@ export function checkFinanceWorker(directory, finance, proof) {
 	for (const name of [
 		'src/lib/runtime/worker/recovery.ts',
 		'src/lib/components/worker/WorkerRecovery.svelte',
+		'src/lib/components/worker/WorkerLogin.svelte',
+		'src/lib/components/identity/LoginForm.svelte',
 		'src/lib/machines/workspaces/workspace-initialization.ts',
 		'src/lib/machines/workspaces/workspace-creation-transaction.ts',
 		'src/lib/diagnostics/error-details.ts',

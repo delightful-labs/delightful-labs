@@ -20,6 +20,7 @@ function attach() {
 		props: {
 			view: owner.view,
 			recovery: owner.recovery,
+			onRestore: owner.restoreIdentity,
 			onSelectWorkspace: owner.selectWorkspace,
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
@@ -78,7 +79,8 @@ const fixture = {
 	edit: (accountId: string, name: string) => request({ type: 'TEST_EDIT', accountId, name }),
 	seedLedger: (workspaceId: string, accountId: string) =>
 		request({ type: 'TEST_SEED_LEDGER', workspaceId, accountId }),
-	transactions: (workspaceId: string) => request({ type: 'TEST_TRANSACTIONS', workspaceId }),
+	transactions: (workspaceId: string, authority = false) =>
+		request({ type: 'TEST_TRANSACTIONS', workspaceId, authority }),
 	archive: (accountId: string) => current().archiveAccount(accountId, get(current().view)),
 	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),
 	releaseArchive: () => request({ type: 'TEST_RELEASE_ARCHIVE' }),

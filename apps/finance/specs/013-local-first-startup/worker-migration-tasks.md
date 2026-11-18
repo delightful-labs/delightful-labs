@@ -1,5 +1,30 @@
 # Finance worker migration: foundation-first tasks
 
+## Current handoff — November 18
+
+The maintained isolated candidate targets **alpha.67**; the active app remains alpha.60.
+Use the [current resource/implementation record](worker-session-resource-decision.md) and
+[maintained candidate runner](../../tests/worker-upgrade/README.md) before older version-specific
+entries below. Candidate source cleanup and all concurrent PR46 updates are preserved.
+
+Qualified worker slices now include native SDK/session/storage custody, account creation/archive,
+income/expense entry and selected editing, exact balances and bounded filtered ledger pages,
+workspace initialization, recovery-key display and **private account restoration**. Archive,
+initialization and forms share one restartable SDK-bound group. Recovery reuses Local First's actors;
+raw phrases never enter Finance's inspected state. Actual cross-profile restoration recovers existing
+transactions and survives a full offline process restart. Pending offline uploads preserve Jazz's
+native account-switch refusal and resume ordinary Finance without retrying.
+
+Latest local qualification: **1,978 Finance units** (46 host), zero-warning static/browser types,
+and **39 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
+passes 200 schema/restore and 42 worker/session cases. Hosted Finance/Foundation/Clipper pass at
+`cef5aa4b`. W12/W16 remain partial: sign-out/new-account and full shell/chooser/navigation precede
+remaining settings/classification/transfers, provider, attachment and workspace/archive UI parity.
+W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
+The intermittent check/account-move failure remains an explicit activation blocker.
+
+## Historical qualification snapshots
+
 **2026-11-17 release update:** target alpha.66 for the coordinated upgrade.
 The [actual-code audit and revised order](worker-jazz-alpha66-research.md)
 retain the private session actor and awaited SDK factory, and move the isolated
