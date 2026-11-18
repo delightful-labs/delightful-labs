@@ -60,16 +60,14 @@ export default s.definePermissions(app, ({ policy, session, allOf, anyOf }) => {
 		highlightId: RowRefValue
 	}) =>
 		allOf([
-			owns(row.libraryId),
+			documentParent(row),
 			anyOf([
-				allOf([
-					{ highlightId: null },
-					policy.libraryDocuments.exists.where({ id: row.documentId, libraryId: row.libraryId })
-				]),
-				allOf([
-					{ documentId: null },
-					policy.highlights.exists.where({ id: row.highlightId, libraryId: row.libraryId })
-				])
+				{ highlightId: null },
+				policy.highlights.exists.where({
+					id: row.highlightId,
+					libraryId: row.libraryId,
+					documentId: row.documentId
+				})
 			])
 		])
 	policy.notes.allowInsert.where(noteParent)

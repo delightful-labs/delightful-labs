@@ -98,7 +98,7 @@ function matchesAcceptedHighlight(
 	return (
 		note.libraryId === value.libraryId &&
 		note.highlightId === value.id &&
-		note.documentId === null &&
+		note.documentId === value.documentId &&
 		note.source === null &&
 		record.motivation === 'commenting' &&
 		record.body.value === note.text
@@ -179,9 +179,7 @@ export function createPublicationStore(
 						!!document &&
 						document.libraryId === scope.libraryId &&
 						document.status !== 'trashed' &&
-						(values.highlightId
-							? !!highlight
-							: !!note && note.highlightId === null && note.documentId !== null),
+						(values.highlightId ? !!highlight : !!note && note.highlightId === null),
 					occupied:
 						sourceRows.length > 1 ||
 						(!!existingId && existingId.id !== current?.id) ||

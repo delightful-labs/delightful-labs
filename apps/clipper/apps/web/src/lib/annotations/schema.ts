@@ -92,7 +92,7 @@ export type PreparedAnnotation = {
 export const annotationNoteRowSchema = z.object({
 	id: lowercaseUuidSchema,
 	libraryId: lowercaseUuidSchema,
-	documentId: lowercaseUuidSchema.nullable(),
+	documentId: lowercaseUuidSchema,
 	highlightId: lowercaseUuidSchema.nullable(),
 	source: z.string().nullable(),
 	text: z.string()
