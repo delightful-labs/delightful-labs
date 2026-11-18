@@ -1,4 +1,4 @@
-import { required } from '../bank-sync/identity.js'
+import { required } from '../../domain/required.js'
 import {
 	archiveAllowed,
 	archiveScopeMatches,
@@ -257,4 +257,11 @@ export function selectAccountArchiveView(
 				? snapshot.context.result
 				: undefined
 	}
+}
+
+/** Public scope correlation for a parent that forwards this workflow's view. */
+export function selectAccountArchiveReport(
+	snapshot: SnapshotFrom<ReturnType<typeof createAccountArchiveMachine>>
+) {
+	return { binding: snapshot.context.observation.binding, view: selectAccountArchiveView(snapshot) }
 }

@@ -4,11 +4,7 @@ import type { EventPayload } from '../../contracts/event-payload.js'
 
 type Context = { identity: RequestIdentity; current: Observation; error: unknown }
 
-// Invariant narrowing at typed actor boundaries; workflow decisions belong to guards.
-export function required<Value>(value: Value | null | undefined): Value {
-	if (value == null) throw new Error('invalid-machine-context')
-	return value
-}
+export { required } from '../../domain/required.js'
 
 export function createIdentityMachine({ observe }: Dependencies) {
 	const events0 = { CHECK: types<EventPayload<{ type: 'CHECK' }, 'CHECK'>>() }

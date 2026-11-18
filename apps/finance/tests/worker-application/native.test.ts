@@ -1,3 +1,4 @@
+import svg from '@poppanator/sveltekit-svg'
 import { createServer } from 'node:http'
 import { glob, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { extname, join, resolve } from 'node:path'
@@ -24,6 +25,7 @@ beforeAll(async () => {
 		logLevel: 'silent',
 		plugins: [
 			svelte({ configFile: false }),
+			svg(),
 			{
 				name: 'finance-window-boundary',
 				generateBundle(_options, bundle) {
@@ -195,16 +197,63 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					.toEqual(['Edited B'])
 				await page.evaluate(() => window.financeWorkerReadFixture.attach())
 				await browserExpect(page.getByRole('cell', { name: 'Edited B', exact: true })).toBeVisible()
-				expect(
-					await page.evaluate((id) => window.financeWorkerReadFixture.archive(id), accountB)
-				).toEqual({ ok: true })
+				await page
+					.getByRole('row')
+					.filter({ has: page.getByRole('cell', { name: 'Edited B', exact: true }) })
+					.getByRole('button', { name: 'Archive', exact: true })
+					.click()
 				await browserExpect(page.getByRole('cell', { name: 'Edited B', exact: true })).toHaveCount(
 					0
 				)
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().accounts))
 					.toEqual([])
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().archiveFeedback))
+					.toMatchObject({ outcome: 'succeeded', name: 'Edited B' })
+				await browserExpect(page.getByText(/Edited B/)).toBeVisible()
 				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('drains an archive issued through the real UI before closing its native SDK', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Pending archive'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate((id) => window.financeWorkerReadFixture.select(id), workspaceId)
+				const row = page
+					.getByRole('row')
+					.filter({ has: page.getByRole('cell', { name: 'Pending archive', exact: true }) })
+				await browserExpect(row).toBeVisible()
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.holdArchive())).toEqual({
+					ok: true
+				})
+				await row.getByRole('button', { name: 'Archive', exact: true }).click()
+				await browserExpect(row).toHaveCount(0)
+				await page.evaluate(() => window.financeWorkerReadFixture.close())
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('closing')
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.releaseArchive())).toEqual(
+					{ ok: true }
+				)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('closed')
 			} finally {
 				await browser.close()
 			}

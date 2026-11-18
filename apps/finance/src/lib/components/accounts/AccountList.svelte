@@ -4,6 +4,8 @@
 	import type { AccountArchiveView } from '#lib/machines/accounts/account-archive.js'
 	import type { AccountDeleteGrantView } from '#lib/machines/accounts/account-delete-grants.js'
 	import type { AccountMembership, OrganizationMember } from '#lib/schema.js'
+	import AccountArchiveFeedback from './AccountArchiveFeedback.svelte'
+	import { projectAccountArchiveFeedback } from '../../contracts/account-archive-feedback.js'
 	import AccountActionsDialog from './AccountActionsDialog.svelte'
 	import { m } from '#lib/paraglide/messages.js'
 	import { formatSignedMoney } from '#lib/domain/money.js'
@@ -31,20 +33,7 @@
 		grantQueries: ComponentProps<typeof AccountActionsDialog>['grantQueries']
 		onActionsOpenChange: (open: boolean) => void
 	} = $props()
-	const feedbackText = $derived(
-		view.feedback?.outcome === 'succeeded'
-			? m['status.archived_subject_name']({
-					subject: m['nouns.account']({ count: 1 }),
-					name: view.feedback.request.name
-				})
-			: view.feedback?.settlement === 'locallyPersisted'
-				? m['accounts.archive_interrupted_saved']()
-				: view.feedback?.outcome === 'scopeChanged'
-					? m['accounts.archive_scope_changed']()
-					: view.feedback?.outcome === 'denied'
-						? m['accounts.archive_restricted']()
-						: m['errors.archive_subject']({ subject: m['nouns.account']({ count: 1 }) })
-	)
+
 	let selectedAccountId = $state<string | null>(null)
 	let dialogOpen = $state(false)
 	$effect(() => {
@@ -80,12 +69,7 @@
 		text={m['errors.load_subject']({ subject: m['nouns.account']({ count: 2 }) })}
 	/>
 {:else if view.kind === 'ready'}
-	{#if view.feedback}
-		<StatusMessage
-			variant={view.feedback.settlement === 'locallyPersisted' ? 'success' : 'error'}
-			text={feedbackText}
-		/>
-	{/if}
+	<AccountArchiveFeedback feedback={projectAccountArchiveFeedback(view.feedback)} />
 	{#if view.rows.length === 0}
 		<p>{m['accounts.empty.title']()}</p>
 	{:else}

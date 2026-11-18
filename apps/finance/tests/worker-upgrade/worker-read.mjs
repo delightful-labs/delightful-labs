@@ -8,7 +8,14 @@ export function checkFinanceWorker(directory, finance, proof) {
 	const run = (command, args) => execFileSync(command, args, { cwd: app, stdio: 'inherit' })
 	for (const name of [
 		'src/lib/contracts/worker-application.ts',
+		'src/lib/contracts/account-archive-feedback.ts',
+		'src/lib/tdesign-icons.d.ts',
+		'src/lib/machines/accounts/account-archive.ts',
+		'src/lib/machines/accounts/account-archive-operation.ts',
+		'src/lib/components/accounts/AccountArchiveButton.svelte',
+		'src/lib/components/accounts/AccountArchiveFeedback.svelte',
 		'src/lib/data/accounts.ts',
+		'src/lib/domain/required.ts',
 		'src/lib/machines/runtime/worker-application.ts',
 		'src/lib/runtime/worker/application.worker.ts',
 		'src/lib/runtime/worker/client.ts',
@@ -28,6 +35,7 @@ export function checkFinanceWorker(directory, finance, proof) {
 	for (const name of [
 		'src/lib/runtime/worker/read-binding.ts',
 		'src/lib/data/accounts.ts',
+		'src/lib/machines/accounts/account-archive-operation.ts',
 		'tests/worker-application/read-binding.ts'
 	]) {
 		const path = join(app, name)
@@ -39,6 +47,7 @@ export function checkFinanceWorker(directory, finance, proof) {
 			{
 				extends: './tsconfig.json',
 				include: [
+					'src/lib/tdesign-icons.d.ts',
 					'src/lib/runtime/worker/application.worker.ts',
 					'src/lib/data/accounts.ts',
 					'src/lib/runtime/worker/client.ts',

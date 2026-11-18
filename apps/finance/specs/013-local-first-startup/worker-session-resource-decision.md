@@ -535,6 +535,49 @@ Balances, transactions, other forms, bank workflows, backup/restore UI, recovery
 remote acquisition, shell/routes and full application drain/parity remain before
 Finance can use this runtime as its production replacement.
 
+## Finance archive integration model
+
+Implemented in the candidate: the real archive UI now sends the validated command
+to the existing domain chart. Permission/duplicate/scope decisions and write drain
+are unchanged. Both legacy and Worker views share the extracted archive button
+and feedback components; the existing strings/icons are retained. A generic
+invariant helper moved out of bank-sync so archive does not import unrelated
+bank actor/SDK types. There is one implementation and the old bank export remains
+compatible.
+
+Full Finance static checks and **1,946 unit tests pass**, including 18 host cases.
+All **12 native cases pass** across Chromium/Firefox/WebKit, including the actual
+archive button, live row removal and success feedback, plus close while a native
+archive receipt is deliberately held. That hold follows native local settlement;
+unit cases independently hold the write leaf and cover duplicate admission,
+A → B → A, viewer/foreign-grant refusal, stale commands, rejected writes without
+replay and unexpected child completion. SDK close cannot begin until the original
+archive owner completes SHUTDOWN. The runner reuses Finance's existing SVG plugin,
+icon package and type declaration; no workspace dependency is added.
+
+Logs: `/private/tmp/finance-worker-archive-{types,unit,full-unit,alpha67-native}.log`.
+Production activation, account creation and the remaining forms/app integration
+are still required; this does not qualify full Finance parity.
+
+The next implementation reuses `createAccountArchiveMachine` as one fixed
+host-lifetime invoked child. Workspace and native identity changes update its
+observations without stopping it; an issued write retains its admitted native
+binding through settlement. Native account, membership and grant subscriptions
+supply copied facts inside the Worker. The existing chart owns validation,
+permission admission, duplicate refusal, scope interruption and SHUTDOWN drain.
+
+The validated ARCHIVE_ACCOUNT command includes the selected workspace revision;
+the host refuses obsolete selections before forwarding to that existing child.
+The wire contains only row action availability and bounded feedback. The existing
+archive button/feedback presentation is shared by the legacy account view and
+Worker view; no financial policy moves into Svelte.
+
+CLOSE first sends SHUTDOWN to the archive child and waits for actual completion.
+Only then may native session, AccountStore and broker closure begin. Query
+failure can withdraw data while a write settles; it must not stop the archive
+child. Forced child stop/failure cannot establish a successful drain. There is
+no new operation registry, detached root actor or async message-handler write.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing

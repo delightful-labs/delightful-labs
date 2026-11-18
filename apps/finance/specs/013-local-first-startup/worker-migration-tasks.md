@@ -215,7 +215,11 @@ retain their product/parity requirements, not the abandoned implementation plan.
       ordinary Svelte subscription/rendering; do not send complete XState
       snapshots or build a generic remote Jazz/actor API. Qualify identity/scope
       replacement, late views, unsubscribe and offline restart.
-- [ ] **C6 — Move one existing financial workflow intact.** After the read slice,
+- [ ] **C6 — Move one existing financial workflow intact.** The candidate now
+      uses the existing archive workflow through the actual UI, including scoped
+      permissions, feedback and issued-write drain; 18 host cases and 12 native
+      cases pass with all 1,946 Finance units. Production activation and the
+      remaining forms/app integration stay open. Continue to
       reuse the existing account archive chart/operation and its issued-write
       drain first; supply membership/grant facts. Native create/archive leaves
       are now shared in `data/accounts.ts` without Svelte imports, preserving

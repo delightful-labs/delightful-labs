@@ -1,4 +1,4 @@
-import { createActor, waitFor } from 'xstate'
+import { createActor, waitFor, type ActorFromLogic } from 'xstate'
 import { describe, expect, it, vi } from 'vitest'
 import {
 	createSessionRuntimeMachine,
@@ -6,12 +6,18 @@ import {
 	type SessionRuntimeObservation,
 	type SessionRuntimeResource
 } from 'delightful-local-first/session/runtime'
-import { financeWorkerMachine, selectFinanceWorkerView } from './worker-application.js'
+import {
+	createFinanceWorkerMachine,
+	selectFinanceWorkerView,
+	selectFinanceArchiveObservation,
+	selectFinanceArchiveWriter
+} from './worker-application.js'
 import type {
 	FinanceReadCapabilities,
 	WorkerAccount,
 	WorkerWorkspace
 } from '../../contracts/worker-application.js'
+import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 
 const userId = '10000000-0000-4000-8000-000000000001',
 	a = '20000000-0000-4000-8000-000000000001',
@@ -36,6 +42,12 @@ function fixture() {
 		failed: () => void
 		release: ReturnType<typeof vi.fn<() => void>>
 	}[] = []
+	const memberships: {
+		publish: (row: ArchiveObservation['membership']) => void
+		failed: () => void
+	}[] = []
+	const grants: { publish: (rows: ArchiveObservation['grants']) => void; failed: () => void }[] = []
+	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const capabilities: FinanceReadCapabilities = {
 		observeWorkspaces: (publish, failed) => {
 			const release = vi.fn(() => {
@@ -48,9 +60,37 @@ function fixture() {
 			const release = vi.fn(() => {
 				order.push('query')
 			})
-			queries.push({ workspaceId, publish, failed, release })
+			queries.push({
+				workspaceId,
+				publish: (rows) =>
+					publish(rows.map((row) => ({ ...row, organizationId: workspaceId, archivedAt: null }))),
+				failed,
+				release
+			})
 			return release
-		}
+		},
+		observeMembership: (workspaceId, publish, failed) => {
+			memberships.push({ publish, failed })
+			publish({
+				id: '40000000-0000-4000-8000-000000000001',
+				organizationId: workspaceId,
+				userId,
+				role: 'owner',
+				accountAccessMode: 'all',
+				profileId: null
+			})
+			return () => {
+				order.push('membership')
+			}
+		},
+		observeGrants: (_workspaceId, publish, failed) => {
+			grants.push({ publish, failed })
+			publish([])
+			return () => {
+				order.push('grants')
+			}
+		},
+		archiveAccount: archiveWrite
 	}
 	const ready = (binding: object): SessionRuntimeObservation<FinanceReadCapabilities> => ({
 		status: 'ready',
@@ -87,7 +127,15 @@ function fixture() {
 		order.push('broker')
 		return brokerIdentity
 	})
-	const actor = createActor(financeWorkerMachine, {
+	let owner: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
+	const machine = createFinanceWorkerMachine({
+		observe: () => selectFinanceArchiveObservation(owner?.getSnapshot()),
+		persist: (request) => {
+			const write = selectFinanceArchiveWriter(owner?.getSnapshot(), request)
+			return write ? write(request.accountId) : Promise.reject(new Error('Binding retired'))
+		}
+	})
+	const actor = createActor(machine, {
 		input: {
 			session: createSessionRuntimeConnection(runtime, binding),
 			closeAccountStore,
@@ -95,6 +143,7 @@ function fixture() {
 			brokerIdentity
 		}
 	})
+	owner = actor
 	const start = async () => {
 		actor.start()
 		runtime.start()
@@ -113,6 +162,9 @@ function fixture() {
 		order,
 		directory,
 		queries,
+		memberships,
+		grants,
+		archiveWrite,
 		start,
 		select,
 		ready,
@@ -149,19 +201,23 @@ describe('Finance worker ownership and selected accounts', () => {
 			const first = last(f.queries),
 				firstBinding = f.actor.getSnapshot().context.readBinding
 			first.publish([row('first A')])
-			expect(f.view().accounts).toEqual([row('first A')])
+			expect(f.view().accounts).toMatchObject([row('first A')])
 			f.select(b, 2)
 			expect(f.view().accounts).toEqual([])
 			const second = last(f.queries)
 			second.publish([row('B')])
 			first.publish([row('late first A')])
 			if (!firstBinding) throw new Error('Missing retired binding')
-			f.actor.send({ type: 'ACCOUNTS', binding: firstBinding, rows: [row('stale report')] })
-			expect(f.view().accounts).toEqual([row('B')])
+			f.actor.send({
+				type: 'ACCOUNTS',
+				binding: firstBinding,
+				rows: [{ ...row('stale report'), organizationId: a, archivedAt: null }]
+			})
+			expect(f.view().accounts).toMatchObject([row('B')])
 			f.select(a, 3)
 			last(f.queries).publish([row('new A')])
 			first.publish([row('original A')])
-			expect(f.view().accounts).toEqual([row('new A')])
+			expect(f.view().accounts).toMatchObject([row('new A')])
 			f.select(b, 2)
 			expect(f.queries).toHaveLength(3)
 			expect(first.release).toHaveBeenCalledOnce()
@@ -187,7 +243,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.view().accounts).toEqual([])
 			last(f.queries).publish([row('current')])
 			last(f.directory).publish([{ id: a, name: 'current workspace' }])
-			expect(f.view().accounts).toEqual([row('current')])
+			expect(f.view().accounts).toMatchObject([row('current')])
 			expect(before.release).toHaveBeenCalledOnce()
 		} finally {
 			f.stop()
@@ -277,7 +333,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			try {
 				await f.start()
 				f.actor.send({ type: 'CLOSE' })
-				await waitFor(f.actor, (s) => s.matches('failed'))
+				await waitFor(f.actor, (s) => s.matches('closeFailed'))
 				expect(f.actor.getSnapshot().output).toBeUndefined()
 				if (fault === 'sdk') expect(f.closeAccountStore).not.toHaveBeenCalled()
 				if (fault === 'store') expect(f.closeBroker).not.toHaveBeenCalled()
@@ -286,6 +342,178 @@ describe('Finance worker ownership and selected accounts', () => {
 			}
 		}
 	)
+	it('uses the existing archive workflow and drains an issued save before SDK teardown', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.archiveWrite.mockImplementation(async () => {
+			f.order.push('write')
+			await held.promise
+			f.order.push('settled')
+		})
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			expect(f.view().accounts[0]?.archiveAction).toBe('available')
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			expect(f.view().accounts[0]?.archiveAction).toBe('archiving')
+			f.actor.send({ type: 'CLOSE' })
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.view().status).toBe('closing')
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			held.resolve()
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(f.order.indexOf('settled')).toBeLessThan(f.order.indexOf('sdk'))
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('keeps an old workspace save alive across A → B → A without publishing its old feedback or replaying it', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.archiveWrite.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			f.select(a, 1)
+			last(f.queries).publish([row('Original A')])
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Original A').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			f.select(b, 2)
+			last(f.queries).publish([row('B')])
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('B').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			f.select(a, 3)
+			last(f.queries).publish([row('New A')])
+			expect(f.view().archiveFeedback).toBeNull()
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			held.resolve()
+			await vi.waitFor(() => expect(f.view().accounts[0]?.archiveAction).toBe('available'))
+			expect(f.view().archiveFeedback).toBeNull()
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('uses actual membership and scoped grants rather than the presence of a rendered row as archive permission', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			const owner = {
+				id: '40000000-0000-4000-8000-000000000001',
+				organizationId: a,
+				userId,
+				role: 'owner',
+				accountAccessMode: 'all',
+				profileId: null
+			} satisfies NonNullable<ArchiveObservation['membership']>
+			last(f.memberships).publish({ ...owner, role: 'viewer' })
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			expect(f.view().accounts[0]?.archiveAction).toBe('unavailable')
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			last(f.memberships).publish({ ...owner, role: 'member', accountAccessMode: 'selected' })
+			last(f.grants).publish([
+				{ organizationId: b, userId, accountId: row('Wallet').id, access: 'write' }
+			])
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			last(f.grants).publish([
+				{ organizationId: a, userId, accountId: row('Wallet').id, access: 'write' }
+			])
+			expect(f.view().accounts[0]?.archiveAction).toBe('available')
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 0 }
+			})
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			await vi.waitFor(() => expect(f.view().archiveFeedback?.outcome).toBe('succeeded'))
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('reports a rejected archive once and never retries it automatically', async () => {
+		const f = fixture()
+		f.archiveWrite.mockRejectedValueOnce(new Error('Synthetic native write refusal'))
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: { workspaceId: a, revision: 1 }
+			})
+			await vi.waitFor(() =>
+				expect(f.view().archiveFeedback).toEqual({
+					outcome: 'failed',
+					settlement: 'rejected',
+					name: 'Wallet'
+				})
+			)
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('refuses native close when the archive owner completes without the host requesting a drain', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.actor.getSnapshot().children.archive?.send({ type: 'SHUTDOWN' })
+			await waitFor(f.actor, (snapshot) => snapshot.matches('drainFailed'))
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.actor.getSnapshot().output).toBeUndefined()
+		} finally {
+			f.stop()
+		}
+	})
 	it('reports failed native acquisition without starting queries and can release the unopened host', async () => {
 		const f = fixture()
 		f.open.mockRejectedValueOnce(new Error('Synthetic native acquisition failure'))
@@ -349,7 +577,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.runtime.stop()
 			await waitFor(f.actor, (s) => s.matches('failed'))
 			f.actor.send({ type: 'CLOSE' })
-			await waitFor(f.actor, (s) => s.matches('failed'))
+			await waitFor(f.actor, (s) => s.matches('closeFailed'))
 			expect(f.actor.getSnapshot().output).toBeUndefined()
 			expect(f.nativeClose).not.toHaveBeenCalled()
 			expect(f.closeAccountStore).not.toHaveBeenCalled()

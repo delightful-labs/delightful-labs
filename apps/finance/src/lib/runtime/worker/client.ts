@@ -3,6 +3,7 @@ import { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/work
 import brokerUrl from '#jazz-broker-worker?sharedworker&url'
 import {
 	financeWorkerOpen,
+	financeWorkerCommand,
 	financeWorkerReply,
 	workerSelection,
 	type FinanceWorkerView,
@@ -35,12 +36,19 @@ export function createFinanceWorkerClient(
 		status: 'starting',
 		identityId: null,
 		workspaces: null,
-		accounts: []
+		accounts: [],
+		archiveFeedback: null
 	})
 	const fail = () => {
 		// Keep the close receipt listener: a data fault never authorizes termination.
 		worker.removeEventListener('message', receiveView)
-		state.update((view) => ({ ...view, status: 'failed', accounts: [], workspaces: null }))
+		state.update((view) => ({
+			...view,
+			status: 'failed',
+			accounts: [],
+			workspaces: null,
+			archiveFeedback: null
+		}))
 	}
 	const receiveView = (event: MessageEvent<unknown>) => {
 		const decoded = financeWorkerReply.safeParse(event.data)
@@ -69,7 +77,8 @@ export function createFinanceWorkerClient(
 			status: 'closed',
 			accounts: [],
 			workspaces: null,
-			identityId: null
+			identityId: null,
+			archiveFeedback: null
 		}))
 	}
 	worker.addEventListener('message', receiveView)
@@ -88,9 +97,21 @@ export function createFinanceWorkerClient(
 				...view,
 				selection,
 				status: view.status === 'failed' ? 'failed' : 'loading',
-				accounts: []
+				accounts: [],
+				archiveFeedback: null
 			}))
 			worker.postMessage({ type: 'SELECT_WORKSPACE', selection })
+		},
+		archiveAccount: (accountId: string) => {
+			const current = get(state)
+			if (current.status !== 'ready') return
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'ARCHIVE_ACCOUNT',
+					selection: current.selection,
+					accountId
+				})
+			)
 		},
 		close: () => worker.postMessage({ type: 'CLOSE' })
 	}

@@ -2,12 +2,19 @@
 	import { fromStore, type Readable } from 'svelte/store'
 	import { Table, StatusMessage } from 'delightful-ui'
 	import WorkspaceSelector from '../workspaces/WorkspaceSelector.svelte'
+	import AccountArchiveButton from '../accounts/AccountArchiveButton.svelte'
+	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
 	import type { FinanceWorkerView } from '../../contracts/worker-application.js'
 	import { m } from '#lib/paraglide/messages.js'
 	let {
 		view,
-		onSelectWorkspace
-	}: { view: Readable<FinanceWorkerView>; onSelectWorkspace: (id: string) => void } = $props()
+		onSelectWorkspace,
+		onArchive
+	}: {
+		view: Readable<FinanceWorkerView>
+		onSelectWorkspace: (id: string) => void
+		onArchive: (id: string) => void
+	} = $props()
 	const live = $derived(fromStore(view))
 </script>
 
@@ -16,6 +23,7 @@
 	organizationId={live.current.selection.workspaceId}
 	onchange={onSelectWorkspace}
 />
+<AccountArchiveFeedback feedback={live.current.archiveFeedback} />
 {#if live.current.status === 'failed'}
 	<StatusMessage
 		variant="error"
@@ -43,6 +51,7 @@
 					>{m['labels.subject_type']({ subject: m['nouns.account']({ count: 1 }) })}</th
 				>
 				<th scope="col">{m['labels.currency']()}</th>
+				<th scope="col">{m['labels.actions']()}</th>
 			</tr></thead
 		>
 		<tbody
@@ -56,6 +65,12 @@
 								: m['accounts.type.card']()}</td
 					>
 					<td>{account.currency}</td>
+					<td
+						><AccountArchiveButton
+							action={account.archiveAction}
+							onarchive={() => onArchive(account.id)}
+						/></td
+					>
 				</tr>{/each}</tbody
 		>
 	</Table>

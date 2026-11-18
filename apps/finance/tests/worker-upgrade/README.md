@@ -68,6 +68,15 @@ active alpha.60 import-catalog build. This is read-slice qualification, not writ
 workflow parity, complete application adoption or an SDK cutover.
 [Ownership and remaining work](../../specs/013-local-first-startup/worker-session-resource-decision.md#first-finance-worker-and-svelte-read-slice).
 
+The candidate now includes the first actual write workflow: ARCHIVE_ACCOUNT
+forwards to the existing account archive chart, supplies native membership/grant
+facts, and drains it before SDK closure. Both UI paths share the same archive
+button/feedback. The new native suite contains **12 passing cases**, including
+actual UI archive and close held behind an issued native save receipt. The host
+has **18 cases**, and the full current Finance unit suite passes **1,946**.
+The existing SVG plugin/icon dependencies are reused in the isolated proof only;
+active SDK pins/routes remain unchanged pending full application parity.
+
 ## Alpha.66 Finance schema, permissions and retained data
 
 From Finance, using the workspace's Node/pnpm and current built Local First:

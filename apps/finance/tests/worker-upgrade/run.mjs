@@ -83,6 +83,8 @@ const packages = [
 	'svelte',
 	'svelte-check',
 	'@sveltejs/vite-plugin-svelte',
+	'@poppanator/sveltekit-svg',
+	'tdesign-icons-svg',
 	'xstate',
 	'zod',
 	'ws',

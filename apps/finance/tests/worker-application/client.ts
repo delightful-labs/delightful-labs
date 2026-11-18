@@ -17,7 +17,11 @@ function attach() {
 	const owner = current()
 	component = mount(WorkerAccounts, {
 		target,
-		props: { view: owner.view, onSelectWorkspace: owner.selectWorkspace }
+		props: {
+			view: owner.view,
+			onSelectWorkspace: owner.selectWorkspace,
+			onArchive: owner.archiveAccount
+		}
 	})
 }
 function request(message: unknown) {
@@ -48,7 +52,9 @@ const fixture = {
 	seed: (workspaceId: string, accountId: string, name: string) =>
 		request({ type: 'TEST_SEED', workspaceId, accountId, name }),
 	edit: (accountId: string, name: string) => request({ type: 'TEST_EDIT', accountId, name }),
-	archive: (accountId: string) => request({ type: 'TEST_ARCHIVE', accountId }),
+	archive: (accountId: string) => current().archiveAccount(accountId),
+	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),
+	releaseArchive: () => request({ type: 'TEST_RELEASE_ARCHIVE' }),
 	select: (workspaceId: string) => current().selectWorkspace(workspaceId),
 	async detach() {
 		if (component) await unmount(component)

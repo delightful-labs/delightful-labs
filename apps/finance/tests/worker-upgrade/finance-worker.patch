@@ -1,15 +1,15 @@
 diff --git a/src/lib/runtime/worker/application.worker.ts b/src/lib/runtime/worker/application.worker.ts
-index a769e00..ae2f5fc 100644
+index a769e00..6ae1f48 100644
 --- a/src/lib/runtime/worker/application.worker.ts
 +++ b/src/lib/runtime/worker/application.worker.ts
-@@ -1,31 +1,82 @@
+@@ -1,31 +1,99 @@
 -import { createJazzClient } from 'jazz-tools/client'
 -import { createJazzSessionAcquisition } from 'delightful-local-first/backend/jazz/session'
 -import { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/startup'
 -import { createSessionAcquisitionMachine } from 'delightful-local-first/session/workflow'
 -import { createWorkerChannel } from 'delightful-local-first/worker/channel/workflow'
 -import { createWorkerEffectDrain } from 'delightful-local-first/worker/effect-drain/workflow'
-+import { createActor } from 'xstate'
++import { createActor, type ActorFromLogic } from 'xstate'
 +import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
 +import {
 +	createSessionRuntimeMachine,
@@ -25,7 +25,9 @@ index a769e00..ae2f5fc 100644
 +	type FinanceReadCapabilities
 +} from '../../contracts/worker-application.js'
 +import {
-+	financeWorkerMachine,
++	createFinanceWorkerMachine,
++	selectFinanceArchiveObservation,
++	selectFinanceArchiveWriter,
 +	selectFinanceWorkerView
 +} from '../../machines/runtime/worker-application.js'
  import { createFinanceAccountStore } from './account-store.js'
@@ -52,7 +54,7 @@ index a769e00..ae2f5fc 100644
 -	factories: Object.fromEntries(
 -		Object.entries(factories).map(([name, factory]) => [name, typeof factory])
 -	)
-+let application: ReturnType<typeof createActor<typeof financeWorkerMachine>> | undefined
++let application: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
 +const sessionMachine = createSessionRuntimeMachine<FinanceReadCapabilities>()
 +self.addEventListener('message', (event: MessageEvent<unknown>) => {
 +	const open = financeWorkerOpen.safeParse(event.data)
@@ -62,7 +64,11 @@ index a769e00..ae2f5fc 100644
 +		if (!data || !control) return
 +		try {
 +			const { serverUrl, scope, environment } = open.data
-+			const store = createFinanceAccountStore({ serverUrl, scope, environment })
++			const store = createFinanceAccountStore({
++				serverUrl,
++				scope,
++				environment
++			})
 +			const broker = brokerHostClient(data, control, scope, {
 +				onOverdue: () => application?.send({ type: 'NATIVE_FAILED' }),
 +				onBlocked: () => application?.send({ type: 'NATIVE_FAILED' })
@@ -84,8 +90,19 @@ index a769e00..ae2f5fc 100644
 +				createFinanceReadBinding
 +			)
 +			const runtime = createActor(sessionMachine, { input: native })
-+			runtime.subscribe({ error: () => application?.send({ type: 'NATIVE_FAILED' }) })
-+			application = createActor(financeWorkerMachine, {
++			runtime.subscribe({
++				error: () => application?.send({ type: 'NATIVE_FAILED' })
++			})
++			const machine = createFinanceWorkerMachine({
++				observe: () => selectFinanceArchiveObservation(application?.getSnapshot()),
++				persist: (request) => {
++					const write = selectFinanceArchiveWriter(application?.getSnapshot(), request)
++					return write
++						? write(request.accountId)
++						: Promise.reject(new Error('Finance archive binding retired'))
++				}
++			})
++			application = createActor(machine, {
 +				input: {
 +					session: createSessionRuntimeConnection(runtime, native.binding),
 +					closeAccountStore: () => store.close(),
