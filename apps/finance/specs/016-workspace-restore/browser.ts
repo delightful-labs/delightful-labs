@@ -1,3 +1,4 @@
+import { bindWorkspaceRestoreFile } from '../../src/lib/runtime/jazz-session-binding.js'
 import {
 	createJazzClient as createSession,
 	type JazzClientConfig,
@@ -54,7 +55,6 @@ import {
 	createFinanceWorkspaceRestore,
 	createWorkspaceRestoreController,
 	prepareWorkspaceRestoreFile,
-	bindWorkspaceRestoreFile,
 	selectWorkspaceRestoreReport,
 	readRecovery,
 	recoveryQueries
@@ -92,6 +92,7 @@ export type RecoverySample = {
 import { createRecoveryProbe, type RecoveryInput } from '../../tests/helpers/restore-probe.js'
 
 const recovery = {
+	bindWorkspaceRestoreFile,
 	financeBackupReader,
 	financeBackupProfile,
 	prepareJazzArchiveExport,
@@ -109,7 +110,6 @@ const recovery = {
 	createFinanceWorkspaceRestore,
 	createWorkspaceRestoreController,
 	prepareWorkspaceRestoreFile,
-	bindWorkspaceRestoreFile,
 	selectWorkspaceRestoreReport,
 	readRecovery,
 	recoveryQueries,

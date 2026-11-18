@@ -296,3 +296,29 @@ real occurrence. In the absence of a reproduction, no application recovery
 change is justified by this batch. Continue qualifying the SDK upgrade on its
 existing evidence and retained-data gates, without claiming it resolves this
 alpha.60 failure.
+
+## PR46 workspace-settings recurrence at 42dfaf64
+
+[Finance CI run 44221220011](https://github.com/delightful-labs/delightful-labs/actions/runs/44221220011)
+passes 54 workspace cases and fails the owner workspace-settings case while
+saving the default currency after a successful rename and reload. The trace
+shows the actual failure/unknown-save alerts and the original USD selection;
+this is not just a missing success-message locator. Native persistence and
+scoped-form children report failure, but the retained trace contains only
+sanitized actor diagnostics, not an underlying native error code. Do not infer
+that it has the same cause as the earlier protocol failure.
+
+Artifact `14390158598` is retained at
+`/private/tmp/finance-workspace-42dfaf64.zip`. Clipper, Finance types/unit/build,
+PWA/worker bindings, the other application/auth/permission/startup browser jobs
+and all 107 restore-recovery cases pass at this head. The separate Foundation
+failure is a fixture typing error: the SDK60 mock used the broader shared status
+union, and a native restoration fixture accepted overrides from both native and
+actor variants. Both fixtures now use their precise native contracts. Full
+Local First Svelte/TypeScript checks and the 76 affected tests pass locally.
+
+No save assertion, timeout, retry policy or financial outcome has changed. The
+unknown-save investigation remains open. A local workspace-test invocation
+selected no cases because its grep was incorrectly anchored; it is not a local
+reproduction or passing qualification. Do not rerun the hosted shard merely to
+turn this failure green without another hypothesis.

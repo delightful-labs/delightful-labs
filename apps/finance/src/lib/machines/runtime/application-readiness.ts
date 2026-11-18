@@ -1,6 +1,11 @@
 import type { ActorFromLogic } from 'xstate'
-import type { JazzClient, JazzSession } from 'jazz-tools/svelte'
-import type { MutationErrorEvent } from 'jazz-tools'
+import {
+	financeSessionIdentityId,
+	workspaceRestoreSessionReady,
+	bindWorkspaceRestoreFile,
+	observeFinanceMutationRejections,
+	type FinanceSession
+} from '../../runtime/jazz-session-binding.js'
 import type { TransferWriteTracking } from '../transfers/internal-transfer.js'
 import {
 	createInternalTransferMutationOwner,
@@ -67,8 +72,6 @@ import {
 	createWorkspaceRestoreController,
 	selectWorkspaceRestoreReport,
 	emptyWorkspaceRestoreView,
-	bindWorkspaceRestoreFile,
-	workspaceRestoreSessionReady,
 	workspaceRestoreFileAvailable,
 	type WorkspaceRestoreConfiguration,
 	type WorkspaceRestoreFile,
@@ -79,7 +82,7 @@ import { createCallbackLogic, setup, types, createAsyncLogic, matchesState } fro
 import type { ActorRefFrom, SnapshotFrom, DoneActorEvent } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type Session = JazzSession<JazzClient>
+type Session = FinanceSession
 type Workspace = ActorFromLogic<ReturnType<typeof createWorkspaceReadinessMachine>>
 type Status = SessionStatus
 export type MutationNotice =
@@ -230,13 +233,8 @@ export function createApplicationReadinessMachine(
 				Promise.resolve({ session: input, readiness: required(bindReadiness)(input) })
 		}),
 		observeMutationRejections: createCallbackLogic<Event, Session>(({ input, sendBack }) => {
-			const db = input.getSnapshot().client?.db
-			if (!db) return
-			return db.onMutationError((rejection) => {
-				sendBack({
-					type: 'MUTATION_REJECTED',
-					transactionId: rejection.transaction.transactionId
-				})
+			return observeFinanceMutationRejections(input, (transactionId) => {
+				sendBack({ type: 'MUTATION_REJECTED', transactionId })
 			})
 		})
 	}
@@ -813,7 +811,7 @@ export function createApplicationReadinessMachine(
 				if (
 					matchesState({ running: 'ready' }, args.value) &&
 					(event.command.type === 'CONFIRM' || event.command.type === 'OPEN') &&
-					context.workspaceRestoreView.identityId === context.session?.getSnapshot().account?.id &&
+					context.workspaceRestoreView.identityId === financeSessionIdentityId(context.session) &&
 					workspaceRestoreSessionReady(context.session)
 				) {
 					enq.sendTo('workspaceRestore', event.command)
@@ -3953,7 +3951,7 @@ export function selectApplicationWorkspaceRestore(
 		snapshot.matches({ running: 'ready' }) &&
 		snapshot.context.restoreConfiguration !== undefined &&
 		workspaceRestoreSessionReady(snapshot.context.session)
-	const current = ready && view.identityId === snapshot.context.session?.getSnapshot().account?.id
+	const current = ready && view.identityId === financeSessionIdentityId(snapshot.context.session)
 	return {
 		...view,
 		canReload:

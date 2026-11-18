@@ -3108,55 +3108,6 @@ new file mode 100644
 +		request.release()
 +	}
 +})
-diff --git a/src/lib/machines/workspaces/workspace-restore.ts b/src/lib/machines/workspaces/workspace-restore.ts
---- a/src/lib/machines/workspaces/workspace-restore.ts
-+++ b/src/lib/machines/workspaces/workspace-restore.ts
-@@ -35,7 +35,7 @@
- import { payloadLimits } from 'delightful-local-first/backup/archive'
- import type { JazzSession } from 'jazz-tools/client'
- import { stableUuid } from '../../domain/stable-uuid.js'
--import { app } from '../../schema.js'
-+import { app } from '../../queries.js'
- import { validateFinanceBackup } from '../../backup/workspace.js'
- import {
- 	canonicalRecovery,
-@@ -1400,7 +1400,7 @@
- }
- export function workspaceRestoreSessionReady(session: JazzSession<JazzClient> | undefined) {
- 	const state = session?.getSnapshot()
--	return state?.status === 'ready' && state.account !== undefined && state.client !== undefined
-+	return state?.status === 'ready' && state.user !== null && state.client !== undefined
- }
- export function workspaceRestoreFileAvailable(request: WorkspaceRestoreFile) {
- 	return restoreFiles.has(request) && restoreFiles.get(request)?.scope === undefined
-@@ -1411,23 +1411,20 @@
- 	config: WorkspaceRestoreConfiguration
- ) {
- 	const state = session.getSnapshot()
--	if (state.status !== 'ready' || !state.account || !state.client)
-+	if (state.status !== 'ready' || !state.user || !state.client)
- 		throw new Error('Restore session unavailable')
--	const account = state.account,
-+	const user = state.user,
- 		client = state.client,
- 		db = client.db
- 	restoreFile(request).scope = {
- 		...config,
- 		session,
--		identityId: account.id,
-+		identityId: user.accountId,
- 		db,
- 		isCurrent: () => {
- 			const now = session.getSnapshot()
- 			return (
--				now.status === 'ready' &&
--				now.account === account &&
--				now.client === client &&
--				now.client.db === db
-+				now.status === 'ready' && now.user === user && now.client === client && now.client.db === db
- 			)
- 		}
- 	}
 diff --git a/src/lib/machines/workspaces/workspace-restore-plan.ts b/src/lib/machines/workspaces/workspace-restore-plan.ts
 --- a/src/lib/machines/workspaces/workspace-restore-plan.ts
 +++ b/src/lib/machines/workspaces/workspace-restore-plan.ts
@@ -3223,11 +3174,11 @@ new file mode 100644
 +import {
 +	createWorkspaceRestoreController,
 +	prepareWorkspaceRestoreFile,
-+	bindWorkspaceRestoreFile,
 +	selectWorkspaceRestoreReport,
 +	createFinanceWorkspaceRestore,
 +	createFinanceRestoreSession
 +} from '../machines/workspaces/workspace-restore.js'
++import { bindWorkspaceRestoreFile } from '../runtime/jazz-session-binding.js'
 +import { app } from '../queries.js'
 +
 +const api = {
@@ -3916,3 +3867,41 @@ new file mode 100644
 +	},
 +	60_000
 +)
+diff --git a/src/lib/runtime/jazz-session-binding.ts b/src/lib/runtime/jazz-session-binding.ts
+index 2b75fc4..7801c30 100644
+--- a/src/lib/runtime/jazz-session-binding.ts
++++ b/src/lib/runtime/jazz-session-binding.ts
+@@ -11,7 +11,7 @@ export type FinanceSession = JazzSession<JazzClient>
+ /** Native SDK reads stay here; application charts consume identity facts and domain bindings. */
+ export function financeSessionIdentityId(session: FinanceSession | undefined) {
+ 	const state = session?.getSnapshot()
+-	return state?.status === 'ready' && state.account && state.client ? state.account.id : undefined
++	return state?.status === 'ready' && state.user && state.client ? state.user.accountId : undefined
+ }
+ export function workspaceRestoreSessionReady(session: FinanceSession | undefined) {
+ 	return financeSessionIdentityId(session) !== undefined
+@@ -30,20 +30,20 @@ export function bindWorkspaceRestoreFile(
+ 	config: WorkspaceRestoreConfiguration
+ ) {
+ 	const state = session.getSnapshot()
+-	if (state.status !== 'ready' || !state.account || !state.client)
++	if (state.status !== 'ready' || !state.user || !state.client)
+ 		throw new Error('Restore session unavailable')
+-	const account = state.account,
++	const user = state.user,
+ 		client = state.client,
+ 		db = client.db
+ 	const binding: WorkspaceRestoreBinding = {
+-		identityId: account.id,
++		identityId: user.accountId,
+ 		db,
+ 		subscribe: (notify) => session.subscribe(notify),
+ 		isCurrent: () => {
+ 			const now = session.getSnapshot()
+ 			return (
+ 				now.status === 'ready' &&
+-				now.account === account &&
++				now.user === user &&
+ 				now.client === client &&
+ 				now.client.db === db
+ 			)

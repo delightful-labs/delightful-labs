@@ -148,6 +148,14 @@ Next port Finance's actual worker/UI callers to that same boundary, retaining
 its independent workspace/restore Db and application domain drains. U2 remains
 open; pins stay alpha.60 and the coordinated U3–U5 gates still apply.
 
+Finance's application/restore charts now take identity, mutation observation and
+borrowed-Db restore bindings through one native session module. Its restore
+controller consumes domain capabilities instead of a native session. The
+alpha.67 port changes that module, preserving the chart; all 24 candidate native
+restore cases and nine directly affected alpha.60 native cases pass.
+[Exact binding boundary and remaining worker adoption](worker-session-resource-decision.md#finance-session-binding-isolated-from-the-restore-chart).
+The existing UI still owns its alpha.60 session. C3–C5 and U2 remain open.
+
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 

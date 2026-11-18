@@ -1,5 +1,4 @@
 import type { ActorFromLogic } from 'xstate'
-import type { JazzClient } from 'jazz-tools/client'
 import type { Db, Transaction, WriteHandle } from 'jazz-tools'
 import { sameBackupBinding, type BackupBinding } from 'delightful-local-first/backup/binding'
 import type {
@@ -33,7 +32,6 @@ import {
 } from 'delightful-local-first/backup/envelope'
 import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
 import { payloadLimits } from 'delightful-local-first/backup/archive'
-import type { JazzSession } from 'jazz-tools/client'
 import { stableUuid } from '../../domain/stable-uuid.js'
 import { app } from '../../schema.js'
 import { validateFinanceBackup } from '../../backup/workspace.js'
@@ -1360,12 +1358,13 @@ export type WorkspaceRestoreConfiguration = {
 	serverUrl: string
 	environment: string
 }
-type RestoreScope = WorkspaceRestoreConfiguration & {
-	session: JazzSession<JazzClient>
+export type WorkspaceRestoreBinding = {
 	identityId: string
 	isCurrent(): boolean
+	subscribe(notify: () => void): () => void
 	db: FinanceRestoreDb
 }
+type RestoreScope = WorkspaceRestoreConfiguration & WorkspaceRestoreBinding
 type RestoreFileData = {
 	file: File
 	name?: string | undefined
@@ -1398,39 +1397,17 @@ export function prepareWorkspaceRestoreFile(file: File, password: string): Works
 function restoreFile(request: WorkspaceRestoreFile | undefined) {
 	return required(request && restoreFiles.get(request))
 }
-export function workspaceRestoreSessionReady(session: JazzSession<JazzClient> | undefined) {
-	const state = session?.getSnapshot()
-	return state?.status === 'ready' && state.account !== undefined && state.client !== undefined
-}
 export function workspaceRestoreFileAvailable(request: WorkspaceRestoreFile) {
 	return restoreFiles.has(request) && restoreFiles.get(request)?.scope === undefined
 }
-export function bindWorkspaceRestoreFile(
+/** Borrow the application's bound Db; restore owns only its transactions and artifacts. */
+export function bindWorkspaceRestoreResource(
 	request: WorkspaceRestoreFile,
-	session: JazzSession<JazzClient>,
+	binding: WorkspaceRestoreBinding,
 	config: WorkspaceRestoreConfiguration
 ) {
-	const state = session.getSnapshot()
-	if (state.status !== 'ready' || !state.account || !state.client)
-		throw new Error('Restore session unavailable')
-	const account = state.account,
-		client = state.client,
-		db = client.db
-	restoreFile(request).scope = {
-		...config,
-		session,
-		identityId: account.id,
-		db,
-		isCurrent: () => {
-			const now = session.getSnapshot()
-			return (
-				now.status === 'ready' &&
-				now.account === account &&
-				now.client === client &&
-				now.client.db === db
-			)
-		}
-	}
+	if (!binding.isCurrent()) throw new Error('Restore session unavailable')
+	restoreFile(request).scope = { ...config, ...binding }
 }
 const restoreJournalName = 'finance-workspace-restores'
 export type WorkspaceRestoreCommand = {
@@ -1519,7 +1496,7 @@ export function createWorkspaceRestoreController(
 					}
 				}
 				observe()
-				return scope.session.subscribe(observe)
+				return scope.subscribe(observe)
 			}
 		),
 		readFile: createAsyncLogic<void, WorkspaceRestoreFile>({

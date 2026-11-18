@@ -391,6 +391,47 @@ do not retain a legacy Svelte provider through an SDK-shaped facade. U2 stays
 open until those actual consumers are qualified. U3–U5 and the later worker UI
 and financial workflow slices retain their recorded gates.
 
+## Finance session binding isolated from the restore chart
+
+Finance's application chart no longer reads native SDK session snapshots or
+registers native mutation-error callbacks directly. Its identity/readiness,
+mutation-error subscription and workspace-restore capture live together in
+`runtime/jazz-session-binding.ts`. It forwards transaction IDs, not SDK error
+objects. The active alpha.60 adapter retains its real session; it does not
+construct an SDK-shaped replacement or another session owner.
+
+The actual restore controller now consumes `WorkspaceRestoreBinding`: the
+borrowed application Db, captured identity, exact-current predicate and an
+observation subscription. Its file scope no longer holds a Jazz session or
+calls session APIs. Transactions, journal identity, destination selection,
+cancellation, issued-write drain and artifact cleanup remain in the existing
+charts. The native adapter captures the original account/client/Db and supplies
+those leaves. The worker binding can supply its ready Db/current predicate and
+actor selection through this same domain contract, without returning the SDK
+session or Db to Window.
+
+The alpha.67 schema candidate now changes the session API only in the new native
+module, instead of patching the restore chart. Its native browser harness imports
+the real binding from there. Strict candidate types and all **24 existing native
+restore cases** pass across Chromium/Firefox/WebKit, including same-account and
+A → B → A replacement, reload/journal recognition, issued commit drain,
+conflict and failed cleanup. On alpha.60, Finance app/browser-test types and the
+**nine directly affected native cases** pass (binding retirement, borrowed Db,
+file-controller reload/cancellation/cleanup). All **1,928 Finance unit/native
+tests** pass in the combined batch: 1,744 under the sandbox and the 184 cases
+requiring native listeners in the separately authorized run. The other 98 cases of the
+107-case restore matrix were not repeated. Full Local First static checks and
+76 affected fixture tests also pass after the CI typing correction.
+
+Artifacts reuse `/private/tmp/finance-alpha67-host-4eo19nnx/app` and the isolated
+SDK60 checkout. Logs use `/private/tmp/finance-session-binding-` with
+`{types,unit,native-unit,sdk60-native,alpha67-types,alpha67-native}.log` suffixes.
+The pinned UI and SDK remain active; this is the Finance native-boundary step,
+not a worker/UI cutover or completion of U2/C3–C5. Next bind the actual Finance
+worker session and its first bounded read view through these capabilities.
+The independent [unknown-save CI recurrence](worker-pr39-ci-offline-edit.md#pr46-workspace-settings-recurrence-at-42dfaf64)
+remains open; successful restore checks do not establish a fix.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing
