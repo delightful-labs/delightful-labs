@@ -141,13 +141,12 @@ keeping `documentId` required on every Note before implementation of the repair.
 The generated native migration preserves that column and adds the annotation
 tables and note fields; public Margin records do not change.
 
-This repairs the production baseline, but is not a complete rollout path. A
-disposable, populated local replica using the optional-column schema from PR #50
-fails to query after reopening with the required-column schema:
-`changing the type of required column notes.documentId without a default is not supported yet`.
-Do not merge/deploy the repair until these profiles have a supported preservation
-path. No profile reset, data deletion, storage-name change, dependency upgrade or
-SDK patch is authorized by the shape approval.
+Profiles created with PR #50's optional-column schema cannot upgrade in place
+with this SDK. On 2026-11-18, the user confirmed that all affected data is test
+data and directed that no preservation work be done. Those test profiles may be
+discarded; a preservation path is not a release requirement. Keep native schema
+history for future changes. No custom migration system, dependency upgrade or SDK
+patch is selected by this decision.
 
 ## Editing and public limits
 

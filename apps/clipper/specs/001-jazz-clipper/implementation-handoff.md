@@ -1,6 +1,6 @@
 # Article notes — implementation started
 
-## Production schema lineage repair — draft, rollout blocked
+## Production schema lineage repair — test profiles disposable
 
 Production PR #50 (`f3827565`) returns Jazz 503 and sign-in 500 because its store
 has disconnected schema roots `8a5130d42577` and `a07b009f5a89`. The user approved
@@ -9,31 +9,25 @@ Jazz migration history, connecting the exact production baseline to required-not
 schema `5734b944387b`. Native policies, projections and writes enforce the same
 document/library for a Note and its Highlight. No public lexicon changes.
 
-The SQLite regression reopens the actual frozen production schema and a populated
-replica on the new schema, retaining app/account IDs, signed-in account mapping,
-document progress/favorite/attachment, article text, image bytes, existing note
-revisions and synthetic AT Protocol session data. A further authority restart
-retains the old data and accepts new highlight-attached notes. Generated snapshots
-and migration index remain owned by `jazz-tools`; only these generated artifacts
-are exempted from Oxfmt so native validation does not recreate formatting drift.
+On 2026-11-18, the user confirmed that all affected data is test data and directed
+that no preservation work be done. The optional-schema test profiles are therefore
+outside upgrade support and can be discarded rather than migrated. No custom
+copy/backfill system, UUID default, dependency upgrade or SDK patch is needed.
+The preservation-specific historical schema/policy fixtures and populated-replica
+test have been removed. A small native SQLite test still verifies that the current
+application can open the existing production schema using the generated migration.
+The native migration remains necessary to open that store and retain proper schema
+history for future changes. Jazz owns its generated snapshots and history bundle.
 
-The repair is **not ready to merge**: a separate disposable reproduction populated
-a PR #50 optional-schema replica with a Highlight and attached Note, closed it,
-and reopened it using the required schema. Its first note query fails with
-`changing the type of required column notes.documentId without a default is not supported yet`.
-The production baseline migration does not solve this local upgrade. Preserve
-these profiles; do not delete data, rename stores, invent a UUID default or bypass
-Jazz migration validation. The reproduction is retained locally in
-`/tmp/optional-lineage-repro.test.ts`, `/tmp/optional-schema-repro.test-support.ts`
-and `/tmp/clipper-optional-reopen-result.json`. The schema fixture is the unchanged
-PR #50 schema from Git. A supported local-data migration remains required before
-rollout, followed by the production OAuth/real Margin interoperability check.
-
-Local checks: 1,028 unit/native tests, 32 component tests, all four annotation
-browser tests, root/web/service-worker/extension types and production build pass.
-The expanded native preservation regression also passes separately. Production
-data, settings, storage names and deployment are unchanged; no public test record
-was created during this investigation.
+Qualification before this simplification passed 1,028 unit/native tests, 32
+component tests, all four local annotation browser tests, strict types and the
+production build. All hosted PR #51 jobs passed at `8fde6d86`, including the full
+web, offline, worker, sample-data and packaged-extension suites. Requalify the
+small replacement migration test and current types/format/lint on the new head.
+The optional-profile compatibility issue no longer blocks review under the user's
+explicit test-data decision. Production OAuth/real Margin interoperability remains
+the next verification after the user merges the repair. No production deployment,
+storage-name change or data reset was performed as part of this simplification.
 
 ## Approved TID address allocation — 2026-11-17
 
