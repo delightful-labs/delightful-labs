@@ -1,8 +1,7 @@
 import { issueLocalWrite, persistLocal } from 'delightful-local-first/backend/jazz/data'
 import type { getDb } from 'jazz-tools/svelte'
-import { app, type Account, type Category, type Organization, type Tag } from './schema.js'
-import { ACCOUNT_CURRENCY, type AccountCurrency } from './domain/account-currency.js'
-import { appAccountSchema } from './validation/accounts.js'
+import { app, type Category, type Organization, type Tag } from './schema.js'
+import type { AccountCurrency } from './domain/account-currency.js'
 import { appCategorySchema } from './validation/categories.js'
 import { appTagSchema } from './validation/tags.js'
 import type { z } from 'zod'
@@ -11,6 +10,8 @@ import {
 	profileAvatarValuesSchema,
 	workspaceSettingsFormSchema
 } from './validation/identity.js'
+
+export { createAccount, archiveAccount } from './data/accounts.js'
 
 export { stableUuid } from './domain/stable-uuid.js'
 
@@ -52,21 +53,6 @@ export function workspaceNamingWrites(db: Pick<Db, 'update'>) {
 		issueRename,
 		persistLocal: (write: ReturnType<typeof issueRename>['write']) => persistLocal(write)
 	}
-}
-
-export function createAccount(
-	db: Pick<Db, 'insert'>,
-	organizationId: string,
-	name: string,
-	kind: Account['kind'],
-	currency: AccountCurrency = ACCOUNT_CURRENCY.USD
-) {
-	const account = appAccountSchema.parse({ organizationId, name, kind, currency })
-	return db.insert(app.accounts, account).wait({ tier: 'local' })
-}
-
-export function archiveAccount(db: Pick<Db, 'update'>, accountId: Account['id']) {
-	return db.update(app.accounts, accountId, { archivedAt: new Date() }).wait({ tier: 'local' })
 }
 
 export function createCategory(

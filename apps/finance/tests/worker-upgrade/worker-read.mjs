@@ -8,6 +8,7 @@ export function checkFinanceWorker(directory, finance, proof) {
 	const run = (command, args) => execFileSync(command, args, { cwd: app, stdio: 'inherit' })
 	for (const name of [
 		'src/lib/contracts/worker-application.ts',
+		'src/lib/data/accounts.ts',
 		'src/lib/machines/runtime/worker-application.ts',
 		'src/lib/runtime/worker/application.worker.ts',
 		'src/lib/runtime/worker/client.ts',
@@ -26,6 +27,7 @@ export function checkFinanceWorker(directory, finance, proof) {
 	run('git', ['apply', join(proof, 'finance-worker.patch')])
 	for (const name of [
 		'src/lib/runtime/worker/read-binding.ts',
+		'src/lib/data/accounts.ts',
 		'tests/worker-application/read-binding.ts'
 	]) {
 		const path = join(app, name)
@@ -38,6 +40,7 @@ export function checkFinanceWorker(directory, finance, proof) {
 				extends: './tsconfig.json',
 				include: [
 					'src/lib/runtime/worker/application.worker.ts',
+					'src/lib/data/accounts.ts',
 					'src/lib/runtime/worker/client.ts',
 					'src/lib/components/worker/WorkerAccounts.svelte',
 					'tests/worker-application/**/*.ts',

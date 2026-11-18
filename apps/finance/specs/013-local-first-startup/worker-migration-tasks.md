@@ -217,8 +217,9 @@ retain their product/parity requirements, not the abandoned implementation plan.
       replacement, late views, unsubscribe and offline restart.
 - [ ] **C6 — Move one existing financial workflow intact.** After the read slice,
       reuse the existing account archive chart/operation and its issued-write
-      drain first; supply membership/grant facts and keep native data helpers free
-      of Svelte. Then move other forms/workflows into the worker, reusing
+      drain first; supply membership/grant facts. Native create/archive leaves
+      are now shared in `data/accounts.ts` without Svelte imports, preserving
+      existing frontend exports and local settlement. Then move other forms/workflows into the worker, reusing
       their validation, transaction, permissions and outcome handling. Keep DOM,
       focus and UI interaction behavior with Svelte. Retain operation identity,
       interruption and uncertain-write behavior; do not add a second command-owner

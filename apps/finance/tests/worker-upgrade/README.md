@@ -53,7 +53,8 @@ SDK pins, existing data and production deployment remain unchanged.
 
 The new slice passes strict TypeScript, zero-warning Svelte checking and **nine
 native cases** (three per browser engine). It checks workspace/account rendering,
-UI detachment without stopping the Worker, malformed-view quarantine with clean
+UI detachment without stopping the Worker, execution of the existing native
+archive persistence leaf with live row withdrawal, malformed-view quarantine with clean
 native close, and retained records/edits across two full process restarts with
 app/auth/Jazz endpoints unavailable. SDK seeding/edit controls are fixture-only
 binding injection; no test commands enter the product protocol. Development

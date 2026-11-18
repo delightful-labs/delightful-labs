@@ -48,6 +48,7 @@ const fixture = {
 	seed: (workspaceId: string, accountId: string, name: string) =>
 		request({ type: 'TEST_SEED', workspaceId, accountId, name }),
 	edit: (accountId: string, name: string) => request({ type: 'TEST_EDIT', accountId, name }),
+	archive: (accountId: string) => request({ type: 'TEST_ARCHIVE', accountId }),
 	select: (workspaceId: string) => current().selectWorkspace(workspaceId),
 	async detach() {
 		if (component) await unmount(component)

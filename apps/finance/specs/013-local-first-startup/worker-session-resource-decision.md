@@ -517,10 +517,18 @@ contract; keep the original admitted Db/binding until settlement. SDK close must
 follow their drain, just as in the existing Finance application. Do not rebuild
 that policy in the Worker message listener or introduce a command-owner registry.
 
-Before importing the current archive persistence leaf into a Worker, separate
-its native data access from `data.ts`'s unrelated Svelte-dependent write helpers.
-Keep the current frontend export/callers and one implementation of the existing
-local-tier update. Supply actual membership/grant/account facts inside the Worker;
+The account persistence leaves now live in `data/accounts.ts`, separate from
+`data.ts`'s unrelated Svelte-dependent helpers. The existing `data.ts` exports
+re-export those exact functions, keeping current callers, canonical account
+validation and local-tier settlement unchanged. The three-engine read fixture
+imports and executes the real archive leaf inside the Worker, then checks that
+the subscribed row disappears; the product protocol still exposes no writes.
+All nine native cases, strict candidate checks, full SDK60 app/browser-test types
+and 42 existing account/data cases pass after this extraction. Logs:
+`/private/tmp/finance-account-leaves-{unit,types,alpha67-native}.log`.
+
+The remaining C6 work is domain-owner integration, not another persistence leaf.
+Supply actual membership/grant/account facts inside the Worker;
 never treat a rendered account row as write permission. Reuse existing account
 presentation/action feedback rather than designing another financial form.
 Balances, transactions, other forms, bank workflows, backup/restore UI, recovery,

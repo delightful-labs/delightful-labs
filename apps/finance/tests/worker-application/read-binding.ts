@@ -1,3 +1,4 @@
+import { archiveAccount } from '../../src/lib/data/accounts.js'
 import { createFinanceReadBinding as nativeBinding } from '../../src/lib/runtime/worker/read-binding.js'
 import { app } from '../../src/lib/schema.js'
 import { z } from 'zod'
@@ -21,6 +22,7 @@ const edit = z.strictObject({
 const command = z.discriminatedUnion('type', [
 	seed,
 	edit,
+	z.strictObject({ type: z.literal('TEST_ARCHIVE'), accountId: z.uuid() }),
 	z.strictObject({ type: z.literal('TEST_BAD_VIEW') })
 ])
 // Fixture-only SDK controls: the real entry, runtime and read binding stay in use.
@@ -42,7 +44,8 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 				reply.postMessage({ ok: true })
 				return
 			}
-			if (c.type === 'TEST_EDIT')
+			if (c.type === 'TEST_ARCHIVE') await archiveAccount(db, c.accountId)
+			else if (c.type === 'TEST_EDIT')
 				await db.update(app.accounts, c.accountId, { name: c.name }).wait({ tier: 'local' })
 			else {
 				const identityId = db.getAuthState().session?.user

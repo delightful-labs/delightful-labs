@@ -195,6 +195,15 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					.toEqual(['Edited B'])
 				await page.evaluate(() => window.financeWorkerReadFixture.attach())
 				await browserExpect(page.getByRole('cell', { name: 'Edited B', exact: true })).toBeVisible()
+				expect(
+					await page.evaluate((id) => window.financeWorkerReadFixture.archive(id), accountB)
+				).toEqual({ ok: true })
+				await browserExpect(page.getByRole('cell', { name: 'Edited B', exact: true })).toHaveCount(
+					0
+				)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().accounts))
+					.toEqual([])
 				await close(page)
 			} finally {
 				await browser.close()
