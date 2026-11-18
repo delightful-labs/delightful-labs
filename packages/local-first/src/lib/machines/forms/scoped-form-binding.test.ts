@@ -3,6 +3,8 @@ import { createActor, setup, types, type SnapshotFrom } from 'xstate'
 import type { FormCapability, FormObservation } from '../../contracts/scoped-form.js'
 import { createSingleWriteFormOptions } from './policy.js'
 import { createScopedFormMachine, selectScopedFormView } from './scoped-form.js'
+import { createWorkerFormViewSchema } from '../../worker/form-view.js'
+import { z } from 'zod'
 
 it('binds initial and replacement readiness to the generation accepted by the form', () => {
 	type Facts = { scope: string; crash: boolean }
@@ -45,25 +47,38 @@ it('binds initial and replacement readiness to the generation accepted by the fo
 		classifyBlocked: () => 'unavailable',
 		write: async () => undefined
 	})
-	const message = () => 'Test feedback'
 	const logic = createScopedFormMachine(options, {
-		validationIssues: () => undefined,
-		messages: {
-			unknown: message,
-			loading: message,
-			loadFailed: message,
-			saved: message,
-			completionFailed: message,
-			interruptedSaved: message,
-			archiveFailed: message,
-			saveFailed: message,
-			settling: message
-		}
+		validationIssues: () => undefined
 	})
 	const actor = createActor(logic, { input: facts }).start()
 	try {
 		const generation = actor.getSnapshot().context.watchGeneration
 		expect(selectScopedFormView(actor.getSnapshot(), options).canSubmit).toBe(true)
+		const publicView = selectScopedFormView(actor.getSnapshot(), options)
+		expect(structuredClone(publicView)).toEqual(publicView)
+		const wire = createWorkerFormViewSchema(z.undefined(), z.string())
+		expect(wire.parse(publicView)).toEqual(publicView)
+		const projected = wire.parse({
+			...publicView,
+			feedback: {
+				kind: 'result',
+				result: {
+					outcome: 'failed',
+					code: 'operationFailed',
+					settlement: 'unknown',
+					checkpoint: () => 'private recovery capability'
+				}
+			}
+		})
+		expect(structuredClone(projected)).toEqual(projected)
+		if (projected.feedback.kind !== 'result') throw new Error('Missing result')
+		expect(projected.feedback.result).not.toHaveProperty('checkpoint')
+		expect(
+			wire.safeParse({
+				...publicView,
+				feedbackDescriptors: [{ section: 'result', message: 'unregistered' }]
+			}).success
+		).toBe(false)
 		actor.send({ type: 'OBSERVE', observation: { ...facts, crash: true } })
 		expect(selectScopedFormView(actor.getSnapshot(), options).canRetryReadiness).toBe(true)
 		actor.send({ type: 'OBSERVE', observation: facts })

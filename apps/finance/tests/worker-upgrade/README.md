@@ -43,6 +43,25 @@ caller adoption, the entire historical restore matrix, live Vercel workload
 admission or the coherent workspace switch. See the
 [alpha.67 source review and evidence](../../specs/013-local-first-startup/worker-jazz-alpha66-research.md#alpha67-native-source-review-and-requalification).
 
+## Current Finance account creation and form transport
+
+The same maintained `--worker --sdk=2.0.0-alpha.67` command includes the existing
+account-creation form/policy and archive workflow in the actual Worker/UI slice.
+The Local First form view carries serializable state-selected message descriptors;
+Svelte retains the existing translation callbacks and FormData/DOM behavior.
+One SDK-bound forms actor keeps pending saves alive through binding retirement.
+Both session and workspace revisions scope mutation commands. Host closure drains
+forms and archive independently before SDK/store/broker teardown.
+
+Strict candidate types, zero-warning Svelte checks and **15 native browser cases**
+pass, including TZS workspace-default creation and a UI-created account surviving
+two process restarts without app/auth/Jazz endpoints. All **1,954 Finance units**,
+**54 shared form tests**, library static/package and public consumer checks pass.
+A fresh maintained run also passes 200 schema/permission/backup/restore and 42
+existing worker/session cases before those 15 actual Worker/UI cases.
+These are candidate results; active routes, SDK pins and full application parity
+remain open. [Implementation and remaining work](../../specs/013-local-first-startup/worker-session-resource-decision.md#worker-owned-account-creation-and-form-transport).
+
 ## Actual Finance Worker/UI read slice
 
 The maintained `--worker --sdk=2.0.0-alpha.67` command now also copies and checks

@@ -1,10 +1,10 @@
-import { createFinanceReadBinding as nativeBinding } from '../../src/lib/runtime/worker/read-binding.js'
+import { createFinanceWorkerBinding as nativeBinding } from '../../src/lib/runtime/worker/binding.js'
 import { app } from '../../src/lib/schema.js'
 import { z } from 'zod'
 
 let captured: Parameters<typeof nativeBinding>[0] | undefined
 let archiveReceipt: ReturnType<typeof Promise.withResolvers<void>> | undefined
-export function createFinanceReadBinding(input: Parameters<typeof nativeBinding>[0]) {
+export function createFinanceWorkerBinding(input: Parameters<typeof nativeBinding>[0]) {
 	captured = input
 	const native = nativeBinding(input)
 	return {
@@ -20,7 +20,8 @@ const seed = z.strictObject({
 	type: z.literal('TEST_SEED'),
 	workspaceId: z.uuid(),
 	accountId: z.uuid(),
-	name: z.string().min(1)
+	name: z.string().min(1),
+	currency: z.enum(['USD', 'TZS'])
 })
 const edit = z.strictObject({
 	type: z.literal('TEST_EDIT'),
@@ -68,7 +69,7 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 						{
 							name: c.name + ' workspace',
 							kind: 'personal',
-							defaultCurrency: 'USD',
+							defaultCurrency: c.currency,
 							ownerId: identityId
 						},
 						{ id: c.workspaceId }

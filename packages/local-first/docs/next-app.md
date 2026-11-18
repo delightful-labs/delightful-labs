@@ -91,7 +91,9 @@ consumers under `fixtures/package-consumer/` for transaction, selection, naming 
 Use `forms/contracts`, `forms/readiness`, `forms/write`, `forms/submission` and `forms/workflow`
 individually or compose a single-write operation through `forms/policy`. Schema validation only
 requires `parseAsync`; it does not require Zod. Supply `validationIssues(error)` to normalize your
-validator's field issues and `messages` callbacks to translate feedback at render time. Complex
+validator's field issues. Supply `defaultMessages` to the feedback/profile presentation,
+not the workflow. The machine selects plain `feedbackDescriptors`; `forms/feedback` formats
+those descriptors with the current locale and caller-owned messages. Complex
 writes supply a persistence actor instead of a promise containing a hidden workflow.
 
 `forms/svelte` attaches one controller with `observe`, the exact binding/policy options, dependencies
@@ -99,6 +101,15 @@ and optional diagnostics. `forms/lifecycle` drains before stopping. The presenta
 `forms/content`, `forms/feedback-view` and `forms/modal`. They accept typed views/callbacks/snippets,
 with caller-owned labels. Import DUI's base CSS/theme at the application boundary; the foundation
 does not impose a global theme.
+
+For a Worker, `forms/worker` exports `createWorkerFormViewSchema(resultSchema, reasonSchema)`
+to validate and project the public form view with native Zod. Consumer schemas own result/reason
+shapes; opaque recovery checkpoints remain with the workflow and are removed from wire results.
+Do not serialize SDK objects, functions or complete snapshots. `selectScopedFormObservation`
+echoes the admitted observation at an explicit parent/report boundary, so a parent can reject
+retired child views without inspecting private workflow state. Keep DOM/FormData extraction and
+translation on Window, and validation, policy, submission and settlement in the worker actor.
+
 
 `profile/workflow` assembles name/avatar forms with your schemas, local save adapters and image
 processing actor. `profile/avatar` owns processing → validation → write → cleanup and interruption;

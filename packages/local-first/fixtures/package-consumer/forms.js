@@ -1,6 +1,8 @@
 // Domain-free readiness and actor-free outcome imports; no SDK, Svelte or browser context.
 import { createActor, createStepLogic, toPromise } from 'xstate'
 import { formInterruptionResult } from 'delightful-local-first/forms/contracts'
+import { createWorkerFormViewSchema } from 'delightful-local-first/forms/worker'
+import { z } from 'zod'
 import { createScopedFormReadinessMachine } from 'delightful-local-first/forms/readiness'
 
 const scope = { attachment: {}, project: 'consumer' }
@@ -45,3 +47,31 @@ try {
 } finally {
 	actor.stop()
 }
+
+// The public worker boundary projects private recovery capabilities out of a view.
+const wire = createWorkerFormViewSchema(z.string(), z.string())
+const view = wire.parse({
+	readiness: { kind: 'ready' },
+	content: { kind: 'fields' },
+	activity: { kind: 'idle' },
+	feedback: {
+		kind: 'result',
+		result: {
+			outcome: 'failed',
+			code: 'operationFailed',
+			settlement: 'unknown',
+			checkpoint: () => undefined
+		}
+	},
+	feedbackDescriptors: [{ section: 'result', message: 'unknown' }],
+	canSubmit: false,
+	canReset: false,
+	canOpen: true,
+	canCancel: false,
+	fieldsEditable: false,
+	canRetryReadiness: false,
+	draftRevision: 0
+})
+structuredClone(view)
+if (view.feedback.kind !== 'result' || 'checkpoint' in view.feedback.result)
+	throw new Error('Packaged form view leaked a recovery capability')

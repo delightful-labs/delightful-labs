@@ -5,11 +5,12 @@
 	import type { ProfileView } from '../../contracts/profile.js'
 	import FormFeedback from '../../components/forms/FormFeedback.svelte'
 	import FormContent from '../../components/forms/FormContent.svelte'
+	import type { FormFeedbackMessages } from '../../contracts/scoped-form.js'
 	const instanceId = $props.id()
 	const avatarId = `${instanceId}-avatar`
 	const helpId = `${instanceId}-avatar-help`
 	let {
-		labels,reasonText,validateFile,accept,cropper,
+		labels,reasonText,defaultMessages,validateFile,accept,cropper,
 		profileId,
 		avatarData,
 		mimeType,
@@ -23,6 +24,7 @@
 	}: {
 		labels:Record<'formats'|'maxSize'|'resize'|'profile'|'invalidName'|'avatar'|'select'|'details'|'close'|'remove'|'clear'|'edit'|'invalid'|'save'|'saved'|'cropTitle'|'retry',string>
 		reasonText:(reason:import('../../contracts/profile.js').ProfileReason)=>string
+		defaultMessages: FormFeedbackMessages
 		validateFile:(file:File)=>boolean
 		accept:string
 		cropper:Snippet<[File,(file:File)=>void,()=>void]>
@@ -53,7 +55,7 @@
 <Text id={helpId}
 	>{labels.formats} {labels.maxSize} {labels.resize}</Text
 >
-<FormFeedback retryLabel={labels.retry}
+<FormFeedback retryLabel={labels.retry} {defaultMessages}
 	{view}
 	subject={labels.profile}
 	{reasonText}
@@ -102,7 +104,7 @@
 			{/if}
 		{/snippet}
 		{#snippet feedback(view)}
-			<FormFeedback retryLabel={labels.retry}
+			<FormFeedback retryLabel={labels.retry} {defaultMessages}
 				{view}
 				subject={labels.profile}
 				{reasonText}

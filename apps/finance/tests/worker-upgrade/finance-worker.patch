@@ -1,8 +1,8 @@
 diff --git a/src/lib/runtime/worker/application.worker.ts b/src/lib/runtime/worker/application.worker.ts
-index a769e00..6ae1f48 100644
+index a769e00..cc4990b 100644
 --- a/src/lib/runtime/worker/application.worker.ts
 +++ b/src/lib/runtime/worker/application.worker.ts
-@@ -1,31 +1,99 @@
+@@ -1,31 +1,116 @@
 -import { createJazzClient } from 'jazz-tools/client'
 -import { createJazzSessionAcquisition } from 'delightful-local-first/backend/jazz/session'
 -import { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/startup'
@@ -22,16 +22,17 @@ index a769e00..6ae1f48 100644
 +import {
 +	financeWorkerCommand,
 +	financeWorkerOpen,
-+	type FinanceReadCapabilities
++	type FinanceWorkerCapabilities
 +} from '../../contracts/worker-application.js'
 +import {
 +	createFinanceWorkerMachine,
 +	selectFinanceArchiveObservation,
 +	selectFinanceArchiveWriter,
++	selectFinanceAccountCreationObservation,
 +	selectFinanceWorkerView
 +} from '../../machines/runtime/worker-application.js'
  import { createFinanceAccountStore } from './account-store.js'
-+import { createFinanceReadBinding } from './read-binding.js'
++import { createFinanceWorkerBinding } from './binding.js'
 
 -// W02 build-only entry: no production caller, session, actor, port or storage owner.
 -// Keeping factory values in this diagnostic catalog prevents an empty-worker proof.
@@ -45,7 +46,22 @@ index a769e00..6ae1f48 100644
 -	brokerHostClient,
 -	createFinanceAccountStore,
 -	loadLocalFirstClient: () => import('jazz-tools/local-first')
--}
++let application: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
++let viewScheduled = false
++function publishView() {
++	if (viewScheduled) return
++	viewScheduled = true
++	queueMicrotask(() => {
++		viewScheduled = false
++		if (!application) return
++		try {
++			self.postMessage(selectFinanceWorkerView(application.getSnapshot()))
++		} catch {
++			application.send({ type: 'NATIVE_FAILED' })
++			self.postMessage({ type: 'FAILED' })
++		}
++	})
+ }
 -
 -// The isolated proof driver is never invoked automatically. If opened manually,
 -// this entry reports import kinds only; it never calls a factory or opens the SDK.
@@ -54,8 +70,7 @@ index a769e00..6ae1f48 100644
 -	factories: Object.fromEntries(
 -		Object.entries(factories).map(([name, factory]) => [name, typeof factory])
 -	)
-+let application: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
-+const sessionMachine = createSessionRuntimeMachine<FinanceReadCapabilities>()
++const sessionMachine = createSessionRuntimeMachine<FinanceWorkerCapabilities>()
 +self.addEventListener('message', (event: MessageEvent<unknown>) => {
 +	const open = financeWorkerOpen.safeParse(event.data)
 +	if (open.success && !application && event.ports.length === 2) {
@@ -87,7 +102,7 @@ index a769e00..6ae1f48 100644
 +						browserWorkerHost: broker
 +					}
 +				},
-+				createFinanceReadBinding
++				createFinanceWorkerBinding
 +			)
 +			const runtime = createActor(sessionMachine, { input: native })
 +			runtime.subscribe({
@@ -95,6 +110,7 @@ index a769e00..6ae1f48 100644
 +			})
 +			const machine = createFinanceWorkerMachine({
 +				observe: () => selectFinanceArchiveObservation(application?.getSnapshot()),
++				observeCreation: () => selectFinanceAccountCreationObservation(application?.getSnapshot()),
 +				persist: (request) => {
 +					const write = selectFinanceArchiveWriter(application?.getSnapshot(), request)
 +					return write
@@ -111,7 +127,7 @@ index a769e00..6ae1f48 100644
 +				}
 +			})
 +			application.subscribe({
-+				next: (snapshot) => self.postMessage(selectFinanceWorkerView(snapshot)),
++				next: publishView,
 +				error: () => self.postMessage({ type: 'FAILED' }),
 +				complete: () => {
 +					if (application?.getSnapshot().output?.outcome === 'closed')

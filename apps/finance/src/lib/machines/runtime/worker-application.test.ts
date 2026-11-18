@@ -10,13 +10,17 @@ import {
 	createFinanceWorkerMachine,
 	selectFinanceWorkerView,
 	selectFinanceArchiveObservation,
+	selectFinanceAccountCreationObservation,
 	selectFinanceArchiveWriter
 } from './worker-application.js'
 import type {
-	FinanceReadCapabilities,
+	FinanceWorkerCapabilities,
 	WorkerAccount,
+	WorkerAccountRecord,
 	WorkerWorkspace
 } from '../../contracts/worker-application.js'
+import { createFinanceFormsMachine } from './worker-forms.js'
+import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 
 const userId = '10000000-0000-4000-8000-000000000001',
@@ -30,9 +34,9 @@ const row = (name: string): WorkerAccount => ({
 })
 function fixture() {
 	const order: string[] = []
-	let observed = (_: SessionRuntimeObservation<FinanceReadCapabilities>) => {}
+	let observed = (_: SessionRuntimeObservation<FinanceWorkerCapabilities>) => {}
 	const directory: {
-		publish: (rows: WorkerWorkspace[]) => void
+		publish: (rows: Pick<WorkerWorkspace, 'id' | 'name'>[]) => void
 		failed: () => void
 		release: ReturnType<typeof vi.fn<() => void>>
 	}[] = []
@@ -48,12 +52,27 @@ function fixture() {
 	}[] = []
 	const grants: { publish: (rows: ArchiveObservation['grants']) => void; failed: () => void }[] = []
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
-	const capabilities: FinanceReadCapabilities = {
+	const createWrite = vi.fn(
+		async (
+			organizationId: string,
+			values: { name: string; kind: 'cash' | 'bank' | 'card'; currency: 'USD' | 'TZS' }
+		): Promise<WorkerAccountRecord> => ({
+			...values,
+			organizationId,
+			id: crypto.randomUUID(),
+			archivedAt: null
+		})
+	)
+	const capabilities: Omit<FinanceWorkerCapabilities, 'createForms'> = {
 		observeWorkspaces: (publish, failed) => {
 			const release = vi.fn(() => {
 				order.push('directory')
 			})
-			directory.push({ publish, failed, release })
+			directory.push({
+				publish: (rows) => publish(rows.map((row) => ({ ...row, defaultCurrency: 'USD' }))),
+				failed,
+				release
+			})
 			return release
 		},
 		observeAccounts: (workspaceId, publish, failed) => {
@@ -92,18 +111,21 @@ function fixture() {
 		},
 		archiveAccount: archiveWrite
 	}
-	const ready = (binding: object): SessionRuntimeObservation<FinanceReadCapabilities> => ({
+	const ready = (binding: object): SessionRuntimeObservation<FinanceWorkerCapabilities> => ({
 		status: 'ready',
 		binding,
 		identityId: userId,
 		identityKind: 'device',
 		localFirst: true,
-		capabilities
+		capabilities: {
+			...capabilities,
+			createForms: (observe) => createFinanceFormsMachine({ binding, observe, create: createWrite })
+		}
 	})
 	const nativeClose = vi.fn(async () => {
 		order.push('sdk')
 	})
-	const resource: SessionRuntimeResource<FinanceReadCapabilities> = {
+	const resource: SessionRuntimeResource<FinanceWorkerCapabilities> = {
 		observe: (publish) => {
 			observed = publish
 			publish(ready({}))
@@ -117,7 +139,7 @@ function fixture() {
 	const open = vi.fn(async () => resource)
 	const binding = {},
 		brokerIdentity = { scope: 'host', requestId: 'close-receipt' }
-	const runtime = createActor(createSessionRuntimeMachine<FinanceReadCapabilities>(), {
+	const runtime = createActor(createSessionRuntimeMachine<FinanceWorkerCapabilities>(), {
 		input: { binding, capability: { open } }
 	})
 	const closeAccountStore = vi.fn(async () => {
@@ -130,6 +152,7 @@ function fixture() {
 	let owner: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
 	const machine = createFinanceWorkerMachine({
 		observe: () => selectFinanceArchiveObservation(owner?.getSnapshot()),
+		observeCreation: () => selectFinanceAccountCreationObservation(owner?.getSnapshot()),
 		persist: (request) => {
 			const write = selectFinanceArchiveWriter(owner?.getSnapshot(), request)
 			return write ? write(request.accountId) : Promise.reject(new Error('Binding retired'))
@@ -165,10 +188,22 @@ function fixture() {
 		memberships,
 		grants,
 		archiveWrite,
+		createWrite,
+		create: (
+			command: WorkerAccountCreationCommand,
+			scope = selectFinanceWorkerView(actor.getSnapshot())
+		) =>
+			actor.send({
+				type: 'ACCOUNT_CREATION',
+				command,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			}),
 		start,
 		select,
 		ready,
-		publishSession: (value: SessionRuntimeObservation<FinanceReadCapabilities>) => observed(value),
+		publishSession: (value: SessionRuntimeObservation<FinanceWorkerCapabilities>) =>
+			observed(value),
 		view: () => selectFinanceWorkerView(actor.getSnapshot()),
 		stop: () => {
 			actor.stop()
@@ -183,6 +218,166 @@ function last<T>(rows: T[]): T {
 }
 
 describe('Finance worker ownership and selected accounts', () => {
+	it('validates creation in the existing worker form and publishes a cloneable success', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([])
+			expect(f.view().accountCreation?.canOpen).toBe(true)
+			f.create({ type: 'SUBMIT', values: { name: '  Wallet  ', kind: 'cash', currency: 'TZS' } })
+			await vi.waitFor(() => expect(f.view().accountCreation?.content.kind).toBe('success'))
+			expect(f.createWrite).toHaveBeenCalledExactlyOnceWith(a, {
+				name: 'Wallet',
+				kind: 'cash',
+				currency: 'TZS'
+			})
+			expect(f.view().accountCreation?.content).toMatchObject({
+				kind: 'success',
+				value: { name: 'Wallet', currency: 'TZS' }
+			})
+			expect(structuredClone(f.view())).toEqual(f.view())
+		} finally {
+			f.stop()
+		}
+	})
+	it.each(['invalid', 'duplicate', 'readOnly'])(
+		'refuses %s creation before native writes',
+		async (reason) => {
+			const f = fixture()
+			try {
+				await f.start()
+				last(f.directory).publish([{ id: a, name: 'A' }])
+				f.select(a, 1)
+				last(f.queries).publish([row('Wallet')])
+				if (reason === 'readOnly')
+					last(f.memberships).publish({
+						id: crypto.randomUUID(),
+						organizationId: a,
+						userId,
+						role: 'viewer',
+						accountAccessMode: 'all',
+						profileId: null
+					})
+				f.create({
+					type: 'SUBMIT',
+					values: { name: reason === 'invalid' ? '' : 'Wallet', kind: 'cash', currency: 'USD' }
+				})
+				await vi.waitFor(() => expect(f.view().accountCreation?.activity.kind).toBe('idle'))
+				if (reason === 'readOnly') {
+					expect(f.view().accountCreation?.readiness).toEqual({
+						kind: 'blocked',
+						reason: 'readOnly'
+					})
+					expect(f.view().accountCreation?.canSubmit).toBe(false)
+				} else {
+					await vi.waitFor(() => expect(f.view().accountCreation?.feedback.kind).toBe('result'))
+					expect(f.view().accountCreation?.feedback).toMatchObject({
+						kind: 'result',
+						result: { outcome: reason === 'invalid' ? 'invalid' : 'unavailable' }
+					})
+				}
+				expect(f.createWrite).not.toHaveBeenCalled()
+			} finally {
+				f.stop()
+			}
+		}
+	)
+	it('refuses old session commands even when the replacement identity and workspace IDs match', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			const oldScope = f.view()
+			f.publishSession(f.ready({}))
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([row('Wallet')])
+			expect(f.view().sessionRevision).toBeGreaterThan(oldScope.sessionRevision)
+			f.create({ type: 'SUBMIT', values: { name: 'New', kind: 'cash', currency: 'USD' } }, oldScope)
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: oldScope.selection,
+				sessionRevision: oldScope.sessionRevision
+			})
+			expect(f.createWrite).not.toHaveBeenCalled()
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			f.create({ type: 'SUBMIT', values: { name: 'New', kind: 'cash', currency: 'USD' } })
+			await vi.waitFor(() => expect(f.createWrite).toHaveBeenCalledOnce())
+		} finally {
+			f.stop()
+		}
+	})
+	it('drains an admitted creation before replacing its SDK-bound form owner and hides old results', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<Awaited<ReturnType<typeof f.createWrite>>>()
+		f.createWrite.mockImplementationOnce(() => held.promise)
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([])
+			const owner = f.actor.getSnapshot().context.forms?.owner
+			f.create({ type: 'SUBMIT', values: { name: 'Old save', kind: 'cash', currency: 'USD' } })
+			await vi.waitFor(() => expect(f.createWrite).toHaveBeenCalledOnce())
+			f.publishSession(f.ready({}))
+			expect(f.actor.getSnapshot().matches('retiringForms')).toBe(true)
+			expect(f.actor.getSnapshot().context.forms?.owner).toBe(owner)
+			expect(f.view().accountCreation).toBeNull()
+			expect(f.queries).toHaveLength(1)
+			held.resolve({ ...row('Old save'), organizationId: a, archivedAt: null })
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([])
+			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(owner)
+			expect(f.view().accountCreation?.content.kind).toBe('fields')
+			expect(f.view().accountCreation?.feedback.kind).toBe('none')
+			expect(f.createWrite).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve({ ...row('Old save'), organizationId: a, archivedAt: null })
+			f.stop()
+		}
+	})
+	it('waits for both archive and creation settlement before closing the SDK', async () => {
+		const f = fixture(),
+			archived = Promise.withResolvers<void>(),
+			created = Promise.withResolvers<Awaited<ReturnType<typeof f.createWrite>>>()
+		f.archiveWrite.mockImplementation(() => archived.promise)
+		f.createWrite.mockImplementation(() => created.promise)
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet')])
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: f.view().selection,
+				sessionRevision: f.view().sessionRevision
+			})
+			f.create({ type: 'SUBMIT', values: { name: 'New save', kind: 'cash', currency: 'USD' } })
+			await vi.waitFor(() => expect(f.createWrite).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			archived.resolve()
+			await vi.waitFor(() =>
+				expect(f.actor.getSnapshot().matches({ draining: { archive: 'closed' } })).toBe(true)
+			)
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			created.resolve({ ...row('New save'), organizationId: a, archivedAt: null })
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.createWrite).toHaveBeenCalledOnce()
+		} finally {
+			archived.resolve()
+			created.resolve({ ...row('New save'), organizationId: a, archivedAt: null })
+			f.stop()
+		}
+	})
 	it('publishes plain fields, starts only the selected query and rejects retired A → B → A reports', async () => {
 		const f = fixture()
 		try {
@@ -301,7 +496,7 @@ describe('Finance worker ownership and selected accounts', () => {
 	})
 	it('waits for late native acquisition and closes it without starting queries', async () => {
 		const f = fixture(),
-			acquired = Promise.withResolvers<SessionRuntimeResource<FinanceReadCapabilities>>()
+			acquired = Promise.withResolvers<SessionRuntimeResource<FinanceWorkerCapabilities>>()
 		f.open.mockImplementation(() => acquired.promise)
 		try {
 			f.actor.start()
@@ -358,11 +553,13 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.view().accounts[0]?.archiveAction).toBe('available')
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
 				selection: { workspaceId: a, revision: 1 }
 			})
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
 				selection: { workspaceId: a, revision: 1 }
 			})
@@ -396,6 +593,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			last(f.queries).publish([row('Original A')])
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Original A').id,
 				selection: { workspaceId: a, revision: 1 }
 			})
@@ -403,6 +601,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			last(f.queries).publish([row('B')])
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('B').id,
 				selection: { workspaceId: a, revision: 1 }
 			})
@@ -437,6 +636,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			last(f.memberships).publish({ ...owner, role: 'viewer' })
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
 				selection: { workspaceId: a, revision: 1 }
 			})
@@ -448,6 +648,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			])
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
 				selection: { workspaceId: a, revision: 1 }
 			})
@@ -458,12 +659,14 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.view().accounts[0]?.archiveAction).toBe('available')
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
 				selection: { workspaceId: a, revision: 0 }
 			})
 			expect(f.archiveWrite).not.toHaveBeenCalled()
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
 				selection: { workspaceId: a, revision: 1 }
 			})
@@ -483,6 +686,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			last(f.queries).publish([row('Wallet')])
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
 				selection: { workspaceId: a, revision: 1 }
 			})

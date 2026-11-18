@@ -1,31 +1,45 @@
 import { ReadTier, type Db } from 'jazz-tools'
 import { app } from '../../schema.js'
-import { workerAccountRecord } from '../../contracts/worker-application.js'
-import type { FinanceReadCapabilities } from '../../contracts/worker-application.js'
+import {
+	workerWorkspace,
+	type FinanceWorkerCapabilities
+} from '../../contracts/worker-application.js'
 import { observeRow } from '../observations.js'
-import { archiveAccount } from '../../data/accounts.js'
+import { archiveAccount, createAccount } from '../../data/accounts.js'
+import { persistedAccountSchema } from '../../validation/accounts.js'
+import { createFinanceFormsMachine } from '../../machines/runtime/worker-forms.js'
 
 /** Inert native construction: no subscription starts until its owning chart invokes it. */
-export function createFinanceReadBinding({
+export function createFinanceWorkerBinding({
 	db,
 	isCurrent,
-	identityId
+	identityId,
+	binding
 }: {
 	db: Db
 	isCurrent: () => boolean
 	identityId: string
-}): FinanceReadCapabilities {
+	binding: object
+}): FinanceWorkerCapabilities {
 	return {
 		observeWorkspaces: (publish, failed) =>
 			db.subscribe(
-				app.organizations.select('id', 'name').orderBy('name'),
+				app.organizations.select('id', 'name', 'defaultCurrency').orderBy('name'),
 				{
 					onUpdate: (rows) => {
 						if (!isCurrent()) {
 							failed()
 							return
 						}
-						publish(rows.map(({ id, name }) => ({ id, name })))
+						publish(
+							workerWorkspace.array().parse(
+								rows.map(({ id, name, defaultCurrency }) => ({
+									id,
+									name,
+									defaultCurrency: defaultCurrency === 'TZS' ? 'TZS' : 'USD'
+								}))
+							)
+						)
 					},
 					onError: failed
 				},
@@ -43,7 +57,7 @@ export function createFinanceReadBinding({
 							failed()
 							return
 						}
-						const decoded = workerAccountRecord.array().safeParse(
+						const decoded = persistedAccountSchema.array().safeParse(
 							rows.map(({ id, organizationId, name, kind, currency, archivedAt }) => ({
 								id,
 								organizationId,
@@ -97,6 +111,29 @@ export function createFinanceReadBinding({
 		archiveAccount: (accountId) => {
 			if (!isCurrent()) return Promise.reject(new Error('Finance account binding retired'))
 			return archiveAccount(db, accountId)
-		}
+		},
+		createForms: (observe) =>
+			createFinanceFormsMachine({
+				binding,
+				observe,
+				create: async (workspaceId, values) => {
+					if (!isCurrent()) throw new Error('Finance account binding retired')
+					const row = await createAccount(
+						db,
+						workspaceId,
+						values.name,
+						values.kind,
+						values.currency
+					)
+					return persistedAccountSchema.parse({
+						id: row.id,
+						organizationId: row.organizationId,
+						name: row.name,
+						kind: row.kind,
+						currency: row.currency,
+						archivedAt: row.archivedAt
+					})
+				}
+			})
 	}
 }

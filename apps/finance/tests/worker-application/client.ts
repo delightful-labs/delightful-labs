@@ -20,7 +20,8 @@ function attach() {
 		props: {
 			view: owner.view,
 			onSelectWorkspace: owner.selectWorkspace,
-			onArchive: owner.archiveAccount
+			onArchive: owner.archiveAccount,
+			onAccountCreation: owner.accountCreationCommand
 		}
 	})
 }
@@ -49,10 +50,10 @@ const fixture = {
 		attach()
 	},
 	state: () => get(current().view),
-	seed: (workspaceId: string, accountId: string, name: string) =>
-		request({ type: 'TEST_SEED', workspaceId, accountId, name }),
+	seed: (workspaceId: string, accountId: string, name: string, currency: 'USD' | 'TZS' = 'USD') =>
+		request({ type: 'TEST_SEED', workspaceId, accountId, name, currency }),
 	edit: (accountId: string, name: string) => request({ type: 'TEST_EDIT', accountId, name }),
-	archive: (accountId: string) => current().archiveAccount(accountId),
+	archive: (accountId: string) => current().archiveAccount(accountId, get(current().view)),
 	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),
 	releaseArchive: () => request({ type: 'TEST_RELEASE_ARCHIVE' }),
 	select: (workspaceId: string) => current().selectWorkspace(workspaceId),

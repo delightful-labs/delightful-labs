@@ -1,5 +1,9 @@
 # Shared form contracts and readiness: Finance adoption review
 
+Current worker follow-up: the shared form now selects serializable `feedbackDescriptors`,
+replacing the historical callback decoration below. Finance supplies the same messages at the
+Svelte presentation boundary. See [the current worker form implementation](../specs/013-local-first-startup/worker-session-resource-decision.md#worker-owned-account-creation-and-form-transport).
+
 Baseline Finance main e04bdf4, library main ed96a79; branches feat/finance-foundation-extraction.
 Shared implementation/roadmap commit f5dfed9 and approved coverage commit 47fc8b0 are complete.
 This batch adopts only the shared core protocols and readiness observer, not the whole form stack.

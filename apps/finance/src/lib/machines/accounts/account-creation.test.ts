@@ -13,6 +13,10 @@ import {
 import { createScopedFormMachine, selectScopedFormView } from '../forms/scoped-form.js'
 import { createActor, waitFor } from 'xstate'
 import type { SnapshotFrom } from 'xstate'
+import {
+	formatFormFeedback,
+	type FormFeedbackMessages
+} from 'delightful-local-first/forms/feedback'
 
 const cleanups: (() => void)[] = []
 afterEach(() => cleanups.splice(0).forEach((fn) => fn()))
@@ -83,6 +87,63 @@ const account: Account = {
 }
 
 describe('account creation scoped adoption', () => {
+	it('keeps state-selected form feedback cloneable and translates it after a locale change without another workflow', async () => {
+		const f = fixture()
+		let locale = 'en'
+		const fallback = () => locale
+		const messages: FormFeedbackMessages = {
+			unknown: fallback,
+			loading: fallback,
+			loadFailed: fallback,
+			saved: fallback,
+			completionFailed: fallback,
+			interruptedSaved: fallback,
+			archiveFailed: fallback,
+			saveFailed: fallback,
+			settling: fallback
+		}
+		const render = (view: ReturnType<typeof f.view>) =>
+			(view.feedbackDescriptors ?? []).flatMap((descriptor) =>
+				formatFormFeedback(
+					descriptor,
+					{
+						view,
+						subject: 'Account',
+						reasonText: (reason) => locale + ':' + reason,
+						validationMessages: [],
+						successMessage: (value) => locale + ':' + value.name,
+						action: 'save',
+						messages: {},
+						blockedRole: () => 'status'
+					},
+					messages
+				)
+			)
+		f.patch({ membership: null })
+		const blocked = structuredClone(f.view())
+		expect(render(blocked)).toContainEqual({ text: 'en:readOnly', role: 'status' })
+		locale = 'fr'
+		expect(render(blocked)).toContainEqual({ text: 'fr:readOnly', role: 'status' })
+		f.patch({
+			membership: {
+				id: 'member',
+				organizationId: 'workspace',
+				userId: 'user',
+				role: 'owner',
+				accountAccessMode: 'all',
+				profileId: null
+			}
+		})
+		f.actor.send({ type: 'OPEN' })
+		f.actor.send({ type: 'SUBMIT', values: { name: 'Wallet', kind: 'cash', currency: 'USD' } })
+		f.saved.resolve(account)
+		await waitFor(f.actor, () => f.view().content.kind === 'success')
+		const saved = structuredClone(f.view())
+		expect(render(saved)).toContainEqual({ text: 'fr:Wallet', role: 'status' })
+		locale = 'en'
+		expect(render(saved)).toContainEqual({ text: 'en:Wallet', role: 'status' })
+	})
+
 	it.each([
 		[{ sessionReady: false }, 'sessionUnavailable'],
 		[{ identityId: null }, 'sessionUnavailable'],

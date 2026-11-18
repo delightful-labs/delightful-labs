@@ -4,16 +4,20 @@
 	import WorkspaceSelector from '../workspaces/WorkspaceSelector.svelte'
 	import AccountArchiveButton from '../accounts/AccountArchiveButton.svelte'
 	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
-	import type { FinanceWorkerView } from '../../contracts/worker-application.js'
+	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
+	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+	import WorkerAccountCreation from './WorkerAccountCreation.svelte'
 	import { m } from '#lib/paraglide/messages.js'
 	let {
 		view,
 		onSelectWorkspace,
-		onArchive
+		onArchive,
+		onAccountCreation
 	}: {
 		view: Readable<FinanceWorkerView>
 		onSelectWorkspace: (id: string) => void
-		onArchive: (id: string) => void
+		onArchive: (id: string, scope: WorkerCommandScope) => void
+		onAccountCreation: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
 	} = $props()
 	const live = $derived(fromStore(view))
 </script>
@@ -23,6 +27,7 @@
 	organizationId={live.current.selection.workspaceId}
 	onchange={onSelectWorkspace}
 />
+<WorkerAccountCreation view={live.current} onsend={onAccountCreation} />
 <AccountArchiveFeedback feedback={live.current.archiveFeedback} />
 {#if live.current.status === 'failed'}
 	<StatusMessage
@@ -68,7 +73,11 @@
 					<td
 						><AccountArchiveButton
 							action={account.archiveAction}
-							onarchive={() => onArchive(account.id)}
+							onarchive={() =>
+								onArchive(account.id, {
+									sessionRevision: live.current.sessionRevision,
+									selection: live.current.selection
+								})}
 						/></td
 					>
 				</tr>{/each}</tbody

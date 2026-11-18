@@ -1,8 +1,16 @@
 import type { Account, OrganizationMember } from '../schema.js'
 import type { ScopedFormView } from './form-contract.js'
 
+export const ACCOUNT_CREATION_REASON = Object.freeze({
+	sessionUnavailable: 'sessionUnavailable',
+	selectWorkspace: 'selectWorkspace',
+	loadFailed: 'loadFailed',
+	loading: 'loading',
+	readOnly: 'readOnly',
+	duplicateName: 'duplicateName'
+})
 export type AccountCreationReason =
-	'sessionUnavailable' | 'selectWorkspace' | 'loadFailed' | 'loading' | 'readOnly' | 'duplicateName'
+	(typeof ACCOUNT_CREATION_REASON)[keyof typeof ACCOUNT_CREATION_REASON]
 export type AccountCreationScope = {
 	identityId: string | null
 	organizationId: string | null

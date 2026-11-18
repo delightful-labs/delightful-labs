@@ -19,3 +19,16 @@ export const formReasonText = {
 	noAccounts: () => m['transactions.no_accounts'](),
 	noCategories: () => m['forms.no_categories']()
 }
+
+import type { FormFeedbackMessages } from 'delightful-local-first/forms/feedback'
+export const formMessages: FormFeedbackMessages = {
+	unknown: () => m['forms.unknown'](),
+	loading: (input) => m['status.loading_subject'](input),
+	loadFailed: (input) => m['errors.load_subject'](input),
+	saved: (input) => m['status.saved_subject'](input),
+	completionFailed: () => m['forms.completion_failed'](),
+	interruptedSaved: () => m['forms.interrupted_saved'](),
+	archiveFailed: (input) => m['errors.archive_subject'](input),
+	saveFailed: (input) => m['errors.save_subject'](input),
+	settling: () => m['forms.settling']()
+}

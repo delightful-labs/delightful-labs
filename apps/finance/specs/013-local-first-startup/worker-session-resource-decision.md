@@ -578,6 +578,60 @@ failure can withdraw data while a write settles; it must not stop the archive
 child. Forced child stop/failure cannot establish a successful drain. There is
 no new operation registry, detached root actor or async message-handler write.
 
+## Worker-owned account creation and form transport
+
+Account creation now runs through the existing `createAccountCreationFormOptions` and shared
+scoped form machine inside the alpha.67 application Worker candidate. The native binding closes
+over its original Db and calls the single existing `data/accounts.ts` create implementation.
+The real existing AccountForm presentation is reused: Window extracts FormData, forwards a scoped
+command and renders the bounded view. Validation, duplicate names, membership admission, operation
+results and settlement stay with the original worker-side form actors. Workspace default currency
+is included in copied directory facts; no new wording, catalog generation or SDK patch is added.
+
+The existing Local First form machine now selects plain message descriptors from state metadata.
+Its public views no longer carry formatting functions. The Svelte feedback component supplies the
+same callbacks and formats the selected descriptor using the current locale. A shared native Zod
+view projection takes consumer result/reason schemas and strips private recovery checkpoints before
+structured cloning. The worker retains those checkpoints; the wire is not a recovery journal.
+Profile form wrappers and existing fixtures use this same presentation contract.
+
+Resource model: each SDK binding owns one forms actor, with one fixed account-creation child.
+The form child's states/effects remain unchanged. Its group owns active → closing → closed and an
+unexpected-failure state; only actual child completion after SHUTDOWN produces closed output.
+The host starts the SDK-bound group with native `enq.spawn`, observes it with `enq.subscribeTo`,
+and explicitly retires its observer on completion. These supported APIs let the original native Db
+remain bound through issued-write settlement. There is no per-call population, remote actor API,
+SDK facade or separately started child root. A replacement SDK binding withdraws its views, drains
+the old group, and only then creates the replacement. Workspace changes update owned observations;
+public observation identity plus the workspace revision rejects stale child views.
+
+Commands include both sessionRevision and selected workspace/revision. This rejects commands
+rendered by an old native binding even when a replacement retains the same identity/workspace IDs.
+Host CLOSE sends SHUTDOWN to archive and forms together; independent parallel XState regions
+retain each completion. Neither region resets the other's acknowledgement. Only both completions
+permit the existing SDK → AccountStore → exact broker receipt close sequence. Cleanup failures
+cannot be overwritten by a late form completion, and unknown writes are never replayed.
+
+Qualification: all **1,954 Finance unit tests**, including **25 host cases**, pass. Full Finance
+static checks and shared library Svelte checks report zero errors/warnings. All **54 shared form
+cases**, packaging/publint and the public consumer suite pass. The alpha.67 actual application
+Worker/UI candidate passes strict types, zero-warning Svelte checks and **15 native cases** across
+Chromium, Firefox and WebKit. These include account creation with TZS workspace defaults, existing
+archive UI/held receipt closure, and a UI-created account retained through two complete browser
+process restarts while app/auth/Jazz endpoints are unavailable. Unit cases also cover invalid and
+duplicate names, read-only access, same-ID session replacement, held creation on SDK replacement,
+no old feedback/replay, and simultaneous creation/archive settlement before native close.
+
+Logs: `/private/tmp/finance-worker-creation-{types,unit,full-unit}.log`,
+`/private/tmp/finance-form-transport-{library-types,library-unit,consumer}.log`, and
+`/private/tmp/finance-creation-alpha67-native.log`. The maintained fresh upgrade runner also passes **200 native schema/permission/backup/restore
+cases, 42 existing worker/session cases and the 15 actual Worker/UI cases** from published
+alpha.67 SDK/Wasm tarballs and the built public packages. Its artifacts are
+`finance-jazz-alpha67-v5E6pm` under the system temporary directory; log:
+`/private/tmp/finance-creation-fresh-alpha67.log`. Production routes/pins and the remaining Finance features are not
+activated by these results. Continue with the existing manual transaction workflow and its copied
+reference facts, then the remaining domain/identity/provider/backup flows and coordinated rollout.
+
 ## Earlier accessor proposal (superseded)
 
 Keep the mutable SDK facade outside immutable chart context, under the **existing

@@ -51,7 +51,7 @@ beforeAll(async () => {
 					enforce: 'pre',
 					resolveId(source, importer) {
 						if (
-							source === './read-binding.js' &&
+							source === './binding.js' &&
 							importer !== undefined &&
 							/\/runtime\/worker\/application\.worker\.ts(?:\?|$)/.test(importer)
 						)
@@ -148,6 +148,17 @@ async function close(page: Page) {
 		.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
 		.toBe('closed')
 }
+async function createAccountUI(page: Page, name: string) {
+	await page.getByRole('button', { name: /add account/i, exact: true }).click()
+	const dialog = page.getByRole('dialog', { name: /add account/i })
+	await browserExpect(dialog).toBeVisible()
+	await dialog.getByLabel(/account name/i).fill(name)
+	await dialog.getByLabel(/account type/i).selectOption('cash')
+	await dialog.getByRole('button', { name: /add account/i }).click()
+	await browserExpect(dialog.getByText(new RegExp(name + '.*saved', 'i'))).toBeVisible()
+	await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+	await browserExpect(page.getByRole('cell', { name, exact: true })).toBeVisible()
+}
 for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 	describe(name, () => {
 		it('renders only selected accounts and keeps the Worker alive when UI observation detaches', async () => {
@@ -212,6 +223,42 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().archiveFeedback))
 					.toMatchObject({ outcome: 'succeeded', name: 'Edited B' })
 				await browserExpect(page.getByText(/Edited B/)).toBeVisible()
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('creates an account through the existing form with the workspace currency and worker-owned feedback', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Seed', 'TZS'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await browserExpect(page.getByRole('cell', { name: 'Seed', exact: true })).toBeVisible()
+				await page.getByRole('button', { name: /add account/i, exact: true }).click()
+				const dialog = page.getByRole('dialog', { name: /add account/i })
+				await browserExpect(dialog.getByLabel('Currency', { exact: true })).toHaveValue('TZS')
+				await dialog.getByLabel(/account name/i).fill('Local cash')
+				await dialog.getByLabel(/account type/i).selectOption('cash')
+				await dialog.getByRole('button', { name: /add account/i }).click()
+				await browserExpect(dialog.getByText(/Local cash.*saved/i)).toBeVisible()
+				await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+				const account = page
+					.getByRole('row')
+					.filter({ has: page.getByRole('cell', { name: 'Local cash', exact: true }) })
+				await browserExpect(account.getByRole('cell', { name: 'TZS', exact: true })).toBeVisible()
 				await close(page)
 			} finally {
 				await browser.close()
@@ -319,6 +366,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect(
 					page.getByRole('cell', { name: 'Retained wallet', exact: true })
 				).toBeVisible()
+				await createAccountUI(page, 'Offline created wallet')
 				await close(page)
 				await context.close()
 				context = await engine.launchPersistentContext(profile, { headless: true })
@@ -348,6 +396,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.evaluate((id) => window.financeWorkerReadFixture.select(id), workspaceId)
 				await browserExpect(
 					page.getByRole('cell', { name: 'Retained edit', exact: true })
+				).toBeVisible()
+				await browserExpect(
+					page.getByRole('cell', { name: 'Offline created wallet', exact: true })
 				).toBeVisible()
 				await close(page)
 			} finally {

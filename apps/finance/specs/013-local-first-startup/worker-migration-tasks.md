@@ -219,7 +219,15 @@ retain their product/parity requirements, not the abandoned implementation plan.
       uses the existing archive workflow through the actual UI, including scoped
       permissions, feedback and issued-write drain; 18 host cases and 12 native
       cases pass with all 1,946 Finance units. Production activation and the
-      remaining forms/app integration stay open. Continue to
+      remaining forms/app integration stay open.
+      **Account creation also implemented:** its original scoped form/policy and
+      actual AccountForm UI run against the Worker. Shared message descriptors
+      replace callback-bearing views; native Zod strips private checkpoints from
+      wire results. One SDK-bound forms owner drains before replacement, and
+      session plus workspace revisions reject stale commands. All 1,954 units
+      (25 host), 54 shared form cases, public consumers and 15 three-engine native
+      cases pass. See the [form transport and resource model](worker-session-resource-decision.md#worker-owned-account-creation-and-form-transport).
+      Continue to
       reuse the existing account archive chart/operation and its issued-write
       drain first; supply membership/grant facts. Native create/archive leaves
       are now shared in `data/accounts.ts` without Svelte imports, preserving
@@ -699,8 +707,10 @@ identity and storage. No production UI handoff is implied.
       an app-local replacement for its scoped form machine.
       Keep FormData extraction, native inputs, focus and presentation in Window.
       Keep validation, eligibility, draft/workflow authority, submissions and result
-      selection in worker actors. Replace callback-bearing feedback labels in wire
-      views with selected serializable descriptors; retain Finance's current wording
+      selection in worker actors. The first account-creation slice replaces callback-bearing feedback labels in
+      wire views with selected serializable descriptors and qualifies reactive locale;
+      other feature-specific input/reset/navigation/private-file boundaries remain.
+      For those features, retain Finance's current wording
       and reactive locale. Specify draft revisions, out-of-order input, reset,
       navigation acknowledgement, cancellation and late completion. Qualify shared
       API changes with existing consumers; don't create another form workflow.

@@ -229,6 +229,10 @@
 			"types": "./dist/machines/forms/feedback.d.ts",
 			"default": "./dist/machines/forms/feedback.js"
 		},
+		"./forms/worker": {
+			"types": "./dist/worker/form-view.d.ts",
+			"default": "./dist/worker/form-view.js"
+		},
 		"./forms/lifecycle": {
 			"types": "./dist/machines/forms/lifecycle.d.ts",
 			"default": "./dist/machines/forms/lifecycle.js"

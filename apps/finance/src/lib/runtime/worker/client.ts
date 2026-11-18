@@ -7,8 +7,10 @@ import {
 	financeWorkerReply,
 	workerSelection,
 	type FinanceWorkerView,
+	type WorkerCommandScope,
 	type FinanceWorkerOpen
 } from '../../contracts/worker-application.js'
+import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
 
 /** Window owns native transport and rendering only. Domain state stays in the Worker. */
 export function createFinanceWorkerClient(
@@ -32,12 +34,14 @@ export function createFinanceWorkerClient(
 	let revision = 0
 	const state = writable<FinanceWorkerView>({
 		type: 'VIEW',
+		sessionRevision: 0,
 		selection: { workspaceId: null, revision },
 		status: 'starting',
 		identityId: null,
 		workspaces: null,
 		accounts: [],
-		archiveFeedback: null
+		archiveFeedback: null,
+		accountCreation: null
 	})
 	const fail = () => {
 		// Keep the close receipt listener: a data fault never authorizes termination.
@@ -47,7 +51,8 @@ export function createFinanceWorkerClient(
 			status: 'failed',
 			accounts: [],
 			workspaces: null,
-			archiveFeedback: null
+			archiveFeedback: null,
+			accountCreation: null
 		}))
 	}
 	const receiveView = (event: MessageEvent<unknown>) => {
@@ -78,7 +83,8 @@ export function createFinanceWorkerClient(
 			accounts: [],
 			workspaces: null,
 			identityId: null,
-			archiveFeedback: null
+			archiveFeedback: null,
+			accountCreation: null
 		}))
 	}
 	worker.addEventListener('message', receiveView)
@@ -98,18 +104,37 @@ export function createFinanceWorkerClient(
 				selection,
 				status: view.status === 'failed' ? 'failed' : 'loading',
 				accounts: [],
-				archiveFeedback: null
+				archiveFeedback: null,
+				accountCreation: null
 			}))
 			worker.postMessage({ type: 'SELECT_WORKSPACE', selection })
 		},
-		archiveAccount: (accountId: string) => {
+		archiveAccount: (accountId: string, scope: WorkerCommandScope) => {
 			const current = get(state)
 			if (current.status !== 'ready') return
 			worker.postMessage(
 				financeWorkerCommand.parse({
 					type: 'ARCHIVE_ACCOUNT',
-					selection: current.selection,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection,
 					accountId
+				})
+			)
+		},
+		accountCreationCommand: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => {
+			const current = get(state)
+			if (
+				current.status === 'closed' ||
+				current.status === 'closing' ||
+				current.status === 'failed'
+			)
+				return
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'ACCOUNT_CREATION',
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection,
+					command
 				})
 			)
 		},

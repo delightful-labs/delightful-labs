@@ -8,6 +8,7 @@ import { formDependencies } from '#lib/forms/form-dependencies.js'
 import type { Snapshot } from 'xstate'
 
 export { selectScopedFormView } from 'delightful-local-first/forms/workflow'
+export { selectScopedFormObservation } from 'delightful-local-first/forms/workflow'
 export type ScopedFormOptions<
 	Values,
 	Result,

@@ -2,17 +2,18 @@
 	import Shared from 'delightful-local-first/profile/avatar-form'
 	import type { ComponentProps } from 'svelte'
 	import { avatarMimeType, profileAvatarFormSchema } from '#lib/validation/identity.js'
-	import { formReasonText } from '#lib/forms/form-messages.js'
+	import { formReasonText, formMessages } from '#lib/forms/form-messages.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import PhotoCropper from '../photo-cropper/PhotoCropper.svelte'
 	let props: Omit<
 		ComponentProps<typeof Shared>,
-		'labels' | 'reasonText' | 'validateFile' | 'accept' | 'cropper'
+		'labels' | 'reasonText' | 'defaultMessages' | 'validateFile' | 'accept' | 'cropper'
 	> = $props()
 </script>
 
 <Shared
 	{...props}
+	defaultMessages={formMessages}
 	labels={{
 		formats: m['images.formats'](),
 		maxSize: m['images.max_file_size'](),

@@ -1,4 +1,14 @@
-import { createAsyncLogic, createCallbackLogic, setup, types, type SnapshotFrom } from 'xstate'
+import {
+	createAsyncLogic,
+	createCallbackLogic,
+	setup,
+	types,
+	matchesState,
+	type SnapshotFrom,
+	type ActorRefFrom,
+	type ActorRef,
+	type Snapshot
+} from 'xstate'
 import {
 	sessionCloseMachine,
 	type SessionRuntimeObservation,
@@ -6,7 +16,7 @@ import {
 } from 'delightful-local-first/session/runtime'
 import type { WorkerHostClosed } from 'delightful-local-first/worker/channel/contracts'
 import type {
-	FinanceReadCapabilities,
+	FinanceWorkerCapabilities,
 	FinanceWorkerSession,
 	FinanceWorkerView,
 	WorkerSelection,
@@ -19,8 +29,15 @@ import {
 } from '../accounts/account-archive.js'
 import type { ArchiveObservation, ArchiveRequest } from '../accounts/account-archive-operation.js'
 import { projectAccountArchiveFeedback } from '../../contracts/account-archive-feedback.js'
+import { createFinanceFormsMachine, selectFinanceFormsView } from './worker-forms.js'
+import type { AccountCreationObservation } from '../../contracts/account-creation-contract.js'
+import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
 
-type Ready = Extract<SessionRuntimeObservation<FinanceReadCapabilities>, { status: 'ready' }>
+type Ready = Extract<SessionRuntimeObservation<FinanceWorkerCapabilities>, { status: 'ready' }>
+type FormsReport =
+	| { type: 'FORMS_VIEW'; binding: object; view: ReturnType<typeof selectFinanceFormsView> }
+	| { type: 'FORMS_CLOSED'; binding: object }
+	| { type: 'FORMS_FAILED'; binding: object }
 type Input = {
 	session: FinanceWorkerSession
 	closeAccountStore: () => Promise<void>
@@ -30,17 +47,26 @@ type Input = {
 type Context = Input & {
 	ready: Ready | undefined
 	selection: WorkerSelection
+	sessionRevision: number
 	workspaces: WorkerWorkspace[] | null
 	accounts: WorkerAccountRecord[] | null
 	membership: ArchiveObservation['membership']
 	grants: ArchiveObservation['grants'] | null
 	archive: ReturnType<typeof selectAccountArchiveReport> | undefined
+	forms:
+		| {
+				binding: object
+				owner: ActorRefFrom<ReturnType<typeof createFinanceFormsMachine>>
+				observer: ActorRef<Snapshot<unknown>, never>
+		  }
+		| undefined
+	formsView: ReturnType<typeof selectFinanceFormsView> | undefined
 	readBinding: object | undefined
 	sessionStatus: SessionRuntimeView['status']
 }
 const observeSession = createCallbackLogic<never, FinanceWorkerSession>(({ input, sendBack }) => {
 	let active = true
-	const publish = (view: SessionRuntimeView<FinanceReadCapabilities>) => {
+	const publish = (view: SessionRuntimeView<FinanceWorkerCapabilities>) => {
 		if (active) sendBack({ type: 'SESSION', view })
 	}
 	const read = () => {
@@ -168,6 +194,16 @@ function archiveObservation(context: Context): ArchiveObservation {
 		grants: context.grants ?? []
 	}
 }
+function creationObservation(context: Context): AccountCreationObservation {
+	const observation = archiveObservation(context)
+	return {
+		...observation,
+		binding: context.ready?.binding ?? null,
+		loading:
+			context.accounts === null || context.membership === undefined || context.workspaces === null,
+		error: null
+	}
+}
 function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Finance worker resource unavailable')
 	return value
@@ -180,10 +216,12 @@ const closeBroker = createAsyncLogic({
 })
 export function createFinanceWorkerMachine({
 	persist,
-	observe
+	observe,
+	observeCreation
 }: {
 	persist: (request: ArchiveRequest) => Promise<unknown>
 	observe: () => ArchiveObservation
+	observeCreation: () => AccountCreationObservation
 }) {
 	const archive = createAccountArchiveMachine(persist, observe)
 	const withdrawn = { accounts: null, membership: undefined, grants: null, archive: undefined }
@@ -192,8 +230,9 @@ export function createFinanceWorkerMachine({
 			input: types<Input>(),
 			context: types<Context>(),
 			output: types<{ outcome: 'closed' }>(),
+			internalEvents: { ARCHIVE_DRAINED: types() },
 			events: {
-				SESSION: types<{ view: SessionRuntimeView<FinanceReadCapabilities> }>(),
+				SESSION: types<{ view: SessionRuntimeView<FinanceWorkerCapabilities> }>(),
 				WORKSPACES: types<{ binding: object; rows: WorkerWorkspace[] }>(),
 				ACCOUNTS: types<{ binding: object; rows: WorkerAccountRecord[] }>(),
 				MEMBERSHIP: types<{ binding: object; row: ArchiveObservation['membership'] }>(),
@@ -201,12 +240,27 @@ export function createFinanceWorkerMachine({
 				READ_FAILED: types<{ binding: object }>(),
 				ACCOUNTS_FAILED: types<{ binding: object }>(),
 				SELECT_WORKSPACE: types<{ selection: WorkerSelection }>(),
-				ARCHIVE_ACCOUNT: types<{ selection: WorkerSelection; accountId: string }>(),
+				ARCHIVE_ACCOUNT: types<{
+					selection: WorkerSelection
+					sessionRevision: number
+					accountId: string
+				}>(),
+				ACCOUNT_CREATION: types<{
+					selection: WorkerSelection
+					sessionRevision: number
+					command: WorkerAccountCreationCommand
+				}>(),
+				FORMS_VIEW: types<{ binding: object; view: ReturnType<typeof selectFinanceFormsView> }>(),
+				FORMS_CLOSED: types<{ binding: object }>(),
+				FORMS_FAILED: types<{ binding: object }>(),
 				CLOSE: types(),
 				NATIVE_FAILED: types(),
 				READ_DISPOSAL_FAILED: types()
 			},
-			children: { archive: types<import('xstate').ActorRefFrom<typeof archive>>() }
+			children: {
+				archive: types<import('xstate').ActorRefFrom<typeof archive>>(),
+				forms: types<ActorRefFrom<ReturnType<typeof createFinanceFormsMachine>>>()
+			}
 		},
 		actors: {
 			observeSession,
@@ -226,11 +280,14 @@ export function createFinanceWorkerMachine({
 			...input,
 			ready: undefined,
 			selection: { workspaceId: null, revision: 0 },
+			sessionRevision: 0,
 			workspaces: null,
 			accounts: null,
 			membership: undefined,
 			grants: null,
 			archive: undefined,
+			forms: undefined,
+			formsView: undefined,
 			readBinding: undefined,
 			sessionStatus: 'starting'
 		}),
@@ -258,10 +315,14 @@ export function createFinanceWorkerMachine({
 						? { context: { archive: report } }
 						: undefined
 				},
-				onDone: ({ value }) =>
-					value === 'cleanupFailed'
-						? undefined
-						: { target: value === 'draining' ? '.closingSession' : '.drainFailed' },
+				onDone: ({ value }, enq) => {
+					if (value === 'cleanupFailed') return
+					if (matchesState('draining', value)) {
+						enq.raise({ type: 'ARCHIVE_DRAINED' })
+						return
+					}
+					return { target: '.drainFailed' }
+				},
 				onError: {
 					target: '.drainFailed',
 					context: { ready: undefined, accounts: null, workspaces: null }
@@ -269,11 +330,55 @@ export function createFinanceWorkerMachine({
 			}
 		],
 		on: {
-			CLOSE: (_, enq) => {
+			CLOSE: ({ context }, enq) => {
 				enq.sendTo('archive', { type: 'SHUTDOWN' })
+				if (context.forms) enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
 				return {
 					target: '.draining',
 					context: { ready: undefined, workspaces: null, accounts: null }
+				}
+			},
+			FORMS_VIEW: ({ context, event }) =>
+				event.binding === context.forms?.binding &&
+				event.view.selectionRevision === context.selection.revision
+					? event.view.status === 'failed'
+						? {
+								target: '.drainFailed',
+								context: { formsView: undefined, ready: undefined, ...withdrawn, workspaces: null }
+							}
+						: { context: { formsView: event.view } }
+					: undefined,
+			FORMS_FAILED: ({ context, event }) =>
+				event.binding === context.forms?.binding
+					? {
+							target: '.drainFailed',
+							context: { formsView: undefined, ready: undefined, ...withdrawn, workspaces: null }
+						}
+					: undefined,
+			FORMS_CLOSED: ({ context, event, value }, enq) => {
+				if (event.binding !== context.forms?.binding || !context.forms) return
+				enq.stop(context.forms.observer)
+				if (value === 'retiringForms')
+					return {
+						target:
+							context.sessionStatus === 'error' || context.sessionStatus === 'closed'
+								? '.failed'
+								: context.ready
+									? '.running.ready'
+									: '.running.waiting',
+						context: { forms: undefined, formsView: undefined }
+					}
+				if (value === 'cleanupFailed' || value === 'failed' || value === 'drainFailed')
+					return { context: { forms: undefined, formsView: undefined } }
+				return {
+					target: '.drainFailed',
+					context: {
+						forms: undefined,
+						formsView: undefined,
+						ready: undefined,
+						...withdrawn,
+						workspaces: null
+					}
 				}
 			},
 			READ_DISPOSAL_FAILED: {
@@ -317,6 +422,10 @@ export function createFinanceWorkerMachine({
 								sessionStatus: view.status
 							}
 							enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+							if (context.forms) {
+								enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
+								return { target: '#finance-worker.retiringForms', context: next }
+							}
 							return { target: '.waiting', context: next }
 						}
 						if (context.ready?.binding === ready.binding)
@@ -327,19 +436,51 @@ export function createFinanceWorkerMachine({
 							workspaces: null,
 							...withdrawn,
 							readBinding: {},
+							sessionRevision: context.sessionRevision + 1,
 							sessionStatus: view.status
 						}
 						enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+						if (context.forms && context.forms.binding !== ready.binding) {
+							enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
+							return { target: '#finance-worker.retiringForms', context: next }
+						}
 						return { target: '.ready', reenter: true, context: next }
 					},
 					SELECT_WORKSPACE: ({ context, event }, enq) => {
 						if (event.selection.revision <= context.selection.revision) return
 						const next = { ...context, selection: event.selection, ...withdrawn, readBinding: {} }
 						enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
-						return { target: context.ready ? '.ready' : '.waiting', reenter: true, context: next }
+						if (context.forms)
+							enq.sendTo(context.forms.owner, {
+								type: 'OBSERVE',
+								observation: creationObservation(next),
+								selectionRevision: next.selection.revision
+							})
+						return {
+							target: context.ready ? '.ready' : '.waiting',
+							reenter: true,
+							context: { ...next, formsView: undefined }
+						}
+					},
+					ACCOUNT_CREATION: ({ context, event }, enq) => {
+						if (
+							event.sessionRevision !== context.sessionRevision ||
+							event.selection.revision !== context.selection.revision ||
+							event.selection.workspaceId !== context.selection.workspaceId ||
+							!context.forms ||
+							context.forms.binding !== context.ready?.binding
+						)
+							return
+						enq.sendTo(context.forms.owner, {
+							type: 'OBSERVE',
+							observation: creationObservation(context),
+							selectionRevision: context.selection.revision
+						})
+						enq.sendTo(context.forms.owner, { type: 'ACCOUNT_CREATION', command: event.command })
 					},
 					ARCHIVE_ACCOUNT: ({ context, event }, enq) => {
 						if (
+							event.sessionRevision !== context.sessionRevision ||
 							event.selection.revision !== context.selection.revision ||
 							event.selection.workspaceId !== context.selection.workspaceId
 						)
@@ -352,6 +493,27 @@ export function createFinanceWorkerMachine({
 					waiting: {},
 					ready: {
 						initial: 'loading',
+						entry: ({ context }, enq) => {
+							if (!context.ready || context.forms) return
+							const binding = context.ready.binding
+							const owner = enq.spawn(context.ready.capabilities.createForms(observeCreation), {
+								id: 'forms',
+								input: {
+									observation: creationObservation(context),
+									selectionRevision: context.selection.revision
+								}
+							})
+							const observer = enq.subscribeTo(owner, {
+								snapshot: (snapshot): FormsReport => ({
+									type: 'FORMS_VIEW',
+									binding,
+									view: selectFinanceFormsView(snapshot)
+								}),
+								done: (): FormsReport => ({ type: 'FORMS_CLOSED', binding }),
+								error: (): FormsReport => ({ type: 'FORMS_FAILED', binding })
+							})
+							return { context: { forms: { binding, owner, observer }, formsView: undefined } }
+						},
 						invoke: [
 							{
 								src: 'workspaces',
@@ -382,6 +544,12 @@ export function createFinanceWorkerMachine({
 								onError: ({ context }, enq) => {
 									const next = { ...context, ...withdrawn }
 									enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+									if (context.forms)
+										enq.sendTo(context.forms.owner, {
+											type: 'OBSERVE',
+											observation: creationObservation(next),
+											selectionRevision: next.selection.revision
+										})
 									return { target: 'readFailed', context: next }
 								}
 							},
@@ -396,43 +564,86 @@ export function createFinanceWorkerMachine({
 								onError: ({ context }, enq) => {
 									const next = { ...context, ...withdrawn }
 									enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+									if (context.forms)
+										enq.sendTo(context.forms.owner, {
+											type: 'OBSERVE',
+											observation: creationObservation(next),
+											selectionRevision: next.selection.revision
+										})
 									return { target: 'readFailed', context: next }
 								}
 							}
 						],
 						on: {
-							WORKSPACES: ({ context, event }) =>
-								event.binding === context.ready?.binding
-									? { context: { workspaces: event.rows } }
-									: undefined,
+							WORKSPACES: ({ context, event }, enq) => {
+								if (event.binding !== context.ready?.binding) return
+								const next = { ...context, workspaces: event.rows }
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										observation: creationObservation(next),
+										selectionRevision: context.selection.revision
+									})
+								return { context: { workspaces: event.rows } }
+							},
 							ACCOUNTS: ({ context, event }, enq) => {
 								if (event.binding !== context.readBinding) return
 								const next = { ...context, accounts: event.rows }
 								enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										observation: creationObservation(next),
+										selectionRevision: next.selection.revision
+									})
 								return { target: '.loaded', context: { accounts: event.rows } }
 							},
 							MEMBERSHIP: ({ context, event }, enq) => {
 								if (event.binding !== context.readBinding) return
 								const next = { ...context, membership: event.row }
 								enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										observation: creationObservation(next),
+										selectionRevision: next.selection.revision
+									})
 								return { context: { membership: event.row } }
 							},
 							GRANTS: ({ context, event }, enq) => {
 								if (event.binding !== context.readBinding) return
 								const next = { ...context, grants: event.rows }
 								enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										observation: creationObservation(next),
+										selectionRevision: next.selection.revision
+									})
 								return { context: { grants: event.rows } }
 							},
 							READ_FAILED: ({ context, event }, enq) => {
 								if (event.binding !== context.ready?.binding) return
 								const next = { ...context, ...withdrawn, workspaces: null }
 								enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										observation: creationObservation(next),
+										selectionRevision: next.selection.revision
+									})
 								return { target: 'readFailed', context: next }
 							},
 							ACCOUNTS_FAILED: ({ context, event }, enq) => {
 								if (event.binding !== context.readBinding) return
 								const next = { ...context, ...withdrawn }
 								enq.sendTo('archive', { type: 'OBSERVE', observation: archiveObservation(next) })
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										observation: creationObservation(next),
+										selectionRevision: next.selection.revision
+									})
 								return { target: 'readFailed', context: next }
 							}
 						},
@@ -441,7 +652,74 @@ export function createFinanceWorkerMachine({
 					readFailed: {}
 				}
 			},
-			draining: { on: { CLOSE: {}, NATIVE_FAILED: {} } },
+			retiringForms: {
+				on: {
+					FORMS_VIEW: {},
+					SESSION: ({ context, event }) => {
+						const observation = event.view.observation
+						const ready =
+							event.view.stage === 'active' && observation?.status === 'ready'
+								? observation
+								: undefined
+						return {
+							context: {
+								ready,
+								workspaces: null,
+								...withdrawn,
+								formsView: undefined,
+								readBinding: {},
+								sessionRevision:
+									ready && ready.binding !== context.ready?.binding
+										? context.sessionRevision + 1
+										: context.sessionRevision,
+								sessionStatus:
+									event.view.stage === 'failed' ||
+									event.view.stage === 'observerFailed' ||
+									event.view.stage === 'openFailed'
+										? 'error'
+										: event.view.status
+							}
+						}
+					},
+					SELECT_WORKSPACE: ({ context, event }) =>
+						event.selection.revision > context.selection.revision
+							? { context: { selection: event.selection, formsView: undefined } }
+							: undefined
+				}
+			},
+			draining: {
+				type: 'parallel',
+				on: { CLOSE: {}, NATIVE_FAILED: {}, FORMS_VIEW: {} },
+				onDone: { target: 'closingSession' },
+				states: {
+					archive: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { ARCHIVE_DRAINED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
+					forms: {
+						initial: 'assessing',
+						states: {
+							assessing: {
+								type: 'choice',
+								choice: ({ context }) => ({ target: context.forms ? 'waiting' : 'closed' })
+							},
+							waiting: {
+								on: {
+									FORMS_CLOSED: ({ context, event }, enq) => {
+										if (!context.forms || event.binding !== context.forms.binding) return
+										enq.stop(context.forms.observer)
+										return { target: 'closed', context: { forms: undefined, formsView: undefined } }
+									}
+								}
+							},
+							closed: { type: 'final' }
+						}
+					}
+				}
+			},
 			drainFailed: { on: { CLOSE: {} } },
 			closeFailed: { on: { CLOSE: { target: 'closingSession' } } },
 			closingSession: {
@@ -517,6 +795,7 @@ export function selectFinanceWorkerView(
 						: 'starting'
 	return {
 		type: 'VIEW',
+		sessionRevision: context.sessionRevision,
 		selection: context.selection,
 		status,
 		identityId: snapshot.status === 'active' ? (context.ready?.identityId ?? null) : null,
@@ -540,6 +819,13 @@ export function selectFinanceWorkerView(
 			context.archive &&
 			context.archive.binding === context.readBinding
 				? projectAccountArchiveFeedback(context.archive.view.feedback)
+				: null,
+		accountCreation:
+			snapshot.status === 'active' &&
+			context.forms?.binding === context.ready?.binding &&
+			context.formsView?.status === 'ready' &&
+			context.formsView.selectionRevision === context.selection.revision
+				? context.formsView.creation
 				: null
 	}
 }
@@ -574,4 +860,20 @@ export function selectFinanceArchiveWriter(
 		context.selection.workspaceId === request.organizationId
 		? context.ready.capabilities.archiveAccount
 		: undefined
+}
+
+export function selectFinanceAccountCreationObservation(
+	snapshot: SnapshotFrom<ReturnType<typeof createFinanceWorkerMachine>> | undefined
+): AccountCreationObservation {
+	if (snapshot?.status === 'active') return creationObservation(snapshot.context)
+	return {
+		identityId: null,
+		organizationId: null,
+		binding: null,
+		sessionReady: false,
+		loading: true,
+		error: null,
+		accounts: [],
+		membership: undefined
+	}
 }
