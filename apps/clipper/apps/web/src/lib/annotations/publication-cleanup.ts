@@ -153,8 +153,7 @@ export const publicationCleanupMachine = setup({
 	},
 	states: {
 		admitting: {
-			type: 'choice',
-			choice: ({ context }) =>
+			always: ({ context }) =>
 				context.capability?.isCurrent()
 					? { target: 'active', context: { capability: context.capability } }
 					: { target: 'stopped' }
@@ -194,8 +193,7 @@ export const publicationCleanupMachine = setup({
 			},
 			states: {
 				choosing: {
-					type: 'choice',
-					choice: ({ context }) => {
+					always: ({ context }) => {
 						const publication = candidates(context).find(
 							(value) => !context.completed.includes(key(value))
 						)

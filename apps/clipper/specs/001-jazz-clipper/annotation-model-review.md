@@ -559,3 +559,30 @@ including the ordinary worker request, the actual client/plugin/PAR default,
 callback persistence across native backend restart, and rejection of insufficient
 grants at publication. The shared plugin's identity-only default remains covered.
 The combined first-sign-in scope has not yet been qualified with the live provider.
+
+### Remove unused intermediate endpoints (2026-11-17)
+
+The MVP UI calls Preview, Publish, Unpublish and deletion Cleanup. Its Publish
+owner already checks the actual OAuth grant and persists requested intent before
+issuance. The separate request-only and permission-observation routes have no
+application callers and are removed along with their duplicate statecharts.
+The publisher retains its existing publication lifecycle, native transaction ownership and
+permission predicates. Relevant SDK, refresh, revocation, admission and
+cancellation tests exercise the actual Publish handler instead. No data model,
+product copy or dependency changes are needed.
+
+The XState/Svelte follow-up uses the installed XState v6 documentation and Svelte
+5 effect guidance. Publication routing returns context changes from the grant
+completion transition instead of a separate choice state. Cleanup uses ordinary
+conditional transitions when retaining selected work; choice states only route.
+The note editor's DOM effect owns the native Jazz adapter and its teardown, with
+a nested effect forwarding changed saved text. The component regression verifies
+that detached input events cannot write after unmount, alongside unchanged-row
+typing and accepted remote edits.
+
+Qualification: 1,026 unit/native tests, 32 component tests and all four native
+annotation browser tests pass. Focused publisher/SDK tests also pass after the
+final transition refinement. Strict root/web/service-worker/extension checks,
+lint, formatting, whitespace checks and the production build pass. The batch
+removes 667 net production lines; the public/private annotation shapes are
+unchanged. Hosted checks must run on the resulting commit.

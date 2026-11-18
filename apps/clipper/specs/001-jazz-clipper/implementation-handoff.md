@@ -197,7 +197,10 @@ Strict root/web/service-worker/extension type checks, Clipper lint/formatting an
 whitespace checks pass. The changed production code is a pure preparer; no new
 build, browser, hosted provider or PDS execution evidence is claimed for this slice.
 
-## Current publication permission observation — 2026-11-17
+## Historical publication permission observation — 2026-11-17
+
+Removed during the MVP simplification: this intermediate endpoint had no UI
+caller. Actual grant validation and the relevant SDK tests now belong to Publish.
 
 `POST /api/publication/permission` reuses the approved `publicationBaseSchema`
 and returns an empty HTTP 204 when an eligible document Note's selected publisher
@@ -254,7 +257,10 @@ Strict root/web/service-worker/extension type checks, Clipper lint/formatting,
 whitespace checks and the production web/server/service-worker build also pass.
 No new browser or live-provider qualification is claimed for this endpoint.
 
-## Authenticated publication request — 2026-11-17
+## Historical intermediate publication request — 2026-11-17
+
+Removed during the MVP simplification: Publish already owns native intent
+admission, so the separate request-only endpoint and statechart are unnecessary.
 
 `POST /api/publication/request` accepts the existing strict
 `publicationBaseSchema` (`libraryId`, `source`, `publishingDid`) and acknowledges

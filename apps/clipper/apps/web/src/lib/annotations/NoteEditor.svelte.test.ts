@@ -58,4 +58,12 @@ it('preserves local typing when unrelated worker views repeat unchanged saved te
 	notes.set({ ...original, text: 'Changed on another device.' })
 	flushSync()
 	expect(field.value).toBe('Changed on another device.')
+	const dispose = cleanups.pop()
+	if (!dispose) throw new Error('Missing editor cleanup')
+	await dispose()
+	const writes = send.mock.calls.length
+	field.value = 'Input on the detached editor.'
+	field.dispatchEvent(new Event('input', { bubbles: true }))
+	flushSync()
+	expect(send).toHaveBeenCalledTimes(writes)
 })

@@ -25,7 +25,6 @@ export function staticShellServer(initialRoot: string) {
 			auth &&
 			(url.pathname.startsWith('/api/auth/') ||
 				url.pathname === '/api/publication/preview' ||
-				url.pathname === '/api/publication/request' ||
 				url.pathname === '/api/publication/publish' ||
 				url.pathname === '/api/publication/unpublish' ||
 				url.pathname === '/api/publication/cleanup')

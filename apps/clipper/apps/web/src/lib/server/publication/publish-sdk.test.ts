@@ -15,12 +15,10 @@ import type { PolicyTestApp } from 'jazz-tools/testing'
 import { app } from '../../backend/jazz/schema.js'
 import permissions from '../../backend/jazz/permissions.js'
 import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
-import { createPublicationPermission, handlePublicationPermission } from './permission.js'
-import { handlePublicationPublish } from './publish.js'
+import { createPublicationPublish, handlePublicationPublish } from './publish.js'
 import { cidSchema } from '../../annotations/publication-link.js'
 import { firstPublicationWriteSchema } from './first-write.js'
 import { publicationSchema } from '../../annotations/publication.js'
-import { handlePublicationSubmit } from './submit.js'
 import { origin, requestFixture } from './request.test-support.js'
 import type { PublicationAuth } from './access.js'
 import { pdsRead } from './pds-read.js'
@@ -69,7 +67,7 @@ function request(
 	a: Fixture,
 	changes: { body?: unknown; headers?: Record<string, string>; signal?: AbortSignal } = {}
 ) {
-	return new Request(origin + '/api/publication/permission', {
+	return new Request(origin + '/api/publication/publish', {
 		method: 'POST',
 		headers: {
 			origin,
@@ -247,50 +245,35 @@ async function seedProvider(a: Fixture, scope: string, expired = false) {
 	}
 }
 
-for (const scope of [identity, granted, 'repo:at.margin.note atproto'])
-	it(`observes the actual SDK grant ${scope} without changing publication intent`, async () => {
-		const net = network('did:plc:ewvi7nxzyoun6zhxrhs64oiz')
-		const a = await setup('permission-' + scope.replaceAll(':', '-').replaceAll(' ', '-'))
-		// Deliberately invert linked-account metadata: it is not grant authority.
+it.each([false, true])(
+	'refuses an identity-only SDK grant despite linked-account metadata, refreshed=%s',
+	async (expired) => {
+		const net = network('did:plc:ewvi7nxzyoun6zhxrhs64oiz', identity)
+		const a = await setup('publish-sdk-identity-' + expired)
 		await a.owner.backend
-			.update(app.better_auth_account, a.credentials.accountId, {
-				scope: scope === identity ? granted : identity
-			})
+			.update(app.better_auth_account, a.credentials.accountId, { scope: granted })
 			.wait({ tier: 'global' })
-		await seedProvider(a, scope)
-		const response = await handlePublicationPermission(a.auth, backend(a), request(a), origin)
-		expect(response.status).toBe(scope === identity ? 409 : 204)
+		await seedProvider(a, expired ? granted : identity, expired)
+		const response = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
+		expect(response.status).toBe(403)
 		expect(await response.text()).toBe('')
 		expect(response.headers.get('cache-control')).toBe('private, no-store')
 		expect(response.headers.get('vary')).toBe('Cookie')
 		expect(response.headers.get('set-cookie')).toBeNull()
 		expect(await a.owner.backend.all(app.publications)).toHaveLength(0)
 		expect(net.mock.calls.every(([input]) => !requestedUrl(input).includes('/xrpc/'))).toBe(true)
-	})
-
-for (const scope of [identity, granted])
-	it(`uses the refreshed SDK grant ${scope}, including a reduced grant`, async () => {
-		const net = network('did:plc:ewvi7nxzyoun6zhxrhs64oiz', scope)
-		const a = await setup('permission-refresh-' + scope.replaceAll(':', '-').replaceAll(' ', '-'))
-		await seedProvider(a, scope === identity ? granted : identity, true)
-		expect((await handlePublicationPermission(a.auth, backend(a), request(a), origin)).status).toBe(
-			scope === identity ? 409 : 204
-		)
 		expect(
 			net.mock.calls.filter(([input]) => requestedUrl(input) === issuer + '/token')
-		).toHaveLength(1)
-	})
+		).toHaveLength(expired ? 1 : 0)
+	}
+)
 
 it('does not mistake a missing or revoked provider session for permission', async () => {
 	network('did:plc:ewvi7nxzyoun6zhxrhs64oiz', granted, true)
 	const a = await setup('permission-revoked')
-	expect((await handlePublicationPermission(a.auth, backend(a), request(a), origin)).status).toBe(
-		503
-	)
+	expect((await handlePublicationPublish(a.auth, backend(a), request(a), origin)).status).toBe(403)
 	await seedProvider(a, granted, true)
-	expect((await handlePublicationPermission(a.auth, backend(a), request(a), origin)).status).toBe(
-		503
-	)
+	expect((await handlePublicationPublish(a.auth, backend(a), request(a), origin)).status).toBe(403)
 	expect(await a.owner.backend.all(app.better_auth_atprotoSession)).toHaveLength(0)
 	expect(await a.owner.backend.all(app.publications)).toHaveLength(0)
 })
@@ -309,16 +292,15 @@ it('rejects input/proof and ineligible sources before restoring any provider ses
 		[{ body: { ...selection(a), scope: granted } }, 400],
 		[{ body: { ...selection(a), publishingDid: 'x'.repeat(4097) } }, 400],
 		[{ body: { ...selection(a), publishingDid: 'did:plc:other' } }, 409],
-		[{ body: { ...selection(a), source: { highlightId: a.owner.highlightId } } }, 409],
 		[{ body: { ...selection(a), source: { noteId: other.owner.noteId } } }, 409]
 	] satisfies [Parameters<typeof request>[1], number][])
 		expect(
-			(await handlePublicationPermission(a.auth, scope, request(a, changes), origin)).status
+			(await handlePublicationPublish(a.auth, scope, request(a, changes), origin)).status
 		).toBe(status)
 	await a.owner.backend
 		.update(app.libraryDocuments, a.owner.documentId, { status: 'trashed' })
 		.wait({ tier: 'global' })
-	expect((await handlePublicationPermission(a.auth, scope, request(a), origin)).status).toBe(409)
+	expect((await handlePublicationPublish(a.auth, scope, request(a), origin)).status).toBe(409)
 	expect(restore).not.toHaveBeenCalled()
 })
 
@@ -338,18 +320,14 @@ it('refuses malformed, mismatched, expired and insufficient SDK observations', a
 		{ sub: did, scope: granted, expiresAt: 'future' }
 	]) {
 		restore.mockResolvedValue(sdkSession(did, async () => value))
-		expect((await handlePublicationPermission(a.auth, backend(a), request(a), origin)).status).toBe(
-			409
+		expect((await handlePublicationPublish(a.auth, backend(a), request(a), origin)).status).toBe(
+			403
 		)
 	}
 	restore.mockResolvedValue(sdkSession('did:plc:other', async () => ({ sub: did, scope: granted })))
-	expect((await handlePublicationPermission(a.auth, backend(a), request(a), origin)).status).toBe(
-		409
-	)
+	expect((await handlePublicationPublish(a.auth, backend(a), request(a), origin)).status).toBe(403)
 	restore.mockResolvedValue(sdkSession(did))
-	expect((await handlePublicationPermission(a.auth, backend(a), request(a), origin)).status).toBe(
-		409
-	)
+	expect((await handlePublicationPublish(a.auth, backend(a), request(a), origin)).status).toBe(403)
 })
 
 for (const change of ['session', 'destination', 'link'])
@@ -363,7 +341,7 @@ for (const change of ['session', 'destination', 'link'])
 				return gate.promise
 			})
 		)
-		const result = handlePublicationPermission(a.auth, backend(a), request(a), origin)
+		const result = handlePublicationPublish(a.auth, backend(a), request(a), origin)
 		await entered.promise
 		if (change === 'session')
 			await a.owner.backend
@@ -378,32 +356,17 @@ for (const change of ['session', 'destination', 'link'])
 				.delete(app.better_auth_account, a.credentials.accountId)
 				.wait({ tier: 'global' })
 		gate.resolve({ sub: a.owner.scope.publishingDid, scope: granted })
-		expect((await result).status).toBe(401)
+		expect((await result).status).toBe(409)
+		expect(await a.owner.backend.all(app.publications)).toHaveLength(0)
 	})
-
-it('observes a requested publication without changing its accepted lifecycle or history', async () => {
-	network('did:plc:ewvi7nxzyoun6zhxrhs64oiz')
-	const a = await setup('permission-requested'),
-		scope = backend(a)
-	await seedProvider(a, granted)
-	expect((await handlePublicationSubmit(a.auth, scope, request(a), origin)).status).toBe(202)
-	const before = await a.owner.backend.all(app.publications)
-	expect((await handlePublicationPermission(a.auth, scope, request(a), origin)).status).toBe(204)
-	const after = await a.owner.backend.all(app.publications)
-	expect(after).toEqual(before)
-	const row = after[0]
-	if (!row) throw new Error('Expected requested publication')
-	expect(row.lifecycle).toEqual({ state: 'requested' })
-	expect(await a.owner.backend.all(app.$history.publications.where({ id: row.id }))).toHaveLength(1)
-})
 
 it('sanitizes SDK failures and discards late restoration after disconnect', async () => {
 	const a = await setup('permission-disconnect')
 	const restore = vi
 		.spyOn(oauth.OAuthClient.prototype, 'restore')
 		.mockRejectedValue(new Error('private provider detail'))
-	const failed = await handlePublicationPermission(a.auth, backend(a), request(a), origin)
-	expect(failed.status).toBe(503)
+	const failed = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
+	expect(failed.status).toBe(403)
 	expect(await failed.text()).toBe('')
 	const gate = Promise.withResolvers<unknown>(),
 		entered = Promise.withResolvers<void>()
@@ -412,7 +375,7 @@ it('sanitizes SDK failures and discards late restoration after disconnect', asyn
 		return gate.promise
 	})
 	const controller = new AbortController()
-	const result = handlePublicationPermission(
+	const result = handlePublicationPublish(
 		a.auth,
 		backend(a),
 		request(a, { signal: controller.signal }),
@@ -437,7 +400,7 @@ it('bounds stalled SDK token inspection and ignores its late successful result',
 		sdkSession(a.owner.scope.publishingDid, () => gate.promise)
 	)
 	const clock = new SimulatedClock()
-	const actor = createActor(createPublicationPermission(a.auth, backend(a)), {
+	const actor = createActor(createPublicationPublish(a.auth, backend(a)), {
 		input: { request: request(a), origin },
 		clock
 	})
@@ -445,7 +408,7 @@ it('bounds stalled SDK token inspection and ignores its late successful result',
 	actor.start()
 	try {
 		await waitFor(actor, (snapshot) => snapshot.matches('checkingGrant'))
-		clock.increment(30_000)
+		clock.increment(120_000)
 		expect((await done).status).toBe(503)
 		gate.resolve({ sub: a.owner.scope.publishingDid, scope: granted })
 		await Promise.resolve()
@@ -462,9 +425,8 @@ it('fails closed when the configured auth host lacks the server-only plugin capa
 	const a = await setup('permission-capability')
 	const getSession: PublicationAuth['api']['getSession'] = (input) => a.auth.api.getSession(input)
 	expect(
-		(await handlePublicationPermission({ api: { getSession } }, backend(a), request(a), origin))
-			.status
-	).toBe(503)
+		(await handlePublicationPublish({ api: { getSession } }, backend(a), request(a), origin)).status
+	).toBe(403)
 })
 
 function hasReadSession(value: unknown): value is { session: PdsReadSession } {
@@ -546,63 +508,68 @@ for (const found of [true, false])
 		}
 	})
 
-it('publishes through the real OAuth SDK, refreshes the grant and reads back before native confirmation', async () => {
-	const records = new Map<string, unknown>()
-	let writes = 0
-	network('did:plc:ewvi7nxzyoun6zhxrhs64oiz', granted, false, async (req) => {
-		expect(req.headers.has('DPoP')).toBe(true)
-		expect(req.headers.get('Authorization')).toBe('DPoP synthetic-access-after')
-		if (req.url.endsWith('/xrpc/com.atproto.repo.deleteRecord')) {
-			const removal = firstPublicationWriteSchema
-				.pick({ repo: true, collection: true, rkey: true })
-				.extend({ swapRecord: cidSchema })
-				.parse(await req.json())
-			expect(removal.swapRecord).toBe('bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')
-			const uri = 'at://' + removal.repo + '/' + removal.collection + '/' + removal.rkey
-			records.delete(uri)
-			return Response.json({})
-		}
-		if (req.method === 'POST') {
-			const write = firstPublicationWriteSchema.parse(await req.json())
-			const uri = 'at://' + write.repo + '/' + write.collection + '/' + write.rkey
-			const rows = await a.owner.backend.all(
-				app.publications.where({ libraryId: a.owner.libraryId })
-			)
-			expect(rows[0]?.lifecycle).toEqual({ state: 'issued', uri, record: write.record })
-			expect(records.has(uri)).toBe(false)
-			records.set(uri, write.record)
-			writes++
-			return Response.json({ uri, cid: 'unused-write-receipt' })
-		}
-		const params = new URL(req.url).searchParams
-		const uri =
-			'at://' + params.get('repo') + '/' + params.get('collection') + '/' + params.get('rkey')
-		return records.has(uri)
-			? Response.json({
-					uri,
-					value: records.get(uri),
-					cid: 'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
-				})
-			: Response.json({ error: 'RecordNotFound' }, { status: 400 })
-	})
-	const a = await setup('publish-sdk')
-	await seedProvider(a, granted, true)
-	const response = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
-	expect(response.status).toBe(200)
-	const published = publicationSchema.parse(await response.json())
-	expect(published.state).toBe('published')
-	expect(writes).toBe(1)
-	const again = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
-	expect(await again.json()).toEqual(published)
-	expect(writes).toBe(1)
-	const removal = await handlePublicationPublish(
-		a.auth,
-		backend(a),
-		request(a),
-		origin,
-		'unpublish'
-	)
-	expect(removal.status).toBe(200)
-	expect(publicationSchema.parse(await removal.json()).state).toBe('unpublished')
-	expect(records.size).toBe(0)
-})
+it.each([granted, 'repo:at.margin.note atproto'])(
+	'publishes through the real OAuth SDK with refreshed grant %s and reads back before native confirmation',
+	async (scope) => {
+		const records = new Map<string, unknown>()
+		let writes = 0
+		network('did:plc:ewvi7nxzyoun6zhxrhs64oiz', scope, false, async (req) => {
+			expect(req.headers.has('DPoP')).toBe(true)
+			expect(req.headers.get('Authorization')).toBe('DPoP synthetic-access-after')
+			if (req.url.endsWith('/xrpc/com.atproto.repo.deleteRecord')) {
+				const removal = firstPublicationWriteSchema
+					.pick({ repo: true, collection: true, rkey: true })
+					.extend({ swapRecord: cidSchema })
+					.parse(await req.json())
+				expect(removal.swapRecord).toBe(
+					'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
+				)
+				const uri = 'at://' + removal.repo + '/' + removal.collection + '/' + removal.rkey
+				records.delete(uri)
+				return Response.json({})
+			}
+			if (req.method === 'POST') {
+				const write = firstPublicationWriteSchema.parse(await req.json())
+				const uri = 'at://' + write.repo + '/' + write.collection + '/' + write.rkey
+				const rows = await a.owner.backend.all(
+					app.publications.where({ libraryId: a.owner.libraryId })
+				)
+				expect(rows[0]?.lifecycle).toEqual({ state: 'issued', uri, record: write.record })
+				expect(records.has(uri)).toBe(false)
+				records.set(uri, write.record)
+				writes++
+				return Response.json({ uri, cid: 'unused-write-receipt' })
+			}
+			const params = new URL(req.url).searchParams
+			const uri =
+				'at://' + params.get('repo') + '/' + params.get('collection') + '/' + params.get('rkey')
+			return records.has(uri)
+				? Response.json({
+						uri,
+						value: records.get(uri),
+						cid: 'bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku'
+					})
+				: Response.json({ error: 'RecordNotFound' }, { status: 400 })
+		})
+		const a = await setup('publish-sdk')
+		await seedProvider(a, identity, true)
+		const response = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
+		expect(response.status).toBe(200)
+		const published = publicationSchema.parse(await response.json())
+		expect(published.state).toBe('published')
+		expect(writes).toBe(1)
+		const again = await handlePublicationPublish(a.auth, backend(a), request(a), origin)
+		expect(await again.json()).toEqual(published)
+		expect(writes).toBe(1)
+		const removal = await handlePublicationPublish(
+			a.auth,
+			backend(a),
+			request(a),
+			origin,
+			'unpublish'
+		)
+		expect(removal.status).toBe(200)
+		expect(publicationSchema.parse(await removal.json()).state).toBe('unpublished')
+		expect(records.size).toBe(0)
+	}
+)

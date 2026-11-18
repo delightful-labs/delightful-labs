@@ -258,9 +258,6 @@ export function createPublicationPublish(
 			checkingGrant: {
 				schemas: { context: types<Selected & { publication: Publication; session: Session }>() }
 			},
-			choosingWork: {
-				schemas: { context: types<Selected & { publication: Publication; session: Session }>() }
-			},
 			allocating: { schemas: { context: types<Selected & { preview: PublicationPreview }>() } },
 			identifyingSave: { schemas: { context: types<Selected & { publication: Publication }>() } },
 			saving: {
@@ -467,46 +464,42 @@ export function createPublicationPublish(
 					id: 'grant',
 					src: 'grant',
 					input: ({ context }) => context.session,
-					onDone: ({ event }) =>
-						event.output ? { target: 'choosingWork' } : { target: 'needsGrant' },
-					onError: { target: 'needsGrant' }
-				}
-			},
-			choosingWork: {
-				type: 'choice',
-				choice: ({ context }) => {
-					if (mode !== 'publish')
-						return context.publication.state === 'unpublishing'
-							? { target: 'readingRemovalTarget', context: { publication: context.publication } }
-							: 'uri' in context.publication && context.publicationId
-								? {
-										target: 'readingIssued',
-										context: {
-											publication: context.publication,
-											publicationId: context.publicationId
+					onDone: ({ context, event }) => {
+						if (!event.output) return { target: 'needsGrant' }
+						if (mode !== 'publish')
+							return context.publication.state === 'unpublishing'
+								? { target: 'readingRemovalTarget', context: { publication: context.publication } }
+								: 'uri' in context.publication && context.publicationId
+									? {
+											target: 'readingIssued',
+											context: {
+												publication: context.publication,
+												publicationId: context.publicationId
+											}
 										}
+									: { target: 'unavailable' }
+						if (context.publication.state === 'unpublished' && context.preview)
+							return {
+								target: 'identifyingSave',
+								context: {
+									publication: {
+										...context.selection,
+										state: 'issued',
+										uri: context.publication.uri,
+										record: context.preview.record
 									}
-								: { target: 'unavailable' }
-					if (context.publication.state === 'unpublished' && context.preview)
-						return {
-							target: 'identifyingSave',
-							context: {
-								publication: {
-									...context.selection,
-									state: 'issued',
-									uri: context.publication.uri,
-									record: context.preview.record
 								}
 							}
-						}
-					return context.publication.state === 'issued'
-						? { target: 'readingRemote', context: { publication: context.publication } }
-						: context.publication.state === 'requested'
-							? { target: 'allocating' }
-							: {
-									target: 'identifyingSave',
-									context: { publication: { ...context.selection, state: 'requested' } }
-								}
+						return context.publication.state === 'issued'
+							? { target: 'readingRemote', context: { publication: context.publication } }
+							: context.publication.state === 'requested' && context.preview
+								? { target: 'allocating', context: { preview: context.preview } }
+								: {
+										target: 'identifyingSave',
+										context: { publication: { ...context.selection, state: 'requested' } }
+									}
+					},
+					onError: { target: 'needsGrant' }
 				}
 			},
 			allocating: {
