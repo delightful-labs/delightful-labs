@@ -226,8 +226,8 @@
 			"default": "./dist/machines/forms/scoped-form.js"
 		},
 		"./forms/feedback": {
-			"types": "./dist/machines/forms/feedback.d.ts",
-			"default": "./dist/machines/forms/feedback.js"
+			"types": "./dist/presentation/form-feedback.d.ts",
+			"default": "./dist/presentation/form-feedback.js"
 		},
 		"./forms/worker": {
 			"types": "./dist/worker/form-view.d.ts",

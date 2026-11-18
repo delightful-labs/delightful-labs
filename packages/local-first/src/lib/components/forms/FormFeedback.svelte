@@ -2,7 +2,7 @@
 	import { Button } from 'delightful-ui'
 	import type { ScopedFormView } from '../../contracts/scoped-form.js'
 	import type { FormFeedbackMessages } from '../../contracts/scoped-form.js'
-	import { formatFormFeedback } from '../../machines/forms/feedback.js'
+	import { formatFormFeedback } from '../../presentation/form-feedback.js'
 	let {
 		retryLabel,
 		defaultMessages,

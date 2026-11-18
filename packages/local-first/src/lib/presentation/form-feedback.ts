@@ -3,14 +3,14 @@ export type {
 	FormFeedbackInput,
 	FormFeedbackDescriptor,
 	FormFeedbackMessages
-} from '../../contracts/scoped-form.js'
+} from '../contracts/scoped-form.js'
 
 import type {
 	FeedbackMessage,
 	FormFeedbackDescriptor,
 	FormFeedbackInput,
 	FormFeedbackMessages
-} from '../../contracts/scoped-form.js'
+} from '../contracts/scoped-form.js'
 
 /** Translate the message selected by the workflow; never choose a workflow outcome here. */
 export function formatFormFeedback<Result, Reason>(
