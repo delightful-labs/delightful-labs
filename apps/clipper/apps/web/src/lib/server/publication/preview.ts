@@ -99,7 +99,6 @@ export function createDocumentNotePreview(db: Pick<Db, 'one'>) {
 				facts.ownerId === context.binding.accountId &&
 				facts.note.libraryId === context.binding.libraryId &&
 				facts.note.highlightId === null &&
-				facts.note.documentId !== null &&
 				facts.document?.libraryId === context.binding.libraryId &&
 				facts.document.status !== 'trashed' &&
 				!facts.publications.some(

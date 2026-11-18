@@ -41,13 +41,11 @@ export const marginRecordSchema = z.discriminatedUnion('motivation', [
 export type MarginRecord = z.infer<typeof marginRecordSchema>
 
 const documentNoteSchema = annotationNoteRowSchema.extend({
-	documentId: annotationNoteRowSchema.shape.documentId.unwrap(),
 	highlightId: z.null(),
 	source: webUrlSchema,
 	text: noteInputTextSchema
 })
 const attachedNoteSchema = annotationNoteRowSchema.extend({
-	documentId: z.null(),
 	source: z.null(),
 	highlightId: annotationNoteRowSchema.shape.highlightId.unwrap(),
 	text: noteInputTextSchema
@@ -79,7 +77,11 @@ function isAttachedNoteForHighlight(
 	note: z.infer<typeof attachedNoteSchema>,
 	highlight: AnnotationHighlight
 ) {
-	return note.libraryId === highlight.libraryId && note.highlightId === highlight.id
+	return (
+		note.libraryId === highlight.libraryId &&
+		note.documentId === highlight.documentId &&
+		note.highlightId === highlight.id
+	)
 }
 
 function projectionError() {

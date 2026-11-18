@@ -33,12 +33,17 @@ coordinator preserves its existing preinstall checks; unrelated app preparation
 and extension installation are excluded. Use the full workspace install above
 for development and CI, including the extension fixtures used by web type checks.
 
-## Development schema baseline
+## Jazz schema generation
 
-Clipper uses one current Jazz schema with `migrations: 'none'`. Historical schema
-migrations, snapshots and upgrade fixtures have been removed. Development data is
-disposable; an existing database from another schema must be explicitly reset before
-using this baseline. Normal startup must not silently delete a database.
+Commit `schema.ts`, native migration definitions and schema snapshots. Jazz's
+`jazz:generate` script validates them and produces the ignored
+`apps/web/src/lib/backend/jazz/migrations/index.ts` runtime bundle. Web setup,
+development, type checks and builds run this generation automatically; do not edit
+or commit the generated bundle.
+
+Development data is disposable. Test profiles created with the incompatible
+optional-document annotation schema must be cleared before using the repaired
+schema. Normal startup never silently deletes a database.
 
 Saved state lives on Documents, which join to Article attachments and their reusable
 Sites. Article owns title, parser excerpt, content and capture URL evidence. Notes,

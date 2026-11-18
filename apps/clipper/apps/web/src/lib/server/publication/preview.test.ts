@@ -159,7 +159,6 @@ it('refuses highlights before reading and does not treat an attached note as an 
 		.wait({ tier: 'global' })
 	await a.backend
 		.update(app.notes, a.noteId, {
-			documentId: null,
 			highlightId,
 			source: null
 		})

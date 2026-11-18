@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { marginRecordSchema, toMarginDocumentNote, toMarginHighlight } from './margin.js'
-import { textFingerprint } from './schema.js'
+import { annotationNoteRowSchema, textFingerprint } from './schema.js'
 import type { AnnotationHighlight, AnnotationNote } from './schema.js'
 
 const libraryId = crypto.randomUUID()
@@ -49,7 +49,7 @@ async function highlight() {
 }
 
 function attachedNote(parent: AnnotationHighlight): AnnotationNote {
-	return { ...documentNote(), documentId: null, source: null, highlightId: parent.id }
+	return { ...documentNote(), documentId: parent.documentId, source: null, highlightId: parent.id }
 }
 
 it('maps a document Note to the reviewed Margin shape without private fields', () => {
@@ -83,13 +83,15 @@ it('uses supplied publication times and keeps the original creation time on upda
 it('refuses attached/malformed document parents and unsupported source URLs', () => {
 	for (const changes of [
 		{ highlightId: crypto.randomUUID() },
-		{ documentId: null },
 		{ source: null },
 		{ source: 'at://example.org/private' },
 		{ source: 'https://user:secret@example.org/article' }
 	]) {
 		expect(() => toMarginDocumentNote({ ...documentNote(), ...changes }, createdAt)).toThrow()
 	}
+	expect(annotationNoteRowSchema.safeParse({ ...documentNote(), documentId: null }).success).toBe(
+		false
+	)
 })
 
 it('refuses oversized native merged notes without altering or truncating their text', () => {
@@ -176,7 +178,7 @@ it('blocks competing attached Notes and foreign or duplicated parent relationshi
 		[note, { ...note, id: crypto.randomUUID() }],
 		[{ ...note, libraryId: crypto.randomUUID() }],
 		[{ ...note, highlightId: crypto.randomUUID() }],
-		[{ ...note, documentId }],
+		[{ ...note, documentId: crypto.randomUUID() }],
 		[{ ...note, source }],
 		[{ ...note, text: 'x'.repeat(3001) }]
 	]) {

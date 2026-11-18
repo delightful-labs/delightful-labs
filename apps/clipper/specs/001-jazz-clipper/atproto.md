@@ -203,6 +203,44 @@ supersedes the historical companion approval. The [technical synchronization
 proposal](../../docs/reviews/margin-sync-technical-proposal.md) retains historical
 mechanics; it is not a current implementation contract for removed companions.
 
+## Future: read annotations created in other AT Protocol apps
+
+Accepted future requirement, recorded 2026-11-18 at the user's request. This is
+unimplemented, outside the publishing MVP, and has no assigned implementation
+order. It does not select the next feature.
+
+Clipper must discover supported `at.margin.note` records in the signed-in user's
+AT Protocol repository and display their highlights and notes against relevant
+saved documents. Records created in Margin or another compatible app are eligible
+even when Clipper has no existing publication link for them. Discovery uses AT
+Protocol and the shared vocabulary; it must not depend on a Margin-specific API
+or require a Clipper sidecar record.
+
+Validate external records before using them. Use their target/source evidence to
+associate them with saved documents and the supported W3C selectors to locate
+passages. Preserve the external record URI as its identity for repeated discovery,
+including recognizing records originally published by Clipper. Reading a record
+does not authorize rewriting it or discarding foreign fields. Reuse the existing
+exact anchoring and ambiguous/unresolved behavior rather than inventing a match.
+
+Acceptance criteria when this feature is implemented:
+
+- A user publishes a supported highlight, highlight with commentary, or
+  document-level note from Margin for an article already saved in Clipper. After
+  the selected discovery operation, Clipper displays the corresponding annotation
+  on that document without requiring prior publication from Clipper.
+- Repeating discovery of the same record does not create duplicate annotations,
+  including for a record originally published by Clipper.
+- An ambiguous or unresolved passage is not silently attached to a different
+  passage; its supported quote/note remains accessible with that outcome.
+
+Before implementation, review local data shapes with the user and decide the
+discovery/refresh trigger, local representation or caching, handling of records
+whose documents are not saved, unsupported record variants, and external
+edit/deletion reconciliation. Automatic ongoing inbound synchronization and
+editing imported records are not selected by this requirement. Existing public
+conflict and explicit-import decisions remain in force.
+
 ## Work remaining
 
 | Work | Status / next evidence |
@@ -218,6 +256,7 @@ mechanics; it is not a current implementation contract for removed companions.
 | Synchronization design | Native Jazz publications retain library/source/DID bindings, lifecycle and issued history. Backend XState owners dispatch conditional writes/removals; the library worker retries cleanup from accepted native source deletions. Automatic content-edit updates, document Trash/restore synchronization and conflict controls remain deferred. No separate persistent queue or revision graph is introduced. |
 | Publication implementation | The MVP exposes Preview, Publish, Unpublish and deletion Cleanup. Publish persists native requested/issued evidence before a conditional PDS write and verifies it by readback. Unpublish retains the CID before conditional deletion and verifies removal while preserving the private annotation. Notes and source-verified highlights use the same owner. The unused request-only endpoint is removed; intent admission belongs to Publish. |
 | Publication qualification | Native conditional-write/lost-response and content/CID checks, built browser offline restart/reconnect and real preview publication/removal pass. Both temporary public records were removed and preview protection restored. Fresh live sign-in with the revised combined scope and broader Margin/second-reader interoperability remain distinct from the completed existing-grant test. |
+| External annotation reading | Accepted future scope: discover the user's supported `at.margin.note` records created in Margin or another compatible app and display them on saved documents. See [requirements and acceptance criteria](#future-read-annotations-created-in-other-at-protocol-apps). Unimplemented and unscheduled; this is not the next selected feature or a publishing-MVP release gate. |
 | Deferred scope | Local-work transfer and real merge, broader recovery/unlinking/provider-loss design, extension AT Protocol provider login, private/encrypted PDS storage, restricted audiences and automatic inbound synchronization. |
 
 Recording this checkpoint selects no new data shapes, namespace, executor process,

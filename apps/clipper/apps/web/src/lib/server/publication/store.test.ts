@@ -144,7 +144,7 @@ it('refuses foreign roots, attached Notes, wrong publishers, wrong owners and Tr
 			app.notes,
 			{
 				libraryId: a.libraryId,
-				documentId: null,
+				documentId: a.documentId,
 				highlightId: a.highlightId,
 				source: null,
 				text: 'Attached'

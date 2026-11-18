@@ -23,3 +23,6 @@ apps/extension/.test-build/
 
 .xstate-test/
 apps/web/.jazz/
+
+# Generated from schema.ts and the committed native migration history.
+apps/web/src/lib/backend/jazz/migrations/index.ts

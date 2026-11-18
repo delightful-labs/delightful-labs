@@ -18,6 +18,16 @@ offline cases, 32 worker cases, 2 sample-data cases and 12 packaged-extension ca
 Both production shell builds and the extension build pass. The fresh baseline has no
 legacy migration path or automatic database erasure.
 
+# Future AT Protocol interoperability — unscheduled
+
+The user requested recording this requirement on 2026-11-18 without making it
+the next feature or adding it to the publishing MVP. See the
+[external annotation reading specification](atproto.md#future-read-annotations-created-in-other-at-protocol-apps).
+
+- [ ] Review local data shapes and discovery/refresh behavior before implementation; retain the user's model-approval requirement.
+- [ ] Discover supported `at.margin.note` highlights and notes from the user's repository, including records created in Margin or another compatible app, and display them against relevant saved documents using supported W3C selectors.
+- [ ] Qualify Margin-created highlights, attached commentary and document notes; repeated discovery and Clipper-originated records must not duplicate annotations, and ambiguous/unresolved matches must not silently attach elsewhere.
+
 # Offline article images — current batch
 
 - [x] Start `feat/offline-article-images` from merged main `89ad4e7`; inspect native storage, gateway, extraction and DUI before implementation.

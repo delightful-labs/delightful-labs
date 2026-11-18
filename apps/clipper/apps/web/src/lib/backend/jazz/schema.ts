@@ -6,6 +6,7 @@ import { schema as authSchema } from './auth-schema.js'
 import { captureSourceSchema } from '../../capture/article-schema.js'
 import { readingProgressColumn, resumePositionColumn } from './reading-columns.js'
 import { documentReadingStatusSchema, documentStatusSchema } from '../../capture/document-schema.js'
+import { migrations } from './migrations/index.js'
 
 function nativeEnumValues<Value extends string>(values: Value[]): [Value, ...Value[]] {
 	const [first, ...rest] = values
@@ -32,7 +33,7 @@ export const app = s.defineApp(
 		notes: s.table(
 			{
 				libraryId: s.uuid(),
-				documentId: s.uuid().optional(),
+				documentId: s.uuid(),
 				source: s.string().optional(),
 				highlightId: s.uuid().optional(),
 				text: s.string().merge('text').default('')
@@ -209,5 +210,5 @@ export const app = s.defineApp(
 			}
 		)
 	},
-	{ migrations: 'none' }
+	{ migrations }
 )
