@@ -1,5 +1,5 @@
 diff --git a/src/lib/backend/jazz/account.ts b/src/lib/backend/jazz/account.ts
-index aae803e..c731473 100644
+index aae803e..bc8582c 100644
 --- a/src/lib/backend/jazz/account.ts
 +++ b/src/lib/backend/jazz/account.ts
 @@ -2,6 +2,7 @@ import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
@@ -136,7 +136,7 @@ index aae803e..c731473 100644
  			runtimeSources: config.runtimeSources ?? runtimeSources
  		}),
  		bind: (session) =>
-@@ -190,6 +184,26 @@ export function accountInput(
+@@ -190,6 +184,28 @@ export function accountInput(
  	}
  }
  
@@ -151,19 +151,21 @@ index aae803e..c731473 100644
 +			initial: 'device',
 +			runtimeSources: config.runtimeSources ?? runtimeSources
 +		},
-+		(ready) =>
-+			createLibraryBinding({
++		(ready) => ({
++			...createLibraryBinding({
 +				...ready,
 +				libraryFactory,
 +				cacheNamespace: JSON.stringify([config.scope, config.serverUrl, config.env])
-+			})
++			}),
++			recovery: ready.recovery
++		})
 +	)
 +}
 +
  /** Existing identities/restoration only; extension sign-in must not create an unrelated account. */
  export function existingAccountInput(
  	config: JazzClientConfig,
-@@ -199,6 +213,7 @@ export function existingAccountInput(
+@@ -199,6 +215,7 @@ export function existingAccountInput(
  		startup: registry.getJazzStartupBinding({
  			...config,
  			client: localFirst,
@@ -171,7 +173,7 @@ index aae803e..c731473 100644
  			runtimeSources: config.runtimeSources ?? runtimeSources
  		}),
  		bind: (session) =>
-@@ -214,15 +229,15 @@ export function existingAccountInput(
+@@ -214,15 +231,15 @@ export function existingAccountInput(
  export function currentLibraryRecords() {
  	const session = registry.getCurrentJazzSession()
  	const snapshot = session?.getSnapshot()
@@ -191,7 +193,7 @@ index aae803e..c731473 100644
  		},
  		readConnection(client.db)
  	)
-@@ -236,15 +251,15 @@ export async function requestCapture(
+@@ -236,17 +253,14 @@ export async function requestCapture(
  ) {
  	const session = registry.getCurrentJazzSession()
  	const snapshot = session?.getSnapshot()
@@ -204,12 +206,14 @@ index aae803e..c731473 100644
  	return createLibraryCapture(db, () => {
  		const now = session.getSnapshot()
  		return (
- 			now.status === 'ready' &&
+-			now.status === 'ready' &&
 -			now.account === account &&
-+			now.user === user &&
- 			now.client === client &&
- 			now.client.db === db
+-			now.client === client &&
+-			now.client.db === db
++			now.status === 'ready' && now.user === user && now.client === client && now.client.db === db
  		)
+ 	})(operation, body, signal)
+ }
 diff --git a/src/lib/contracts/account.ts b/src/lib/contracts/account.ts
 index cc83019..4d5f14b 100644
 --- a/src/lib/contracts/account.ts

@@ -138,6 +138,9 @@ or duplicate identity workflow is authorized by this boundary.
 
 ## Bounded sign-out command: implemented, application adoption pending
 
+This records the first sign-out checkpoint. The current shared identity-change
+protocol extends that same path; see the create/restore/recovery batch below.
+
 Route the native SDK sign-out leaf through the existing session actor first.
 The application's ordered sign-out chart retains provider sign-out, domain drain,
 deadline feedback and its final identity refresh. The session actor accepts a
@@ -252,14 +255,75 @@ Native patches pass strict apply/whitespace checks; source formatting passes.
 Active SDK pins remain alpha.60. All hosted Finance/Clipper/Foundation checks
 passed for the preceding sign-out checkpoint `f464f7c1`.
 
-Next batch: add the bounded create/restore/recovery operations the actual host
-requires, reusing existing restoration validation and domain drains. Then replace
+The create/restore/recovery batch below supplies the next native operations,
+reusing existing restoration validation and domain drains. Next replace
 Clipper's startup/host-close custody of raw sessions with this actor and binding
 constructor. Retire the corresponding old registry path on qualified adoption.
 Finance should reuse this boundary for its worker-owned capabilities; retain the
 legacy Svelte provider until the worker UI replacement rather than adding an SDK
 facade to satisfy it. Do not turn the historical raw-session fixture green by
 changing only mocks or disabling development freezing.
+
+## Create, restore and recovery: implemented, host wiring pending
+
+The session actor now uses one `CHANGE_IDENTITY` request/report path for create,
+restore and sign-out. This replaces the unreleased sign-out-only protocol; there
+is no compatibility alias or second execution owner. The operation discriminant
+selects exactly one native `createDeviceAccount`, `restoreDeviceAccount` or
+`signOut` call. Existing admission, scoped reports, observer ownership, busy
+refusal and close-after-settlement states are reused. Signed-out observations
+also carry an opaque binding, so an old signed-out request cannot create a new
+identity after the session has moved through another binding.
+
+Create is admitted from its captured signed-out binding. Restore is admitted
+from its captured ready or signed-out binding; application validation and domain
+drain remain prerequisites owned by the existing restoration workflow. The
+adapter rechecks the binding immediately before issuing native I/O. Rejection
+does not establish rollback or authorize replay.
+
+The pending session state's input retains only scope, operation and recipient.
+The validated credential goes from the entry event directly to the invoked
+native leaf, without entering the long-lived session context or pending state's
+input. The invocation remains sensitive and ephemeral: never inspect or persist
+its input, command payload or the restoration workflow's secrets. Terminal
+reports contain no credential. Native SDK custody remains in adapter closures.
+
+Recovery reuses `createJazzRecoveryAdapter` and `createRecoveryPhraseMachine`.
+The binding function receives their existing checked capability/source pair;
+the candidate Clipper constructor includes that pair in its app capability
+record. The recovery actor owns reveal/hide/clearing and its subscription, and
+the native adapter owns SDK export/phrase encoding. No new secret-returning
+session command or duplicate recovery workflow is added. Session observations
+advance the existing recovery scope, and close invalidates it before native
+disposal.
+
+Qualification: **132 shared tests** pass across the actual session, restoration,
+recovery and ordered-sign-out charts, including held/rejected identity changes,
+stale signed-out admission and nonsecret pending state input. Full library and
+selected unit-test types, packaging, strict candidate adapter/fixture/account
+constructor types, changed-source lint and strict patch applicability pass.
+**21 selected native cases** pass across Chromium/Firefox/WebKit. Six new cases
+create an actual device identity in a Worker, reveal/hide through the existing
+recovery chart, sign out and restore that same native identity. Old domain and
+recovery bindings stay invalid after restoration. Held restore receipts retain
+the original invocation and defer observer/SDK/AccountStore/broker close. The
+hold follows SDK completion; unit cases independently hold/reject the native
+leaf. Development XState freezing remains enabled. No phrase/key crosses the
+fixture's Worker boundary. The maintained suite contains 42 cases; 21 unrelated
+cases and larger schema/backend suites were not repeated in this batch.
+
+Artifact: `/private/tmp/finance-alpha67-identity-jm5qlfv_`;
+log: `/private/tmp/finance-alpha67-identity-native.log`. The prior Clipper
+candidate artifact is reused for strict constructor checking. Active SDK pins
+remain alpha.60; there is no new SDK patch behavior or production cutover.
+
+Next: wire the actual Clipper worker account/readiness and realm-close owners
+to this runtime, using existing application drain, restoration and ordered
+sign-out charts. Preserve native SDK retry behavior from the existing readiness
+adapter; the runtime's acquisition/observer RETRY is not that SDK operation.
+Remove old raw-session custody on qualified adoption and keep the documented
+legacy regression visible until then. Finance reuses the same binding/identity
+boundary as its actual worker/UI callers move over. U2 remains open.
 
 ## Earlier accessor proposal (superseded)
 

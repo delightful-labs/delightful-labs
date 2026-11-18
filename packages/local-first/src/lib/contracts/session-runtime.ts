@@ -2,22 +2,31 @@ import type { SessionOpenCapability, SessionStatus } from './session.js'
 import type { ActorRef, Snapshot } from 'xstate'
 import type { RestorationScope } from './restoration.js'
 
-export type SessionRuntimeSignOutOutcome =
+/** Captured native identity; an unavailable/transitioning session cannot admit mutation. */
+export type SessionRuntimeIdentity =
+	| Readonly<{ status: 'ready'; binding: object }>
+	| Readonly<{ status: 'signed-out'; binding: object }>
+export type SessionRuntimeIdentityChange =
+	| Readonly<{ operation: 'create'; before: Readonly<{ status: 'signed-out'; binding: object }> }>
+	| Readonly<{ operation: 'restore'; before: SessionRuntimeIdentity; credential: string }>
+	| Readonly<{ operation: 'signOut'; before: Readonly<{ status: 'ready'; binding: object }> }>
+export type SessionRuntimeChangeOutcome =
 	| 'completed'
 	| 'failed'
 	| 'bindingChanged'
 	| 'unavailable'
 	| 'busy'
 	| 'invalidRequest'
-export type SessionRuntimeSignOutReport = Readonly<{
-	type: 'SESSION_SIGN_OUT_SETTLED'
+export type SessionRuntimeChangeReport = Readonly<{
+	type: 'SESSION_CHANGE_SETTLED'
 	scope: RestorationScope
-	outcome: SessionRuntimeSignOutOutcome
+	operation: SessionRuntimeIdentityChange['operation']
+	outcome: SessionRuntimeChangeOutcome
 }>
-export type SessionRuntimeSignOutRequest = Readonly<{
+export type SessionRuntimeChangeRequest = Readonly<{
 	scope: RestorationScope
-	identityBinding: object
-	replyTo: ActorRef<Snapshot<unknown>, SessionRuntimeSignOutReport>
+	change: SessionRuntimeIdentityChange
+	replyTo: ActorRef<Snapshot<unknown>, SessionRuntimeChangeReport>
 }>
 
 /** Worker-local native facts and app capabilities. Domain readiness remains app-owned. */
@@ -31,7 +40,8 @@ export type SessionRuntimeObservation<Capabilities = undefined> =
 			/** App-owned capability record; native handles remain in adapter closures. */
 			capabilities: Capabilities
 	  }>
-	| Readonly<{ status: Exclude<SessionStatus, 'ready'> | 'starting' }>
+	| Readonly<{ status: 'signed-out'; binding: object }>
+	| Readonly<{ status: Exclude<SessionStatus, 'ready' | 'signed-out'> | 'starting' }>
 
 /** Private native leaves. Their closures retain SDK resources; consumers use the actor. */
 export type SessionRuntimeResource<Capabilities = undefined> = Readonly<{
@@ -41,7 +51,7 @@ export type SessionRuntimeResource<Capabilities = undefined> = Readonly<{
 	) => () => void
 	close: () => Promise<void>
 	/** One native call after an adjacent binding recheck. Failure does not prove rollback. */
-	signOut: (identityBinding: object) => Promise<'completed' | 'bindingChanged'>
+	changeIdentity: (change: SessionRuntimeIdentityChange) => Promise<'completed' | 'bindingChanged'>
 }>
 
 export type SessionRuntimeInput<Capabilities = undefined> = Readonly<{

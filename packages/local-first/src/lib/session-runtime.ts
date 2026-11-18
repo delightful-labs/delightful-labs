@@ -9,7 +9,9 @@ export type {
 	SessionRuntimeObservation,
 	SessionRuntimeResource,
 	SessionRuntimeResult,
-	SessionRuntimeSignOutRequest,
-	SessionRuntimeSignOutReport,
-	SessionRuntimeSignOutOutcome
+	SessionRuntimeIdentity,
+	SessionRuntimeIdentityChange,
+	SessionRuntimeChangeRequest,
+	SessionRuntimeChangeReport,
+	SessionRuntimeChangeOutcome
 } from './contracts/session-runtime.js'

@@ -1,9 +1,9 @@
 diff --git a/tests/worker-bindings/actor/client.ts b/tests/worker-bindings/actor/client.ts
 new file mode 100644
-index 0000000..c348c95
+index 0000000..f19b0e1
 --- /dev/null
 +++ b/tests/worker-bindings/actor/client.ts
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,34 @@
 +import { fixture as sdk } from '../sdk-session.js'
 +
 +const fixture = {
@@ -19,9 +19,16 @@ index 0000000..c348c95
 +		if (reply.kind !== 'actor-binding') throw new Error('Unexpected binding reply')
 +		return reply.rows
 +	},
++	createIdentity: () => sdk.command({ type: 'CREATE_ACTOR_IDENTITY' }),
++	async recover() {
++		const reply = await sdk.command({ type: 'RECOVER_ACTOR_IDENTITY' })
++		if (reply.kind !== 'actor-recovered') throw new Error('Unexpected recovery reply')
++		return reply.cleared
++	},
++	restoreIdentity: (hold = false) => sdk.command({ type: 'RESTORE_ACTOR_IDENTITY', hold }),
 +	close: () => sdk.command({ type: 'CLOSE_ACTOR' }),
 +	signOut: (stale = false, hold = false) => sdk.command({ type: 'SIGN_OUT_ACTOR', stale, hold }),
-+	releaseSignOut: () => sdk.command({ type: 'RELEASE_ACTOR_SIGN_OUT' }),
++	releaseChange: () => sdk.command({ type: 'RELEASE_ACTOR_CHANGE' }),
 +	releaseOpen: () => sdk.command({ type: 'RELEASE_ACTOR_OPEN' }),
 +	dispose: () => sdk.closeActor()
 +}
@@ -49,38 +56,57 @@ index 0000000..6edd339
 +</html>
 diff --git a/tests/worker-bindings/actor/session.ts b/tests/worker-bindings/actor/session.ts
 new file mode 100644
-index 0000000..352169d
+index 0000000..fc4ecb0
 --- /dev/null
 +++ b/tests/worker-bindings/actor/session.ts
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,289 @@
 +import { createActor, createCallbackLogic, waitFor } from 'xstate'
-+import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
++import {
++	createJazzSessionRuntime,
++	type JazzSessionBindingInput
++} from 'delightful-local-first/backend/jazz/session-runtime'
 +import {
 +	createSessionRuntimeMachine,
 +	selectSessionRuntimeObservation,
-+	type SessionRuntimeSignOutReport
++	type SessionRuntimeChangeReport,
++	type SessionRuntimeIdentityChange
 +} from 'delightful-local-first/session/runtime'
 +import { createFinanceAccountStore } from '../../../src/lib/runtime/worker/account-store.js'
 +import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
 +import wasmUrl from '#jazz-wasm-binary?url'
 +import { app } from '../../../src/lib/schema.js'
++import { RecoveryPhrase } from 'jazz-tools/passphrase'
++import {
++	createRecoveryPhraseMachine,
++	selectRecoveryPhraseView
++} from 'delightful-local-first/recovery/workflow'
++import type { AvailableRecoveryScope } from 'delightful-local-first/recovery/contracts'
 +
-+type Capabilities = { isCurrent: () => boolean; read: () => Promise<number> }
++type Capabilities = {
++	isCurrent: () => boolean
++	read: () => Promise<number>
++	recovery: JazzSessionBindingInput['recovery']
++}
 +const sessionRuntimeMachine = createSessionRuntimeMachine<Capabilities>()
 +
 +let broker: ReturnType<typeof brokerHostClient> | undefined
 +let actor: ReturnType<typeof createActor<typeof sessionRuntimeMachine>> | undefined
 +let store: ReturnType<typeof createFinanceAccountStore> | undefined
 +let held: ReturnType<typeof Promise.withResolvers<void>> | undefined
-+let signOutHeld: ReturnType<typeof Promise.withResolvers<void>> | undefined
-+const reports: { attempt: number; outcome: SessionRuntimeSignOutReport['outcome'] }[] = []
-+const receiveReport = createCallbackLogic<SessionRuntimeSignOutReport>(({ receive }) => {
++let changeHeld: ReturnType<typeof Promise.withResolvers<void>> | undefined
++const reports: { attempt: number; outcome: SessionRuntimeChangeReport['outcome'] }[] = []
++const receiveReport = createCallbackLogic<SessionRuntimeChangeReport>(({ receive }) => {
 +	receive((event) => reports.push({ attempt: event.scope.attempt, outcome: event.outcome }))
 +})
 +let caller: ReturnType<typeof createActor<typeof receiveReport>> | undefined
 +let sessionBinding: object | undefined
 +let bound = 0
 +let capabilities: Capabilities | undefined
++let originalCapabilities: Capabilities | undefined
++let credential: string | undefined
++let recoveryScope: AvailableRecoveryScope | undefined
++let created = 0,
++	restored = 0
 +let acquired = 0,
 +	subscribed = 0,
 +	unsubscribed = 0,
@@ -91,6 +117,15 @@ index 0000000..352169d
 +function owner() {
 +	if (!actor) throw new Error('Native session actor not open')
 +	return actor
++}
++function request(change: SessionRuntimeIdentityChange) {
++	if (!sessionBinding || !caller) throw new Error('Session command unavailable')
++	owner().send({
++		type: 'CHANGE_IDENTITY',
++		scope: { binding: sessionBinding, attempt: reports.length + 1 },
++		change,
++		replyTo: caller
++	})
 +}
 +export const actorFixture = {
 +	open(
@@ -127,12 +162,14 @@ index 0000000..352169d
 +					browserWorkerHost: broker
 +				}
 +			},
-+			({ db, isCurrent }) => {
++			({ db, isCurrent, recovery }) => {
 +				bound++
 +				capabilities = {
 +					isCurrent,
++					recovery,
 +					read: async () => (await db.all(app.organizations, { tier: 'local-first' })).length
 +				}
++				originalCapabilities ??= capabilities
 +				return capabilities
 +			}
 +		)
@@ -156,11 +193,15 @@ index 0000000..352169d
 +									unsubscribed++
 +								}
 +							},
-+							signOut: async (binding) => {
-+								signOutStarted++
-+								const outcome = await resource.signOut(binding)
-+								if (outcome === 'completed') signOutCompleted++
-+								await signOutHeld?.promise
++							changeIdentity: async (change) => {
++								if (change.operation === 'signOut') signOutStarted++
++								const outcome = await resource.changeIdentity(change)
++								if (outcome === 'completed') {
++									if (change.operation === 'signOut') signOutCompleted++
++									if (change.operation === 'create') created++
++									if (change.operation === 'restore') restored++
++								}
++								await changeHeld?.promise
 +								return outcome
 +							},
 +							close: async () => {
@@ -191,6 +232,11 @@ index 0000000..352169d
 +			subscribed,
 +			unsubscribed,
 +			closed,
++			created,
++			restored,
++			firstBindingCurrent: originalCapabilities?.isCurrent() ?? false,
++			retiredRecoveryRejected:
++				!!recoveryScope && !originalCapabilities?.recovery.capability.isCurrentScope(recoveryScope),
 +			bound,
 +			bindingCurrent: capabilities?.isCurrent() ?? false,
 +			signOutStarted,
@@ -215,23 +261,74 @@ index 0000000..352169d
 +		const observation = selectSessionRuntimeObservation(owner().getSnapshot())
 +		if (observation?.status !== 'ready' || !sessionBinding || !caller)
 +			throw new Error('Native session actor identity unavailable')
-+		if (hold) signOutHeld = Promise.withResolvers<void>()
++		if (hold) changeHeld = Promise.withResolvers<void>()
 +		owner().send({
-+			type: 'SIGN_OUT',
++			type: 'CHANGE_IDENTITY',
 +			scope: { binding: sessionBinding, attempt: reports.length + 1 },
-+			identityBinding: stale ? {} : observation.binding,
++			change: {
++				operation: 'signOut',
++				before: { status: 'ready', binding: stale ? {} : observation.binding }
++			},
 +			replyTo: caller
 +		})
 +	},
-+	releaseSignOut() {
-+		signOutHeld?.resolve()
++	releaseChange() {
++		changeHeld?.resolve()
 +	},
 +	releaseOpen() {
 +		held?.resolve()
 +	},
++	createIdentity() {
++		const observation = selectSessionRuntimeObservation(owner().getSnapshot())
++		if (observation?.status !== 'signed-out') throw new Error('Fixture must be signed out')
++		request({ operation: 'create', before: observation })
++	},
++	async recover() {
++		const observation = selectSessionRuntimeObservation(owner().getSnapshot())
++		if (observation?.status !== 'ready') throw new Error('Recovery binding unavailable')
++		const binding = observation.capabilities.recovery
++		const phrase = createActor(createRecoveryPhraseMachine(binding.capability), {
++			input: { kind: 'unavailable' }
++		}).start()
++		const stop = binding.source.subscribe((scope) => phrase.send({ type: 'OBSERVE', scope }))
++		try {
++			phrase.send({ type: 'REVEAL' })
++			await waitFor(phrase, (s) => selectRecoveryPhraseView(s).kind === 'revealed')
++			const view = selectRecoveryPhraseView(phrase.getSnapshot()),
++				scope = phrase.getSnapshot().context.scope
++			if (view.kind !== 'revealed' || scope.kind !== 'available')
++				throw new Error('Native recovery unavailable')
++			credential = RecoveryPhrase.toSecret(view.phrase)
++			recoveryScope = scope
++			phrase.send({ type: 'HIDE' })
++			return (
++				selectRecoveryPhraseView(phrase.getSnapshot()).kind === 'hidden' &&
++				phrase.getSnapshot().context.phrase === undefined
++			)
++		} finally {
++			stop()
++			phrase.send({ type: 'SHUTDOWN' })
++			await waitFor(phrase, (s) => s.status === 'done')
++			phrase.stop()
++		}
++	},
++	restoreIdentity(hold: boolean) {
++		const observation = selectSessionRuntimeObservation(owner().getSnapshot())
++		if (!credential || (observation?.status !== 'ready' && observation?.status !== 'signed-out'))
++			throw new Error('Restore binding unavailable')
++		if (hold) changeHeld = Promise.withResolvers<void>()
++		const key = credential
++		credential = undefined
++		request({
++			operation: 'restore',
++			before: { status: observation.status, binding: observation.binding },
++			credential: key
++		})
++	},
 +	async dispose() {
++		credential = undefined
 +		held?.resolve()
-+		signOutHeld?.resolve()
++		changeHeld?.resolve()
 +		const current = owner()
 +		if (current.getSnapshot().status !== 'done') current.send({ type: 'CLOSE' })
 +		await waitFor(current, (snapshot) => snapshot.status === 'done', { timeout: 5000 })
@@ -253,7 +350,7 @@ index 0000000..352169d
 +	}
 +}
 diff --git a/tests/worker-bindings/native.test.ts b/tests/worker-bindings/native.test.ts
-index eb4c31d..957bc02 100644
+index eb4c31d..2f5b8c7 100644
 --- a/tests/worker-bindings/native.test.ts
 +++ b/tests/worker-bindings/native.test.ts
 @@ -4,6 +4,9 @@ import { join, resolve, extname } from 'node:path'
@@ -365,7 +462,7 @@ index eb4c31d..957bc02 100644
  	server = listener
  	await new Promise<void>((resolve, reject) => {
  		listener.once('error', reject)
-@@ -106,6 +145,195 @@ function retainOnFailure() {
+@@ -106,6 +145,292 @@ function retainOnFailure() {
  
  for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
  	describe(engine, () => {
@@ -474,7 +571,7 @@ index eb4c31d..957bc02 100644
 +							unsubscribed: 0,
 +							reports: [{ attempt: 1, outcome: 'bindingChanged' }]
 +						})
-+						await actorPage.evaluate(() => window.financeSessionActorFixture.releaseSignOut())
++						await actorPage.evaluate(() => window.financeSessionActorFixture.releaseChange())
 +					} else {
 +						await expect
 +							.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()))
@@ -504,6 +601,103 @@ index eb4c31d..957bc02 100644
 +						storeClosed: true,
 +						hostClosed: true
 +					})
++				} finally {
++					if (page)
++						await page.evaluate(() => window.financeSessionActorFixture.dispose()).catch(() => {})
++					await browser.close()
++				}
++			}
++		)
++		it.each([false, true])(
++			'creates, recovers and restores one native Worker identity (held restore: %s)',
++			async (hold) => {
++				retainOnFailure()
++				const browser = await browserType.launch({ headless: true })
++				let page: Page | undefined
++				try {
++					const actorPage = await browser.newPage()
++					page = actorPage
++					await actorPage.goto(origin + '/development/tests/worker-bindings/actor/index.html')
++					await actorPage.waitForFunction(() => Boolean(window.financeSessionActorFixture))
++					await actorPage.evaluate(
++						({ scope, broker }) =>
++							window.financeSessionActorFixture.open('signed-out', scope, broker),
++						{ scope: crypto.randomUUID(), broker: origin + actorBrokerPath }
++					)
++					await expect
++						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()))
++						.toMatchObject({ status: 'signed-out' })
++					await actorPage.evaluate(() => window.financeSessionActorFixture.createIdentity())
++					await expect
++						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()))
++						.toMatchObject({ status: 'ready', created: 1, bound: 1 })
++					const initial = await actorPage.evaluate(() => window.financeSessionActorFixture.state())
++					expect(initial.identityId).toMatch(/\S/)
++					expect(await actorPage.evaluate(() => window.financeSessionActorFixture.recover())).toBe(
++						true
++					)
++					await actorPage.evaluate(() => window.financeSessionActorFixture.signOut())
++					await expect
++						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()))
++						.toMatchObject({
++							status: 'signed-out',
++							retiredRecoveryRejected: true,
++							firstBindingCurrent: false
++						})
++					await actorPage.evaluate(
++						(hold) => window.financeSessionActorFixture.restoreIdentity(hold),
++						hold
++					)
++					await expect
++						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()))
++						.toMatchObject({ restored: 1, bound: 2 })
++					if (hold) {
++						await actorPage.evaluate(() => window.financeSessionActorFixture.close())
++						expect(
++							await actorPage.evaluate(() => window.financeSessionActorFixture.state())
++						).toMatchObject({
++							done: false,
++							closed: 0,
++							unsubscribed: 0,
++							reports: [
++								{ attempt: 1, outcome: 'completed' },
++								{ attempt: 2, outcome: 'completed' }
++							]
++						})
++						await actorPage.evaluate(() => window.financeSessionActorFixture.releaseChange())
++					} else {
++						await expect
++							.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()))
++							.toMatchObject({
++								status: 'ready',
++								identityId: initial.identityId,
++								retiredRecoveryRejected: true,
++								firstBindingCurrent: false,
++								bindingCurrent: true
++							})
++						await actorPage.evaluate(() => window.financeSessionActorFixture.close())
++					}
++					await expect
++						.poll(() => actorPage.evaluate(() => window.financeSessionActorFixture.state()))
++						.toMatchObject({
++							done: true,
++							clean: true,
++							actorFailed: false,
++							contextFrozen: true,
++							windowPresent: false,
++							created: 1,
++							restored: 1,
++							closed: 1,
++							unsubscribed: 1,
++							reports: [
++								{ attempt: 1, outcome: 'completed' },
++								{ attempt: 2, outcome: 'completed' },
++								{ attempt: 3, outcome: 'completed' }
++							]
++						})
++					expect(
++						await actorPage.evaluate(() => window.financeSessionActorFixture.dispose())
++					).toEqual({ sdkClosed: true, storeClosed: true, hostClosed: true })
 +				} finally {
 +					if (page)
 +						await page.evaluate(() => window.financeSessionActorFixture.dispose()).catch(() => {})
@@ -561,7 +755,7 @@ index eb4c31d..957bc02 100644
  		it('isolates native Window SDK startup from the worker bridge', async () => {
  			retainOnFailure()
  			const browser = await browserType.launch({ headless: true })
-@@ -121,6 +349,152 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
+@@ -121,6 +446,152 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
  				await browser.close()
  			}
  		})
@@ -848,10 +1042,10 @@ index a968589..2520fa3 100644
  	command,
  	stats: () => ({ ...active?.stats }),
 diff --git a/tests/worker-bindings/sdk-session.worker.ts b/tests/worker-bindings/sdk-session.worker.ts
-index f8a8f90..5eecc79 100644
+index f8a8f90..85b00e5 100644
 --- a/tests/worker-bindings/sdk-session.worker.ts
 +++ b/tests/worker-bindings/sdk-session.worker.ts
-@@ -1,11 +1,36 @@
+@@ -1,11 +1,39 @@
 +import { actorFixture } from './actor/session.js'
  import { createJazzClient } from 'jazz-tools/client'
  import wasmUrl from '#jazz-wasm-binary?url'
@@ -872,10 +1066,13 @@ index f8a8f90..5eecc79 100644
 +			control: MessagePort
 +	  }
 +	| { type: 'ACTOR_STATE' }
++	| { type: 'CREATE_ACTOR_IDENTITY' }
++	| { type: 'RECOVER_ACTOR_IDENTITY' }
++	| { type: 'RESTORE_ACTOR_IDENTITY'; hold: boolean }
 +	| { type: 'READ_ACTOR_BINDING' }
 +	| { type: 'CLOSE_ACTOR' }
 +	| { type: 'SIGN_OUT_ACTOR'; stale: boolean; hold: boolean }
-+	| { type: 'RELEASE_ACTOR_SIGN_OUT' }
++	| { type: 'RELEASE_ACTOR_CHANGE' }
 +	| { type: 'RELEASE_ACTOR_OPEN' }
 +	| { type: 'DISPOSE_ACTOR' }
 +	| {
@@ -889,13 +1086,14 @@ index f8a8f90..5eecc79 100644
  	| { type: 'READ'; organizationId: string }
  	| {
  			type: 'SEED'
-@@ -16,10 +41,16 @@ export type SdkCommand =
+@@ -16,10 +44,17 @@ export type SdkCommand =
  	  }
  	| { type: 'EDIT'; transactionId: string; amountMinor: number }
  	| { type: 'CLOSE' }
 +	| { type: 'QUALIFY_SESSION' }
  export type SdkReply =
 +	| { kind: 'actor-started' }
++	| { kind: 'actor-recovered'; cleared: boolean }
 +	| { kind: 'actor-binding'; rows: number }
 +	| { kind: 'actor-state'; state: ReturnType<typeof actorFixture.state> }
 +	| { kind: 'actor-disposed'; receipt: Awaited<ReturnType<typeof actorFixture.dispose>> }
@@ -906,7 +1104,7 @@ index f8a8f90..5eecc79 100644
  	| { kind: 'closed'; sdkClosed: boolean; hostClosed: boolean }
  	| { kind: 'failed'; message: string; stack?: string }
  
-@@ -28,13 +59,42 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
+@@ -28,13 +63,48 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
  let broker: ReturnType<typeof brokerHostClient> | undefined
  function current() {
  	const snapshot = session?.getSnapshot()
@@ -930,20 +1128,26 @@ index f8a8f90..5eecc79 100644
 +		)
 +		return { kind: 'actor-started' }
 +	}
++	if (command.type === 'RECOVER_ACTOR_IDENTITY')
++		return { kind: 'actor-recovered', cleared: await actorFixture.recover() }
 +	if (command.type === 'READ_ACTOR_BINDING')
 +		return { kind: 'actor-binding', rows: await actorFixture.readBinding() }
 +	if (command.type === 'DISPOSE_ACTOR')
 +		return { kind: 'actor-disposed', receipt: await actorFixture.dispose() }
 +	if (
 +		command.type === 'ACTOR_STATE' ||
++		command.type === 'CREATE_ACTOR_IDENTITY' ||
++		command.type === 'RESTORE_ACTOR_IDENTITY' ||
 +		command.type === 'CLOSE_ACTOR' ||
 +		command.type === 'SIGN_OUT_ACTOR' ||
-+		command.type === 'RELEASE_ACTOR_SIGN_OUT' ||
++		command.type === 'RELEASE_ACTOR_CHANGE' ||
 +		command.type === 'RELEASE_ACTOR_OPEN'
 +	) {
++		if (command.type === 'CREATE_ACTOR_IDENTITY') actorFixture.createIdentity()
++		if (command.type === 'RESTORE_ACTOR_IDENTITY') actorFixture.restoreIdentity(command.hold)
 +		if (command.type === 'CLOSE_ACTOR') actorFixture.close()
 +		if (command.type === 'SIGN_OUT_ACTOR') actorFixture.signOut(command.stale, command.hold)
-+		if (command.type === 'RELEASE_ACTOR_SIGN_OUT') actorFixture.releaseSignOut()
++		if (command.type === 'RELEASE_ACTOR_CHANGE') actorFixture.releaseChange()
 +		if (command.type === 'RELEASE_ACTOR_OPEN') actorFixture.releaseOpen()
 +		return { kind: 'actor-state', state: actorFixture.state() }
 +	}
@@ -951,7 +1155,7 @@ index f8a8f90..5eecc79 100644
  	if (command.type === 'OPEN') {
  		if (session || store || broker) throw new Error('SDK fixture already open')
  		const serverUrl = new URL('/jazz', location.origin).href
-@@ -48,7 +108,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -48,7 +118,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  			scope: command.scope,
  			env: 'sdk-proof',
  			store,
@@ -965,7 +1169,7 @@ index f8a8f90..5eecc79 100644
  			runtimeSources: {
  				wasmUrl,
  				brokerWorkerUrl: command.brokerUrl,
-@@ -57,7 +122,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -57,7 +132,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  			}
  		})
  		const { db, accountId } = current()
@@ -973,7 +1177,7 @@ index f8a8f90..5eecc79 100644
  		return {
  			kind: 'opened',
  			accountId,
-@@ -66,9 +130,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -66,9 +140,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  		}
  	}
  	if (command.type === 'CLOSE') {
@@ -986,7 +1190,7 @@ index f8a8f90..5eecc79 100644
  		await store.close()
  		const receipt = await broker.close()
  		return {
-@@ -79,6 +143,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
+@@ -79,6 +153,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
  				receipt.requestId === broker.host.identity.requestId
  		}
  	}

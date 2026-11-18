@@ -148,11 +148,16 @@ index f15347c..a322805 100644
  		}
 diff --git a/src/lib/backend/jazz/session-runtime.ts b/src/lib/backend/jazz/session-runtime.ts
 new file mode 100644
-index 0000000..a2ce122
+index 0000000..fbf192e
 --- /dev/null
 +++ b/src/lib/backend/jazz/session-runtime.ts
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,147 @@
 +import { createJazzClient } from 'jazz-tools/client'
++import { createJazzRecoveryAdapter } from './recovery-phrase.js'
++import type {
++	RecoveryPhraseCapability,
++	RecoveryScopeSource
++} from '../../contracts/recovery-phrase.js'
 +import type { JazzClient, JazzClientConfig, JazzSessionSnapshot } from 'jazz-tools/client'
 +import type {
 +	SessionRuntimeInput,
@@ -168,6 +173,7 @@ index 0000000..a2ce122
 +	identityKind: 'device' | 'backend'
 +	binding: object
 +	isCurrent: () => boolean
++	recovery: Readonly<{ capability: RecoveryPhraseCapability; source: RecoveryScopeSource }>
 +}>
 +
 +/** Only this native adapter retains the SDK facade. App bindings retain selected leaves. */
@@ -187,16 +193,31 @@ index 0000000..a2ce122
 +		capability: {
 +			open: async () => {
 +				const session = await createJazzClient(captured)
++				const recovery = createJazzRecoveryAdapter(() => session)
++				const recoveryBinding = {
++					capability: recovery.capability,
++					source: {
++						subscribe: (notify: Parameters<RecoveryScopeSource['subscribe']>[0]) => {
++							const publish = () => notify(recovery.observeSession())
++							const stop = session.subscribe(publish)
++							publish()
++							return stop
++						}
++					}
++				}
 +				let previous: JazzSessionSnapshot<JazzClient> | undefined
 +				let binding: object = Object.freeze({})
 +				let selected: { capabilities: Capabilities | undefined } | undefined
 +				const read = (): SessionRuntimeObservation<Capabilities | undefined> => {
 +					const snapshot = session.getSnapshot()
++					recovery.observeSession()
 +					if (snapshot.status !== 'ready') {
++						if (previous?.status !== snapshot.status) binding = Object.freeze({})
 +						previous = snapshot
-+						binding = Object.freeze({})
 +						selected = undefined
-+						return { status: snapshot.status }
++						return snapshot.status === 'signed-out'
++							? { status: 'signed-out', binding }
++							: { status: snapshot.status }
 +					}
 +					if (!snapshot.user || !snapshot.client)
 +						throw new Error('Jazz ready session resources unavailable')
@@ -215,6 +236,7 @@ index 0000000..a2ce122
 +						selected = {
 +							capabilities: bind?.({
 +								db,
++								recovery: recoveryBinding,
 +								binding: currentBinding,
 +								identityId: user.accountId,
 +								identityKind: user.kind,
@@ -254,12 +276,22 @@ index 0000000..a2ce122
 +						notify()
 +						return unsubscribe
 +					},
-+					close: () => session.close(),
-+					signOut: async (identityBinding) => {
++					close: async () => {
++						recovery.invalidate()
++						await session.close()
++					},
++					changeIdentity: async (change) => {
 +						const current = read()
-+						if (current.status !== 'ready' || current.binding !== identityBinding)
++						if (
++							(current.status !== 'ready' && current.status !== 'signed-out') ||
++							current.status !== change.before.status ||
++							current.binding !== change.before.binding
++						)
 +							return 'bindingChanged'
-+						await session.signOut()
++						if (change.operation === 'create') await session.createDeviceAccount()
++						else if (change.operation === 'restore')
++							await session.restoreDeviceAccount(change.credential)
++						else await session.signOut()
 +						return 'completed'
 +					}
 +				}

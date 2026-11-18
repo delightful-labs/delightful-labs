@@ -5,56 +5,65 @@ import type {
 	SessionRuntimeInput,
 	SessionRuntimeObservation,
 	SessionRuntimeResource,
-	SessionRuntimeSignOutReport,
-	SessionRuntimeSignOutRequest
+	SessionRuntimeChangeReport,
+	SessionRuntimeChangeRequest,
+	SessionRuntimeIdentityChange
 } from '../../contracts/session-runtime.js'
 
 function fixture() {
 	let publish: (value: SessionRuntimeObservation) => void = () => {}
 	let fail = () => {}
+	const signedOut: Extract<SessionRuntimeObservation, { status: 'signed-out' }> = {
+		status: 'signed-out',
+		binding: {}
+	}
 	const unsubscribe = vi.fn(() => {})
 	const close = vi.fn(async () => {})
-	const signOut = vi.fn<SessionRuntimeResource['signOut']>(async () => 'completed')
+	const changeIdentity = vi.fn<SessionRuntimeResource['changeIdentity']>(async () => 'completed')
 	const observe = vi.fn<SessionRuntimeResource['observe']>((notify, failed) => {
 		publish = notify
 		fail = failed
-		notify({ status: 'signed-out' })
+		notify(signedOut)
 		return unsubscribe
 	})
-	const resource: SessionRuntimeResource = { observe, close, signOut }
+	const resource: SessionRuntimeResource = { observe, close, changeIdentity }
 	const open = vi.fn(async () => resource)
 	const input: SessionRuntimeInput = { binding: {}, capability: { open } }
 	const actor = createActor(sessionRuntimeMachine, { input })
 	return {
 		actor,
+		signedOut,
 		input,
 		open,
 		resource,
 		observe,
 		close,
-		signOut,
+		changeIdentity,
 		unsubscribe,
 		publish: (value: SessionRuntimeObservation) => publish(value),
 		fail: () => fail()
 	}
 }
 
-function signOutCaller(f: ReturnType<typeof fixture>, identityBinding: object) {
-	const reports: SessionRuntimeSignOutReport[] = []
+function changeCaller(f: ReturnType<typeof fixture>, change: SessionRuntimeIdentityChange) {
+	const reports: SessionRuntimeChangeReport[] = []
 	const caller = createActor(
-		createCallbackLogic<SessionRuntimeSignOutReport>(({ receive }) => {
+		createCallbackLogic<SessionRuntimeChangeReport>(({ receive }) => {
 			receive((event) => reports.push(event))
 		})
 	).start()
-	const request: SessionRuntimeSignOutRequest = {
+	const request: SessionRuntimeChangeRequest = {
 		scope: { binding: f.input.binding, attempt: 1 },
-		identityBinding,
+		change,
 		replyTo: caller
 	}
 	return { caller, reports, request }
 }
+function signOutCaller(f: ReturnType<typeof fixture>, binding: object) {
+	return changeCaller(f, { operation: 'signOut', before: { status: 'ready', binding } })
+}
 
-async function readyForSignOut(f: ReturnType<typeof fixture>, identityBinding: object) {
+async function observeReady(f: ReturnType<typeof fixture>, identityBinding: object) {
 	f.actor.start()
 	await waitFor(f.actor, (snapshot) => !!selectSessionRuntimeObservation(snapshot))
 	f.publish({
@@ -72,22 +81,25 @@ describe('session sign-out protocol', () => {
 		const f = fixture(),
 			binding = {},
 			c = signOutCaller(f, binding)
-		f.signOut.mockImplementation(async () => {
-			f.publish({ status: 'signed-out' })
+		f.changeIdentity.mockImplementation(async () => {
+			f.publish(f.signedOut)
 			return 'completed'
 		})
-		await readyForSignOut(f, binding)
+		await observeReady(f, binding)
 		try {
-			f.actor.send({ type: 'SIGN_OUT', ...c.request })
+			f.actor.send({ type: 'CHANGE_IDENTITY', ...c.request })
 			await vi.waitFor(() =>
 				expect(c.reports).toEqual([
-					{ type: 'SESSION_SIGN_OUT_SETTLED', scope: c.request.scope, outcome: 'completed' }
+					{
+						type: 'SESSION_CHANGE_SETTLED',
+						operation: 'signOut',
+						scope: c.request.scope,
+						outcome: 'completed'
+					}
 				])
 			)
-			expect(f.signOut).toHaveBeenCalledExactlyOnceWith(binding)
-			expect(selectSessionRuntimeObservation(f.actor.getSnapshot())).toEqual({
-				status: 'signed-out'
-			})
+			expect(f.changeIdentity).toHaveBeenCalledExactlyOnceWith(c.request.change)
+			expect(selectSessionRuntimeObservation(f.actor.getSnapshot())).toEqual(f.signedOut)
 			expect(f.close).not.toHaveBeenCalled()
 			f.actor.send({ type: 'CLOSE' })
 			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
@@ -105,22 +117,25 @@ describe('session sign-out protocol', () => {
 		const f = fixture(),
 			binding = {},
 			c = signOutCaller(f, binding)
-		await readyForSignOut(f, binding)
-		if (fault === 'availability') f.publish({ status: 'signed-out' })
+		await observeReady(f, binding)
+		if (fault === 'availability') f.publish({ status: 'transitioning' })
 		const request = {
 			...c.request,
 			scope: {
 				binding: fault === 'session' ? {} : f.input.binding,
 				attempt: fault === 'attempt' ? -1 : 1
 			},
-			identityBinding: fault === 'identity' ? {} : binding
+			change: {
+				operation: 'signOut',
+				before: { status: 'ready', binding: fault === 'identity' ? {} : binding }
+			} satisfies SessionRuntimeChangeRequest['change']
 		}
 		try {
-			f.actor.send({ type: 'SIGN_OUT', ...request })
+			f.actor.send({ type: 'CHANGE_IDENTITY', ...request })
 			expect(c.reports).toEqual([
-				{ type: 'SESSION_SIGN_OUT_SETTLED', scope: request.scope, outcome }
+				{ type: 'SESSION_CHANGE_SETTLED', operation: 'signOut', scope: request.scope, outcome }
 			])
-			expect(f.signOut).not.toHaveBeenCalled()
+			expect(f.changeIdentity).not.toHaveBeenCalled()
 			f.actor.send({ type: 'CLOSE' })
 			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
 		} finally {
@@ -135,38 +150,44 @@ describe('session sign-out protocol', () => {
 				binding = {},
 				c = signOutCaller(f, binding)
 			const pending = Promise.withResolvers<void>()
-			f.signOut.mockImplementation(async () => {
+			f.changeIdentity.mockImplementation(async () => {
 				await pending.promise
 				if (outcome === 'failed') throw new Error('Synthetic sign-out rejection')
-				f.publish({ status: 'signed-out' })
+				f.publish(f.signedOut)
 				return 'completed'
 			})
-			await readyForSignOut(f, binding)
+			await observeReady(f, binding)
 			try {
-				f.actor.send({ type: 'SIGN_OUT', ...c.request })
-				const child = f.actor.getSnapshot().children.signOut
+				f.actor.send({ type: 'CHANGE_IDENTITY', ...c.request })
+				const child = f.actor.getSnapshot().children.changeIdentity
 				expect(selectSessionRuntimeObservation(f.actor.getSnapshot())).toBeUndefined()
-				f.actor.send({ type: 'SIGN_OUT', ...c.request, scope: { ...c.request.scope, attempt: 2 } })
+				f.actor.send({
+					type: 'CHANGE_IDENTITY',
+					...c.request,
+					scope: { ...c.request.scope, attempt: 2 }
+				})
 				expect(c.reports).toEqual([
 					{
-						type: 'SESSION_SIGN_OUT_SETTLED',
+						type: 'SESSION_CHANGE_SETTLED',
+						operation: 'signOut',
 						scope: { ...c.request.scope, attempt: 2 },
 						outcome: 'busy'
 					}
 				])
 				f.actor.send({ type: 'CLOSE' })
-				expect(f.actor.getSnapshot().children.signOut).toBe(child)
+				expect(f.actor.getSnapshot().children.changeIdentity).toBe(child)
 				expect(f.unsubscribe).not.toHaveBeenCalled()
 				expect(f.close).not.toHaveBeenCalled()
 				pending.resolve()
 				await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
 				expect(c.reports).toHaveLength(2)
 				expect(c.reports[1]).toEqual({
-					type: 'SESSION_SIGN_OUT_SETTLED',
+					type: 'SESSION_CHANGE_SETTLED',
+					operation: 'signOut',
 					scope: c.request.scope,
 					outcome
 				})
-				expect(f.signOut).toHaveBeenCalledOnce()
+				expect(f.changeIdentity).toHaveBeenCalledOnce()
 				expect(f.unsubscribe).toHaveBeenCalledOnce()
 				expect(f.close).toHaveBeenCalledOnce()
 			} finally {
@@ -180,13 +201,18 @@ describe('session sign-out protocol', () => {
 		const f = fixture(),
 			binding = {},
 			c = signOutCaller(f, binding)
-		f.signOut.mockResolvedValueOnce('bindingChanged')
-		await readyForSignOut(f, binding)
+		f.changeIdentity.mockResolvedValueOnce('bindingChanged')
+		await observeReady(f, binding)
 		try {
-			f.actor.send({ type: 'SIGN_OUT', ...c.request })
+			f.actor.send({ type: 'CHANGE_IDENTITY', ...c.request })
 			await vi.waitFor(() =>
 				expect(c.reports).toEqual([
-					{ type: 'SESSION_SIGN_OUT_SETTLED', scope: c.request.scope, outcome: 'bindingChanged' }
+					{
+						type: 'SESSION_CHANGE_SETTLED',
+						operation: 'signOut',
+						scope: c.request.scope,
+						outcome: 'bindingChanged'
+					}
 				])
 			)
 			expect(selectSessionRuntimeObservation(f.actor.getSnapshot())?.status).toBe('ready')
@@ -202,17 +228,17 @@ describe('session sign-out protocol', () => {
 			binding = {},
 			c = signOutCaller(f, binding)
 		const pending = Promise.withResolvers<void>()
-		f.signOut.mockImplementation(async () => {
+		f.changeIdentity.mockImplementation(async () => {
 			await pending.promise
 			return 'completed'
 		})
-		await readyForSignOut(f, binding)
+		await observeReady(f, binding)
 		try {
-			f.actor.send({ type: 'SIGN_OUT', ...c.request })
-			const child = f.actor.getSnapshot().children.signOut
+			f.actor.send({ type: 'CHANGE_IDENTITY', ...c.request })
+			const child = f.actor.getSnapshot().children.changeIdentity
 			f.fail()
 			f.actor.send({ type: 'CLOSE' })
-			expect(f.actor.getSnapshot().children.signOut).toBe(child)
+			expect(f.actor.getSnapshot().children.changeIdentity).toBe(child)
 			expect(f.close).not.toHaveBeenCalled()
 			pending.resolve()
 			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
@@ -220,6 +246,95 @@ describe('session sign-out protocol', () => {
 			expect(f.close).toHaveBeenCalledOnce()
 		} finally {
 			pending.resolve()
+			f.actor.stop()
+			c.caller.stop()
+		}
+	})
+})
+
+describe('session identity changes', () => {
+	it.each([
+		{ operation: 'create', ready: false, reject: false },
+		{ operation: 'restore', ready: false, reject: false },
+		{ operation: 'restore', ready: true, reject: false },
+		{ operation: 'restore', ready: true, reject: true }
+	])(
+		'drains $operation (ready: $ready, reject: $reject) without retaining credentials in the session',
+		async ({ operation, ready, reject }) => {
+			const f = fixture(),
+				binding = {}
+			if (ready) await observeReady(f, binding)
+			else {
+				f.actor.start()
+				await waitFor(f.actor, (s) => !!selectSessionRuntimeObservation(s))
+			}
+			const before = ready
+				? ({ status: 'ready', binding } satisfies SessionRuntimeIdentityChange['before'])
+				: f.signedOut
+			if (before.status !== 'ready' && before.status !== 'signed-out')
+				throw new Error('Fixture identity unavailable')
+			const change: SessionRuntimeIdentityChange =
+				operation === 'create'
+					? { operation: 'create', before: f.signedOut }
+					: { operation: 'restore', before, credential: 'synthetic-private-credential' }
+			const c = changeCaller(f, change),
+				pending = Promise.withResolvers<'completed'>()
+			f.changeIdentity.mockImplementation(() => pending.promise)
+			try {
+				f.actor.send({ type: 'CHANGE_IDENTITY', ...c.request })
+				expect(f.changeIdentity).toHaveBeenCalledExactlyOnceWith(change)
+				expect(
+					Object.values(f.actor.getSnapshot().getInputs()).some(
+						(input) =>
+							input !== null &&
+							typeof input === 'object' &&
+							('credential' in input || 'change' in input)
+					)
+				).toBe(false)
+				expect(selectSessionRuntimeObservation(f.actor.getSnapshot())).toBeUndefined()
+				const issued = f.actor.getSnapshot().children.changeIdentity
+				f.actor.send({ type: 'CLOSE' })
+				expect(f.actor.getSnapshot().children.changeIdentity).toBe(issued)
+				expect(f.close).not.toHaveBeenCalled()
+				if (reject) pending.reject(new Error('Synthetic identity rejection'))
+				else pending.resolve('completed')
+				await waitFor(f.actor, (s) => s.status === 'done')
+				expect(c.reports).toEqual([
+					{
+						type: 'SESSION_CHANGE_SETTLED',
+						scope: c.request.scope,
+						operation: change.operation,
+						outcome: reject ? 'failed' : 'completed'
+					}
+				])
+				expect(f.unsubscribe).toHaveBeenCalledOnce()
+				expect(f.close).toHaveBeenCalledOnce()
+			} finally {
+				pending.resolve('completed')
+				f.actor.stop()
+				c.caller.stop()
+			}
+		}
+	)
+	it('refuses a retired signed-out binding before creating an identity', async () => {
+		const f = fixture(),
+			c = changeCaller(f, { operation: 'create', before: { status: 'signed-out', binding: {} } })
+		f.actor.start()
+		try {
+			await waitFor(f.actor, (s) => !!selectSessionRuntimeObservation(s))
+			f.actor.send({ type: 'CHANGE_IDENTITY', ...c.request })
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+			expect(c.reports).toEqual([
+				{
+					type: 'SESSION_CHANGE_SETTLED',
+					scope: c.request.scope,
+					operation: 'create',
+					outcome: 'bindingChanged'
+				}
+			])
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (s) => s.status === 'done')
+		} finally {
 			f.actor.stop()
 			c.caller.stop()
 		}

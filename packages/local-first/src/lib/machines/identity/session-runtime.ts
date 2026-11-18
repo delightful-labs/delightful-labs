@@ -16,7 +16,7 @@ import type {
 	SessionRuntimeObservation,
 	SessionRuntimeResource,
 	SessionRuntimeResult,
-	SessionRuntimeSignOutRequest
+	SessionRuntimeChangeRequest
 } from '../../contracts/session-runtime.js'
 
 function required<Value>(value: Value | undefined): Value {
@@ -39,8 +39,8 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 		| { type: 'CLOSE' | 'RETRY' }
 		| { type: 'OBSERVATION_FAILED' | 'OBSERVER_CLOSED' | 'OBSERVER_CLOSE_FAILED'; binding: object }
 		| { type: 'OBSERVED'; binding: object; observation: SessionRuntimeObservation<Capabilities> }
-		| ({ type: 'SIGN_OUT' } & SessionRuntimeSignOutRequest)
-		| { type: 'SIGN_OUT_SETTLED'; outcome: 'completed' | 'bindingChanged' | 'failed' }
+		| ({ type: 'CHANGE_IDENTITY' } & SessionRuntimeChangeRequest)
+		| { type: 'CHANGE_SETTLED'; outcome: 'completed' | 'bindingChanged' | 'failed' }
 
 	const actors = {
 		acquisition: createSessionAcquisitionMachine<SessionRuntimeResource<Capabilities>>(),
@@ -84,12 +84,15 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 		close: createAsyncLogic({
 			run: ({ input }: { input: SessionRuntimeResource<Capabilities> }) => input.close()
 		}),
-		signOut: createAsyncLogic({
+		changeIdentity: createAsyncLogic({
 			run: ({
 				input
 			}: {
-				input: { resource: SessionRuntimeResource<Capabilities>; identityBinding: object }
-			}) => input.resource.signOut(input.identityBinding)
+				input: {
+					resource: SessionRuntimeResource<Capabilities>
+					change: SessionRuntimeChangeRequest['change']
+				}
+			}) => input.resource.changeIdentity(input.change)
 		})
 	}
 
@@ -101,7 +104,7 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 			events: {
 				CLOSE: types(),
 				RETRY: types(),
-				SIGN_OUT: types<SessionRuntimeSignOutRequest>(),
+				CHANGE_IDENTITY: types<SessionRuntimeChangeRequest>(),
 				ACQUIRED: types<Omit<Extract<Event, { type: 'ACQUIRED' }>, 'type'>>(),
 				ACQUISITION_FAILED: types<Omit<Extract<Event, { type: 'ACQUISITION_FAILED' }>, 'type'>>(),
 				RELEASED: types<Omit<Extract<Event, { type: 'RELEASED' }>, 'type'>>(),
@@ -114,13 +117,13 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 				OBSERVER_CLOSE_FAILED: types<{ binding: object }>()
 			},
 			internalEvents: {
-				SIGN_OUT_SETTLED: types<{ outcome: 'completed' | 'bindingChanged' | 'failed' }>()
+				CHANGE_SETTLED: types<{ outcome: 'completed' | 'bindingChanged' | 'failed' }>()
 			},
 			children: {
 				acquisition: types<import('xstate').ActorRefFrom<typeof actors.acquisition>>(),
 				observe: types<import('xstate').ActorRefFrom<typeof actors.observe>>(),
 				close: types<import('xstate').ActorRefFrom<typeof actors.close>>(),
-				signOut: types<import('xstate').ActorRefFrom<typeof actors.signOut>>()
+				changeIdentity: types<import('xstate').ActorRefFrom<typeof actors.changeIdentity>>()
 			}
 		},
 		states: {
@@ -130,8 +133,14 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 				id: 'session-runtime-bound',
 				states: {
 					observing: {},
-					signingOut: {
-						schemas: { input: types<SessionRuntimeSignOutRequest>() },
+					changingIdentity: {
+						schemas: {
+							input: types<
+								Omit<SessionRuntimeChangeRequest, 'change'> & {
+									operation: SessionRuntimeChangeRequest['change']['operation']
+								}
+							>()
+						},
 						states: { active: {}, stopping: {} }
 					},
 					observerFailed: {},
@@ -148,17 +157,14 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 		},
 		actors,
 		guards: {
-			validSignOutScope: (
-				{ context }: { context: Context },
-				request: SessionRuntimeSignOutRequest
-			) =>
+			validChangeScope: ({ context }: { context: Context }, request: SessionRuntimeChangeRequest) =>
 				request.scope.binding === context.input.binding &&
 				Number.isSafeInteger(request.scope.attempt) &&
 				request.scope.attempt >= 0,
-			signingOut: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ bound: 'signingOut' }, value),
-			closingSignOut: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ bound: { signingOut: 'stopping' } }, value),
+			changingIdentity: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ bound: 'changingIdentity' }, value),
+			closingChange: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ bound: { changingIdentity: 'stopping' } }, value),
 			currentObserver: ({ context, event }: { context: Context; event: Event }) =>
 				'binding' in event && event.binding === context.observationBinding,
 			currentAcquisition: ({ context, event }: { context: Context; event: Event }) =>
@@ -183,11 +189,12 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 		}),
 		initial: 'acquiring',
 		on: {
-			SIGN_OUT: (args, enq) =>
+			CHANGE_IDENTITY: (args, enq) =>
 				enq.sendTo(args.event.replyTo, {
-					type: 'SESSION_SIGN_OUT_SETTLED',
+					type: 'SESSION_CHANGE_SETTLED',
 					scope: args.event.scope,
-					outcome: args.guards.signingOut(args) ? 'busy' : 'unavailable'
+					operation: args.event.change.operation,
+					outcome: args.guards.changingIdentity(args) ? 'busy' : 'unavailable'
 				})
 		},
 		output: ({ context }) =>
@@ -197,7 +204,7 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 			src: 'acquisition',
 			input: ({ context }) => context.input,
 			onError: (args) =>
-				args.guards.signingOut(args)
+				args.guards.changingIdentity(args)
 					? { context: { observation: undefined, failure: 'acquisition' } }
 					: { target: '.ownerFailed', context: { observation: undefined, failure: 'acquisition' } },
 			onSnapshot: (args, enq) => {
@@ -274,7 +281,7 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 						binding: required(context.observationBinding)
 					}),
 					onError: (args) =>
-						args.guards.signingOut(args)
+						args.guards.changingIdentity(args)
 							? {
 									context: {
 										observation: undefined,
@@ -293,36 +300,45 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 				states: {
 					observing: {
 						on: {
-							SIGN_OUT: (args, enq) => {
-								if (!args.guards.validSignOutScope(args, args.event)) {
+							CHANGE_IDENTITY: (args, enq) => {
+								if (!args.guards.validChangeScope(args, args.event)) {
 									enq.sendTo(args.event.replyTo, {
-										type: 'SESSION_SIGN_OUT_SETTLED',
+										type: 'SESSION_CHANGE_SETTLED',
 										scope: args.event.scope,
+										operation: args.event.change.operation,
 										outcome: 'invalidRequest'
 									})
 									return {}
 								}
-								if (args.context.observation?.status !== 'ready') {
+								if (
+									args.context.observation?.status !== 'ready' &&
+									args.context.observation?.status !== 'signed-out'
+								) {
 									enq.sendTo(args.event.replyTo, {
-										type: 'SESSION_SIGN_OUT_SETTLED',
+										type: 'SESSION_CHANGE_SETTLED',
 										scope: args.event.scope,
+										operation: args.event.change.operation,
 										outcome: 'unavailable'
 									})
 									return {}
 								}
-								if (args.context.observation.binding !== args.event.identityBinding) {
+								if (
+									args.context.observation.status !== args.event.change.before.status ||
+									args.context.observation.binding !== args.event.change.before.binding
+								) {
 									enq.sendTo(args.event.replyTo, {
-										type: 'SESSION_SIGN_OUT_SETTLED',
+										type: 'SESSION_CHANGE_SETTLED',
 										scope: args.event.scope,
+										operation: args.event.change.operation,
 										outcome: 'bindingChanged'
 									})
 									return {}
 								}
 								return {
-									target: 'signingOut',
+									target: 'changingIdentity',
 									input: {
 										scope: { ...args.event.scope },
-										identityBinding: args.event.identityBinding,
+										operation: args.event.change.operation,
 										replyTo: args.event.replyTo
 									}
 								}
@@ -337,17 +353,18 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 									: undefined
 						}
 					},
-					signingOut: {
+					changingIdentity: {
 						initial: 'active',
 						states: { active: {}, stopping: {} },
 						on: {
-							SIGN_OUT_SETTLED: (args, enq) => {
+							CHANGE_SETTLED: (args, enq) => {
 								enq.sendTo(args.input.replyTo, {
-									type: 'SESSION_SIGN_OUT_SETTLED',
+									type: 'SESSION_CHANGE_SETTLED',
 									scope: args.input.scope,
+									operation: args.input.operation,
 									outcome: args.event.outcome
 								})
-								if (args.guards.closingSignOut(args))
+								if (args.guards.closingChange(args))
 									return {
 										target: args.context.failure ? '#session-runtime-closing' : 'stopping',
 										context: { observation: undefined }
@@ -372,15 +389,16 @@ export function createSessionRuntimeMachine<Capabilities = undefined>() {
 									: undefined
 						},
 						invoke: {
-							id: 'signOut',
-							src: 'signOut',
-							input: ({ context, input }) => ({
-								resource: required(context.resource),
-								identityBinding: input.identityBinding
-							}),
+							id: 'changeIdentity',
+							src: 'changeIdentity',
+							input: ({ context, event }) => {
+								if (event.type !== 'CHANGE_IDENTITY')
+									throw new Error('Identity command unavailable')
+								return { resource: required(context.resource), change: event.change }
+							},
 							onDone: ({ event }, enq) =>
-								enq.raise({ type: 'SIGN_OUT_SETTLED', outcome: event.output }),
-							onError: (_, enq) => enq.raise({ type: 'SIGN_OUT_SETTLED', outcome: 'failed' })
+								enq.raise({ type: 'CHANGE_SETTLED', outcome: event.output }),
+							onError: (_, enq) => enq.raise({ type: 'CHANGE_SETTLED', outcome: 'failed' })
 						}
 					},
 					observerFailed: { on: { RETRY: { target: 'reobserving' } } },

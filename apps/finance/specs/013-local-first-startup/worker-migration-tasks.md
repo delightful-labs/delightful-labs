@@ -134,9 +134,14 @@ Clipper's active account adapter and candidate constructor reuse one extracted
 root/library/capture builder. Shared types/tests, active Clipper tests/full types,
 alpha.67 candidate constructor/native tests and focused three-engine Worker
 checks pass. [Exact boundary and next batch](worker-session-resource-decision.md#app-binding-function-approved-and-implemented).
-Actual worker-host adoption remains open; finish its required create/restore/
-recovery commands before replacing raw-session startup/close. Do not introduce
-another facade to retain Finance's legacy Svelte provider.
+The shared create/restore/sign-out path and reused recovery capability now also
+pass 132 shared tests and 21 focused native cases, including an actual Worker
+create → recover/hide → sign-out → same-identity restore and close during a held
+restore receipt. [Current command contract and exact evidence](worker-session-resource-decision.md#create-restore-and-recovery-implemented-host-wiring-pending).
+Actual worker-host adoption remains open. Next replace Clipper's raw-session
+account/readiness/realm-close custody, preserve its native SDK retry behavior,
+and reuse existing restoration/sign-out/drain charts. Do not introduce another
+facade to retain Finance's legacy Svelte provider.
 
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
