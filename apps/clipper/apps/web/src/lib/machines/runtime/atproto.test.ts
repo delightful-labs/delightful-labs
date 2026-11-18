@@ -50,7 +50,7 @@ it('starts offline without probing auth, requesting tokens or restoring a second
 		f.owner.stop()
 	}
 })
-it('requests one provider redirect, leaving account following to Jazz', async () => {
+it('requests identity and Margin access in one provider redirect, leaving account following to Jazz', async () => {
 	const fetch = vi.fn(async (_path: string, _init: RequestInit) =>
 		Response.json({ url: 'https://provider.example.invalid/authorize' })
 	)
@@ -66,7 +66,10 @@ it('requests one provider redirect, leaving account following to Jazz', async ()
 		if (!call) throw Error('Expected authorization request')
 		const [path, init] = call
 		expect(path).toBe('/api/auth/sign-in/atproto')
-		expect(JSON.parse(String(init.body))).toMatchObject({ handle: 'derocher.me' })
+		expect(JSON.parse(String(init.body))).toMatchObject({
+			handle: 'derocher.me',
+			scope: 'atproto repo:at.margin.note'
+		})
 		expect(JSON.parse(String(init.body)).callbackURL).toMatch(/^\/\?atproto_attempt=[\da-f-]{36}$/)
 	} finally {
 		f.owner.stop()
@@ -285,7 +288,7 @@ it.each(['authorization', 'completion'] as const)(
 	}
 )
 
-it('requests Margin permission only for an explicit publishing authorization', async () => {
+it('can request Margin access again for an existing narrower grant', async () => {
 	const fetch = vi.fn<typeof globalThis.fetch>(async () =>
 		Response.json({ url: 'https://provider.example.invalid/authorize' })
 	)

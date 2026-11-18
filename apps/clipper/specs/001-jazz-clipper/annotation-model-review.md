@@ -535,3 +535,27 @@ values reach Jazz's existing adapter. No revision field or custom text merge is
 added. A regression using the real SDK adapter fails before this correction and
 passes afterward; all 32 component cases and four native annotation browser cases,
 including sequential typing and reload persistence, pass.
+
+### One sign-in for identity and publishing (2026-11-17)
+
+The live preview completed real identity sign-in and reopened the private article
+and note, but publishing then required another provider sign-in for Margin access.
+The user rejected this two-step experience. This supersedes the earlier
+identity-only default for Clipper: ordinary sign-in now requests
+`atproto repo:at.margin.note` together. The shared OAuth plugin and Finance keep
+their existing defaults. Publishing remains a separate explicit user action.
+
+The worker retains the existing BEGIN → attempt creation → authorization →
+redirect → callback confirmation lifecycle and its cancellation/drain rules.
+Only the default requested scope changes in the worker and Clipper's server
+validation. Existing narrower or reduced grants still require authorization;
+grant checks at publication remain enforced. No stored model or product copy is
+added. The live test stopped before any public record was created. The temporary
+preview alias exception was revoked and cookie-free metadata again redirects to
+Vercel login.
+
+Qualification: all 39 focused OAuth and publication-permission cases pass,
+including the ordinary worker request, the actual client/plugin/PAR default,
+callback persistence across native backend restart, and rejection of insufficient
+grants at publication. The shared plugin's identity-only default remains covered.
+The combined first-sign-in scope has not yet been qualified with the live provider.

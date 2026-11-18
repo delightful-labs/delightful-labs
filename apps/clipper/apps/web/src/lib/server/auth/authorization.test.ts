@@ -111,7 +111,7 @@ function signInRequest(scope: unknown, selectedOrigin = origin) {
 	})
 }
 
-it('sends only the chosen permission through the real client, plugin and OAuth PAR implementation', async () => {
+it('requests Margin access by default and honors explicit scopes through the real client, plugin and OAuth PAR implementation', async () => {
 	const remote = provider()
 	const auth = createAuthServer({ db: () => db, schema: app }, { origin, secret })
 	const client = createAuthClient({
@@ -138,7 +138,7 @@ it('sends only the chosen permission through the real client, plugin and OAuth P
 		expect(new URL(redirect.url).origin).toBe(issuer)
 	}
 	expect(remote.pushed.map((body) => body.get('scope'))).toEqual([
-		'atproto',
+		'atproto repo:at.margin.note',
 		'atproto',
 		'atproto repo:at.margin.note'
 	])

@@ -56,7 +56,7 @@ const actors = {
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
 						handle: input.handle,
-						scope: input.authorizationScope ?? 'atproto',
+						scope: input.authorizationScope ?? 'atproto repo:at.margin.note',
 						callbackURL: '/?atproto_attempt=' + input.attemptId
 					})
 				},
