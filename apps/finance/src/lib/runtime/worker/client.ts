@@ -340,6 +340,15 @@ export function createFinanceWorkerClient(
 		recovery: { source: recoverySource, capability: recoveryCapability },
 		selectWorkspace: (workspaceId: string | null) =>
 			selectContext(workspaceId, get(state).transactionKind),
+		navigateTransaction: (transactionId: string | null, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'OPEN_TRANSACTION',
+					transactionId,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
 		selectTransaction: (transactionId: string | null) =>
 			selectContext(get(state).selection.workspaceId, get(state).transactionKind, transactionId),
 		selectTransactionKind: (kind: TransactionKind) =>

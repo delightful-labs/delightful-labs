@@ -7,6 +7,10 @@
 	import { transactionTagNames } from '#lib/domain/transaction-tags.js'
 	import type { TransactionKind } from '#lib/domain/transaction-kind.js'
 	import { groupTransactionsByDate } from '#lib/domain/transaction-groups.js'
+	import {
+		transactionListLocation,
+		transactionListQuery
+	} from '../../domain/transaction-list-routes.js'
 	import { withQueryParams } from '#lib/domain/query-params.js'
 	import { app } from '#lib/schema.js'
 	import { createQuerySubscription } from 'delightful-local-first/backend/jazz/data'
@@ -23,7 +27,6 @@
 	import TransactionListFilters from '../filters/TransactionListFilters.svelte'
 	import {
 		filterTransactions,
-		transactionListLocation,
 		type TransactionListFilters as ListFilters
 	} from '#lib/filters/transaction-list-filters.js'
 
@@ -48,14 +51,10 @@
 	const listFilters = $derived(location.filters)
 	function changeListFilters(value: ListFilters) {
 		replaceState(
-			withQueryParams(`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`, {
-				start: value.start || null,
-				end: value.end || null,
-				category: value.categoryId || null,
-				currency: value.currency || null,
-				q: value.query || null,
-				page: null
-			}),
+			withQueryParams(
+				`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+				transactionListQuery(value, 1)
+			),
 			page.state
 		)
 	}
@@ -70,15 +69,12 @@
 		})
 	}
 	function transactionHref(id: string) {
-		return withQueryParams(`${listPath}/${encodeURIComponent(id)}`, {
-			start: listFilters.start || null,
-			end: listFilters.end || null,
-			category: listFilters.categoryId || null,
-			currency: listFilters.currency || null,
-			q: listFilters.query || null,
-			page: requestedPage > 1 ? requestedPage : null
-		})
+		return withQueryParams(
+			`${listPath}/${encodeURIComponent(id)}`,
+			transactionListQuery(listFilters, requestedPage)
+		)
 	}
+
 	const newHref = $derived(
 		withQueryParams(`${listPath}/new`, {
 			page: requestedPage > 1 ? requestedPage : null

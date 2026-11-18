@@ -43,6 +43,7 @@ export function selectWorkerLedger(
 		noAccountsSelected: selectedAccountIds?.length === 0,
 		rangeValid,
 		page: page.page,
+		requestedPage,
 		pageCount: page.pageCount,
 		groups: page.groups.map((group) => ({
 			bookedOn: group.bookedOn,

@@ -8,23 +8,6 @@ export type TransactionListFilters = {
 	query: string
 }
 
-/** Shared URL semantics for the legacy integration and worker-owned list. */
-export function transactionListLocation(search: string) {
-	const params = new URLSearchParams(search),
-		value = params.get('page') ?? '1',
-		number = Number(value)
-	return {
-		filters: {
-			start: params.get('start') ?? '',
-			end: params.get('end') ?? '',
-			categoryId: params.get('category') ?? '',
-			currency: params.get('currency') ?? '',
-			query: params.get('q') ?? ''
-		},
-		requestedPage: /^\d+$/.test(value) && Number.isSafeInteger(number) && number > 0 ? number : 1
-	}
-}
-
 export function filterTransactions<
 	Row extends Pick<
 		TransactionRow,

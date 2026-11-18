@@ -1,9 +1,12 @@
 import { toggleSelectedAccount } from '../../filters/finance-filters.js'
-import { transactionListLocation } from '../../filters/transaction-list-filters.js'
+import {
+	transactionListLocation,
+	transactionListQuery,
+	transactionIdForPath
+} from '../../domain/transaction-list-routes.js'
 import { withQueryParams } from '../../domain/query-params.js'
-import { workspaceRoute } from '../../domain/workspace-routes.js'
-import { transactionKindForPath } from '../../domain/transaction-kind.js'
-import { z } from 'zod'
+import { workspaceRoute, workspaceHref } from '../../domain/workspace-routes.js'
+import { transactionKindForPath, transactionPages } from '../../domain/transaction-kind.js'
 import type {
 	WorkspaceNavigationFacts,
 	WorkspaceRoute,
@@ -227,6 +230,15 @@ function formsObservation(context: Context): FinanceFormsObservation {
 	}
 }
 
+function transactionContextForRoute(route: WorkspaceRoute | undefined) {
+	const location = route ? transactionListLocation(route.search) : undefined
+	return {
+		transactionId: route ? transactionIdForPath(route.pathname) : null,
+		ledgerFilters: location?.filters ?? emptyLedgerFilters,
+		ledgerPage: location?.requestedPage ?? 1
+	}
+}
+
 function sameCommandScope(context: Context, scope: WorkerCommandScope) {
 	return (
 		scope.sessionRevision === context.sessionRevision &&
@@ -298,6 +310,7 @@ export function createFinanceWorkerMachine({
 				FORMS_VIEW: types<{ binding: object; view: ReturnType<typeof selectFinanceFormsView> }>(),
 				FORMS_CLOSED: types<{ binding: object }>(),
 				FORMS_FAILED: types<{ binding: object }>(),
+				OPEN_TRANSACTION: types<WorkerCommandScope & { transactionId: string | null }>(),
 				SET_ACCOUNT_SELECTED: types<WorkerCommandScope & { accountId: string; checked: boolean }>(),
 				SET_ALL_ACCOUNTS_SELECTED: types<WorkerCommandScope & { checked: boolean }>(),
 				SET_LEDGER_PAGE: types<WorkerCommandScope & { page: number }>(),
@@ -361,8 +374,6 @@ export function createFinanceWorkerMachine({
 			OBSERVE_ROUTE: ({ context, event }, enq) => {
 				if (event.revision <= context.selection.revision) return
 				const route = { pathname: event.pathname, search: event.search, hash: event.hash }
-				const candidate = /^\/(?:expenses|income)\/([^/]+)$/.exec(event.pathname)?.[1]
-				const transaction = z.uuid().safeParse(candidate)
 				enq.raise({
 					type: 'SELECT_CONTEXT',
 					selection: {
@@ -370,7 +381,7 @@ export function createFinanceWorkerMachine({
 						revision: event.revision
 					},
 					kind: transactionKindForPath(event.pathname),
-					transactionId: transaction.success ? transaction.data : null
+					transactionId: transactionIdForPath(event.pathname)
 				})
 				return { context: { route, href: `${route.pathname}${route.search}${route.hash}` } }
 			},
@@ -537,10 +548,8 @@ export function createFinanceWorkerMachine({
 							...withdrawn,
 							readBinding: {},
 							sessionRevision: context.sessionRevision + 1,
-							transactionId: null,
+							...transactionContextForRoute(context.route),
 							selectedAccountIds: null,
-							ledgerFilters: emptyLedgerFilters,
-							ledgerPage: 1,
 							sessionStatus: view.status
 						}
 						if (context.forms && context.forms.binding !== ready.binding) {
@@ -632,6 +641,38 @@ export function createFinanceWorkerMachine({
 							return
 						enq.sendTo(context.forms.owner, { type: 'RETRY_NAVIGATION' })
 					},
+					OPEN_TRANSACTION: ({ context, event }, enq) => {
+						if (
+							!sameCommandScope(context, event) ||
+							!context.route ||
+							!context.forms ||
+							context.forms.binding !== context.ready?.binding ||
+							!context.selection.workspaceId
+						)
+							return
+						if (
+							event.transactionId !== null &&
+							!context.facts?.transactions?.some(
+								(row) =>
+									row.id === event.transactionId &&
+									row.organizationId === context.selection.workspaceId &&
+									row.kind === context.transactionKind
+							)
+						)
+							return
+						const path = transactionPages[context.transactionKind].path
+						enq.sendTo(context.forms.owner, {
+							type: 'NAVIGATE',
+							replace: false,
+							destination: withQueryParams(
+								workspaceHref(
+									context.selection.workspaceId,
+									event.transactionId ? `${path}/${encodeURIComponent(event.transactionId)}` : path
+								),
+								transactionListQuery(context.ledgerFilters, context.ledgerPage)
+							)
+						})
+					},
 					SET_ACCOUNT_SELECTED: ({ context, event }, enq) => {
 						if (
 							!sameCommandScope(context, event) ||
@@ -703,14 +744,7 @@ export function createFinanceWorkerMachine({
 								replace: true,
 								destination: withQueryParams(
 									`${context.route.pathname}${context.route.search}${context.route.hash}`,
-									{
-										start: event.filters.start || null,
-										end: event.filters.end || null,
-										category: event.filters.categoryId || null,
-										currency: event.filters.currency || null,
-										q: event.filters.query || null,
-										page: null
-									}
+									transactionListQuery(event.filters, 1)
 								)
 							})
 							return
@@ -963,12 +997,9 @@ export function createFinanceWorkerMachine({
 									ready && ready.binding !== context.ready?.binding
 										? null
 										: context.selectedAccountIds,
-								ledgerFilters:
-									ready && ready.binding !== context.ready?.binding
-										? emptyLedgerFilters
-										: context.ledgerFilters,
-								ledgerPage:
-									ready && ready.binding !== context.ready?.binding ? 1 : context.ledgerPage,
+								...(ready && ready.binding !== context.ready?.binding
+									? transactionContextForRoute(context.route)
+									: {}),
 								...withdrawn,
 								formsView: undefined,
 								readBinding: {},

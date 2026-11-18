@@ -53,6 +53,7 @@ export const workerLedgerView = z.strictObject({
 	noAccountsSelected: z.boolean(),
 	rangeValid: z.boolean(),
 	page: z.number().int().positive().safe(),
+	requestedPage: z.number().int().positive().safe(),
 	pageCount: z.number().int().positive().safe(),
 	groups: z.array(
 		z.strictObject({
@@ -85,6 +86,12 @@ export const financeWorkerCommand = z.discriminatedUnion('type', [
 	}),
 	z.strictObject({
 		type: z.literal('RETRY_WORKSPACE_NAVIGATION'),
+		sessionRevision,
+		selection: workerSelection
+	}),
+	z.strictObject({
+		type: z.literal('OPEN_TRANSACTION'),
+		transactionId: z.uuid().nullable(),
 		sessionRevision,
 		selection: workerSelection
 	}),

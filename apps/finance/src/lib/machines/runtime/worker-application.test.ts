@@ -753,6 +753,104 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+	it('navigates scoped transaction intents with list context and rebinds the observed detail after SDK replacement', async () => {
+		const f = fixture(),
+			id = crypto.randomUUID()
+		try {
+			await f.start()
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses',
+				search: '?workspace=' + a + '&page=2&q=rent&currency=USD',
+				hash: '#row',
+				revision: 1
+			})
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([row('Wallet')])
+			last(f.ledgers).publish([
+				{
+					id,
+					organizationId: a,
+					accountId: row('Wallet').id,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					kind: 'expense',
+					currency: 'USD',
+					amountMinor: 100,
+					bookedOn: '2026-11-18',
+					description: 'Rent',
+					memo: null,
+					tagNames: []
+				}
+			])
+			const scope = f.view()
+			f.actor.send({
+				type: 'OPEN_TRANSACTION',
+				transactionId: crypto.randomUUID(),
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			expect(f.navigate).not.toHaveBeenCalled()
+			f.actor.send({
+				type: 'OPEN_TRANSACTION',
+				transactionId: id,
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
+			expect(f.navigate).toHaveBeenCalledWith(
+				'/expenses/' + id + '?workspace=' + a + '&currency=USD&q=rent&page=2',
+				expect.any(AbortSignal),
+				'/expenses?workspace=' + a + '&page=2&q=rent&currency=USD#row',
+				false
+			)
+			expect(f.view().transactionId).toBeNull()
+			f.actor.send({
+				type: 'OBSERVE_ROUTE',
+				pathname: '/expenses/' + id,
+				search: '?workspace=' + a + '&currency=USD&q=rent&page=2',
+				hash: '',
+				revision: 2
+			})
+			expect(f.view().transactionId).toBe(id)
+			f.actor.send({
+				type: 'OPEN_TRANSACTION',
+				transactionId: null,
+				sessionRevision: scope.sessionRevision,
+				selection: scope.selection
+			})
+			expect(f.navigate).toHaveBeenCalledOnce()
+			const generation = f.view().sessionRevision,
+				oldDetails = last(f.details)
+			f.publishSession(f.ready({}))
+			await vi.waitFor(() => expect(f.view().sessionRevision).toBeGreaterThan(generation))
+			await vi.waitFor(() => expect(last(f.details)).not.toBe(oldDetails))
+			expect(oldDetails.release).toHaveBeenCalledOnce()
+			expect(f.view().transactionId).toBe(id)
+			expect(f.view().transactionEdit).toMatchObject({
+				transactionId: id,
+				initialTransaction: null,
+				form: { canSubmit: false, readiness: { kind: 'blocked', reason: 'loading' } }
+			})
+			expect(f.actor.getSnapshot().context.ledgerFilters.query).toBe('rent')
+			expect(f.actor.getSnapshot().context.ledgerPage).toBe(2)
+			const current = f.view()
+			f.actor.send({
+				type: 'OPEN_TRANSACTION',
+				transactionId: null,
+				sessionRevision: current.sessionRevision,
+				selection: current.selection
+			})
+			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledTimes(2))
+			expect(f.navigate).toHaveBeenLastCalledWith(
+				'/expenses?workspace=' + a + '&currency=USD&q=rent&page=2',
+				expect.any(AbortSignal),
+				'/expenses/' + id + '?workspace=' + a + '&currency=USD&q=rent&page=2',
+				false
+			)
+		} finally {
+			f.stop()
+		}
+	})
 	it('keeps missing balances unknown, projects one exact ledger page, and refuses stale filter/page intents', async () => {
 		const f = fixture()
 		try {

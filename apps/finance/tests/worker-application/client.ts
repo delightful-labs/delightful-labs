@@ -2,7 +2,10 @@ import { mount, unmount } from 'svelte'
 import { get } from 'svelte/store'
 import WorkerAccounts from '../../src/lib/components/worker/WorkerAccounts.svelte'
 import { createFinanceWorkerClient } from '../../src/lib/runtime/worker/client.js'
-import type { FinanceWorkerConfiguration } from '../../src/lib/contracts/worker-application.js'
+import type {
+	FinanceWorkerConfiguration,
+	WorkerCommandScope
+} from '../../src/lib/contracts/worker-application.js'
 
 let worker: Worker | undefined, client: ReturnType<typeof createFinanceWorkerClient> | undefined
 let component: ReturnType<typeof mount> | undefined
@@ -33,7 +36,8 @@ function attach() {
 			onAccountCreation: owner.accountCreationCommand,
 			onTransactionEntry: owner.transactionEntryCommand,
 			onTransactionEdit: owner.transactionEditCommand,
-			onSelectTransaction: owner.selectTransaction,
+			onSelectTransaction: (id: string | null, scope: WorkerCommandScope) =>
+				routeObserver ? owner.navigateTransaction(id, scope) : owner.selectTransaction(id),
 			onLedgerPage: owner.selectLedgerPage,
 			onLedgerFilters: owner.setLedgerFilters,
 			onSelectAccount: owner.selectAccount,

@@ -51,7 +51,7 @@
 		onArchive: (id: string, scope: WorkerCommandScope) => void
 		onLedgerPage: (page: number, scope: WorkerCommandScope) => void
 		onLedgerFilters: (filters: TransactionListFilters, scope: WorkerCommandScope) => void
-		onSelectTransaction: (id: string | null) => void
+		onSelectTransaction: (id: string | null, scope: WorkerCommandScope) => void
 		onTransactionEdit: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 		onTransactionEntry: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 		onAccountCreation: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
@@ -160,7 +160,7 @@
 	{/if}
 
 	{#if live.current.transactionId}
-		<Button type="button" onclick={() => onSelectTransaction(null)}
+		<Button type="button" onclick={() => onSelectTransaction(null, live.current)}
 			>{m['actions.back_to_subject']({ subject: m['nouns.list']({ count: 1 }) })}</Button
 		>
 		<WorkerTransactionEntry

@@ -15,6 +15,7 @@ export function checkFinanceWorker(directory, finance, proof) {
 		'src/lib/domain/workspace-routes.ts',
 		'src/lib/domain/query-params.ts',
 		'src/lib/domain/transaction-kind.ts',
+		'src/lib/domain/transaction-list-routes.ts',
 		'src/lib/components/workspaces/WorkspaceScopeNotice.svelte',
 		'src/lib/components/navigation/AppLink.svelte',
 		'src/lib/components/navigation/Anchor.svelte',

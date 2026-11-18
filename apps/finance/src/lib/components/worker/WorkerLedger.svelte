@@ -7,6 +7,7 @@
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
 	import { transactionPages } from '../../domain/transaction-kind.js'
 	import { workspaceHref } from '../../domain/workspace-routes.js'
+	import { transactionListQuery } from '../../domain/transaction-list-routes.js'
 	import { withQueryParams } from '../../domain/query-params.js'
 	import { m } from '../../paraglide/messages.js'
 	let {
@@ -16,7 +17,7 @@
 		onFilters
 	}: {
 		view: FinanceWorkerView
-		onOpen: (id: string) => void
+		onOpen: (id: string, scope: WorkerCommandScope) => void
 		onPage: (page: number, scope: WorkerCommandScope) => void
 		onFilters: (filters: Filters, scope: WorkerCommandScope) => void
 	} = $props()
@@ -35,21 +36,25 @@
 	)
 	const scope = $derived({ sessionRevision: view.sessionRevision, selection: view.selection })
 	function transactionHref(id: string) {
-		return workspaceHref(
-			view.selection.workspaceId,
-			`${transactionPages[view.transactionKind].path}/${encodeURIComponent(id)}`
+		return withQueryParams(
+			workspaceHref(
+				view.selection.workspaceId,
+				`${transactionPages[view.transactionKind].path}/${encodeURIComponent(id)}`
+			),
+			view.ledger ? transactionListQuery(view.ledger.filters, view.ledger.requestedPage) : {}
 		)
 	}
+
 	function open(event: MouseEvent, id: string) {
 		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
 			return
 		event.preventDefault()
-		onOpen(id)
+		onOpen(id, scope)
 	}
 	function pageHref(page: number) {
 		return withQueryParams(
 			workspaceHref(view.selection.workspaceId, transactionPages[view.transactionKind].path),
-			{ page }
+			view.ledger ? transactionListQuery(view.ledger.filters, page) : {}
 		)
 	}
 </script>

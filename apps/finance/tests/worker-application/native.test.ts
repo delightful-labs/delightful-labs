@@ -1244,6 +1244,79 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('opens routed details and returns to the filtered list through native history without losing the requested page', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Detail wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seedLedger(workspaceId, accountId),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate((id) => {
+					window.financeWorkerReadFixture.route('/expenses?workspace=' + id + '&q=ledger&page=99')
+					window.financeWorkerReadFixture.followRoutes()
+				}, workspaceId)
+				await browserExpect(page.getByRole('link', { name: /transaction details/i })).toHaveCount(
+					15
+				)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().ledger))
+					.toMatchObject({ page: 2, requestedPage: 99, filters: { query: 'ledger' } })
+				const link = page.getByRole('link', { name: /transaction details/i }).first(),
+					href = await link.getAttribute('href')
+				if (!href) throw new Error('Missing native detail link')
+				const destination = new URL(href, page.url())
+				expect(destination.searchParams.get('workspace')).toBe(workspaceId)
+				expect(destination.searchParams.get('q')).toBe('ledger')
+				expect(destination.searchParams.get('page')).toBe('99')
+				await link.click()
+				await browserExpect.poll(() => page.url()).toBe(destination.href)
+				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('1.00')
+				await browserExpect(
+					page.getByRole('button', { name: 'Back to List', exact: true })
+				).toBeVisible()
+				await page.goBack()
+				await browserExpect.poll(() => new URL(page.url()).pathname).toBe('/expenses')
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().transactionId))
+					.toBeNull()
+				await browserExpect(page.getByRole('link', { name: /transaction details/i })).toHaveCount(
+					15
+				)
+				await page.goForward()
+				await browserExpect.poll(() => page.url()).toBe(destination.href)
+				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('1.00')
+				await page.getByRole('button', { name: 'Back to List', exact: true }).click()
+				await browserExpect.poll(() => new URL(page.url()).pathname).toBe('/expenses')
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().transactionId))
+					.toBeNull()
+				expect(new URL(page.url()).searchParams.get('q')).toBe('ledger')
+				expect(new URL(page.url()).searchParams.get('page')).toBe('99')
+				await browserExpect(page.getByRole('link', { name: /transaction details/i })).toHaveCount(
+					15
+				)
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('keeps data failed after a malformed view and still waits for clean native close', async () => {
 			onTestFailed(() => {
 				retained = true

@@ -1241,3 +1241,31 @@ request registry or SDK boundary is needed. Qualify actual detail-link hrefs, na
 back to list, browser back/forward, filtered page retention and stale command refusal before
 claiming routed detail parity. This model is the next independent implementation while account
 order storage choice is pending.
+
+
+Implemented routed detail intent: **2,000 Finance units** (64 host), **51 real Worker application
+cases** across Chromium/Firefox/WebKit, zero-warning full/native static and complete browser-test
+types, and **eight existing SvelteKit pagination cases** pass. The new three-engine case verifies
+actual link hrefs and native history through detail → browser Back → Forward → Back to List.
+A direct requested page 99 remains in links/history while the rendered data correctly clamps to
+page 2; the bounded ledger view now retains that requested-page fact separately from its current
+page. Filter and account-selection behavior remain covered in the complete native matrix.
+
+SDK replacement derives a fresh selection from the stored observed route, retaining its ID/filter /
+page intent while clearing record metadata and creating a new detail subscription. Missing data
+remains blocked/loading; previous editor data and commands cannot survive the new SDK revision.
+Routed OPEN_TRANSACTION refuses stale headers and unknown/not-current-kind record IDs before
+navigation. The low-level non-router selection method remains unchanged.
+
+URL readers/writers now share `domain/transaction-list-routes.ts`; Window uses its pure link
+formatter without importing financial filtering/aggregation. The existing navigation child still
+owns the single native effect and receipt. No new navigation actor, request registry or SDK patch.
+Logs: `/private/tmp/finance-worker-detail-routing-{static,test-types,unit-final,full-unit,native-types,native-focused,native-final,legacy-browser}.log`.
+Initial extraction/import and loading-placeholder assertion failures remain in the earlier unit
+logs; all final checks above pass.
+
+Next foundation step: move the existing account-order chart and its preference ownership. An
+explicit user question is pending about using IndexedDB with no migration for that separate UI
+preference (the earlier IndexedDB decision selected the credential AccountStore). Do not claim
+an answer or implement the dependent persistence choice from elapsed time. Full shell, ordinary
+settings/classification/transfers, provider/attachments/backups and activation remain open.
