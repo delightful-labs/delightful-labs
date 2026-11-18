@@ -146,25 +146,3 @@ index 7a2514b..d7771ed 100644
  					: { kind: 'unavailable' }
  			}
  		}
-diff --git a/src/lib/backend/jazz/session-readiness.ts b/src/lib/backend/jazz/session-readiness.ts
-index 9a903e8..febe12c 100644
---- a/src/lib/backend/jazz/session-readiness.ts
-+++ b/src/lib/backend/jazz/session-readiness.ts
-@@ -1,15 +1,10 @@
- import type { JazzSession } from 'jazz-tools/client'
--import type {
--	SessionReadinessBinding,
--	SessionReadinessCapability
--} from '../../contracts/session.js'
-+import type { SessionReadinessBinding, SessionReadinessCapability } from '../../contracts/session.js'
- 
- /** Bind the host's acquired session without reading, subscribing, creating, or replacing it. */
- export function createJazzSessionReadinessAdapter<Client>(
- 	session: JazzSession<Client>
--): SessionReadinessBinding & {
--	capability: Extract<SessionReadinessCapability, { retry: () => Promise<void> }>
--} {
-+): SessionReadinessBinding & { capability: Extract<SessionReadinessCapability, { retry: () => Promise<void> }> } {
- 	return {
- 		binding: Object.freeze({}),
- 		capability: {

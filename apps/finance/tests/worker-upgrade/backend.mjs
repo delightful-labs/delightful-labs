@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSy
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { copyCandidate } from './copy-candidate.mjs'
 
 // Reuse the generated Clipper schema proof and its exact dependency graph.
 // No application pins, installed workspace packages or destinations are changed.
@@ -16,7 +17,7 @@ const source = join(directory, 'app')
 const json = (path, value) => writeFileSync(path, JSON.stringify(value, null, 2) + '\n')
 const run = (command, args, cwd = app) => execFileSync(command, args, { cwd, stdio: 'inherit' })
 const metadata = JSON.parse(readFileSync(join(directory, 'sdk-metadata.json'), 'utf8'))
-assert.ok(['2.0.0-alpha.66', '2.0.0-alpha.67'].includes(metadata.version))
+assert.equal(metadata.version, '2.0.0-alpha.67')
 const app = mkdtempSync(join(directory, 'backend-'))
 cpSync(join(source, 'src'), join(app, 'src'), { recursive: true })
 for (const name of ['package.json', 'pnpm-lock.yaml', '.npmrc', 'tsconfig.schema.json'])
@@ -90,9 +91,11 @@ run('pnpm', ['install', '--offline', '--ignore-scripts'])
 run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.backend.json'])
 run('pnpm', testArgs)
 const withAuth = process.argv.includes('--auth')
+const authReport = join(app, 'auth-results.json')
 if (withAuth) {
 	run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'clipper-auth.patch')])
 	run('git', ['apply', join(proof, 'clipper-auth.patch')])
+	copyCandidate(join(proof, 'candidate/backend'), app)
 	json(join(app, 'tsconfig.auth.json'), {
 		extends: './tsconfig.schema.json',
 		include: ['src/lib/server/auth/*.ts', 'src/lib/server/jazz.ts']
@@ -160,7 +163,7 @@ if (withAuth) {
 		}
 	}
 	run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.auth.json'])
-	run('pnpm', authArgs)
+	run('pnpm', [...authArgs, '--reporter=json', '--outputFile', authReport])
 	// Auth changed the dependency graph: keep gateway admission qualified on that graph.
 	run('pnpm', ['exec', 'tsc', '--project', 'tsconfig.backend.json'])
 	run('pnpm', testArgs)
@@ -174,7 +177,7 @@ json(join(directory, 'backend-qualification.json'), {
 	...(withAuth
 		? {
 				betterAuthVersion: '1.7.22',
-				authCases: 30,
+				authCases: JSON.parse(readFileSync(authReport, 'utf8')).numPassedTests,
 				authControls: ['unpatched-provider', 'missing-expiry', 'renewing-admission']
 			}
 		: {}),

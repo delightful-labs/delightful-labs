@@ -39,6 +39,8 @@ New candidate implementations and qualification cases live as normal source in
 
 - `finance/` and `clipper/` hold new native transforms, runtime query bindings and
   upgrade/restore cases.
+- `backend/` holds the native Better Auth expiry/refresh case, copied only for
+  backend qualification with `--auth`.
 - `fixture/` holds the native actor and Svelte fixtures.
 - `local-first/` holds the private native Jazz session adapter.
 - `worker/application.worker.ts` is the candidate Finance worker entry. The
@@ -69,6 +71,15 @@ but lost the saved/edited row after process restart. The bridge has not gained
 new behavior. Backend qualification extracts the existing alpha.60 backend
 hunks and reuses the existing provider correction, with unpatched negative
 controls. No installed workspace dependency patch changes here.
+
+Against the schema reconciled with merged PR51, the backend command passes eight
+gateway and 34 auth cases plus strict selected types. All five negative controls
+still fail as expected: unpatched extension origin, registered device admission,
+provider callback, missing expiry and refreshing admission. The auth count comes
+from Vitest's JSON report. The expiry case is unchanged source moved out of the
+auth patch; the no-op readiness adapter formatting patch has also been removed.
+This qualifies the bounded gateway/auth integration, while complete Clipper
+session/backend adoption and live Vercel admission remain open.
 
 The runner verifies the published SDK tarball's SHA-512 integrity, SDK/native/Wasm
 version identity, generated schema identity, strict types and Svelte checks.
