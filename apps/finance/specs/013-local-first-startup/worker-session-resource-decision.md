@@ -1329,3 +1329,26 @@ Logs: `/private/tmp/finance-order-final-checks.log` (static/types/full units + l
 `/private/tmp/finance-order-native-final.log` (complete 57-case native matrix),
 `/private/tmp/finance-order-native-focus.log` (nine targeted three-engine cases), and
 `/private/tmp/finance-order-drain.log` (10 persistence cases).
+
+### Full-shell reuse preparation
+
+Reuse AppShell and its existing drawer components rather than creating a second layout. First
+make its current host supply the observed pathname and footer snippet. WorkspaceBootstrap already
+owns route observation and the bank integration, so it can render the same AppDrawerStatus in
+that snippet without changing its lifetime, DOM, labels or behavior. AppShell keeps only native
+DOM/disclosure/viewport behavior and the existing data/intent props. This removes its SvelteKit
+page singleton and full bank actor requirement before a Worker caller is introduced.
+
+Narrow drawer account/workspace inputs to the existing AccountSelection/WorkspaceSelector props;
+these controls require bounded display records, not complete SDK rows. QueryContent needs only
+isLoading and an error value (null means no error), so give that presentation shape its own type
+instead of importing a Jazz subscription type. Keep the existing loading/failure selection and
+markup. Verify the legacy shell through strict types and existing ordering/pagination browser
+cases. This preparation does not enable the Worker shell or claim provider/PWA/route parity.
+
+Shell preparation passes full zero-warning Svelte checking, complete browser-test TypeScript
+checking and all **13 existing ordering/pagination browser cases** in the isolated alpha.60
+checkout. `/private/tmp/finance-shell-reuse-checks.log` retains the result. The preceding
+2,013-unit / 57-native-browser result belongs to the account-order checkpoint; no full-suite
+rerun is claimed for this presentation-only cleanup. Actual Worker shell mounting, route-link
+binding, responsive keyboard/focus coverage and the remaining feature parity are still next.

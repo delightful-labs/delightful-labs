@@ -34,6 +34,7 @@
 	} from '#lib/filters/finance-filters.js'
 	import BankSyncIntegration from '../banks/BankSyncIntegration.svelte'
 	import AppShell from '../navigation/AppShell.svelte'
+	import AppDrawerStatus from '../navigation/AppDrawerStatus.svelte'
 	import AccountCreation from '../accounts/AccountCreation.svelte'
 	import JazzStartup from '../startup/JazzStartup.svelte'
 	import { useMachine, useSelector } from '@xstate/svelte'
@@ -350,10 +351,8 @@
 			{#snippet children(bankSync)}
 				{#if ready}
 					<AppShell
-						{bankSync}
+						pathname={page.url.pathname}
 						{organizations}
-						{syncConfigured}
-						{browserOffline}
 						accounts={activeAccounts}
 						{accountBalances}
 						editingAccountOrder={$orderSnapshot.matches('editing')}
@@ -371,6 +370,9 @@
 						onAccountChange={setAccountSelected}
 						onAllAccountsChange={setAllAccountsSelected}
 					>
+						{#snippet footer()}
+							<AppDrawerStatus {bankSync} {browserOffline} {syncConfigured} />
+						{/snippet}
 						{#snippet accountCreation(trigger)}
 							<AccountCreation {trigger} />
 						{/snippet}

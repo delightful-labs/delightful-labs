@@ -4,7 +4,6 @@
 	import AppNavigationLink from './AppNavigationLink.svelte'
 	import { Button, ButtonContent, NavigationGroup, Navigation } from 'delightful-ui'
 	import { type ComponentProps, type Snippet } from 'svelte'
-	import type { Account } from '#lib/schema.js'
 	import AppDrawerContentSection from './AppDrawerContentSection.svelte'
 	import QueryContent from '../shared/QueryContent.svelte'
 	import AccountsIcon from 'tdesign-icons-svg/src/wallet.svg?component'
@@ -31,7 +30,7 @@
 		onNavigate: () => void
 		accountCreation: Snippet<[Snippet<[() => void, boolean]>]>
 		accountBalances?: ReadonlyMap<string, bigint> | null
-		accounts: readonly Account[]
+		accounts: ComponentProps<typeof AccountSelection>['accounts']
 		selectedAccountIds: readonly string[] | null
 		accountQueries: ComponentProps<typeof QueryContent>['queries']
 		onAccountChange: (accountId: string, checked: boolean) => void

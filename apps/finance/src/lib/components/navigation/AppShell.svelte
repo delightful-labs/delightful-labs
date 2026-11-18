@@ -6,21 +6,16 @@
 	import AppDrawerNavigation from './AppDrawerNavigation.svelte'
 	import AppDrawerAccounts from './AppDrawerAccounts.svelte'
 	import AppDrawerSettings from './AppDrawerSettings.svelte'
-	import AppDrawerStatus from './AppDrawerStatus.svelte'
 	import type QueryContent from '../shared/QueryContent.svelte'
 	import { onMount, type ComponentProps, type Snippet } from 'svelte'
-	import { page } from '$app/state'
 	import { isMobile } from '#lib/runtime/viewport.js'
-	import type { BankSyncControls } from '#lib/runtime/bank-sync.js'
-	import type { Account, Organization } from '#lib/schema.js'
 	import { m } from '#lib/paraglide/messages.js'
 
 	let {
 		children,
 		accountCreation,
-		bankSync,
-		syncConfigured,
-		browserOffline,
+		pathname,
+		footer,
 		organizations,
 		accounts,
 		accountBalances = null,
@@ -40,12 +35,11 @@
 	}: {
 		children: Snippet
 		accountCreation: Snippet<[Snippet<[() => void, boolean]>]>
-		bankSync: BankSyncControls
-		syncConfigured: boolean
-		browserOffline: boolean
-		organizations: readonly Organization[] | undefined
+		pathname: string
+		footer: Snippet
+		organizations: ComponentProps<typeof AppDrawerSettings>['organizations']
 		accountBalances?: ReadonlyMap<string, bigint> | null
-		accounts: readonly Account[]
+		accounts: ComponentProps<typeof AppDrawerAccounts>['accounts']
 		organizationId: string | null
 		selectedAccountIds: readonly string[] | null
 		organizationQueries: ComponentProps<typeof QueryContent>['queries']
@@ -93,10 +87,10 @@
 		<AppTopMenu {drawerId} {toggleId} {drawerOpen} onToggle={toggleDrawer} />
 	</div>
 	<div class="workspace" data-drawer-open={drawerOpen}>
-		<AppDrawer {drawerId} bind:drawerOpen>
-			<AppDrawerNavigation pathname={page.url.pathname} onNavigate={dismissMobileDrawer}>
+		<AppDrawer {drawerId} bind:drawerOpen {footer}>
+			<AppDrawerNavigation {pathname} onNavigate={dismissMobileDrawer}>
 				<AppDrawerAccounts
-					pathname={page.url.pathname}
+					{pathname}
 					onNavigate={dismissMobileDrawer}
 					{accountCreation}
 					{accounts}
@@ -113,7 +107,7 @@
 					{onMoveAccount}
 				/>
 				<AppDrawerSettings
-					pathname={page.url.pathname}
+					{pathname}
 					onNavigate={dismissMobileDrawer}
 					{organizations}
 					{organizationId}
@@ -121,9 +115,6 @@
 					{onOrganizationChange}
 				/>
 			</AppDrawerNavigation>
-			{#snippet footer()}
-				<AppDrawerStatus {bankSync} {browserOffline} {syncConfigured} />
-			{/snippet}
 		</AppDrawer>
 		<div class="content" inert={mainInert}>
 			{@render children()}
