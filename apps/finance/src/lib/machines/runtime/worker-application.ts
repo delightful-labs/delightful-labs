@@ -1,3 +1,4 @@
+import { toggleSelectedAccount } from '../../filters/finance-filters.js'
 import { transactionListLocation } from '../../filters/transaction-list-filters.js'
 import { withQueryParams } from '../../domain/query-params.js'
 import { workspaceRoute } from '../../domain/workspace-routes.js'
@@ -93,6 +94,7 @@ type Context = Input & {
 	transactionId: string | null
 	transactionKind: TransactionKind
 	ledgerPage: number
+	selectedAccountIds: string[] | null
 	ledgerFilters: TransactionListFilters
 	sessionRevision: number
 	facts: FinanceQueryFacts | undefined
@@ -296,6 +298,8 @@ export function createFinanceWorkerMachine({
 				FORMS_VIEW: types<{ binding: object; view: ReturnType<typeof selectFinanceFormsView> }>(),
 				FORMS_CLOSED: types<{ binding: object }>(),
 				FORMS_FAILED: types<{ binding: object }>(),
+				SET_ACCOUNT_SELECTED: types<WorkerCommandScope & { accountId: string; checked: boolean }>(),
+				SET_ALL_ACCOUNTS_SELECTED: types<WorkerCommandScope & { checked: boolean }>(),
 				SET_LEDGER_PAGE: types<WorkerCommandScope & { page: number }>(),
 				SET_LEDGER_FILTERS: types<WorkerCommandScope & { filters: TransactionListFilters }>(),
 				CLOSE: types(),
@@ -331,6 +335,7 @@ export function createFinanceWorkerMachine({
 			transactionId: null,
 			transactionKind: EXPENSE,
 			ledgerPage: 1,
+			selectedAccountIds: null,
 			ledgerFilters: emptyLedgerFilters,
 			sessionRevision: 0,
 			facts: undefined,
@@ -533,6 +538,7 @@ export function createFinanceWorkerMachine({
 							readBinding: {},
 							sessionRevision: context.sessionRevision + 1,
 							transactionId: null,
+							selectedAccountIds: null,
 							ledgerFilters: emptyLedgerFilters,
 							ledgerPage: 1,
 							sessionStatus: view.status
@@ -559,6 +565,10 @@ export function createFinanceWorkerMachine({
 						const next = {
 							...context,
 							selection: event.selection,
+							selectedAccountIds:
+								event.selection.workspaceId === context.selection.workspaceId
+									? context.selectedAccountIds
+									: null,
 							transactionKind: event.kind,
 							transactionId: event.transactionId ?? null,
 							ledgerFilters: location?.filters ?? context.ledgerFilters,
@@ -621,6 +631,54 @@ export function createFinanceWorkerMachine({
 						)
 							return
 						enq.sendTo(context.forms.owner, { type: 'RETRY_NAVIGATION' })
+					},
+					SET_ACCOUNT_SELECTED: ({ context, event }, enq) => {
+						if (
+							!sameCommandScope(context, event) ||
+							!context.facts?.accounts?.some((account) => account.id === event.accountId)
+						)
+							return
+						if (
+							context.route &&
+							context.forms &&
+							new URLSearchParams(context.route.search).has('page')
+						)
+							enq.sendTo(context.forms.owner, {
+								type: 'NAVIGATE',
+								replace: true,
+								destination: withQueryParams(
+									`${context.route.pathname}${context.route.search}${context.route.hash}`,
+									{ page: null }
+								)
+							})
+						return {
+							context: {
+								selectedAccountIds: toggleSelectedAccount(
+									context.selectedAccountIds,
+									context.facts.accounts,
+									event.accountId,
+									event.checked
+								),
+								ledgerPage: 1
+							}
+						}
+					},
+					SET_ALL_ACCOUNTS_SELECTED: ({ context, event }, enq) => {
+						if (!sameCommandScope(context, event) || !context.facts?.accounts) return
+						if (
+							context.route &&
+							context.forms &&
+							new URLSearchParams(context.route.search).has('page')
+						)
+							enq.sendTo(context.forms.owner, {
+								type: 'NAVIGATE',
+								replace: true,
+								destination: withQueryParams(
+									`${context.route.pathname}${context.route.search}${context.route.hash}`,
+									{ page: null }
+								)
+							})
+						return { context: { selectedAccountIds: event.checked ? null : [], ledgerPage: 1 } }
 					},
 					SET_LEDGER_PAGE: ({ context, event }, enq) => {
 						if (!sameCommandScope(context, event)) return
@@ -881,7 +939,8 @@ export function createFinanceWorkerMachine({
 									selection: { workspaceId: null, revision: context.selection.revision },
 									transactionId: null,
 									ledgerPage: 1,
-									ledgerFilters: emptyLedgerFilters
+									ledgerFilters: emptyLedgerFilters,
+									selectedAccountIds: null
 								}
 							}
 						}
@@ -900,6 +959,10 @@ export function createFinanceWorkerMachine({
 						return {
 							context: {
 								ready,
+								selectedAccountIds:
+									ready && ready.binding !== context.ready?.binding
+										? null
+										: context.selectedAccountIds,
 								ledgerFilters:
 									ready && ready.binding !== context.ready?.binding
 										? emptyLedgerFilters
@@ -927,6 +990,10 @@ export function createFinanceWorkerMachine({
 							? {
 									context: {
 										selection: event.selection,
+										selectedAccountIds:
+											event.selection.workspaceId === context.selection.workspaceId
+												? context.selectedAccountIds
+												: null,
 										transactionKind: event.kind,
 										transactionId: event.transactionId ?? null,
 										formsView: undefined
@@ -1119,6 +1186,7 @@ export function selectFinanceWorkerView(
 			snapshot.status === 'active' &&
 			snapshot.matches('running') &&
 			context.ready?.identityKind === 'device',
+		selectedAccountIds: snapshot.status === 'active' ? context.selectedAccountIds : null,
 		identityId: snapshot.status === 'active' ? (context.ready?.identityId ?? null) : null,
 		workspaces: snapshot.status === 'active' ? (context.facts?.workspaces ?? null) : null,
 		accounts:
@@ -1147,7 +1215,8 @@ export function selectFinanceWorkerView(
 						context.facts,
 						context.transactionKind,
 						context.ledgerFilters,
-						context.ledgerPage
+						context.ledgerPage,
+						context.selectedAccountIds
 					)
 				: null,
 		transactionEdit:
@@ -1192,7 +1261,12 @@ export function selectFinanceWorkerView(
 					accounts: transactionAccounts,
 					categories: applicableTransactionCategories(transactionFacts),
 					tagSuggestions: applicableTransactionTags(transactionFacts).map((tag) => tag.name),
-					defaultAccountId: transactionAccounts[0]?.id ?? null,
+					defaultAccountId:
+						transactionAccounts.find(
+							(account) =>
+								context.selectedAccountIds === null ||
+								context.selectedAccountIds.includes(account.id)
+						)?.id ?? null,
 					defaultCategoryId: defaultTransactionCategory(transactionFacts)?.id ?? null
 				}
 			: null

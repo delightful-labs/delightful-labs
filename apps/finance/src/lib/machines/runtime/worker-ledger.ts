@@ -23,11 +23,16 @@ export function selectWorkerLedger(
 	facts: FinanceQueryFacts | undefined,
 	kind: TransactionKind,
 	filters: TransactionListFilters,
-	requestedPage: number
+	requestedPage: number,
+	selectedAccountIds: readonly string[] | null = null
 ): WorkerLedgerView | null {
 	if (!facts || facts.status === 'failed' || !facts.transactions || !facts.categories) return null
 	const categories = new Map(facts.categories.map((row) => [row.id, row.name]))
-	const rows = facts.transactions.filter((row) => row.kind === kind)
+	const rows = facts.transactions.filter(
+		(row) =>
+			row.kind === kind &&
+			(selectedAccountIds === null || selectedAccountIds.includes(row.accountId))
+	)
 	const tags = new Map(rows.map((row) => [row.id, row.tagNames]))
 	const rangeValid = !filters.start || !filters.end || filters.start <= filters.end
 	const selected = rangeValid ? filterTransactions(rows, filters, categories, tags) : []
@@ -35,6 +40,7 @@ export function selectWorkerLedger(
 	const visible = page.groups.flatMap((group) => group.transactions)
 	return {
 		filters,
+		noAccountsSelected: selectedAccountIds?.length === 0,
 		rangeValid,
 		page: page.page,
 		pageCount: page.pageCount,

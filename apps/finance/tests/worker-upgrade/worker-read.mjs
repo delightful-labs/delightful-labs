@@ -65,6 +65,8 @@ export function checkFinanceWorker(directory, finance, proof) {
 		'src/lib/runtime/worker/client.ts',
 		'src/lib/runtime/worker/binding.ts',
 		'src/lib/components/worker/WorkerAccounts.svelte',
+		'src/lib/components/accounts/AccountSelection.svelte',
+		'src/lib/filters/finance-filters.ts',
 		'src/lib/components/workspaces/WorkspaceSelector.svelte',
 		'src/lib/paraglide',
 		'tooling/jazz-wasm.ts',
@@ -109,6 +111,8 @@ export function checkFinanceWorker(directory, finance, proof) {
 					'src/lib/data/accounts.ts',
 					'src/lib/runtime/worker/client.ts',
 					'src/lib/components/worker/WorkerAccounts.svelte',
+					'src/lib/components/accounts/AccountSelection.svelte',
+					'src/lib/filters/finance-filters.ts',
 					'tests/worker-application/**/*.ts',
 					'tooling/jazz-wasm.ts',
 					'vitest.worker-application.config.ts'

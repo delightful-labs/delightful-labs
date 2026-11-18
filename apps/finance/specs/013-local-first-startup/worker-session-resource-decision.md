@@ -1180,3 +1180,64 @@ Alpha.67's stock upgrader source still refuses computed/transform markers (`dist
 Clipper's legacy reading columns contain those markers. Keep the already bounded native authoring
 port and native transform declarations. Do not patch that SDK refusal or invent a general migration
 framework. Full Clipper session/backend/provider adoption remains a separate gate.
+
+
+### Shared shell account selection
+
+The existing Worker application owns the current account-selection mask (`null` means all,
+including later accounts; an empty list means none). Scoped checkbox/all commands update that
+fact only for the current SDK/selection and observed accounts. Workspace/SDK replacement clears
+it; filter/page/detail changes within the workspace retain it. Selection changes reset pagination,
+using the existing navigation child to remove a routed page parameter. No SDK requery or separate
+actor is needed for this pure selection fact.
+
+Reuse the existing WorkspaceBootstrap selection calculation in `filters/finance-filters.ts`.
+Ledger projection applies the account mask before text/date filtering, grouping and totals;
+account balances remain totals across their full known ledger. Publish the empty-selection fact
+for the existing list's no-accounts presentation. The Worker admits no financial operation through
+this mask; native grants and existing financial charts retain authorization.
+
+Extract the drawer's existing checkbox/balance/order presentation as a pure reusable component,
+so legacy drawer and Worker view render the same native controls. This is shared presentation,
+not a new shell/router or duplicate set of checkboxes. Existing ordering controls remain bound to
+their legacy chart; the Worker ordering/persistence port remains the next distinct operation.
+Qualify all/none/individual masks, balances, query retention, page reset, added accounts, stale
+commands, workspace/SDK replacement and native checkbox interaction before broad shell adoption.
+
+
+Qualified: **1,999 Finance units** (63 host), zero-warning full/native static and complete browser
+types, **48 actual Chromium/Firefox/WebKit application cases**, and **13 existing account-order /
+pagination browser cases** pass. Native checkbox interaction proves per-account filtering, the
+existing no-accounts message, full known balances, page reset, inclusion of later accounts in all
+mode, and workspace reset. Host coverage also proves unknown/stale command refusal and same-ID
+SDK replacement reset without recreating subscriptions.
+
+Account creation retains its existing independent controls. The shared account-selection component
+renders the prior native checkbox/balance/order markup; ordering capability is present for the
+legacy drawer and awaits its Worker port. New transaction defaults prefer selected writable
+accounts; edit defaults retain the record's own account. Account selection only requests a native
+URL replacement when there is actually a page parameter to remove.
+Logs: `/private/tmp/finance-worker-account-selection-{unit,static,test-types,full-unit,native-final,legacy-browser}.log`.
+The new scenario's corrected checkbox/visible-row assertions are independently covered in
+`finance-worker-account-selection-native-focused-final.log` before the complete 48-case pass.
+
+
+### Routed transaction detail intent
+
+The existing root receives a session/selection-scoped OPEN_TRANSACTION intent (UUID or null for
+return to list). It computes the existing transaction page path and list query and sends NAVIGATE
+to the same SDK-bound navigation child; Window reports the resulting route before the selected
+editor changes. Keep the low-level selectTransaction method for consumers with no router and bind
+the routed UI to the explicit navigation method. These are distinct intents, not an SDK fallback.
+
+Share the existing list URL read/write semantics in a pure route module. Legacy list links,
+Worker-projected link presentation and Worker navigation use the same q/date/category/currency/page
+mapping. Do not import financial filtering/aggregation into Window. Native modified/new-tab links
+must carry the same query context as ordinary click intents. Back/forward restores the observed
+list/editor/page; a stale editor command never navigates a replacement selection.
+
+Reuse the existing navigation invocation, native supersession and drain. No new routing actor,
+request registry or SDK boundary is needed. Qualify actual detail-link hrefs, native navigation,
+back to list, browser back/forward, filtered page retention and stale command refusal before
+claiming routed detail parity. This model is the next independent implementation while account
+order storage choice is pending.

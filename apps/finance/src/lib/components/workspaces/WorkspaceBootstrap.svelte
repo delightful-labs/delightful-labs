@@ -37,6 +37,7 @@
 	import AccountCreation from '../accounts/AccountCreation.svelte'
 	import JazzStartup from '../startup/JazzStartup.svelte'
 	import { useMachine, useSelector } from '@xstate/svelte'
+	import { toggleSelectedAccount } from '#lib/filters/finance-filters.js'
 	import { accountOrderMachine, orderAccounts } from '#lib/machines/accounts/account-order.js'
 	import { getReadiness } from '#lib/runtime/bank-sync.js'
 	import { bankData, type BankObservationEvent } from '#lib/machines/bank-sync/types.js'
@@ -321,14 +322,12 @@
 	}
 
 	function setAccountSelected(accountId: string, checked: boolean) {
-		if (checked && filters.selectedAccountIds === null) return
-
-		const selected = new Set(
-			filters.selectedAccountIds ?? activeAccounts.map((account) => account.id)
+		filters.selectedAccountIds = toggleSelectedAccount(
+			filters.selectedAccountIds,
+			activeAccounts,
+			accountId,
+			checked
 		)
-		if (checked) selected.add(accountId)
-		else selected.delete(accountId)
-		filters.selectedAccountIds = [...selected]
 	}
 
 	function setAllAccountsSelected(checked: boolean) {

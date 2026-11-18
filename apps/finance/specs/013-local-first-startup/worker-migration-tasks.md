@@ -15,14 +15,16 @@ raw phrases never enter Finance's inspected state. Actual cross-profile restorat
 transactions and survives a full offline process restart. Pending offline uploads preserve Jazz's
 native account-switch refusal and resume ordinary Finance without retrying.
 
-Latest local qualification: **1,998 Finance units** (62 host), zero-warning static/browser types,
-and **45 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
+Latest local qualification: **1,999 Finance units** (63 host), zero-warning static/browser types,
+and **48 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
 passes 200 schema/restore and 42 worker/session cases. Shared recovery coordination accepts the typed session connection and an explicit private-root
 recipient; **1,250 Local First units** pass. Hosted Finance/Foundation/Clipper pass at
 `198a57c5`. Worker routing now reuses the existing workspace-navigation chart, with native default/switch,
 denied scope, legacy details and navigation drain qualified. Shared URL filters/pages, non-blocking native
-history replacement, input focus and back/forward are also qualified. W12/W16 remain partial: full shell
-parity and account selection/order precede
+history replacement, input focus and back/forward are also qualified. Worker account masks now reuse the legacy
+checkbox presentation and selection calculation; exact ledger totals, full balances, all/none,
+new accounts, workspace/SDK reset and routed page reset are qualified. W12/W16 remain partial: full shell
+parity and account ordering precede
 remaining settings/classification/transfers, provider, attachment and workspace/archive UI parity.
 W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
 The intermittent check/account-move failure remains an explicit activation blocker.

@@ -61,6 +61,7 @@ export function createFinanceWorkerClient(
 		selection: { workspaceId: null, revision },
 		status: 'starting',
 		identityId: null,
+		selectedAccountIds: null,
 		workspaces: null,
 		accounts: [],
 		archiveFeedback: null,
@@ -98,6 +99,7 @@ export function createFinanceWorkerClient(
 			},
 			workspaceNavigation: null,
 			accounts: [],
+			selectedAccountIds: null,
 			workspaces: null,
 			archiveFeedback: null,
 			recoveryAvailable: false,
@@ -153,6 +155,7 @@ export function createFinanceWorkerClient(
 			},
 			workspaceNavigation: null,
 			accounts: [],
+			selectedAccountIds: null,
 			workspaces: null,
 			identityId: null,
 			archiveFeedback: null,
@@ -201,6 +204,7 @@ export function createFinanceWorkerClient(
 			status: view.status === 'failed' ? 'failed' : 'loading',
 			workspaceNavigation: null,
 			accounts: [],
+			selectedAccountIds: null,
 			archiveFeedback: null,
 			recoveryAvailable: false,
 			workspaceStartup: null,
@@ -406,6 +410,14 @@ export function createFinanceWorkerClient(
 				})
 			)
 		},
+		selectAccount: (accountId: string, checked: boolean, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({ type: 'SET_ACCOUNT_SELECTED', accountId, checked, ...scope })
+			),
+		selectAllAccounts: (checked: boolean, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({ type: 'SET_ALL_ACCOUNTS_SELECTED', checked, ...scope })
+			),
 		selectLedgerPage: (page: number, scope: WorkerCommandScope) => {
 			worker.postMessage(
 				financeWorkerCommand.parse({

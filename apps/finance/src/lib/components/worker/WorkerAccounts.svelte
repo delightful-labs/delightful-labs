@@ -15,6 +15,7 @@
 	import WorkerLogin from './WorkerLogin.svelte'
 	import WorkerRecovery from './WorkerRecovery.svelte'
 	import WorkerLedger from './WorkerLedger.svelte'
+	import AccountSelection from '../accounts/AccountSelection.svelte'
 	import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
 	import { formatSignedMoney } from '../../domain/money.js'
 	import { getLocale } from '../../paraglide/runtime.js'
@@ -35,12 +36,16 @@
 		onSelectTransaction,
 		onTransactionEntry,
 		onLedgerPage,
-		onLedgerFilters
+		onLedgerFilters,
+		onSelectAccount,
+		onSelectAllAccounts
 	}: {
 		recovery: { source: RecoveryScopeSource; capability: RecoveryPhraseCapability }
 		onRestore: (phrase: string) => void
 		onRetryRecoveryNavigation: () => void
 		onRetryWorkspaceNavigation: () => void
+		onSelectAccount: (id: string, checked: boolean, scope: WorkerCommandScope) => void
+		onSelectAllAccounts: (checked: boolean, scope: WorkerCommandScope) => void
 		view: Readable<FinanceWorkerView>
 		onSelectWorkspace: (id: string) => void
 		onArchive: (id: string, scope: WorkerCommandScope) => void
@@ -52,6 +57,11 @@
 		onAccountCreation: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
 	} = $props()
 	const live = $derived(fromStore(view))
+	const balances = $derived(
+		live.current.accounts.some((account) => account.balanceMinor === null)
+			? null
+			: new Map(live.current.accounts.map((account) => [account.id, account.balanceMinor ?? 0n]))
+	)
 </script>
 
 <WorkerRecovery binding={recovery} />
@@ -69,6 +79,23 @@
 />
 {#if live.current.workspaceNavigation?.showContent ?? true}
 	<WorkerAccountCreation view={live.current} onsend={onAccountCreation} />
+	{#if live.current.accounts.length}
+		<AccountSelection
+			accounts={live.current.accounts}
+			accountBalances={balances}
+			selectedAccountIds={live.current.selectedAccountIds}
+			onAccountChange={(id, checked) =>
+				onSelectAccount(id, checked, {
+					sessionRevision: live.current.sessionRevision,
+					selection: live.current.selection
+				})}
+			onAllAccountsChange={(checked) =>
+				onSelectAllAccounts(checked, {
+					sessionRevision: live.current.sessionRevision,
+					selection: live.current.selection
+				})}
+		/>
+	{/if}
 	<AccountArchiveFeedback feedback={live.current.archiveFeedback} />
 	{#if live.current.status === 'failed'}
 		<StatusMessage

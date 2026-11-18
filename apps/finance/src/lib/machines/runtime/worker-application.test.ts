@@ -626,6 +626,133 @@ describe('Finance worker ownership and selected accounts', () => {
 			}
 		}
 	)
+	it('filters selected accounts before totals, retains balances and subscriptions, and resets the mask at scope replacement', async () => {
+		const f = fixture(),
+			accountB = '30000000-0000-4000-8000-000000000002'
+		try {
+			await f.start()
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			f.select(a, 1)
+			last(f.queries).publish([row('Wallet A'), { ...row('Wallet B'), id: accountB }])
+			const records: WorkerLedgerRecord[] = [
+				{
+					id: crypto.randomUUID(),
+					organizationId: a,
+					accountId: row('Wallet A').id,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					kind: 'expense',
+					currency: 'USD',
+					amountMinor: 1200,
+					bookedOn: '2026-11-18',
+					description: 'From A',
+					memo: null,
+					tagNames: []
+				},
+				{
+					id: crypto.randomUUID(),
+					organizationId: a,
+					accountId: accountB,
+					categoryId: '50000000-0000-4000-8000-000000000001',
+					kind: 'expense',
+					currency: 'USD',
+					amountMinor: 500,
+					bookedOn: '2026-11-18',
+					description: 'From B',
+					memo: null,
+					tagNames: []
+				}
+			]
+			last(f.ledgers).publish(records)
+			const scope = f.view(),
+				subscription = last(f.queries)
+			f.actor.send({
+				type: 'SET_LEDGER_PAGE',
+				page: 2,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			f.actor.send({
+				type: 'SET_ACCOUNT_SELECTED',
+				accountId: row('Wallet A').id,
+				checked: false,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.view().selectedAccountIds).toEqual([accountB])
+			expect(f.view().ledger?.groups[0]?.transactions.map((t) => t.description)).toEqual(['From B'])
+			expect(f.view().ledger?.groups[0]?.totals).toEqual([['USD', 500n]])
+			expect(f.view().accounts.map((a) => a.balanceMinor)).toEqual([-1200n, -500n])
+			expect(f.view().transactionEntry?.defaultAccountId).toBe(accountB)
+			expect(f.actor.getSnapshot().context.ledgerPage).toBe(1)
+			expect(last(f.queries)).toBe(subscription)
+			f.actor.send({
+				type: 'SET_ALL_ACCOUNTS_SELECTED',
+				checked: false,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.view().ledger).toMatchObject({ noAccountsSelected: true, groups: [] })
+			f.actor.send({
+				type: 'SET_ACCOUNT_SELECTED',
+				accountId: crypto.randomUUID(),
+				checked: true,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.view().selectedAccountIds).toEqual([])
+			f.actor.send({
+				type: 'SET_ALL_ACCOUNTS_SELECTED',
+				checked: true,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.view().selectedAccountIds).toBeNull()
+			const extraAccount = '30000000-0000-4000-8000-000000000003'
+			last(f.queries).publish([
+				row('Wallet A'),
+				{ ...row('Wallet B'), id: accountB },
+				{ ...row('New'), id: extraAccount }
+			])
+			const first = records[0]
+			if (!first) throw new Error('Missing ledger fixture')
+			last(f.ledgers).publish([
+				...records,
+				{ ...first, id: crypto.randomUUID(), accountId: extraAccount, description: 'New account' }
+			])
+			expect(f.view().ledger?.groups.flatMap((g) => g.transactions)).toHaveLength(3)
+			f.actor.send({
+				type: 'SET_ALL_ACCOUNTS_SELECTED',
+				checked: false,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			f.select(b, 2)
+			expect(f.view().selectedAccountIds).toBeNull()
+			f.actor.send({
+				type: 'SET_ALL_ACCOUNTS_SELECTED',
+				checked: false,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			expect(f.view().selectedAccountIds).toBeNull()
+			last(f.queries).publish([row('B')])
+			const current = f.view()
+			f.actor.send({
+				type: 'SET_ALL_ACCOUNTS_SELECTED',
+				checked: false,
+				selection: current.selection,
+				sessionRevision: current.sessionRevision
+			})
+			expect(f.view().selectedAccountIds).toEqual([])
+			f.publishSession(f.ready({}))
+			expect(f.view().selectedAccountIds).toBeNull()
+		} finally {
+			f.stop()
+		}
+	})
 	it('keeps missing balances unknown, projects one exact ledger page, and refuses stale filter/page intents', async () => {
 		const f = fixture()
 		try {

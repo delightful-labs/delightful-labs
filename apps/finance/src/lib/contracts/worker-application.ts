@@ -50,6 +50,7 @@ export const workerLedgerFilters = z.strictObject({
 })
 export const workerLedgerView = z.strictObject({
 	filters: workerLedgerFilters,
+	noAccountsSelected: z.boolean(),
 	rangeValid: z.boolean(),
 	page: z.number().int().positive().safe(),
 	pageCount: z.number().int().positive().safe(),
@@ -84,6 +85,19 @@ export const financeWorkerCommand = z.discriminatedUnion('type', [
 	}),
 	z.strictObject({
 		type: z.literal('RETRY_WORKSPACE_NAVIGATION'),
+		sessionRevision,
+		selection: workerSelection
+	}),
+	z.strictObject({
+		type: z.literal('SET_ACCOUNT_SELECTED'),
+		accountId: z.uuid(),
+		checked: z.boolean(),
+		sessionRevision,
+		selection: workerSelection
+	}),
+	z.strictObject({
+		type: z.literal('SET_ALL_ACCOUNTS_SELECTED'),
+		checked: z.boolean(),
 		sessionRevision,
 		selection: workerSelection
 	}),
@@ -199,6 +213,7 @@ export const financeWorkerView = z.strictObject({
 	selection: workerSelection,
 	status: z.enum(['starting', 'signed-out', 'loading', 'ready', 'failed', 'closing', 'closed']),
 	identityId: z.uuid().nullable(),
+	selectedAccountIds: z.array(z.uuid()).nullable(),
 	recoveryAvailable: z.boolean(),
 	workspaceNavigation: z
 		.strictObject({

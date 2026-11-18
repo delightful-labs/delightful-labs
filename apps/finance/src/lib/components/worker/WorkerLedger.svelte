@@ -68,7 +68,7 @@
 			{groups}
 			{categoryNames}
 			tagNamesByTransaction={tagNames}
-			noAccountsSelected={false}
+			noAccountsSelected={view.ledger.noAccountsSelected}
 			page={view.ledger.page}
 			pageCount={view.ledger.pageCount}
 			{pageHref}

@@ -1145,6 +1145,105 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('filters with shared account checkboxes, retains full balances and resets selection across workspaces', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Mask A'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await createAccountUI(page, 'Mask B')
+				const accountB = await page.evaluate(
+					() =>
+						window.financeWorkerReadFixture
+							.state()
+							.accounts.find((account) => account.name === 'Mask B')?.id
+				)
+				if (!accountB) throw new Error('Missing second native account')
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seedLedger(workspaceId, accountId),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await enterExpenseUI(page, accountB, 'Only selected B')
+				await page.evaluate((id) => {
+					window.financeWorkerReadFixture.route('/expenses?workspace=' + id + '&page=2#accounts')
+					window.financeWorkerReadFixture.followRoutes()
+				}, workspaceId)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().ledger?.page))
+					.toBe(2)
+				await page.getByRole('checkbox', { name: 'Mask A', exact: true }).uncheck()
+				await browserExpect.poll(() => new URL(page.url()).searchParams.has('page')).toBe(false)
+				await browserExpect(page.getByText('Only selected B', { exact: true })).toBeVisible()
+				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(0)
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture
+								.state()
+								.accounts.map((account) => [account.name, account.balanceMinor])
+						)
+					)
+					.toEqual([
+						['Mask A', -4000n],
+						['Mask B', -1234n]
+					])
+				await browserExpect(
+					page.getByRole('checkbox', { name: 'Mask B', exact: true })
+				).toBeChecked()
+				await page.getByRole('checkbox', { name: 'Mask B', exact: true }).uncheck()
+				await browserExpect(
+					page.getByText('Turn on an account to see its transactions.', { exact: true })
+				).toBeVisible()
+				await page.getByRole('checkbox', { name: 'All Accounts', exact: true }).check()
+				await browserExpect(page.getByRole('link', { name: /transaction details/i })).toHaveCount(
+					25
+				)
+				await createAccountUI(page, 'Later account')
+				await browserExpect(
+					page.getByRole('checkbox', { name: 'Later account', exact: true })
+				).toBeChecked()
+				await page.getByRole('checkbox', { name: 'All Accounts', exact: true }).uncheck()
+				const other = crypto.randomUUID(),
+					otherAccount = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ other, otherAccount }) =>
+							window.financeWorkerReadFixture.seed(other, otherAccount, 'Other workspace'),
+						{ other, otherAccount }
+					)
+				).toEqual({ ok: true })
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(other)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Other workspace', exact: true })
+				).toBeVisible()
+				await browserExpect(
+					page.getByRole('checkbox', { name: 'All Accounts', exact: true })
+				).toBeChecked()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().selectedAccountIds)
+					)
+					.toBeNull()
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('keeps data failed after a malformed view and still waits for clean native close', async () => {
 			onTestFailed(() => {
 				retained = true

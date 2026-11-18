@@ -35,7 +35,9 @@ function attach() {
 			onTransactionEdit: owner.transactionEditCommand,
 			onSelectTransaction: owner.selectTransaction,
 			onLedgerPage: owner.selectLedgerPage,
-			onLedgerFilters: owner.setLedgerFilters
+			onLedgerFilters: owner.setLedgerFilters,
+			onSelectAccount: owner.selectAccount,
+			onSelectAllAccounts: owner.selectAllAccounts
 		}
 	})
 }
