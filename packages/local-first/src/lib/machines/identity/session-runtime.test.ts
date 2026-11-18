@@ -1,10 +1,12 @@
-import { createActor, waitFor } from 'xstate'
+import { createActor, createCallbackLogic, waitFor } from 'xstate'
 import { describe, expect, it, vi } from 'vitest'
 import { sessionRuntimeMachine, selectSessionRuntimeObservation } from './session-runtime.js'
 import type {
 	SessionRuntimeInput,
 	SessionRuntimeObservation,
-	SessionRuntimeResource
+	SessionRuntimeResource,
+	SessionRuntimeSignOutReport,
+	SessionRuntimeSignOutRequest
 } from '../../contracts/session-runtime.js'
 
 function fixture() {
@@ -12,13 +14,14 @@ function fixture() {
 	let fail = () => {}
 	const unsubscribe = vi.fn(() => {})
 	const close = vi.fn(async () => {})
+	const signOut = vi.fn<SessionRuntimeResource['signOut']>(async () => 'completed')
 	const observe = vi.fn<SessionRuntimeResource['observe']>((notify, failed) => {
 		publish = notify
 		fail = failed
 		notify({ status: 'signed-out' })
 		return unsubscribe
 	})
-	const resource: SessionRuntimeResource = { observe, close }
+	const resource: SessionRuntimeResource = { observe, close, signOut }
 	const open = vi.fn(async () => resource)
 	const input: SessionRuntimeInput = { binding: {}, capability: { open } }
 	const actor = createActor(sessionRuntimeMachine, { input })
@@ -29,11 +32,198 @@ function fixture() {
 		resource,
 		observe,
 		close,
+		signOut,
 		unsubscribe,
 		publish: (value: SessionRuntimeObservation) => publish(value),
 		fail: () => fail()
 	}
 }
+
+function signOutCaller(f: ReturnType<typeof fixture>, identityBinding: object) {
+	const reports: SessionRuntimeSignOutReport[] = []
+	const caller = createActor(
+		createCallbackLogic<SessionRuntimeSignOutReport>(({ receive }) => {
+			receive((event) => reports.push(event))
+		})
+	).start()
+	const request: SessionRuntimeSignOutRequest = {
+		scope: { binding: f.input.binding, attempt: 1 },
+		identityBinding,
+		replyTo: caller
+	}
+	return { caller, reports, request }
+}
+
+async function readyForSignOut(f: ReturnType<typeof fixture>, identityBinding: object) {
+	f.actor.start()
+	await waitFor(f.actor, (snapshot) => !!selectSessionRuntimeObservation(snapshot))
+	f.publish({
+		status: 'ready',
+		binding: identityBinding,
+		identityId: 'original',
+		identityKind: 'device',
+		localFirst: true
+	})
+}
+
+describe('session sign-out protocol', () => {
+	it('reports the scoped native result and publishes its settled identity facts', async () => {
+		const f = fixture(),
+			binding = {},
+			c = signOutCaller(f, binding)
+		f.signOut.mockImplementation(async () => {
+			f.publish({ status: 'signed-out' })
+			return 'completed'
+		})
+		await readyForSignOut(f, binding)
+		try {
+			f.actor.send({ type: 'SIGN_OUT', ...c.request })
+			await vi.waitFor(() =>
+				expect(c.reports).toEqual([
+					{ type: 'SESSION_SIGN_OUT_SETTLED', scope: c.request.scope, outcome: 'completed' }
+				])
+			)
+			expect(f.signOut).toHaveBeenCalledExactlyOnceWith(binding)
+			expect(selectSessionRuntimeObservation(f.actor.getSnapshot())).toEqual({
+				status: 'signed-out'
+			})
+			expect(f.close).not.toHaveBeenCalled()
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+		} finally {
+			f.actor.stop()
+			c.caller.stop()
+		}
+	})
+	it.each([
+		{ fault: 'session', outcome: 'invalidRequest' },
+		{ fault: 'attempt', outcome: 'invalidRequest' },
+		{ fault: 'identity', outcome: 'bindingChanged' },
+		{ fault: 'availability', outcome: 'unavailable' }
+	])('refuses $fault before native sign-out', async ({ fault, outcome }) => {
+		const f = fixture(),
+			binding = {},
+			c = signOutCaller(f, binding)
+		await readyForSignOut(f, binding)
+		if (fault === 'availability') f.publish({ status: 'signed-out' })
+		const request = {
+			...c.request,
+			scope: {
+				binding: fault === 'session' ? {} : f.input.binding,
+				attempt: fault === 'attempt' ? -1 : 1
+			},
+			identityBinding: fault === 'identity' ? {} : binding
+		}
+		try {
+			f.actor.send({ type: 'SIGN_OUT', ...request })
+			expect(c.reports).toEqual([
+				{ type: 'SESSION_SIGN_OUT_SETTLED', scope: request.scope, outcome }
+			])
+			expect(f.signOut).not.toHaveBeenCalled()
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+		} finally {
+			f.actor.stop()
+			c.caller.stop()
+		}
+	})
+	it.each(['completed', 'failed'])(
+		'drains %s native sign-out before close and refuses another operation while busy',
+		async (outcome) => {
+			const f = fixture(),
+				binding = {},
+				c = signOutCaller(f, binding)
+			const pending = Promise.withResolvers<void>()
+			f.signOut.mockImplementation(async () => {
+				await pending.promise
+				if (outcome === 'failed') throw new Error('Synthetic sign-out rejection')
+				f.publish({ status: 'signed-out' })
+				return 'completed'
+			})
+			await readyForSignOut(f, binding)
+			try {
+				f.actor.send({ type: 'SIGN_OUT', ...c.request })
+				const child = f.actor.getSnapshot().children.signOut
+				expect(selectSessionRuntimeObservation(f.actor.getSnapshot())).toBeUndefined()
+				f.actor.send({ type: 'SIGN_OUT', ...c.request, scope: { ...c.request.scope, attempt: 2 } })
+				expect(c.reports).toEqual([
+					{
+						type: 'SESSION_SIGN_OUT_SETTLED',
+						scope: { ...c.request.scope, attempt: 2 },
+						outcome: 'busy'
+					}
+				])
+				f.actor.send({ type: 'CLOSE' })
+				expect(f.actor.getSnapshot().children.signOut).toBe(child)
+				expect(f.unsubscribe).not.toHaveBeenCalled()
+				expect(f.close).not.toHaveBeenCalled()
+				pending.resolve()
+				await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+				expect(c.reports).toHaveLength(2)
+				expect(c.reports[1]).toEqual({
+					type: 'SESSION_SIGN_OUT_SETTLED',
+					scope: c.request.scope,
+					outcome
+				})
+				expect(f.signOut).toHaveBeenCalledOnce()
+				expect(f.unsubscribe).toHaveBeenCalledOnce()
+				expect(f.close).toHaveBeenCalledOnce()
+			} finally {
+				pending.resolve()
+				f.actor.stop()
+				c.caller.stop()
+			}
+		}
+	)
+	it('passes through an adjacent native binding refusal without claiming mutation', async () => {
+		const f = fixture(),
+			binding = {},
+			c = signOutCaller(f, binding)
+		f.signOut.mockResolvedValueOnce('bindingChanged')
+		await readyForSignOut(f, binding)
+		try {
+			f.actor.send({ type: 'SIGN_OUT', ...c.request })
+			await vi.waitFor(() =>
+				expect(c.reports).toEqual([
+					{ type: 'SESSION_SIGN_OUT_SETTLED', scope: c.request.scope, outcome: 'bindingChanged' }
+				])
+			)
+			expect(selectSessionRuntimeObservation(f.actor.getSnapshot())?.status).toBe('ready')
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+		} finally {
+			f.actor.stop()
+			c.caller.stop()
+		}
+	})
+	it('retains sign-out after observation fails and still drains it before closing', async () => {
+		const f = fixture(),
+			binding = {},
+			c = signOutCaller(f, binding)
+		const pending = Promise.withResolvers<void>()
+		f.signOut.mockImplementation(async () => {
+			await pending.promise
+			return 'completed'
+		})
+		await readyForSignOut(f, binding)
+		try {
+			f.actor.send({ type: 'SIGN_OUT', ...c.request })
+			const child = f.actor.getSnapshot().children.signOut
+			f.fail()
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.actor.getSnapshot().children.signOut).toBe(child)
+			expect(f.close).not.toHaveBeenCalled()
+			pending.resolve()
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(c.reports).toHaveLength(1)
+			expect(f.close).toHaveBeenCalledOnce()
+		} finally {
+			pending.resolve()
+			f.actor.stop()
+			c.caller.stop()
+		}
+	})
+})
 
 describe('session runtime ownership', () => {
 	it('publishes native facts and awaits actual SDK close after observer removal', async () => {

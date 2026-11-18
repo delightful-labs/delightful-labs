@@ -7,5 +7,8 @@ export type {
 	SessionRuntimeInput,
 	SessionRuntimeObservation,
 	SessionRuntimeResource,
-	SessionRuntimeResult
+	SessionRuntimeResult,
+	SessionRuntimeSignOutRequest,
+	SessionRuntimeSignOutReport,
+	SessionRuntimeSignOutOutcome
 } from './contracts/session-runtime.js'

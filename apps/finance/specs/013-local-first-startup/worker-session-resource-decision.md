@@ -30,7 +30,7 @@ Evidence against main `2d1b5cd2`:
   it out, then supplies that exact facade to the actual packed Local First
   acquisition machine. A development-condition Vite build reports owner status
   `error` and the native `session.db: there is no Db while the session is
-  signed-out` error. The diagnostic asserts that failure; its passing result is
+signed-out` error. The diagnostic asserts that failure; its passing result is
   reproduction evidence, not successful integration.
 - Artifacts: `finance-jazz-alpha65-8L5U5x` under the system temporary directory.
   Logs: `/private/tmp/finance-alpha65-clipper-latest-main.log` and
@@ -135,6 +135,64 @@ session actor's identity/recovery commands using existing operation scopes and
 application drains, then bind domain access inside the worker adapter and move
 both consumers to the actor. No generic SDK proxy, per-call actor/grant population
 or duplicate identity workflow is authorized by this boundary.
+
+## Bounded sign-out command: implemented, application adoption pending
+
+Route the native SDK sign-out leaf through the existing session actor first.
+The application's ordered sign-out chart retains provider sign-out, domain drain,
+deadline feedback and its final identity refresh. The session actor accepts a
+request correlated with the existing binding/attempt scope and caller actor,
+plus the exact observed identity binding. Its statechart admits one operation,
+rejects busy/unavailable/stale requests without native I/O, and reports one
+settled result. The Jazz adapter rechecks the native binding immediately before
+the SDK call. SDK rejection does not imply rollback.
+
+The native observer remains owned throughout sign-out; public availability is
+withdrawn until settlement. CLOSE during sign-out selects its stopping substate
+and retains the original invocation. After settlement it removes the observer
+and awaits SDK close. Do not add a request queue, replay cache, per-call actor
+population or SDK-shaped facade. Restore/recovery secret lifetime and domain
+binding adoption remain subsequent work using this same boundary.
+
+Review further commands against the actual consumer's existing workflow before
+extending this boundary. The alpha.66 audit does not authorize a general command
+framework or compensating code for upstream SDK gaps. Native library behavior
+and existing workflows take precedence over speculative coordination.
+
+The caller review confirms that `createOrderedSignOutMachine` already owns
+provider → session reobservation → native sign-out, deadline feedback and retained
+invocations during shutdown. Clipper's `signOutInput` supplies those leaves. Keep
+that workflow; the session actor adds only admission, one native invocation and
+settled reporting. Neither application's callers are switched in this checkpoint.
+
+The alpha.67 private adapter now implements the seven-line native leaf: read the
+current native binding, refuse replacement, await `session.signOut()`, report
+completion. SDK custody remains private. There is no new SDK patch, command
+queue, SDK facade, provider workflow or per-request actor population.
+
+Qualification: **34 affected shared tests** pass across session ownership and
+existing ordered-sign-out suites. Full library types, changed production lint,
+packaging, strict candidate adapter/worker-fixture types and **15 selected native
+browser cases** pass. These include the previous nine development-XState Worker
+ownership cases and six new sign-out cases across Chromium/Firefox/WebKit.
+Stale requests cause zero native calls; successful sign-out publishes signed-out
+facts; holding settlement while CLOSE arrives retains the original invocation,
+reports once and awaits observer/SDK/AccountStore/broker teardown. The hold is
+after actual SDK completion and tests application receipt/drain ownership; it
+does not simulate an internally stalled SDK operation. Unit cases independently
+hold/reject the native leaf. Development freezing remains enabled.
+
+Artifact: `/private/tmp/finance-alpha67-signout-proof-pe072hlw`;
+log: `/private/tmp/finance-alpha67-signout-native.log`. This focused batch reuses
+the prior alpha.67 artifact and its dependencies, existing generated catalogs and
+unchanged schemas/backend. It does not rerun or extend the earlier 325-case
+foundation claim. The maintained fixture now contains 36 cases; this checkpoint
+ran 15 and deliberately omitted 21 unaffected cases. Active pins remain alpha.60.
+
+Next: connect actual worker callers and their existing ordered sign-out/drain
+owners, then add the bounded recovery/restore commands needed by those callers.
+Finance's legacy Svelte provider and Clipper's raw-session host must be replaced
+at their real application boundary; changing only fixtures does not complete U2.
 
 ## Earlier accessor proposal (superseded)
 
