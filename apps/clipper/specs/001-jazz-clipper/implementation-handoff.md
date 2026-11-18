@@ -17,17 +17,36 @@ The preservation-specific historical schema/policy fixtures and populated-replic
 test have been removed. A small native SQLite test still verifies that the current
 application can open the existing production schema using the generated migration.
 The native migration remains necessary to open that store and retain proper schema
-history for future changes. Jazz owns its generated snapshots and history bundle.
+history for future changes. Jazz owns its migration definitions and snapshots.
+The generated runtime history bundle is rebuilt by the web app's `jazz:generate`
+script during setup/dev/check/build and is ignored by Git. It duplicates the
+committed history and does not need a second checked-in representation.
 
 Qualification before this simplification passed 1,028 unit/native tests, 32
 component tests, all four local annotation browser tests, strict types and the
 production build. All hosted PR #51 jobs passed at `8fde6d86`, including the full
-web, offline, worker, sample-data and packaged-extension suites. Requalify the
-small replacement migration test and current types/format/lint on the new head.
+web, offline, worker, sample-data and packaged-extension suites. The small
+replacement native migration test, strict types, formatting and lint also pass.
 The optional-profile compatibility issue no longer blocks review under the user's
 explicit test-data decision. Production OAuth/real Margin interoperability remains
 the next verification after the user merges the repair. No production deployment,
 storage-name change or data reset was performed as part of this simplification.
+
+PR #51 review: remove the 2,749-line generated runtime bundle from version control;
+native regeneration from a missing bundle reproduces it byte-for-byte. Reuse
+`prepare` in web type checks and the ordinary dev script in `dev:agent`. The
+remaining snapshots and migration definition are Jazz's authoring inputs and
+still connect the existing backend schema. No new data model or SDK patch.
+Review of the changed annotation/preview/publication paths retains XState v6
+invocation, pure transitions, state-owned cancellation and worker execution.
+The reader keys its annotation surface by actor/document; Svelte owns native
+text-field adapters, highlight rendering and listener cleanup. No Svelte component
+is changed by this PR, and no application workflow is moved into a component.
+Review qualification passes frozen offline installation with a missing generated
+bundle, workspace dependency links, strict root/web/service-worker/extension
+types, 1,028 unit/native tests, 32 component tests, all four annotation browser
+tests, formatting, lint and production build. Hosted qualification must run on
+the updated generation scripts before merge.
 
 ## Approved TID address allocation — 2026-11-17
 
