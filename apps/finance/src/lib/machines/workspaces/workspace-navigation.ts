@@ -14,7 +14,7 @@ import type {
 	NavigationStatusEvent,
 	WorkspaceNavigate
 } from '../../contracts/workspace-orchestration-contract.js'
-import { setup, types, createAsyncLogic } from 'xstate'
+import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 export type { WorkspaceNavigationFacts } from '../../contracts/workspace-orchestration-contract.js'
@@ -341,6 +341,11 @@ export function createWorkspaceNavigationMachine(
 				}
 			},
 			navigating: {
+				initial: 'active',
+				states: {
+					active: {},
+					closing: { on: { SHUTDOWN: {}, OBSERVED: {}, REEVALUATE: {}, SELECT: {}, RETRY: {} } }
+				},
 				entry: (args, enq) => {
 					let context = args.context
 					let patch = {}
@@ -356,6 +361,7 @@ export function createWorkspaceNavigationMachine(
 					return { context: patch }
 				},
 				on: {
+					SHUTDOWN: { target: '.closing' },
 					REEVALUATE: (args, enq) => {
 						const { context } = args
 						if (
@@ -386,6 +392,7 @@ export function createWorkspaceNavigationMachine(
 						}
 					},
 					onDone: (args) => {
+						if (matchesState({ navigating: 'closing' }, args.value)) return { target: 'closed' }
 						const { context } = args
 						if (
 							context.destination ===
@@ -395,7 +402,9 @@ export function createWorkspaceNavigationMachine(
 						}
 						return { target: 'settled' }
 					},
-					onError: { target: 'failed' }
+					onError: ({ value }) => ({
+						target: matchesState({ navigating: 'closing' }, value) ? 'closed' : 'failed'
+					})
 				}
 			},
 			waiting: {

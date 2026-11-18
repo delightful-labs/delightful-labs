@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWorkspaceNavigationMachine } from './workspace-navigation.js'
 import type {
 	NavigationStatusEvent,
-	WorkspaceNavigationFacts
+	WorkspaceNavigationFacts,
+	WorkspaceNavigate
 } from '../../contracts/workspace-orchestration-contract.js'
 import { workspaceReports } from './workspace-reports.fixture.js'
 import { scope, records } from './workspace-integrity.fixture.js'
@@ -28,7 +29,11 @@ const facts: WorkspaceNavigationFacts = {
 	access: 'ready',
 	organizations: records().organizations
 }
-function fixture(input: WorkspaceNavigationFacts = facts, preferredWorkspaceId?: string) {
+function fixture(
+	input: WorkspaceNavigationFacts = facts,
+	preferredWorkspaceId?: string,
+	navigation?: WorkspaceNavigate
+) {
 	const one = vi
 		.fn()
 		.mockResolvedValue(
@@ -37,7 +42,8 @@ function fixture(input: WorkspaceNavigationFacts = facts, preferredWorkspaceId?:
 				: null
 		)
 	const navigate = vi.fn(
-		async (_url: string, _signal: AbortSignal, _href: string, _replace: boolean) => {}
+		navigation ??
+			(async (_url: string, _signal: AbortSignal, _href: string, _replace: boolean) => {})
 	)
 	const recipient = workspaceReports<NavigationStatusEvent>()
 	const actor = createActor(createWorkspaceNavigationMachine({ one }, navigate), {
@@ -340,6 +346,26 @@ describe('workspace navigation public contract', () => {
 		expect(f.reports().at(-1)?.report).toEqual({ generation: 2, status: 'unavailable' })
 		expect(f.navigate).not.toHaveBeenCalled()
 	})
+	it.each(['fulfilled', 'rejected'])(
+		'waits for a %s native navigation during shutdown without issuing another',
+		async (outcome) => {
+			const held = Promise.withResolvers<void>()
+			const f = fixture(facts, undefined, () => held.promise)
+			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
+			const signal = f.navigate.mock.calls[0]?.[1]
+			f.actor.send({ type: 'SHUTDOWN' })
+			f.actor.send({ type: 'OBSERVED', facts: { ...facts, generation: 1, pathname: '/income' } })
+			f.actor.send({ type: 'SELECT', workspaceId: scope.profileId })
+			f.actor.send({ type: 'RETRY' })
+			expect(f.actor.getSnapshot().matches({ navigating: 'closing' })).toBe(true)
+			expect(signal?.aborted).toBe(false)
+			expect(f.navigate).toHaveBeenCalledOnce()
+			if (outcome === 'fulfilled') held.resolve()
+			else held.reject(new Error('Native navigation refused'))
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.navigate).toHaveBeenCalledOnce()
+		}
+	)
 	it('refreshes in-flight reports without restarting the same lookup', async () => {
 		const pending = Promise.withResolvers<{ organizationId: string } | null>()
 		const f = fixture({ ...facts, ready: false, pathname: '/expenses/entry' })

@@ -15,7 +15,7 @@ raw phrases never enter Finance's inspected state. Actual cross-profile restorat
 transactions and survives a full offline process restart. Pending offline uploads preserve Jazz's
 native account-switch refusal and resume ordinary Finance without retrying.
 
-Latest local qualification: **1,982 Finance units** (50 host), zero-warning static/browser types,
+Latest local qualification: **1,984 Finance units** (50 host), zero-warning static/browser types,
 and **39 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
 passes 200 schema/restore and 42 worker/session cases. Shared recovery coordination accepts the typed session connection and an explicit private-root
 recipient; **1,250 Local First units** pass. Hosted Finance/Foundation/Clipper pass at

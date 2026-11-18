@@ -1028,3 +1028,31 @@ Foundation and Clipper all pass at checkpoint `198a57c5`. Current-head hosted CI
 Full workspace chooser/default/legacy-route handling, shell preferences and remaining domain parity
 are still open. Native history capability qualification does not claim complete SvelteKit shell
 integration or production activation. No SDK patch, active pin, catalog or production route changed.
+
+### Workspace navigation drain before reuse
+
+Actual SvelteKit 3 source/types show `goto` returns its completion promise and has no AbortSignal
+option. WorkspaceBootstrap checks its signal/origin before invoking native goto; aborting the
+XState promise actor after that call cannot cancel the navigation. The existing workspace navigation
+chart currently takes SHUTDOWN directly to final, even with that invocation outstanding.
+
+Before Worker reuse, retain the existing navigating invoke in an active/closing compound state.
+SHUTDOWN enters closing, refuses further observations/selection/retry and waits for the selected
+native promise to fulfill or reject before final close. Both results settle an interrupted UI effect;
+neither retries navigation. Keep resource-free profile/legacy lookup interruption unchanged.
+This also improves the legacy caller's shutdown behavior; it does not change normal routing policy,
+SDK ownership or production routes. Existing transaction view-transition hooks resolve their
+onNavigate barrier before navigation completion, and bank beforeNavigate does not await a workspace
+drain, so these inspected hooks do not introduce a navigation/drain dependency cycle.
+
+Implemented and qualified: all **1,984 Finance units**, zero-warning Finance static and complete
+browser-test types pass. Held native-navigation success/rejection cases prove SHUTDOWN waits and
+refuses newer selection/retry/observation commands. Existing legacy lookup cancellation stays
+covered. Three actual SvelteKit browser flows pass using an isolated memory authority: sole-workspace
+canonicalization/reload, both workspace selectors, and unavailable scope/legacy detail resolution.
+Logs: `/private/tmp/finance-worker-workspace-navigation-{unit,full-unit,static,test-types,browser}.log`.
+
+SvelteKit's actual client also rejects superseded navigation tokens before applying the old route
+(`navigation aborted` checks in `client.js`). Keep that native latest-navigation behavior; do not
+add a producer queue or per-call navigation owner. This change only retains the chart's current
+navigation invocation during explicit shutdown. Full Worker route observation and reuse remain next.
