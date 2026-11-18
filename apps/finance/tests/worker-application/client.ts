@@ -34,6 +34,7 @@ function attach() {
 				routeObserver ? owner.navigateWorkspace(id) : owner.selectWorkspace(id),
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
+			onAccountOrder: owner.accountOrderCommand,
 			onTransactionEntry: owner.transactionEntryCommand,
 			onTransactionEdit: owner.transactionEditCommand,
 			onSelectTransaction: (id: string | null, scope: WorkerCommandScope) =>
@@ -49,6 +50,7 @@ function request(message: unknown) {
 	if (!worker) throw new Error('Fixture Worker unavailable')
 	const channel = new MessageChannel()
 	const result = new Promise<{
+		ids?: readonly string[]
 		ok: boolean
 		recoveryReads?: number
 		error?: string
@@ -144,6 +146,8 @@ const fixture = {
 		component = undefined
 	},
 	attach,
+	orderStorage: (namespace: string, key: string, ids?: string[]) =>
+		request({ type: 'TEST_ORDER_STORAGE', namespace, key, ...(ids ? { ids } : {}) }),
 	badView: () => request({ type: 'TEST_BAD_VIEW' }),
 	close: () => current().close(),
 	scope: () => scope

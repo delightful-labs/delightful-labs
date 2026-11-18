@@ -36,7 +36,19 @@ export const workerTransactionEntryCommand = z.discriminatedUnion('type', [
 	})
 ])
 export type WorkerTransactionEntryCommand = z.output<typeof workerTransactionEntryCommand>
+export const workerAccountOrderCommand = z.discriminatedUnion('type', [
+	z.strictObject({ type: z.enum(['EDIT', 'DONE']) }),
+	z.strictObject({ type: z.literal('MOVE'), id: z.uuid(), direction: z.enum(['up', 'down']) })
+])
+export type WorkerAccountOrderCommand = z.output<typeof workerAccountOrderCommand>
+export const workerAccountOrderView = z.strictObject({
+	ids: z.array(z.uuid()),
+	editing: z.boolean(),
+	canToggle: z.boolean(),
+	moves: z.array(z.strictObject({ id: z.uuid(), up: z.boolean(), down: z.boolean() }))
+})
 export type FinanceFormsObservation = {
+	order: AccountOrderObservation
 	navigation: WorkspaceNavigationFacts
 	archive: ArchiveObservation
 	creation: AccountCreationObservation
@@ -46,3 +58,9 @@ export type FinanceFormsObservation = {
 export const workerTransactionCategory = appCategorySchema.extend({ id: z.uuid() })
 
 export const workerTagRecord = appTagSchema.extend({ id: z.uuid() })
+
+export type AccountOrderObservation = { key: string | null; ids: readonly string[] }
+export type AccountOrderStorage = {
+	read: (key: string) => Promise<readonly string[]>
+	write: (key: string, ids: readonly string[]) => Promise<void>
+}

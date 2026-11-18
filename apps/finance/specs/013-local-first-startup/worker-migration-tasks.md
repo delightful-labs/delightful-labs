@@ -15,8 +15,8 @@ raw phrases never enter Finance's inspected state. Actual cross-profile restorat
 transactions and survives a full offline process restart. Pending offline uploads preserve Jazz's
 native account-switch refusal and resume ordinary Finance without retrying.
 
-Latest local qualification: **2,000 Finance units** (64 host), zero-warning static/browser types,
-and **51 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
+Latest local qualification: **2,013 Finance units** (67 host), zero-warning static/browser types,
+and **57 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
 passes 200 schema/restore and 42 worker/session cases. Shared recovery coordination accepts the typed session connection and an explicit private-root
 recipient; **1,250 Local First units** pass. Hosted Finance/Foundation/Clipper pass at
 `198a57c5`. Worker routing now reuses the existing workspace-navigation chart, with native default/switch,
@@ -25,9 +25,10 @@ history replacement, input focus and back/forward are also qualified. Worker acc
 checkbox presentation and selection calculation; exact ledger totals, full balances, all/none,
 new accounts, workspace/SDK reset and routed page reset are qualified. Transaction detail links
 and native Back/Forward/Back to List retain filters and requested pages; SDK replacement rebinds
-the observed detail without retaining its old data. W12/W16 remain partial: full shell
-parity and account ordering precede
-remaining settings/classification/transfers, provider, attachment and workspace/archive UI parity.
+the observed detail without retaining its old data. Account ordering now reuses its existing chart with Worker-owned IndexedDB preferences,
+serialized/coalesced writes, shutdown flush and native offline restart qualification. The user
+approved no legacy localStorage migration. W12/W13/W16 remain partial: full shell binding precedes
+remaining account/grant/settings/classification/transfers, provider, attachment and workspace/archive UI parity.
 W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
 The intermittent check/account-move failure remains an explicit activation blocker.
 Finance has no sign-out or explicit new-identity screen; do not add those as parity work.
@@ -812,7 +813,8 @@ workflow decisions from worker internals.
       on W12. Replace WorkspaceBootstrap's data/query/aggregation responsibilities
       with worker projections. Preserve exact balances, workspace navigation and
       account-order edit/done/move and persisted preference behavior. Keep disclosure,
-      responsive layout, route observation and native storage primitives in Window.
+      responsive layout, route observation and Window-only primitives in Window. Account-order
+      IndexedDB transactions belong in the Worker and are qualified in the current candidate.
 - [ ] **W14 — Prove the first read-only vertical slice.** Depends on W13.
       Render existing accounts presentation from the worker's list projection in an
       isolated migration preview. Verify no page SDK/query owner, bounded output,

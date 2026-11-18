@@ -11,7 +11,10 @@
 	import AccountArchiveButton from '../accounts/AccountArchiveButton.svelte'
 	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
-	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+	import type {
+		WorkerAccountOrderCommand,
+		WorkerAccountCreationCommand
+	} from '../../contracts/worker-forms.js'
 	import WorkerLogin from './WorkerLogin.svelte'
 	import WorkerRecovery from './WorkerRecovery.svelte'
 	import WorkerLedger from './WorkerLedger.svelte'
@@ -32,6 +35,7 @@
 		onSelectWorkspace,
 		onArchive,
 		onAccountCreation,
+		onAccountOrder,
 		onTransactionEdit,
 		onSelectTransaction,
 		onTransactionEntry,
@@ -54,6 +58,7 @@
 		onSelectTransaction: (id: string | null, scope: WorkerCommandScope) => void
 		onTransactionEdit: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
 		onTransactionEntry: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
+		onAccountOrder: (command: WorkerAccountOrderCommand, scope: WorkerCommandScope) => void
 		onAccountCreation: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
 	} = $props()
 	const live = $derived(fromStore(view))
@@ -81,6 +86,17 @@
 	<WorkerAccountCreation view={live.current} onsend={onAccountCreation} />
 	{#if live.current.accounts.length}
 		<AccountSelection
+			ordering={live.current.accountOrder
+				? {
+						editing: live.current.accountOrder.editing,
+						canToggle: live.current.accountOrder.canToggle,
+						canMove: (id, direction) =>
+							live.current.accountOrder?.moves.find((move) => move.id === id)?.[direction] ?? false,
+						onEdit: () => onAccountOrder({ type: 'EDIT' }, live.current),
+						onDone: () => onAccountOrder({ type: 'DONE' }, live.current),
+						onMove: (id, direction) => onAccountOrder({ type: 'MOVE', id, direction }, live.current)
+					}
+				: undefined}
 			accounts={live.current.accounts}
 			accountBalances={balances}
 			selectedAccountIds={live.current.selectedAccountIds}

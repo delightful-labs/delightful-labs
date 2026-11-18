@@ -1,5 +1,6 @@
 import type { WorkspaceNavigate } from './workspace-orchestration-contract.js'
 import { z } from 'zod'
+import type { AccountOrderStorage } from './worker-forms.js'
 import { appAccountSchema, persistedAccountSchema } from '../validation/accounts.js'
 import { appWorkspaceSchema } from '../validation/identity.js'
 import type { SessionRuntimeConnection } from 'delightful-local-first/session/runtime'
@@ -7,6 +8,8 @@ import type { ArchiveObservation } from '../machines/accounts/account-archive-op
 import { accountArchiveFeedback } from './account-archive-feedback.js'
 import {
 	workerAccountCreationCommand,
+	workerAccountOrderCommand,
+	workerAccountOrderView,
 	workerAccountCreationView,
 	workerTransactionEntryView,
 	workerTransactionEntryCommand,
@@ -70,6 +73,12 @@ export const workerLedgerView = z.strictObject({
 export type WorkerLedgerRecord = z.output<typeof transactionLedgerRecordSchema>
 export type WorkerLedgerView = z.output<typeof workerLedgerView>
 export const financeWorkerCommand = z.discriminatedUnion('type', [
+	z.strictObject({
+		type: z.literal('ACCOUNT_ORDER'),
+		command: workerAccountOrderCommand,
+		sessionRevision,
+		selection: workerSelection
+	}),
 	workerContextCommand,
 	z.strictObject({
 		type: z.literal('OBSERVE_ROUTE'),
@@ -257,6 +266,7 @@ export const financeWorkerView = z.strictObject({
 	archiveFeedback: accountArchiveFeedback.nullable(),
 	workspaceStartup: z.enum(['checking', 'ready', 'unavailable', 'failed', 'closed']).nullable(),
 	accountCreation: workerAccountCreationView.nullable(),
+	accountOrder: workerAccountOrderView.nullable(),
 	transactionEntry: workerTransactionEntry.nullable(),
 	transactionEdit: workerTransactionEdit.nullable(),
 	ledger: workerLedgerView.nullable()
@@ -319,7 +329,8 @@ export type FinanceWorkerCapabilities = {
 	createForms(
 		observe: () => FinanceFormsObservation,
 		archive: FinanceWorkerCapabilities['archiveAccount'],
-		navigate: WorkspaceNavigate
+		navigate: WorkspaceNavigate,
+		accountOrderStorage: AccountOrderStorage
 	): ReturnType<typeof createFinanceFormsMachine>
 }
 export type FinanceWorkerSession = SessionRuntimeConnection<FinanceWorkerCapabilities>

@@ -1,3 +1,4 @@
+import { createFinanceAccountOrderStorage } from '../../src/lib/runtime/worker/account-order-store.js'
 import type { SessionRuntimeInput } from 'delightful-local-first/session/runtime'
 import type { FinanceWorkerCapabilities } from '../../src/lib/contracts/worker-application.js'
 import type { InspectionEvent } from 'xstate'
@@ -53,6 +54,12 @@ const edit = z.strictObject({
 	name: z.string().min(1)
 })
 const command = z.discriminatedUnion('type', [
+	z.strictObject({
+		type: z.literal('TEST_ORDER_STORAGE'),
+		namespace: z.string(),
+		key: z.string(),
+		ids: z.array(z.uuid()).optional()
+	}),
 	seed,
 	z.strictObject({
 		type: z.literal('TEST_SEED_LEDGER'),
@@ -81,6 +88,13 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 	if (!reply) return
 	void (async () => {
 		try {
+			if (decoded.data.type === 'TEST_ORDER_STORAGE') {
+				const c = decoded.data,
+					storage = createFinanceAccountOrderStorage(c.namespace)
+				if (c.ids) await storage.write(c.key, c.ids)
+				reply.postMessage({ ok: true, ids: await storage.read(c.key) })
+				return
+			}
 			if (!native?.isCurrent()) throw new Error('Fixture binding unavailable')
 			const { db } = native,
 				c = decoded.data

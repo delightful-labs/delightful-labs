@@ -1355,6 +1355,144 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('isolates native preference transactions by SDK namespace and workspace key', async () => {
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const namespace = crypto.randomUUID(),
+					one = crypto.randomUUID(),
+					two = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ namespace, one, two }) =>
+							window.financeWorkerReadFixture.orderStorage(namespace, 'identity/workspace', [
+								two,
+								one
+							]),
+						{ namespace, one, two }
+					)
+				).toEqual({ ok: true, ids: [two, one] })
+				expect(
+					await page.evaluate(
+						(namespace) =>
+							window.financeWorkerReadFixture.orderStorage(namespace, 'identity/other-workspace'),
+						namespace
+					)
+				).toEqual({ ok: true, ids: [] })
+				expect(
+					await page.evaluate(
+						(namespace) =>
+							window.financeWorkerReadFixture.orderStorage(
+								namespace + '-other-environment',
+								'identity/workspace'
+							),
+						namespace
+					)
+				).toEqual({ ok: true, ids: [] })
+				expect(
+					await page.evaluate(
+						(namespace) =>
+							window.financeWorkerReadFixture.orderStorage(namespace, 'identity/workspace'),
+						namespace
+					)
+				).toEqual({ ok: true, ids: [two, one] })
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+		it('orders accounts through the worker controls and isolates workspace preferences', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const a = crypto.randomUUID(),
+					b = crypto.randomUUID(),
+					accountA = crypto.randomUUID(),
+					accountB = crypto.randomUUID()
+				for (const [workspaceId, accountId, name] of [
+					[a, accountA, 'Order A'],
+					[b, accountB, 'Other A']
+				]) {
+					if (!workspaceId || !accountId || !name) throw new Error('Missing ordering fixture')
+					expect(
+						await page.evaluate(
+							({ workspaceId, accountId, name }) =>
+								window.financeWorkerReadFixture.seed(workspaceId, accountId, name),
+							{ workspaceId, accountId, name }
+						)
+					).toEqual({ ok: true })
+				}
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(a)
+				await createAccountUI(page, 'Order B')
+				await browserExpect(
+					page.getByRole('button', { name: 'Edit Order', exact: true })
+				).toBeEnabled()
+				await page.getByRole('button', { name: 'Edit Order', exact: true }).click()
+				await browserExpect(
+					page.getByRole('button', { name: 'Move Order A up', exact: true })
+				).toBeDisabled()
+				await browserExpect(
+					page.getByRole('button', { name: 'Move Order B down', exact: true })
+				).toBeDisabled()
+				await page.getByRole('button', { name: 'Move Order B up', exact: true }).click()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture.state().accounts.map((row) => row.name)
+						)
+					)
+					.toEqual(['Order B', 'Order A'])
+				const idB = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().accounts[0]?.id
+				)
+				if (!idB) throw new Error('Missing reordered account')
+				await browserExpect
+					.poll(() =>
+						page.evaluate(
+							() => window.financeWorkerReadFixture.state().transactionEntry?.defaultAccountId
+						)
+					)
+					.toBe(idB)
+				await browserExpect(
+					page.getByRole('checkbox', { name: 'Order A', exact: true })
+				).toBeChecked()
+				await browserExpect(
+					page.getByRole('checkbox', { name: 'Order B', exact: true })
+				).toBeChecked()
+				await page.getByRole('button', { name: 'Done', exact: true }).click()
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(b)
+				await createAccountUI(page, 'Other B')
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().accountOrder?.ids)
+					)
+					.toHaveLength(2)
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture.state().accounts.map((row) => row.name)
+						)
+					)
+					.toEqual(['Other A', 'Other B'])
+				await page.getByLabel('Current Workspace', { exact: true }).selectOption(a)
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture.state().accounts.map((row) => row.name)
+						)
+					)
+					.toEqual(['Order B', 'Order A'])
+				await browserExpect(page.getByLabel('Account', { exact: true })).toHaveValue(idB)
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('retains selected rows after a full process restart with app/auth/Jazz endpoints unreachable', async () => {
 			onTestFailed(() => {
 				retained = true
@@ -1382,6 +1520,16 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					page.getByRole('cell', { name: 'Retained wallet', exact: true })
 				).toBeVisible()
 				await createAccountUI(page, 'Offline created wallet')
+				await page.getByRole('button', { name: 'Edit Order', exact: true }).click()
+				await page.getByRole('button', { name: 'Move Retained wallet up', exact: true }).click()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture.state().accounts.map((row) => row.name)
+						)
+					)
+					.toEqual(['Retained wallet', 'Offline created wallet'])
+				await page.getByRole('button', { name: 'Done', exact: true }).click()
 				await enterExpenseUI(page, accountId, 'Retained expense')
 				await page.getByRole('link', { name: /transaction details.*Retained expense/i }).click()
 				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('12.34')
@@ -1410,6 +1558,13 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect(
 					page.getByRole('cell', { name: 'Retained wallet', exact: true })
 				).toBeVisible()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture.state().accounts.map((row) => row.name)
+						)
+					)
+					.toEqual(['Retained wallet', 'Offline created wallet'])
 				expect(
 					await page.evaluate(
 						(id) => window.financeWorkerReadFixture.edit(id, 'Retained edit'),
@@ -1431,6 +1586,13 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect(
 					page.getByRole('cell', { name: 'Offline created wallet', exact: true })
 				).toBeVisible()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() =>
+							window.financeWorkerReadFixture.state().accounts.map((row) => row.name)
+						)
+					)
+					.toEqual(['Retained edit', 'Offline created wallet'])
 				expect(
 					await page.evaluate((id) => window.financeWorkerReadFixture.transactions(id), workspaceId)
 				).toMatchObject({

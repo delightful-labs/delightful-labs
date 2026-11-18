@@ -20,14 +20,16 @@
 		selectedAccountIds: readonly string[] | null
 		onAccountChange: (accountId: string, checked: boolean) => void
 		onAllAccountsChange: (checked: boolean) => void
-		ordering?: {
-			editing: boolean
-			canToggle: boolean
-			canMove: (id: string, direction: 'up' | 'down') => boolean
-			onMove: (id: string, direction: 'up' | 'down') => void
-			onEdit: () => void
-			onDone: () => void
-		}
+		ordering?:
+			| {
+					editing: boolean
+					canToggle: boolean
+					canMove: (id: string, direction: 'up' | 'down') => boolean
+					onMove: (id: string, direction: 'up' | 'down') => void
+					onEdit: () => void
+					onDone: () => void
+			  }
+			| undefined
 	} = $props()
 </script>
 

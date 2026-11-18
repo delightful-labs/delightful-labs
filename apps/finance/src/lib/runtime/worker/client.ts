@@ -25,6 +25,7 @@ import {
 import { EXPENSE, type TransactionKind } from '../../domain/transaction-kind.js'
 import type {
 	WorkerTransactionEntryCommand,
+	WorkerAccountOrderCommand,
 	WorkerAccountCreationCommand
 } from '../../contracts/worker-forms.js'
 
@@ -78,6 +79,7 @@ export function createFinanceWorkerClient(
 		},
 		workspaceStartup: null,
 		accountCreation: null,
+		accountOrder: null,
 		transactionEntry: null,
 		transactionEdit: null,
 		ledger: null
@@ -105,6 +107,7 @@ export function createFinanceWorkerClient(
 			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
+			accountOrder: null,
 			transactionEntry: null,
 			transactionEdit: null,
 			ledger: null
@@ -162,6 +165,7 @@ export function createFinanceWorkerClient(
 			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
+			accountOrder: null,
 			transactionEntry: null,
 			transactionEdit: null,
 			ledger: null
@@ -209,6 +213,7 @@ export function createFinanceWorkerClient(
 			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
+			accountOrder: null,
 			transactionEntry: null,
 			transactionEdit: null,
 			ledger: null
@@ -365,6 +370,15 @@ export function createFinanceWorkerClient(
 				})
 			)
 		},
+		accountOrderCommand: (command: WorkerAccountOrderCommand, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'ACCOUNT_ORDER',
+					command,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
 		accountCreationCommand: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => {
 			const current = get(state)
 			if (

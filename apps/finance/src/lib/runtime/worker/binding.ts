@@ -263,11 +263,12 @@ export function createFinanceWorkerBinding({
 			if (!isCurrent()) return Promise.reject(new Error('Finance account binding retired'))
 			return archiveAccount(db, accountId)
 		},
-		createForms: (observe, archive, navigate) =>
+		createForms: (observe, archive, navigate, accountOrderStorage) =>
 			createFinanceFormsMachine({
 				binding,
 				db,
 				initialization: { db, userId: identityId },
+				accountOrderStorage,
 				navigation: createWorkspaceNavigationMachine(db, (destination, signal, origin, replace) => {
 					if (!isCurrent()) return Promise.reject(new Error('Finance navigation binding retired'))
 					return navigate(destination, signal, origin, replace)

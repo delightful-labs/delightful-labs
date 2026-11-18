@@ -17,7 +17,7 @@ node tests/worker-upgrade/backend.mjs /path/to/reported-clipper-artifacts --auth
 `--worker` includes the Finance schema checks, native worker/session cases and
 actual Finance Worker/Svelte cases across Chromium, Firefox and WebKit. It
 exercises account creation/archive, transaction entry/editing, balances, bounded
-ledger pages, offline process restarts and draining writes before close. It
+ledger pages, IndexedDB account-order preferences, offline process restarts and draining writes before close. It
 reuses the existing Finance domain charts, validation, forms and translations.
 `--schema` runs the Finance schema/permission/backup/restore checks alone.
 `--clipper-schema` runs Clipper's schema/reading checks; the separate backend

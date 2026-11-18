@@ -29,7 +29,8 @@ import {
 	selectFinanceNavigationRetry,
 	selectFinanceRecoveryReader
 } from '../../machines/runtime/worker-application.js'
-import { createFinanceAccountStore } from './account-store.js'
+import { createFinanceAccountStore, financeAccountStoreBinding } from './account-store.js'
+import { createFinanceAccountOrderStorage } from './account-order-store.js'
 import { createFinanceWorkerBinding } from './binding.js'
 
 let application: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
@@ -188,6 +189,9 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 			application = createActor(machine, {
 				input: {
 					session: createSessionRuntimeConnection(runtime, native.binding),
+					accountOrderStorage: createFinanceAccountOrderStorage(
+						financeAccountStoreBinding({ serverUrl, scope, environment }).key
+					),
 					closeAccountStore: () => store.close(),
 					closeBroker: () => broker.close(),
 					brokerIdentity: broker.host.identity,

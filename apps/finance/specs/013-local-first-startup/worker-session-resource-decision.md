@@ -1264,8 +1264,68 @@ Logs: `/private/tmp/finance-worker-detail-routing-{static,test-types,unit-final,
 Initial extraction/import and loading-placeholder assertion failures remain in the earlier unit
 logs; all final checks above pass.
 
-Next foundation step: move the existing account-order chart and its preference ownership. An
-explicit user question is pending about using IndexedDB with no migration for that separate UI
-preference (the earlier IndexedDB decision selected the credential AccountStore). Do not claim
-an answer or implement the dependent persistence choice from elapsed time. Full shell, ordinary
-settings/classification/transfers, provider/attachments/backups and activation remain open.
+At the preceding checkpoint, account-order persistence awaited a separate storage decision.
+The user has now explicitly approved IndexedDB with no migration; the implementation and
+qualification follow below. Full shell, ordinary settings/classification/transfers,
+provider/attachments/backups and activation remain open.
+
+
+### IndexedDB account-order ownership — approved
+
+The user approved IndexedDB with no migration for account-order preferences. Do not read or
+migrate the legacy localStorage preference. Keep the existing ordering machine as the fixed editor
+child; its accepted MOVE increments a data revision. A small persistence coordinator observes that
+child, serializes selected writes, and coalesces later moves to the latest revision after the
+current transaction settles. Edit/done/boundary eligibility remains in the existing machine.
+
+The coordinator owns waiting, reading, ready, saving and unavailable states. Scope observations
+carry a key derived from identity/workspace and active account IDs; the native store additionally
+binds the existing server/scope/environment namespace. New scope while I/O is pending withdraws
+its ordering view, waits for that operation, then reads only the latest scope. Same-scope account
+changes preserve editing and append new accounts through existing orderAccounts. Read/write
+failure keeps session ordering usable without automatic retry or blocking unrelated finance.
+
+Invoke this coordinator as a fixed SDK-group child. SHUTDOWN during reading/saving retains the
+native invocation until settlement, flushes the latest accepted moves if another write is needed,
+then completes without replay; the SDK group waits for that
+receipt before replacement/close. Native operations each own one short IndexedDB connection and
+transaction, acknowledge at transaction completion, then close it. There is no Window bridge,
+per-call registry, persistent database cache, Jazz schema change or SDK patch.
+
+Project bounded ordered IDs and edit/move capabilities through the existing group view. Root
+orders account rows and writable transaction defaults; edit defaults retain their own record.
+A fresh entry form waits for the preference read/fallback so its initial native select uses
+the stored first account; unrelated lists, balances and edit forms remain usable.
+Window reuses AccountSelection and forwards scoped EDIT/DONE/MOVE commands. Qualify rapid moves,
+scope/SDK replacement, shutdown with held I/O, fallback, native restart persistence, namespace /
+workspace isolation and unchanged legacy ordering before uploading.
+
+
+Implemented and qualified: **2,013 Finance unit tests** (67 Worker host), **57 actual native
+Worker/Svelte browser cases** across Chromium/Firefox/WebKit, and **13 existing SvelteKit
+ordering/pagination cases** pass. Full application and complete browser-test types plus native
+candidate types/Svelte diagnostics pass with zero warnings. The 10 focused persistence cases
+cover native receipts, coalescing, latest-intent flush before workspace change/close, scope
+replacement, A → B → A and read/write failure without automatic retry. Host cases cover stale
+commands, withheld entry defaults, SDK-group replacement and native write drain before SDK close.
+
+Native UI cases verify shared controls and boundary refusal, unchanged checkboxes, ordered defaults
+on a fresh entry, workspace isolation and real IndexedDB namespace separation. The retained-data
+case saves an order that differs from the native name sort, closes the whole browser process,
+reopens offline, edits an account, restarts again and retains both order and financial edits.
+Changing order does not erase a transaction draft already being edited; a fresh draft uses the
+new default. The first browser attempt exposed an invalid test assumption about replacing an
+existing draft and tried moving an already-first account upward. The corrected cases retain the
+existing draft behavior and actually move the later account; all final native checks pass.
+
+No legacy preference migration, SDK patch or production activation was introduced. The next
+foundation is to bind the existing full shell to Worker projections/commands, keeping Window
+responsible for DOM, drawer/focus/viewport, route observations and native navigation. Remaining
+account/grant/settings/classification/transfers/provider/attachment/backup parity, coordinated
+SDK adoption and W20/W21 remain open. The intermittent financial check/account-move failure
+remains an activation blocker; a passing matrix does not establish its cause or fix.
+
+Logs: `/private/tmp/finance-order-final-checks.log` (static/types/full units + legacy browser),
+`/private/tmp/finance-order-native-final.log` (complete 57-case native matrix),
+`/private/tmp/finance-order-native-focus.log` (nine targeted three-engine cases), and
+`/private/tmp/finance-order-drain.log` (10 persistence cases).

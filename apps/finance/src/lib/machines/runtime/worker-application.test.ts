@@ -76,6 +76,8 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 	const recoveryRead = vi.fn(async () => 'fixture phrase')
 	const navigate = vi.fn<WorkspaceNavigate>(async () => {})
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
+	const accountOrderRead = vi.fn(async (_key: string): Promise<readonly string[]> => [])
+	const accountOrderWrite = vi.fn(async (_key: string, _ids: readonly string[]) => {})
 	const createWrite = vi.fn(
 		async (
 			organizationId: string,
@@ -180,9 +182,10 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		localFirst: true,
 		capabilities: {
 			...capabilities,
-			createForms: (observe, _archive, navigate) =>
+			createForms: (observe, _archive, navigate, accountOrderStorage) =>
 				createFinanceFormsMachine({
 					binding,
+					accountOrderStorage,
 					observe,
 					create: createWrite,
 					archive: archiveWrite,
@@ -233,6 +236,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 	const actor = createActor(machine, {
 		input: {
 			session: createSessionRuntimeConnection(runtime, binding),
+			accountOrderStorage: { read: accountOrderRead, write: accountOrderWrite },
 			closeAccountStore,
 			closeBroker,
 			brokerIdentity,
@@ -263,6 +267,8 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		grants,
 		ledgers,
 		details,
+		accountOrderRead,
+		accountOrderWrite,
 		archiveWrite,
 		navigate,
 		recoveryRead,
@@ -685,7 +691,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.view().ledger?.groups[0]?.transactions.map((t) => t.description)).toEqual(['From B'])
 			expect(f.view().ledger?.groups[0]?.totals).toEqual([['USD', 500n]])
 			expect(f.view().accounts.map((a) => a.balanceMinor)).toEqual([-1200n, -500n])
-			expect(f.view().transactionEntry?.defaultAccountId).toBe(accountB)
+			await vi.waitFor(() => expect(f.view().transactionEntry?.defaultAccountId).toBe(accountB))
 			expect(f.actor.getSnapshot().context.ledgerPage).toBe(1)
 			expect(last(f.queries)).toBe(subscription)
 			f.actor.send({
@@ -967,7 +973,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			last(f.queries).publish([row('Wallet')])
 			expect(f.view().workspaceStartup).toBe('checking')
 			expect(f.view().accounts[0]?.name).toBe('Wallet')
-			expect(f.view().transactionEntry?.form.canSubmit).toBe(true)
+			await vi.waitFor(() => expect(f.view().transactionEntry?.form.canSubmit).toBe(true))
 			f.select(b, 2)
 			expect(read).toHaveBeenCalledTimes(4)
 			expect(initial.beginTransaction).not.toHaveBeenCalled()
@@ -1071,7 +1077,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				f.select(a, 1)
 				if (kind === 'income') f.selectKind('income', 2)
 				last(f.queries).publish([row('Wallet')])
-				expect(f.view().transactionEntry?.form.canSubmit).toBe(true)
+				await vi.waitFor(() => expect(f.view().transactionEntry?.form.canSubmit).toBe(true))
 				f.enter({
 					type: 'SUBMIT',
 					values: {
@@ -1162,6 +1168,98 @@ describe('Finance worker ownership and selected accounts', () => {
 			await vi.waitFor(() => expect(f.view().transactionEntry?.form.content.kind).toBe('success'))
 			expect(f.transactionDb.commit).toHaveBeenCalledOnce()
 		} finally {
+			f.stop()
+		}
+	})
+	it('rejects stale ordering commands and drains an issued preference write before closing the SDK', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>()
+		f.accountOrderWrite.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			f.select(a, 1)
+			const first = row('First'),
+				second = { ...row('Second'), id: '30000000-0000-4000-8000-000000000002' }
+			last(f.queries).publish([first, second])
+			await vi.waitFor(() => expect(f.view().accountOrder?.ids).toEqual([first.id, second.id]))
+			const scope = f.view()
+			f.actor.send({
+				type: 'ACCOUNT_ORDER',
+				...{ selection: scope.selection, sessionRevision: scope.sessionRevision },
+				command: { type: 'EDIT' }
+			})
+			f.actor.send({
+				type: 'ACCOUNT_ORDER',
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision,
+				command: { type: 'MOVE', id: second.id, direction: 'up' }
+			})
+			expect(f.view().accounts.map((account) => account.name)).toEqual(['Second', 'First'])
+			expect(f.accountOrderWrite).toHaveBeenCalledOnce()
+			f.select(b, 2)
+			f.actor.send({
+				type: 'ACCOUNT_ORDER',
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision,
+				command: { type: 'MOVE', id: first.id, direction: 'up' }
+			})
+			expect(f.accountOrderWrite).toHaveBeenCalledOnce()
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			held.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.closeAccountStore).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('keeps lists available while a preference read determines the fresh entry default', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<readonly string[]>()
+		f.accountOrderRead.mockImplementationOnce(() => held.promise)
+		const first = row('First'),
+			second = { ...row('Second'), id: '30000000-0000-4000-8000-000000000002' }
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([first, second])
+			expect(f.view().accounts.map((account) => account.name)).toEqual(['First', 'Second'])
+			expect(f.view().transactionEntry).toBeNull()
+			held.resolve([second.id, first.id])
+			await vi.waitFor(() => expect(f.view().transactionEntry?.defaultAccountId).toBe(second.id))
+			expect(f.view().accounts.map((account) => account.name)).toEqual(['Second', 'First'])
+		} finally {
+			held.resolve([])
+			f.stop()
+		}
+	})
+	it('awaits an old ordering read before replacing the SDK group and rejects late preference data', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<readonly string[]>()
+		f.accountOrderRead.mockImplementationOnce(() => held.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('Old')])
+			expect(f.accountOrderRead).toHaveBeenCalledOnce()
+			f.publishSession({ status: 'transitioning' })
+			f.publishSession(f.ready({}))
+			expect(f.view().accounts).toEqual([])
+			expect(f.view().accountOrder).toBeNull()
+			expect(f.queries).toHaveLength(1)
+			held.resolve([row('Old').id])
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.queries).publish([row('Current')])
+			await vi.waitFor(() => expect(f.view().accountOrder?.ids).toEqual([row('Current').id]))
+			expect(f.view().accounts.map((account) => account.name)).toEqual(['Current'])
+			expect(f.accountOrderRead).toHaveBeenCalledTimes(2)
+			expect(f.accountOrderWrite).not.toHaveBeenCalled()
+		} finally {
+			held.resolve([])
 			f.stop()
 		}
 	})
@@ -1455,6 +1553,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			oldDirectory.publish([{ id: a, name: 'retired directory' }])
 			expect(f.view().workspaces).toBeNull()
 			expect(f.view().accounts).toEqual([])
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
 			last(f.queries).publish([row('current')])
 			last(f.directory).publish([{ id: a, name: 'current workspace' }])
 			expect(f.view().accounts).toMatchObject([row('current')])

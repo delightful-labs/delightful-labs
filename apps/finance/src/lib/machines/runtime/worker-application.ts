@@ -1,3 +1,6 @@
+import { orderAccounts } from '../accounts/account-order.js'
+import type { AccountOrderStorage } from '../../contracts/worker-forms.js'
+import type { WorkerAccountOrderCommand } from '../../contracts/worker-forms.js'
 import { toggleSelectedAccount } from '../../filters/finance-filters.js'
 import {
 	transactionListLocation,
@@ -74,6 +77,7 @@ type FormsReport =
 	| { type: 'FORMS_CLOSED'; binding: object }
 	| { type: 'FORMS_FAILED'; binding: object }
 type Input = {
+	accountOrderStorage: AccountOrderStorage
 	session: FinanceWorkerSession
 	closeAccountStore: () => Promise<void>
 	closeBroker: () => Promise<WorkerHostClosed>
@@ -211,6 +215,13 @@ function formsObservation(context: Context): FinanceFormsObservation {
 		tags: context.facts?.tags ?? []
 	}
 	return {
+		order: {
+			key:
+				context.ready?.identityId && context.selection.workspaceId
+					? JSON.stringify([context.ready.identityId, context.selection.workspaceId])
+					: null,
+			ids: context.facts?.accounts?.map((account) => account.id) ?? []
+		},
 		navigation: navigationObservation(context),
 		archive,
 		creation,
@@ -302,6 +313,7 @@ export function createFinanceWorkerMachine({
 					sessionRevision: number
 					accountId: string
 				}>(),
+				ACCOUNT_ORDER: types<WorkerCommandScope & { command: WorkerAccountOrderCommand }>(),
 				ACCOUNT_CREATION: types<{
 					selection: WorkerSelection
 					sessionRevision: number
@@ -751,6 +763,20 @@ export function createFinanceWorkerMachine({
 						}
 						return { context: { ledgerFilters: event.filters, ledgerPage: 1 } }
 					},
+					ACCOUNT_ORDER: ({ context, event }, enq) => {
+						if (
+							!sameCommandScope(context, event) ||
+							!context.forms ||
+							context.forms.binding !== context.ready?.binding
+						)
+							return
+						enq.sendTo(context.forms.owner, {
+							type: 'OBSERVE',
+							observation: formsObservation(context),
+							selectionRevision: context.selection.revision
+						})
+						enq.sendTo(context.forms.owner, { type: 'ACCOUNT_ORDER', command: event.command })
+					},
 					ACCOUNT_CREATION: ({ context, event }, enq) => {
 						if (
 							!sameCommandScope(context, event) ||
@@ -818,7 +844,8 @@ export function createFinanceWorkerMachine({
 								context.ready.capabilities.createForms(
 									observeForms,
 									context.ready.capabilities.archiveAccount,
-									context.navigate
+									context.navigate,
+									context.accountOrderStorage
 								),
 								{
 									id: 'forms',
@@ -1161,16 +1188,17 @@ export function selectFinanceWorkerView(
 	const observations = formsObservation(context)
 	const transactionFacts = observations.transaction
 	const edited = observations.edit.transaction
-	const transactionAccounts = writableTransactionAccounts({
-		...transactionFacts,
-		accounts: context.facts?.accounts ?? []
-	})
 	const group =
 		snapshot.status === 'active' &&
 		context.forms?.binding === context.ready?.binding &&
 		context.formsView?.selectionRevision === context.selection.revision
 			? context.formsView
 			: undefined
+	const orderedAccounts = orderAccounts(context.facts?.accounts ?? [], group?.order?.view.ids ?? [])
+	const transactionAccounts = writableTransactionAccounts({
+		...transactionFacts,
+		accounts: orderedAccounts
+	})
 	const forms = group?.status === 'ready' ? group : undefined
 	const navigation = status === 'failed' ? 'failed' : (group?.navigation?.status ?? 'waiting')
 	const navigationNotice =
@@ -1222,7 +1250,7 @@ export function selectFinanceWorkerView(
 		workspaces: snapshot.status === 'active' ? (context.facts?.workspaces ?? null) : null,
 		accounts:
 			snapshot.status === 'active'
-				? (context.facts?.accounts ?? []).map(({ id, name, kind, currency }) => ({
+				? orderedAccounts.map(({ id, name, kind, currency }) => ({
 						id,
 						name,
 						kind,
@@ -1240,6 +1268,14 @@ export function selectFinanceWorkerView(
 				: null,
 		workspaceStartup: forms?.initialization ?? null,
 		accountCreation: forms?.creation ?? null,
+		accountOrder: group?.order
+			? {
+					ids: [...group.order.view.ids],
+					editing: group.order.view.editing,
+					canToggle: group.order.view.canToggle,
+					moves: group.order.view.moves
+				}
+			: null,
 		ledger:
 			snapshot.status === 'active'
 				? selectWorkerLedger(
@@ -1285,22 +1321,23 @@ export function selectFinanceWorkerView(
 							: null
 					}
 				: null,
-		transactionEntry: forms
-			? {
-					kind: context.transactionKind,
-					form: forms.transaction,
-					accounts: transactionAccounts,
-					categories: applicableTransactionCategories(transactionFacts),
-					tagSuggestions: applicableTransactionTags(transactionFacts).map((tag) => tag.name),
-					defaultAccountId:
-						transactionAccounts.find(
-							(account) =>
-								context.selectedAccountIds === null ||
-								context.selectedAccountIds.includes(account.id)
-						)?.id ?? null,
-					defaultCategoryId: defaultTransactionCategory(transactionFacts)?.id ?? null
-				}
-			: null
+		transactionEntry:
+			forms && group?.order
+				? {
+						kind: context.transactionKind,
+						form: forms.transaction,
+						accounts: transactionAccounts,
+						categories: applicableTransactionCategories(transactionFacts),
+						tagSuggestions: applicableTransactionTags(transactionFacts).map((tag) => tag.name),
+						defaultAccountId:
+							transactionAccounts.find(
+								(account) =>
+									context.selectedAccountIds === null ||
+									context.selectedAccountIds.includes(account.id)
+							)?.id ?? null,
+						defaultCategoryId: defaultTransactionCategory(transactionFacts)?.id ?? null
+					}
+				: null
 	}
 }
 
@@ -1327,6 +1364,7 @@ export function selectFinanceFormObservations(
 	if (snapshot?.status === 'active') return formsObservation(snapshot.context)
 	const archive = selectFinanceArchiveObservation(undefined)
 	return {
+		order: { key: null, ids: [] },
 		navigation: {
 			pathname: '/',
 			search: '',
