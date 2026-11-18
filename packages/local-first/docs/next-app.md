@@ -32,7 +32,10 @@ hosts pass that connection directly; they do not recreate a Jazz `getSnapshot().
 Its navigation-facts leaf reads the current typed identity and requires an active runtime before
 navigation. Existing SDK-shaped session callers remain supported. Navigation-only retry does not
 repeat restoration. Keep phrase-bearing coordinator actors private and retain them through issued
-native navigation; Window supplies only the native navigation effect.
+native navigation; Window supplies only the native navigation effect. A private coordinator root
+sets `reportTo` to its host actor; an invoked coordinator keeps using its parent by default.
+The recipient receives the existing `RECOVERY_VALIDATED` / `RECOVERY_DRAIN_REQUESTED` notices
+and sends `WORKSPACE_DRAINED` only after its own resources have settled.
 
 ## Foreground data
 

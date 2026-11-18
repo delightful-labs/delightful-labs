@@ -978,3 +978,53 @@ navigation callback is deliberately a fixture leaf; native Window goto is the ne
 No coordinator lifecycle or legacy caller behavior changed. Logs:
 `/private/tmp/finance-worker-recovery-connection-{unit,full-unit,static,package,consumer,native,finance-static,finance-unit}.log`.
 Hosted Finance, Foundation and Clipper also pass at restoration checkpoint `7778311e`.
+
+### Native post-recovery navigation integration model
+
+Create the existing `sessionRecoveryMachine` directly as the private root at the actual Worker
+host boundary. Its optional explicit report recipient reuses the existing parent-report protocol
+without adding a wrapper actor. Finance receives only non-secret attempt notices and terminal
+facts. Attempts are monotonic within this fixed Worker/session host; terminal/error reports also
+carry the captured host binding. The coordinator clears its request after invoke input is bound,
+owns its existing active/closing/terminal behavior, and retains issued Window navigation through
+SHUTDOWN. Raw phrases, credentials and private snapshots never enter Finance's inspected tree.
+
+A native MessageChannel carries each selected Window navigation and its bounded success/failure
+reply. There is no generic RPC registry or queue. The existing `WorkspaceNavigate` capability is
+injected at the client boundary; the SvelteKit host will supply native goto, and browser fixtures
+supply actual history effects. Window observes the relative URL and reports it as a typed Finance
+fact; popstate/router observations invalidate stale origin intent. Window rechecks expected origin
+adjacent to the native effect. UI detach leaves the application/client alive.
+
+The private coordinator owns restoration versus navigation-failure classification. Retain its
+non-secret navigation retry facts so retry creates a navigation-only coordinator and never repeats
+SDK mutation. Finance close drains financial work and the private identity/navigation owner in
+parallel before SDK/storage/broker close. A private owner failure releases that dead owner's wait,
+withdraws admission and uses the SDK owner's existing actual-mutation drain; never await a dead
+actor or report its uncertain result as a settled success. Qualify origin change, failed navigation,
+navigation-only retry, UI detach and close while the native navigation receipt is held.
+
+Implemented with the shared coordinator directly, using its additive optional `reportTo` input.
+There is no extra Finance recovery wrapper machine. Existing invoked consumers keep their parent
+recipient. Finance holds only the private actor reference, non-secret notices/results and typed
+current URL facts. Navigation-only retry uses the retained result facts and the same shared chart.
+The Window transport performs one injected native navigation and returns a bounded receipt; the
+Worker keeps that receipt alive through close. Transport failure withdraws retry/restore capabilities.
+
+Qualification: **1,982 Finance units** (50 host), **1,250 Local First units**, full Finance/library
+static and browser-test types, strict package/public-consumer checks, formatting and denied-warning
+lint pass. All **39 native Chromium/Firefox/WebKit application cases** pass with the direct private
+coordinator. The strengthened real-authority recovery case exercises redirect failure, the existing
+Try again control, a navigation-only retry, changed-origin refusal, close while a Window navigation
+receipt is held, actual history effects, and retained transactions after an offline process restart.
+The final permission-withdrawal adjustment also passes the three native malformed-view/clean-close
+cases; its final native types pass after applying the same query import port as the maintained runner.
+Earlier full Finance compatibility checks used the isolated installed package copy; this final run
+explicitly injects the newly built coordinator into that copy as well as the alpha.67 native artifact.
+
+Logs: `/private/tmp/finance-worker-navigation-{static,full-unit,test-types,unit,native-final,fault-final,fault-final-types,core-unit,core-static,core-package,core-consumer,core-consumer-runtime}.log`.
+The preceding native worker/session matrix remains **42 passing cases**, and hosted Finance,
+Foundation and Clipper all pass at checkpoint `198a57c5`. Current-head hosted CI is checked separately.
+Full workspace chooser/default/legacy-route handling, shell preferences and remaining domain parity
+are still open. Native history capability qualification does not claim complete SvelteKit shell
+integration or production activation. No SDK patch, active pin, catalog or production route changed.

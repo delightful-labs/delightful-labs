@@ -68,6 +68,7 @@ export type WorkerLedgerRecord = z.output<typeof transactionLedgerRecordSchema>
 export type WorkerLedgerView = z.output<typeof workerLedgerView>
 export const financeWorkerCommand = z.discriminatedUnion('type', [
 	workerContextCommand,
+	z.strictObject({ type: z.literal('OBSERVE_LOCATION'), href: z.string().max(8192) }),
 	z.strictObject({
 		type: z.literal('ARCHIVE_ACCOUNT'),
 		sessionRevision,
@@ -153,9 +154,21 @@ export const workerTransactionEdit = workerTransactionEntry.extend({
 /** Private host input: excluded from ordinary commands and inspected application events. */
 export const financeIdentityRestore = z.strictObject({
 	type: z.literal('RESTORE_IDENTITY'),
+	origin: z.string().max(8192),
 	sessionRevision,
 	phrase: z.string().max(8192)
 })
+export const financeRecoveryRetry = z.strictObject({
+	type: z.literal('RETRY_RECOVERY_NAVIGATION'),
+	sessionRevision
+})
+export const financeNavigationRequest = z.strictObject({
+	type: z.literal('NAVIGATE'),
+	destination: z.literal('/'),
+	origin: z.string().max(8192),
+	replace: z.boolean()
+})
+export const financeNavigationReply = z.strictObject({ outcome: z.enum(['completed', 'failed']) })
 export const financeWorkerView = z.strictObject({
 	type: z.literal('VIEW'),
 	sessionRevision,
@@ -168,6 +181,9 @@ export const financeWorkerView = z.strictObject({
 	identityRestore: z.strictObject({
 		canSubmit: z.boolean(),
 		busy: z.boolean(),
+		navigationOnly: z.boolean(),
+		navigationError: z.boolean(),
+		canRetryNavigation: z.boolean(),
 		error: z.boolean(),
 		draftRevision: z.number().int().nonnegative()
 	}),
@@ -187,6 +203,7 @@ export const financeWorkerView = z.strictObject({
 })
 export const financeWorkerReply = z.discriminatedUnion('type', [
 	financeWorkerView,
+	financeNavigationRequest,
 	z.strictObject({ type: z.literal('CLOSED') }),
 	z.strictObject({ type: z.literal('FAILED') })
 ])

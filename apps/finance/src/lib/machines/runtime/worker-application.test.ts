@@ -1,4 +1,5 @@
-import { restorationMachine } from 'delightful-local-first/restoration/workflow'
+import { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordination'
+import type { RecoveryRequest } from 'delightful-local-first/recovery/coordination'
 import type { SessionRuntimeIdentityChange } from 'delightful-local-first/session/runtime'
 import { createActor, waitFor, type ActorFromLogic } from 'xstate'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,6 +13,7 @@ import {
 	createFinanceWorkerMachine,
 	selectFinanceWorkerView,
 	selectFinanceRestorationAdmission,
+	selectFinanceNavigationRetry,
 	selectFinanceRecoveryReader,
 	selectFinanceFormObservations
 } from './worker-application.js'
@@ -1305,29 +1307,43 @@ describe('Finance worker ownership and selected accounts', () => {
 
 function restoreFixture(
 	f: ReturnType<typeof fixture>,
-	parse = vi.fn(async (_phrase: string) => 'synthetic-secret')
+	parse = vi.fn(async (_phrase: string) => 'synthetic-secret'),
+	navigate = vi.fn(async (_destination: string) => {}),
+	request: RecoveryRequest = {
+		kind: 'restore',
+		phrase: 'private input',
+		origin: '/from',
+		destination: '/to'
+	}
 ) {
-	const admitted = selectFinanceRestorationAdmission(
-		f.actor.getSnapshot(),
-		f.view().sessionRevision
-	)
+	if (!f.actor.getSnapshot().context.href) f.actor.send({ type: 'OBSERVE_LOCATION', href: '/from' })
+	const select =
+		request.kind === 'restore' ? selectFinanceRestorationAdmission : selectFinanceNavigationRetry
+	const admitted = select(f.actor.getSnapshot(), f.view().sessionRevision)
 	if (!admitted) throw new Error('Restoration not admitted')
 	const { session, scope } = admitted
-	const actor = createActor(restorationMachine, {
+	const actor = createActor(sessionRecoveryMachine, {
 		input: {
-			scope,
-			phrase: 'private input',
+			attempt: scope.attempt,
+			request,
+			session,
+			navigate,
+			readHref: () => f.actor.getSnapshot().context.href ?? '/from',
 			reportTo: f.actor,
-			capability: {
-				runtime: session,
-				parsePhrase: parse,
-				isCurrentBinding: (binding) =>
-					binding === session.binding && session.view.get().stage === 'active',
-				readIdentity: async () => {
-					const observation = session.view.get().observation
-					return observation?.status === 'ready'
-						? { kind: 'ready', identityId: observation.identityId }
-						: { kind: 'unavailable' }
+			restorationBinding: {
+				binding: scope.binding,
+				invalidate: () => {},
+				capability: {
+					runtime: session,
+					parsePhrase: parse,
+					isCurrentBinding: (binding) =>
+						binding === session.binding && session.view.get().stage === 'active',
+					readIdentity: async () => {
+						const observation = session.view.get().observation
+						return observation?.status === 'ready'
+							? { kind: 'ready', identityId: observation.identityId }
+							: { kind: 'unavailable' }
+					}
 				}
 			}
 		}
@@ -1335,17 +1351,20 @@ function restoreFixture(
 	actor.subscribe({
 		complete: () => {
 			const result = actor.getSnapshot().output
-			if (result) f.actor.send({ type: 'RESTORATION_FINISHED', result, view: session.view.get() })
+			if (result)
+				f.actor.send({ type: 'RESTORATION_FINISHED', scope, result, view: session.view.get() })
+			else f.actor.send({ type: 'RESTORATION_FAILED', ...scope })
 		}
 	})
 	f.actor.send({
 		type: 'REGISTER_RESTORATION',
 		scope,
 		owner: actor,
+		operation: request.kind,
 		sessionRevision: f.view().sessionRevision
 	})
 	actor.start()
-	return { actor, scope, parse }
+	return { actor, scope, parse, navigate }
 }
 describe('worker restoration and financial drain', () => {
 	it('rejects an invalid phrase without replacing finance or issuing SDK mutation', async () => {
@@ -1426,7 +1445,8 @@ describe('worker restoration and financial drain', () => {
 			expect(f.changeIdentity).toHaveBeenCalledOnce()
 			f.actor.send({
 				type: 'RESTORATION_FINISHED',
-				result: { ...r.scope, mutation: 'settled', outcome: 'restored', identityId: userId },
+				scope: r.scope,
+				result: { mutation: 'settled', outcome: 'restored' },
 				view: f.actor.getSnapshot().context.session.view.get()
 			})
 			expect(f.view().identityRestore.error).toBe(true)
@@ -1457,7 +1477,7 @@ describe('worker restoration and financial drain', () => {
 			held.resolve()
 			await waitFor(f.actor, (s) => s.status === 'done')
 			expect(r.actor.getSnapshot().output).toMatchObject({
-				outcome: 'cancelled',
+				outcome: 'closed',
 				mutation: 'notStarted'
 			})
 			expect(f.nativeClose).toHaveBeenCalledOnce()
@@ -1483,7 +1503,7 @@ describe('worker restoration and financial drain', () => {
 			})
 			const r = restoreFixture(f)
 			await waitFor(f.actor, (s) => s.matches('restoring'))
-			r.actor.send({ type: 'CANCEL' })
+			r.actor.send({ type: 'SHUTDOWN' })
 			await waitFor(r.actor, (s) => s.status === 'done')
 			expect(f.actor.getSnapshot().matches('restoring')).toBe(true)
 			expect(f.changeIdentity).not.toHaveBeenCalled()
@@ -1520,7 +1540,7 @@ describe('worker restoration and financial drain', () => {
 			f.publishSession(signedOut)
 			expect(r.actor.getSnapshot().status).toBe('active')
 			expect(f.view().identityRestore.busy).toBe(true)
-			r.actor.send({ type: 'CANCEL' })
+			r.actor.send({ type: 'SHUTDOWN' })
 			await waitFor(r.actor, (s) => s.status === 'done')
 			expect(f.changeIdentity).not.toHaveBeenCalled()
 			expect(f.view().identityRestore.canSubmit).toBe(true)
@@ -1565,10 +1585,107 @@ describe('worker restoration and financial drain', () => {
 			await waitFor(f.actor, (s) => s.status === 'done')
 			expect(f.nativeClose).toHaveBeenCalledOnce()
 			expect(f.closeAccountStore).toHaveBeenCalledOnce()
-			expect(r.actor.getSnapshot().output?.outcome).toBe('cancelled')
+			expect(r.actor.getSnapshot().output?.outcome).toBe('closed')
 			expect(f.view().status).toBe('closed')
 		} finally {
 			held.resolve('completed')
+			f.stop()
+		}
+	})
+})
+
+describe('worker recovery native navigation ownership', () => {
+	it('retries a failed redirect without repeating restoration', async () => {
+		const f = fixture(),
+			navigate = vi
+				.fn(async (_destination: string) => {})
+				.mockRejectedValueOnce(new Error('Window navigation failed'))
+		try {
+			await f.start()
+			const first = restoreFixture(f, undefined, navigate)
+			await waitFor(first.actor, (s) => s.status === 'done')
+			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
+			expect(f.view().identityRestore).toMatchObject({
+				busy: false,
+				error: false,
+				navigationError: true,
+				canRetryNavigation: true
+			})
+			const retry = selectFinanceNavigationRetry(f.actor.getSnapshot(), f.view().sessionRevision)
+			if (!retry) throw new Error('Navigation retry unavailable')
+			const next = restoreFixture(f, undefined, navigate, { kind: 'navigate', ...retry.navigation })
+			await waitFor(next.actor, (s) => s.status === 'done')
+			expect(f.view().identityRestore).toMatchObject({
+				busy: false,
+				error: false,
+				navigationError: false,
+				canRetryNavigation: false
+			})
+			expect(navigate).toHaveBeenCalledTimes(2)
+			expect(f.changeIdentity).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('waits for issued native navigation before closing the SDK and storage', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<void>(),
+			navigate = vi.fn((_destination: string) => held.promise)
+		try {
+			await f.start()
+			const r = restoreFixture(f, undefined, navigate)
+			await vi.waitFor(() => expect(navigate).toHaveBeenCalledOnce())
+			expect(r.actor.getSnapshot().context.request).toBeUndefined()
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.view().status).toBe('closing')
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			held.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(r.actor.getSnapshot().output?.outcome).toBe('closed')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.closeAccountStore).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('does not redirect after the user has left the recovery origin', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<'completed'>()
+		f.changeIdentity.mockImplementation(() => held.promise)
+		try {
+			await f.start()
+			const r = restoreFixture(f)
+			await vi.waitFor(() => expect(f.changeIdentity).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'OBSERVE_LOCATION', href: '/elsewhere' })
+			held.resolve('completed')
+			await waitFor(r.actor, (s) => s.status === 'done')
+			expect(r.navigate).not.toHaveBeenCalled()
+			expect(f.view().identityRestore.busy).toBe(false)
+		} finally {
+			held.resolve('completed')
+			f.stop()
+		}
+	})
+	it('withdraws a failed private owner and does not wait for a dead owner during close', async () => {
+		const f = fixture(),
+			parsed = Promise.withResolvers<string>()
+		try {
+			await f.start()
+			const r = restoreFixture(
+				f,
+				vi.fn(() => parsed.promise)
+			)
+			f.actor.send({ type: 'RESTORATION_FAILED', ...r.scope })
+			expect(f.view().status).toBe('failed')
+			r.actor.send({ type: 'SHUTDOWN' })
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+		} finally {
+			parsed.resolve('late-secret')
 			f.stop()
 		}
 	})

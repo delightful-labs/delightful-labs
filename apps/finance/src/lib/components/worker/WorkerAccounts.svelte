@@ -25,6 +25,7 @@
 		view,
 		recovery,
 		onRestore,
+		onRetryRecoveryNavigation,
 		onSelectWorkspace,
 		onArchive,
 		onAccountCreation,
@@ -36,6 +37,7 @@
 	}: {
 		recovery: { source: RecoveryScopeSource; capability: RecoveryPhraseCapability }
 		onRestore: (phrase: string) => void
+		onRetryRecoveryNavigation: () => void
 		view: Readable<FinanceWorkerView>
 		onSelectWorkspace: (id: string) => void
 		onArchive: (id: string, scope: WorkerCommandScope) => void
@@ -50,7 +52,7 @@
 </script>
 
 <WorkerRecovery binding={recovery} />
-<WorkerLogin view={live.current} {onRestore} />
+<WorkerLogin view={live.current} {onRestore} onRetryNavigation={onRetryRecoveryNavigation} />
 <WorkspaceSelector
 	organizations={live.current.workspaces ?? undefined}
 	organizationId={live.current.selection.workspaceId}

@@ -1,7 +1,7 @@
 import { createSessionRuntimeMachine, createSessionRuntimeConnection } from './session-runtime.js'
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createActor, setup, waitFor, types } from 'xstate'
+import { createActor, createCallbackLogic, setup, waitFor, types, type ActorRefFrom } from 'xstate'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import {
 	sessionRecoveryMachine,
@@ -317,4 +317,54 @@ describe('recovery navigation through a session actor connection', () => {
 			}
 		}
 	)
+})
+
+describe('explicit recovery host reports', () => {
+	it('runs a private root with an explicit recipient and waits for its drain permit', async () => {
+		const runtime = runtimeFixture()
+		await waitFor(runtime.actor, (s) => s.matches({ bound: 'observing' }))
+		const notices: string[] = []
+		let coordinator: ActorRefFrom<typeof sessionRecoveryMachine> | undefined
+		const recipient = createActor(
+			createCallbackLogic<RecoveryNotice>(({ receive }) => {
+				receive((event) => {
+					notices.push(event.type)
+					if (event.type === 'RECOVERY_DRAIN_REQUESTED')
+						coordinator?.send({ type: 'WORKSPACE_DRAINED' })
+				})
+			})
+		).start()
+		roots.add(recipient)
+		const navigate = vi.fn(async (_destination: string) => {})
+		coordinator = createActor(sessionRecoveryMachine, {
+			input: {
+				attempt: 1,
+				reportTo: recipient,
+				request: { kind: 'restore', phrase: 'private phrase', origin: '/from', destination: '/to' },
+				session: runtime.connection,
+				readHref: () => '/from',
+				navigate,
+				restorationBinding: {
+					binding: runtime.connection.binding,
+					invalidate: () => {},
+					capability: {
+						runtime: runtime.connection,
+						parsePhrase: async () => 'private credential',
+						isCurrentBinding: (binding) => binding === runtime.connection.binding,
+						readIdentity: async () => ({ kind: 'ready', identityId: 'restored' })
+					}
+				}
+			}
+		})
+		roots.add(coordinator)
+		coordinator.start()
+		const done = await waitFor(coordinator, (s) => s.status === 'done')
+		expect(notices).toEqual(['RECOVERY_VALIDATED', 'RECOVERY_DRAIN_REQUESTED'])
+		expect(done.output).toEqual({ outcome: 'restored', mutation: 'settled' })
+		expect(runtime.changeIdentity).toHaveBeenCalledOnce()
+		expect(navigate).toHaveBeenCalledExactlyOnceWith('/to')
+		expect(done.context.request).toBeUndefined()
+		expect(done.context.restorationBinding).toBeUndefined()
+		runtime.closed.resolve()
+	})
 })

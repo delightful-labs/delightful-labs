@@ -7,6 +7,9 @@ import type { FinanceWorkerConfiguration } from '../../src/lib/contracts/worker-
 let worker: Worker | undefined, client: ReturnType<typeof createFinanceWorkerClient> | undefined
 let component: ReturnType<typeof mount> | undefined
 let scope = ''
+let navigationFailure = false,
+	navigationReceipt: ReturnType<typeof Promise.withResolvers<void>> | undefined
+let navigationCalls = 0
 function current() {
 	if (!client) throw new Error('Fixture not open')
 	return client
@@ -21,6 +24,7 @@ function attach() {
 			view: owner.view,
 			recovery: owner.recovery,
 			onRestore: owner.restoreIdentity,
+			onRetryRecoveryNavigation: owner.retryRecoveryNavigation,
 			onSelectWorkspace: owner.selectWorkspace,
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
@@ -61,15 +65,48 @@ function request(message: unknown) {
 	return result
 }
 const fixture = {
+	failNextNavigation: () => {
+		navigationFailure = true
+	},
+	holdNavigation: () => {
+		navigationReceipt = Promise.withResolvers<void>()
+	},
+	releaseNavigation: () => {
+		navigationReceipt?.resolve()
+		navigationReceipt = undefined
+	},
+	navigationCalls: () => navigationCalls,
+	route: (href: string) => {
+		history.pushState(null, '', href)
+		current().observeLocation()
+	},
 	open(configuration: FinanceWorkerConfiguration) {
 		scope = configuration.scope
-		client = createFinanceWorkerClient(configuration, () => {
-			worker = new Worker(
-				new URL('../../src/lib/runtime/worker/application.worker.ts', import.meta.url),
-				{ type: 'module' }
-			)
-			return worker
-		})
+		client = createFinanceWorkerClient(
+			configuration,
+			async (destination, signal, expectedHref, replace) => {
+				navigationCalls += 1
+				if (navigationFailure) {
+					navigationFailure = false
+					throw new Error('Fixture native navigation failure')
+				}
+				await navigationReceipt?.promise
+				if (
+					signal.aborted ||
+					`${location.pathname}${location.search}${location.hash}` !== expectedHref
+				)
+					return
+				if (replace) history.replaceState(null, '', destination)
+				else history.pushState(null, '', destination)
+			},
+			() => {
+				worker = new Worker(
+					new URL('../../src/lib/runtime/worker/application.worker.ts', import.meta.url),
+					{ type: 'module' }
+				)
+				return worker
+			}
+		)
 		attach()
 	},
 	recoveryReads: () => request({ type: 'TEST_RECOVERY_READS' }),

@@ -1,3 +1,5 @@
+import { replyWithWindowNavigation } from './navigation.js'
+import type { WorkspaceNavigate } from '../../contracts/workspace-orchestration-contract.js'
 import type {
 	RecoveryScope,
 	RecoveryScopeSource,
@@ -11,6 +13,7 @@ import {
 	financeWorkerOpen,
 	financeRecoveryRead,
 	financeIdentityRestore,
+	financeRecoveryRetry,
 	financeRecoveryReply,
 	financeWorkerCommand,
 	financeWorkerReply,
@@ -28,6 +31,7 @@ import type {
 /** Window owns native transport and rendering only. Domain state stays in the Worker. */
 export function createFinanceWorkerClient(
 	configuration: FinanceWorkerConfiguration,
+	navigate: WorkspaceNavigate,
 	createWorker: () => Worker = () =>
 		new Worker(new URL('./application.worker.ts', import.meta.url), { type: 'module' })
 ) {
@@ -61,7 +65,15 @@ export function createFinanceWorkerClient(
 		accounts: [],
 		archiveFeedback: null,
 		recoveryAvailable: false,
-		identityRestore: { canSubmit: false, busy: false, error: false, draftRevision: 0 },
+		identityRestore: {
+			canSubmit: false,
+			busy: false,
+			error: false,
+			draftRevision: 0,
+			navigationOnly: false,
+			navigationError: false,
+			canRetryNavigation: false
+		},
 		workspaceStartup: null,
 		accountCreation: null,
 		transactionEntry: null,
@@ -74,7 +86,15 @@ export function createFinanceWorkerClient(
 		state.update((view) => ({
 			...view,
 			status: 'failed',
-			identityRestore: { ...view.identityRestore, canSubmit: false, busy: false, error: true },
+			identityRestore: {
+				...view.identityRestore,
+				canSubmit: false,
+				canRetryNavigation: false,
+				navigationOnly: false,
+				navigationError: false,
+				busy: false,
+				error: true
+			},
 			accounts: [],
 			workspaces: null,
 			archiveFeedback: null,
@@ -98,6 +118,13 @@ export function createFinanceWorkerClient(
 	const receiveControl = (event: MessageEvent<unknown>) => {
 		const decoded = financeWorkerReply.safeParse(event.data)
 		if (!decoded.success || decoded.data.type === 'VIEW') return
+		if (decoded.data.type === 'NAVIGATE') {
+			const port = event.ports[0]
+			if (port && event.ports.length === 1)
+				void replyWithWindowNavigation(port, decoded.data, navigate).finally(observeLocation)
+			else fail()
+			return
+		}
 		if (decoded.data.type === 'FAILED') {
 			fail()
 			return
@@ -106,12 +133,21 @@ export function createFinanceWorkerClient(
 		worker.removeEventListener('message', receiveControl)
 		worker.removeEventListener('error', fail)
 		worker.removeEventListener('messageerror', fail)
+		window.removeEventListener('popstate', observeLocation)
 		worker.terminate()
 		releaseBroker()
 		state.update((view) => ({
 			...view,
 			status: 'closed',
-			identityRestore: { ...view.identityRestore, canSubmit: false, busy: false, error: false },
+			identityRestore: {
+				...view.identityRestore,
+				canSubmit: false,
+				canRetryNavigation: false,
+				navigationOnly: false,
+				navigationError: false,
+				busy: false,
+				error: false
+			},
 			accounts: [],
 			workspaces: null,
 			identityId: null,
@@ -128,7 +164,17 @@ export function createFinanceWorkerClient(
 	worker.addEventListener('message', receiveControl)
 	worker.addEventListener('error', fail)
 	worker.addEventListener('messageerror', fail)
+	function relativeHref() {
+		return `${location.pathname}${location.search}${location.hash}`
+	}
+	function observeLocation() {
+		worker.postMessage(
+			financeWorkerCommand.parse({ type: 'OBSERVE_LOCATION', href: relativeHref() })
+		)
+	}
 	worker.postMessage(open, [data.port2, control.port2])
+	observeLocation()
+	window.addEventListener('popstate', observeLocation)
 	const view: Readable<FinanceWorkerView> = { subscribe: state.subscribe }
 	function selectContext(
 		workspaceId: string | null,
@@ -218,12 +264,24 @@ export function createFinanceWorkerClient(
 	}
 	return {
 		view,
+		observeLocation,
+		retryRecoveryNavigation: () => {
+			const current = get(state)
+			if (current.identityRestore.canRetryNavigation)
+				worker.postMessage(
+					financeRecoveryRetry.parse({
+						type: 'RETRY_RECOVERY_NAVIGATION',
+						sessionRevision: current.sessionRevision
+					})
+				)
+		},
 		restoreIdentity: (phrase: string) => {
 			const current = get(state)
 			if (!current.identityRestore.canSubmit) return
 			worker.postMessage(
 				financeIdentityRestore.parse({
 					type: 'RESTORE_IDENTITY',
+					origin: relativeHref(),
 					sessionRevision: current.sessionRevision,
 					phrase
 				})

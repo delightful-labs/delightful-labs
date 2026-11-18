@@ -1,5 +1,5 @@
 import type { SessionRuntimeConnection } from '../../contracts/session-runtime.js'
-import { types, createAsyncLogic, matchesState, setup } from 'xstate'
+import { types, createAsyncLogic, matchesState, setup, type ActorRef, type Snapshot } from 'xstate'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import { restorationMachine } from './restoration.js'
@@ -67,6 +67,8 @@ export type RecoveryNotice =
 			attempt: number
 	  }
 type Input = {
+	/** Explicit host for private roots; invoked coordinators retain the existing parent default. */
+	reportTo?: ActorRef<Snapshot<unknown>, RecoveryNotice>
 	attempt: number
 	request: RecoveryRequest
 	session: Session
@@ -75,6 +77,7 @@ type Input = {
 	navigate: (destination: string) => Promise<void>
 }
 type Context = {
+	reportTo: Input['reportTo']
 	attempt: number
 	request: RecoveryRequest | undefined
 	session: Session
@@ -239,6 +242,7 @@ export const sessionRecoveryMachine = model.createMachine({
 	id: 'session-recovery',
 	initial: 'choosing',
 	context: ({ input }) => ({
+		reportTo: input.reportTo,
 		attempt: input.attempt,
 		request: input.request,
 		session: input.session,
@@ -359,14 +363,14 @@ export const sessionRecoveryMachine = model.createMachine({
 					on: {
 						RESTORATION_VALIDATED: (args, enq) => {
 							if (!args.guards.currentReport(args)) return
-							enq.sendTo(args.parent, {
+							enq.sendTo(args.context.reportTo ?? args.parent, {
 								type: 'RECOVERY_VALIDATED',
 								attempt: args.context.attempt
 							})
 						},
 						RESTORATION_PREPARE_REQUESTED: (args, enq) => {
 							if (!args.guards.currentReport(args)) return
-							enq.sendTo(args.parent, {
+							enq.sendTo(args.context.reportTo ?? args.parent, {
 								type: 'RECOVERY_DRAIN_REQUESTED',
 								attempt: args.context.attempt
 							})

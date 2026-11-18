@@ -507,6 +507,10 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					temporary
 				)
 				await browserExpect(input).toHaveValue('')
+				await page.evaluate(() => {
+					window.financeWorkerReadFixture.route('/login')
+					window.financeWorkerReadFixture.failNextNavigation()
+				})
 				await input.fill(phrase)
 				await page.getByRole('button', { name: 'Login', exact: true }).click()
 				await browserExpect
@@ -516,6 +520,28 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
 					.toMatchObject({ busy: false, error: false })
 				await browserExpect(input).toHaveValue('')
+				await browserExpect(
+					page
+						.getByRole('alert')
+						.filter({ hasText: /account was restored.*destination could not be opened/i })
+				).toBeVisible()
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.navigationCalls())).toBe(1)
+				await page.evaluate(() => window.financeWorkerReadFixture.holdNavigation())
+				await page.getByRole('button', { name: 'Try again', exact: true }).click()
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.navigationCalls()))
+					.toBe(2)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
+					.toMatchObject({ busy: true, navigationOnly: true })
+				await page.evaluate(() => {
+					window.financeWorkerReadFixture.route('/account')
+					window.financeWorkerReadFixture.releaseNavigation()
+				})
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
+					.toMatchObject({ busy: false, navigationError: false })
+				expect(new URL(page.url()).pathname).toBe('/account')
 				await browserExpect
 					.poll(() =>
 						page.evaluate(() =>
@@ -530,7 +556,24 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect(
 					page.getByRole('link', { name: /transaction details.*Existing recovered expense/i })
 				).toBeVisible()
-				await close(page)
+				await page.evaluate(() => {
+					window.financeWorkerReadFixture.route('/login')
+					window.financeWorkerReadFixture.holdNavigation()
+				})
+				await input.fill(phrase)
+				await page.getByRole('button', { name: 'Login', exact: true }).click()
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.navigationCalls()))
+					.toBe(3)
+				await page.evaluate(() => window.financeWorkerReadFixture.close())
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('closing')
+				await page.evaluate(() => window.financeWorkerReadFixture.releaseNavigation())
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('closed')
+				expect(new URL(page.url()).pathname).toBe('/')
 				await context.close()
 				await authority.close()
 				endpoint.closeAllConnections()
@@ -957,6 +1000,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
 					.toBe('failed')
+				expect(
+					await page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore)
+				).toMatchObject({ canSubmit: false, canRetryNavigation: false, busy: false })
 				const workspaceId = crypto.randomUUID(),
 					accountId = crypto.randomUUID()
 				expect(

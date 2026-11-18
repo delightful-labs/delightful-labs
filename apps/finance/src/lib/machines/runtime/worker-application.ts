@@ -1,9 +1,10 @@
 import type {
-	RestorationEvent,
-	RestorationReport,
-	RestorationResult,
-	RestorationScope
-} from 'delightful-local-first/restoration/contracts'
+	RecoveryResult,
+	RecoveryNavigation,
+	RecoveryNotice
+} from 'delightful-local-first/recovery/coordination'
+import type { FinanceRecoveryFinished } from '../../contracts/worker-recovery.js'
+import type { RestorationScope } from 'delightful-local-first/restoration/contracts'
 import {
 	createAsyncLogic,
 	createCallbackLogic,
@@ -64,14 +65,15 @@ type Input = {
 	closeBroker: () => Promise<WorkerHostClosed>
 	brokerIdentity: WorkerHostClosed
 }
-type RestorationFinished = {
-	result: RestorationResult
-	view: SessionRuntimeView<FinanceWorkerCapabilities>
-}
-type RestorationOwner = ActorRef<Snapshot<unknown>, RestorationEvent>
+type RestorationFinished = Omit<FinanceRecoveryFinished, 'type'>
+type RestorationOwner = ActorRef<Snapshot<unknown>, { type: 'SHUTDOWN' | 'WORKSPACE_DRAINED' }>
 type Context = Input & {
-	restoration: { scope: RestorationScope; owner: RestorationOwner } | undefined
-	restorationOutcome: RestorationResult['outcome'] | undefined
+	restoration:
+		| { scope: RestorationScope; owner: RestorationOwner; operation: 'restore' | 'navigate' }
+		| undefined
+	recoveryNavigation: RecoveryNavigation | undefined
+	href: string | undefined
+	restorationOutcome: RecoveryResult['outcome'] | undefined
 	restorationAttempt: number
 	settledRestoration: RestorationFinished | undefined
 	ready: Ready | undefined
@@ -216,15 +218,16 @@ export function createFinanceWorkerMachine({
 				REGISTER_RESTORATION: types<{
 					scope: RestorationScope
 					owner: RestorationOwner
+					operation: 'restore' | 'navigate'
 					sessionRevision: number
 				}>(),
-				RESTORATION_VALIDATED:
-					types<Omit<Extract<RestorationReport, { type: 'RESTORATION_VALIDATED' }>, 'type'>>(),
-				RESTORATION_PREPARE_REQUESTED:
-					types<
-						Omit<Extract<RestorationReport, { type: 'RESTORATION_PREPARE_REQUESTED' }>, 'type'>
-					>(),
+				RECOVERY_VALIDATED:
+					types<Omit<Extract<RecoveryNotice, { type: 'RECOVERY_VALIDATED' }>, 'type'>>(),
+				RECOVERY_DRAIN_REQUESTED:
+					types<Omit<Extract<RecoveryNotice, { type: 'RECOVERY_DRAIN_REQUESTED' }>, 'type'>>(),
 				RESTORATION_FINISHED: types<RestorationFinished>(),
+				RESTORATION_FAILED: types<RestorationScope>(),
+				OBSERVE_LOCATION: types<{ href: string }>(),
 				SESSION: types<{ view: SessionRuntimeView<FinanceWorkerCapabilities> }>(),
 				SELECT_CONTEXT: types<{
 					selection: WorkerSelection
@@ -273,6 +276,8 @@ export function createFinanceWorkerMachine({
 		initial: 'running',
 		context: ({ input }) => ({
 			...input,
+			recoveryNavigation: undefined,
+			href: undefined,
 			restoration: undefined,
 			restorationOutcome: undefined,
 			restorationAttempt: 0,
@@ -302,10 +307,26 @@ export function createFinanceWorkerMachine({
 			}
 		],
 		on: {
-			RESTORATION_VALIDATED: {},
+			RECOVERY_VALIDATED: {},
+			OBSERVE_LOCATION: ({ event }) => ({ context: { href: event.href } }),
+			RESTORATION_FAILED: ({ context, event }) =>
+				sameRestoration(context, event)
+					? {
+							target: '.failed',
+							context: { restoration: undefined, ready: undefined, facts: undefined }
+						}
+					: undefined,
 			RESTORATION_FINISHED: ({ context, event }) => {
-				if (!sameRestoration(context, event.result)) return
-				return { context: { restoration: undefined, restorationOutcome: event.result.outcome } }
+				if (!sameRestoration(context, event.scope)) return
+				const completed = {
+					restoration: undefined,
+					restorationOutcome: event.result.outcome,
+					recoveryNavigation:
+						event.result.outcome === 'navigationFailed' ? event.result.navigation : undefined
+				}
+				return event.result.outcome === 'restorationChildFailed'
+					? { target: '.failed', context: { ...completed, ready: undefined, facts: undefined } }
+					: { context: completed }
 			},
 			CLOSE: ({ context }, enq) => {
 				if (context.restoration) enq.sendTo(context.restoration.owner, { type: 'SHUTDOWN' })
@@ -315,7 +336,6 @@ export function createFinanceWorkerMachine({
 					context: {
 						ready: undefined,
 						facts: undefined,
-						restoration: undefined,
 						settledRestoration: undefined
 					}
 				}
@@ -385,15 +405,16 @@ export function createFinanceWorkerMachine({
 							return
 						return {
 							context: {
-								restoration: { scope: event.scope, owner: event.owner },
+								restoration: { scope: event.scope, owner: event.owner, operation: event.operation },
+								recoveryNavigation: undefined,
 								restorationAttempt: event.scope.attempt,
 								restorationOutcome: undefined
 							}
 						}
 					},
-					RESTORATION_VALIDATED: {},
-					RESTORATION_PREPARE_REQUESTED: ({ context, event }, enq) => {
-						if (!sameRestoration(context, event)) return
+					RECOVERY_VALIDATED: {},
+					RECOVERY_DRAIN_REQUESTED: ({ context, event }, enq) => {
+						if (event.attempt !== context.restoration?.scope.attempt) return
 						if (context.forms) enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
 						return {
 							target: '#finance-worker.restoring.draining',
@@ -415,7 +436,7 @@ export function createFinanceWorkerMachine({
 								? ready?.status !== 'ready' || ready.binding !== context.ready.binding
 								: view.status !== context.sessionStatus)
 						)
-							enq.sendTo(context.restoration.owner, { type: 'BINDING_INVALIDATED' })
+							enq.sendTo(context.restoration.owner, { type: 'SHUTDOWN' })
 						if (
 							view.stage === 'failed' ||
 							view.stage === 'closed' ||
@@ -641,10 +662,10 @@ export function createFinanceWorkerMachine({
 								}
 							: undefined,
 					FORMS_VIEW: {},
-					RESTORATION_VALIDATED: {},
-					RESTORATION_PREPARE_REQUESTED: {},
+					RECOVERY_VALIDATED: {},
+					RECOVERY_DRAIN_REQUESTED: {},
 					RESTORATION_FINISHED: ({ context, event, value }) => {
-						if (!sameRestoration(context, event.result)) return
+						if (!sameRestoration(context, event.scope)) return
 						return matchesState({ restoring: 'mutating' }, value)
 							? { target: '.resuming', context: { settledRestoration: event } }
 							: { context: { settledRestoration: event } }
@@ -684,8 +705,7 @@ export function createFinanceWorkerMachine({
 						entry: ({ context }, enq) => {
 							if (context.restoration)
 								enq.sendTo(context.restoration.owner, {
-									type: 'PREPARED',
-									...context.restoration.scope
+									type: 'WORKSPACE_DRAINED'
 								})
 						}
 					},
@@ -695,12 +715,14 @@ export function createFinanceWorkerMachine({
 							const settled = required(context.settledRestoration),
 								view = settled.view
 							const ready =
-								view.stage === 'active' && view.observation?.status === 'ready'
+								view.stage === 'active' &&
+								settled.result.outcome !== 'restorationChildFailed' &&
+								view.observation?.status === 'ready'
 									? view.observation
 									: undefined
 							return {
 								target:
-									view.stage === 'active'
+									view.stage === 'active' && settled.result.outcome !== 'restorationChildFailed'
 										? ready
 											? '#finance-worker.running.ready'
 											: '#finance-worker.running.waiting'
@@ -712,6 +734,10 @@ export function createFinanceWorkerMachine({
 									restoration: undefined,
 									settledRestoration: undefined,
 									restorationOutcome: settled.result.outcome,
+									recoveryNavigation:
+										settled.result.outcome === 'navigationFailed'
+											? settled.result.navigation
+											: undefined,
 									selection: { workspaceId: null, revision: context.selection.revision },
 									transactionId: null,
 									ledgerPage: 1,
@@ -770,25 +796,49 @@ export function createFinanceWorkerMachine({
 				}
 			},
 			draining: {
-				initial: 'assessing',
+				type: 'parallel',
 				on: { CLOSE: {}, NATIVE_FAILED: {}, FORMS_VIEW: {} },
+				onDone: { target: 'closingSession' },
 				states: {
-					assessing: {
-						type: 'choice',
-						choice: ({ context }) => ({
-							target: context.forms ? 'waiting' : '#finance-worker.closingSession'
-						})
-					},
-					waiting: {
-						on: {
-							FORMS_CLOSED: ({ context, event }, enq) => {
-								if (!context.forms || event.binding !== context.forms.binding) return
-								enq.stop(context.forms.observer)
-								return {
-									target: '#finance-worker.closingSession',
-									context: { forms: undefined, formsView: undefined }
+					financial: {
+						initial: 'assessing',
+						states: {
+							assessing: {
+								type: 'choice',
+								choice: ({ context }) => ({ target: context.forms ? 'waiting' : 'closed' })
+							},
+							waiting: {
+								on: {
+									FORMS_CLOSED: ({ context, event }, enq) => {
+										if (!context.forms || event.binding !== context.forms.binding) return
+										enq.stop(context.forms.observer)
+										return { target: 'closed', context: { forms: undefined, formsView: undefined } }
+									}
 								}
-							}
+							},
+							closed: { type: 'final' }
+						}
+					},
+					recovery: {
+						initial: 'assessing',
+						states: {
+							assessing: {
+								type: 'choice',
+								choice: ({ context }) => ({ target: context.restoration ? 'waiting' : 'closed' })
+							},
+							waiting: {
+								on: {
+									RESTORATION_FINISHED: ({ context, event }) =>
+										sameRestoration(context, event.scope)
+											? { target: 'closed', context: { restoration: undefined } }
+											: undefined,
+									RESTORATION_FAILED: ({ context, event }) =>
+										sameRestoration(context, event)
+											? { target: 'closed', context: { restoration: undefined } }
+											: undefined
+								}
+							},
+							closed: { type: 'final' }
 						}
 					}
 				}
@@ -895,16 +945,16 @@ export function selectFinanceWorkerView(
 		selection: context.selection,
 		status,
 		identityRestore: {
-			canSubmit:
-				snapshot.status === 'active' &&
-				snapshot.matches('running') &&
-				!context.restoration &&
-				(context.ready !== undefined || context.sessionStatus === 'signed-out'),
+			canSubmit: selectFinanceRestorationAdmission(snapshot, context.sessionRevision) !== undefined,
 			busy: context.restoration !== undefined,
+			navigationOnly: context.restoration?.operation === 'navigate',
+			navigationError: context.restorationOutcome === 'navigationFailed',
+			canRetryNavigation:
+				selectFinanceNavigationRetry(snapshot, context.sessionRevision) !== undefined,
 			error:
 				context.restorationOutcome === 'invalid' ||
-				context.restorationOutcome === 'failed' ||
-				context.restorationOutcome === 'identityUnavailable',
+				context.restorationOutcome === 'restoreFailed' ||
+				context.restorationOutcome === 'restorationChildFailed',
 			draftRevision: context.restorationAttempt
 		},
 		recoveryAvailable:
@@ -1064,5 +1114,19 @@ export function selectFinanceRestorationAdmission(
 					attempt: snapshot.context.restorationAttempt + 1
 				}
 			}
+		: undefined
+}
+
+export function selectFinanceNavigationRetry(
+	snapshot: SnapshotFrom<ReturnType<typeof createFinanceWorkerMachine>> | undefined,
+	revision: number
+) {
+	const admitted = selectFinanceRestorationAdmission(snapshot, revision),
+		navigation = snapshot?.context.recoveryNavigation
+	return admitted &&
+		navigation &&
+		snapshot?.context.href === navigation.origin &&
+		snapshot.context.ready?.identityId === navigation.identity
+		? { ...admitted, navigation }
 		: undefined
 }

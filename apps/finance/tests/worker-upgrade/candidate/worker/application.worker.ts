@@ -1,4 +1,6 @@
-import { restorationMachine } from 'delightful-local-first/restoration/workflow'
+import { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordination'
+import { requestWindowNavigation } from './navigation.js'
+import type { RecoveryRequest } from 'delightful-local-first/recovery/coordination'
 import { parseJazzRecoveryPhrase } from 'delightful-local-first/backend/jazz/restoration'
 import { replyWithRecoveryPhrase } from './recovery.js'
 import { createActor, type ActorFromLogic } from 'xstate'
@@ -15,6 +17,7 @@ import {
 	financeWorkerCommand,
 	financeRecoveryRead,
 	financeIdentityRestore,
+	financeRecoveryRetry,
 	financeWorkerOpen,
 	type FinanceWorkerCapabilities
 } from '../../contracts/worker-application.js'
@@ -23,13 +26,14 @@ import {
 	selectFinanceFormObservations,
 	selectFinanceWorkerView,
 	selectFinanceRestorationAdmission,
+	selectFinanceNavigationRetry,
 	selectFinanceRecoveryReader
 } from '../../machines/runtime/worker-application.js'
 import { createFinanceAccountStore } from './account-store.js'
 import { createFinanceWorkerBinding } from './binding.js'
 
 let application: ActorFromLogic<ReturnType<typeof createFinanceWorkerMachine>> | undefined
-let restoration: ActorFromLogic<typeof restorationMachine> | undefined
+let restoration: ActorFromLogic<typeof sessionRecoveryMachine> | undefined
 let viewScheduled = false
 function publishView() {
 	if (viewScheduled) return
@@ -47,32 +51,58 @@ function publishView() {
 }
 const sessionMachine = createSessionRuntimeMachine<FinanceWorkerCapabilities>()
 self.addEventListener('message', (event: MessageEvent<unknown>) => {
-	const restore = financeIdentityRestore.safeParse(event.data)
-	if (restore.success) {
+	const restore = financeIdentityRestore.safeParse(event.data),
+		retry = financeRecoveryRetry.safeParse(event.data)
+	if (restore.success || retry.success) {
 		for (const port of event.ports) port.close()
-		const admitted = selectFinanceRestorationAdmission(
-			application?.getSnapshot(),
-			restore.data.sessionRevision
-		)
-		if (!admitted || !application || restoration?.getSnapshot().status === 'active') return
+		const revision = restore.success
+			? restore.data.sessionRevision
+			: retry.success
+				? retry.data.sessionRevision
+				: -1
+		const navigation = retry.success
+			? selectFinanceNavigationRetry(application?.getSnapshot(), revision)
+			: undefined
+		const admitted = restore.success
+			? selectFinanceRestorationAdmission(application?.getSnapshot(), revision)
+			: navigation
+		const request: RecoveryRequest | undefined = restore.success
+			? {
+					kind: 'restore',
+					phrase: restore.data.phrase,
+					origin: restore.data.origin,
+					destination: '/'
+				}
+			: navigation
+				? { kind: 'navigate', ...navigation.navigation }
+				: undefined
+		if (!admitted || !request || !application || restoration?.getSnapshot().status === 'active')
+			return
 		const { session, scope } = admitted
 		const current = (binding: object) =>
 			binding === session.binding && session.view.get().stage === 'active'
-		const owner = createActor(restorationMachine, {
+		const owner = createActor(sessionRecoveryMachine, {
 			input: {
-				scope,
-				phrase: restore.data.phrase,
+				attempt: scope.attempt,
+				request,
+				session,
 				reportTo: application,
-				capability: {
-					runtime: session,
-					parsePhrase: parseJazzRecoveryPhrase,
-					isCurrentBinding: current,
-					readIdentity: async () => {
-						const view = session.view.get(),
-							observation = view.observation
-						return view.stage === 'active' && observation?.status === 'ready'
-							? { kind: 'ready', identityId: observation.identityId }
-							: { kind: 'unavailable' }
+				readHref: () => application?.getSnapshot().context.href ?? request.origin,
+				navigate: (destination) => requestWindowNavigation(destination, request.origin),
+				restorationBinding: {
+					binding: scope.binding,
+					invalidate: () => {},
+					capability: {
+						runtime: session,
+						parsePhrase: parseJazzRecoveryPhrase,
+						isCurrentBinding: current,
+						readIdentity: async () => {
+							const view = session.view.get(),
+								observation = view.observation
+							return view.stage === 'active' && observation?.status === 'ready'
+								? { kind: 'ready', identityId: observation.identityId }
+								: { kind: 'unavailable' }
+						}
 					}
 				}
 			}
@@ -80,21 +110,28 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 		restoration = owner
 		owner.subscribe({
 			complete: () => {
-				const result = owner.getSnapshot().output
 				if (restoration === owner) restoration = undefined
+				const result = owner.getSnapshot().output
 				if (result)
-					application?.send({ type: 'RESTORATION_FINISHED', result, view: session.view.get() })
+					application?.send({
+						type: 'RESTORATION_FINISHED',
+						scope,
+						result,
+						view: session.view.get()
+					})
+				else application?.send({ type: 'RESTORATION_FAILED', ...scope })
 			},
 			error: () => {
 				if (restoration === owner) restoration = undefined
-				application?.send({ type: 'NATIVE_FAILED' })
+				application?.send({ type: 'RESTORATION_FAILED', ...scope })
 			}
 		})
 		application.send({
 			type: 'REGISTER_RESTORATION',
 			scope,
 			owner,
-			sessionRevision: restore.data.sessionRevision
+			operation: request.kind,
+			sessionRevision: revision
 		})
 		owner.start()
 		return

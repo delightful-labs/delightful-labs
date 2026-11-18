@@ -9,6 +9,8 @@ export function checkFinanceWorker(directory, finance, proof) {
 	const run = (command, args) => execFileSync(command, args, { cwd: app, stdio: 'inherit' })
 	for (const name of [
 		'src/lib/runtime/worker/recovery.ts',
+		'src/lib/runtime/worker/navigation.ts',
+		'src/lib/contracts/worker-recovery.ts',
 		'src/lib/components/worker/WorkerRecovery.svelte',
 		'src/lib/components/worker/WorkerLogin.svelte',
 		'src/lib/components/identity/LoginForm.svelte',

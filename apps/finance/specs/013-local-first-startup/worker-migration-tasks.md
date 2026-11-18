@@ -9,16 +9,17 @@ entries below. Candidate source cleanup and all concurrent PR46 updates are pres
 
 Qualified worker slices now include native SDK/session/storage custody, account creation/archive,
 income/expense entry and selected editing, exact balances and bounded filtered ledger pages,
-workspace initialization, recovery-key display and **private account restoration**. Archive,
+workspace initialization, recovery-key display and **private account restoration and native post-recovery navigation**. Archive,
 initialization and forms share one restartable SDK-bound group. Recovery reuses Local First's actors;
 raw phrases never enter Finance's inspected state. Actual cross-profile restoration recovers existing
 transactions and survives a full offline process restart. Pending offline uploads preserve Jazz's
 native account-switch refusal and resume ordinary Finance without retrying.
 
-Latest local qualification: **1,978 Finance units** (46 host), zero-warning static/browser types,
+Latest local qualification: **1,982 Finance units** (50 host), zero-warning static/browser types,
 and **39 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
-passes 200 schema/restore and 42 worker/session cases. Hosted Finance/Foundation/Clipper pass at
-`cef5aa4b`. W12/W16 remain partial: full shell/chooser/navigation precedes
+passes 200 schema/restore and 42 worker/session cases. Shared recovery coordination accepts the typed session connection and an explicit private-root
+recipient; **1,250 Local First units** pass. Hosted Finance/Foundation/Clipper pass at
+`198a57c5`. W12/W16 remain partial: full shell/chooser/navigation precedes
 remaining settings/classification/transfers, provider, attachment and workspace/archive UI parity.
 W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
 The intermittent check/account-move failure remains an explicit activation blocker.
