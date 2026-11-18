@@ -9,6 +9,7 @@ import {
 import {
 	createFinanceWorkerMachine,
 	selectFinanceWorkerView,
+	selectFinanceRecoveryReader,
 	selectFinanceArchiveObservation,
 	selectFinanceFormObservations,
 	selectFinanceArchiveWriter
@@ -67,6 +68,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		publish: (row: TransactionEntryObservation['transaction']) => void
 		release: ReturnType<typeof vi.fn>
 	}[] = []
+	const recoveryRead = vi.fn(async () => 'fixture phrase')
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const createWrite = vi.fn(
 		async (
@@ -161,6 +163,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 			details.push({ publish, release })
 			return release
 		},
+		readRecoveryPhrase: recoveryRead,
 		archiveAccount: archiveWrite
 	}
 	const ready = (binding: object): SessionRuntimeObservation<FinanceWorkerCapabilities> => ({
@@ -252,6 +255,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		ledgers,
 		details,
 		archiveWrite,
+		recoveryRead,
 		createWrite,
 		transactionDb,
 		enter: (
@@ -372,6 +376,24 @@ describe('Finance worker ownership and selected accounts', () => {
 			})
 			expect(f.actor.getSnapshot().context.ledgerPage).toBe(1)
 			expect(f.actor.getSnapshot().context.ledgerFilters.query).toBe('tail')
+		} finally {
+			f.stop()
+		}
+	})
+	it('admits only current device-account recovery reads and withdraws them before native close', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			const revision = f.view().sessionRevision
+			expect(f.recoveryRead).not.toHaveBeenCalled()
+			expect(selectFinanceRecoveryReader(f.actor.getSnapshot(), revision - 1)).toBeUndefined()
+			const read = selectFinanceRecoveryReader(f.actor.getSnapshot(), revision)
+			expect(await read?.()).toBe('fixture phrase')
+			expect(f.recoveryRead).toHaveBeenCalledOnce()
+			expect(JSON.stringify(f.view())).not.toContain('fixture phrase')
+			f.actor.send({ type: 'CLOSE' })
+			expect(selectFinanceRecoveryReader(f.actor.getSnapshot(), revision)).toBeUndefined()
+			await waitFor(f.actor, (s) => s.status === 'done')
 		} finally {
 			f.stop()
 		}

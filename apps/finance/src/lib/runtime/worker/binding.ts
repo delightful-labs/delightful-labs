@@ -1,3 +1,8 @@
+import type {
+	RecoveryScope,
+	RecoveryScopeSource,
+	RecoveryPhraseCapability
+} from 'delightful-local-first/recovery/contracts'
 import { ReadTier, type Db } from 'jazz-tools'
 import { app } from '../../schema.js'
 import {
@@ -17,12 +22,14 @@ export function createFinanceWorkerBinding({
 	db,
 	isCurrent,
 	identityId,
-	binding
+	binding,
+	recovery
 }: {
 	db: Db
 	isCurrent: () => boolean
 	identityId: string
 	binding: object
+	recovery: { source: RecoveryScopeSource; capability: RecoveryPhraseCapability }
 }): FinanceWorkerCapabilities {
 	return {
 		observeWorkspaces: (publish, failed) =>
@@ -236,6 +243,21 @@ export function createFinanceWorkerBinding({
 				},
 				{ tier: ReadTier.LocalFirst }
 			),
+		readRecoveryPhrase: async () => {
+			if (!isCurrent()) throw new Error('Finance recovery binding retired')
+			// The native source publishes its current scope synchronously. Observe once;
+			// the shared SDK capability rechecks the exact binding adjacent to export.
+			const observed: { scope: RecoveryScope } = { scope: { kind: 'unavailable' } }
+			const stop = recovery.source.subscribe((scope) => {
+				observed.scope = scope
+			})
+			stop()
+			if (observed.scope.kind !== 'available') throw new Error('Recovery unavailable')
+			const phrase = await recovery.capability.readPhrase(observed.scope)
+			if (!isCurrent() || !recovery.capability.isCurrentScope(observed.scope))
+				throw new Error('Recovery binding changed')
+			return phrase
+		},
 		archiveAccount: (accountId) => {
 			if (!isCurrent()) return Promise.reject(new Error('Finance account binding retired'))
 			return archiveAccount(db, accountId)

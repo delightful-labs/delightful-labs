@@ -1,3 +1,4 @@
+import { replyWithRecoveryPhrase } from './recovery.js'
 import { createActor, type ActorFromLogic } from 'xstate'
 import { createJazzSessionRuntime } from 'delightful-local-first/backend/jazz/session-runtime'
 import {
@@ -10,6 +11,7 @@ import brokerUrl from '#jazz-broker-worker?sharedworker&url'
 import sdk from 'jazz-tools/package.json' with { type: 'json' }
 import {
 	financeWorkerCommand,
+	financeRecoveryRead,
 	financeWorkerOpen,
 	type FinanceWorkerCapabilities
 } from '../../contracts/worker-application.js'
@@ -18,7 +20,8 @@ import {
 	selectFinanceArchiveObservation,
 	selectFinanceArchiveWriter,
 	selectFinanceFormObservations,
-	selectFinanceWorkerView
+	selectFinanceWorkerView,
+	selectFinanceRecoveryReader
 } from '../../machines/runtime/worker-application.js'
 import { createFinanceAccountStore } from './account-store.js'
 import { createFinanceWorkerBinding } from './binding.js'
@@ -41,6 +44,16 @@ function publishView() {
 }
 const sessionMachine = createSessionRuntimeMachine<FinanceWorkerCapabilities>()
 self.addEventListener('message', (event: MessageEvent<unknown>) => {
+	const recovery = financeRecoveryRead.safeParse(event.data)
+	if (recovery.success && event.ports.length === 1) {
+		const reply = event.ports[0]
+		if (reply)
+			void replyWithRecoveryPhrase(
+				reply,
+				selectFinanceRecoveryReader(application?.getSnapshot(), recovery.data.sessionRevision)
+			)
+		return
+	}
 	const open = financeWorkerOpen.safeParse(event.data)
 	if (open.success && !application && event.ports.length === 2) {
 		const data = event.ports[0],

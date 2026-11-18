@@ -838,3 +838,39 @@ Artifact: `finance-jazz-alpha67-6UPXKy`. Logs:
 `/private/tmp/finance-worker-startup-{static,test-types,unit,full-unit,native,fresh-alpha67}.log`.
 The active alpha.60 app is unchanged. Identity UI, shell/chooser navigation, optional seeding,
 initialization retry presentation and remaining domain/provider/backup parity remain open.
+
+## Existing recovery dialog with worker-owned key export
+
+Reuse Local First's recovery dialog and private UI interaction actor unchanged. Opening/hiding the
+dialog, focus and clearing its displayed phrase remain UI responsibilities. The Worker publishes
+only device-account availability; the existing native SDK adapter validates scope and exports/encodes
+the key in the Worker after an explicit reveal. Bind its public source/capability contract to the
+existing worker client rather than moving a Jazz session or SDK crypto onto Window.
+
+Use one native MessageChannel for each explicit resource-free key read, with a validated session
+revision and a bounded private result. Ordinary Finance views, inspected actor state, logs and
+persistent stores never carry the phrase. The client validates replies and closes its port; the
+Worker closes the reply port on either outcome and rejects retired/closing SDK bindings. The
+shared dialog's existing hide/unmount/scope-change behavior clears sensitive UI state. No registry,
+SDK patch, data migration or new localization is needed. This does not authorize restoration or
+sign-out before domain drains; those remain the next identity-write slice. Qualify no startup
+export, explicit reveal/hide, UI detachment, scoped failure and close during reveal across engines.
+
+Implemented using the existing public Local First recovery integration, UI actor, dialog and
+messages. The UI adapter maps the Worker's availability/revision observations into that existing
+contract; the SDK adapter performs the actual scoped export/encoding in the Worker. A private
+MessageChannel carries each explicitly requested result, with no generic request registry. Replies
+are validated, stale/closing bindings are refused, and both reply ports are released. The shared
+UI actor remains private and clears its phrase on hide, detach, scope loss and close. Finance's
+ordinary Worker view and inspected financial actor tree never contain the phrase.
+
+All **1,969 Finance units** (37 host), complete Finance/browser-test static checks with zero
+warnings, and **33 native browser cases** pass. New three-engine cases assert zero startup exports,
+explicit reveal, same-key repeat reveal, no phrase in public Finance views, clearing on hide and
+UI detach/remount, and close during reveal. The same 33 cases pass through the incorporated
+readable-candidate source assembler. The candidate worker entry matches the tested entry byte for
+byte; the retired worker-entry patch stays deleted. No SDK patch or public shared implementation
+changed. Logs: `/private/tmp/finance-worker-recovery-{combined-static,test-types,unit,full-unit,native,combined-native}.log`.
+Startup's preceding fresh qualification remains 200 schema/restore + 42 session + 30 application
+cases at `finance-jazz-alpha67-6UPXKy`; the extended 33-case application run uses that same native
+artifact. Restoration/sign-out, complete shell navigation and remaining parity/activation stay open.

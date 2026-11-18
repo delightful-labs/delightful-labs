@@ -19,6 +19,7 @@ function attach() {
 		target,
 		props: {
 			view: owner.view,
+			recovery: owner.recovery,
 			onSelectWorkspace: owner.selectWorkspace,
 			onArchive: owner.archiveAccount,
 			onAccountCreation: owner.accountCreationCommand,
@@ -35,6 +36,7 @@ function request(message: unknown) {
 	const channel = new MessageChannel()
 	const result = new Promise<{
 		ok: boolean
+		recoveryReads?: number
 		error?: string
 		transactions?: {
 			id: string
@@ -69,6 +71,7 @@ const fixture = {
 		})
 		attach()
 	},
+	recoveryReads: () => request({ type: 'TEST_RECOVERY_READS' }),
 	state: () => get(current().view),
 	seed: (workspaceId: string, accountId: string, name: string, currency: 'USD' | 'TZS' = 'USD') =>
 		request({ type: 'TEST_SEED', workspaceId, accountId, name, currency }),

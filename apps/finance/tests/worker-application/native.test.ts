@@ -297,6 +297,53 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('reveals a recovery phrase only on request and clears the shared dialog on hide, detach and close', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.recoveryReads())).toEqual({
+					ok: true,
+					recoveryReads: 0
+				})
+				const show = page.getByRole('button', { name: /show recovery phrase/i })
+				await show.click()
+				const phrase = page.getByRole('textbox', { name: /recovery phrase/i })
+				await browserExpect(phrase).toBeVisible()
+				const revealed = await phrase.inputValue()
+				expect(revealed.trim().split(/\s+/).length).toBeGreaterThan(10)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.recoveryReads())).toEqual({
+					ok: true,
+					recoveryReads: 1
+				})
+				expect(
+					await page.evaluate(() =>
+						JSON.stringify(window.financeWorkerReadFixture.state(), (_key, value: unknown) =>
+							typeof value === 'bigint' ? String(value) : value
+						)
+					)
+				).not.toContain(revealed)
+				await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click()
+				await browserExpect(phrase).toHaveCount(0)
+				await show.click()
+				await browserExpect(phrase).toHaveValue(revealed)
+				await page.evaluate(() => window.financeWorkerReadFixture.detach())
+				await page.evaluate(() => window.financeWorkerReadFixture.attach())
+				await browserExpect(phrase).toHaveCount(0)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.recoveryReads())).toEqual({
+					ok: true,
+					recoveryReads: 2
+				})
+				await show.click()
+				await close(page)
+				await browserExpect(phrase).toHaveCount(0)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('initializes a real workspace without fixture writes and reuses its marker offline', async () => {
 			onTestFailed(() => {
 				retained = true

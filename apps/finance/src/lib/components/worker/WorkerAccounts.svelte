@@ -1,4 +1,9 @@
 <script lang="ts">
+	import type {
+		RecoveryScopeSource,
+		RecoveryPhraseCapability
+	} from 'delightful-local-first/recovery/contracts'
+
 	import { fromStore, type Readable } from 'svelte/store'
 	import { Table, StatusMessage, Button } from 'delightful-ui'
 	import WorkspaceSelector from '../workspaces/WorkspaceSelector.svelte'
@@ -6,6 +11,7 @@
 	import AccountArchiveFeedback from '../accounts/AccountArchiveFeedback.svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
 	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+	import WorkerRecovery from './WorkerRecovery.svelte'
 	import WorkerLedger from './WorkerLedger.svelte'
 	import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
 	import { formatSignedMoney } from '../../domain/money.js'
@@ -16,6 +22,7 @@
 	import { m } from '#lib/paraglide/messages.js'
 	let {
 		view,
+		recovery,
 		onSelectWorkspace,
 		onArchive,
 		onAccountCreation,
@@ -25,6 +32,7 @@
 		onLedgerPage,
 		onLedgerFilters
 	}: {
+		recovery: { source: RecoveryScopeSource; capability: RecoveryPhraseCapability }
 		view: Readable<FinanceWorkerView>
 		onSelectWorkspace: (id: string) => void
 		onArchive: (id: string, scope: WorkerCommandScope) => void
@@ -38,6 +46,7 @@
 	const live = $derived(fromStore(view))
 </script>
 
+<WorkerRecovery binding={recovery} />
 <WorkspaceSelector
 	organizations={live.current.workspaces ?? undefined}
 	organizationId={live.current.selection.workspaceId}

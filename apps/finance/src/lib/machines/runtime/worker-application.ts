@@ -756,6 +756,10 @@ export function selectFinanceWorkerView(
 		transactionId: context.transactionId,
 		selection: context.selection,
 		status,
+		recoveryAvailable:
+			snapshot.status === 'active' &&
+			snapshot.matches('running') &&
+			context.ready?.identityKind === 'device',
 		identityId: snapshot.status === 'active' ? (context.ready?.identityId ?? null) : null,
 		workspaces: snapshot.status === 'active' ? (context.facts?.workspaces ?? null) : null,
 		accounts:
@@ -888,4 +892,17 @@ export function selectFinanceFormObservations(
 			transaction: null
 		}
 	}
+}
+
+/** Only an active, current device-account binding can export. The secret is never actor state. */
+export function selectFinanceRecoveryReader(
+	snapshot: SnapshotFrom<ReturnType<typeof createFinanceWorkerMachine>> | undefined,
+	sessionRevision: number
+) {
+	return snapshot?.status === 'active' &&
+		snapshot.matches('running') &&
+		snapshot.context.sessionRevision === sessionRevision &&
+		snapshot.context.ready?.identityKind === 'device'
+		? snapshot.context.ready.capabilities.readRecoveryPhrase
+		: undefined
 }

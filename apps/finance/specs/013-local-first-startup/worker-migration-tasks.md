@@ -253,6 +253,12 @@ retain their product/parity requirements, not the abandoned implementation plan.
       a fresh 200-schema/42-session proof pass. Actual authority cases create the
       first workspace without fixture writes and retain it/account after an offline
       process restart. [Startup evidence](worker-session-resource-decision.md#worker-owned-native-workspace-initialization).
+      **Recovery display implemented in the candidate:** reuse Local First's
+      existing private UI actor/dialog and translations; actual key export and
+      scope rechecks run in the Worker, returning only on a private reply port.
+      All 1,969 units (37 host) and 33 native cases pass, including no automatic
+      export and clearing on hide/detach/close. The native application matrix
+      also passes through the readable-source candidate assembler. [Recovery boundary](worker-session-resource-decision.md#existing-recovery-dialog-with-worker-owned-key-export).
       Continue to
       reuse the existing account archive chart/operation and its issued-write
       drain first; supply membership/grant facts. Native create/archive leaves

@@ -106,6 +106,14 @@ export const financeWorkerCommand = z.discriminatedUnion('type', [
 	}),
 	z.strictObject({ type: z.literal('CLOSE') })
 ])
+export const financeRecoveryRead = z.strictObject({
+	type: z.literal('READ_RECOVERY_PHRASE'),
+	sessionRevision
+})
+export const financeRecoveryReply = z.discriminatedUnion('outcome', [
+	z.strictObject({ outcome: z.literal('ready'), phrase: z.string().min(1).max(8192) }),
+	z.strictObject({ outcome: z.literal('unavailable') })
+])
 export const financeWorkerOpen = z.strictObject({
 	type: z.literal('OPEN'),
 	hostId: z.uuid(),
@@ -150,6 +158,7 @@ export const financeWorkerView = z.strictObject({
 	selection: workerSelection,
 	status: z.enum(['starting', 'signed-out', 'loading', 'ready', 'failed', 'closing', 'closed']),
 	identityId: z.uuid().nullable(),
+	recoveryAvailable: z.boolean(),
 	workspaces: z.array(workerWorkspace).nullable(),
 	accounts: z.array(
 		workerAccount.extend({
@@ -216,6 +225,7 @@ export type FinanceWorkerCapabilities = {
 		publish: (row: TransactionEntryObservation['transaction']) => void,
 		failed: () => void
 	): () => void
+	readRecoveryPhrase(): Promise<string>
 	archiveAccount(accountId: string): Promise<unknown>
 	createForms(observe: () => FinanceFormsObservation): ReturnType<typeof createFinanceFormsMachine>
 }

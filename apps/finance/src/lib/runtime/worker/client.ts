@@ -1,9 +1,16 @@
+import type {
+	RecoveryScope,
+	RecoveryScopeSource,
+	RecoveryPhraseCapability
+} from 'delightful-local-first/recovery/contracts'
 import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
 import { get, writable, type Readable } from 'svelte/store'
 import { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/worker-broker'
 import brokerUrl from '#jazz-broker-worker?sharedworker&url'
 import {
 	financeWorkerOpen,
+	financeRecoveryRead,
+	financeRecoveryReply,
 	financeWorkerCommand,
 	financeWorkerReply,
 	workerContextCommand,
@@ -52,6 +59,7 @@ export function createFinanceWorkerClient(
 		workspaces: null,
 		accounts: [],
 		archiveFeedback: null,
+		recoveryAvailable: false,
 		workspaceStartup: null,
 		accountCreation: null,
 		transactionEntry: null,
@@ -67,6 +75,7 @@ export function createFinanceWorkerClient(
 			accounts: [],
 			workspaces: null,
 			archiveFeedback: null,
+			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
 			transactionEntry: null,
@@ -103,6 +112,7 @@ export function createFinanceWorkerClient(
 			workspaces: null,
 			identityId: null,
 			archiveFeedback: null,
+			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
 			transactionEntry: null,
@@ -137,6 +147,7 @@ export function createFinanceWorkerClient(
 			status: view.status === 'failed' ? 'failed' : 'loading',
 			accounts: [],
 			archiveFeedback: null,
+			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
 			transactionEntry: null,
@@ -145,8 +156,65 @@ export function createFinanceWorkerClient(
 		}))
 		worker.postMessage(command)
 	}
+	const recoveryToken = Object.freeze({})
+	function currentRecoveryScope(view: FinanceWorkerView): RecoveryScope {
+		return view.recoveryAvailable && view.identityId
+			? {
+					kind: 'available',
+					binding: recoveryToken,
+					identityId: view.identityId,
+					generation: view.sessionRevision
+				}
+			: { kind: 'unavailable' }
+	}
+	const recoverySource: RecoveryScopeSource = {
+		subscribe: (publish) => state.subscribe((view) => publish(currentRecoveryScope(view)))
+	}
+	const recoveryCurrent: RecoveryPhraseCapability['isCurrentScope'] = (scope) => {
+		const current = get(state)
+		return (
+			current.recoveryAvailable &&
+			scope.binding === recoveryToken &&
+			scope.generation === current.sessionRevision &&
+			scope.identityId === current.identityId
+		)
+	}
+	const recoveryCapability: RecoveryPhraseCapability = {
+		isCurrentScope: recoveryCurrent,
+		readPhrase: (scope) => {
+			if (!recoveryCurrent(scope)) return Promise.reject(new Error('Recovery unavailable'))
+			const channel = new MessageChannel()
+			return new Promise<string>((resolve, reject) => {
+				const failed = () => {
+					channel.port1.close()
+					reject(new Error('Recovery unavailable'))
+				}
+				channel.port1.onmessageerror = failed
+				channel.port1.onmessage = (event) => {
+					channel.port1.close()
+					const result = financeRecoveryReply.safeParse(event.data)
+					if (result.success && result.data.outcome === 'ready' && recoveryCurrent(scope))
+						resolve(result.data.phrase)
+					else reject(new Error('Recovery unavailable'))
+				}
+				try {
+					worker.postMessage(
+						financeRecoveryRead.parse({
+							type: 'READ_RECOVERY_PHRASE',
+							sessionRevision: scope.generation
+						}),
+						[channel.port2]
+					)
+				} catch {
+					channel.port2.close()
+					failed()
+				}
+			})
+		}
+	}
 	return {
 		view,
+		recovery: { source: recoverySource, capability: recoveryCapability },
 		selectWorkspace: (workspaceId: string | null) =>
 			selectContext(workspaceId, get(state).transactionKind),
 		selectTransaction: (transactionId: string | null) =>
