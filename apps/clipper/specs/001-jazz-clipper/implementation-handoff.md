@@ -1,5 +1,40 @@
 # Article notes — implementation started
 
+## Production schema lineage repair — draft, rollout blocked
+
+Production PR #50 (`f3827565`) returns Jazz 503 and sign-in 500 because its store
+has disconnected schema roots `8a5130d42577` and `a07b009f5a89`. The user approved
+retaining required `notes.documentId` on every Note. The repair restores native
+Jazz migration history, connecting the exact production baseline to required-note
+schema `5734b944387b`. Native policies, projections and writes enforce the same
+document/library for a Note and its Highlight. No public lexicon changes.
+
+The SQLite regression reopens the actual frozen production schema and a populated
+replica on the new schema, retaining app/account IDs, signed-in account mapping,
+document progress/favorite/attachment, article text, image bytes, existing note
+revisions and synthetic AT Protocol session data. A further authority restart
+retains the old data and accepts new highlight-attached notes. Generated snapshots
+and migration index remain owned by `jazz-tools`; only these generated artifacts
+are exempted from Oxfmt so native validation does not recreate formatting drift.
+
+The repair is **not ready to merge**: a separate disposable reproduction populated
+a PR #50 optional-schema replica with a Highlight and attached Note, closed it,
+and reopened it using the required schema. Its first note query fails with
+`changing the type of required column notes.documentId without a default is not supported yet`.
+The production baseline migration does not solve this local upgrade. Preserve
+these profiles; do not delete data, rename stores, invent a UUID default or bypass
+Jazz migration validation. The reproduction is retained locally in
+`/tmp/optional-lineage-repro.test.ts`, `/tmp/optional-schema-repro.test-support.ts`
+and `/tmp/clipper-optional-reopen-result.json`. The schema fixture is the unchanged
+PR #50 schema from Git. A supported local-data migration remains required before
+rollout, followed by the production OAuth/real Margin interoperability check.
+
+Local checks: 1,028 unit/native tests, 32 component tests, all four annotation
+browser tests, root/web/service-worker/extension types and production build pass.
+The expanded native preservation regression also passes separately. Production
+data, settings, storage names and deployment are unchanged; no public test record
+was created during this investigation.
+
 ## Approved TID address allocation — 2026-11-17
 
 The user approved adding `@atcute/tid@1.1.4` after reviewing why a retained address

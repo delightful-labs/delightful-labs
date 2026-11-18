@@ -176,8 +176,7 @@ export const sharingPreviewMachine = setup({
 		SHOW: ({ context, event }) =>
 			context.capability?.isCurrent() &&
 			event.note.libraryId === context.capability.libraryId &&
-			event.note.highlightId === null &&
-			event.note.documentId !== null
+			event.note.highlightId === null
 				? {
 						target: '.loading',
 						reenter: true,

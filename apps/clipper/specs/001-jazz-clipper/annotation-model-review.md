@@ -26,7 +26,9 @@ not implement another text merge engine, version graph or deletion history.
 - Highlight owns a passage target. It does not duplicate the original quotation
   in a separate `originalQuote` field.
 - A document-level Note owns a whole-document target. A highlight-attached Note
-  references the Highlight and uses its target, without a copied Document/source.
+  references the Highlight and uses its target. The user-approved production
+  migration correction retains its owning Document relationship too; its source
+  remains on the Highlight.
 - Note text lives directly on Note as a native Jazz text-merge column. The custom
   `NoteRevision` proposal is rejected; the existing revision implementation is not
   the selected future annotation model.
@@ -111,7 +113,7 @@ highlightAnchors: s.table(
 
 notes: s.table(
   {
-    documentId: s.uuid().optional(),
+    documentId: s.uuid(),
     source: s.string().optional(),
     highlightId: s.uuid().optional(),
     text: s.string().merge('text').default('')
@@ -123,11 +125,29 @@ notes: s.table(
 )
 ```
 
-Document Notes require document/source and omit highlight. Attached Notes require
-highlight and omit document/source. Domain validation, permissions and transaction
+Every Note requires its owning document. Document Notes require source and omit
+highlight. Attached Notes require highlight and omit source; the Highlight must
+belong to the same document and library. Domain validation, permissions and transaction
 admission must enforce these alternatives and owner relationships. Highlight and
 its original anchor are created in one owned transaction; deriving another anchor
 must preserve the original row.
+
+### Production migration correction (user approved)
+
+The production store still uses schema `8a5130d42577`. The annotation release
+disabled migration history and made `notes.documentId` optional. Jazz alpha.60
+cannot migrate an existing column's required/optional setting. The user approved
+keeping `documentId` required on every Note before implementation of the repair.
+The generated native migration preserves that column and adds the annotation
+tables and note fields; public Margin records do not change.
+
+This repairs the production baseline, but is not a complete rollout path. A
+disposable, populated local replica using the optional-column schema from PR #50
+fails to query after reopening with the required-column schema:
+`changing the type of required column notes.documentId without a default is not supported yet`.
+Do not merge/deploy the repair until these profiles have a supported preservation
+path. No profile reset, data deletion, storage-name change, dependency upgrade or
+SDK patch is authorized by the shape approval.
 
 ## Editing and public limits
 

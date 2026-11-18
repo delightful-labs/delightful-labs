@@ -53,18 +53,14 @@ export function createAnnotationRecords(
 										.select('*', '$deletedAt'),
 									{ tier: ReadTier.LocalFirst }
 								),
-								resource.tx.one(
-									app.notes.where({ id: noteId, libraryId }).include({ highlight: true }),
-									{ tier: ReadTier.LocalFirst }
-								),
+								resource.tx.one(app.notes.where({ id: noteId, libraryId }), {
+									tier: ReadTier.LocalFirst
+								}),
 								resource.tx.all(
 									app.notes
 										.where({
 											libraryId,
-											documentId:
-												command.type === 'ADD_NOTE' && !command.highlightId
-													? command.documentId
-													: null,
+											documentId: command.documentId,
 											highlightId:
 												command.type === 'ADD_NOTE' ? (command.highlightId ?? null) : null
 										})
@@ -97,7 +93,7 @@ export function createAnnotationRecords(
 							highlightDeleted:
 								!!highlight?.$deletedAt && highlight.documentId === command.documentId,
 							noteAvailable: !!note,
-							noteDocumentId: note?.documentId ?? note?.highlight?.documentId,
+							noteDocumentId: note?.documentId,
 							existingNote: existing.length > 0,
 							source:
 								attachmentResult.value?.source?.resolvedUrl ?? document?.sourceUrl ?? undefined,
@@ -140,7 +136,7 @@ export function createAnnotationRecords(
 							app.notes,
 							{
 								libraryId,
-								documentId: draft.command.highlightId ? null : draft.command.documentId,
+								documentId: draft.command.documentId,
 								source: draft.command.highlightId ? null : source,
 								highlightId: draft.command.highlightId ?? null,
 								text: ''

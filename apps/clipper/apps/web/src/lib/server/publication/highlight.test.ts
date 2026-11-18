@@ -57,7 +57,7 @@ async function setup(name: string, withNote = false) {
 				app.notes,
 				{
 					libraryId: a.owner.libraryId,
-					documentId: null,
+					documentId: a.owner.documentId,
 					highlightId: a.owner.highlightId,
 					source: null,
 					text: 'Attached note'

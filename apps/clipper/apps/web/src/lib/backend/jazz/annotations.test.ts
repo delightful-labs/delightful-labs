@@ -6,6 +6,7 @@ import { app } from './schema.js'
 import permissions from './permissions.js'
 import { policySchema } from './schema-permissions.test-support.js'
 import { createLibraryRecords } from './records.js'
+import { newDocumentValues } from './document-values.js'
 import type { AnnotationMutation } from '../../annotations/schema.js'
 import { annotationsMachine, selectAnnotations } from '../../annotations/machine.js'
 import { toTextPositionSelector, toTextQuoteSelector } from '../../annotations/selectors.js'
@@ -89,6 +90,10 @@ it('uses native ranges, text/history and same-identity highlight restoration', a
 	const note = await mutate(a, { type: 'ADD_NOTE', documentId: a.documentId, highlightId }),
 		id = note.prepared.id
 	expect(note.result.outcome).toBe('succeeded')
+	expect(await a.db.one(app.notes.where({ id }))).toMatchObject({
+		documentId: a.documentId,
+		highlightId
+	})
 	await mutate(a, {
 		type: 'EDIT_NOTE',
 		documentId: a.documentId,
@@ -116,6 +121,53 @@ it('uses native ranges, text/history and same-identity highlight restoration', a
 	await mutate(a, { type: 'DELETE_NOTE', documentId: a.documentId, id })
 	expect(await a.db.one(app.notes.where({ id }))).toBeNull()
 	expect(await a.db.one(app.highlights.where({ id: highlightId }))).not.toBeNull()
+})
+it('enforces the same document for an attached note and its highlight in native permissions', async () => {
+	const a = await owner('annotation-document-parent'),
+		otherDocumentId = crypto.randomUUID()
+	await a.db
+		.insert(app.libraryDocuments, newDocumentValues(otherDocumentId, a.libraryId, null), {
+			id: otherDocumentId
+		})
+		.wait({ tier: 'global' })
+	const highlight = await mutate(a, {
+		type: 'HIGHLIGHT',
+		documentId: a.documentId,
+		text: 'Selected passage',
+		start: 0,
+		end: 8
+	})
+	await expect(
+		a.db
+			.insert(app.notes, {
+				libraryId: a.libraryId,
+				documentId: otherDocumentId,
+				highlightId: highlight.prepared.id
+			})
+			.wait({ tier: 'global' })
+	).rejects.toThrow()
+	const note = await mutate(a, {
+		type: 'ADD_NOTE',
+		documentId: a.documentId,
+		highlightId: highlight.prepared.id
+	})
+	expect(note.result.outcome).toBe('succeeded')
+	expect(
+		(
+			await mutate(a, {
+				type: 'ADD_NOTE',
+				documentId: a.documentId,
+				highlightId: highlight.prepared.id
+			})
+		).result.outcome
+	).toBe('blocked')
+	await expect(
+		a.db
+			.update(app.notes, note.prepared.id, {
+				documentId: otherDocumentId
+			})
+			.wait({ tier: 'global' })
+	).rejects.toThrow()
 })
 it('projects native document notes and verified source anchors while refusing reader substitution', async () => {
 	const a = await owner('annotation-margin'),

@@ -147,7 +147,7 @@ it('refuses inactive/foreign/attached selections before fetching and expires an 
 	current = true
 	for (const note of [
 		{ ...a.note, libraryId: crypto.randomUUID() },
-		{ ...a.note, highlightId: crypto.randomUUID(), documentId: null }
+		{ ...a.note, highlightId: crypto.randomUUID() }
 	])
 		a.actor.send({ type: 'SHOW', note })
 	expect(fetch).not.toHaveBeenCalled()
@@ -341,7 +341,7 @@ it('previews a highlight and its commentary using the approved highlight source 
 	const highlight = {
 		id: highlightId,
 		libraryId: a.note.libraryId,
-		documentId: a.note.documentId ?? crypto.randomUUID(),
+		documentId: a.note.documentId,
 		source: 'https://example.org/source',
 		anchors: [
 			{
@@ -353,7 +353,7 @@ it('previews a highlight and its commentary using the approved highlight source 
 				range: { before: 'Reader before', matched: 'Quoted passage.', after: 'Reader after' }
 			}
 		],
-		notes: [{ ...a.note, highlightId, documentId: null, source: null }]
+		notes: [{ ...a.note, highlightId, source: null }]
 	}
 	const value = {
 		...a.value,
@@ -396,7 +396,7 @@ it('uses the existing highlight-unavailable message for an unverified source', a
 		highlight: {
 			id,
 			libraryId: a.note.libraryId,
-			documentId: a.note.documentId ?? crypto.randomUUID(),
+			documentId: a.note.documentId,
 			source: 'https://example.org/source',
 			anchors: [],
 			notes: []
