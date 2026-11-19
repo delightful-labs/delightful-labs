@@ -4,7 +4,7 @@ import { assertTestCoverage, propertyTest, type TestSut } from '@xstate/test'
 import { createActor, setup, types, type EventFrom, type SnapshotFrom } from 'xstate'
 import { z } from 'zod'
 import { createBrowserWorkerJob } from './browser-worker-job.js'
-import { TestJobWorker } from './browser-worker-job.test-support.js'
+import { TestJobWorker } from '../../../../tests/fixtures/browser-worker-job.js'
 
 const schema = z.object({ value: z.number().int() })
 const job = createBrowserWorkerJob<string, z.infer<typeof schema>>()
@@ -66,7 +66,7 @@ function ledger(scenario: Scenario) {
 		}
 	})
 }
-it.each(['normal', 'pre-abort', 'construction', 'post'] as const)(
+it.each(['normal', 'pre-abort', 'construction', 'post'] satisfies Scenario[])(
 	'generates %s worker races against an independent single-outcome/resource ledger',
 	async (scenario) => {
 		const model = ledger(scenario)
@@ -159,7 +159,7 @@ it.each(['normal', 'pre-abort', 'construction', 'post'] as const)(
 				STOP: fc.constant({})
 			},
 			sut,
-			failures: { dir: '.xstate-test', key: 'clipper-browser-job-' + scenario }
+			failures: { dir: '.xstate-test', key: 'browser-job-' + scenario }
 		})
 		assertTestCoverage(coverage, { stateNodes: 1, eventTypes: 1, transitions: 1 })
 	}

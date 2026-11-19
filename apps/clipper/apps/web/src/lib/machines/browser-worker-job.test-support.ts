@@ -1,5 +1,8 @@
 import { vi } from 'vitest'
-import type { BrowserJobWorker, BrowserWorkerJobInput } from './browser-worker-job.js'
+import type {
+	BrowserJobWorker,
+	BrowserWorkerJobInput
+} from 'delightful-local-first/worker/browser-job'
 
 export class TestJobWorker implements BrowserJobWorker {
 	onmessage: ((event: MessageEvent<unknown>) => void) | null = null

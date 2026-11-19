@@ -1,7 +1,7 @@
 import {
 	createBrowserWorkerJob,
 	type BrowserWorkerJobInput
-} from '../../web/src/lib/machines/browser-worker-job.js'
+} from 'delightful-local-first/worker/browser-job'
 import { extractionReplySchema, type Source, type ExtractionReply } from './protocol.js'
 
 export const EXTRACTION_TIMEOUT_MS = 15_000

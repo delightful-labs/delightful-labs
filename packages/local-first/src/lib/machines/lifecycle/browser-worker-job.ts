@@ -1,5 +1,4 @@
 import { createCallbackLogic, setup, types } from 'xstate'
-import { monotonicNow } from '../contracts/resource-waits.js'
 
 export type BrowserJobWorker = Pick<
 	Worker,
@@ -28,7 +27,7 @@ export function createBrowserWorkerJob<Request, Reply>() {
 	type Context = { input: Input; result: Result }
 	const native = createCallbackLogic<{ type: 'OPEN' | 'POST' | 'RELEASE' }, Input>(
 		({ input, receive, sendBack }) => {
-			const now = input.now ?? monotonicNow,
+			const now = input.now ?? (() => performance.now()),
 				startedAt = now()
 			let worker: BrowserJobWorker | undefined
 			let released = false
@@ -71,7 +70,8 @@ export function createBrowserWorkerJob<Request, Reply>() {
 					}
 				} else if (event.type === 'POST') {
 					try {
-						worker!.postMessage(input.message, input.transfer ?? [])
+						if (!worker) throw new Error('Missing browser job worker')
+						worker.postMessage(input.message, input.transfer ?? [])
 						sendBack({ type: 'POSTED' })
 					} catch {
 						sendBack({ type: 'FAILED', reason: 'post' })

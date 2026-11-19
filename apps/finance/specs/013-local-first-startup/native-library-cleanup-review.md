@@ -426,7 +426,7 @@ the shared component APIs and existing interaction/accessibility coverage.
 ### C09 — Reuse finite worker jobs only where it deletes meaningful duplication
 
 **Confirmed overlap, selective extraction.** Clipper's existing
-[browser-worker-job.ts](../../../clipper/apps/web/src/lib/machines/browser-worker-job.ts)
+[browser-worker-job.ts](../../../../packages/local-first/src/lib/machines/lifecycle/browser-worker-job.ts)
 is used by image processing and extension extraction. Finance's
 [provider transport](../../src/lib/integrations/simplefin-worker.ts) and
 [image render leaf](../../src/lib/runtime/worker/image-render.ts) separately own
@@ -482,7 +482,7 @@ another full backlog into the resource-decision document.
    changing Finance's feature-view composition; C07 follows the affected reports.
    These are focused app slices, not one cross-app rewrite.
 5. **Independent smaller reuse:** C08 can proceed per component. C09 proceeds
-   only if the before/after example demonstrates less code and fewer lifecycles.
+   when the before/after example demonstrates shared behavior and fewer independently maintained lifecycles; net line savings are secondary.
 
 Approve a concrete ownership/API design before each runtime slice. Reuse public
 native APIs first. Introduce no SDK patch, dependency, storage migration, generic
@@ -882,7 +882,7 @@ manual snapshot binding should be replaced. Remaining: C09–C10; no push, merge
 deployment, migration or dependency change.
 
 
-## C09 revised shared-worker design (not implemented)
+## C09 shared-worker design (first slice complete; provider pending)
 
 The user clarified that reducing drift between the two apps and reusing common
 behavior take priority over net line savings. The proposed line-count-based skip
@@ -949,9 +949,56 @@ separate: its identity/unknown-effect protocol and channel resource owner are no
 these finite jobs. Persistent Jazz/application workers and financial write custody
 also retain their existing real close protocols.
 
-C09 remains open pending the shared implementation and verification, followed by
-provider caller integration. C10 remains open. C01–C08 are complete; retained
+C09 remains open pending provider caller integration; the shared core and image
+consumer slice below is complete. C10 remains open. C01–C08 are complete; retained
 shared bindings may be revisited if an actual cross-app fork is found.
+
+### C09 first slice completion and verification
+
+Promoted Clipper's existing finite job chart to the public Local First
+`worker/browser-job` export. Clipper image processing, extension extraction and
+Finance image rendering now consume that one implementation. Deleted the private
+Clipper production chart and Finance's separate promise-owned worker lifecycle;
+there is no compatibility re-export or actor-to-promise bridge. Canonical unit and
+generated lifecycle tests moved with the implementation. App schemas, native
+worker URLs and Clipper's 20s/15s deadlines remain app-owned.
+
+Finance directly invokes the shared chart. Preview replacement and pending apply
+select their next action while retaining the current invocation until native
+release. Cancel/shutdown likewise wait before releasing bitmap/canvas resources
+or completing. Refused native termination blocks completion. Finance's render
+module now contains only worker construction and ImageData request/reply mapping.
+This removes a lifecycle fork between apps; source line savings are secondary.
+The provider transport remains the second independent finite lifecycle, pending
+its separately reviewed integration.
+
+Verification (2026-11-19):
+
+- Canonical lifecycle unit/generated tests **17/17**, including four seeded
+  generated campaigns (480 runs); Finance focused editor/attachment/permissions
+  tests **151/151**; Clipper full unit suite **992/992**. The moved 17 cases are
+  tested once at their canonical owner rather than duplicated in Clipper.
+- Local First library and full-root Svelte/type checks, Finance Svelte/test type
+  checks, and Clipper web/extension Svelte and extension type checks passed.
+  Svelte checks reported **zero errors and warnings**.
+- Direct package build, strict publint and all **five packed public consumers**
+  passed, including the browser-job type/runtime consumer and self-contained ESM
+  worker artifacts. Offline injection refresh changed no dependencies or lock;
+  all eight workspace consumer identity/link checks passed.
+- Native/browser checks **40/40**: Finance shared image jobs **15/15** across
+  Chromium/Firefox/WebKit (success, preview/apply cancellation, replacement and
+  refused release); existing Finance image UI **3/3** (including offline edits,
+  stable identity after reload and viewer restrictions); Clipper native image/
+  extraction jobs **6/6**, image UI **4/4**, packaged extension suite **12/12**.
+- Changed-source formatting/lint and `git diff --check` passed. Extension test
+  artifact and Finance preview builds passed. Finance used a disposable ignored
+  Vite configuration excluding catalog generation and existing compiled messages;
+  ephemeral authorities, browser profiles, ports and build output remained in
+  this checkout. Test listeners were disposed. No Paraglide/catalog source,
+  dependency, SDK patch, storage, identity, permissions or provider consent change.
+
+Remaining: C09 provider caller/drain integration and C10. C01–C08 remain complete.
+No push, merge or deployment.
 
 ## C10 concrete work sequence (not implemented)
 
@@ -987,5 +1034,5 @@ batch. For build reuse, verify actual compiled environment inputs before
 collapsing jobs. Clipper's per-spec authority/server restart remains intentional;
 reuse an immutable build only across truly matching inputs, never a mutable
 backend. Keep generated output separate from user servers/data and introduce no
-new generic fixture/RPC/cache framework. Remaining: C09 shared implementation/provider integration and C10;
+new generic fixture/RPC/cache framework. Remaining: C09 provider integration and C10;
 C01–C08 are complete.
