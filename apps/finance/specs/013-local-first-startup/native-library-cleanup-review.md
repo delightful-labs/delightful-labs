@@ -1,7 +1,7 @@
 # Native-library cleanup specification
 
-Status: C01–C09 complete, including explicit retained-owner dispositions for C06
-and C08. C10 remains open. Complete
+Status: C01–C10 complete, including explicit retained-owner dispositions for C06
+and C08. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -70,8 +70,8 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01–C09 are complete. C06 and C08 include reviewed retained-owner decisions
-below. C10 remains open pending its acceptance evidence. The source evidence and constraints for each
+C01–C10 are complete. C06 and C08 include reviewed retained-owner decisions
+below. Completed batches and verification evidence follow. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -94,7 +94,7 @@ do not mark an item complete merely because code moved to a smaller file.
 - [x] **C09:** Record the before/after ownership decision for finite worker reuse.
       Share common lifecycle behavior to reduce app drift; report code costs and
       document any justified boundary-specific exceptions.
-- [ ] **C10:** Production-bound fixtures use the actual adapter; identical builds
+- [x] **C10:** Production-bound fixtures use the actual adapter; identical builds
       are reused only across matching configurations with separate authorities and full coverage.
 
 Each completed implementation slice must list changed ownership/API surfaces,
@@ -1057,7 +1057,7 @@ Verification:
 C09 is complete. Remaining: C10 fixture ownership and matching test-build reuse.
 No push, merge or deployment.
 
-## C10 concrete work sequence (not implemented)
+## C10 reviewed work sequence (completed in the batches below)
 
 Source recheck found the old unscoped store in two fixtures plus independent
 historical tests. Production and the custody fixture already use the scoped
@@ -1163,3 +1163,54 @@ lint correction to its failure reporting, not to weaken closure assertions.
 
 Remaining: C10 matching Finance CI build reuse batch. No dependency, storage
 migration, catalog generation, push, merge or deployment.
+
+
+## C10 matching Finance build batch completed
+
+Finance CI now builds the exact general E2E configuration once for the two
+application shards, authentication, permissions and workspace jobs. It retains
+`FINANCE_PREVIEW=true`, `PUBLIC_DEBUG=true`, `vite.e2e.config.ts` and that config's
+in-memory backend. The other public flags retain the defaults in `src/env.ts`:
+fake/demo disabled and empty server/app values (the client resolves its same-origin
+endpoint). This is distinct from the check job's `ci-build` output. Presentation,
+startup, restore experiments, debugging/fake-data and PWA keep their independent
+configuration/build lifetimes.
+
+The builder uploads only `.svelte-kit/output`, including hidden files, under its
+commit/attempt name. Matching jobs download the producer's exact immutable
+artifact ID via [the native Actions download contract](https://github.com/actions/download-artifact/tree/v7),
+then set `FINANCE_E2E_PREBUILT=true` for preview-only startup. The producer ID also
+preserves the correct artifact when failed consumer jobs are rerun independently.
+Missing/failed artifacts fail matching jobs before preview; unrelated configurations
+remain independently runnable. No mutable server, profile or database is shared.
+Default local behavior still builds and previews; no generic cache, wrapper,
+compatibility layer or package dependency was introduced. Existing matrix selections,
+projects, shards, test flags and result artifacts remain intact.
+
+Verification:
+
+- Built matching Finance E2E output once in this isolated checkout using existing
+  compiled messages and the equivalent temporary no-codegen Vite config. Archived
+  and restored **666 files**, with every SHA-256 hash matching the original output.
+  Used the real base config's preview-only command against that restored output
+  on port 5182, with separate disposable browser profiles and an in-memory backend.
+- Representative tests **4/4** across all four matching projects: native image
+  edit/save, invalid-recovery preservation, administrator permissions and workspace
+  transaction entry. No build ran during those preview-only tests. The installed
+  Paraglide preview hooks only set configuration; its generation hook did not run.
+- Default and prebuilt test listings are byte-identical: **270 tests / 37 files**.
+  Config inspection confirms the default command still builds then previews and
+  the opt-in command only previews. Finance test TypeScript and changed config
+  formatting passed; workflow YAML parsed with all seven jobs present. Native
+  upload/download artifact inputs were checked against the first-party contract.
+- `git diff --check` passed. Catalog/generated sources and the lockfile are
+  unchanged. Disposable test listeners were closed; no user server or data was
+  touched. The GitHub-hosted workflow itself has not been run from this local
+  branch; its first hosted run remains normal CI validation after publication.
+
+**C01–C10 are complete.** Retained-owner decisions in C06/C08 remain explicit;
+completion does not imply removing those existing shared implementations. No
+push, merge, deployment, SDK patch, package dependency or storage migration was performed.
+
+Final fresh `git fetch origin main` confirmed `origin/main` remains `b69e6ad6`;
+no newer main commit, merge or rebase was required.
