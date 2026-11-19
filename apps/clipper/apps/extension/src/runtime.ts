@@ -1,4 +1,10 @@
+import type { AccountCapabilities } from '../../web/src/lib/contracts/account.js'
 import { machineDiagnostics } from '../../web/src/lib/diagnostics/inspect.js'
+import {
+	createSessionRuntimeMachine,
+	createSessionRuntimeConnection,
+	sessionCloseMachine
+} from 'delightful-local-first/session/runtime'
 import { createActor, toPromise, waitFor } from 'xstate'
 import { stopAfterShutdown } from 'delightful-local-first/forms/lifecycle'
 import {
@@ -6,7 +12,7 @@ import {
 	selectLibraryActor,
 	selectApplicationView
 } from '../../web/src/lib/machines/runtime/application-readiness.js'
-import { existingAccountInput, type Session } from '../../web/src/lib/backend/jazz/account.js'
+import { existingAccountInput } from '../../web/src/lib/backend/jazz/account.js'
 import { extensionLibrary } from './library.js'
 import { createRuntimeMachine } from './runtime-machine.js'
 import {
@@ -21,9 +27,24 @@ async function command(message: unknown) {
 	if (!acceptedAcknowledgmentSchema.safeParse(await chrome.runtime.sendMessage(message)).success)
 		throw new Error('invalidResponse')
 }
-const owner = createActor(createApplicationReadinessMachine<Session>(), {
+const native = existingAccountInput(
+	{ serverUrl: __CLIPPER_SERVER__, env: 'clipper' },
+	extensionLibrary
+)
+const session = createActor(createSessionRuntimeMachine<AccountCapabilities>(), {
+	input: native.native,
+	...machineDiagnostics
+})
+const connection = createSessionRuntimeConnection(session, native.native.binding)
+const owner = createActor(createApplicationReadinessMachine(), {
 	...machineDiagnostics,
-	input: existingAccountInput({ serverUrl: __CLIPPER_SERVER__, env: 'clipper' }, extensionLibrary)
+	input: { session: connection, parsePhrase: native.parsePhrase, signOut: native.signOut }
+})
+const closure = createActor(sessionCloseMachine, { input: connection, ...machineDiagnostics })
+owner.subscribe({
+	complete: () => {
+		if (owner.getSnapshot().output?.clean) closure.start()
+	}
 })
 
 const runtime = createActor(
@@ -31,6 +52,9 @@ const runtime = createActor(
 		reload: async () => {
 			owner.send({ type: 'SHUTDOWN' })
 			await waitFor(owner, (snapshot) => snapshot.status === 'done')
+			if (!owner.getSnapshot().output?.clean) throw new Error('Application drain failed')
+			const closed = await toPromise(closure)
+			if (closed.outcome !== 'closed') throw new Error('Session close failed')
 			location.reload()
 		},
 		account: (bind) => {
@@ -39,6 +63,7 @@ const runtime = createActor(
 				bind(selectLibraryActor(snapshot), view.message, view.status)
 			})
 			owner.start()
+			session.start()
 			return () => {
 				subscription.unsubscribe()
 				stopAfterShutdown(owner)

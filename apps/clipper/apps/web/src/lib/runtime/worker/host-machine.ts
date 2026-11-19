@@ -10,9 +10,11 @@ import {
 } from 'xstate'
 import { hasDetachedTransactions } from '../../backend/jazz/transaction.js'
 
-import type { Session } from '../../backend/jazz/account.js'
 import type { WorkerHostClosed } from 'delightful-local-first/worker/channel/contracts'
-import type { SessionOwnerReply } from 'delightful-local-first/session/contracts'
+import {
+	sessionCloseMachine,
+	selectSessionCloseStage
+} from 'delightful-local-first/session/runtime'
 import type { AccountInput, RecoveryBinding } from '../../contracts/account.js'
 import { createApplicationReadinessMachine } from '../../machines/runtime/application-readiness.js'
 import type { RuntimeCommand } from './protocol.js'
@@ -36,8 +38,8 @@ function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Worker binding unavailable')
 	return value
 }
-const application = createApplicationReadinessMachine<Session>(observeBrowserConnection)
-type Input = AccountInput<Session> & {
+const application = createApplicationReadinessMachine(observeBrowserConnection)
+type Input = AccountInput & {
 	scope: string
 	callbackAttempt?: string | null | undefined
 	authReturned?: () => void
@@ -66,7 +68,6 @@ type Context = {
 	redirect: string | undefined
 	recovery: RecoveryOwner | undefined
 	input: Input
-	session: Session | undefined
 	library: LibraryRef | undefined
 	scope: string
 	limit: number
@@ -96,26 +97,8 @@ type Event =
 	| { type: 'OAUTH_REDIRECT'; url: string }
 	| { type: 'OAUTH_RETURNED' }
 	| { type: 'SHUTDOWN' }
-	| { type: 'OWNER_READY'; session: Session; custodyClear: boolean }
-	| { type: 'OWNER_EMPTY'; custodyClear: boolean }
+	| { type: 'SESSION_CLOSE_STAGE'; stage: 'acquisition' | 'session' }
 	| { type: 'APPLICATION_CLOSED'; clean: boolean }
-const owner = createCallbackLogic<SessionOwnerReply<Session>, Input>(
-	({ input, self, receive, sendBack }) => {
-		const scope = { binding: input.startup.scope.binding, attachment: {}, generation: 0 }
-		receive((event) => {
-			if (event.type === 'ACQUIRED')
-				sendBack({
-					type: 'OWNER_READY',
-					session: event.session,
-					custodyClear: !hasDetachedTransactions()
-				})
-			else if (event.type === 'ACQUISITION_FAILED')
-				sendBack({ type: 'OWNER_EMPTY', custodyClear: !hasDetachedTransactions() })
-		})
-		input.startup.owner.send({ type: 'ACQUIRE', scope, replyTo: self })
-		return () => input.startup.owner.send({ type: 'RELEASE', scope, replyTo: self })
-	}
-)
 const bindingIdentity = createCallbackLogic<
 	never,
 	{ scope: string | undefined; generation: number }
@@ -132,9 +115,9 @@ const actors = {
 	surface: readerSurfaceLeaseMachine,
 	oauth: atprotoMachine,
 	application,
-	owner,
 	tagForm: tagFormMachine,
-	close: createAsyncLogic({ run: ({ input }: { input: Session }) => input().close() }),
+	close: sessionCloseMachine,
+	custody: createAsyncLogic({ run: async () => !hasDetachedTransactions() }),
 	closeTransport: createAsyncLogic<WorkerHostClosed, () => Promise<WorkerHostClosed>>({
 		run: ({ input }) => input()
 	})
@@ -163,8 +146,7 @@ export const workerHostMachine = setup({
 			BIND_RECOVERY: types<EventPayload<Event, 'BIND_RECOVERY'>>(),
 			BIND_LIBRARY: types<EventPayload<Event, 'BIND_LIBRARY'>>(),
 			ATTACH_BOUND: types<EventPayload<Event, 'ATTACH_BOUND'>>(),
-			OWNER_READY: types<EventPayload<Event, 'OWNER_READY'>>(),
-			OWNER_EMPTY: types<EventPayload<Event, 'OWNER_EMPTY'>>(),
+			SESSION_CLOSE_STAGE: types<EventPayload<Event, 'SESSION_CLOSE_STAGE'>>(),
 			LIBRARY_OBSERVED: types<EventPayload<Event, 'LIBRARY_OBSERVED'>>(),
 			BINDING_IDENTIFIED: types<EventPayload<Event, 'BINDING_IDENTIFIED'>>(),
 			SURFACE_CLOSED: types<EventPayload<Event, 'SURFACE_CLOSED'>>(),
@@ -181,7 +163,7 @@ export const workerHostMachine = setup({
 		children: {
 			oauth: types<ActorRefFrom<typeof atprotoMachine>>(),
 			application: types<import('xstate').ActorRefFrom<(typeof actors)['application']>>(),
-			owner: types<import('xstate').ActorRefFrom<(typeof actors)['owner']>>(),
+			custody: types<import('xstate').ActorRefFrom<(typeof actors)['custody']>>(),
 			tagForm: types<import('xstate').ActorRefFrom<(typeof actors)['tagForm']>>(),
 			closeAccountStore: types<import('xstate').ActorRefFrom<typeof actors.closeTransport>>(),
 			closeBroker: types<import('xstate').ActorRefFrom<typeof actors.closeTransport>>(),
@@ -205,8 +187,6 @@ export const workerHostMachine = setup({
 		hasBroker: ({ context }: { context: Context }) => context.input.closeBroker !== undefined,
 		hasAccountStore: ({ context }: { context: Context }) =>
 			context.input.closeAccountStore !== undefined,
-		custodyClear: ({ event }: { event: Event }) =>
-			(event.type === 'OWNER_READY' || event.type === 'OWNER_EMPTY') && event.custodyClear,
 		suppliedRecovery: ({ event }: { event: Event }) =>
 			event.type === 'BIND_RECOVERY' && !!event.binding,
 		currentRecovery: ({ context, event }: { context: Context; event: Event }) =>
@@ -262,7 +242,6 @@ export const workerHostMachine = setup({
 		redirect: undefined,
 		input,
 		recovery: undefined,
-		session: undefined,
 		library: undefined,
 		scope: input.scope,
 		limit: 50,
@@ -618,73 +597,84 @@ export const workerHostMachine = setup({
 			}
 		},
 		settlingAcquisition: {
-			initial: 'waiting',
-			states: {
-				waiting: { timeout: 'acquisitionDeadline', onTimeout: { target: 'overdue' } },
-				overdue: {
-					entry: ({ context }) => ({
-						context: {
-							closeIssue: context.closeIssue ?? { stage: 'acquisition', reason: 'overdue' }
-						}
-					})
-				}
-			},
 			invoke: {
-				id: 'owner',
-				src: 'owner',
-				input: ({ context }: { context: Context }) => context.input
-			},
-			on: {
-				OWNER_READY: (args) => {
-					if (args.guards.custodyClear(args)) {
-						return { target: 'closingSession', context: { session: args.event.session } }
-					}
-					return { target: 'failed' }
-				},
-				OWNER_EMPTY: (args) => {
-					if (args.guards.custodyClear(args)) {
-						return {
-							target: args.guards.hasAccountStore(args)
-								? 'closingAccountStore'
-								: args.guards.hasBroker(args)
-									? 'closingBroker'
-									: 'closed'
-						}
-					}
-					return { target: 'failed' }
+				id: 'custody',
+				src: 'custody',
+				onDone: ({ event }) =>
+					event.output
+						? { target: 'closingSession' }
+						: {
+								target: 'failed',
+								context: { closeIssue: { stage: 'application', reason: 'custody' } }
+							},
+				onError: {
+					target: 'failed',
+					context: { closeIssue: { stage: 'application', reason: 'custody' } }
 				}
 			}
 		},
 		closingSession: {
-			initial: 'waiting',
+			initial: 'acquisition',
 			states: {
-				waiting: { timeout: 'sessionCloseDeadline', onTimeout: { target: 'overdue' } },
-				overdue: {
-					entry: ({ context }) => ({
-						context: { closeIssue: context.closeIssue ?? { stage: 'session', reason: 'overdue' } }
-					})
+				acquisition: {
+					initial: 'waiting',
+					states: {
+						waiting: { timeout: 'acquisitionDeadline', onTimeout: { target: 'overdue' } },
+						overdue: {
+							entry: ({ context }) => ({
+								context: {
+									closeIssue: context.closeIssue ?? { stage: 'acquisition', reason: 'overdue' }
+								}
+							})
+						}
+					}
+				},
+				session: {
+					initial: 'waiting',
+					states: {
+						waiting: { timeout: 'sessionCloseDeadline', onTimeout: { target: 'overdue' } },
+						overdue: {
+							entry: ({ context }) => ({
+								context: {
+									closeIssue: context.closeIssue ?? { stage: 'session', reason: 'overdue' }
+								}
+							})
+						}
+					}
 				}
+			},
+			on: {
+				SESSION_CLOSE_STAGE: ({ event, value }) =>
+					event.stage === 'session' && matchesState({ closingSession: 'acquisition' }, value)
+						? { target: '.session' }
+						: undefined
 			},
 			invoke: {
 				id: 'close',
 				src: 'close',
-				input: ({ context }: { context: Context }) => {
-					if (!context.session) throw new Error('Worker session unavailable')
-					return context.session
-				},
-				onDone: (args) => ({
-					target: args.guards.hasAccountStore(args)
-						? 'closingAccountStore'
-						: args.guards.hasBroker(args)
-							? 'closingBroker'
-							: 'closed'
-				}),
+				input: ({ context }) => context.input.session,
+				onSnapshot: ({ event }, enq) =>
+					enq.raise({
+						type: 'SESSION_CLOSE_STAGE',
+						stage: selectSessionCloseStage(event.snapshot)
+					}),
+				onDone: (args) =>
+					args.event.output.outcome === 'closed'
+						? {
+								target: args.guards.hasAccountStore(args)
+									? 'closingAccountStore'
+									: args.guards.hasBroker(args)
+										? 'closingBroker'
+										: 'closed'
+							}
+						: { target: 'failed', context: { closeIssue: { stage: 'session', reason: 'failed' } } },
 				onError: {
 					target: 'failed',
 					context: { closeIssue: { stage: 'session', reason: 'failed' } }
 				}
 			}
 		},
+
 		closingAccountStore: {
 			invoke: {
 				id: 'closeAccountStore',
@@ -710,13 +700,7 @@ export const workerHostMachine = setup({
 			}
 		},
 
-		closed: {
-			type: 'final',
-			entry: (args, enq) => {
-				enq(({ context }) => context.input.startup.owner.stop(), args)
-				return { context: { session: undefined } }
-			}
-		},
+		closed: { type: 'final' },
 		failed: {}
 	}
 })

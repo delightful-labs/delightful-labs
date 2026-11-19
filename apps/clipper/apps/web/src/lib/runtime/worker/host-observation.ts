@@ -5,7 +5,6 @@ import {
 	selectRecoveryBinding
 } from '../../machines/runtime/application-readiness.js'
 import type { ApplicationSnapshot } from '../../machines/runtime/application-readiness.js'
-import type { Session } from '../../backend/jazz/account.js'
 import type { libraryMachine } from '../../machines/capture/library.js'
 import type { tagFormMachine } from '../../machines/capture/tag-form.js'
 import type { RecoveryBinding } from '../../contracts/account.js'
@@ -19,9 +18,7 @@ export type ApplicationBindingFacts = {
 	library: Library | undefined
 	recovery: RecoveryBinding | undefined
 }
-export function applicationBindingFacts(
-	snapshot: ApplicationSnapshot<Session>
-): ApplicationBindingFacts {
+export function applicationBindingFacts(snapshot: ApplicationSnapshot): ApplicationBindingFacts {
 	return { library: selectLibraryActor(snapshot), recovery: selectRecoveryBinding(snapshot) }
 }
 export function sameApplicationBinding(

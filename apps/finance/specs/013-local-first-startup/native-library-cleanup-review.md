@@ -1,6 +1,6 @@
 # Native-library cleanup specification
 
-Status: C01–C03 complete; C04 proposed for design review. Complete
+Status: C01–C04 complete; C05 proposed for design review. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -65,7 +65,7 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01–C03 are complete; C04–C10 remain open. The source evidence and constraints for each
+C01–C04 are complete; C05–C10 remain open. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -75,7 +75,7 @@ do not mark an item complete merely because code moved to a smaller file.
       fixture-only public controls are removed while native worker coverage remains.
 - [x] **C03:** Both apps and shared fixtures consume one SDK asset-resolution
       boundary; consumer SDK identity, production assets and WebKit behavior remain valid.
-- [ ] **C04:** Clipper and Finance reuse the native session integration; linked,
+- [x] **C04:** Clipper and Finance reuse the native session integration; linked,
       restored, expired, signed-out and offline identities retain their behavior/data.
 - [ ] **C05:** The identified child-dependent policy decisions consume explicit
       reports; host rendering no longer enumerates private child actor trees.
@@ -196,10 +196,77 @@ existing tests appropriate to the change; add coverage only for a real gap.
   this isolated checkout or disposable OS temporary directories. No storage keys,
   dependencies, patches, credentials, user servers or user data changed.
 
-Remaining: review the refined C04 design below before runtime implementation;
-C04–C10 remain open. The native fixture's routing adapter intentionally does not
-qualify SvelteKit's router itself; existing SvelteKit browser suites retain that
-acceptance boundary.
+- C04: the user approved the refined design after C03. Clipper now constructs
+  the existing `createJazzSessionRuntime` at its web/extension worker boundaries
+  and offscreen host. Its application chart consumes the public connection and
+  one native binding generation. Removed the startup registry, duplicated native
+  status/readiness/restoration adapters, three token maps, explicit SDK thin-client
+  preparation and unused registry-based capture/record helpers. Domain library
+  construction remains a scoped lease, allocated after native local readiness and
+  released after issued work drains. Existing `createLibraryBinding` and domain
+  capabilities remain Clipper-owned. Net production deletion: 847 lines across
+  ten files; no shared runtime API, dependency or patch change was needed.
+- C04 identity changes use the existing `createSessionChangeMachine`, restoration
+  workflow and ordered sign-out input accepting `SessionRuntimeChangeInput`.
+  Provider settlement, native post-provider observation and captured binding
+  admission remain in order; replaced/local identities are not signed out again.
+  Web `initial: 'device'`, extension existing-account admission, provider consent,
+  current account-store keys/backends and cache namespace inputs are preserved.
+  Old shared adapters remain published because package-consumer/native fixtures
+  still use those public contracts; the parser leaf remains in use too.
+- C04 shutdown: the application drains domain work but does not close the SDK.
+  The worker host also waits for actual reader-surface cleanup, checks detached
+  transaction custody, then invokes the existing `sessionCloseMachine`, which
+  retains pending acquisition and native close through overdue feedback. Only its
+  real closed result permits account-store then broker closure. Forced stop,
+  failed domain output and retained custody never authorize clean realm closure.
+  The offscreen host likewise requires clean domain output and shared session
+  close before reload. Native handles stay inside the shared adapter's closures.
+- C04 verification: Clipper web svelte-check, extension svelte-check and extension
+  tsc pass (zero Svelte errors/warnings). Changed-file Oxlint and formatting pass;
+  `git diff --check` passes. Direct production web/extension builds and the matched
+  packaged extension test build pass. Updated only development optimizer entries
+  from retired adapters to the current public runtime exports. Jazz schema
+  generation performed by existing isolated browser dev scripts produced no
+  tracked source changes; no Paraglide catalogs were generated or edited.
+- C04 workflow checks: 52 focused cases passed, including generated host
+  acquisition/shutdown campaigns, held root and article writes, A → B → C
+  replacement, provider/session overdue effects, stale admission and custody
+  refusal. The broader Clipper suite then passed **1,007 tests in 155 files**.
+  Review subsequently restored the original terminal `closed`/`ownerFailed` view
+  labels; 43 affected workflow/host cases passed after that narrow correction,
+  including explicit terminal-view assertions. Old adapter-only fake tests were
+  replaced with native-runtime resource leaves; shared session lifecycle,
+  ordered-sign-out and restoration suites passed **115 cases**. Existing package
+  consumer types, session consumer and ordered-sign-out consumer also passed.
+- C04 native checks: all **32 worker browser cases** passed, including actual
+  A → B → A restoration with an attached reader, forced stop, immediate shutdown
+  during acquisition, real late surface receipts, malformed/expired proof recovery
+  and child-resource recovery. All **22 account browser cases** passed, including
+  first-use without signup/authority, invalid restoration, permission/proof refusal,
+  full offline browser restart, resumed capture and restored-profile sync.
+- C04 production native checks: **8/8 selected cases** passed across the existing
+  offline/auth suites: linked, existing and expired backend identities each survive
+  two full offline process restarts and reconnect; native startup passes Chromium,
+  Firefox and WebKit; abrupt worker-stop/offline recovery and annotation restart/
+  reconciliation pass. Those production tests used one immutable matching offline-a
+  build; unchanged shell-update cases were not rerun. The final terminal-label
+  correction was followed by a fresh production build and targeted workflow checks.
+- C04 packaged Chromium extension: **12/12 cases** passed on the final matched
+  extension artifact, including signed-out and stale-account refusal, restoration
+  into the existing library, offline restart/capture, reference retention, repeated
+  settings teardown and real toolbar admission. Finance's shared-integration
+  WebKit restore, archive-drain and cold offline restart checks passed **3/3**;
+  unrelated Finance suites were not repeated. All endpoints, profiles, storage and
+  generated output were disposable and isolated from user/other-agent servers.
+  Existing large-bundle warnings, isolated schema-location notices and rejected
+  late UI/controller event diagnostics remain; none caused a failing check.
+
+Remaining: review C05's concrete report proposal below before its runtime slice;
+C05–C10 remain open. No publishing, push, merge, storage migration or dependency
+change is part of this work. The Finance standalone routing fixture intentionally
+does not qualify SvelteKit's router itself; its existing browser suites retain
+that acceptance boundary.
 
 ## Proposed fixes
 
@@ -445,7 +512,7 @@ Finish each source batch before running its affected checks. Stop to discuss a
 material design choice; do not turn a source review into an all-at-once rewrite.
 Every progress report must include what remains.
 
-## Concrete integration design — C03 implemented; C04 awaiting review
+## Integration design — C03/C04 approved and implemented
 
 C03: extend the existing Node-only `backend/jazz/worker-build` export with
 `resolveJazzWorkerAssets(consumerUrl: string | URL)`, returning the broker entry,
@@ -479,7 +546,7 @@ runtime. No storage move, new supervisor, actor wrapper or generic transport is
 proposed. This proposal still requires user review before runtime work.
 
 
-### Refined C04 review boundary after the consumer audit
+### C04 design approved after the consumer audit (implemented)
 
 The three Clipper tokens are compared in `sameAccountBinding`; the additional
 special case is `application-readiness.preparationReplaced`, which distinguishes
@@ -501,9 +568,35 @@ capabilities at the native session binding; Clipper owns library drain/admission
 provider actions, navigation and extension sign-in rules. Session runtime close
 must finish before scoped account storage and broker release.
 
-This is a runtime ownership/API review, separate from the approved C03 build
-slice. Before implementation, review removal of the pending-preparation branches
-and the single-generation report contract together; qualify replacement during
+The user approved this runtime ownership/API slice separately from C03. The
+implementation removes pending-preparation branches and consumes the native
+single-generation report contract; its checks qualify replacement during
 preparation, held-write/restore/sign-out interruption, provider refusal, expired
 backend identity and extension existing-account admission. Preserve the current
 storage key/backend and all independent native shutdown/identity/offline tests.
+
+
+## C05 concrete next-slice proposal (not implemented)
+
+1. At the existing draft invocation, consume a scoped public draft report through
+   native `onSnapshot`, retaining only pending/failure facts needed by recovery.
+   The recovery chart's removal guard consumes those reports; it no longer reads
+   `children.drafts` during an `always` decision. Keep pending admission adjacent
+   to command dispatch so a queued report cannot briefly permit premature removal.
+2. At the existing recovery invocation, publish the bounded recovery report
+   (readiness, pending/failed and draft note IDs/records needed by its public view).
+   Annotation preview guards consume that report with document/binding-generation
+   checks, instead of reading the recovery child snapshot. Preserve A → B → A
+   rejection, recovery visibility and publication eligibility while writes drain.
+3. Library already uses native `onSnapshot` for images, reader experience,
+   annotations and search. Verify those public root notifications; add the same
+   native phrase-invocation notification at `worker-recovery-owner`. Then reduce
+   `bindingObservation` to subscriptions to the three named public roots (library,
+   tag form, recovery owner), deleting the dynamic subscription map, child-tree
+   enumeration and phrase-child subscription. Public selectors may still project
+   documented views of their own owned invocation; policy stays in its owner.
+
+This introduces no event bus, actor wrapper or generic observer. Review report
+scope and immediate pending semantics before implementation. Qualify preview
+admission/refusal, recovery/remove interruption, image updates, phrase hide/close
+and existing native reader-surface drain behavior. C04's close protocol is retained.

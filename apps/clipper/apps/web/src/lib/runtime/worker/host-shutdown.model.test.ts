@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import * as fc from 'fast-check'
 import { assertTestCoverage, propertyTest, type TestSut } from '@xstate/test'
 import { setup, types, waitFor, type EventFrom, type SnapshotFrom } from 'xstate'
-import { selectAcquiredSession } from 'delightful-local-first/session/workflow'
+import { selectSessionRuntimeView } from 'delightful-local-first/session/runtime'
 import { createWorkerHostFixture } from './host-machine.test-support.js'
 
 // Independent resource contract: shutdown cannot close an acquisition whose
@@ -30,7 +30,11 @@ const sut: TestSut<SnapshotFrom<typeof contract>, EventFrom<typeof contract>> = 
 				if (event.type === 'ACQUIRED') {
 					acquired = true
 					acquisition.resolve()
-					if (!shutdown) await waitFor(f.owner, (snapshot) => !!selectAcquiredSession(snapshot))
+					if (!shutdown)
+						await waitFor(
+							f.owner,
+							(snapshot) => selectSessionRuntimeView(snapshot).stage === 'active'
+						)
 				} else {
 					shutdown = true
 					f.actor.send(event)

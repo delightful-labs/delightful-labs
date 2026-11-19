@@ -1,49 +1,44 @@
-import { createActor, toPromise } from 'xstate'
-import { expect, it, vi } from 'vitest'
+import { createActor, toPromise, waitFor } from 'xstate'
+import { expect, it } from 'vitest'
 import { signOutMachine, signOutInput } from './sign-out.js'
-import type { AccountHost } from '../../contracts/account.js'
+import { nativeSessionFixture, readyAccount } from './session.test-support.js'
 
-function fixture(signOut: () => Promise<void>) {
-	const logout = vi.fn(async () => {})
-	const input: AccountHost = {
-		signOut,
-		logout,
-		read: () => ({ status: 'signed-out' }),
-		create: logout,
-		release: () => {},
-		readiness: {
-			binding: {},
-			capability: { readStatus: () => 'signed-out', subscribe: () => () => {}, retry: logout }
-		},
-		restoration: {
-			binding: {},
-			capability: {
-				parsePhrase: async () => '',
-				isCurrentBinding: () => false,
-				restoreIdentity: logout,
-				readIdentity: async () => ({ kind: 'unavailable' })
-			}
-		}
-	}
+async function fixture(signOut: () => Promise<void>) {
+	const observation = readyAccount()
+	const native = nativeSessionFixture(observation)
+	native.owner.start()
+	await waitFor(native.owner, (s) => s.context.observation?.status === 'ready')
 	return {
-		logout,
-		actor: createActor(signOutMachine, { input: signOutInput(input, input.read()) })
+		native,
+		actor: createActor(signOutMachine, {
+			input: signOutInput({ ...native.input, signOut }, observation, 1)
+		})
 	}
 }
 it('waits for provider cookie clearance before native Jazz logout', async () => {
 	const cleared = Promise.withResolvers<void>()
-	const f = fixture(() => cleared.promise)
-	const done = toPromise(f.actor.start())
-	expect(f.logout).not.toHaveBeenCalled()
-	cleared.resolve()
-	await done
-	expect(f.logout).toHaveBeenCalledOnce()
+	const f = await fixture(() => cleared.promise)
+	try {
+		const done = toPromise(f.actor.start())
+		expect(f.native.change).not.toHaveBeenCalled()
+		cleared.resolve()
+		expect(await done).toEqual({ outcome: 'completed' })
+		expect(f.native.change).toHaveBeenCalledOnce()
+	} finally {
+		cleared.resolve()
+		f.actor.stop()
+		f.native.owner.stop()
+	}
 })
 it('does not log Jazz out after a provider sign-out failure', async () => {
-	const f = fixture(async () => {
+	const f = await fixture(async () => {
 		throw new Error('Provider unavailable')
 	})
-	f.actor.subscribe({ error: () => {} })
-	expect(await toPromise(f.actor.start())).toEqual({ outcome: 'failed', stage: 'provider' })
-	expect(f.logout).not.toHaveBeenCalled()
+	try {
+		expect(await toPromise(f.actor.start())).toEqual({ outcome: 'failed', stage: 'provider' })
+		expect(f.native.change).not.toHaveBeenCalled()
+	} finally {
+		f.actor.stop()
+		f.native.owner.stop()
+	}
 })
