@@ -6,27 +6,32 @@ import { diagnosticText } from '../../src/lib/diagnostics/machines.js'
 import { createJazzClient } from 'jazz-tools/client'
 import { jazzRuntimeSources } from '../../src/lib/backend/jazz/runtime-sources.js'
 import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
-import { createWorkerAccountStore } from '../../src/lib/runtime/worker/account-store.js'
-import {
-	accountStorageClient,
-	accountStorageKey
-} from '../../src/lib/runtime/worker/storage-channel.js'
+import { createScopedWorkerAccountStore } from '../../src/lib/runtime/worker/scoped-account-store.js'
+import { createScopedAccountStorage } from '../../src/lib/runtime/worker/scoped-storage-channel.js'
+import { accountStorageKey } from '../../src/lib/runtime/worker/storage-channel.js'
 self.onmessage = async ({ data }) => {
-	const storage = accountStorageClient(data.port)
+	const storage = createScopedAccountStorage(data.port, data.storageControl, data.storageScope, {
+		onOverdue: () => self.postMessage({ type: 'FAILED' }),
+		onBlocked: () => self.postMessage({ type: 'FAILED' })
+	})
+	const store = createScopedWorkerAccountStore(accountStorageKey(data.serverUrl), storage, {
+		onOverdue: () => self.postMessage({ type: 'FAILED' })
+	})
 	const brokerHost = brokerHostClient(data.broker, data.brokerControl, data.brokerScope, {
 		onOverdue: () => self.postMessage({ type: 'FAILED' }),
 		onBlocked: () => self.postMessage({ type: 'FAILED' })
 	})
+	let sdkClosed = true
 	try {
-		const key = accountStorageKey(data.serverUrl)
 		const session = await createJazzClient({
 			client: () => import('jazz-tools/local-first'),
 			serverUrl: data.serverUrl,
 			env: 'clipper',
 			initial: 'device',
-			store: createWorkerAccountStore(key, storage),
+			store,
 			runtimeSources: { ...jazzRuntimeSources, browserWorkerHost: brokerHost }
 		})
+		sdkClosed = false
 		try {
 			await session
 				.getSnapshot()
@@ -84,6 +89,7 @@ self.onmessage = async ({ data }) => {
 			})
 		} finally {
 			await session.close()
+			sdkClosed = true
 		}
 	} catch (error) {
 		self.postMessage({
@@ -92,8 +98,15 @@ self.onmessage = async ({ data }) => {
 			sharedWorker: typeof SharedWorker
 		})
 	} finally {
-		await brokerHost.close()
-		storage.close()
-		self.postMessage({ type: 'CLOSED' })
+		try {
+			await store.close()
+			await storage.close()
+			await brokerHost.close()
+			self.postMessage(
+				sdkClosed ? { type: 'CLOSED' } : { type: 'FAILED', message: 'SDK close failed' }
+			)
+		} catch {
+			self.postMessage({ type: 'FAILED', message: 'Worker fixture close failed' })
+		}
 	}
 }

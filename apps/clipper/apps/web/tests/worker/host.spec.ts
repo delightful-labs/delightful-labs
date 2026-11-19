@@ -1,10 +1,12 @@
+import { test, closeSeedReplica } from '../seed-fixture.js'
 import { z } from 'zod'
 import { ACCOUNT_STORAGE_PREFIX } from '../../src/lib/runtime/worker/storage-channel.js'
-import { test, expect } from '@playwright/test'
+import { expect } from '@playwright/test'
 
 test('a forcibly stopped host reports failure without clean closure or releasing native custody', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const result = await page.evaluate(async () => {
@@ -22,6 +24,7 @@ test('a forcibly stopped host reports failure without clean closure or releasing
 test('dedicated worker reuses the existing identity and persistent library without a Window shim', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const result = await page.evaluate(async () => {
@@ -31,12 +34,14 @@ test('dedicated worker reuses the existing identity and persistent library witho
 	expect(result).toMatchObject({
 		type: 'READY',
 		sameAccount: true,
+		closed: true,
 		existing: true,
 		written: true,
 		domainSaved: true,
 		windowPresent: false,
 		sharedWorker: 'undefined'
 	})
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await expect(page.getByRole('link', { name: 'Worker proof', exact: true })).toBeVisible()
@@ -58,6 +63,7 @@ test('dedicated worker reuses the existing identity and persistent library witho
 test('application worker runs DLF readiness and domain library, then drains before closing', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const result = await page.evaluate(async () => {
@@ -72,6 +78,7 @@ test('application worker runs DLF readiness and domain library, then drains befo
 })
 
 test('application worker waits for acquisition during immediate shutdown', async ({ page }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const result = await page.evaluate(async () => {
@@ -79,6 +86,7 @@ test('application worker waits for acquisition during immediate shutdown', async
 		return (await import(/* @vite-ignore */ path)).qualifyApplicationHost(true)
 	})
 	expect(result).toEqual({ closed: true })
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 })
@@ -95,12 +103,14 @@ test('application shutdown retains an attached reader surface until its viewport
 		)
 			viewportAttached = true
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await page.evaluate(async () => {
 		const path = '/tests/worker/host-driver.ts'
 		await (await import(/* @vite-ignore */ path)).qualifyHost()
 	})
+	await closeSeedReplica(page)
 	await page.reload()
 	await page.getByRole('link', { name: 'Worker proof', exact: true }).click()
 	await expect(page.getByRole('article')).toContainText('Saved in a worker.')
@@ -123,6 +133,7 @@ test('worker provisions the first local account and library without a Window app
 			body: '<!doctype html><html><body><div id="worker-test"></div></body></html>'
 		})
 	)
+	await closeSeedReplica(page)
 	await page.goto('/worker-fixture')
 	await expect(page.locator('#worker-test')).toBeAttached()
 	expect(
@@ -140,6 +151,7 @@ test('worker provisions the first local account and library without a Window app
 		library: { rows: [], total: 0 },
 		worker: { windowPresent: false }
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 })
@@ -162,6 +174,7 @@ test('web UI opens one application worker without loading Jazz WASM on the UI th
 			})
 		}
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	expect(
@@ -172,6 +185,7 @@ test('web UI opens one application worker without loading Jazz WASM on the UI th
 })
 
 test('worker refuses stale library intent before issuing a save', async ({ page }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const result = await page.evaluate(async () => {
@@ -179,4 +193,44 @@ test('worker refuses stale library intent before issuing a save', async ({ page 
 		return (await import(/* @vite-ignore */ path)).qualifyScopedCommands()
 	})
 	expect(result).toEqual({ valid: true, stale: false })
+})
+
+test('the Window fixture drains the scoped store and refuses later writes without replacing selection', async ({
+	page
+}) => {
+	await page.goto('/')
+	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
+	const result = await page.evaluate(async () => {
+		const path = '/tests/browser-account-store.ts'
+		const { browserAccountStore, fixtureServerUrl } = await import(/* @vite-ignore */ path)
+		const original = browserAccountStore(fixtureServerUrl())
+		const before = await original.store.read()
+		await original.store.update((value: string | null) => value ?? '')
+		await original.close()
+		let issued = false,
+			refused = false
+		try {
+			await original.store.update(() => {
+				issued = true
+				return ''
+			})
+		} catch (error) {
+			refused =
+				typeof error === 'object' &&
+				error !== null &&
+				'writeOutcome' in error &&
+				error.writeOutcome === 'not-issued'
+		}
+		const reopened = browserAccountStore(fixtureServerUrl())
+		try {
+			return {
+				retained: before !== null && (await reopened.store.read()) === before,
+				issued,
+				refused
+			}
+		} finally {
+			await reopened.close()
+		}
+	})
+	expect(result).toEqual({ retained: true, issued: false, refused: true })
 })

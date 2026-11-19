@@ -1,4 +1,5 @@
-import { test, expect, type Browser, type Page } from '@playwright/test'
+import { test, closeSeedReplica } from '../seed-fixture.js'
+import { expect, type Browser, type Page } from '@playwright/test'
 import { z } from 'zod'
 import { openArticleActions } from '../article-actions.js'
 
@@ -108,6 +109,7 @@ for (const mode of ['fresh', 'expired', 'forged', 'audience', 'identity'] as con
 			? 'a new tab opens the same library after the broker proof expires'
 			: `refuses a ${mode} proof and recovers through visible Retry while retaining offline edits`,
 		async ({ page, browser, context }) => {
+			await closeSeedReplica(page)
 			await page.goto('/')
 			await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 			await page.evaluate(async () => {
@@ -125,6 +127,7 @@ for (const mode of ['fresh', 'expired', 'forged', 'audience', 'identity'] as con
 			})
 
 			await joiningWorker(joining, mode)
+			await closeSeedReplica(joining)
 			await joining.goto('/')
 			await expect
 				.poll(async () => {
@@ -195,6 +198,7 @@ for (const mode of ['fresh', 'expired', 'forged', 'audience', 'identity'] as con
 			await expect(
 				joining.getByRole('main').getByRole('button', { name: 'Retry', exact: true })
 			).toHaveCount(0)
+			await closeSeedReplica(joining)
 			await joining.close()
 		}
 	)

@@ -1,8 +1,9 @@
+import { test, closeSeedReplica } from './seed-fixture.js'
 import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from './account-ui.js'
 import { readingControls } from './reader-ui.js'
 import { openAddLink } from './add-link.js'
 import type { ArticleImage } from '../src/lib/images/schema.js'
-import { test, expect, chromium } from '@playwright/test'
+import { expect, chromium } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -104,6 +105,7 @@ async function png(page: Page, width = 3000, height = 1000, mediaType = 'image/p
 	)
 }
 async function seed(page: Page, urls: string[]) {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	// Keep fixture history independently of a reload's partially hydrated library.
@@ -300,21 +302,26 @@ test('persists processed native images across restart without Jazz and synchroni
 		await page.getByRole('link', { name: 'Offline image fixture', exact: true }).click()
 		await imageLoaded(page, 'Saved image 1', 24)
 		const restored = await independent.newPage()
+		await closeSeedReplica(restored)
 		await restored.goto('http://127.0.0.1:5180/')
 		await restoreAccount(restored, phrase)
 		await expectLibrarySynced(restored)
 		await restored.getByRole('link', { name: 'Offline image fixture', exact: true }).click()
 		await imageLoaded(restored, 'Saved image 1', 24)
 		await authority.stop()
+		await closeSeedReplica(context)
 		await context.close()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
 
 		const reopened = await context.newPage()
+		await closeSeedReplica(reopened)
 		await reopened.goto('http://127.0.0.1:5180/articles/' + id)
 		await imageLoaded(reopened, 'Saved image 1', 24)
 		await expect(reopened.getByRole('article')).toContainText('Saved text stays readable')
 	} finally {
+		await closeSeedReplica(context)
 		await context.close()
+		await closeSeedReplica(independent)
 		await independent.close()
 		authority = await startLocalJazzServer(options())
 		await rm(profile, { recursive: true, force: true })

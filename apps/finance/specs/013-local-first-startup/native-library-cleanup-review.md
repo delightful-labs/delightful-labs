@@ -1095,7 +1095,7 @@ new generic fixture/RPC/cache framework. Remaining: C10;
 C01–C09 are complete.
 
 
-### C10 normal-close ownership design for review
+### C10 normal-close ownership design (approved and implemented)
 
 The Window seed replica is imported by article, reader, image, storage and startup
 fixture drivers. Those scenarios include reloads, navigation, manual browser
@@ -1103,7 +1103,7 @@ contexts and deliberately abrupt process loss; a teardown-only hook cannot cover
 all normal closes, and an asynchronous beforeunload handler cannot acknowledge
 resource drain.
 
-Proposed boundary: `fixture-records.ts` owns one explicit awaited close capability
+Approved boundary: `fixture-records.ts` owns one explicit awaited close capability
 for its SDK session and scoped store/host. Expose that capability only after the
 fixture has initialized; test teardown must not import the module and accidentally
 create a replica just to close it. Native Playwright fixture teardown closes any
@@ -1114,6 +1114,52 @@ production account/session lifetime entirely separate. This uses Playwright's
 native fixture ownership and the existing scoped adapter rather than a new
 runtime wrapper or unload supervisor.
 
-Review this owner before adapting the Window fixture or changing its scenarios.
-The dedicated worker fixture's scoped channels/awaited real close and Finance's
-matching immutable CI build remain the other C10 work. No C10 source is modified.
+The user approved this owner before implementation. The dedicated worker fixture
+and Window adapter are qualified below; matching immutable CI build reuse is the
+second C10 batch.
+
+
+## C10 fixture ownership and actual-adapter batch completed
+
+The Window seed replica and dedicated host fixture now use the production
+`createScopedWorkerAccountStore` and scoped storage data/control channels. The
+seed replica owns an idempotent awaited SDK/store/host close capability, exposed
+only after initialization. Playwright's native page fixture awaits it at normal
+teardown; test-controlled hard navigation, reload and page/context close await
+the same capability. Cleanup never imports a seed module merely to instantiate a
+replica to close. Startup failure closes acquired resources; closing refuses new
+fixture work. Abrupt realm/process loss remains abrupt and supplies no clean
+receipt; no asynchronous beforeunload acknowledgement was invented.
+
+The dedicated fixture sends CLOSED only after actual SDK, store, storage and
+broker closure. SDK close failure or a failed/blocked native close cannot produce
+that receipt. The driver waits for CLOSED before forced test-resource disposal.
+A new native check reopens the exact persisted selection after scoped-store close
+and verifies that subsequent writes are refused before their transform executes.
+
+Rechecking references after adoption found the old unscoped account owner and
+storage transport used only by historical lock/upgrade/transport tests. Moved
+those implementations to `tests/legacy-account-store.ts` and
+`tests/legacy-storage-channel.ts`, retaining those independent tests and all
+storage key/prefix functions unchanged in production. This removes **229 lines**
+of obsolete production source while preserving historical qualification; reuse
+of the actual production boundary is the primary outcome.
+
+Verification: web/extension Svelte checks **0 errors/0 warnings**, extension
+TypeScript passed, historical unit tests **9/9**, and affected browser/native
+cases **76/76**: account 22, reader 9, startup 1, organization 8, annotations 4,
+discovery 14, images 4, host 9 and proof expiry 5. Includes offline full browser
+restarts/restoration, permissions, retained edits and forced-stop refusal. Each
+ordinary spec retained its own disposable authority and web backend. Changed-file
+lint/format and `git diff --check` passed.
+
+The initial broad invocation used one backend across specs and was stopped after
+a cold Vite reload caused the first failure and subsequent authority-restart
+failures. The cold check exposed the missing shared browser-job entry in the
+existing prebundle list; added that entry, preserved the zero-reload assertion,
+and qualified all changed ordinary specs with per-spec backend isolation. No
+passing unaffected suite was repeated. The final host batch was rerun after a
+lint correction to its failure reporting, not to weaken closure assertions.
+
+Remaining: C10 matching Finance CI build reuse batch. No dependency, storage
+migration, catalog generation, push, merge or deployment.

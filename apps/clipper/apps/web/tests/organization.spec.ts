@@ -1,9 +1,10 @@
+import { test, closeSeedReplica } from './seed-fixture.js'
 import { openArticleActions } from './article-actions.js'
 import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from './account-ui.js'
 import { readingControls } from './reader-ui.js'
 import { closeLibraryPopovers, openLibraryFilters } from './library-popovers.js'
 import { openAddLink } from './add-link.js'
-import { test, expect, chromium } from '@playwright/test'
+import { expect, chromium } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -44,6 +45,7 @@ async function supplied(page: Page, suffix: string) {
 test('changes all statuses, keeps favorites independent, combines filters, and preserves reader and duplicate capture', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const first = await supplied(page, 'organize-first'),
@@ -117,6 +119,7 @@ test('synchronizes independent desired values in both directions between restore
 	page,
 	browser
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const row = await supplied(page, 'organize-sync')
@@ -125,6 +128,7 @@ test('synchronizes independent desired values in both directions between restore
 	const independent = await browser.newContext()
 	try {
 		const restored = await independent.newPage()
+		await closeSeedReplica(restored)
 		await restored.goto(base)
 		await restoreAccount(restored, phrase)
 		const remote = restored.locator(`[data-article-id="${id}"]`)
@@ -162,6 +166,7 @@ test('synchronizes independent desired values in both directions between restore
 			})
 		).toHaveAttribute('aria-pressed', 'true')
 	} finally {
+		await closeSeedReplica(independent)
 		await independent.close()
 	}
 })
@@ -173,12 +178,14 @@ test('persists offline edits across complete browser restart and synchronizes on
 	const independent = await browser.newContext()
 	try {
 		const page = await context.newPage()
+		await closeSeedReplica(page)
 		await page.goto(base)
 		await expectLibrarySynced(page)
 		const row = await supplied(page, 'organize-restart')
 		const id = await row.getAttribute('data-article-id')
 		const phrase = await readRecoveryPhrase(page)
 		const restored = await independent.newPage()
+		await closeSeedReplica(restored)
 		await restored.goto(base)
 		await restoreAccount(restored, phrase)
 		const remote = restored.locator(`[data-article-id="${id}"]`)
@@ -199,9 +206,11 @@ test('persists offline edits across complete browser restart and synchronizes on
 		await expect(
 			(await openArticleActions(row)).getByRole('button', { name: 'Remove favorite', exact: true })
 		).toBeEnabled()
+		await closeSeedReplica(context)
 		await context.close()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
 		const reopened = await context.newPage()
+		await closeSeedReplica(reopened)
 		await reopened.goto(base)
 		const persisted = reopened.locator(`[data-article-id="${id}"]`)
 		await expect(persisted.getByLabel('Status', { exact: true })).toHaveValue('archive')
@@ -218,7 +227,9 @@ test('persists offline edits across complete browser restart and synchronizes on
 			.selectOption('later')
 		await expect(persisted.getByLabel('Status', { exact: true })).toBeEnabled()
 		authority = await startAuthority()
+		await closeSeedReplica(reopened)
 		await reopened.reload()
+		await closeSeedReplica(restored)
 		await restored.reload()
 		await expect(remote.getByLabel('Status', { exact: true })).toHaveValue('later', {
 			timeout: 30000
@@ -230,7 +241,9 @@ test('persists offline edits across complete browser restart and synchronizes on
 			})
 		).toHaveAttribute('aria-pressed', 'true')
 	} finally {
+		await closeSeedReplica(independent)
 		await independent.close()
+		await closeSeedReplica(context)
 		await context.close()
 		await rm(profile, { recursive: true, force: true })
 		await authority.stop()
@@ -243,6 +256,7 @@ test('organizes a link-only article and retains its values when supplied content
 	await page.route('**/api/capture/resolve', (route) =>
 		route.fulfill({ status: 503, json: { code: 'gatewayUnavailable' } })
 	)
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const url = 'https://example.com/organize-pending'
@@ -285,6 +299,7 @@ test('native status radios support keyboard navigation and mobile wrapping while
 	page
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 })
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const inbox = await supplied(page, 'radio-inbox')
@@ -334,6 +349,7 @@ for (const width of [1440, 390]) {
 		page
 	}) => {
 		await page.setViewportSize({ width, height: 900 })
+		await closeSeedReplica(page)
 		await page.goto('/')
 		await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 		const first = await supplied(page, `popover-first-${width}`)
@@ -401,6 +417,7 @@ for (const width of [1440, 390]) {
 }
 
 test('a status change that removes the current row focuses the next article', async ({ page }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	await supplied(page, 'status-focus-first')

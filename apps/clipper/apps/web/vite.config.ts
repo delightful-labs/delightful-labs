@@ -52,6 +52,7 @@ export default defineConfig(({ command, mode }) => {
 				'delightful-local-first/transactions/workflow',
 				'delightful-local-first/lifecycle/operation/workflow',
 				'delightful-local-first/worker/request/workflow',
+				'delightful-local-first/worker/browser-job',
 				'delightful-local-first/worker/channel/workflow',
 				'delightful-local-first/worker/effect-drain/workflow'
 			]

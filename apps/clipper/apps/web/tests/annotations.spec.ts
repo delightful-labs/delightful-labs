@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, closeSeedReplica } from './seed-fixture.js'
+import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -24,6 +25,7 @@ test.afterAll(async () => {
 	await rm(directory, { recursive: true, force: true })
 })
 async function seed(page: Page) {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const id = await page.evaluate(async () => {
@@ -70,6 +72,7 @@ test('saves a Unicode highlight and note across reload, then removes without off
 		'aria-busy',
 		'false'
 	)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page.getByRole('blockquote')).toHaveText(quote)
 	await expect(group.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
@@ -92,6 +95,7 @@ test('saves a Unicode highlight and note across reload, then removes without off
 		'aria-busy',
 		'false'
 	)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page.getByRole('button', { name: 'Add note', exact: true })).toBeEnabled()
 	await expect(group).toHaveCount(0)
@@ -112,6 +116,7 @@ test('autosaves a document note through the native text adapter without a select
 		'aria-busy',
 		'false'
 	)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(field).toHaveValue(text)
 })
@@ -137,6 +142,7 @@ test('retains oversized input locally across reload, then saves an explicitly sh
 		'aria-busy',
 		'false'
 	)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page.getByRole('textbox', { name: 'note', exact: true }).first()).toHaveValue(
 		'Previously saved text.'
@@ -153,6 +159,7 @@ test('retains oversized input locally across reload, then saves an explicitly sh
 		'aria-busy',
 		'false'
 	)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page.getByRole('textbox', { name: 'note', exact: true })).toHaveValue(
 		'Explicitly shortened recovery.'
@@ -202,6 +209,7 @@ test('marks an edit pending before worker delivery and clears the previous synce
 		'aria-busy',
 		'false'
 	)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(field).toHaveValue('An edit waiting for worker delivery.')
 })
