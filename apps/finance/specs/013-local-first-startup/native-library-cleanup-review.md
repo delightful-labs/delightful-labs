@@ -1,6 +1,7 @@
 # Native-library cleanup specification
 
-Status: C01–C05 complete; C06 proposed for design review. Complete
+Status: C01–C05 complete; C06 classification slice complete. Broader C06
+coordination review and C07–C10 remain open. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -65,7 +66,8 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01–C05 are complete; C06–C10 remain open. The source evidence and constraints for each
+C01–C05 are complete. C06 classification is implemented and verified; the rest of
+C06 and C07–C10 remain open. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -262,8 +264,8 @@ existing tests appropriate to the change; add coverage only for a real gap.
   Existing large-bundle warnings, isolated schema-location notices and rejected
   late UI/controller event diagnostics remain; none caused a failing check.
 
-Remaining: review C06's concrete classification-owner proposal below before its
-runtime slice; C06–C10 remain open. No publishing, push, merge, storage migration or dependency
+Remaining: C06's classification slice is complete; review the remaining C06
+coordination before further grouping. C07–C10 remain open. No publishing, push, merge, storage migration or dependency
 change is part of this work. The Finance standalone routing fixture intentionally
 does not qualify SvelteKit's router itself; its existing browser suites retain
 that acceptance boundary.
@@ -362,7 +364,7 @@ Finish the shared session work before rewriting its host-observation plumbing.
 
 ### C06 — Reduce Finance's repeated feature coordination
 
-**Confirmed duplication; grouping design needs review.**
+**Confirmed duplication; classification slice completed below, broader grouping remains under review.**
 [worker-forms.ts](../../src/lib/machines/runtime/worker-forms.ts) is 2,052 lines
 and owns forms, bank sync/history, integrity, samples, attachments, transfers,
 backup, restore and navigation. It repeats snapshot admission/projection for
@@ -654,11 +656,12 @@ Clipper-only source changes.
 
 Remaining: C06–C10. No push, merge, publishing, migration or dependency change.
 
-## C06 concrete next-slice proposal (not implemented)
+## C06 reviewed classification design and completed slice
 
-Start with classification only: category/tag create/archive already share one
+The user approved classification-only implementation and testing by directing
+continued work after the concrete proposal. Category/tag create/archive share one
 `ManagementObservation`, one session/workspace binding and the same route reset
-policy. `worker-forms.ts` currently repeats four snapshot admission/projection
+policy. At review, `worker-forms.ts` repeated four snapshot admission/projection
 blocks, four observation identities, four shutdown sends, four closed events and
 four waiting regions for this one feature. The outer application consumes only
 the forms group's public report and close result.
@@ -690,3 +693,77 @@ archive, duplicate/read-only/reference refusal, route reset and scope replacemen
 held mutation interrupted by workspace/session change or shutdown; native resource
 drain. Bank/provider, transfers, backup and restore remain in their existing owners
 until separate source-backed designs settle their different lifetimes.
+
+
+### C06 classification implementation and evidence
+
+- `classification-forms.ts` now composes four static invocations of the existing
+  Local First scoped forms. Native parallel completion joins their actual terminal
+  reports after shutdown admission ends. The accepting control region rejects
+  unexpected completion from the four named children; invocation errors select
+  its failed state. That control state does not exit sibling resource owners or
+  acknowledge clean closure. The public report projects only coherent owned views
+  for the current observation and reports failure explicitly.
+- `worker-forms.ts` now consumes that one report and one finite close result.
+  Removed its four copied view fields/four observation identities, four individual
+  invocation/projection blocks, three redundant closed-event/waiting protocols
+  and individual observation/reset/shutdown forwarding. Existing classification
+  commands pass directly to the feature; no extra command envelope was retained.
+  The canonical `classificationForm` enum names the fixed broadcast recipients.
+- Scope and lifetime stay unchanged: session/workspace-bound forms survive route
+  changes, which still issue RESET. Current observation identity gates both the
+  feature report and its parent consumption, including A → B → A replacement.
+  Issued writes retain their existing scoped-form owner and actual settlement.
+  The worker wire DTO, trust-boundary validation, financial schemas, identities,
+  data, provider consent and bank/transfer/backup/restore owners are unchanged.
+- Measured production difference against `df0b9b6f`: `worker-forms.ts` removes
+  **178 net lines**; the concrete composition adds **164 lines** beside the existing
+  classification options. Total: **14 fewer production lines / 244 fewer bytes**,
+  with no additional production file, generic group factory, supervisor, dependency
+  or framework/SDK adaptation. This is a modest total reduction, not a reason to
+  repeat the pattern for smaller or unrelated features.
+
+Verification on November 19, Node 24.22.2 / pnpm 10.28.0:
+
+- **105/105 affected unit tests passed** across classification forms, management
+  policy and the worker application. Nine added owner cases cover all four command
+  destinations/DTOs; duplicate/read-only/reference refusal; route reset and current
+  A → B → A reports; held writes through route/workspace/session interruption and
+  shutdown without replay; and unexpected child completion while a sibling write
+  remains owned, without reporting clean closure.
+- Finance `svelte-check --tsconfig ./tsconfig.json --fail-on-warnings` with
+  `FINANCE_PREVIEW=true`: **0 errors / 0 warnings**. Both
+  `tsc --project tests/tsconfig.json --noEmit` and the existing service-worker type
+  check passed. Changed-file Prettier and `git diff --check` passed.
+- **15/15 selected native worker browser cases passed**, five scenarios in each
+  of Chromium, Firefox and WebKit: create/archive classifications and retain full
+  history after offline process restart; route/deny scope and drain navigation;
+  refuse offline restoration after a held archive and remount; drain a real UI
+  archive before SDK close; and retain failure after malformed view while waiting
+  for real native closure. The existing production components/fixture route
+  adapter and genuine SDK/broker remain in use. The other 51 native cases were
+  deliberately unselected, rather than rerun without an affected behavior.
+- Native verification built once into a unique disposable `.svelte-kit` directory,
+  used an ephemeral loopback listener and separate browser profiles, then disposed
+  its server/artifacts. All checks finished before browser generation. No user or
+  other-agent servers/data or Paraglide files were touched. No full production,
+  shared-package or Clipper checks were repeated for this Finance-only slice.
+- `git fetch origin main` still showed no commits newer than `b69e6ad6`. The prior
+  specification/corrections and C01–C05 commits remain preserved on this branch.
+
+### C06 remaining review boundary
+
+C06 remains unchecked as a whole. Profile name/avatar still share their profile
+observation and existing shared scoped-form policies; workspace rename is already
+one scoped form with a different workspace observation. A new owner for either
+one or two forms has no demonstrated total-code benefit from this four-form
+experiment. Bank/history, transfer submission/editing, backups and restore also
+have distinct existing reports and actual settlement obligations; they are not a
+single ordinary form lifetime. Do not generalize the classification chart or
+move these blocks solely to shrink `worker-forms.ts`.
+
+Discuss whether to retain those existing owners with explicit reviewed dispositions
+or review a concrete further reduction before changing their ownership. C07's
+empty-view/one-decode deletion can follow the now-stable external classification
+DTO without inventing another feature group. Remaining: broader C06 disposition
+and C07–C10; no push, merge, deployment, migration or dependency change.
