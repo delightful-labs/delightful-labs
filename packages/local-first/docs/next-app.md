@@ -219,7 +219,9 @@ Import `createBrowserWorkerJob`, `BrowserWorkerJobInput` and
 this chart from the existing operation owner. Supply the selected Worker factory,
 request, reply decoder, optional transfer list and optional abort signal/clock.
 Domain validation, permissions, deadlines and result mapping stay with the caller.
-Clipper's image/extraction jobs and Finance's image editor use this same lifecycle.
+Clipper's image/extraction jobs and Finance's image editor/provider fetch use this
+same lifecycle. Completed job snapshots clear their admitted input after release;
+callers must likewise clear transient credentials from their own context.
 
 The job completes only after removing its handlers and abort listener and returning
 from native `Worker.terminate()`. CANCEL uses that same cleanup path. Failed native

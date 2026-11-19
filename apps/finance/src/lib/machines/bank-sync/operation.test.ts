@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { unlockCredential } from '#lib/integrations/passkey.js'
-import { fetchAccounts } from '#lib/integrations/simplefin.js'
+import type { BankTrace } from '#lib/integrations/diagnostics.js'
+const fetchAccounts =
+	vi.fn<
+		(
+			url: string,
+			discovery: boolean,
+			signal: AbortSignal,
+			trace: BankTrace
+		) => Promise<ProviderResponse>
+	>()
 import { createBankTrace } from '#lib/integrations/diagnostics.js'
 import { createBankOperationMachine } from './operation.js'
 import type { createPreparationMachine } from './preparation.js'
@@ -26,7 +35,15 @@ import type { ActorFromLogic, InputFrom, OutputFrom } from 'xstate'
 
 vi.mock('#lib/integrations/passkey.js', () => ({ unlockCredential: vi.fn() }))
 vi.mock('#lib/integrations/simplefin.js', () => ({
-	fetchAccounts: vi.fn(),
+	prepareProviderFetch: async (
+		url: string,
+		discovery: boolean,
+		signal: AbortSignal,
+		trace: BankTrace
+	) =>
+		nativeProvider
+			? { kind: 'worker' }
+			: { kind: 'demo', response: await fetchAccounts(url, discovery, signal, trace) },
 	providerAccountIdentity: (account: { id: string }) => account.id,
 	providerBalanceSnapshot: () => undefined,
 	simplefinDemo: false
@@ -94,6 +111,7 @@ const connection: Connection = {
 	lastError: null,
 	claimedAt: new Date('2026-10-17T00:00:00Z')
 }
+let nativeProvider = false
 const response: ProviderResponse = { errors: [], accounts: [] }
 let counts = { imported: 0, existing: 0, omitted: 0 }
 const failed = vi.fn()
@@ -137,6 +155,7 @@ function start(type: 'DISCOVER' | 'SYNC'): OperationActor {
 
 beforeEach(() => {
 	vi.resetAllMocks()
+	nativeProvider = false
 	counts = { imported: 0, existing: 0, omitted: 0 }
 	vi.mocked(createBankTrace).mockReturnValue({
 		id: 'trace',
@@ -150,6 +169,7 @@ beforeEach(() => {
 })
 afterEach(() => {
 	for (const actor of actors.splice(0)) actor.stop()
+	vi.unstubAllGlobals()
 })
 
 function expectCleanup(actor: OperationActor) {
@@ -368,4 +388,48 @@ describe('discovery response recovery', () => {
 		expect(persist).not.toHaveBeenCalled()
 		expectCleanup(actor)
 	})
+})
+
+describe('provider release and operation lock', () => {
+	it.each(['cancel', 'lock-failed', 'blocked-release'])(
+		'retains custody through %s',
+		async (mode) => {
+			nativeProvider = true
+			const post = vi.fn()
+			const terminate = vi.fn(() => {
+				expect(releaseLock).not.toHaveBeenCalled()
+				if (mode === 'blocked-release') throw new Error('release refused')
+			})
+			const worker = Object.assign(new EventTarget(), {
+				onmessage: null,
+				onerror: null,
+				onmessageerror: null,
+				postMessage: post,
+				terminate
+			})
+			vi.stubGlobal('Worker', function () {
+				return worker
+			})
+			vi.stubGlobal('location', { origin: 'https://finance.example' })
+			const actor = start('SYNC')
+			await vi.waitFor(() => expect(post).toHaveBeenCalledOnce())
+			const provider = actor.getSnapshot().children.fetchProvider
+			if (!provider) throw new Error('Expected provider owner')
+			if (mode === 'lock-failed') actor.send({ type: 'LOCK_FAILED', error: new Error('lost-lock') })
+			else actor.send({ type: 'CANCEL' })
+			expect(terminate).toHaveBeenCalledOnce()
+			if (mode === 'blocked-release') {
+				expect(actor.getSnapshot().status).toBe('active')
+				expect(actor.getSnapshot().output).toBeUndefined()
+				expect(releaseLock).not.toHaveBeenCalled()
+			} else {
+				expect(await toPromise(actor)).toMatchObject({
+					kind: mode === 'lock-failed' ? 'failed' : 'cancelled'
+				})
+				expect(provider.getSnapshot().context.input).toBeUndefined()
+				expectCleanup(actor)
+			}
+			expect(imported).not.toHaveBeenCalled()
+		}
+	)
 })

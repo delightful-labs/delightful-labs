@@ -1,5 +1,4 @@
 import type { BankTrace } from './diagnostics.js'
-import { requestProviderWorker } from './simplefin-worker.js'
 import { requestRelay, type RelayRequest } from './simplefin-relay.js'
 import { providerResponseSchema, type ProviderAccount } from '../validation/integrations.js'
 
@@ -119,7 +118,7 @@ export async function claimToken(token: string, signal: AbortSignal, trace: Bank
 	await trace.step('claim.validate-access-url', () => bridgeUrl(accessUrl, 'access', trace))
 	return accessUrl
 }
-export async function fetchAccounts(
+export async function prepareProviderFetch(
 	accessUrl: string,
 	discovery: boolean,
 	signal: AbortSignal,
@@ -128,7 +127,7 @@ export async function fetchAccounts(
 	signal.throwIfAborted()
 	if (simplefinDemo) {
 		if (accessUrl !== demoAccessUrl) throw new Error('invalid-provider-url')
-		return trace.step('demo.validate-response', () =>
+		const response = await trace.step('demo.validate-response', () =>
 			providerResponseSchema.parse({
 				errors: [],
 				accounts: discovery
@@ -136,7 +135,8 @@ export async function fetchAccounts(
 					: demoAccounts
 			})
 		)
+		return { kind: 'demo', response } satisfies { kind: 'demo'; response: typeof response }
 	}
 	bridgeUrl(accessUrl, 'access', trace)
-	return requestProviderWorker(accessUrl, discovery, signal, trace)
+	return { kind: 'worker' } satisfies { kind: 'worker' }
 }

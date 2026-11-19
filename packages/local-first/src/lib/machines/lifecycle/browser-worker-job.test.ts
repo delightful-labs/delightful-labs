@@ -43,6 +43,7 @@ it('delivers validated replies only after synchronous native cleanup, once', asy
 	f.actor.send({ type: 'CANCEL' })
 	expect(await toPromise(f.actor)).toMatchObject({ kind: 'replied', reply: { value: 7 } })
 	expect(outcomes).toHaveLength(1)
+	expect(f.actor.getSnapshot().context.input).toBeUndefined()
 	expect(f.worker.onmessage).toBeNull()
 	expect(f.worker.onerror).toBeNull()
 	expect(f.worker.onmessageerror).toBeNull()
@@ -57,7 +58,11 @@ it.each(['construction', 'post', 'worker', 'message', 'reply'] satisfies (
 )[])('contains %s failure and releases each acquired worker', async (reason) => {
 	const f = fixture({ failOpen: reason === 'construction', failPost: reason === 'post' })
 	f.actor.start()
-	if (reason === 'worker') f.worker.onerror?.(new Event('error'))
+	if (reason === 'worker') {
+		const event = new Event('error', { cancelable: true })
+		f.worker.onerror?.(event)
+		expect(event.defaultPrevented).toBe(true)
+	}
 	if (reason === 'message') f.worker.onmessageerror?.(new Event('messageerror'))
 	if (reason === 'reply') f.worker.reply({ value: 'invalid' })
 	expect(await toPromise(f.actor)).toMatchObject({ kind: 'failed', reason })
@@ -129,7 +134,7 @@ it('retains the first reentrant reply/error/abort outcome through cleanup', asyn
 		f = fixture({ signal: abort.signal })
 	f.worker.postMessage.mockImplementation(() => {
 		f.worker.reply({ value: 7 })
-		f.worker.onerror?.()
+		f.worker.onerror?.(new Event('error'))
 		abort.abort()
 	})
 	f.actor.start()

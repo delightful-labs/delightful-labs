@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import './sdk-session.js'
 import './image-job.js'
+import './provider-job-driver.js'
 import type { Operation, Reply } from './bindings.worker.js'
 
 type Result = Exclude<Reply, { type: 'READY' }>

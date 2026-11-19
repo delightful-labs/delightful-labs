@@ -110,7 +110,7 @@ it.each(['normal', 'pre-abort', 'construction', 'post'] satisfies Scenario[])(
 							message?.(new MessageEvent('message', { data: { value: 7 } }))
 						if (event.type === 'INVALID')
 							message?.(new MessageEvent('message', { data: { value: 'bad' } }))
-						if (event.type === 'ERROR') error?.()
+						if (event.type === 'ERROR') error?.(new Event('error'))
 						if (event.type === 'MESSAGE_ERROR') messageError?.()
 						if (event.type === 'ABORT') abort.abort()
 						if (event.type === 'CANCEL' && actor.getSnapshot().status === 'active')

@@ -1,7 +1,7 @@
 # Native-library cleanup specification
 
-Status: C01–C08 complete, including explicit retained-owner dispositions for C06
-and C08. C09–C10 remain open. Complete
+Status: C01–C09 complete, including explicit retained-owner dispositions for C06
+and C08. C10 remains open. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -70,8 +70,8 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01–C08 are complete. C06 and C08 include reviewed retained-owner decisions
-below. C09–C10 remain open pending their acceptance evidence. The source evidence and constraints for each
+C01–C09 are complete. C06 and C08 include reviewed retained-owner decisions
+below. C10 remains open pending its acceptance evidence. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -91,7 +91,7 @@ do not mark an item complete merely because code moved to a smaller file.
       bookkeeping is reduced with no stale data or lost immediate pending feedback.
 - [x] **C08:** Where native Svelte/XState bindings reduce code, adopt them without
       changing DOM resource ownership, error handling or graceful shutdown.
-- [ ] **C09:** Record the before/after ownership decision for finite worker reuse.
+- [x] **C09:** Record the before/after ownership decision for finite worker reuse.
       Share common lifecycle behavior to reduce app drift; report code costs and
       document any justified boundary-specific exceptions.
 - [ ] **C10:** Production-bound fixtures use the actual adapter; identical builds
@@ -427,10 +427,11 @@ the shared component APIs and existing interaction/accessibility coverage.
 
 **Confirmed overlap, selective extraction.** Clipper's existing
 [browser-worker-job.ts](../../../../packages/local-first/src/lib/machines/lifecycle/browser-worker-job.ts)
-is used by image processing and extension extraction. Finance's
-[provider transport](../../src/lib/integrations/simplefin-worker.ts) and
-[image render leaf](../../src/lib/runtime/worker/image-render.ts) separately own
-worker creation, message/error/abort handling and termination. This is the prior
+is now used by image processing, extension extraction and Finance rendering and
+provider fetching. At review, Finance's provider transport and
+[image render leaf](../../src/lib/runtime/worker/image-render.ts) separately owned
+worker creation, message/error/abort handling and termination. The completed
+[provider fetch chart](../../src/lib/machines/bank-sync/provider-fetch.ts) now delegates those native effects to the shared job. This is the prior
 R4 reuse candidate, not a newly discovered need for a transport framework.
 
 Evaluate moving the existing finite-job primitive to Local First and adopting it
@@ -882,7 +883,7 @@ manual snapshot binding should be replaced. Remaining: C09–C10; no push, merge
 deployment, migration or dependency change.
 
 
-## C09 shared-worker design (first slice complete; provider pending)
+## C09 shared-worker design and completed integration
 
 The user clarified that reducing drift between the two apps and reusing common
 behavior take priority over net line savings. The proposed line-count-based skip
@@ -949,8 +950,8 @@ separate: its identity/unknown-effect protocol and channel resource owner are no
 these finite jobs. Persistent Jazz/application workers and financial write custody
 also retain their existing real close protocols.
 
-C09 remains open pending provider caller integration; the shared core and image
-consumer slice below is complete. C10 remains open. C01–C08 are complete; retained
+C09 is complete after the two qualified slices below. C10 remains open.
+C01–C08 are complete; retained
 shared bindings may be revisited if an actual cross-app fork is found.
 
 ### C09 first slice completion and verification
@@ -1000,6 +1001,62 @@ Verification (2026-11-19):
 Remaining: C09 provider caller/drain integration and C10. C01–C08 remain complete.
 No push, merge or deployment.
 
+### C09 provider integration completion
+
+The user reviewed the fetch-chart/lock/drain explanation and explicitly approved
+continuation. Finance now invokes `providerFetchMachine` directly from the bank
+operation, and that chart invokes Local First's same finite browser job. Deleted
+`simplefin-worker.ts` and its Promise lifecycle; `prepareProviderFetch` retains
+only URL validation and demo response selection. Provider response types derive
+from the existing validation schema. No child actor is started inside a Promise.
+All four consumers now share construction/post/reply/error/cancel/native-release
+behavior; Finance owns its domain mapping and operation policy.
+
+The operation retains its lock/invocation through cancellation and lock failure,
+then consumes the selected child outcome after release. Unexpected child failure
+or refused termination cannot produce a clean operation result. Cancellation
+forwarding checks active child references so a completed child awaiting its
+notification is not mistaken for an active recipient or a drain receipt. Both
+existing authorization boundaries remain. The 75-second state-owned timeout
+bounds real worker bootstrap/body work and selects a timeout outcome separately
+from user cancellation; neither admits another provider request. Debug waiting
+traces follow the actual request lifetime and use only existing selected scalar
+fields. Stage/status/count diagnostics remain sanitized.
+
+After release, both shared-job and provider-chart snapshots clear their admitted
+input, including raw URL credentials and decoder closures. The shared job also
+prevents the native error event's default propagation, preserving Finance's
+previous provider error behavior. Blocked release retains ownership and does not
+claim secrets/resources were drained. Persistent SDK workers, financial write
+custody and provider consent policy are unchanged.
+
+Verification:
+
+- Finance bank and integration suites **351/351** in 21 files, including actual
+  lock retention during cancellation/lock failure/refused release and existing
+  authorization/import/logging/settlement cases. Focused provider/editor/attachment
+  checks **51/51**; Finance Svelte check **0 errors/0 warnings** and test TypeScript
+  check passed.
+- Canonical shared job **17/17**, including seeded generated races and assertions
+  for native error prevention and cleared terminal input; full Local First
+  TypeScript check passed. Public packed consumers **5/5** and all eight workspace
+  identity/link checks passed, with no dependency or lock change.
+- Clipper's 153 unit files qualified: 129 passed in the initial run, and all 24
+  suites affected by sandbox listener restrictions passed with isolated listener
+  access (**155/155** in that rerun). No passing unaffected suites were repeated.
+  Web and extension Svelte checks report **0 errors/0 warnings**.
+- Native Finance provider/image cases **27/27** across Chromium/Firefox/WebKit.
+  Provider qualification additionally runs the production fetch chart in a
+  dedicated Worker creating the real nested provider Worker, with disposable
+  intercepted relay responses: success, HTTP failure, cancel and refused release.
+  No real provider, user data or server is contacted.
+- Direct package and isolated Finance production preview builds, changed-source
+  lint/format and `git diff --check` passed. Catalog generation was bypassed; no Paraglide source, SDK patch, dependency,
+  storage identity or permission change.
+
+C09 is complete. Remaining: C10 fixture ownership and matching test-build reuse.
+No push, merge or deployment.
+
 ## C10 concrete work sequence (not implemented)
 
 Source recheck found the old unscoped store in two fixtures plus independent
@@ -1034,5 +1091,29 @@ batch. For build reuse, verify actual compiled environment inputs before
 collapsing jobs. Clipper's per-spec authority/server restart remains intentional;
 reuse an immutable build only across truly matching inputs, never a mutable
 backend. Keep generated output separate from user servers/data and introduce no
-new generic fixture/RPC/cache framework. Remaining: C09 provider integration and C10;
-C01–C08 are complete.
+new generic fixture/RPC/cache framework. Remaining: C10;
+C01–C09 are complete.
+
+
+### C10 normal-close ownership design for review
+
+The Window seed replica is imported by article, reader, image, storage and startup
+fixture drivers. Those scenarios include reloads, navigation, manual browser
+contexts and deliberately abrupt process loss; a teardown-only hook cannot cover
+all normal closes, and an asynchronous beforeunload handler cannot acknowledge
+resource drain.
+
+Proposed boundary: `fixture-records.ts` owns one explicit awaited close capability
+for its SDK session and scoped store/host. Expose that capability only after the
+fixture has initialized; test teardown must not import the module and accidentally
+create a replica just to close it. Native Playwright fixture teardown closes any
+still-open initialized seed replicas. Test-controlled normal reloads, navigation
+and context closes explicitly await the same capability first. Deliberate crash/
+process-loss cases remain abrupt, with no fabricated clean receipt. Keep ordinary
+production account/session lifetime entirely separate. This uses Playwright's
+native fixture ownership and the existing scoped adapter rather than a new
+runtime wrapper or unload supervisor.
+
+Review this owner before adapting the Window fixture or changing its scenarios.
+The dedicated worker fixture's scoped channels/awaited real close and Finance's
+matching immutable CI build remain the other C10 work. No C10 source is modified.

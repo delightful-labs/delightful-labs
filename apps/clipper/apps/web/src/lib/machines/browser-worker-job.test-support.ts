@@ -6,7 +6,7 @@ import type {
 
 export class TestJobWorker implements BrowserJobWorker {
 	onmessage: ((event: MessageEvent<unknown>) => void) | null = null
-	onerror: ((event?: Event) => void) | null = null
+	onerror: ((event: Event) => void) | null = null
 	onmessageerror: ((event?: Event) => void) | null = null
 	postMessage = vi.fn(
 		(_message: unknown, _transfer?: Transferable[] | StructuredSerializeOptions) => {}
