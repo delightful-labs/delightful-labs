@@ -13,6 +13,8 @@ type Input = { capability: AnnotationCapability | undefined }
 type Target = { id: string; text: string }
 type Context = Input & {
 	documentId: string
+	generation: number
+	draft: ReturnType<typeof selectNoteDraftState>
 	sequence: number
 	targets: Target[]
 	recovered: NoteDraftRecord[]
@@ -64,7 +66,7 @@ export const annotationRecoveryMachine = setup({
 		input: types<Input>(),
 		output: types<undefined>(),
 		events: {
-			OPEN: types<{ documentId: string }>(),
+			OPEN: types<{ documentId: string; generation: number }>(),
 			CLOSE: types(),
 			RETAIN: types<{ noteId: string; text: string }>(),
 			FORGET: types<{ noteId: string; writerId: string | undefined; text: string }>(),
@@ -84,6 +86,8 @@ export const annotationRecoveryMachine = setup({
 	context: ({ input }) => ({
 		...input,
 		documentId: '',
+		generation: 0,
+		draft: selectNoteDraftState(undefined),
 		sequence: 0,
 		targets: [],
 		recovered: [],
@@ -99,11 +103,12 @@ export const annotationRecoveryMachine = setup({
 		},
 		active: {
 			type: 'parallel',
-			always: ({ value }) =>
-				matchesState(
-					{ active: { control: 'closing', drafts: 'closed', reading: 'idle', clearing: 'idle' } },
-					value
-				) ||
+			always: ({ context, value }) =>
+				(!context.removals.length &&
+					matchesState(
+						{ active: { control: 'closing', drafts: 'closed', reading: 'idle', clearing: 'idle' } },
+						value
+					)) ||
 				matchesState(
 					{ active: { control: 'closing', drafts: 'closed', reading: 'idle', clearing: 'failed' } },
 					value
@@ -167,10 +172,23 @@ export const annotationRecoveryMachine = setup({
 							libraryId: required(context.capability?.recovery).libraryId,
 							isCurrent: required(context.capability).isCurrent
 						}),
-						onSnapshot: {},
-						onDone: ({ event }) =>
-							event.output.unsaved.length ? { target: '.failed' } : { target: '.closed' },
-						onError: { target: '.failed' }
+						onSnapshot: ({ event }) => ({
+							context: { draft: selectNoteDraftState(event.snapshot) }
+						}),
+						onDone: ({ context, event }) => ({
+							target: event.output.unsaved.length ? '.failed' : '.closed',
+							context: {
+								draft: {
+									...context.draft,
+									pending: event.output.unsaved.length > 0,
+									failed: event.output.unsaved.length > 0
+								}
+							}
+						}),
+						onError: ({ context }) => ({
+							target: '.failed',
+							context: { draft: { ...context.draft, failed: true } }
+						})
 					},
 					states: {
 						running: {
@@ -193,7 +211,11 @@ export const annotationRecoveryMachine = setup({
 								? {
 										target: '.targets',
 										reenter: true,
-										context: { documentId: event.documentId, recovered: [] }
+										context: {
+											documentId: event.documentId,
+											generation: event.generation,
+											recovered: []
+										}
 									}
 								: undefined,
 						CLOSE: { target: '.idle', context: { documentId: '', recovered: [] } }
@@ -244,9 +266,10 @@ export const annotationRecoveryMachine = setup({
 					initial: 'idle',
 					states: {
 						idle: {
-							always: ({ context, self }) =>
+							always: ({ context }) =>
 								context.removals.length &&
-								!selectNoteDraftState(self.getSnapshot().children.drafts?.getSnapshot()).pending
+								context.draft.sequence >= context.sequence &&
+								!context.draft.pending
 									? { target: 'removing' }
 									: undefined
 						},
@@ -279,11 +302,14 @@ export const annotationRecoveryMachine = setup({
 export function selectAnnotationRecovery(
 	snapshot: SnapshotFrom<typeof annotationRecoveryMachine> | undefined
 ) {
-	const draft = selectNoteDraftState(snapshot?.children.drafts?.getSnapshot())
+	const draft = snapshot?.context.draft ?? selectNoteDraftState(undefined)
 	return {
+		documentId: snapshot?.context.documentId ?? '',
+		generation: snapshot?.context.generation ?? 0,
 		records: snapshot?.context.recovered ?? [],
 		pending:
 			draft.pending ||
+			(!!snapshot && draft.sequence < snapshot.context.sequence) ||
 			snapshot?.matches({ active: { clearing: 'removing' } }) === true ||
 			(!!snapshot?.context.removals.length &&
 				!snapshot.matches({ active: { clearing: 'failed' } })),

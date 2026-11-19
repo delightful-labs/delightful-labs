@@ -56,51 +56,29 @@ export const bindingObservation = createCallbackLogic<
 		generation: number
 	}
 >(({ input, sendBack }) => {
-	const subscriptions = new Map<object, { unsubscribe: () => void }>()
-	let updating = false,
-		disposed = false
+	let disposed = false
 	const update = () => {
-		if (updating || disposed) return
-		updating = true
-		try {
-			const watched: Observable[] = [
-				input.library,
-				input.tagForm,
-				input.recovery,
-				input.recovery?.getSnapshot().children.phrase,
-				...Object.values(input.library?.getSnapshot().children ?? {})
-			].filter((ref) => ref !== undefined)
-			for (const [reference, subscription] of subscriptions) {
-				if (!watched.some((ref) => ref === reference)) {
-					subscription.unsubscribe()
-					subscriptions.delete(reference)
-				}
-			}
-			for (const reference of watched) {
-				if (!subscriptions.has(reference))
-					subscriptions.set(
-						reference,
-						reference.subscribe({
-							next: update,
-							error: () => sendBack({ type: 'BINDING_FAILED', generation: input.generation })
-						})
-					)
-			}
-			if (input.library)
-				sendBack({
-					type: 'LIBRARY_OBSERVED',
-					generation: input.generation,
-					facts: libraryBindingFacts(input.library)
-				})
-			else sendBack({ type: 'RENDER' })
-		} finally {
-			updating = false
-		}
+		if (disposed) return
+		if (input.library)
+			sendBack({
+				type: 'LIBRARY_OBSERVED',
+				generation: input.generation,
+				facts: libraryBindingFacts(input.library)
+			})
+		else sendBack({ type: 'RENDER' })
 	}
+	const roots: Observable[] = [input.library, input.tagForm, input.recovery].filter(
+		(ref) => ref !== undefined
+	)
+	const subscriptions = roots.map((root) =>
+		root.subscribe({
+			next: update,
+			error: () => sendBack({ type: 'BINDING_FAILED', generation: input.generation })
+		})
+	)
 	update()
 	return () => {
 		disposed = true
-		for (const subscription of subscriptions.values()) subscription.unsubscribe()
-		subscriptions.clear()
+		for (const subscription of subscriptions) subscription.unsubscribe()
 	}
 })

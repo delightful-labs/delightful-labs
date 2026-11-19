@@ -1,6 +1,6 @@
 # Native-library cleanup specification
 
-Status: C01–C04 complete; C05 proposed for design review. Complete
+Status: C01–C05 complete; C06 proposed for design review. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -65,7 +65,7 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01–C04 are complete; C05–C10 remain open. The source evidence and constraints for each
+C01–C05 are complete; C06–C10 remain open. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -77,7 +77,7 @@ do not mark an item complete merely because code moved to a smaller file.
       boundary; consumer SDK identity, production assets and WebKit behavior remain valid.
 - [x] **C04:** Clipper and Finance reuse the native session integration; linked,
       restored, expired, signed-out and offline identities retain their behavior/data.
-- [ ] **C05:** The identified child-dependent policy decisions consume explicit
+- [x] **C05:** The identified child-dependent policy decisions consume explicit
       reports; host rendering no longer enumerates private child actor trees.
 - [ ] **C06:** Reviewed feature owners remove repeated coordination, expose public
       reports/close results, and preserve draft, interruption and settlement semantics.
@@ -262,8 +262,8 @@ existing tests appropriate to the change; add coverage only for a real gap.
   Existing large-bundle warnings, isolated schema-location notices and rejected
   late UI/controller event diagnostics remain; none caused a failing check.
 
-Remaining: review C05's concrete report proposal below before its runtime slice;
-C05–C10 remain open. No publishing, push, merge, storage migration or dependency
+Remaining: review C06's concrete classification-owner proposal below before its
+runtime slice; C06–C10 remain open. No publishing, push, merge, storage migration or dependency
 change is part of this work. The Finance standalone routing fixture intentionally
 does not qualify SvelteKit's router itself; its existing browser suites retain
 that acceptance boundary.
@@ -342,7 +342,7 @@ session change once across both apps and Local First consumers.
 
 ### C05 — Replace private-child decisions and actor-tree subscriptions with reports
 
-**Confirmed.** Clipper's [annotation machine](../../../clipper/apps/web/src/lib/annotations/machine.ts)
+**Confirmed at review; completed in C05 below.** Clipper's [annotation machine](../../../clipper/apps/web/src/lib/annotations/machine.ts)
 reads `children.recovery.getSnapshot()` while deciding preview eligibility;
 [annotation recovery](../../../clipper/apps/web/src/lib/annotations/recovery.ts)
 reads a draft child's pending state inside an `always` decision.
@@ -491,9 +491,10 @@ evidence of deleted duplication and retained behavior, not just smaller files.
 ## Agent handoff
 
 The documentation is on local branch `docs/native-library-cleanup-review` in
-`/Users/matt/Projects/delightful-labs-finance-worker-inventory`. At handoff, the
-specification and two linked status/note corrections are uncommitted. Preserve
-them and other agents' changes; inspect Git state before switching branches.
+`/Users/matt/Projects/delightful-labs-finance-worker-inventory`. At the original handoff, the
+specification and two linked status/note corrections were uncommitted. They were
+preserved in `c505acea` with C01/C02; C03 is `302a5e18` and C04 is `8418c175`.
+Preserve these commits and other agents' changes; inspect Git state before switching branches.
 The baseline `main` was fetched for this review; check for newer commits before
 implementation without resetting or overwriting local work.
 
@@ -576,7 +577,7 @@ backend identity and extension existing-account admission. Preserve the current
 storage key/backend and all independent native shutdown/identity/offline tests.
 
 
-## C05 concrete next-slice proposal (not implemented)
+## C05 reviewed design and completed implementation
 
 1. At the existing draft invocation, consume a scoped public draft report through
    native `onSnapshot`, retaining only pending/failure facts needed by recovery.
@@ -596,7 +597,96 @@ storage key/backend and all independent native shutdown/identity/offline tests.
    enumeration and phrase-child subscription. Public selectors may still project
    documented views of their own owned invocation; policy stays in its owner.
 
-This introduces no event bus, actor wrapper or generic observer. Review report
-scope and immediate pending semantics before implementation. Qualify preview
-admission/refusal, recovery/remove interruption, image updates, phrase hide/close
-and existing native reader-surface drain behavior. C04's close protocol is retained.
+The user approved this design and its implementation/testing slice. The existing
+invocation snapshots now supply those bounded reports. Recovery reports carry the
+document and observation generation; OPEN/CLOSE withdraw the previous report.
+The fixed invocation lifetime scopes reports to the admitted library capability.
+Draft reports expose the highest admitted sequence alongside pending/failure;
+removal requires that sequence to cover the last dispatched RETAIN and no issued
+or queued draft. Draft terminal output updates the retained facts, and unexpected
+child failure withdraws readiness. No new event bus, wrapper, dependency or SDK
+contact point was introduced.
+
+The held-write regression exposed a real join race: draft completion could let
+the recovery root close while removal was still queued. The idle closure branch
+now requires an empty removal queue. Native terminal output is consumed directly;
+closure never treats child disappearance as completed removal. C04's application,
+surface, session, scoped-store and broker close protocol is retained.
+
+Deleted: three annotation policy reads of the recovery child's snapshot, the
+recovery removal guard's draft-child read, the host's dynamic subscription map,
+child enumeration, phrase-child subscription and reentrant resubscription loop.
+The host subscribes once to library, tag form and recovery owner. Library's four
+existing native invocation notifications for images/reader/annotations/search
+remain; the recovery owner now publishes phrase-invocation changes the same way.
+The production slice adds 38 net lines for bounded reports, correlation and the
+drain correction while deleting 22 lines from host observation. This is a reduction
+in private topology and subscription machinery, not a total source-line reduction;
+no additional generalized abstraction was introduced.
+
+Verification on November 19, Node 24.22.2 / pnpm 10.28.0:
+
+- Existing Clipper Vitest suite: **1,009 tests / 155 files passed**, including two
+  added native-Jazz cases: removal waits behind two held drafts through shutdown,
+  and A → B → A recovery rejects obsolete readiness before preview admission.
+- After final error-report withdrawal changes, the focused annotation/draft/
+  preview suite passed **28/28**. Web `svelte-check --fail-on-warnings` reported
+  **0 errors / 0 warnings**; changed-file Oxlint and formatting passed.
+- Native browser annotation routes passed **4/4**, including Unicode notes,
+  recovered oversized input after reload, explicit recovery and immediate pending.
+- Native image cases passed **4/4**, including asynchronous completion/failure,
+  route replacement, full offline browser restart and restored-client sync.
+- Native account cases passed **22/22**, including phrase reveal/close, invalid
+  restoration, retained identity, full offline restart, resumed capture and sync.
+- Native worker suite passed **32/32**, including real A → B → A restoration,
+  immediate/forced shutdown, acquired custody, native search failures and actual
+  late reader surface receipts through open/detach/replacement timeouts. The
+  browser runs total **62/62**; all test servers were disposed afterward.
+
+Each browser spec used its own server/authority lifetime and disposable profiles;
+checks finished before server generation. No user or other-agent server/data was
+touched. `git fetch origin main` confirmed no commits beyond baseline `b69e6ad6`.
+The sandbox initially denied the native unit listener; the approved rerun used
+its disposable test authority. Existing rejected late UI/controller notifications
+and schema-location notices did not fail checks. Finance/shared-package checks,
+production/extension builds and unrelated suites were not repeated for these
+Clipper-only source changes.
+
+Remaining: C06–C10. No push, merge, publishing, migration or dependency change.
+
+## C06 concrete next-slice proposal (not implemented)
+
+Start with classification only: category/tag create/archive already share one
+`ManagementObservation`, one session/workspace binding and the same route reset
+policy. `worker-forms.ts` currently repeats four snapshot admission/projection
+blocks, four observation identities, four shutdown sends, four closed events and
+four waiting regions for this one feature. The outer application consumes only
+the forms group's public report and close result.
+
+1. Add one concrete classification chart with four statically invoked existing
+   scoped-form machines. Its native parallel regions each reach a final state
+   only from that form's real completion during shutdown. Native parallel
+   completion joins those results; unexpected completion/error fails the owner.
+   Delete the separate closed-event/waiting-region protocol from `worker-forms`.
+2. Keep the existing session/workspace lifetime and route-change RESET behavior.
+   Forward the same observation and existing form commands. Issued mutations keep
+   their current Local First scoped-form resource owner and shutdown drain.
+   Navigation does not recreate a pending form or replay a mutation.
+3. Publish one classification report correlated to the current observation,
+   containing the existing four DTO views, and one finite close result. The forms
+   parent forwards one observation, one route-reset command and one shutdown,
+   consumes that public report and waits for that close result. Keep the current
+   worker wire DTO/client validation and rendered controls.
+
+Review the total source difference before proceeding to profile/workspace or any
+bank/transfer/restore grouping. The uncertainty is whether this concrete ownership
+join removes enough repeated coordination to reduce total code after adding its
+chart; moving the same four blocks into another file is insufficient. If it does
+not, retain the current ownership and discuss the measured result. This proposal
+adds no generic group factory/supervisor or shared framework API.
+
+Qualification for this slice: existing Finance type checks; classification create/
+archive, duplicate/read-only/reference refusal, route reset and scope replacement;
+held mutation interrupted by workspace/session change or shutdown; native resource
+drain. Bank/provider, transfers, backup and restore remain in their existing owners
+until separate source-backed designs settle their different lifetimes.

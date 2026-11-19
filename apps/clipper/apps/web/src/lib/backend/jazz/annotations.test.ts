@@ -7,6 +7,8 @@ import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
 import { newDocumentValues } from './document-values.js'
 import type { AnnotationMutation } from '../../annotations/schema.js'
+import { annotationRecoveryMachine, selectAnnotationRecovery } from '../../annotations/recovery.js'
+import type { NoteDraftRecord } from '../../notes/schema.js'
 import { annotationsMachine, selectAnnotations } from '../../annotations/machine.js'
 import { toTextPositionSelector, toTextQuoteSelector } from '../../annotations/selectors.js'
 import { toMarginDocumentNote, toMarginHighlight } from '../../annotations/margin.js'
@@ -359,5 +361,113 @@ it('does not let an older note receipt report a queued edit as synced', async ()
 		gate.resolve()
 		actor.send({ type: 'SHUTDOWN' })
 		await toPromise(actor)
+	}
+})
+
+it('keeps recovery removal behind every admitted draft and drains before shutdown', async () => {
+	const a = await owner('annotation-draft-removal')
+	const first = Promise.withResolvers<void>(),
+		second = Promise.withResolvers<void>()
+	const writes: NoteDraftRecord[] = [],
+		removed: NoteDraftRecord[] = []
+	const noteId = crypto.randomUUID(),
+		writerId = crypto.randomUUID()
+	const actor = createActor(annotationRecoveryMachine, {
+		input: {
+			capability: {
+				...a.records.annotations,
+				recovery: {
+					libraryId: a.libraryId,
+					writerId,
+					store: {
+						read: async () => [],
+						write: async (record) => {
+							writes.push(record)
+							await (record.draft.sequence === 1 ? first.promise : second.promise)
+						},
+						remove: async (record) => {
+							removed.push(record)
+						}
+					}
+				}
+			}
+		}
+	}).start()
+	try {
+		actor.send({ type: 'RETAIN', noteId, text: 'first' })
+		actor.send({ type: 'RETAIN', noteId, text: 'second' })
+		actor.send({ type: 'FORGET', noteId, writerId, text: 'second' })
+		expect(selectAnnotationRecovery(actor.getSnapshot()).pending).toBe(true)
+		expect(removed).toEqual([])
+		first.resolve()
+		await expect.poll(() => writes.length).toBe(2)
+		expect(removed).toEqual([])
+		actor.send({ type: 'SHUTDOWN' })
+		expect(actor.getSnapshot().status).toBe('active')
+		second.resolve()
+		await toPromise(actor)
+		expect(removed.map((record) => record.draft.text)).toEqual(['second'])
+	} finally {
+		first.resolve()
+		second.resolve()
+		actor.stop()
+	}
+})
+
+it('admits preview only after recovery for the current A → B → A document generation', async () => {
+	const a = await owner('annotation-recovery-generation')
+	const created = await mutate(a, { type: 'ADD_NOTE', documentId: a.documentId })
+	const reads = [
+		Promise.withResolvers<{ id: string; text: string }[]>(),
+		Promise.withResolvers<{ id: string; text: string }[]>(),
+		Promise.withResolvers<{ id: string; text: string }[]>()
+	]
+	let count = 0
+	const actor = createActor(annotationsMachine, {
+		input: {
+			capability: {
+				...a.records.annotations,
+				recoveryTargets: () => {
+					const read = reads[count++]
+					if (!read) throw new Error('Unexpected recovery read')
+					return read.promise
+				},
+				recovery: {
+					libraryId: a.libraryId,
+					writerId: crypto.randomUUID(),
+					store: {
+						read: async () => [],
+						write: async () => {},
+						remove: async () => {}
+					}
+				}
+			}
+		}
+	}).start()
+	const views: ReturnType<typeof selectAnnotations>[] = []
+	const subscription = actor.subscribe((snapshot) => views.push(selectAnnotations(snapshot)))
+	try {
+		actor.send({ type: 'OPEN', documentId: a.documentId, text: 'Saved text.' })
+		actor.send({ type: 'OPEN', documentId: crypto.randomUUID(), text: 'Another document.' })
+		actor.send({ type: 'OPEN', documentId: a.documentId, text: 'Saved text.' })
+		await expect.poll(() => selectAnnotations(actor.getSnapshot()).notes.length).toBe(1)
+		reads[0]?.resolve([])
+		reads[1]?.resolve([])
+		await Promise.all(reads.slice(0, 2).map((read) => read.promise))
+		actor.send({ type: 'PREVIEW_NOTE', documentId: a.documentId, id: created.prepared.id })
+		expect(selectAnnotations(actor.getSnapshot()).enabled).toBe(false)
+		expect(selectAnnotations(actor.getSnapshot()).preview.source).toBeUndefined()
+		reads[2]?.resolve([])
+		await expect.poll(() => selectAnnotations(actor.getSnapshot()).enabled).toBe(true)
+		expect(views.some((view) => view.enabled && view.notes.length === 1)).toBe(true)
+		actor.send({ type: 'PREVIEW_NOTE', documentId: a.documentId, id: created.prepared.id })
+		expect(selectAnnotations(actor.getSnapshot()).preview.source).toEqual({
+			noteId: created.prepared.id
+		})
+	} finally {
+		for (const read of reads) read.resolve([])
+		actor.send({ type: 'SHUTDOWN' })
+		await toPromise(actor)
+		subscription.unsubscribe()
 	}
 })
