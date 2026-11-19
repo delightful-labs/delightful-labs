@@ -869,3 +869,80 @@ no runtime files or generated/catalog output changed in C08.
 C08 is complete as a selective adoption/retain decision, not a claim that every
 manual snapshot binding should be replaced. Remaining: C09–C10; no push, merge,
 deployment, migration or dependency change.
+
+
+## C09 source assessment and proposed skip (review pending)
+
+The current implementation was read together with its actual callers and tests.
+Before: Clipper's finite `browser-worker-job.ts` is **202 lines / 5,913 bytes**,
+Finance's `simplefin-worker.ts` is **83 lines / 2,650 bytes**, and its
+`image-render.ts` is **42 lines / 1,465 bytes**: **327 lines / 10,028 bytes** total
+across the three implementations. Clipper already shares its chart between web
+images and extension extraction; the native job cases passed in C07.
+
+Proposed after-decision: retain these implementations (**327 lines / 10,028
+bytes; zero source delta**), with no shared export or new adapter. This is an
+explicit skip proposal, not an implemented/tested extraction or a claim that an
+alternative has a measured source reduction.
+
+- Promoting Clipper's chart alone relocates 202 lines and adds a public package
+  contact point while deleting no lifecycle implementation.
+- Finance's image renderer is one native cancellable CPU leaf, already invoked
+  by the image editor's render actor. It validates ImageData and uses native
+  finally/abort cleanup. A chart adapter would need result/error mapping and an
+  integration change; the present small leaf is the simpler reviewed boundary.
+- Provider transport is called through `fetchAccounts`, with a promise contract,
+  a 75-second bootstrap/body deadline, explicit cancellation-vs-timeout trace,
+  worker-error prevention, bounded domain reply decoding and sanitized stage/
+  count diagnostics. The shared job is an invoked chart with different output
+  and error handling. Starting it inside this promise and awaiting it would be
+  the prohibited child-actor promise bridge; correct adoption requires a reviewed
+  change in the existing provider owner rather than a transport substitution.
+- Local First's existing `createWorkerRequest` is also not the same resource:
+  its channel owns routing/resources, request identities and unknown-effect
+  receipts. Adapting finite CPU/HTTP workers to it would add a channel protocol;
+  it would not delete their native resource owner. No RPC/worker framework is
+  proposed.
+
+The recommended skip preserves provider consent/secrets, trace sanitization,
+Finance deadline behavior and each existing cleanup contract. No runtime code or
+qualification was changed for this assessment. C09 remains unchecked until this
+before/after retain decision is accepted. Do not mistake finite native
+`terminate()` returning for a Jazz/application resource-drain receipt.
+
+## C10 concrete work sequence (not implemented)
+
+Source recheck found the old unscoped store in two fixtures plus independent
+historical tests. Production and the custody fixture already use the scoped
+adapter. Keep this as two reviewed source batches:
+
+1. **Actual adapter and fixture lifetime.** In the dedicated host driver/worker,
+   use the existing scoped storage data/control channels and
+   `createScopedWorkerAccountStore`, exactly as production `serve-application`
+   does. Await SDK/session close, scoped store close and native storage/broker
+   close before CLOSED; keep failure distinct from a clean receipt. The Window
+   `browserAccountStore` helper must also use the existing scope host/store at
+   its fixture boundary. Its caller `fixture-records.ts` owns a long-lived SDK
+   seed replica, so establish an explicit normal-close owner there before changing
+   it; do not invent an awaited beforeunload drain. Intentional abrupt-process
+   cases must remain abrupt and must not report success from disposal. Preserve
+   independent old-store Web Lock/extension-storage tests; remove or relocate a
+   production helper only after its non-historical callers are gone.
+2. **One matching Finance E2E artifact.** The general app shards and auth/
+   permissions/workspace projects inherit `tests/config/base.ts` and its
+   `FINANCE_PREVIEW=true`, `PUBLIC_DEBUG=true`, `vite.e2e.config.ts` build. Build
+   that exact configuration once per commit in CI and have those jobs download
+   the immutable artifact and run preview-only, with separate disposable
+   authorities/profiles. Preserve the default local build-and-preview command.
+   Do not reuse the check job's `ci-build` artifact: it is a different config.
+   Exclude presentation (dev server), startup (different flags/authority URL),
+   fake-data/debug/PWA flag builds and any other nonmatching configuration.
+   Keep all existing browser selections/shards; no test coverage is removed.
+
+Review the Window seed-replica lifetime as the material uncertainty in the first
+batch. For build reuse, verify actual compiled environment inputs before
+collapsing jobs. Clipper's per-spec authority/server restart remains intentional;
+reuse an immutable build only across truly matching inputs, never a mutable
+backend. Keep generated output separate from user servers/data and introduce no
+new generic fixture/RPC/cache framework. Remaining: C09 disposition and C10;
+C01–C08 are complete.
