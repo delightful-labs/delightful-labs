@@ -37,6 +37,20 @@ Environment files belong in `apps/website`; copy that app's `.env.example` there
 when needed. Existing local files in other checkouts are untouched.
 Generated output, browser evidence and caches belong to the app directory.
 
+Library declaration maps support editor “Go to Definition” navigation back to
+`packages/ui/src/lib` and `packages/local-first/src/lib`. Run `pnpm build:libraries`
+after library changes. The root package, UI build, Local First verification, and install commands
+also refresh map paths in PNPM's injected copies, preserving each app's peer
+resolution. After packaging directly inside a library, run
+`pnpm monorepo:source-maps` from the root. Reload the editor's TypeScript/Svelte
+language services if they retain an older definition target.
+
+This setup changes navigation metadata only. Package exports and runtime imports
+continue to use `dist`; original build maps remain relative and portable.
+TypeScript/JavaScript definitions retain symbol positions. Svelte component
+definitions open the original component at its beginning because the installed
+packager emits positions into temporary generated TypeScript files.
+
 All consumers now use workspace UI with their own Svelte peer. The website and
 Local First Storybook import `delightful-ui/theme-classic.css` to retain their
 existing typography; the current default theme remains available to other apps.

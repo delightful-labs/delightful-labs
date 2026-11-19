@@ -11,7 +11,6 @@
 	import { EXPENSE, INCOME, transactionPages } from '#lib/domain/transaction-kind.js'
 	import { resolveInternalTransferLinks } from '#lib/domain/internal-transfer.js'
 	import { observeRow, observeRows } from '#lib/runtime/observations.js'
-	import { createScopedFormController } from '#lib/forms/forms.svelte.js'
 	import { app, transactionDetailQuery } from '#lib/schema.js'
 	import SavedTransactionImages from './SavedTransactionImages.svelte'
 	import {
@@ -48,15 +47,12 @@
 	import { m } from '#lib/paraglide/messages.js'
 	import { formReasonText } from '#lib/forms/form-messages.js'
 	import FormFeedback from '../forms/FormFeedback.svelte'
-	import CategoryForm from '../classification/CategoryForm.svelte'
-	import { createManagementFormOptions } from '#lib/machines/management/management.js'
-	import { categoryFormSchema } from '#lib/validation/categories.js'
-	import { createCategory } from '#lib/data.js'
 	import type { ManagementObservation } from '#lib/contracts/management-contract.js'
 	import PageHeader from '../navigation/PageHeader.svelte'
 	import QueryContent from '../shared/QueryContent.svelte'
 	import TransactionDetails from './TransactionDetails.svelte'
 	import TransactionForm from './TransactionForm.svelte'
+	import TransactionCategoryCreation from './TransactionCategoryCreation.svelte'
 	import InternalTransferDeleteActions from '../transfers/InternalTransferDeleteActions.svelte'
 
 	const filters = getContext<FinanceFilters>(financeFiltersKey)
@@ -524,7 +520,6 @@
 			tags: row.tags?.flatMap((link) => (link.tag?.name ? [link.tag.name] : [])) ?? []
 		}
 	})
-	let categoryModal: CategoryForm | undefined = $state()
 	const categoryScope = $derived({
 		identityId: session.current.account?.id ?? null,
 		organizationId: filters.activeOrganizationId,
@@ -541,29 +536,6 @@
 			failed: [membershipQuery, categoryQuery, transactionQuery].some((q) => q.error != null)
 		}
 	}
-	const categoryOptions = createManagementFormOptions({ binding: db, observe: observeCategory })({
-		schema: categoryFormSchema,
-		successContent: 'replace',
-		assessmentObservation: ({ request, observation }) => ({
-			...observation.facts,
-			intent: {
-				kind: 'createCategory',
-				name: request.values.name,
-				categoryKind: request.values.kind
-			}
-		}),
-		write: ({ request }) => {
-			const organizationId = request.scope.organizationId
-			if (!organizationId) throw new Error('Missing authorized workspace')
-			return createCategory(db, organizationId, request.values.name, request.values.kind)
-		}
-	})
-	const categoryController = createScopedFormController(categoryOptions)
-	const createdCategory = $derived(
-		categoryController.view.content.kind === 'success'
-			? categoryController.view.content.value
-			: undefined
-	)
 </script>
 
 <svelte:head
@@ -578,121 +550,105 @@
 			title={m['labels.subject_details']({ subject: m['nouns.transaction']({ count: 1 }) })}
 		/>{/snippet}
 
-	<QueryContent
-		queries={[transactionQuery]}
-		loadingMessage={m['status.loading_subject']({ subject: m['nouns.transaction']({ count: 1 }) })}
-		errorMessage={m['errors.load_subject']({ subject: m['nouns.transaction']({ count: 1 }) })}
-	>
-		{#key `${session.current.account?.id}:${filters.activeOrganizationId}:${page.params.id}`}
-			<TransactionDetails
-				transaction={observe().transaction}
-				creatorProfile={creatorQuery.current}
-				editorProfile={editorQuery.current}
+	<TransactionCategoryCreation kind={transaction?.kind ?? routeKind} observe={observeCategory}>
+		{#snippet children(onaddcategory, canAddCategory, createdCategory)}
+			<QueryContent
+				queries={[transactionQuery]}
+				loadingMessage={m['status.loading_subject']({
+					subject: m['nouns.transaction']({ count: 1 })
+				})}
+				errorMessage={m['errors.load_subject']({ subject: m['nouns.transaction']({ count: 1 }) })}
 			>
-				{#snippet actions()}
-					<InternalTransferDeleteActions
-						transactionId={transaction?.id ?? page.params.id ?? ''}
-						available={Boolean(
-							linkedTransfer &&
-							formView.fieldsEditable &&
-							transferDeleteResult?.outcome !== 'succeeded'
-						)}
-						pending={transferDeletePending}
-						feedback={editWorkflow.selectDeleteFeedback(editSnapshot)}
-						onDelete={deleteLinkedTransfer}
-					/>
-				{/snippet}
-				{#snippet form()}
-					<FormFeedback
-						view={formView}
-						subject={m['nouns.transaction']({ count: 1 })}
-						reasonText={(reason) => formReasonText[reason]()}
-						invalidMessage={m['forms.validation_error']()}
-						section="readiness"
-						onRetryReadiness={retryReadiness}
-					/>
-					{#if initialTransaction && transaction}
-						<TransactionForm
-							mode="edit"
-							onaddcategory={() => categoryModal?.open()}
-							canAddCategory={categoryController.view.canOpen}
-							{createdCategory}
-							kind={transaction.kind}
-							paymentEntry={transactionPages[transaction.kind].paymentEntry}
-							{initialTransaction}
-							oninput={inputForm}
-							onattachmentschange={updateAttachments}
-							{attachmentPickerRevision}
-							organizationId={filters.activeOrganizationId}
-							accounts={availableAccounts}
-							defaultAccountId={initialTransaction.accountId}
-							categories={availableCategories}
-							defaultCategoryId={initialTransaction.categoryId}
-							{tagSuggestions}
-							{transferSuggestions}
-							{transferEditorState}
-							{transferConflict}
-							{selectedTransferCandidateId}
-							onSelectTransferCandidate={selectTransferCandidate}
-							{transferSearchEnabled}
-							{writableTransferSuggestionIds}
-							onTransferSearchEnabledChange={(enabled) =>
-								editActor.send({ type: enabled ? 'ENABLE_SEARCH' : 'DISABLE_SEARCH' })}
-							{transferLinkPending}
-							{transferLinkResult}
-							transferStatusLabel={editWorkflow.selectTransferStatus(editSnapshot)}
-							transferUnlinkAvailable={linkedTransfer !== null}
-							{transferUnlinkWritable}
-							{transferUnlinkPending}
-							{transferUnlinkResult}
-							{linkedCounterpartHref}
-							onLinkCounterpart={linkCounterpart}
-							onUnlinkTransfer={unlinkTransfer}
-							view={formView}
-							onsubmit={submitForm}
-							onreset={resetForm}
-						>
-							{#snippet savedImages()}
-								{#if transaction}
-									{#key `${transaction.id}:${transaction.accountId}:${transaction.organizationId}`}
-										<SavedTransactionImages
-											{db}
-											{transaction}
-											images={attachmentImages}
-											canEdit={formView.fieldsEditable}
-											removingIds={removingAttachmentIds}
-											failedIds={failedAttachmentIds}
-											onremove={removeAttachment}
-										/>
-									{/key}
-								{/if}
-							{/snippet}
-						</TransactionForm>
-					{/if}
-				{/snippet}
-			</TransactionDetails>
-		{/key}
-	</QueryContent>
-
-	{#if transaction}
-		<CategoryForm
-			bind:this={categoryModal}
-			scope={categoryScope}
-			fixedKind={transaction.kind}
-			view={categoryController.view}
-			onopen={categoryController.open}
-			onsubmit={(event) => {
-				event.preventDefault()
-				if (!(event.currentTarget instanceof HTMLFormElement) || !transaction) return
-				categoryController.submitValues({
-					name: new FormData(event.currentTarget).get('name'),
-					kind: transaction.kind
-				})
-			}}
-			onreset={categoryController.reset}
-			onRetryReadiness={categoryController.retryReadiness}
-		>
-			{#snippet trigger()}{/snippet}
-		</CategoryForm>
-	{/if}
+				{#key `${session.current.account?.id}:${filters.activeOrganizationId}:${page.params.id}`}
+					<TransactionDetails
+						transaction={observe().transaction}
+						creatorProfile={creatorQuery.current}
+						editorProfile={editorQuery.current}
+					>
+						{#snippet actions()}
+							<InternalTransferDeleteActions
+								transactionId={transaction?.id ?? page.params.id ?? ''}
+								available={Boolean(
+									linkedTransfer &&
+									formView.fieldsEditable &&
+									transferDeleteResult?.outcome !== 'succeeded'
+								)}
+								pending={transferDeletePending}
+								feedback={editWorkflow.selectDeleteFeedback(editSnapshot)}
+								onDelete={deleteLinkedTransfer}
+							/>
+						{/snippet}
+						{#snippet form()}
+							<FormFeedback
+								view={formView}
+								subject={m['nouns.transaction']({ count: 1 })}
+								reasonText={(reason) => formReasonText[reason]()}
+								invalidMessage={m['forms.validation_error']()}
+								section="readiness"
+								onRetryReadiness={retryReadiness}
+							/>
+							{#if initialTransaction && transaction}
+								<TransactionForm
+									mode="edit"
+									{onaddcategory}
+									{canAddCategory}
+									{createdCategory}
+									kind={transaction.kind}
+									paymentEntry={transactionPages[transaction.kind].paymentEntry}
+									{initialTransaction}
+									oninput={inputForm}
+									onattachmentschange={updateAttachments}
+									{attachmentPickerRevision}
+									organizationId={filters.activeOrganizationId}
+									accounts={availableAccounts}
+									defaultAccountId={initialTransaction.accountId}
+									categories={availableCategories}
+									defaultCategoryId={initialTransaction.categoryId}
+									{tagSuggestions}
+									{transferSuggestions}
+									{transferEditorState}
+									{transferConflict}
+									{selectedTransferCandidateId}
+									onSelectTransferCandidate={selectTransferCandidate}
+									{transferSearchEnabled}
+									{writableTransferSuggestionIds}
+									onTransferSearchEnabledChange={(enabled) =>
+										editActor.send({ type: enabled ? 'ENABLE_SEARCH' : 'DISABLE_SEARCH' })}
+									{transferLinkPending}
+									{transferLinkResult}
+									transferStatusLabel={editWorkflow.selectTransferStatus(editSnapshot)}
+									transferUnlinkAvailable={linkedTransfer !== null}
+									{transferUnlinkWritable}
+									{transferUnlinkPending}
+									{transferUnlinkResult}
+									{linkedCounterpartHref}
+									onLinkCounterpart={linkCounterpart}
+									onUnlinkTransfer={unlinkTransfer}
+									view={formView}
+									onsubmit={submitForm}
+									onreset={resetForm}
+								>
+									{#snippet savedImages()}
+										{#if transaction}
+											{#key `${transaction.id}:${transaction.accountId}:${transaction.organizationId}`}
+												<SavedTransactionImages
+													{db}
+													{transaction}
+													images={attachmentImages}
+													canEdit={formView.fieldsEditable}
+													removingIds={removingAttachmentIds}
+													failedIds={failedAttachmentIds}
+													onremove={removeAttachment}
+												/>
+											{/key}
+										{/if}
+									{/snippet}
+								</TransactionForm>
+							{/if}
+						{/snippet}
+					</TransactionDetails>
+				{/key}
+			</QueryContent>
+		{/snippet}
+	</TransactionCategoryCreation>
 </PageLayout>

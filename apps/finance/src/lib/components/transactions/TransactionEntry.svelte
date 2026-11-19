@@ -17,6 +17,7 @@
 		applicableTransactionCategories,
 		applicableTransactionTags
 	} from '#lib/machines/transactions/transaction-entry.js'
+	import type { ManagementObservation } from '#lib/contracts/management-contract.js'
 	import type { TransactionEntryObservation } from '#lib/contracts/transaction-entry-contract.js'
 	import FormFeedback from '../forms/FormFeedback.svelte'
 	import { formReasonText } from '#lib/forms/form-messages.js'
@@ -37,6 +38,7 @@
 	import { m } from '#lib/paraglide/messages.js'
 	import AccountCreation from '#lib/components/accounts/AccountCreation.svelte'
 	import TransactionForm from '#lib/components/transactions/TransactionForm.svelte'
+	import TransactionCategoryCreation from './TransactionCategoryCreation.svelte'
 	import PageHeader from '#lib/components/navigation/PageHeader.svelte'
 	let { kind }: { kind: TransactionKind } = $props()
 	let selectedAttachments = $state<readonly File[]>([])
@@ -107,6 +109,21 @@
 			)
 		}
 	}
+	function observeCategory(): ManagementObservation {
+		const facts = observe()
+		return {
+			identityId: facts.identityId,
+			organizationId: facts.organizationId,
+			binding: facts.binding,
+			sessionReady: facts.sessionReady,
+			membership: facts.membership,
+			categories: facts.categories,
+			tags: facts.tags,
+			loading: facts.loading,
+			failed: facts.failed
+		}
+	}
+
 	const accounts = $derived(orderAccounts(writableTransactionAccounts(observe()), accountOrder.ids))
 	const defaultAccountId = $derived(
 		accounts.find(
@@ -182,21 +199,28 @@
 	{#if form.view.readiness.kind === 'blocked' && form.view.readiness.reason === 'noAccounts'}
 		<AccountCreation />
 	{:else if form.view.readiness.kind === 'ready'}
-		<TransactionForm
-			{kind}
-			paymentEntry={config.paymentEntry}
-			organizationId={filters.activeOrganizationId}
-			{accounts}
-			onattachmentschange={updateAttachments}
-			{attachmentPickerRevision}
-			{defaultAccountId}
-			categories={availableCategories}
-			defaultCategoryId={defaultCategory?.id}
-			{tagSuggestions}
-			view={form.view}
-			onsubmit={form.submit}
-			onreset={form.reset}
-			oncancel={() => goto(workspaceHref(filters.activeOrganizationId, config.path))}
-		/>
+		<TransactionCategoryCreation {kind} observe={observeCategory}>
+			{#snippet children(onaddcategory, canAddCategory, createdCategory)}
+				<TransactionForm
+					{onaddcategory}
+					{canAddCategory}
+					{createdCategory}
+					{kind}
+					paymentEntry={config.paymentEntry}
+					organizationId={filters.activeOrganizationId}
+					{accounts}
+					onattachmentschange={updateAttachments}
+					{attachmentPickerRevision}
+					{defaultAccountId}
+					categories={availableCategories}
+					defaultCategoryId={defaultCategory?.id}
+					{tagSuggestions}
+					view={form.view}
+					onsubmit={form.submit}
+					onreset={form.reset}
+					oncancel={() => goto(workspaceHref(filters.activeOrganizationId, config.path))}
+				/>
+			{/snippet}
+		</TransactionCategoryCreation>
 	{/if}
 </PageLayout>

@@ -8,6 +8,7 @@
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": true,
+		"declarationMap": true,
 		"strict": true
 	},
 	"include": ["src", "tests", "*.js", ".storybook"],

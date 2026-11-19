@@ -459,3 +459,74 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 		}
 	)
 }
+
+for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
+	test(
+		`new ${kind} selects inline categories and preserves its draft offline`,
+		{ tag: ['@transactions', '@transaction-edit', '@categories'] },
+		async ({ page, context }) => {
+			await seedTransaction(page, kind === 'income' ? 'imported-income' : 'manual')
+			await page.goto(`/${kind === 'income' ? 'income' : 'expenses'}/new`)
+			const main = page.getByRole('main')
+			const category = main.getByLabel('Category', { exact: true })
+			const amount = main.getByLabel('Amount', { exact: true })
+			const memo = main.getByLabel('Memo (additional notes)', { exact: true })
+			await amount.fill('42.50')
+			await memo.fill('New transaction category draft')
+			const originalCategory = await category.inputValue()
+			const add = main.getByRole('button', { name: 'Add Category', exact: true })
+			await expect(add).toBeEnabled()
+			await context.setOffline(true)
+			await add.click()
+			const dialog = page.getByRole('dialog', { name: 'Add Category', exact: true })
+			await dialog.getByLabel('Category name', { exact: true }).fill('Cancelled new category')
+			await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+			await expect(category).toHaveValue(originalCategory)
+			for (const name of ['First new category', 'Second new category']) {
+				await add.click()
+				await expect(dialog.getByRole('combobox')).toHaveCount(0)
+				await dialog.getByLabel('Category name', { exact: true }).fill(name)
+				await dialog.locator('input[name="kind"]').evaluate((input) => {
+					if (input instanceof HTMLInputElement)
+						input.value = input.value === 'income' ? 'expense' : 'income'
+				})
+				await dialog.getByRole('button', { name: 'Add Category', exact: true }).click()
+				await expect(dialog.getByRole('status')).toContainText(name)
+				await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+				await expect(category.locator('option:checked')).toHaveText(name)
+				await expect(amount).toHaveValue('42.50')
+				await expect(memo).toHaveValue('New transaction category draft')
+			}
+			const categoryId = await category.inputValue()
+			await main.getByRole('button', { name: 'Save Transaction', exact: true }).click()
+			await expect(page).toHaveURL(
+				(url) => url.pathname === `/${kind === 'income' ? 'income' : 'expenses'}`
+			)
+			await expect
+				.poll(() =>
+					page.evaluate(async () => {
+						const schemaPath = '/src/lib/schema.ts'
+						const sessionPath = '/src/lib/runtime/jazz-session.ts'
+						const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
+						const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
+							await import(sessionPath)
+						const db = getCurrentJazzSession()?.getSnapshot().client?.db
+						if (!db) throw new Error('Missing database')
+						const transactions = await db.all(app.transactions)
+						const categories = await db.all(app.categories)
+						const row = transactions.find((row) => row.memo === 'New transaction category draft')
+						return {
+							transaction: row,
+							category: categories.find((category) => category.id === row?.categoryId),
+							cancelled: categories.some((category) => category.name === 'Cancelled new category')
+						}
+					})
+				)
+				.toMatchObject({
+					transaction: { categoryId, amountMinor: 4250, kind },
+					category: { id: categoryId, kind },
+					cancelled: false
+				})
+		}
+	)
+}
