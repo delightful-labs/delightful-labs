@@ -1,0 +1,88 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "3b58f456b5215a537a8024c1c750a487145aefda40cdfc31019e3f86a2561116"
+  },
+  "tables": {
+    "accounts": { "read": "true" },
+    "checks": {
+      "read": "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+      "insert": "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+      "update": {
+        "old": "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+        "new": {
+          "allOf": [
+            "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+            "exists checks(id = this.id, organizationId = this.organizationId, accountId = this.accountId)"
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "organizations": { "read": "true" },
+    "transactions": {
+      "read": "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+      "insert": {
+        "allOf": [
+          "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+          {
+            "anyOf": [
+              {
+                "allOf": [
+                  "checkId = null",
+                  {
+                    "anyOf": [
+                      "paymentMethod = null",
+                      "paymentMethod = 'cash'",
+                      "paymentMethod = 'transfer'",
+                      "paymentMethod = 'electronic'"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  { "allOf": ["paymentMethod = 'check'", "checkId != null"] },
+                  "exists checks(id = this.checkId, organizationId = this.organizationId, accountId = this.accountId)"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+        "new": {
+          "allOf": [
+            "exists accounts(id = this.accountId, organizationId = this.organizationId)",
+            {
+              "anyOf": [
+                {
+                  "allOf": [
+                    "checkId = null",
+                    {
+                      "anyOf": [
+                        "paymentMethod = null",
+                        "paymentMethod = 'cash'",
+                        "paymentMethod = 'transfer'",
+                        "paymentMethod = 'electronic'"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    { "allOf": ["paymentMethod = 'check'", "checkId != null"] },
+                    "exists checks(id = this.checkId, organizationId = this.organizationId, accountId = this.accountId)"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "delete": "false"
+    }
+  }
+}

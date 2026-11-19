@@ -1,12 +1,12 @@
 export { bankObservation } from './availability.js'
-import type { schema } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import type { Account, OrganizationMember, app } from '#lib/schema.js'
+import type { RowOf } from 'jazz-tools'
+import type { Db as JazzDb } from 'jazz-tools'
+import type { Account, OrganizationMember, app } from '#lib/queries.js'
 import type { BankTrace } from '#lib/integrations/diagnostics.js'
 import type { CredentialScope } from '#lib/validation/integrations.js'
 import type { fetchAccounts } from '#lib/integrations/simplefin.js'
 
-export type Connection = schema.RowOf<typeof app.simplefinConnections>
+export type Connection = RowOf<typeof app.simplefinConnections>
 export type ProviderSummary = {
 	id: string
 	name: string
@@ -88,7 +88,16 @@ export type Observation = {
 }
 export type RequestIdentity = Pick<Observation, 'userId' | 'organizationId'>
 export type Dependencies = {
-	db: ReturnType<typeof getDb>
+	db: Pick<
+		JazzDb,
+		| 'all'
+		| 'one'
+		| 'insert'
+		| 'update'
+		| 'delete'
+		| 'beginTransaction'
+		| 'beginSerializableTransaction'
+	>
 	observe: () => Observation
 	passkeyName: () => string
 }
@@ -176,7 +185,7 @@ export type BankSource = {
 	membership: OrganizationMember | null | undefined
 	connections: readonly Connection[]
 	accounts: readonly Account[]
-	links: readonly schema.RowOf<typeof app.simplefinAccountLinks>[]
+	links: readonly RowOf<typeof app.simplefinAccountLinks>[]
 }
 export type BankSyncDependencies = Omit<Dependencies, 'observe'> & { read: () => BankSource }
 export type BankCredential = Pick<

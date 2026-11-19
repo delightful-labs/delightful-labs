@@ -45,7 +45,7 @@ function expectDisposed(worker: ControlledWorker) {
 beforeEach(() => {
 	ControlledWorker.failPosting = false
 	vi.stubGlobal('Worker', ControlledWorker)
-	vi.stubGlobal('window', { location: { origin: 'https://finance.example' } })
+	vi.stubGlobal('location', { origin: 'https://finance.example' })
 })
 afterEach(() => {
 	workers.splice(0)

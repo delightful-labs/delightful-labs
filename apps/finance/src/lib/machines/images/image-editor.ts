@@ -8,7 +8,8 @@ import {
 	type ImageSelection,
 	type ImageSelectionMode
 } from '#lib/domain/image-editor-geometry.js'
-import { renderEditorPixels, type ImageAdjustments } from '#lib/domain/image-editor-pixels.js'
+import type { ImageAdjustments } from '#lib/domain/image-editor-pixels.js'
+import { renderImageInWorker } from '#lib/runtime/worker/image-render.js'
 import * as platform from '#lib/domain/image-editor-platform.js'
 import { setup, types, createAsyncLogic } from 'xstate'
 import type { SnapshotFrom } from 'xstate'
@@ -80,8 +81,8 @@ const read = createAsyncLogic({
 	run: async ({ input }: { input: ImageBitmap }) => platform.readEditorSource(input)
 })
 const render = createAsyncLogic({
-	run: async ({ input }: { input: ReturnType<typeof renderInput> }) =>
-		renderEditorPixels(input.source, input.selection, input.adjustments)
+	run: ({ input, signal }: { input: ReturnType<typeof renderInput>; signal: AbortSignal }) =>
+		renderImageInWorker(input, signal)
 })
 const allocate = createAsyncLogic({ run: async () => platform.createEditorCanvas() })
 const paint = createAsyncLogic({

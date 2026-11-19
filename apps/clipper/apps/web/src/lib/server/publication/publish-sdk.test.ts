@@ -12,9 +12,8 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp } from 'jazz-tools/testing'
-import { app } from '../../backend/jazz/schema.js'
-import permissions from '../../backend/jazz/permissions.js'
-import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
+import permissions from '../../backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { createPublicationPublish, handlePublicationPublish } from './publish.js'
 import { cidSchema } from '../../annotations/publication-link.js'
 import { firstPublicationWriteSchema } from './first-write.js'
@@ -32,7 +31,7 @@ const oauth: { OAuthClient: { prototype: { restore: (...args: unknown[]) => Prom
 
 let fixture: PolicyTestApp
 beforeEach(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterEach(async () => {
 	vi.restoreAllMocks()

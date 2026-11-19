@@ -61,6 +61,7 @@ if (
 console.log(`Development projects: ${canonical.length} unique scenarios`)
 
 const isolatedSuites = {
+	'component-presentation.e2e.ts': 'form-presentation',
 	'pwa.e2e.ts': 'pwa',
 	'pwa-cold-start.e2e.ts': 'pwa',
 	'worker-bundle.e2e.ts': 'pwa',

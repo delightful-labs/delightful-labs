@@ -29,6 +29,10 @@
 		]
 	},
 	"ignorePatterns": [
+		"**/jazz.generated.ts",
+		"**/jazz.app.json",
+		"**/jazz.permissions.json",
+		"**/migrations/snapshots/**",
 		".agents/**",
 		".specify/templates/**",
 		".specify/scripts/**",
@@ -84,6 +88,10 @@
 		{
 			"files": [
 				"fixtures/native-capture/schema.ts",
+				"fixtures/native-capture/jazz/*.ts",
+				"fixtures/private-creation/jazz/*.ts",
+				"fixtures/test-app/jazz/*.ts",
+				"tests/fixtures/invitations/jazz/*.ts",
 				"fixtures/native-capture/experiment.test.ts",
 				"fixtures/native-capture/export-browser.test.ts",
 				"fixtures/package-consumer/jazz.js",

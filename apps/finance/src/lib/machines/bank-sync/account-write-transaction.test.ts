@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { accountWriteTransaction } from './account-write-transaction.js'
 import { mappingFixture, link, request, provider } from './mapping.fixture.js'
 import { account, id } from './test-fixtures.js'

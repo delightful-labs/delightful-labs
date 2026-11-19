@@ -101,6 +101,9 @@ jobs:
           - suite: workspace
             config: playwright.config.ts
             selection: --project=workspace
+          - suite: presentation
+            config: tests/config/playwright.form-presentation.config.ts
+            selection: ''
           - suite: startup
             config: tests/config/playwright.startup.config.ts
             selection: ''

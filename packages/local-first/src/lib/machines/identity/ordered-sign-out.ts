@@ -1,3 +1,4 @@
+import { createSessionChangeMachine } from './session-change.js'
 import { createAsyncLogic, setup, types, type ActorRefFrom } from 'xstate'
 import {
 	DEFAULT_SIGN_OUT_DEADLINE_MS,
@@ -31,9 +32,11 @@ export function createOrderedSignOutMachine() {
 	const provider = createAsyncLogic<void, OrderedSignOutInput>({
 		run: ({ input }) => required(input.provider)()
 	})
-	const session = createAsyncLogic<void, OrderedSignOutInput>({
-		run: ({ input }) => input.session()
-	})
+	const session = createSessionChangeMachine((input: OrderedSignOutInput) =>
+		typeof input.session === 'function'
+			? { operation: 'signOut', native: input.session }
+			: input.session
+	)
 	const observation = createAsyncLogic({
 		run: async ({ input }: { input: OrderedSignOutInput }) => required(input.observeSession)()
 	})
@@ -135,7 +138,15 @@ export function createOrderedSignOutMachine() {
 					id: 'session',
 					src: 'session',
 					input: ({ context }) => required(context.input),
-					onDone: { target: 'settled', context: { result: { outcome: 'completed' } } },
+					onDone: ({ event }) => ({
+						target: 'settled',
+						context: {
+							result:
+								event.output.outcome !== 'completed'
+									? { outcome: 'failed', stage: 'session' }
+									: { outcome: 'completed' }
+						}
+					}),
 					onError: {
 						target: 'settled',
 						context: { result: { outcome: 'failed', stage: 'session' } }

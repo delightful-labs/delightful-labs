@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { resumeObservationsSchema } from '../../reader/schema.js'
 import {
 	documentFieldsSchema,
 	documentSchema,
@@ -8,6 +9,7 @@ import {
 import { captureDocumentSchema } from '../../capture/capture-document-schema.js'
 import { lowercaseUuidSchema } from '../../validation/values.js'
 const nativeDocumentSchema = documentFieldsSchema.extend({
+	resumePosition: resumeObservationsSchema,
 	libraryId: lowercaseUuidSchema,
 	status: documentStatusSchema,
 	previousStatus: documentReadingStatusSchema.nullish(),

@@ -1,5 +1,5 @@
-import type { schema } from 'jazz-tools'
-import { app } from '#lib/schema.js'
+import type { RowOf } from 'jazz-tools'
+import { app } from '#lib/queries.js'
 import { createAuthorizationMachine } from './authorization.js'
 import { required } from './identity.js'
 import type { MappingInterruption } from './account-write-transaction.js'
@@ -12,7 +12,7 @@ import {
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type Link = schema.RowOf<typeof app.simplefinAccountLinks>
+type Link = RowOf<typeof app.simplefinAccountLinks>
 type Input = { work: OperationWork; providerId: string }
 type Context = Input & { links: Link[]; index: number; error: unknown }
 

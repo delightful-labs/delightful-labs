@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
@@ -6,46 +7,7 @@ async function seed(page: Page) {
 	await expect(
 		page.getByRole('main').getByRole('button', { name: 'Add Account', exact: true })
 	).toBeEnabled({ timeout: 30_000 })
-	return page.evaluate(async () => {
-		const schemaPath = '/src/lib/schema.ts',
-			sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing session')
-		const [org] = await db.all(app.organizations)
-		if (!org) throw new Error('Missing workspace')
-		const account = await db
-			.insert(app.accounts, {
-				organizationId: org.id,
-				name: 'Editor ledger',
-				kind: 'cash',
-				currency: 'USD'
-			})
-			.wait({ tier: 'local' })
-		const category = await db
-			.insert(app.categories, {
-				organizationId: org.id,
-				name: 'Editor category',
-				kind: 'expense',
-				isSystem: false
-			})
-			.wait({ tier: 'local' })
-		const transaction = await db
-			.insert(app.transactions, {
-				organizationId: org.id,
-				accountId: account.id,
-				categoryId: category.id,
-				amountMinor: 100,
-				currency: 'USD',
-				kind: 'expense',
-				bookedOn: '2026-10-28',
-				source: 'manual'
-			})
-			.wait({ tier: 'local' })
-		return { transactionId: transaction.id, accountId: account.id, categoryId: category.id }
-	})
+	return financeFixture(page, 'transaction-image-editor.e2e:9')
 }
 async function receipt(page: Page) {
 	const bytes = await page.evaluate(async () => {
@@ -85,29 +47,7 @@ async function decode(bytes: number[]) {
 	}
 }
 async function images(page: Page, transactionId: string) {
-	return page.evaluate(async (transactionId) => {
-		const schemaPath = '/src/lib/schema.ts',
-			sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing session')
-		const links = await db.all(
-			app.transactionAttachments.where({ transactionId }).include({ file: { parts: true } }),
-			{ tier: 'local-first' }
-		)
-		return links.map((link) => ({
-			id: link.id,
-			fileId: link.fileId,
-			name: link.file?.fileName,
-			type: link.file?.mimeType,
-			size: link.file?.sizeBytes,
-			bytes: [...(link.file?.parts ?? [])]
-				.sort((a, b) => a.partIndex - b.partIndex)
-				.flatMap(({ data }) => [...(data ?? [])])
-		}))
-	}, transactionId)
+	return financeFixture(page, 'transaction-image-editor.e2e:88', transactionId)
 }
 async function savedImage(page: Page, transactionId: string) {
 	let image: Awaited<ReturnType<typeof images>>[number] | undefined
@@ -212,19 +152,7 @@ test(
 		await expect(dialog).toBeHidden()
 		await page.getByRole('button', { name: 'Save Transaction', exact: true }).click()
 		await page.waitForURL(/\/expenses(?:\?|$)/)
-		const id = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const row = await getCurrentJazzSession()
-				?.getSnapshot()
-				.client?.db.one(app.transactions.where({ description: 'Editor draft receipt' }), {
-					tier: 'local-first'
-				})
-			return row?.id
-		})
+		const id = await financeFixture(page, 'transaction-image-editor.e2e:215')
 		if (!id) throw new Error('Edited transaction was not saved')
 		const image = await savedImage(page, id)
 		expect(image.name).toBe('receipt.png')
@@ -261,6 +189,12 @@ test(
 		await left.press('Escape')
 		await expect(dialog).toBeHidden()
 		expect(await savedImage(page, ledger.transactionId)).toEqual(original)
+		await page.evaluate(async () => {
+			await navigator.serviceWorker.ready
+		})
+		await expect
+			.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+			.toBe(true)
 		await page.context().setOffline(true)
 		try {
 			dialog = await editor(page)
@@ -320,22 +254,7 @@ test(
 	async ({ page }) => {
 		const ledger = await seed(page)
 		await uploadSaved(page, ledger.transactionId)
-		await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const snapshot = getCurrentJazzSession()?.getSnapshot()
-			if (!snapshot?.client || !snapshot.account) throw new Error('Missing session')
-			const [membership] = await snapshot.client.db.all(
-				app.organizationMembers.where({ userId: snapshot.account.id })
-			)
-			if (!membership) throw new Error('Missing membership')
-			await snapshot.client.db
-				.update(app.organizationMembers, membership.id, { role: 'viewer' })
-				.wait({ tier: 'local' })
-		})
+		await financeFixture(page, 'transaction-image-editor.e2e:323')
 		await expect(page.getByLabel('Add Images', { exact: true })).toBeDisabled()
 		const dialog = await information(page)
 		await expect(dialog.getByRole('link', { name: 'receipt.png', exact: true })).toBeVisible()

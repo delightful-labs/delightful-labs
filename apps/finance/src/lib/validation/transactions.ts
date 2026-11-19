@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { appTagSchema } from './tags.js'
 import { checkNumberText } from './checks.js'
 import { parseAmountMinor } from '../domain/money.js'
-import type { Account, Category, TransactionRow } from '../schema.js'
+import type { Account, Category, TransactionRow } from '../queries.js'
 
 export { checkNumberText } from './checks.js'
 
@@ -222,3 +222,27 @@ export function transactionSchemaFor(_transaction: z.input<typeof transactionSav
 		? transactionSaveSchema.options[0]
 		: transactionSaveSchema.options[1]
 }
+
+/** Copied native ledger facts; write intent and SDK rows never cross the UI boundary. */
+export const transactionLedgerRecordSchema = z.strictObject({
+	id: z.uuid(),
+	organizationId: z.uuid(),
+	accountId: z.uuid(),
+	categoryId: z.uuid(),
+	amountMinor: amountMinorValue,
+	currency: currencyText,
+	bookedOn: dateOnlyText,
+	kind: z.enum([INCOME, EXPENSE]),
+	description: z.string().nullable(),
+	memo: z.string().nullable(),
+	internalTransferId: z.uuid().nullable().default(null),
+	tagNames: z.array(appTagSchema.shape.name)
+})
+export const transactionListRowSchema = transactionLedgerRecordSchema.pick({
+	id: true,
+	bookedOn: true,
+	amountMinor: true,
+	currency: true,
+	categoryId: true,
+	description: true
+})

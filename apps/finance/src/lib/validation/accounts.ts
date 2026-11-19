@@ -12,6 +12,7 @@ export const appAccountSchema = z.strictObject({
 	currency: accountCurrencySchema.default('USD'),
 	archivedAt: z.date().nullable().default(null)
 })
+export const persistedAccountSchema = appAccountSchema.extend({ id: z.uuid() })
 
 export const accountFormSchema = appAccountSchema
 	.pick({ name: true, kind: true, currency: true })

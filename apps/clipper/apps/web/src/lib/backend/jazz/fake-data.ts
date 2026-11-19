@@ -7,19 +7,17 @@ import { createFakeDataMachine, canSeedLibrary } from '../../samples/machine.js'
 import type { SeedRows } from '../../samples/machine.js'
 import type { FakeDataPlan } from '../../samples/plan.js'
 import { insertPreparedContent } from './content.js'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 export type FakeDataDb = Pick<Db, 'one' | 'all' | 'beginSerializableTransaction'>
 type Resource = { tx: ReturnType<FakeDataDb['beginSerializableTransaction']> }
 type Write = ReturnType<Resource['tx']['commit']>
 export function createFakeDataRecords(db: FakeDataDb, libraryId: string, isCurrent: () => boolean) {
 	async function presence(reader: Pick<Db, 'one' | 'all'>, tier?: ReadTier): Promise<SeedRows> {
 		const options = tier === undefined ? undefined : { tier }
-		const [articles, documents, intents, root] = await Promise.all([
-			reader.all(app.libraryDocuments.where({ libraryId }).limit(1), options),
-			reader.all(app.articles.where({ libraryId }).limit(1), options),
-			reader.all(app.storageOperations.where({ libraryId }).limit(1), options),
-			reader.one(app.libraries.where({ id: libraryId }), options)
-		])
+		const articles = await reader.all(app.libraryDocuments.where({ libraryId }).limit(1), options)
+		const documents = await reader.all(app.articles.where({ libraryId }).limit(1), options)
+		const intents = await reader.all(app.storageOperations.where({ libraryId }).limit(1), options)
+		const root = await reader.one(app.libraries.where({ id: libraryId }), options)
 		return {
 			hasData: articles.length > 0 || documents.length > 0 || intents.length > 0,
 			owned: root?.ownerId === libraryId && root.bootstrapVersion === '1'

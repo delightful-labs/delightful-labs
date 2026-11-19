@@ -1,16 +1,15 @@
-import { policySchema } from './schema-permissions.test-support.js'
 import { beforeAll, afterAll, expect, it } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
 import { articleId } from '../../capture/source.js'
 import { readRecord } from '../../machines/storage/read.test-support.js'
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => {
 	await fixture?.shutdown()
@@ -138,7 +137,7 @@ it('does not disclose foreign Documents and refuses cross-library Article relati
 				libraryId: b.id,
 				sourceUrl: url,
 				readingProgress: 0,
-				resumePosition: null,
+				resumePosition: [],
 				status: 'inbox',
 				favorite: false,
 				attachmentId: document.attachment.id

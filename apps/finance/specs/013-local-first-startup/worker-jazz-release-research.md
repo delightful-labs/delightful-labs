@@ -1,9 +1,30 @@
 # Jazz alpha.61–65: code audit for worker simplification
 
+**2026-11-17 update:** the upgrade target is now alpha.66. Its
+[source audit, native lifecycle checks and revised execution order](worker-jazz-alpha66-research.md)
+supersede the version recommendation below. The alpha.65 results remain
+historical evidence, not alpha.66 qualification. Workspace pins remain alpha.60.
+
 Researched 2026-11-16 at the user's request to inspect the actual newer releases
 before recommending cleanup. Workspace dependencies and the existing SDK patch
 remain unchanged at alpha.60. This is an upgrade proposal, not qualification of
 Finance or Clipper on alpha.65.
+
+After PR #39 merged at `fb380114`, the
+[upgrade plan](worker-jazz-upgrade-plan.md) records the next compatibility steps
+and an additional executed core/Drive naming comparison. Native alpha.65 handles
+long Drive names, making Clipper's hashing workaround removable, but its custom
+preview cores cannot be addressed by the new namespace rules. The user permits
+fresh Clipper preview data but requires Finance's existing data to remain
+accessible. The plan records Finance's actual core/Drive inventory and exact-name
+comparison; its custom qualification destination still needs a retention path.
+The subsequent [U1 proof](worker-jazz-upgrade-plan.md#u1-isolated-worker-qualification)
+passes all 15 actual Finance SDK/IDB cases with an isolated worker-only rebase of
+the existing bridge. This does not qualify the complete patch or app upgrade.
+The subsequent [U2a proof](worker-jazz-upgrade-plan.md#u2a-shared-native-session-adapter-qualification)
+adds shared native-session adapter coverage: all 18 cases pass, with same-account
+replacement, A → B → A, sign-out/reopen and stale recovery scope checks. App
+caller/provider adoption and whole-library compatibility are still pending.
 
 ## What was inspected
 

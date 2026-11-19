@@ -1,7 +1,7 @@
 import { TRANSACTION_SOURCE } from '#lib/domain/transaction-source.js'
 import { INCOME, EXPENSE, type TransactionKind } from '#lib/domain/transaction-kind.js'
-import type { schema } from 'jazz-tools'
-import { app } from '#lib/schema.js'
+import type { RowOf } from 'jazz-tools'
+import { app } from '#lib/queries.js'
 import { stableUuid } from '#lib/data.js'
 import { parseAmountMinor } from '#lib/domain/money.js'
 import { appTransactionSchema } from '#lib/validation/transactions.js'
@@ -18,11 +18,11 @@ import {
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type Category = schema.RowOf<typeof app.categories>
+type Category = RowOf<typeof app.categories>
 type Input = {
 	work: OperationWork
 	provider: ProviderResponse['accounts'][number]
-	account: schema.RowOf<typeof app.accounts>
+	account: RowOf<typeof app.accounts>
 	categories: Category[]
 	// Positive knowledge only; a miss always retains the normal lookup/write checks.
 	existingIds?: ReadonlySet<string>

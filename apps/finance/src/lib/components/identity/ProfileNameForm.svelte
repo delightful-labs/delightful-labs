@@ -2,12 +2,16 @@
 	import Shared from 'delightful-local-first/profile/name-view'
 	import type { ComponentProps } from 'svelte'
 	import { m } from '#lib/paraglide/messages.js'
-	import { formReasonText } from '#lib/forms/form-messages.js'
-	let props: Omit<ComponentProps<typeof Shared>, 'labels' | 'reasonText'> = $props()
+	import { formReasonText, formMessages } from '#lib/forms/form-messages.js'
+	let props: Omit<
+		ComponentProps<typeof Shared>,
+		'labels' | 'reasonText' | 'defaultMessages'
+	> = $props()
 </script>
 
 <Shared
 	{...props}
+	defaultMessages={formMessages}
 	reasonText={(reason) => formReasonText[reason]()}
 	labels={{
 		profile: m['nouns.profile']({ count: 1 }),

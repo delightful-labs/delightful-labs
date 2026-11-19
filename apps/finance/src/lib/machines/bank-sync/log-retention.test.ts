@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createSyncLogRetentionMachine, type RetentionScope } from './log-retention.js'
 import { createSyncLogRetentionCoordinator } from './log-retention-coordinator.js'
 import { dependencies, observation, connection, id } from './test-fixtures.js'
-import type { SyncAttempt, SyncAccountResult } from '#lib/schema.js'
+import type { SyncAttempt, SyncAccountResult } from '#lib/queries.js'
 import { createActor, toPromise, waitFor, createAsyncLogic } from 'xstate'
 
 const scope: RetentionScope = {

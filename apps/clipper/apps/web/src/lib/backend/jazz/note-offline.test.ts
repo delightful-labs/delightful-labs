@@ -3,10 +3,10 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createActor, toPromise } from 'xstate'
-import { createJazzClient } from 'jazz-tools/backend'
+import { createJazzClient, type JazzClientConfig } from 'jazz-tools/backend'
 import { ReadTier } from 'jazz-tools'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { noteAttempt } from './note-attempt.test-support.js'
 import { createLibraryRecords } from './records.js'
 
@@ -18,21 +18,22 @@ it('compiles the actual native policies and reopens locally durable notes withou
 		permissions,
 		appId: crypto.randomUUID(),
 		serverUrl: 'http://127.0.0.1:1',
-		driver: { type: 'persistent' as const, dataPath },
-		env: 'test' as const,
-		initial: 'local-first' as const,
+		driver: { type: 'persistent', dataPath },
+		env: 'test',
+		initial: 'device',
 		store: {
 			read: async () => identity,
 			update: async (transform: (current: string | null) => string) => {
 				identity = transform(identity)
 			}
 		}
-	}
+	} satisfies JazzClientConfig
 	let session: Awaited<ReturnType<typeof createJazzClient>> | undefined
 	try {
 		session = await createJazzClient(config)
-		const owner = session.getSnapshot().account!.id
-		const db = session.getSnapshot().client!.db
+		const owner = session.getSnapshot().user?.accountId
+		const db = session.getSnapshot().client?.db
+		if (!owner || !db) throw new Error('Missing local session')
 		await db.disconnect()
 		await db
 			.insert(app.libraries, { ownerId: owner, bootstrapVersion: '1' }, { id: owner })
@@ -116,9 +117,11 @@ it('compiles the actual native policies and reopens locally durable notes withou
 		})
 		await session.close({ timeoutMs: 0 })
 		session = await createJazzClient(config)
-		await session.getSnapshot().client!.db.disconnect()
-		expect(session.getSnapshot().account!.id).toBe(owner)
-		const reopened = createLibraryRecords(session.getSnapshot().client!.db, owner, () => true)
+		const reopenedDb = session.getSnapshot().client?.db
+		if (!reopenedDb) throw new Error('Missing reopened session')
+		await reopenedDb.disconnect()
+		expect(session.getSnapshot().user?.accountId).toBe(owner)
+		const reopened = createLibraryRecords(reopenedDb, owner, () => true)
 		expect(await reopened.notes.read(noteId)).toMatchObject({
 			id: noteId,
 			documentId: article.operationId

@@ -1,6 +1,6 @@
 import { ReadTier } from 'jazz-tools'
 import type { Db } from 'jazz-tools'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 import { publicationFromRow } from '../../annotations/publication.js'
 import type { Publication } from '../../annotations/publication.js'
 

@@ -1,3 +1,4 @@
+import { financeFixture } from '../helpers/worker-fixture.js'
 import { expect } from '@playwright/test'
 import { test, start } from '../helpers/workspace.js'
 import { openSidebarSection, selectWorkspace } from '../helpers/ui.js'
@@ -7,26 +8,7 @@ test(
 	{ tag: ['@workspaces', '@navigation'] },
 	async ({ page }) => {
 		await start(page)
-		const workspaceId = await page.evaluate(async () => {
-			const { app, db, userId } = window.workspaceSettingsTest
-			const workspace = await db
-				.insert(app.organizations, {
-					name: 'Navigation workspace',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: userId
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: workspace.id,
-					userId,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'global' })
-			return workspace.id
-		})
+		const workspaceId = await financeFixture(page, 'features/navigation.e2e:10')
 		const selector = page.getByLabel('Current Workspace', { exact: true })
 		await expect(selector.locator(`option[value="${workspaceId}"]`)).toHaveCount(1)
 		await selectWorkspace(selector, workspaceId)
@@ -57,14 +39,7 @@ test(
 			.fill('Navigation workspace')
 		await expect(save).toBeDisabled()
 		// The binding survives only client navigation and still points to the active client.
-		expect(
-			await page.evaluate(async () => {
-				const sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { getCurrentJazzSession }: typeof import('../../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				return window.workspaceSettingsTest.db === getCurrentJazzSession()?.getSnapshot().client?.db
-			})
-		).toBe(true)
+		expect(await financeFixture(page, 'features/navigation.e2e:61')).toBe(true)
 	}
 )
 

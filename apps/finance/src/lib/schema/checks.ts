@@ -1,15 +1,10 @@
 import { schema as s } from 'jazz-tools'
-import { appCheckSchema } from '../validation/checks.js'
-import { validatedTextColumn } from './text-column.js'
-
-const checkNumber = validatedTextColumn(appCheckSchema.shape.checkNumber)
-const checkDate = validatedTextColumn(appCheckSchema.shape.checkDate)
 
 const checkColumns = {
 	organizationId: s.uuid(),
 	accountId: s.uuid(),
-	checkNumber: checkNumber.column,
-	checkDate: checkDate.column,
+	checkNumber: s.string().transform('checkNumber', s.string()),
+	checkDate: s.string().transform('dateOnly', s.string()),
 	payerName: s.string().optional(),
 	bankName: s.string().optional(),
 	memoOnCheck: s.string().optional()

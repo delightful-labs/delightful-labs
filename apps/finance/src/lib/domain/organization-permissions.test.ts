@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { OrganizationMember } from '../schema.js'
+import type { OrganizationMember } from '../queries.js'
 import { canManageBankCredentials } from './organization-permissions.js'
 
 function membership(role: NonNullable<OrganizationMember['role']>, organizationId = 'workspace') {

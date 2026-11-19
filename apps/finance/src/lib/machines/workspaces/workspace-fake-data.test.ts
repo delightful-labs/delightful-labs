@@ -2,8 +2,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { seedFixture } from '../samples/fake-data.fixture.js'
 import { createActor, toPromise, waitFor } from 'xstate'
 
-const environment = vi.hoisted(() => ({ PUBLIC_FAKE_DATA: 'false', PUBLIC_DEBUG: 'false' }))
-vi.mock('$app/env/public', () => environment)
 beforeEach(() => vi.resetModules())
 afterEach(() => vi.restoreAllMocks())
 
@@ -13,8 +11,8 @@ it.each([
 	{ seed: 'true', debug: 'false', writes: 123 },
 	{ seed: 'true', debug: 'true', writes: 123 }
 ])('seeding=$seed is independent of debugging=$debug', async ({ seed, debug, writes }) => {
-	environment.PUBLIC_FAKE_DATA = seed
-	environment.PUBLIC_DEBUG = debug
+	vi.stubEnv('PUBLIC_FAKE_DATA', seed)
+	vi.stubEnv('PUBLIC_DEBUG', debug)
 	const { workspaceFakeData } = await import('./workspace-fake-data.js')
 	const f = seedFixture()
 	expect(await toPromise(createActor(workspaceFakeData, { input: f.input }).start())).toEqual(
@@ -27,7 +25,7 @@ it.each([
 })
 
 it('preserves confirmed settlement while draining shutdown through the child', async () => {
-	environment.PUBLIC_FAKE_DATA = 'true'
+	vi.stubEnv('PUBLIC_FAKE_DATA', 'true')
 	const { workspaceFakeData } = await import('./workspace-fake-data.js')
 	const f = seedFixture()
 	const confirmation = Promise.withResolvers<void>()
@@ -41,7 +39,7 @@ it('preserves confirmed settlement while draining shutdown through the child', a
 })
 
 it('returns child failure without disguising it as initialized', async () => {
-	environment.PUBLIC_FAKE_DATA = 'true'
+	vi.stubEnv('PUBLIC_FAKE_DATA', 'true')
 	const { workspaceFakeData } = await import('./workspace-fake-data.js')
 	const f = seedFixture()
 	const failure = new Error('Read failed')
@@ -54,3 +52,5 @@ it('returns child failure without disguising it as initialized', async () => {
 		error: failure
 	})
 })
+
+afterEach(() => vi.unstubAllEnvs())

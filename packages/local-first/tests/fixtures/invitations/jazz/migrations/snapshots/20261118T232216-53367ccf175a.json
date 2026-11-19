@@ -1,0 +1,194 @@
+{
+  "notebookInvitations": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "notebookId",
+        "nullable": false,
+        "references": "notebooks"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "codeDigest",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "collaborator"
+          ]
+        },
+        "name": "role",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "expiresAt",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "name": "revoked",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "consumedAccountId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "consumedOperationId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "consumedMembershipId",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "notebook": {
+        "kind": "forward",
+        "table": "notebooks",
+        "column": "notebookId"
+      }
+    }
+  },
+  "notebookMembers": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "notebookId",
+        "nullable": false,
+        "references": "notebooks"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "collaborator"
+          ]
+        },
+        "name": "role",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "invitationId",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "notebook": {
+        "kind": "forward",
+        "table": "notebooks",
+        "column": "notebookId"
+      }
+    }
+  },
+  "notebookRedemptions": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "operationId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "invitationId",
+        "nullable": false,
+        "references": "notebookInvitations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "notebookId",
+        "nullable": false,
+        "references": "notebooks"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "membershipId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "acceptedAt",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "notebook": {
+        "kind": "forward",
+        "table": "notebooks",
+        "column": "notebookId"
+      },
+      "invitation": {
+        "kind": "forward",
+        "table": "notebookInvitations",
+        "column": "invitationId"
+      }
+    }
+  },
+  "notebooks": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "members": {
+        "kind": "reverse",
+        "table": "notebookMembers",
+        "relation": "notebook"
+      }
+    }
+  }
+}

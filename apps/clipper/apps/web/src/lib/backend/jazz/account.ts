@@ -1,12 +1,13 @@
-import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
+import { jazzRuntimeSources } from './runtime-sources.js'
 import { createLibraryCapability } from './library.js'
 import { createLibraryRecords } from './records.js'
 import { readConnection } from './read-connection.js'
-import { ReadTier } from 'jazz-tools'
-import wasmUrl from '#jazz-wasm-binary?url'
-import type { JazzSession, JazzClientConfig } from 'jazz-tools/client'
-import type { JazzClient } from 'jazz-tools/client'
-import { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/startup'
+import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
+import type { JazzClientConfig } from 'jazz-tools/client'
+import {
+	type JazzSessionResource,
+	createJazzStartupRegistry
+} from 'delightful-local-first/backend/jazz/startup'
 import { createJazzSessionReadinessAdapter } from 'delightful-local-first/backend/jazz/session-readiness'
 import { createJazzRecoveryAdapter } from 'delightful-local-first/backend/jazz/recovery'
 import { createJazzRestorationAdapter } from 'delightful-local-first/backend/jazz/restoration'
@@ -17,21 +18,21 @@ import type {
 	AccountBinding,
 	ReadyAccountObservation
 } from '../../contracts/account.js'
-import { app } from './schema.js'
 
-export type Session = JazzSession<JazzClient>
+export type Session = JazzSessionResource
 
 export type LibraryFactory = typeof createLibraryCapability
-function externallySignedIn(account: { identity: { issuer: string } }) {
-	return !['urn:jazz:local-first', 'urn:jazz:anonymous'].includes(account.identity.issuer)
+function externallySignedIn(user: { kind: 'device' | 'backend' }) {
+	return user.kind === 'backend'
 }
 function bindHost(
-	session: Session,
+	resource: Session,
 	libraryFactory: LibraryFactory,
 	cacheNamespace: string
 ): AccountHost {
+	const session = resource()
 	const readiness = createJazzSessionReadinessAdapter(session)
-	const recovery = createJazzRecoveryAdapter(() => session.getSnapshot().account)
+	const recovery = createJazzRecoveryAdapter(() => session)
 	const identities = new WeakMap<object, object>()
 	const candidates = new WeakMap<ReadyAccountObservation, () => AccountBinding>()
 	const identity = (resource: object) => {
@@ -44,32 +45,45 @@ function bindHost(
 	}
 	const read = (): AccountObservation => {
 		const snapshot = session.getSnapshot()
-		recovery.observeAccount(snapshot.account)
-		if (snapshot.status !== 'ready' || !snapshot.account || !snapshot.client) {
-			return { status: snapshot.status === 'ready' ? 'error' : snapshot.status }
+		recovery.observeSession()
+		if (snapshot.status !== 'ready' || !snapshot.user || !snapshot.client) {
+			return {
+				status:
+					snapshot.status === 'ready' || snapshot.status === 'starting' ? 'error' : snapshot.status
+			}
 		}
-		const account = snapshot.account
+		const user = snapshot.user
 		const client = snapshot.client
 		const db = client.db
 		const check = () => {
 			const now = session.getSnapshot()
 			if (
 				now.status !== 'ready' ||
-				now.account !== account ||
+				now.user !== user ||
 				now.client !== client ||
 				now.client?.db !== db
 			)
 				throw new Error('Account scope expired')
 		}
-		const build = (live: () => boolean): ReadyAccountObservation => {
+		const build = (live: () => boolean) => {
 			const admitted = () => {
 				check()
 				if (!live()) throw new Error('Account scope expired')
 			}
-			return {
+			const domain = createLibraryBinding({
+				db,
+				identityId: user.accountId,
+				isCurrent: () => {
+					check()
+					return live()
+				},
+				libraryFactory,
+				cacheNamespace
+			})
+			const observation: ReadyAccountObservation = {
 				status: 'ready',
 				localFirst: db.isLocalFirst(),
-				binding: identity(account),
+				binding: identity(user),
 				clientBinding: identity(client),
 				databaseBinding: identity(db),
 				prepare: () => {
@@ -79,84 +93,43 @@ function bindHost(
 				logout: () => {
 					// Native mutation admission stays bound to the selected identity.
 					admitted()
-					return session.logout()
+					return session.signOut()
 				},
 				logoutStatus: () => {
 					const now = session.getSnapshot()
 					if (
 						now.status === 'signed-out' ||
-						(now.status === 'ready' && now.account && !externallySignedIn(now.account))
+						(now.status === 'ready' && now.user && !externallySignedIn(now.user))
 					)
 						return 'signed-out'
-					if (now.status !== 'ready' || !now.account || !now.client) return 'unavailable'
-					return now.account === account && now.client === client && now.client.db === db && live()
+					if (now.status !== 'ready' || !now.user || !now.client) return 'unavailable'
+					return now.user === user && now.client === client && now.client.db === db && live()
 						? 'current'
 						: 'replaced'
 				},
-				accountId: account.id,
-				signedIn: externallySignedIn(account),
-				root: {
-					read: async () => {
-						admitted()
-						const row = await db.one(app.libraries.where({ id: account.id }), {
-							tier: ReadTier.LocalFirst
-						})
-						if (!row) return 'missing'
-						return row.ownerId === account.id && row.bootstrapVersion === '1'
-							? 'compatible'
-							: 'incompatible'
-					},
-					ensure: () => {
-						admitted()
-						const write = db.upsert(app.libraries, account.id, {
-							ownerId: account.id,
-							bootstrapVersion: '1'
-						})
-						return {
-							local: () => write.wait({ tier: 'local' }),
-							global: () => write.wait({ tier: 'global' })
-						}
-					}
-				},
+				accountId: user.accountId,
+				signedIn: externallySignedIn(user),
+				root: domain.root,
 				recovery: {
 					capability: recovery.capability,
 					source: {
 						subscribe: (notify) => {
-							const publish = () => notify(recovery.observeAccount(session.getSnapshot().account))
+							const publish = () => notify(recovery.observeSession())
 							publish()
 							return session.subscribe(publish)
 						}
 					}
 				}
 			}
+			return { observation, createLibrary: domain.createLibrary }
 		}
-		const observation = build(() => true)
+		const { observation } = build(() => true)
 		candidates.set(observation, () => {
 			check()
 			let released = false
 			const live = () => !released
-			const adopted = {
-				...build(live),
-				library: libraryFactory(
-					createLibraryRecords(
-						db,
-						account.id,
-						() => {
-							try {
-								check()
-								if (!live()) return false
-								return true
-							} catch {
-								return false
-							}
-						},
-						readConnection(db)
-					),
-					account.id,
-					requestCapture,
-					cacheNamespace
-				)
-			}
+			const scoped = build(live)
+			const adopted = { ...scoped.observation, library: scoped.createLibrary() }
 			return {
 				observation: adopted,
 				release: () => {
@@ -176,7 +149,7 @@ function bindHost(
 			return create()
 		},
 		readiness,
-		create: () => session.createLocalFirst(),
+		create: () => session.createDeviceAccount(),
 		signOut: async () => {
 			const response = await fetch('/api/auth/sign-out', {
 				method: 'POST',
@@ -188,7 +161,7 @@ function bindHost(
 			})
 			if (!response.ok) throw new Error('Provider sign-out failed')
 		},
-		logout: () => session.logout(),
+		logout: () => session.signOut(),
 		release: () => {
 			recovery.invalidate()
 			restored.invalidate()
@@ -200,7 +173,6 @@ function bindHost(
 // Constructing the registry is inert; only browser mount requests an attachment.
 const registry = createJazzStartupRegistry()
 const localFirst = () => import('jazz-tools/local-first')
-const runtimeSources = Object.freeze({ wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION })
 export function accountInput(
 	config: JazzClientConfig,
 	libraryFactory: LibraryFactory = createLibraryCapability
@@ -210,8 +182,9 @@ export function accountInput(
 		startup: registry.getJazzStartupBinding({
 			...config,
 			client: localFirst,
-			initial: 'local-first',
-			runtimeSources: config.runtimeSources ?? runtimeSources
+			initial: 'device',
+			localFirst: 'now',
+			runtimeSources: { ...jazzRuntimeSources, ...config.runtimeSources }
 		}),
 		bind: (session) =>
 			bindHost(
@@ -231,7 +204,7 @@ export function existingAccountInput(
 		startup: registry.getJazzStartupBinding({
 			...config,
 			client: localFirst,
-			runtimeSources: config.runtimeSources ?? runtimeSources
+			runtimeSources: { ...jazzRuntimeSources, ...config.runtimeSources }
 		}),
 		bind: (session) =>
 			bindHost(
@@ -246,15 +219,15 @@ export function existingAccountInput(
 export function currentLibraryRecords() {
 	const session = registry.getCurrentJazzSession()
 	const snapshot = session?.getSnapshot()
-	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
+	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
 		throw new Error('Library scope unavailable')
-	const { account, client } = snapshot
+	const { user, client } = snapshot
 	return createLibraryRecords(
 		client.db,
-		account.id,
+		user.accountId,
 		() => {
 			const now = session.getSnapshot()
-			return now.status === 'ready' && now.account === account && now.client === client
+			return now.status === 'ready' && now.user === user && now.client === client
 		},
 		readConnection(client.db)
 	)
@@ -268,26 +241,14 @@ export async function requestCapture(
 ) {
 	const session = registry.getCurrentJazzSession()
 	const snapshot = session?.getSnapshot()
-	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
+	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
 		throw new Error('Account scope unavailable')
-	const { account, client } = snapshot
-	const token = client.db.getConfig().jwtToken
-	const response = await fetch(`/api/capture/${operation}`, {
-		method: 'POST',
-		credentials: 'same-origin',
-		redirect: 'error',
-		cache: 'no-store',
-		signal: signal ?? null,
-		headers: {
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(body)
-	})
-	const now = session.getSnapshot()
-	if (now.status !== 'ready' || now.account !== account || now.client !== client) {
-		await response.body?.cancel()
-		throw new Error('Account scope expired')
-	}
-	return response
+	const { user, client } = snapshot
+	const db = client.db
+	return createLibraryCapture(db, () => {
+		const now = session.getSnapshot()
+		return (
+			now.status === 'ready' && now.user === user && now.client === client && now.client.db === db
+		)
+	})(operation, body, signal)
 }

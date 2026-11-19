@@ -1,0 +1,138 @@
+{
+  "entries": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "workspaceId",
+        "nullable": false,
+        "references": "workspaces"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "fileId",
+        "nullable": false,
+        "references": "files"
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "revision",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "workspace": {
+        "kind": "forward",
+        "table": "workspaces",
+        "column": "workspaceId"
+      },
+      "file": {
+        "kind": "forward",
+        "table": "files",
+        "column": "fileId"
+      }
+    }
+  },
+  "files": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "workspaceId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "revision",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "sizeBytes",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "parts": {
+        "kind": "reverse",
+        "table": "parts",
+        "relation": "file"
+      }
+    }
+  },
+  "parts": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "workspaceId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "fileId",
+        "nullable": false,
+        "references": "files"
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "partIndex",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Bytea"
+        },
+        "name": "data",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "file": {
+        "kind": "forward",
+        "table": "files",
+        "column": "fileId"
+      }
+    }
+  },
+  "workspaces": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "revision",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "name": "allowed",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "name": "visible",
+        "nullable": false
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 import { createAsyncLogic, setup, types } from 'xstate'
-import type { schema } from 'jazz-tools'
-import { app, type Account } from '#lib/schema.js'
+import type { RowOf } from 'jazz-tools'
+import { app, type Account } from '#lib/queries.js'
 import { stableUuid } from '#lib/data.js'
 import { createAccountWriteMachine, type AccountWrite } from './account-write.js'
 import { required } from './identity.js'
@@ -12,8 +12,7 @@ type Context = Input & {
 	index: number
 	accountId: string | undefined
 	snapshot:
-		| { account: Account | undefined; links: schema.RowOf<typeof app.simplefinAccountLinks>[] }
-		| undefined
+		{ account: Account | undefined; links: RowOf<typeof app.simplefinAccountLinks>[] } | undefined
 	error: unknown
 }
 

@@ -5,7 +5,7 @@ import { createAdditionalWorkspaceTransaction } from './workspace-additional-cre
 import { workspaceInitialization } from './workspace-initialization.js'
 import { createWorkspacePersistence } from './workspace-creation-persistence.js'
 import type { WorkspaceCreationAttempt } from '../../domain/workspace-creation.js'
-import { type Organization } from '../../schema.js'
+import { type Organization } from '../../queries.js'
 import { createActor } from 'xstate'
 
 export const userId = '11111111-1111-4111-8111-111111111111'
@@ -92,7 +92,7 @@ export function creationFixture() {
 		const getConfig = vi.fn().mockReturnValue({ serverUrl: 'https://unused.invalid' })
 		const actor = createActor(workspaceInitialization, {
 			input: {
-				db: { beginTransaction, beginSerializableTransaction, all: discover, getConfig },
+				db: { beginTransaction, all: discover, getConfig },
 				userId
 			}
 		})

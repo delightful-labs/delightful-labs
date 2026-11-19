@@ -1,3 +1,32 @@
+import { z } from 'zod'
+const snapshotSchema = z.strictObject({
+	status: z.enum(['active', 'done', 'error', 'stopped']),
+	value: z.unknown(),
+	output: z.undefined(),
+	error: z.undefined()
+})
+const common = {
+	sessionId: z.string(),
+	rootId: z.string(),
+	id: z.null(),
+	_version: z.string(),
+	createdAt: z.string(),
+	snapshot: snapshotSchema
+}
+export const projectedInspection = z.discriminatedUnion('type', [
+	z.strictObject({
+		...common,
+		type: z.literal('@xstate.actor'),
+		parentId: z.string().optional(),
+		name: z.string(),
+		definition: z.string()
+	}),
+	z.strictObject({
+		...common,
+		type: z.literal('@xstate.snapshot'),
+		event: z.strictObject({ type: z.string() })
+	})
+])
 import type { InspectionEvent } from 'xstate'
 
 function field(value: unknown, key: string): unknown {
@@ -21,7 +50,7 @@ function state(value: unknown, depth = 0): unknown {
 			.map((key) => [key, state(field(value, key), depth + 1)])
 	)
 }
-export function inspectionSnapshot(snapshot: unknown) {
+export function inspectionSnapshot(snapshot: unknown): z.output<typeof snapshotSchema> {
 	const status = field(snapshot, 'status')
 	return {
 		status: status === 'done' || status === 'error' || status === 'stopped' ? status : 'active',
@@ -62,7 +91,7 @@ function definition(value: unknown, depth = 0, map = false): unknown {
 }
 /** Hosted inspector transport DTOs, projected from v6's native protocol before
  * buffering. No live actor, context, input, output, error or action params escape. */
-export function projectInspection(event: InspectionEvent) {
+export function projectInspection(event: InspectionEvent): ProjectedInspection | undefined {
 	const sessionId = event.actorRef.sessionId
 	if (!sessionId) return undefined
 	const common = {
@@ -90,4 +119,4 @@ export function projectInspection(event: InspectionEvent) {
 		snapshot: inspectionSnapshot(event.snapshot)
 	}
 }
-export type ProjectedInspection = NonNullable<ReturnType<typeof projectInspection>>
+export type ProjectedInspection = z.output<typeof projectedInspection>

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { INCOME, EXPENSE } from '#lib/domain/transaction-kind.js'
 	import { InputText, Select } from 'delightful-ui'
-	import type { Tag, Category } from '#lib/schema.js'
-	import type { ManagementView, ManagementScope } from '#lib/contracts/management-contract.js'
+	import type { Tag, Category } from '#lib/queries.js'
+	import type { ManagementView } from '#lib/contracts/management-contract.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import { formReasonText } from '#lib/forms/form-messages.js'
 	import FormModal from '../forms/FormModal.svelte'
@@ -16,7 +16,7 @@
 		onRetryReadiness,
 		categories
 	}: {
-		scope: ManagementScope
+		scope: unknown
 		view: ManagementView<Tag>
 		onopen: () => void
 		onsubmit: (event: SubmitEvent) => void

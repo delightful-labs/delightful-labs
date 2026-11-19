@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte'
 	import { InputText, InputDate, FieldFeedback } from 'delightful-ui'
-	import type { Check } from '#lib/schema.js'
+	import type { Check } from '#lib/queries.js'
 	import { todayDateOnly } from '#lib/domain/date-only.js'
 	import { m } from '#lib/paraglide/messages.js'
 	let {

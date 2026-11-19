@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker/locale/en'
-import type { Category, TransactionRow } from '../schema.js'
+import type { Category, TransactionRow } from '../queries.js'
 import { appAccountSchema } from '../validation/accounts.js'
 import { independentTransactionSchema } from '../validation/transactions.js'
 import { stableUuid } from './stable-uuid.js'

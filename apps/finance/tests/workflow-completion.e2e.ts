@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test } from '@playwright/test'
 import { pageContent, selectWorkspace } from './helpers/ui.js'
 import { start } from './helpers/workspace.js'
@@ -94,43 +95,12 @@ for (const role of ['admin', 'member', 'viewer']) {
 				const subjectWorkspaceId = await subject
 					.getByLabel('Current Workspace', { exact: true })
 					.inputValue()
-				const subjectId = await subject.evaluate(async () => {
-					const path = '/src/lib/runtime/jazz-session.ts'
-					const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-						await import(path)
-					const id = getCurrentJazzSession()?.getSnapshot().account?.id
-					if (!id) throw new Error('Missing subject identity')
-					return id
+				const subjectId = await financeFixture(subject, 'workflow-completion.e2e:97')
+				const membershipId = await financeFixture(page, 'workflow-completion.e2e:105', {
+					organizationId,
+					subjectId,
+					role
 				})
-				const membershipId = await page.evaluate(
-					async ({ organizationId, subjectId, role }) => {
-						const schemaPath = '/src/lib/schema.ts',
-							sessionPath = '/src/lib/runtime/jazz-session.ts'
-						const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-						const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-							await import(sessionPath)
-						const db = getCurrentJazzSession()?.getSnapshot().client?.db
-						if (!db) throw new Error('Missing owner database')
-						if (role !== 'admin' && role !== 'member' && role !== 'viewer')
-							throw new Error('Invalid role')
-						const uuid =
-							/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-						if (!uuid.test(organizationId) || !uuid.test(subjectId))
-							throw new Error(
-								`Invalid membership UUIDs: organization=${organizationId}, subject=${subjectId}`
-							)
-						const membership = await db
-							.insert(app.organizationMembers, {
-								organizationId,
-								userId: subjectId,
-								role,
-								accountAccessMode: 'all'
-							})
-							.wait({ tier: 'global' })
-						return membership.id
-					},
-					{ organizationId, subjectId, role }
-				)
 				await subject.goto(`/accounts?workspace=${subjectWorkspaceId}`)
 				const selector = subject.getByLabel('Current Workspace', { exact: true })
 				await expect(selector.locator(`option[value="${organizationId}"]`)).toHaveCount(1)
@@ -157,18 +127,7 @@ for (const role of ['admin', 'member', 'viewer']) {
 						.getByRole('button', { name: 'Add Account', exact: true })
 						.click()
 					await expect(name).toBeEditable()
-					await page.evaluate(async (membershipId) => {
-						const schemaPath = '/src/lib/schema.ts',
-							sessionPath = '/src/lib/runtime/jazz-session.ts'
-						const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-						const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-							await import(sessionPath)
-						const db = getCurrentJazzSession()?.getSnapshot().client?.db
-						if (!db) throw new Error('Missing owner database')
-						await db
-							.update(app.organizationMembers, membershipId, { role: 'viewer' })
-							.wait({ tier: 'global' })
-					}, membershipId)
+					await financeFixture(page, 'workflow-completion.e2e:160', membershipId)
 					await expect(name).toBeDisabled()
 					await expect(submit).toBeDisabled()
 					await expect(
@@ -180,28 +139,11 @@ for (const role of ['admin', 'member', 'viewer']) {
 					await expect(
 						dialog.getByText('Only workspace owners and admins can add accounts.', { exact: true })
 					).toBeVisible()
-					const denied = await subject.evaluate(async (organizationId) => {
-						const schemaPath = '/src/lib/schema.ts',
-							sessionPath = '/src/lib/runtime/jazz-session.ts'
-						const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-						const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-							await import(sessionPath)
-						const db = getCurrentJazzSession()?.getSnapshot().client?.db
-						if (!db) throw new Error('Missing subject database')
-						try {
-							await db
-								.insert(app.accounts, {
-									organizationId,
-									name: 'Forbidden',
-									kind: 'bank',
-									currency: 'USD'
-								})
-								.wait({ tier: 'global' })
-							return false
-						} catch {
-							return true
-						}
-					}, organizationId)
+					const denied = await financeFixture(
+						subject,
+						'workflow-completion.e2e:183',
+						organizationId
+					)
 					expect(denied).toBe(true)
 				}
 			} finally {

@@ -2,16 +2,15 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
-import { policySchema } from './schema-permissions.test-support.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
 import { documentsQuery } from './queries.js'
 import { documentRecord, captureDocumentRecord } from './document-record.js'
 import { newDocumentValues } from './document-values.js'
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => {
 	await fixture?.shutdown()
@@ -45,7 +44,7 @@ it('creates progress zero on URL-only saves and preserves Document state while a
 	expect(before).toMatchObject({
 		sourceUrl: url,
 		readingProgress: 0,
-		resumePosition: null,
+		resumePosition: [],
 		attachment: null
 	})
 	await account.db

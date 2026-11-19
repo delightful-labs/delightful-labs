@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 import {
 	holdWorkspaceWrite,
@@ -18,104 +19,11 @@ async function seedAccounts(page: Page) {
 	await expect(
 		page.getByRole('main').getByRole('button', { name: 'Add Account', exact: true })
 	).toBeEnabled({ timeout: 30_000 })
-	return page.evaluate(async () => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const snapshot = getCurrentJazzSession()?.getSnapshot()
-		if (!snapshot?.client) throw new Error('Test session is not ready.')
-		const db = snapshot.client.db
-		const [organization] = await db.all(app.organizations)
-		if (!organization) throw new Error('Missing organization.')
-		const checking = await db
-			.insert(app.accounts, {
-				organizationId: organization.id,
-				name: 'Transfer checking',
-				kind: 'bank',
-				currency: 'USD'
-			})
-			.wait({ tier: 'local' })
-		const card = await db
-			.insert(app.accounts, {
-				organizationId: organization.id,
-				name: 'Transfer card',
-				kind: 'card',
-				currency: 'USD'
-			})
-			.wait({ tier: 'local' })
-		const tanzanianAccount = await db
-			.insert(app.accounts, {
-				organizationId: organization.id,
-				name: 'Transfer TZS account',
-				kind: 'cash',
-				currency: 'TZS'
-			})
-			.wait({ tier: 'local' })
-		return {
-			organizationId: organization.id,
-			checkingId: checking.id,
-			cardId: card.id,
-			tanzanianAccountId: tanzanianAccount.id
-		}
-	})
+	return financeFixture(page, 'transfer-create.e2e:21')
 }
 
 async function persistedTransfer(page: Page, accountId: string) {
-	return page.evaluate(async (accountId) => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing database')
-		const rows = await db.all(app.transactions.where({ accountId }))
-		const links = await db.all(app.internalTransfers)
-		return {
-			rows: rows.map(
-				({ id, organizationId, kind, amountMinor, currency, bookedOn, internalTransferId }) => ({
-					id,
-					organizationId,
-					kind,
-					amountMinor,
-					currency,
-					bookedOn,
-					internalTransferId
-				})
-			),
-			links: links.map(
-				({
-					id,
-					organizationId,
-					expenseTransactionId,
-					incomeTransactionId,
-					expenseAccountId,
-					incomeAccountId,
-					expenseAmountMinor,
-					expenseCurrency,
-					incomeAmountMinor,
-					incomeCurrency,
-					amountMinor,
-					currency
-				}) => ({
-					id,
-					organizationId,
-					expenseTransactionId,
-					incomeTransactionId,
-					expenseAccountId,
-					incomeAccountId,
-					expenseAmountMinor,
-					expenseCurrency,
-					incomeAmountMinor,
-					incomeCurrency,
-					amountMinor,
-					currency
-				})
-			)
-		}
-	}, accountId)
+	return financeFixture(page, 'transfer-create.e2e:66', accountId)
 }
 
 test(
@@ -216,84 +124,7 @@ test(
 
 async function seedTransferList(page: Page, count = 1) {
 	const accounts = await seedAccounts(page)
-	return page.evaluate(
-		async ({ accounts, count }) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const [account] = await db.all(app.accounts.where({ id: accounts.checkingId }))
-			if (!account) throw new Error('Missing source account')
-			const categories = await db.all(
-				app.categories.where({ organizationId: account.organizationId })
-			)
-			const expenseCategory = categories.find((row) => row.kind === 'expense')
-			const incomeCategory = categories.find((row) => row.kind === 'income')
-			if (!expenseCategory || !incomeCategory) throw new Error('Missing categories')
-			const pairs: { id: string; expenseId: string; incomeId: string }[] = []
-			for (let index = 0; index < count; index++) {
-				const id = crypto.randomUUID()
-				const expenseId = crypto.randomUUID()
-				const incomeId = crypto.randomUUID()
-				const write = await db.transaction((tx) => {
-					tx.insert(
-						app.transactions,
-						{
-							organizationId: account.organizationId,
-							accountId: accounts.checkingId,
-							categoryId: expenseCategory.id,
-							kind: 'expense',
-							amountMinor: 4217,
-							currency: 'USD',
-							bookedOn: index === 0 ? '2026-10-25' : '2026-10-24',
-							description: `Outgoing ${index}`,
-							source: 'manual',
-							internalTransferId: id
-						},
-						{ id: expenseId }
-					)
-					tx.insert(
-						app.transactions,
-						{
-							organizationId: account.organizationId,
-							accountId: accounts.tanzanianAccountId,
-							categoryId: incomeCategory.id,
-							kind: 'income',
-							amountMinor: 6500000,
-							currency: 'TZS',
-							bookedOn: '2026-10-26',
-							description: `Incoming ${index}`,
-							source: 'manual',
-							internalTransferId: id
-						},
-						{ id: incomeId }
-					)
-					tx.insert(
-						app.internalTransfers,
-						{
-							organizationId: account.organizationId,
-							expenseTransactionId: expenseId,
-							incomeTransactionId: incomeId,
-							expenseAccountId: accounts.checkingId,
-							incomeAccountId: accounts.tanzanianAccountId,
-							expenseAmountMinor: 4217,
-							expenseCurrency: 'USD',
-							incomeAmountMinor: 6500000,
-							incomeCurrency: 'TZS'
-						},
-						{ id }
-					)
-				})
-				await write.wait({ tier: 'local' })
-				pairs.push({ id, expenseId, incomeId })
-			}
-			return { accounts, pairs }
-		},
-		{ accounts, count }
-	)
+	return financeFixture(page, 'transfer-create.e2e:219', { accounts, count })
 }
 
 for (const desktop of [true, false]) {
@@ -463,7 +294,7 @@ for (const interruption of ['switch', 'recover'] satisfies ('switch' | 'recover'
 			const gate = await holdWorkspaceWrite(page, 'transfer')
 			try {
 				await page.getByRole('button', { name: 'Save Transfer', exact: true }).click()
-				await expect.poll(() => gate.evaluate((value) => value.started)).toBe(true)
+				await expect.poll(() => gate.status().then((value) => value.started)).toBe(true)
 				if (interruption === 'switch') {
 					await selectWorkspace(page.getByLabel('Current Workspace', { exact: true }), destination)
 					await expect(page).toHaveURL(`/transfers/new?workspace=${destination}`)
@@ -472,9 +303,9 @@ for (const interruption of ['switch', 'recover'] satisfies ('switch' | 'recover'
 					).toHaveCount(0)
 				} else {
 					await requestRecovery(page, phrase)
-					expect(await gate.evaluate((value) => value.restores)).toBe(0)
+					expect(await gate.status().then((value) => value.restores)).toBe(0)
 				}
-				await gate.evaluate((value) => value.release())
+				await gate.release()
 				if (interruption === 'switch') {
 					await expect(page.getByLabel('Source Account', { exact: true })).toBeVisible()
 					await expect(
@@ -483,10 +314,10 @@ for (const interruption of ['switch', 'recover'] satisfies ('switch' | 'recover'
 							.locator(`option[value="${accounts.checkingId}"]`)
 					).toHaveCount(0)
 				} else {
-					await expect.poll(() => gate.evaluate((value) => value.restores)).toBe(1)
+					await expect.poll(() => gate.status().then((value) => value.restores)).toBe(1)
 					expect(errors).toEqual([])
 					await expect
-						.poll(() => gate.evaluate((value) => value.snapshot()))
+						.poll(() => gate.status().then((value) => value.snapshot))
 						.toMatchObject({ status: 'ready', pending: null, hasClient: true, errorName: null })
 					await expect(page.getByLabel('Current Workspace', { exact: true })).toHaveValue(
 						accounts.organizationId
@@ -499,8 +330,7 @@ for (const interruption of ['switch', 'recover'] satisfies ('switch' | 'recover'
 				expect((await persistedTransfer(page, accounts.cardId)).rows).toHaveLength(1)
 				expect(errors).toEqual([])
 			} finally {
-				await gate.evaluate((value) => value.restore())
-				await gate.dispose()
+				await gate.restore()
 			}
 		}
 	)

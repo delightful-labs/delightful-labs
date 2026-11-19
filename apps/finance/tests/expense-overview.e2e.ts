@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 
 async function seed(page: Page) {
@@ -5,101 +6,7 @@ async function seed(page: Page) {
 	await expect(
 		page.getByRole('main').getByRole('button', { name: 'Add Account', exact: true })
 	).toBeEnabled()
-	await page.evaluate(async () => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing database')
-		const [org] = await db.all(app.organizations)
-		if (!org) throw new Error('Missing workspace')
-		const account = await db
-			.insert(app.accounts, {
-				organizationId: org.id,
-				name: 'Overview ledger',
-				kind: 'cash',
-				currency: 'USD'
-			})
-			.wait({ tier: 'local' })
-		const tzsAccount = await db
-			.insert(app.accounts, {
-				organizationId: org.id,
-				name: 'TZS ledger',
-				kind: 'cash',
-				currency: 'TZS'
-			})
-			.wait({ tier: 'local' })
-
-		const food = await db
-			.insert(app.categories, {
-				organizationId: org.id,
-				name: 'Overview food',
-				kind: 'expense',
-				isSystem: false
-			})
-			.wait({ tier: 'local' })
-		const travel = await db
-			.insert(app.categories, {
-				organizationId: org.id,
-				name: 'Overview travel',
-				kind: 'expense',
-				isSystem: false
-			})
-			.wait({ tier: 'local' })
-		function date(days: number) {
-			const d = new Date()
-			d.setDate(d.getDate() - days)
-			return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-		}
-		for (const row of [
-			{
-				description: 'Recent food',
-				categoryId: food.id,
-				amountMinor: 1000,
-				bookedOn: date(0),
-				currency: 'USD'
-			},
-			{
-				description: 'Boundary food',
-				categoryId: food.id,
-				amountMinor: 2000,
-				bookedOn: date(6),
-				currency: 'USD'
-			},
-			{
-				description: 'Older travel',
-				categoryId: travel.id,
-				amountMinor: 9000,
-				bookedOn: date(29),
-				currency: 'USD'
-			},
-			{
-				description: 'Outside range',
-				categoryId: food.id,
-				amountMinor: 99999,
-				bookedOn: date(30),
-				currency: 'USD'
-			},
-			{
-				description: 'TZS expense',
-				categoryId: food.id,
-				amountMinor: 500,
-				bookedOn: date(0),
-				currency: 'TZS'
-			}
-		])
-			await db
-				.insert(app.transactions, {
-					...row,
-					organizationId: org.id,
-					accountId: row.currency === 'TZS' ? tzsAccount.id : account.id,
-					kind: 'expense',
-					source: 'manual'
-				})
-				.wait({ tier: 'local' })
-	})
+	await financeFixture(page, 'expense-overview.e2e:8')
 	await page.goto('/')
 	await expect(page.getByText('Recent food', { exact: true })).toBeVisible()
 }
@@ -178,7 +85,7 @@ test(
 		await seed(page)
 		const overview = page.getByRole('region', { name: 'Expenses by Category', exact: true })
 		const chart = overview.locator('.chart')
-		const list = overview.locator('.transactions')
+		const list = overview.getByRole('region', { name: 'Expenses in this period', exact: true })
 		const desktopChart = await chart.boundingBox()
 		const desktopList = await list.boundingBox()
 		if (!desktopChart || !desktopList) throw new Error('Missing layout')

@@ -8,8 +8,8 @@ import { startLocalJazzServer } from './browser-core.js'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { app } from '../src/lib/backend/jazz/schema.js'
-import permissions from '../src/lib/backend/jazz/permissions.js'
+import { app } from '../src/lib/backend/jazz/jazz.generated.js'
+import permissions from '../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { openAddLink } from './add-link.js'
 let authority: Awaited<ReturnType<typeof startLocalJazzServer>>, directory: string
 const options = () => ({

@@ -1,6 +1,6 @@
 import { createInstance } from 'i18next'
 import type { RecoveryMessages } from 'delightful-local-first/recovery/messages'
-import english from './en.json'
+import english from './en.json' with { type: 'json' }
 
 type LeafKeys<T> = {
 	[K in keyof T & string]: T[K] extends string ? K : `${K}.${LeafKeys<T[K]>}`

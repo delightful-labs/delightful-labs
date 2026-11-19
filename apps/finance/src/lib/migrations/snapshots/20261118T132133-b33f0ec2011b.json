@@ -1,0 +1,1670 @@
+{
+  "accountMemberships": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "userId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "read",
+            "write"
+          ]
+        },
+        "name": "access",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "name": "canDelete",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      }
+    }
+  },
+  "accounts": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "cash",
+            "bank",
+            "card"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "currency",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "archivedAt",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "transactions": {
+        "kind": "reverse",
+        "table": "transactions",
+        "relation": "account"
+      },
+      "memberships": {
+        "kind": "reverse",
+        "table": "accountMemberships",
+        "relation": "account"
+      }
+    }
+  },
+  "batchTemplates": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      }
+    }
+  },
+  "categories": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "expense",
+            "income"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "name": "isSystem",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "archivedAt",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "transactions": {
+        "kind": "reverse",
+        "table": "transactions",
+        "relation": "category"
+      },
+      "tags": {
+        "kind": "reverse",
+        "table": "tags",
+        "relation": "category"
+      }
+    }
+  },
+  "checkDetails": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "transactionId",
+        "nullable": false,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "checkNumber",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "checkDate",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "payerName",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "bankName",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "memoOnCheck",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "transaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "transactionId"
+      },
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      }
+    }
+  },
+  "checks": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "checkNumber",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "checkDate",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "payerName",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "bankName",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "memoOnCheck",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      },
+      "transactions": {
+        "kind": "reverse",
+        "table": "transactions",
+        "relation": "check"
+      }
+    }
+  },
+  "fileParts": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "fileId",
+        "nullable": false,
+        "references": "files"
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "partIndex",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "sizeBytes",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Bytea"
+        },
+        "name": "data",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "file": {
+        "kind": "forward",
+        "table": "files",
+        "column": "fileId"
+      }
+    }
+  },
+  "files": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "transactionId",
+        "nullable": true,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "fileName",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "mimeType",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "sizeBytes",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "transaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "transactionId"
+      },
+      "parts": {
+        "kind": "reverse",
+        "table": "fileParts",
+        "relation": "file"
+      }
+    }
+  },
+  "internalTransfers": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "expenseTransactionId",
+        "nullable": false,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "incomeTransactionId",
+        "nullable": false,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "expenseAccountId",
+        "nullable": true,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "incomeAccountId",
+        "nullable": true,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "BigInt"
+        },
+        "name": "expenseAmountMinor",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "expenseCurrency",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "BigInt"
+        },
+        "name": "incomeAmountMinor",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "incomeCurrency",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "BigInt"
+        },
+        "name": "amountMinor",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "currency",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "expenseTransaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "expenseTransactionId"
+      },
+      "incomeTransaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "incomeTransactionId"
+      },
+      "expenseAccount": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "expenseAccountId"
+      },
+      "incomeAccount": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "incomeAccountId"
+      }
+    }
+  },
+  "organizationMembers": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "userId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "profileId",
+        "nullable": true,
+        "references": "profiles"
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "owner",
+            "admin",
+            "member",
+            "viewer"
+          ]
+        },
+        "name": "role",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "all",
+            "selected"
+          ]
+        },
+        "name": "accountAccessMode",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "profile": {
+        "kind": "forward",
+        "table": "profiles",
+        "column": "profileId"
+      }
+    }
+  },
+  "organizations": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "personal",
+            "business"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "defaultCurrency",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "restoreOperationId",
+        "nullable": true,
+        "references": "restoreOperations"
+      }
+    ],
+    "relations": {
+      "members": {
+        "kind": "reverse",
+        "table": "organizationMembers",
+        "relation": "organization"
+      },
+      "accounts": {
+        "kind": "reverse",
+        "table": "accounts",
+        "relation": "organization"
+      },
+      "categories": {
+        "kind": "reverse",
+        "table": "categories",
+        "relation": "organization"
+      },
+      "tags": {
+        "kind": "reverse",
+        "table": "tags",
+        "relation": "organization"
+      },
+      "transactions": {
+        "kind": "reverse",
+        "table": "transactions",
+        "relation": "organization"
+      },
+      "internalTransfers": {
+        "kind": "reverse",
+        "table": "internalTransfers",
+        "relation": "organization"
+      },
+      "simplefinConnections": {
+        "kind": "reverse",
+        "table": "simplefinConnections",
+        "relation": "organization"
+      },
+      "batches": {
+        "kind": "reverse",
+        "table": "transactionBatches",
+        "relation": "organization"
+      },
+      "batchTemplates": {
+        "kind": "reverse",
+        "table": "batchTemplates",
+        "relation": "organization"
+      },
+      "restoreOperation": {
+        "kind": "forward",
+        "table": "restoreOperations",
+        "column": "restoreOperationId"
+      }
+    }
+  },
+  "profiles": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "userId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "initialWorkspaceId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "displayName",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Bytea"
+        },
+        "name": "avatarData",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "image/png",
+            "image/jpeg",
+            "image/webp"
+          ]
+        },
+        "name": "avatarMimeType",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "memberships": {
+        "kind": "reverse",
+        "table": "organizationMembers",
+        "relation": "profile"
+      }
+    }
+  },
+  "restoreOperations": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "workspaceId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "sourceFileId",
+        "nullable": false,
+        "references": "files"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "incomplete",
+            "active"
+          ]
+        },
+        "name": "status",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "payloadSha256",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "graphSha256",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "workspaceName",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "personal",
+            "business"
+          ]
+        },
+        "name": "workspaceKind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "workspaceCurrency",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "workspace": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "workspaceId"
+      },
+      "sourceFile": {
+        "kind": "forward",
+        "table": "files",
+        "column": "sourceFileId"
+      }
+    }
+  },
+  "simplefinAccountLinks": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "connectionId",
+        "nullable": true,
+        "references": "simplefinConnections"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "simplefinAccountId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "simplefinOrgId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "availableBalance",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "balanceDate",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      },
+      "connection": {
+        "kind": "forward",
+        "table": "simplefinConnections",
+        "column": "connectionId"
+      }
+    }
+  },
+  "simplefinConnections": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "accessUrl",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "credentialVersion",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "credentialId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "prfSalt",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "iv",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "ciphertext",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "succeeded",
+            "partial",
+            "failed"
+          ]
+        },
+        "name": "lastOutcome",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "importedCount",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "existingCount",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "omittedCount",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "active",
+            "error",
+            "revoked"
+          ]
+        },
+        "name": "status",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "lastSyncAt",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "lastError",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "claimedAt",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      }
+    }
+  },
+  "simplefinSyncAccountResults": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "attemptId",
+        "nullable": false,
+        "references": "simplefinSyncAttempts"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "accountName",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "unfinished",
+            "succeeded",
+            "partial",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "name": "outcome",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "authorization",
+            "passkey",
+            "provider",
+            "mapping",
+            "import",
+            "interrupted",
+            "unexpected"
+          ]
+        },
+        "name": "failureCode",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "importedCount",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "existingCount",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "omittedCount",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "attempt": {
+        "kind": "forward",
+        "table": "simplefinSyncAttempts",
+        "column": "attemptId"
+      },
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      }
+    }
+  },
+  "simplefinSyncAttempts": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "connectionId",
+        "nullable": false,
+        "references": "simplefinConnections"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "initiatedBy",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "startedAt",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "finishedAt",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "unfinished",
+            "succeeded",
+            "partial",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "name": "outcome",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "notStarted",
+            "locallyPersisted",
+            "confirmed",
+            "unresolved"
+          ]
+        },
+        "name": "importSettlement",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "authorization",
+            "passkey",
+            "provider",
+            "mapping",
+            "import",
+            "interrupted",
+            "unexpected"
+          ]
+        },
+        "name": "failureCode",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "importedCount",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "existingCount",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "omittedCount",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "connection": {
+        "kind": "forward",
+        "table": "simplefinConnections",
+        "column": "connectionId"
+      }
+    }
+  },
+  "tags": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "expense",
+            "income"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "categoryId",
+        "nullable": true,
+        "references": "categories"
+      },
+      {
+        "column_type": {
+          "type": "Timestamp"
+        },
+        "name": "archivedAt",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "category": {
+        "kind": "forward",
+        "table": "categories",
+        "column": "categoryId"
+      },
+      "transactionTags": {
+        "kind": "reverse",
+        "table": "transactionTags",
+        "relation": "tag"
+      }
+    }
+  },
+  "transactionAttachments": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "transactionId",
+        "nullable": false,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "fileId",
+        "nullable": false,
+        "references": "files"
+      }
+    ],
+    "relations": {
+      "transaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "transactionId"
+      },
+      "file": {
+        "kind": "forward",
+        "table": "files",
+        "column": "fileId"
+      }
+    }
+  },
+  "transactionBatches": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      }
+    }
+  },
+  "transactionTags": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "transactionId",
+        "nullable": false,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "tagId",
+        "nullable": false,
+        "references": "tags"
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "transaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "transactionId"
+      },
+      "tag": {
+        "kind": "forward",
+        "table": "tags",
+        "column": "tagId"
+      }
+    }
+  },
+  "transactions": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "BigInt"
+        },
+        "name": "amountMinor",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "expense",
+            "income"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "currency",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "categoryId",
+        "nullable": false,
+        "references": "categories"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "bookedOn",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "description",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "memo",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "cash",
+            "check",
+            "transfer",
+            "electronic"
+          ]
+        },
+        "name": "paymentMethod",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "checkDetailsId",
+        "nullable": true,
+        "references": "checkDetails"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "checkId",
+        "nullable": true,
+        "references": "checks"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "internalTransferId",
+        "nullable": true,
+        "references": "internalTransfers"
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "manual",
+            "simplefin"
+          ]
+        },
+        "name": "source",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "externalId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "batchId",
+        "nullable": true,
+        "references": "transactionBatches"
+      }
+    ],
+    "relations": {
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      },
+      "category": {
+        "kind": "forward",
+        "table": "categories",
+        "column": "categoryId"
+      },
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "batch": {
+        "kind": "forward",
+        "table": "transactionBatches",
+        "column": "batchId"
+      },
+      "tags": {
+        "kind": "reverse",
+        "table": "transactionTags",
+        "relation": "transaction"
+      },
+      "checkDetails": {
+        "kind": "forward",
+        "table": "checkDetails",
+        "column": "checkDetailsId"
+      },
+      "internalTransfer": {
+        "kind": "forward",
+        "table": "internalTransfers",
+        "column": "internalTransferId"
+      },
+      "check": {
+        "kind": "forward",
+        "table": "checks",
+        "column": "checkId"
+      },
+      "attachments": {
+        "kind": "reverse",
+        "table": "transactionAttachments",
+        "relation": "transaction"
+      }
+    }
+  },
+  "uploads": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "fileId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "pending",
+            "complete",
+            "failed"
+          ]
+        },
+        "name": "status",
+        "nullable": false
+      }
+    ]
+  }
+}

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createActor, createMachine, createAsyncLogic, waitFor } from 'xstate'
 
 const fixture = vi.hoisted(() => ({ enabled: true, warn: vi.fn(), error: vi.fn() }))
-vi.mock('$app/env', () => ({ browser: true }))
 vi.mock('./logger.js', () => ({
 	debugEnabled: fixture.enabled,
 	createLogger: () => ({ warn: fixture.warn, error: fixture.error })

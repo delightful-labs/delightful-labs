@@ -1,5 +1,5 @@
-import type { schema } from 'jazz-tools'
-import { app } from '#lib/schema.js'
+import type { RowOf } from 'jazz-tools'
+import { app } from '#lib/queries.js'
 import { createAccountImportMachine } from './import-account.js'
 import { required } from './identity.js'
 import {
@@ -18,8 +18,8 @@ import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 type Input = { work: OperationWork; response: ProviderResponse }
-type Link = schema.RowOf<typeof app.simplefinAccountLinks>
-type Category = schema.RowOf<typeof app.categories>
+type Link = RowOf<typeof app.simplefinAccountLinks>
+type Category = RowOf<typeof app.categories>
 type Context = Input & {
 	links: Link[]
 	categories: Category[]

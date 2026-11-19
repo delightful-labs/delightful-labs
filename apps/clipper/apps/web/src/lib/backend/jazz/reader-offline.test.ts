@@ -4,13 +4,13 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createActor, toPromise } from 'xstate'
-import { createJazz, createJazzClient, acceptLocalFirstAuth, sqlite } from 'jazz-tools/backend'
+import { createJazz, createJazzClient, acceptDeviceAccounts, sqlite } from 'jazz-tools/backend'
 import type { BackendClientSession, JazzClientConfig } from 'jazz-tools/backend'
-import { ReadTier } from 'jazz-tools'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { ReadTier, type Db } from 'jazz-tools'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
-import type { ReaderChange } from '../../reader/schema.js'
+import type { ReaderChange, ReaderDocumentState } from '../../reader/schema.js'
 
 async function startAuthority(directory: string, port = 0) {
 	const server = createServer((request, response) => backend.nodeHandler(request, response))
@@ -26,7 +26,7 @@ async function startAuthority(directory: string, port = 0) {
 		app,
 		permissions,
 		store: sqlite({ path: join(directory, 'authority') }),
-		authenticate: acceptLocalFirstAuth,
+		authenticate: acceptDeviceAccounts,
 		publicUrl: [serverUrl],
 		allowedOrigins: [origin]
 	})
@@ -45,6 +45,21 @@ async function startAuthority(directory: string, port = 0) {
 		}
 	}
 }
+async function readPosition(db: Db, owner: string, id: string) {
+	const observed = Promise.withResolvers<ReaderDocumentState>()
+	const release = createLibraryRecords(db, owner, () => true).reader.capability.subscribeDocuments(
+		(rows) => {
+			const row = rows.find((value) => value.id === id)
+			if (row) observed.resolve(row)
+		},
+		() => observed.reject(new Error('Reading observation failed'))
+	)
+	try {
+		return await observed.promise
+	} finally {
+		release()
+	}
+}
 it('reconciles concurrent offline progress after both replicas restart, retaining the latest backward resume location', async () => {
 	const releases: (() => void)[] = []
 	const directory = await mkdtemp(join(tmpdir(), 'clipper-reader-offline-'))
@@ -59,12 +74,9 @@ it('reconciles concurrent offline progress after both replicas restart, retainin
 		permissions,
 		serverUrl,
 		appId,
-		driver: { type: 'persistent', dataPath: join(directory, name) } satisfies {
-			type: 'persistent'
-			dataPath: string
-		},
-		initial: 'local-first' satisfies 'local-first',
-		env: 'test' satisfies 'test',
+		driver: { type: 'persistent', dataPath: join(directory, name) },
+		initial: 'device',
+		env: 'test',
 		store: {
 			read: async () => identity,
 			update: async (transform: (current: string | null) => string) => {
@@ -75,7 +87,7 @@ it('reconciles concurrent offline progress after both replicas restart, retainin
 
 	try {
 		first = await createJazzClient(config('first'))
-		const owner = first.getSnapshot().account?.id,
+		const owner = first.getSnapshot().user?.accountId,
 			firstDb = first.getSnapshot().client?.db
 		if (!owner || !firstDb) throw new Error('Missing first replica')
 		await firstDb
@@ -89,14 +101,14 @@ it('reconciles concurrent offline progress after both replicas restart, retainin
 		if (saved.kind !== 'saved') throw new Error('Expected saved Document')
 		await Promise.all(saved.receipts.map((receipt) => receipt.global()))
 		second = await createJazzClient(config('second'))
-		expect(second.getSnapshot().account?.id).toBe(owner)
+		expect(second.getSnapshot().user?.accountId).toBe(owner)
 		const secondDb = second.getSnapshot().client?.db
 		if (!secondDb) throw new Error('Missing second replica')
 		await secondDb.one(app.libraries.where({ id: owner }), { tier: ReadTier.Remote })
 		const query = app.libraryDocuments.where({ id: saved.operationId })
 		expect(await secondDb.one(query, { tier: ReadTier.Remote })).toMatchObject({
 			readingProgress: 0,
-			resumePosition: null
+			resumePosition: []
 		})
 		await Promise.all([firstDb.disconnect(), secondDb.disconnect()])
 		async function position(
@@ -145,11 +157,11 @@ it('reconciles concurrent offline progress after both replicas restart, retainin
 			reopenedSecond = second.getSnapshot().client?.db
 		if (!reopenedFirst || !reopenedSecond) throw new Error('Missing restarted replicas')
 		await Promise.all([reopenedFirst.disconnect(), reopenedSecond.disconnect()])
-		expect(await reopenedFirst.one(query, { tier: ReadTier.LocalFirst })).toMatchObject({
+		expect(await readPosition(reopenedFirst, owner, saved.operationId)).toMatchObject({
 			readingProgress: 0.8,
 			resumePosition: { offset: 80, interactedAt: earlier }
 		})
-		expect(await reopenedSecond.one(query, { tier: ReadTier.LocalFirst })).toMatchObject({
+		expect(await readPosition(reopenedSecond, owner, saved.operationId)).toMatchObject({
 			readingProgress: 0.2,
 			resumePosition: { offset: 20, interactedAt: later }
 		})
@@ -165,7 +177,7 @@ it('reconciles concurrent offline progress after both replicas restart, retainin
 		await Promise.all([reopenedFirst.reconnect(), reopenedSecond.reconnect()])
 		for (const db of [reopenedFirst, reopenedSecond])
 			await expect
-				.poll(() => db.one(query, { tier: ReadTier.LocalFirst }), { timeout: 10_000 })
+				.poll(() => readPosition(db, owner, saved.operationId), { timeout: 10_000 })
 				.toMatchObject({
 					readingProgress: 0.8,
 					resumePosition: { offset: 20, interactedAt: later }

@@ -1,5 +1,5 @@
 import { EXPENSE, INCOME } from './transaction-kind.js'
-import type { InternalTransfer, TransactionRow } from '#lib/schema.js'
+import type { InternalTransfer, TransactionRow } from '#lib/queries.js'
 
 const MATCH_WINDOW_DAYS = 7
 const MILLISECONDS_PER_DAY = 86_400_000

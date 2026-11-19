@@ -4,7 +4,7 @@ import type { Transaction } from 'jazz-tools'
 import type { Jazz } from 'jazz-tools/backend'
 import { createAsyncLogic, setup, types } from 'xstate'
 import type { ActorRefFrom } from 'xstate'
-import { app } from '../../backend/jazz/schema.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
 import { lowercaseUuidSchema } from '../../validation/values.js'
 import { didSchema } from '../../annotations/publication-link.js'
 

@@ -1,6 +1,6 @@
 import { PersistedWriteRejectedError } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import { app } from '#lib/schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app } from '#lib/queries.js'
 import {
 	MAX_TRANSACTION_ATTACHMENT_BYTES,
 	isTransactionAttachmentType
@@ -9,7 +9,7 @@ import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { OutputFrom } from 'xstate'
 import type { EventPayload } from '../../../contracts/event-payload.js'
 
-type Db = Pick<ReturnType<typeof getDb>, 'beginTransaction'>
+type Db = Pick<JazzDb, 'beginTransaction'>
 type Transaction = ReturnType<Db['beginTransaction']>
 export type AttachmentReplacementInput = {
 	db: Db

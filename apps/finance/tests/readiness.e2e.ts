@@ -1,19 +1,11 @@
+import { financeFixture } from './helpers/worker-fixture.js'
+import { failNextAccountStorageOpen } from './helpers/startup-failure.js'
 import { expect, test } from '@playwright/test'
 
 test('startup storage failure is recoverable by an explicit retry', async ({ page }) => {
 	const errors: string[] = []
 	page.on('pageerror', (error) => errors.push(error.message))
-	await page.addInitScript(() => {
-		const getItem = Storage.prototype.getItem
-		let failed = false
-		Storage.prototype.getItem = function (key) {
-			if (!failed && key.startsWith('jazz-account-selection-v1:')) {
-				failed = true
-				throw new DOMException('Synthetic account storage failure', 'SecurityError')
-			}
-			return getItem.call(this, key)
-		}
-	})
+	await failNextAccountStorageOpen(page)
 	await page.goto('/settings/banks')
 	await expect(page.getByText('Your finances could not be opened.', { exact: false })).toBeVisible()
 	await page.getByRole('button', { name: 'Try again', exact: true }).click()
@@ -42,35 +34,7 @@ test('opening / and reloading saved failed bank history causes no machine errors
 	).toBeVisible()
 	const organizationId = new URL(page.url()).searchParams.get('workspace')
 	if (!organizationId) throw new Error('Expected scoped workspace after startup')
-	await page.evaluate(async (organizationId) => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const session = getCurrentJazzSession()?.getSnapshot()
-		if (!session?.client || !session.account) throw new Error('Expected initialized session')
-		await session.client.db
-			.insert(app.simplefinConnections, {
-				organizationId,
-				ownerId: session.account.id,
-				accessUrl: '',
-				status: 'active',
-				credentialVersion: 1,
-				credentialId: 'synthetic-credential',
-				ciphertext: 'synthetic-ciphertext',
-				prfSalt: 'synthetic-salt',
-				iv: 'synthetic-iv',
-				claimedAt: new Date(),
-				lastSyncAt: new Date(),
-				lastOutcome: 'failed',
-				lastError: 'operation-failed',
-				importedCount: 0,
-				existingCount: 0,
-				omittedCount: 0
-			})
-			.wait({ tier: 'local' })
-	}, organizationId)
+	await financeFixture(page, 'readiness.e2e:45', organizationId)
 	await page.goto(`/settings/banks?workspace=${organizationId}`)
 	const history = page.getByRole('main').getByText(/Last sync: .*Outcome: Failed\./)
 	await expect(history).toBeVisible()

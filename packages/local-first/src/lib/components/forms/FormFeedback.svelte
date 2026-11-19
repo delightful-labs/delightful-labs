@@ -1,8 +1,11 @@
 <script lang="ts" generics="Result, Reason">
 	import { Button } from 'delightful-ui'
 	import type { ScopedFormView } from '../../contracts/scoped-form.js'
+	import type { FormFeedbackMessages } from '../../contracts/scoped-form.js'
+	import { formatFormFeedback } from '../../presentation/form-feedback.js'
 	let {
 		retryLabel,
+		defaultMessages,
 		view,
 		subject,
 		reasonText,
@@ -16,6 +19,7 @@
 		blockedRole = () => 'status'
 	}: {
 		retryLabel: string
+		defaultMessages: FormFeedbackMessages
 		view: ScopedFormView<Result, Reason>
 		subject: string
 		reasonText: (reason: Reason) => string
@@ -40,9 +44,9 @@
 		invalidMessages ?? (invalidMessage === undefined ? [] : [invalidMessage])
 	)
 	const feedback = $derived(
-		(view.feedbackLabels ?? []).flatMap((meta) =>
+		(view.feedbackDescriptors ?? []).flatMap((meta) =>
 			section === 'all' || meta.section === section
-				? meta.label({
+				? formatFormFeedback(meta, {
 						view,
 						subject,
 						reasonText,
@@ -51,7 +55,7 @@
 						action,
 						messages,
 						blockedRole
-					})
+					}, defaultMessages)
 				: []
 		)
 	)

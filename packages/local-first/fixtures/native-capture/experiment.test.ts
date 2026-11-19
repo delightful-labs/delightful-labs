@@ -202,7 +202,7 @@ beforeAll(async () => {
 		serverUrl: server.url,
 		driver: { type: 'memory' },
 		env: 'native-capture-experiment',
-		initial: 'local-first'
+		initial: 'device'
 	})
 	sessions.push(session)
 	const readerSnapshot = session.getSnapshot()
@@ -621,7 +621,7 @@ describe('native snapshot export feasibility', () => {
 					const session = await module.createBrowserSession({
 						scope: config.appId,
 						serverUrl: config.serverUrl,
-						initial: 'local-first',
+						initial: 'device',
 						client: module.loadLocalFirst,
 						env: 'native-capture-experiment',
 						driver: { type: 'persistent', dbName: 'disposable-native-capture' }

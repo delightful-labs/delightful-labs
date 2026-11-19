@@ -1,4 +1,4 @@
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 /** All user-record readers consume named native joins, never an attachment-ID lookup. */
 export const documentsQuery = app.libraryDocuments.select('*', '$createdAt').include({
 	library: true,

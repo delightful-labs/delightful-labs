@@ -14,9 +14,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { makeSignature } from 'better-auth/crypto'
-import { acceptLocalFirstAuth } from 'jazz-tools/backend'
+import { acceptDeviceAccounts } from 'jazz-tools/backend'
 import { createAuthServer } from '../../src/lib/server/auth/server.js'
-import { app } from '../../src/lib/backend/jazz/schema.js'
+import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
 import { startJazzAuthority } from '../jazz-authority.js'
 import { staticShellServer } from './server.js'
 import { openAddLink } from '../add-link.js'
@@ -66,7 +66,12 @@ for (const mode of ['linked', 'existing', 'expired'])
 				dataDir: directory,
 				authenticate: async (request) => {
 					const session = await auth.api.getSession({ headers: request.headers })
-					return session ? { userId: session.user.id } : acceptLocalFirstAuth(request)
+					return session
+						? {
+								userId: session.user.id,
+								expiresAt: Math.floor(session.session.expiresAt.getTime() / 1000)
+							}
+						: acceptDeviceAccounts(request)
 				}
 			})
 			auth = createAuthServer({ db: () => authority.backend.db, schema: app }, { origin, secret })
@@ -737,14 +742,20 @@ for (const mode of ['linked', 'existing', 'expired'])
 				await context.setOffline(true)
 				const afterSignOut = await context.newPage()
 				await afterSignOut.goto(origin)
+				await expect(afterSignOut.locator(`[data-article-id="${id}"]`)).toHaveCount(0)
+				await openAccountSettings(afterSignOut)
+				// Explicit sign-out stays signed out across restart; only first use is automatic.
+				const create = afterSignOut.getByRole('button', { name: 'Create account', exact: true })
+				await expect(create).toBeEnabled({ timeout: 30000 })
+				await expect(
+					afterSignOut.getByRole('button', { name: 'Sign out', exact: true })
+				).toHaveCount(0)
+				await create.click()
+				await afterSignOut.getByRole('link', { name: 'All articles', exact: true }).click()
 				await expect(
 					afterSignOut.getByRole('region', { name: 'Saved articles', exact: true })
 				).toBeVisible({ timeout: 30000 })
 				await expect(afterSignOut.locator(`[data-article-id="${id}"]`)).toHaveCount(0)
-				await openAccountSettings(afterSignOut)
-				await expect(
-					afterSignOut.getByRole('button', { name: 'Sign out', exact: true })
-				).toHaveCount(0)
 			}
 		} finally {
 			checkpoint('closing browser')

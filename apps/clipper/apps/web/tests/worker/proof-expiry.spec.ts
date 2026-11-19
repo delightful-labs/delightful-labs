@@ -67,7 +67,7 @@ async function joiningWorker(
 	page: Page,
 	mode: 'fresh' | 'expired' | 'forged' | 'audience' | 'identity'
 ) {
-	await page.route('**/application.worker.ts?worker_file*', async (route) => {
+	await page.context().route(/\/application\.worker\.ts\?(?=.*worker_file)/, async (route) => {
 		const response = await route.fetch()
 		const preamble = `
 			const testNow = Date.now.bind(Date);
@@ -126,6 +126,14 @@ for (const mode of ['fresh', 'expired', 'forged', 'audience', 'identity'] as con
 
 			await joiningWorker(joining, mode)
 			await joining.goto('/')
+			await expect
+				.poll(async () => {
+					const worker = joining
+						.workers()
+						.find((worker) => worker.url().includes('application.worker'))
+					return worker ? worker.evaluate(() => Date.now()) : 0
+				})
+				.toBeGreaterThan(Date.now() + (mode === 'expired' ? -10_000 : elapsed - 10_000))
 			if (mode !== 'fresh') {
 				await expect(
 					joining

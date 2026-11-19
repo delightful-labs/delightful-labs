@@ -70,7 +70,7 @@ export function requestProviderWorker(
 				lifetime.addEventListener('abort', abort, { once: true })
 				try {
 					worker.postMessage({
-						endpoint: new URL('/api/simplefin', window.location.origin).href,
+						endpoint: new URL('/api/simplefin', globalThis.location.origin).href,
 						accessUrl,
 						discovery,
 						traceId: trace.id

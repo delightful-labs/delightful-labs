@@ -1,4 +1,4 @@
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import {
 	sameIntegrityRequest,
 	type IntegrityRequest,
@@ -26,7 +26,7 @@ type Context = Input & {
 	result: IntegrityResult | undefined
 }
 type Event = { type: 'OBSERVED'; request: IntegrityRequest } | { type: 'REEVALUATE' | 'SHUTDOWN' }
-type Db = Pick<ReturnType<typeof getDb>, 'all' | 'beginTransaction' | 'getConfig'>
+type Db = Pick<JazzDb, 'all' | 'beginTransaction' | 'getConfig'>
 
 function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Missing integrity operation result')

@@ -38,10 +38,7 @@ export function createManagementAvailability(binding: object) {
 		SHUTDOWN: types<EventPayload<FormChildEvent<ManagementObservation>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<ManagementObservation>, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<never>
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<{ observation: FormObservation<ManagementObservation> }>(),
@@ -58,166 +55,83 @@ export function createManagementAvailability(binding: object) {
 		},
 		states: {
 			checking: {
-				always: (args) => {
-					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) => !f.sessionReady || !f.identityId || f.binding !== binding)(args)
-					) {
+				type: 'choice',
+				choice: ({ context }) => {
+					const f = context.observation.facts,
+						intent = f.intent
+					if (!f.sessionReady || !f.identityId || f.binding !== binding)
 						return { target: 'sessionUnavailable' }
-					}
+					if (!f.organizationId) return { target: 'selectWorkspace' }
+					if (f.failed) return { target: 'loadFailed' }
+					if (f.loading) return { target: 'loading' }
 					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) => !f.organizationId)(args)
-					) {
-						return { target: 'selectWorkspace' }
-					}
-					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) => f.failed)(args)
-					) {
-						return { target: 'loadFailed' }
-					}
-					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) => f.loading)(args)
-					) {
-						return { target: 'loading' }
-					}
-					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) =>
-							f.membership?.userId !== f.identityId ||
-							!canEditCategoriesAndTags(f.membership, f.organizationId))(args)
-					) {
+						f.membership?.userId !== f.identityId ||
+						!canEditCategoriesAndTags(f.membership, f.organizationId)
+					)
 						return { target: 'readOnly' }
-					}
 					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) =>
-							f.intent?.kind === 'archiveCategory' &&
-							f.categories.some(
-								(c) =>
-									c.id === archiveIntentId(f) && c.organizationId === f.organizationId && c.isSystem
-							))(args)
-					) {
+						intent?.kind === 'archiveCategory' &&
+						f.categories.some(
+							(c) => c.id === intent.id && c.organizationId === f.organizationId && c.isSystem
+						)
+					)
 						return { target: 'protectedRecord' }
-					}
 					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) =>
-							f.intent?.kind === 'archiveCategory' &&
-							(f.intent.organizationId !== f.organizationId ||
-								!f.categories.some(
-									(c) =>
-										c.id === archiveIntentId(f) &&
-										c.organizationId === f.organizationId &&
-										c.archivedAt === null
-								)))(args)
-					) {
+						intent?.kind === 'archiveCategory' &&
+						(intent.organizationId !== f.organizationId ||
+							!f.categories.some(
+								(c) =>
+									c.id === intent.id &&
+									c.organizationId === f.organizationId &&
+									c.archivedAt === null
+							))
+					)
 						return { target: 'unavailableReference' }
-					}
 					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) =>
-							f.intent?.kind === 'archiveTag' &&
-							(f.intent.organizationId !== f.organizationId ||
-								!f.tags.some(
-									(t) =>
-										t.id === archiveIntentId(f) &&
-										t.organizationId === f.organizationId &&
-										t.archivedAt === null
-								)))(args)
-					) {
+						intent?.kind === 'archiveTag' &&
+						(intent.organizationId !== f.organizationId ||
+							!f.tags.some(
+								(t) =>
+									t.id === intent.id &&
+									t.organizationId === f.organizationId &&
+									t.archivedAt === null
+							))
+					)
 						return { target: 'unavailableReference' }
-					}
 					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) => {
-							const intent = f.intent
-							return (
-								intent?.kind === 'createTag' &&
-								intent.categoryId !== null &&
-								!f.categories.some(
-									(category) =>
-										category.id === intent.categoryId &&
-										category.organizationId === f.organizationId &&
-										category.kind === intent.tagKind &&
-										category.archivedAt === null
-								)
-							)
-						})(args)
-					) {
+						intent?.kind === 'createTag' &&
+						intent.categoryId !== null &&
+						!f.categories.some(
+							(category) =>
+								category.id === intent.categoryId &&
+								category.organizationId === f.organizationId &&
+								category.kind === intent.tagKind &&
+								category.archivedAt === null
+						)
+					)
 						return { target: 'unavailableReference' }
-					}
 					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) => {
-							const intent = f.intent
-							return (
-								intent?.kind === 'createTag' &&
-								f.tags.some(
-									(tag) =>
-										tag.organizationId === f.organizationId &&
-										tag.kind === intent.tagKind &&
-										tag.archivedAt === null &&
-										normalizedName(tag.name) === normalizedName(intent.name)
-								)
-							)
-						})(args)
-					) {
+						intent?.kind === 'createTag' &&
+						f.tags.some(
+							(tag) =>
+								tag.organizationId === f.organizationId &&
+								tag.kind === intent.tagKind &&
+								tag.archivedAt === null &&
+								normalizedName(tag.name) === normalizedName(intent.name)
+						)
+					)
 						return { target: 'duplicateName' }
-					}
 					if (
-						(({
-							context: {
-								observation: { facts: f }
-							}
-						}) => {
-							const intent = f.intent
-							return (
-								intent?.kind === 'createCategory' &&
-								f.categories.some(
-									(category) =>
-										category.organizationId === f.organizationId &&
-										category.archivedAt === null &&
-										category.kind === intent.categoryKind &&
-										normalizedName(category.name) === normalizedName(intent.name)
-								)
-							)
-						})(args)
-					) {
+						intent?.kind === 'createCategory' &&
+						f.categories.some(
+							(category) =>
+								category.organizationId === f.organizationId &&
+								category.archivedAt === null &&
+								category.kind === intent.categoryKind &&
+								normalizedName(category.name) === normalizedName(intent.name)
+						)
+					)
 						return { target: 'duplicateName' }
-					}
 					return { target: 'ready' }
 				}
 			},
@@ -264,12 +178,6 @@ export function selectManagementArchiveIds(
 			return snapshot.readiness.kind === 'ready'
 		})
 		.map((row) => row.id)
-}
-
-function archiveIntentId(f: ManagementObservation) {
-	return f.intent?.kind === 'archiveCategory' || f.intent?.kind === 'archiveTag'
-		? f.intent.id
-		: undefined
 }
 
 /** Shared management policy binding; integrations supply each form's unique write and intent. */

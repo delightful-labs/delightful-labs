@@ -1,19 +1,18 @@
 import type { SaveRequest } from '../../contracts/storage.js'
-import { policySchema } from './schema-permissions.test-support.js'
 import { readRecord } from '../../machines/storage/read.test-support.js'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
 import { storageSyncMachine } from '../../machines/storage/sync.js'
 import { BYTE_LIMIT, prepareSave } from '../../storage/prepare.js'
 
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => {
 	await fixture?.shutdown()

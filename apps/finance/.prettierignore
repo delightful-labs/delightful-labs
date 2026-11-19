@@ -8,3 +8,9 @@ pnpm-lock.yaml
 
 # Preserve historical source formatting.
 archive/
+
+# Native Jazz generator owns these artifacts.
+**/jazz.generated.ts
+**/jazz.app.json
+**/jazz.permissions.json
+**/migrations/snapshots/**

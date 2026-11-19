@@ -20,17 +20,25 @@ export function createWorkerHostFixture(
 	bindWorkerConnectivity(true)
 	const unused = vi.fn(async () => {})
 	const close = vi.fn(async () => {})
-	const session: Session = {
-		getSnapshot: () => ({ status: 'signed-out' }),
+	const nativeSession: ReturnType<Session> = {
+		getSnapshot: () => ({ status: 'signed-out', user: null, localFirst: false }),
+		get db(): never {
+			throw new Error('Signed-out fixture has no database')
+		},
+		exportDeviceKey: () => {
+			throw new Error('Signed-out fixture has no device account')
+		},
 		subscribe: () => () => {},
-		createLocalFirst: unused,
-		restoreLocalFirst: unused,
-		loginWithBackend: unused,
-		linkWithBackend: unused,
-		logout: unused,
+		createDeviceAccount: unused,
+		restoreDeviceAccount: unused,
+		reopenDeviceAccount: unused,
+		linkDeviceAccount: unused,
+		signOut: unused,
+		refresh: unused,
 		retry: unused,
 		close
 	}
+	const session: Session = () => nativeSession
 	const binding = {}
 	const owner = createActor(createSessionAcquisitionMachine<Session>(), {
 		input: {

@@ -2,26 +2,10 @@ import { TRANSACTION_SOURCE } from '#lib/domain/transaction-source.js'
 import { PAYMENT_METHOD } from '#lib/domain/payment-method.js'
 import { INCOME, EXPENSE } from '#lib/domain/transaction-kind.js'
 import { schema as s } from 'jazz-tools'
-import {
-	amountMinorValue,
-	checkNumberText,
-	currencyText,
-	dateOnlyText,
-	externalIdText
-} from '../validation/transactions.js'
-import { validatedTextColumn } from './text-column.js'
 import { transactionCheckColumns, transactionCheckRelations } from './checks.js'
 
-const currencyColumn = () => validatedTextColumn(currencyText).column
-const bookedOnColumn = validatedTextColumn(dateOnlyText)
-const checkDateColumn = validatedTextColumn(dateOnlyText)
-const checkNumberColumn = validatedTextColumn(checkNumberText)
-const externalIdColumn = validatedTextColumn(externalIdText)
-const amountMinorColumn = () =>
-	s.bigint().transform<number>({
-		from: (value) => amountMinorValue.parse(Number(value)),
-		to: (value) => BigInt(amountMinorValue.parse(value))
-	})
+const currencyColumn = () => s.string().transform('currency', s.string())
+const amountMinorColumn = () => s.bigint().transform('amountMinor', s.int())
 
 export const transactionsSchema = {
 	transactions: s.table(
@@ -33,7 +17,7 @@ export const transactionsSchema = {
 			accountId: s.uuid(),
 			organizationId: s.uuid(),
 			// ISO 8601 calendar date (YYYY-MM-DD), not a timestamp.
-			bookedOn: bookedOnColumn.column,
+			bookedOn: s.string().transform('dateOnly', s.string()),
 			description: s.string().optional(),
 			memo: s.string().optional(),
 			paymentMethod: s
@@ -48,7 +32,7 @@ export const transactionsSchema = {
 			...transactionCheckColumns,
 			internalTransferId: s.uuid().optional(),
 			source: s.enum(TRANSACTION_SOURCE.MANUAL, TRANSACTION_SOURCE.SIMPLEFIN),
-			externalId: externalIdColumn.column.optional(),
+			externalId: s.string().transform('externalId', s.string()).optional(),
 			batchId: s.uuid().optional()
 		},
 		{
@@ -80,8 +64,8 @@ export const transactionsSchema = {
 			transactionId: s.uuid(),
 			organizationId: s.uuid(),
 			accountId: s.uuid(),
-			checkNumber: checkNumberColumn.column,
-			checkDate: checkDateColumn.column,
+			checkNumber: s.string().transform('checkNumber', s.string()),
+			checkDate: s.string().transform('dateOnly', s.string()),
 			payerName: s.string().optional(),
 			bankName: s.string().optional(),
 			memoOnCheck: s.string().optional()

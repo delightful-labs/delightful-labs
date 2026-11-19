@@ -6,7 +6,7 @@ export type OrderedSignOutInput = Readonly<{
 	provider?: () => Promise<void>
 	/** Synchronous native facts, observed after provider settlement and before mutation. */
 	observeSession?: () => SignOutSessionStatus
-	session: () => Promise<void>
+	session: (() => Promise<void>) | import('./session-runtime.js').SessionRuntimeChangeInput
 	providerDeadlineMs?: number
 	sessionDeadlineMs?: number
 	onOverdue?: (stage: SignOutStage) => void

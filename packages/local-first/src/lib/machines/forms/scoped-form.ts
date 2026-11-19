@@ -10,8 +10,7 @@ import {
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 import type {
-	FormFeedbackInput,
-	FeedbackMessage,
+	FormFeedbackKind,
 	FormCapability,
 	FormSchema,
 	FormIssue,
@@ -31,17 +30,13 @@ import { createScopedFormSubmissionMachine } from './submission.js'
 import { createScopedFormReadinessMachine } from './readiness.js'
 export type ScopedFormDependencies = {
 	validationIssues: (error: unknown) => readonly FormIssue[] | undefined
-	messages: {
-		unknown: () => string
-		loading: (input: { subject: string }) => string
-		loadFailed: (input: { subject: string }) => string
-		saved: (input: { subject: string }) => string
-		completionFailed: () => string
-		interruptedSaved: () => string
-		archiveFailed: (input: { subject: string }) => string
-		saveFailed: (input: { subject: string }) => string
-		settling: () => string
-	}
+}
+
+/** Echo the admitted observation at an explicit parent/report boundary. */
+export function selectScopedFormObservation<Observation>(snapshot: {
+	context: { observation: FormObservation<Observation> | undefined }
+}): Observation | undefined {
+	return snapshot.context.observation?.facts
 }
 export type ScopedFormOptions<
 	Values,
@@ -190,7 +185,7 @@ export function createScopedFormMachine<
 			input: types<Observation>(),
 			meta: types<{
 				section: string
-				label: (input: FormFeedbackInput<Result, Reason>) => readonly FeedbackMessage[]
+				feedback: FormFeedbackKind
 			}>()
 		},
 		actors,
@@ -215,15 +210,6 @@ export function createScopedFormMachine<
 		if (!context.observation) throw new Error('Missing form observation')
 		return context.observation
 	}
-	type Input = FormFeedbackInput<Result, Reason>
-	type Label = (input: Input) => readonly FeedbackMessage[]
-	const status =
-		(label: (input: Input) => string): Label =>
-		(input) => [{ text: label(input), role: 'status' }]
-	const alert =
-		(label: (input: Input) => string): Label =>
-		(input) => [{ text: label(input), role: 'alert' }]
-	const unknown: Label = alert((input) => input.messages.unknown ?? dependencies.messages.unknown())
 	type CompletionEntry = Extract<
 		NonNullable<Parameters<typeof workflow.createStateConfig>[0]['entry']>,
 		(...args: never[]) => unknown
@@ -342,24 +328,10 @@ export function createScopedFormMachine<
 								initial: 'awaiting',
 								states: {
 									awaiting: {
-										meta: {
-											section: 'readiness',
-											label: status(({ subject }) => dependencies.messages.loading({ subject }))
-										}
+										meta: { section: 'readiness', feedback: 'loading' }
 									},
 									current: {
-										meta: {
-											section: 'readiness',
-											label: (input: Input): readonly FeedbackMessage[] =>
-												input.view.readiness.kind === 'blocked'
-													? [
-															{
-																text: input.reasonText(input.view.readiness.reason),
-																role: input.blockedRole(input.view.readiness.reason)
-															}
-														]
-													: []
-										}
+										meta: { section: 'readiness', feedback: 'readinessBlocked' }
 									}
 								},
 								invoke: {
@@ -390,10 +362,7 @@ export function createScopedFormMachine<
 								}
 							},
 							failed: {
-								meta: {
-									section: 'readiness',
-									label: alert(({ subject }) => dependencies.messages.loadFailed({ subject }))
-								},
+								meta: { section: 'readiness', feedback: 'loadFailed' },
 								entry: (args, enq) => {
 									enq.raise({ type: 'AVAILABILITY_FAILED' })
 									return {
@@ -466,45 +435,16 @@ export function createScopedFormMachine<
 									},
 									quiet: {},
 									saved: {
-										meta: {
-											section: 'result',
-											label: status((input) => {
-												const feedback = input.view.feedback
-												return feedback.kind === 'result' &&
-													feedback.result.outcome === 'succeeded' &&
-													input.successMessage
-													? input.successMessage(feedback.result.value)
-													: dependencies.messages.saved({ subject: input.subject })
-											})
-										}
+										meta: { section: 'result', feedback: 'saved' }
 									},
 									completionFailed: {
-										meta: {
-											section: 'result',
-											label: alert(() => dependencies.messages.completionFailed())
-										}
+										meta: { section: 'result', feedback: 'completionFailed' }
 									},
 									invalid: {
-										meta: {
-											section: 'result',
-											label: (input: Input): readonly FeedbackMessage[] =>
-												input.validationMessages.length > 0
-													? [{ paragraphs: input.validationMessages, role: 'alert' }]
-													: []
-										}
+										meta: { section: 'result', feedback: 'invalid' }
 									},
 									blocked: {
-										meta: {
-											section: 'result',
-											label: (input: Input): readonly FeedbackMessage[] => {
-												const feedback = input.view.feedback
-												return feedback.kind === 'result' &&
-													(feedback.result.outcome === 'denied' ||
-														feedback.result.outcome === 'unavailable')
-													? [{ text: input.reasonText(feedback.result.reason), role: 'alert' }]
-													: []
-											}
-										}
+										meta: { section: 'result', feedback: 'blocked' }
 									},
 									interrupted: {
 										initial: 'assessing',
@@ -529,28 +469,14 @@ export function createScopedFormMachine<
 												}
 											},
 											saved: {
-												meta: {
-													section: 'result',
-													label: status(
-														(input) =>
-															input.messages.interruptedSaved ??
-															dependencies.messages.interruptedSaved()
-													)
-												}
+												meta: { section: 'result', feedback: 'interruptedSaved' }
 											},
-											unknown: { meta: { section: 'result', label: unknown } },
+											unknown: { meta: { section: 'result', feedback: 'unknown' } },
 											quiet: {}
 										}
 									},
 									failed: {
-										meta: {
-											section: 'result',
-											label: alert((input) =>
-												input.action === 'archive'
-													? dependencies.messages.archiveFailed({ subject: input.subject })
-													: dependencies.messages.saveFailed({ subject: input.subject })
-											)
-										},
+										meta: { section: 'result', feedback: 'operationFailed' },
 										initial: 'assessing',
 										states: {
 											assessing: {
@@ -566,7 +492,7 @@ export function createScopedFormMachine<
 													return { target: 'quiet' }
 												}
 											},
-											unknown: { meta: { section: 'result', label: unknown } },
+											unknown: { meta: { section: 'result', feedback: 'unknown' } },
 											quiet: {}
 										}
 									}
@@ -855,32 +781,17 @@ export function createScopedFormMachine<
 										}
 									},
 									cancelling: {
-										meta: {
-											section: 'readiness',
-											label: status(
-												(input) => input.messages.settling ?? dependencies.messages.settling()
-											)
-										},
+										meta: { section: 'readiness', feedback: 'settling' },
 										tags: ['can-open'],
 										on: { CANCEL: {} }
 									},
 									invalidated: {
-										meta: {
-											section: 'readiness',
-											label: status(
-												(input) => input.messages.settling ?? dependencies.messages.settling()
-											)
-										},
+										meta: { section: 'readiness', feedback: 'settling' },
 										tags: ['can-open'],
 										on: { CANCEL: {}, INVALIDATE: {}, AVAILABILITY_FAILED: {} }
 									},
 									closing: {
-										meta: {
-											section: 'readiness',
-											label: status(
-												(input) => input.messages.settling ?? dependencies.messages.settling()
-											)
-										},
+										meta: { section: 'readiness', feedback: 'settling' },
 										on: {
 											SHUTDOWN: {},
 											CANCEL: {},
@@ -946,10 +857,7 @@ export function createScopedFormMachine<
 										}
 									},
 									failed: {
-										meta: {
-											section: 'result',
-											label: alert(() => dependencies.messages.completionFailed())
-										},
+										meta: { section: 'result', feedback: 'completionFailed' },
 										on: { SUBMIT: { target: 'admitting' } }
 									},
 									completed: {}
@@ -1037,9 +945,14 @@ export function selectScopedFormView<
 					: { kind: 'observing' }
 	const canSubmit = !failed && snapshot.can({ type: 'SUBMIT', values: snapshot.context.draft })
 	return {
-		feedbackLabels: Object.values(snapshot.getMeta()).flatMap((meta) =>
-			meta?.label
-				? [{ section: meta.section === 'readiness' ? 'readiness' : 'result', label: meta.label }]
+		feedbackDescriptors: Object.values(snapshot.getMeta()).flatMap((meta) =>
+			meta?.feedback
+				? [
+						{
+							section: meta.section === 'readiness' ? 'readiness' : 'result',
+							message: meta.feedback
+						}
+					]
 				: []
 		),
 		readiness,

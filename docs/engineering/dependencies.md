@@ -19,6 +19,28 @@ Prepare a solution using supported APIs without new dependency patches first.
 Discuss a patch only after identifying a concrete limitation of that solution;
 simpler application coordination alone does not make a patch the default.
 
+## Prefer native library behavior and small integration surfaces
+
+The user reiterated this direction on 2026-11-17: Jazz is under active
+development. Use Svelte, XState and Jazz as intended and keep SDK-specific
+integration concentrated, so an upstream change has few application contact
+points. Keep adapters thin and app schemas/permissions native; do not mirror
+the SDK, build a universal facade or replace a library lifecycle with our own.
+Reuse existing application workflows and native library facilities before
+introducing another protocol or owner.
+
+A missing SDK feature or an edge-case discovery is not automatically a task to
+implement compensating infrastructure. Record the limitation, affected behavior,
+version and evidence; defer it when current product requirements allow waiting
+for upstream. Additional code needs a concrete application requirement that
+cannot wait and the smallest supported solution. Do not build speculative
+fallbacks, retry layers, compatibility frameworks or exhaustive defenses around
+every SDK gap. On upgrades, look for custom code that native APIs can remove
+before extending existing wrappers. Preserve actual data and settlement
+requirements without generalizing them into hypothetical requirements.
+
+## Package integration
+
 Consume UI and Local First through supported public workspace exports. UI owns
 generic presentation; Local First owns reusable identity/workspace/operation
 foundations; apps own domain schemas, policies and operations. Keep app domains

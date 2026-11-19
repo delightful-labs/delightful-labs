@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 import { seedTransaction, persisted } from './helpers/transactions.js'
 
@@ -198,6 +199,7 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 			// Browser offline mode prevents Vite from forwarding these diagnostics to CI.
 			// Preserve the already-sanitized error details instead of the trace's object preview.
 			const machineFailures: Promise<unknown>[] = []
+			let unconfirmedSave: { transactionId: string; categoryId: string } | undefined
 			page.on('console', (message) => {
 				if (message.text().startsWith('[state-machine] Machine entered an error state')) {
 					for (const argument of message.args().slice(1)) {
@@ -250,8 +252,10 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 					.or(page.getByRole('combobox', { name: 'Tags', exact: true }))
 				await tags.fill('User tag')
 				await tags.press('Enter')
+				unconfirmedSave = { transactionId: seed.id, categoryId: replacementId }
 				await save.click()
 				await expect(page.getByText('Transaction saved.', { exact: true })).toBeVisible()
+				unconfirmedSave = undefined
 				await expect(save).toBeDisabled()
 				await expect
 					.poll(() => persisted(page, seed.id))
@@ -279,6 +283,36 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 						body: JSON.stringify(await Promise.all(machineFailures), null, 2),
 						contentType: 'application/json'
 					})
+				}
+				if (unconfirmedSave) {
+					const { transactionId, categoryId } = unconfirmedSave
+					try {
+						const row = await test.step(
+							'Read native rows after unconfirmed save',
+							() => persisted(page, transactionId),
+							{ timeout: 5000 }
+						)
+						await testInfo.attach('offline-edit-readback', {
+							body: JSON.stringify({
+								observation: 'live-client-local-read',
+								requestedAmount: row.amountMinor === 5678,
+								originalAmount: row.amountMinor === 1234,
+								requestedMemo: row.memo === 'User notes',
+								originalMemo: row.memo === 'Original memo',
+								requestedCategory: row.categoryId === categoryId,
+								requestedDescription: row.description === 'User description',
+								provenancePreserved:
+									row.source === 'simplefin' && row.externalId === 'imported-edit-test',
+								linksCount: row.links.length
+							}),
+							contentType: 'application/json'
+						})
+					} catch {
+						await testInfo.attach('offline-edit-readback', {
+							body: JSON.stringify({ observation: 'live-client-local-read', available: false }),
+							contentType: 'application/json'
+						})
+					}
 				}
 			}
 		}
@@ -317,20 +351,7 @@ test(
 	{ tag: ['@transactions', '@transaction-edit', '@tags'] },
 	async ({ page }) => {
 		const seed = await seedTransaction(page)
-		await page.evaluate(async (id) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const date = new Date()
-			const bookedOn = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-			await db
-				.update(app.transactions, id, { bookedOn, description: 'Tagged cleanup row' })
-				.wait({ tier: 'local' })
-		}, seed.id)
+		await financeFixture(page, 'transaction-edit.e2e:353', seed.id)
 		for (const path of ['/expenses', '/']) {
 			await page.goto(path)
 			const row = page
@@ -338,16 +359,7 @@ test(
 				.filter({ has: page.getByText('Tagged cleanup row', { exact: true }) })
 			await expect(row.getByText('Historical', { exact: true })).toBeVisible()
 		}
-		await page.evaluate(async (id) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			await db.update(app.tags, id, { name: 'Renamed historical' }).wait({ tier: 'local' })
-		}, seed.tagId)
+		await financeFixture(page, 'transaction-edit.e2e:374', seed.tagId)
 		const row = page
 			.getByRole('listitem')
 			.filter({ has: page.getByText('Tagged cleanup row', { exact: true }) })
@@ -422,25 +434,7 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 			await expect(category.locator('option:checked')).toHaveText('Category only change')
 			await expect(save).toBeEnabled()
 			const categoryOnlyId = await category.inputValue()
-			const createdRows = await page.evaluate(async () => {
-				const schemaPath = '/src/lib/schema.ts'
-				const sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const db = getCurrentJazzSession()?.getSnapshot().client?.db
-				if (!db) throw new Error('Missing database')
-				return (await db.all(app.categories))
-					.filter((row) =>
-						[
-							'First inline category',
-							'Second inline category',
-							'Category only change',
-							'Cancelled category'
-						].includes(row.name)
-					)
-					.map(({ id, name, kind }) => ({ id, name, kind }))
-			})
+			const createdRows = await financeFixture(page, 'transaction-edit.e2e:458')
 			expect(createdRows).toHaveLength(3)
 			expect(createdRows.every((row) => row.kind === kind)).toBe(true)
 			await save.click()

@@ -4,7 +4,7 @@ import {
 	createJazzClient,
 	createJazz,
 	memory,
-	acceptLocalFirstAuth,
+	acceptDeviceAccounts,
 	type JazzClient
 } from 'jazz-tools/backend'
 import { createServer } from 'node:http'
@@ -19,8 +19,8 @@ import { createJazzArchiveExportMachine } from 'delightful-local-first/backup/ex
 import { prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
 import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
 import type { ArchivePayload } from 'delightful-local-first/backup/archive'
-import { app } from '../schema.js'
-import permissions from '../permissions.js'
+import { app } from '../queries.js'
+import permissions from '../jazz.permissions.json' with { type: 'json' }
 import {
 	financeBackupReader,
 	createWorkspaceBackupMachine,
@@ -45,7 +45,7 @@ let authority: ReturnType<typeof createJazz>,
 	identityId: string
 const sessions: JazzSession<JazzClient>[] = []
 beforeAll(async () => {
-	authority = createJazz({ app, permissions, store: memory(), authenticate: acceptLocalFirstAuth })
+	authority = createJazz({ app, permissions, store: memory(), authenticate: acceptDeviceAccounts })
 	server = createServer((request, response) => authority.nodeHandler(request, response))
 	await authority.attach(server)
 	await authority.ready()
@@ -57,14 +57,14 @@ beforeAll(async () => {
 		permissions,
 		serverUrl: `http://127.0.0.1:${address.port}/jazz`,
 		driver: { type: 'memory' },
-		initial: 'local-first'
+		initial: 'device'
 	})
 	sessions.push(session)
 	const owner = session.getSnapshot()
-	if (!owner.client || !owner.account) throw new Error('Disposable backup client unavailable')
+	if (!owner.client || !owner.user) throw new Error('Disposable backup client unavailable')
 	db = owner.client.db
 	writer = authority.db
-	identityId = owner.account.id
+	identityId = owner.user.accountId
 	db.onMutationError(() => {})
 }, 30000)
 afterEach(() => vi.restoreAllMocks())

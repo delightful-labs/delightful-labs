@@ -1,10 +1,9 @@
-import { PUBLIC_SIMPLEFIN_DEMO } from '$app/env/public'
 import type { BankTrace } from './diagnostics.js'
 import { requestProviderWorker } from './simplefin-worker.js'
 import { requestRelay, type RelayRequest } from './simplefin-relay.js'
 import { providerResponseSchema, type ProviderAccount } from '../validation/integrations.js'
 
-export const simplefinDemo = PUBLIC_SIMPLEFIN_DEMO === 'true'
+export const simplefinDemo = import.meta.env.PUBLIC_SIMPLEFIN_DEMO === 'true'
 
 export type ProviderBalanceSnapshot = { availableBalance: string; balanceDate: Date }
 

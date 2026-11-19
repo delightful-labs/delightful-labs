@@ -11,7 +11,7 @@ import type {
 	ArchiveAttachment
 } from 'delightful-local-first/backup/archive'
 import { parseArchivePayload, payloadLimits } from 'delightful-local-first/backup/archive'
-import { app, previousApp } from '../schema.js'
+import { app } from '../queries.js'
 import { currencyText, dateOnlyText } from '../validation/transactions.js'
 import { syncOutcome, syncSettlement, syncFailureCode } from '../validation/bank-sync-log.js'
 
@@ -515,7 +515,6 @@ export function decodeFinanceBackup(payload: ArchivePayload) {
 	}
 }
 type PrivateRead = {
-	tables: typeof previousApp
 	version: 1 | 2
 	sources: { sourceFileId: string; payloadSha256: string }[]
 	rows: Map<RowType, PlainRow[]>
@@ -534,7 +533,6 @@ function data(input: JazzArchiveReaderInput) {
 }
 export function beginFinanceRead(input: JazzArchiveReaderInput) {
 	reads.set(input, {
-		tables: app,
 		version: 1,
 		sources: [],
 		rows: new Map(),
@@ -583,24 +581,19 @@ function retain<Row extends { id: string }>(
 		)
 	})
 }
-export function readFinanceAuthority(
-	input: JazzArchiveReaderInput,
-	tables: typeof previousApp = app
-) {
-	data(input).tables = tables
+/** Order this snapshot's reads; overlapping alpha.67 browser capture queries stall. */
+export async function readFinanceAuthority(input: JazzArchiveReaderInput) {
 	const organizationId = input.binding.workspaceId
-	return Promise.all([
-		retain(
-			input,
-			'organizations',
-			tables.organizations.where({ id: organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'organizationMembers',
-			tables.organizationMembers.where({ organizationId }).select('*', ...auditColumns)
-		)
-	]).then(() => {})
+	await retain(
+		input,
+		'organizations',
+		app.organizations.where({ id: organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'organizationMembers',
+		app.organizationMembers.where({ organizationId }).select('*', ...auditColumns)
+	)
 }
 export function financeOwner(input: JazzArchiveReaderInput): boolean {
 	const current = data(input),
@@ -613,153 +606,145 @@ export function financeOwner(input: JazzArchiveReaderInput): boolean {
 		members.some((row) => row.userId === input.binding.identityId && row.role === 'owner')
 	)
 }
-export function readFinanceMetadata(input: JazzArchiveReaderInput) {
-	const tables = data(input).tables
+export async function readFinanceMetadata(input: JazzArchiveReaderInput) {
 	const organizationId = input.binding.workspaceId
-	return Promise.all([
-		retain(
-			input,
-			'accounts',
-			tables.accounts.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'accountMemberships',
-			tables.accountMemberships.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'categories',
-			tables.categories.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(input, 'tags', tables.tags.where({ organizationId }).select('*', ...auditColumns)),
-		retain(
-			input,
-			'transactions',
-			tables.transactions.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'transactionTags',
-			tables.transactionTags.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(input, 'checks', tables.checks.where({ organizationId }).select('*', ...auditColumns)),
-		retain(
-			input,
-			'internalTransfers',
-			tables.internalTransfers.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'transactionBatches',
-			tables.transactionBatches.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'batchTemplates',
-			tables.batchTemplates.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'simplefinConnections',
-			tables.simplefinConnections
-				.where({ organizationId })
-				.select(
-					'id',
-					'organizationId',
-					'ownerId',
-					'status',
-					'claimedAt',
-					'lastSyncAt',
-					'lastOutcome',
-					'importedCount',
-					'existingCount',
-					'omittedCount',
-					...auditColumns
-				)
-		),
-		retain(
-			input,
-			'simplefinAccountLinks',
-			tables.simplefinAccountLinks.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'simplefinSyncAttempts',
-			tables.simplefinSyncAttempts.where({ organizationId }).select('*', ...auditColumns)
-		),
-		retain(
-			input,
-			'simplefinSyncAccountResults',
-			tables.simplefinSyncAccountResults.where({ organizationId }).select('*', ...auditColumns)
-		)
-	]).then(() => {})
+	await retain(
+		input,
+		'accounts',
+		app.accounts.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'accountMemberships',
+		app.accountMemberships.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'categories',
+		app.categories.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(input, 'tags', app.tags.where({ organizationId }).select('*', ...auditColumns))
+	await retain(
+		input,
+		'transactions',
+		app.transactions.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'transactionTags',
+		app.transactionTags.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(input, 'checks', app.checks.where({ organizationId }).select('*', ...auditColumns))
+	await retain(
+		input,
+		'internalTransfers',
+		app.internalTransfers.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'transactionBatches',
+		app.transactionBatches.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'batchTemplates',
+		app.batchTemplates.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'simplefinConnections',
+		app.simplefinConnections
+			.where({ organizationId })
+			.select(
+				'id',
+				'organizationId',
+				'ownerId',
+				'status',
+				'claimedAt',
+				'lastSyncAt',
+				'lastOutcome',
+				'importedCount',
+				'existingCount',
+				'omittedCount',
+				...auditColumns
+			)
+	)
+	await retain(
+		input,
+		'simplefinAccountLinks',
+		app.simplefinAccountLinks.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'simplefinSyncAttempts',
+		app.simplefinSyncAttempts.where({ organizationId }).select('*', ...auditColumns)
+	)
+	await retain(
+		input,
+		'simplefinSyncAccountResults',
+		app.simplefinSyncAccountResults.where({ organizationId }).select('*', ...auditColumns)
+	)
 }
-export function readFinanceRelations(input: JazzArchiveReaderInput) {
-	const tables = data(input).tables
+export async function readFinanceRelations(input: JazzArchiveReaderInput) {
 	const current = data(input),
 		transactionIds = (current.rows.get('transactions') ?? []).map((row) => row.id),
 		profileIds = (current.rows.get('organizationMembers') ?? []).flatMap((row) =>
 			typeof row.profileId === 'string' ? [row.profileId] : []
 		)
-	return Promise.all([
-		transactionIds.length
-			? retain(
-					input,
-					'transactionAttachments',
-					tables.transactionAttachments
-						.where({ transactionId: { in: transactionIds } })
-						.select('*', ...auditColumns)
-				)
-			: Promise.resolve(current.rows.set('transactionAttachments', [])),
-		profileIds.length
-			? retain(
-					input,
-					'profiles',
-					tables.profiles
-						.where({ id: { in: profileIds } })
-						.select('id', 'userId', 'displayName', ...auditColumns)
-				)
-			: Promise.resolve(current.rows.set('profiles', []))
-	]).then(() => {})
+	await (transactionIds.length
+		? retain(
+				input,
+				'transactionAttachments',
+				app.transactionAttachments
+					.where({ transactionId: { in: transactionIds } })
+					.select('*', ...auditColumns)
+			)
+		: Promise.resolve(current.rows.set('transactionAttachments', [])))
+	await (profileIds.length
+		? retain(
+				input,
+				'profiles',
+				app.profiles
+					.where({ id: { in: profileIds } })
+					.select('id', 'userId', 'displayName', ...auditColumns)
+			)
+		: Promise.resolve(current.rows.set('profiles', [])))
 }
-export function readFinanceFiles(input: JazzArchiveReaderInput) {
-	const tables = data(input).tables
+export async function readFinanceFiles(input: JazzArchiveReaderInput) {
 	const current = data(input),
 		ids = (current.rows.get('transactionAttachments') ?? []).map((row) =>
 			z.string().parse(row.fileId)
 		)
-	return Promise.all([
-		ids.length
-			? retain(input, 'files', tables.files.where({ id: { in: ids } }).select('*', ...auditColumns))
-			: Promise.resolve(current.rows.set('files', [])),
-		current.sources.length
-			? input
-					.all(
-						tables.files
-							.where({ id: { in: current.sources.map((row) => row.sourceFileId) } })
-							.limit(2)
-					)
-					.then((files) => {
-						const target = data(input)
-						if (files.length !== target.sources.length) return invalid()
-						target.rows.set(
-							'sourceDocuments',
-							files.map((file) => {
-								const binding = target.sources.find((row) => row.sourceFileId === file.id)
-								if (
-									!binding ||
-									file.organizationId !== input.binding.workspaceId ||
-									file.transactionId !== null ||
-									file.accountId !== null
-								)
-									return invalid()
-								return rows.sourceDocuments.parse({ ...file, payloadSha256: binding.payloadSha256 })
+	await (ids.length
+		? retain(input, 'files', app.files.where({ id: { in: ids } }).select('*', ...auditColumns))
+		: Promise.resolve(current.rows.set('files', [])))
+	await (current.sources.length
+		? input
+				.all(
+					app.files.where({ id: { in: current.sources.map((row) => row.sourceFileId) } }).limit(2)
+				)
+				.then((files) => {
+					const target = data(input)
+					if (files.length !== target.sources.length) return invalid()
+					target.rows.set(
+						'sourceDocuments',
+						files.map((file) => {
+							const binding = target.sources.find((row) => row.sourceFileId === file.id)
+							if (
+								!binding ||
+								file.organizationId !== input.binding.workspaceId ||
+								file.transactionId !== null ||
+								file.accountId !== null
+							)
+								return invalid()
+							return rows.sourceDocuments.parse({
+								...file,
+								payloadSha256: binding.payloadSha256
 							})
-						)
-					})
-			: Promise.resolve()
-	]).then(() => {})
+						})
+					)
+				})
+		: Promise.resolve())
 }
 /** Pure projection of the sealed source binding captured with the related workspace records. */
 function retainFinanceSourceBindings(
@@ -794,12 +779,11 @@ function financeFiles(input: JazzArchiveReaderInput) {
 	return sources.length ? [...files, ...sources] : files
 }
 export function readFinanceParts(input: JazzArchiveReaderInput) {
-	const tables = data(input).tables
 	const ids = financeFiles(input).map((row) => row.id)
 	if (!ids.length) return Promise.resolve()
 	return input
 		.all(
-			tables.fileParts
+			app.fileParts
 				.where({ fileId: { in: ids } })
 				.select('id', 'fileId', 'partIndex', 'sizeBytes')
 				.limit(input.limits.records + 1)
@@ -882,13 +866,12 @@ export function hasFinancePart(input: JazzArchiveReaderInput) {
 	return current.partIndex < (current.parts.get(file(input).id)?.length ?? 0)
 }
 export function readFinancePart(input: JazzArchiveReaderInput) {
-	const tables = data(input).tables
 	const current = data(input),
 		metadata = current.parts.get(file(input).id)?.[current.partIndex]
 	if (!metadata) return invalid()
 	return input
 		.all(
-			tables.fileParts
+			app.fileParts
 				.where({ id: metadata.id, fileId: metadata.fileId })
 				.select('id', 'data', 'sizeBytes', 'partIndex')
 				.limit(2)

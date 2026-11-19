@@ -10,6 +10,7 @@ export default defineConfig({
 	tsconfig: fileURLToPath(new URL('../tsconfig.json', import.meta.url)),
 	testMatch: '**/*.e2e.ts',
 	testIgnore: [
+		'**/component-presentation.e2e.ts',
 		'**/pwa.e2e.ts',
 		'**/pwa-cold-start.e2e.ts',
 		'**/worker-bundle.e2e.ts',
@@ -29,8 +30,14 @@ export default defineConfig({
 		video: 'off'
 	},
 	webServer: {
-		command: `pnpm dev:agent --host 0.0.0.0 --port ${port} --strictPort`,
+		// General application coverage includes the explicitly enabled developer tools.
+		// Dedicated flag suites still qualify PUBLIC_DEBUG=false independently.
+		env: { PUBLIC_DEBUG: 'true' },
+		// Offline worker creation needs the real production asset/service-worker cache.
+		// The dedicated E2E config retains static fixtures and disposable native data.
+		command: `FINANCE_PREVIEW=true pnpm exec vite build --config vite.e2e.config.ts && FINANCE_PREVIEW=true pnpm exec vite preview --config vite.e2e.config.ts --host 0.0.0.0 --port ${port} --strictPort`,
 		url: baseURL,
+		timeout: 180_000,
 		reuseExistingServer: process.env.FINANCE_E2E_REUSE_SERVER === 'true' && !process.env.CI
 	}
 })

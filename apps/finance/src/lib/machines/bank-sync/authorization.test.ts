@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createAuthorizationMachine } from './authorization.js'
 import { createPreparationMachine } from './preparation.js'
 import { connection, dependencies, id, observation, source } from './test-fixtures.js'
-import type { OrganizationMember } from '#lib/schema.js'
+import type { OrganizationMember } from '#lib/queries.js'
 import type { AuthorizationRequest, Observation } from './types.js'
 import { createActor, toPromise, createAsyncLogic } from 'xstate'
 

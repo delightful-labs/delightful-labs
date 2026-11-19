@@ -1,10 +1,5 @@
 import { schema as s } from 'jazz-tools'
-import {
-	syncCount,
-	syncFailureCode,
-	syncOutcome,
-	syncSettlement
-} from '../validation/bank-sync-log.js'
+import { syncFailureCode, syncOutcome, syncSettlement } from '../validation/bank-sync-log.js'
 
 const outcome = () =>
 	s.enum(
@@ -26,14 +21,7 @@ const failureCode = () =>
 			syncFailureCode.enum.unexpected
 		)
 		.optional()
-const count = () =>
-	s
-		.int()
-		.optional()
-		.transform<number | null>({
-			from: (value) => syncCount.nullable().parse(value),
-			to: (value) => syncCount.nullable().parse(value)
-		})
+const count = () => s.int().optional().transform('syncCount', s.int().optional())
 const counts = () => ({ importedCount: count(), existingCount: count(), omittedCount: count() })
 
 export const bankSyncLogSchema = {

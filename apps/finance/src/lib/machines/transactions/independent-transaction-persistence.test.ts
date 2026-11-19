@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Transaction } from 'jazz-tools'
-import { app } from '#lib/schema.js'
-import type { Tag } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
+import type { Tag } from '#lib/queries.js'
 import {
 	createIndependentTransactionPersistenceMachine,
 	type IndependentTransactionInput

@@ -1,22 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { JazzSession } from 'jazz-tools/client'
-import type { SessionStatus } from '../../contracts/session.js'
+import type { JazzSession, JazzSessionSnapshot } from 'jazz-tools/client'
 import { createJazzSessionReadinessAdapter } from './session-readiness.js'
 
-function fixture(status: SessionStatus = 'ready') {
+function fixture(status: JazzSessionSnapshot<object>['status'] = 'ready') {
 	const unused = vi.fn(async () => {})
 	const unsubscribe = vi.fn()
 	const session = {
-		getSnapshot: vi.fn(() => ({ status })),
+		getSnapshot: vi.fn(() => ({ status, user: null, localFirst: false })),
 		subscribe: vi.fn((_notify: () => void) => unsubscribe),
-		retry: vi.fn(async () => {}),
-		createLocalFirst: unused,
-		restoreLocalFirst: unused,
-		loginWithBackend: unused,
-		linkWithBackend: unused,
-		logout: unused,
-		close: unused
-	} satisfies JazzSession<object>
+		retry: vi.fn(async () => {})
+	} satisfies Pick<JazzSession<object>, 'getSnapshot' | 'subscribe' | 'retry'>
 	return { session, unused, unsubscribe }
 }
 describe('Jazz acquired session readiness boundary', () => {
@@ -30,14 +23,17 @@ describe('Jazz acquired session readiness boundary', () => {
 		expect(f.session.retry).not.toHaveBeenCalled()
 		expect(f.unused).not.toHaveBeenCalled()
 	})
-	it.each<SessionStatus>(['ready', 'signed-out', 'transitioning', 'error', 'closed'])(
-		'projects only %s status',
-		(status) => {
-			const f = fixture(status)
-			expect(createJazzSessionReadinessAdapter(f.session).capability.readStatus()).toBe(status)
-			expect(f.session.getSnapshot).toHaveBeenCalledOnce()
-		}
-	)
+	it.each<JazzSessionSnapshot<object>['status']>([
+		'ready',
+		'signed-out',
+		'transitioning',
+		'error',
+		'closed'
+	])('projects only %s status', (status) => {
+		const f = fixture(status)
+		expect(createJazzSessionReadinessAdapter(f.session).capability.readStatus()).toBe(status)
+		expect(f.session.getSnapshot).toHaveBeenCalledOnce()
+	})
 	it('uses the supplied session subscription and exact cleanup', () => {
 		const f = fixture(),
 			notify = vi.fn()

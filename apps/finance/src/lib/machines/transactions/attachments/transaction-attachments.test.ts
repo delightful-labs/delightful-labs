@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import * as image from '#lib/domain/image-processing.js'
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { createTransactionAttachmentsMachine } from './transaction-attachments.js'
 import { createActor, toPromise } from 'xstate'
 
-type AttachmentDb = Pick<ReturnType<typeof getDb>, 'all' | 'insert' | 'insertStreaming' | 'delete'>
+type AttachmentDb = Pick<JazzDb, 'all' | 'insert' | 'insertStreaming' | 'delete'>
 const transaction = {
 	id: '44444444-4444-4444-8444-444444444444',
 	accountId: '11111111-1111-4111-8111-111111111111',

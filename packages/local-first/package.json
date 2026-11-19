@@ -46,7 +46,7 @@
 		"@xstate/test": "2.0.0-beta.0",
 		"delightful-ui": "workspace:*",
 		"fast-check": "4.10.2",
-		"jazz-tools": "2.0.0-alpha.60",
+		"jazz-tools": "2.0.0-alpha.67",
 		"oxfmt": "0.76.0",
 		"oxlint": "1.91.0",
 		"publint": "0.3.25",
@@ -148,6 +148,10 @@
 			"types": "./dist/backend/jazz/restoration.d.ts",
 			"default": "./dist/backend/jazz/restoration.js"
 		},
+		"./session/runtime": {
+			"types": "./dist/session-runtime.d.ts",
+			"default": "./dist/session-runtime.js"
+		},
 		"./session/contracts": {
 			"types": "./dist/contracts/session.d.ts",
 			"default": "./dist/contracts/session.js"
@@ -222,8 +226,12 @@
 			"default": "./dist/machines/forms/scoped-form.js"
 		},
 		"./forms/feedback": {
-			"types": "./dist/machines/forms/feedback.d.ts",
-			"default": "./dist/machines/forms/feedback.js"
+			"types": "./dist/presentation/form-feedback.d.ts",
+			"default": "./dist/presentation/form-feedback.js"
+		},
+		"./forms/worker": {
+			"types": "./dist/worker/form-view.d.ts",
+			"default": "./dist/worker/form-view.js"
 		},
 		"./forms/lifecycle": {
 			"types": "./dist/machines/forms/lifecycle.d.ts",
@@ -429,6 +437,10 @@
 		"./backend/jazz/worker-broker": {
 			"types": "./dist/backend/jazz/worker-broker.d.ts",
 			"default": "./dist/backend/jazz/worker-broker.js"
+		},
+		"./backend/jazz/session-runtime": {
+			"types": "./dist/backend/jazz/session-runtime.d.ts",
+			"default": "./dist/backend/jazz/session-runtime.js"
 		}
 	},
 	"svelte": "./dist/index.js",
@@ -440,7 +452,7 @@
 	],
 	"peerDependencies": {
 		"delightful-ui": "0.0.25",
-		"jazz-tools": "2.0.0-alpha.60",
+		"jazz-tools": "2.0.0-alpha.67",
 		"svelte": "^5.57.2",
 		"xstate": "6.0.0-beta.1"
 	},

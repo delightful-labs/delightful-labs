@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { app } from '../../schema.js'
+import { app } from '../../queries.js'
 import { creationFixture, attempt, workspace } from './workspace-creation.fixture.js'
 import { waitFor } from 'xstate'
 

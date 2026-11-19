@@ -1,7 +1,7 @@
 import { ReadTier } from 'jazz-tools'
 import type { Db } from 'jazz-tools'
 import { z } from 'zod'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 import { createAnnotationDomain } from '../../annotations/domain.js'
 import { createDomainTransaction } from '../../machines/storage/domain-transaction.js'
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
@@ -121,7 +121,14 @@ export function createAnnotationRecords(
 								kind: 'reader',
 								normalizationVersion: READER_TEXT_VERSION,
 								textHash: draft.textHash,
-								range: draft.range,
+								range: {
+									before: draft.range.before,
+									matched: draft.range.matched,
+									after: draft.range.after,
+									...(draft.range.version === undefined ? {} : { version: draft.range.version }),
+									...(draft.range.start === undefined ? {} : { start: draft.range.start }),
+									...(draft.range.end === undefined ? {} : { end: draft.range.end })
+								},
 								sourceDate: null,
 								textLengthCodePoints: null,
 								sourceCodePointPosition: null

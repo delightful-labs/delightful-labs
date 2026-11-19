@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 const [dlfSource, duiSource] = process.argv.slice(2).map((path) => resolve(path))
 if (!dlfSource || !duiSource)
 	throw new Error('Usage: node tooling/build-v6-vendor.mjs <DLF source> <DUI source>')
-const versions = { xstate: '6.0.0-beta.1', jazz: '2.0.0-alpha.60' }
+const versions = { xstate: '6.0.0-beta.1', jazz: '2.0.0-alpha.67' }
 const sources = [
 	{
 		name: 'delightful-local-first',

@@ -2,7 +2,7 @@
 	import { EXPENSE } from '#lib/domain/transaction-kind.js'
 	import { Button, ButtonContent, Table } from 'delightful-ui'
 	import ArchiveIcon from 'tdesign-icons-svg/src/folder-minus.svg?component'
-	import type { Category } from '#lib/schema.js'
+	import type { Category } from '#lib/queries.js'
 	import { getLocale } from '#lib/paraglide/runtime.js'
 	import type { ManagementView } from '#lib/contracts/management-contract.js'
 	import { formReasonText } from '#lib/forms/form-messages.js'

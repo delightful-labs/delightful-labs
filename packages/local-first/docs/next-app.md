@@ -13,10 +13,29 @@ registry across layout remounts; attachments get distinct scope tokens. A change
 coordinated shutdown. Do not create a second session cache or await remote authentication first.
 The host checks its browser/SSR boundary before asking the registry for a binding.
 
+The coordinated worker upgrade adds `session/runtime`: an SDK-neutral actor for
+acquisition, observation and graceful close, composed with the existing acquisition
+chart. Native SDK references stay inside adapter closures; consumers receive bounded
+observations and send commands. Its alpha.65 Jazz adapter is currently isolated in
+Finance's [upgrade proof](../../../apps/finance/tests/worker-upgrade/README.md).
+Identity/recovery commands and both apps' adoption remain open, so the active
+alpha.60 integration above remains the current application path. Do not persist
+runtime snapshots or treat actor stop as native close acknowledgement.
+
 Recovery uses `recovery/svelte` or the lower-level `recovery/workflow`; explicit identity restoration
 uses `restoration/workflow` and `backend/jazz/restoration`. `recovery/coordination` adds the existing
 validate → request host drain → restore → check navigation facts → navigate sequence. Its host sends
 `WORKSPACE_DRAINED` after its own resources settle. Navigation remains a supplied capability.
+
+The coordinator's `session` input also accepts the library's `SessionRuntimeConnection`. Worker
+hosts pass that connection directly; they do not recreate a Jazz `getSnapshot().account` facade.
+Its navigation-facts leaf reads the current typed identity and requires an active runtime before
+navigation. Existing SDK-shaped session callers remain supported. Navigation-only retry does not
+repeat restoration. Keep phrase-bearing coordinator actors private and retain them through issued
+native navigation; Window supplies only the native navigation effect. A private coordinator root
+sets `reportTo` to its host actor; an invoked coordinator keeps using its parent by default.
+The recipient receives the existing `RECOVERY_VALIDATED` / `RECOVERY_DRAIN_REQUESTED` notices
+and sends `WORKSPACE_DRAINED` only after its own resources have settled.
 
 ## Foreground data
 
@@ -82,7 +101,9 @@ consumers under `fixtures/package-consumer/` for transaction, selection, naming 
 Use `forms/contracts`, `forms/readiness`, `forms/write`, `forms/submission` and `forms/workflow`
 individually or compose a single-write operation through `forms/policy`. Schema validation only
 requires `parseAsync`; it does not require Zod. Supply `validationIssues(error)` to normalize your
-validator's field issues and `messages` callbacks to translate feedback at render time. Complex
+validator's field issues. Supply `defaultMessages` to the feedback/profile presentation,
+not the workflow. The machine selects plain `feedbackDescriptors`; `forms/feedback` formats
+those descriptors with the current locale and caller-owned messages. Complex
 writes supply a persistence actor instead of a promise containing a hidden workflow.
 
 `forms/svelte` attaches one controller with `observe`, the exact binding/policy options, dependencies
@@ -90,6 +111,14 @@ and optional diagnostics. `forms/lifecycle` drains before stopping. The presenta
 `forms/content`, `forms/feedback-view` and `forms/modal`. They accept typed views/callbacks/snippets,
 with caller-owned labels. Import DUI's base CSS/theme at the application boundary; the foundation
 does not impose a global theme.
+
+For a Worker, `forms/worker` exports `createWorkerFormViewSchema(resultSchema, reasonSchema)`
+to validate and project the public form view with native Zod. Consumer schemas own result/reason
+shapes; opaque recovery checkpoints remain with the workflow and are removed from wire results.
+Do not serialize SDK objects, functions or complete snapshots. `selectScopedFormObservation`
+echoes the admitted observation at an explicit parent/report boundary, so a parent can reject
+retired child views without inspecting private workflow state. Keep DOM/FormData extraction and
+translation on Window, and validation, policy, submission and settlement in the worker actor.
 
 `profile/workflow` assembles name/avatar forms with your schemas, local save adapters and image
 processing actor. `profile/avatar` owns processing → validation → write → cleanup and interruption;

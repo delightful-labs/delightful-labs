@@ -1,7 +1,7 @@
 import { ReadTier } from 'jazz-tools'
 import type { Db } from 'jazz-tools'
 import { createAsyncLogic, setup, types } from 'xstate'
-import { app } from '../../backend/jazz/schema.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
 import { annotationNoteRowSchema } from '../../annotations/schema.js'
 import { toMarginDocumentNote } from '../../annotations/margin.js'
 import { publicationSourceSchema } from '../../annotations/publication-link.js'

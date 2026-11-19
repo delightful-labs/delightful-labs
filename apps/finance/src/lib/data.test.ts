@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import {
 	archiveAccount,
 	archiveCategory,
@@ -11,9 +11,9 @@ import {
 	saveProfileName,
 	saveProfileAvatar
 } from './data.js'
-import { app, type Account, type Organization } from './schema.js'
+import { app, type Account, type Organization } from './queries.js'
 
-type Db = ReturnType<typeof getDb>
+type Db = JazzDb
 const userId = '11111111-1111-4111-8111-111111111111'
 const organizationId = '22222222-2222-4222-8222-222222222222'
 const organization = {

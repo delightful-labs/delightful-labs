@@ -1,0 +1,78 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "fef1a4569fc25d61faa33b395fb737d138580292c44adda2829acb028cfc97c3"
+  },
+  "tables": {
+    "restoreAttachments": {
+      "read": {
+        "allOf": [
+          "ownerId = session.user",
+          "exists restoreDestinations(id = this.destinationId, ownerId = session.user, operationId = this.operationId)"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          "ownerId = session.user",
+          "exists restoreDestinations(id = this.destinationId, ownerId = session.user, operationId = this.operationId, status = 'incomplete')"
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    },
+    "restoreDestinations": {
+      "read": "ownerId = session.user",
+      "insert": { "allOf": ["ownerId = session.user", "status = 'incomplete'"] },
+      "update": {
+        "old": { "allOf": ["ownerId = session.user", "status = 'incomplete'"] },
+        "new": {
+          "allOf": [
+            { "allOf": ["ownerId = session.user", "status = 'active'"] },
+            "exists restoreDestinations(id = this.id, ownerId = this.ownerId, operationId = this.operationId, payloadSha256 = this.payloadSha256, graphSha256 = this.graphSha256, status = 'incomplete')"
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "restoreNotebooks": {
+      "read": {
+        "allOf": [
+          "ownerId = session.user",
+          "exists restoreDestinations(id = this.destinationId, ownerId = session.user, operationId = this.operationId)"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          "ownerId = session.user",
+          "exists restoreDestinations(id = this.destinationId, ownerId = session.user, operationId = this.operationId, status = 'incomplete')"
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    },
+    "restoreNotes": {
+      "read": {
+        "allOf": [
+          "ownerId = session.user",
+          "exists restoreDestinations(id = this.destinationId, ownerId = session.user, operationId = this.operationId)"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          "ownerId = session.user",
+          "exists restoreDestinations(id = this.destinationId, ownerId = session.user, operationId = this.operationId, status = 'incomplete')",
+          "exists restoreNotebooks(id = this.notebookId, destinationId = this.destinationId, ownerId = session.user, operationId = this.operationId)",
+          {
+            "anyOf": [
+              "attachmentId = null",
+              "exists restoreAttachments(id = this.attachmentId, destinationId = this.destinationId, ownerId = session.user, operationId = this.operationId)"
+            ]
+          }
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    }
+  }
+}

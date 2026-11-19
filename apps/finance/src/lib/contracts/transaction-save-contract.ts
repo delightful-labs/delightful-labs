@@ -8,7 +8,7 @@ import {
 	type TransactionSaveValues
 } from '../validation/transactions.js'
 import type { IndependentTransaction } from '../domain/transaction.js'
-import type { TransactionDetail } from '../schema.js'
+import type { TransactionDetail } from '../queries.js'
 import type { TransactionEntryScope } from './transaction-entry-contract.js'
 
 const settlementSchema = z.enum([

@@ -1,5 +1,4 @@
 import { createJazzClient } from 'jazz-tools/client'
-import { exportLocalFirstSecret } from 'jazz-tools'
 import { app } from './schema.js'
 
 const config = new URLSearchParams(location.search)
@@ -9,7 +8,8 @@ if (!appId || !serverUrl) throw new Error('Missing isolated fixture configuratio
 const session = await createJazzClient({
 	scope: appId,
 	serverUrl,
-	initial: 'local-first',
+	initial: 'device',
+	localFirst: 'now',
 	client: () => import('jazz-tools/local-first')
 })
 const snapshot = session.getSnapshot()
@@ -30,12 +30,10 @@ const commits = new Map<
 const controls = {
 	ownerId,
 	credential() {
-		const account = session.getSnapshot().account
-		if (!account) throw new Error('Missing fixture account')
-		return exportLocalFirstSecret(account)
+		return session.exportDeviceKey()
 	},
 	restore(credential: string) {
-		return session.restoreLocalFirst(credential)
+		return session.restoreDeviceAccount(credential)
 	},
 	acquire(key: string) {
 		transactions.set(key, db.beginSerializableTransaction())

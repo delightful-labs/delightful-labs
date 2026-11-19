@@ -1,3 +1,4 @@
+import { financeFixture } from '../helpers/worker-fixture.js'
 import { expect } from '@playwright/test'
 import { test, start, installWorkspaceSettingsTest } from '../helpers/workspace.js'
 import { navigateSidebar, selectWorkspace } from '../helpers/ui.js'
@@ -11,88 +12,10 @@ for (const kind of ['expense', 'income']) {
 			const organizationId = await page
 				.getByLabel('Current Workspace', { exact: true })
 				.inputValue()
-			const fixture = await page.evaluate(
-				async ({ organizationId, kind }) => {
-					const { app, db, userId } = window.workspaceSettingsTest
-					if (kind !== 'expense' && kind !== 'income') throw new Error('Invalid kind')
-					const profile = await db.one(app.profiles.where({ userId }), { tier: 'remote' })
-					if (!profile) throw new Error('Missing profile')
-					await db
-						.update(app.profiles, profile.id, { displayName: 'Detail author' })
-						.wait({ tier: 'global' })
-					const account = await db
-						.insert(app.accounts, {
-							organizationId,
-							name: 'Detail account',
-							kind: 'bank',
-							currency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					const category = await db
-						.insert(app.categories, {
-							organizationId,
-							name: 'Detail category',
-							kind,
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-					const tag = await db
-						.insert(app.tags, {
-							organizationId,
-							name: 'Detail tag',
-							kind: category.kind,
-							categoryId: category.id
-						})
-						.wait({ tier: 'global' })
-					const id = crypto.randomUUID()
-					const checkId = crypto.randomUUID()
-					const write = await db.transaction((tx) => {
-						if (kind === 'income')
-							tx.insert(
-								app.checks,
-								{
-									organizationId,
-									accountId: account.id,
-									checkNumber: '12345',
-									checkDate: '2026-10-13'
-								},
-								{ id: checkId }
-							)
-						const transaction = tx.insert(
-							app.transactions,
-							{
-								organizationId,
-								accountId: account.id,
-								categoryId: category.id,
-								kind,
-								amountMinor: 1234,
-								currency: 'USD',
-								bookedOn: '2026-10-14',
-								description: 'Detail description',
-								memo: 'Original detail memo',
-								source: 'manual',
-								...(kind === 'income' ? { paymentMethod: 'check', checkId } : {})
-							},
-							{ id }
-						)
-						tx.insert(app.transactionTags, { organizationId, transactionId: id, tagId: tag.id })
-
-						return transaction
-					})
-					const transaction = await write.wait({ tier: 'global' })
-					const metadata = await db.one(
-						app.transactions.where({ id: transaction.id }).select('$createdAt', '$createdBy'),
-						{ tier: 'remote' }
-					)
-					if (!metadata) throw new Error('Missing metadata')
-					return {
-						id: transaction.id,
-						createdAt: metadata.$createdAt.toISOString(),
-						author: metadata.$createdBy.account
-					}
-				},
-				{ organizationId, kind }
-			)
+			const fixture = await financeFixture(page, 'features/transaction-details.e2e:14', {
+				organizationId,
+				kind
+			})
 			await page
 				.getByRole('navigation')
 				.getByRole('link', { name: kind === 'expense' ? 'Expenses' : 'Income', exact: true })
@@ -129,12 +52,7 @@ for (const kind of ['expense', 'income']) {
 				await expect(main.getByLabel('Check number', { exact: true })).toHaveValue('12345')
 				await expect(main.getByLabel('Check date', { exact: true })).toHaveValue('2026-10-13')
 			} else await expect(main.getByLabel('Check number', { exact: true })).toBeHidden()
-			await page.evaluate(async (id) => {
-				const { app, db } = window.workspaceSettingsTest
-				await db
-					.update(app.transactions, id, { memo: 'Updated detail memo' })
-					.wait({ tier: 'global' })
-			}, fixture.id)
+			await financeFixture(page, 'features/transaction-details.e2e:132', fixture.id)
 			await expect(memo).toHaveValue('Updated detail memo')
 			await expect(main.locator(`time[datetime="${fixture.createdAt}"]`)).toHaveCount(1)
 			await page.reload()
@@ -154,51 +72,11 @@ test(
 	async ({ page }) => {
 		await start(page)
 		const organizationId = await page.getByLabel('Current Workspace', { exact: true }).inputValue()
-		const fixture = await page.evaluate(async (organizationId) => {
-			const { app, db, userId } = window.workspaceSettingsTest
-			const account = await db
-				.insert(app.accounts, {
-					organizationId,
-					name: 'Scope account',
-					kind: 'cash',
-					currency: 'USD'
-				})
-				.wait({ tier: 'global' })
-			const category = await db.one(
-				app.categories.where({ organizationId, kind: 'expense', isSystem: true })
-			)
-			if (!category) throw new Error('Missing category')
-			const transaction = await db
-				.insert(app.transactions, {
-					organizationId,
-					accountId: account.id,
-					categoryId: category.id,
-					kind: 'expense',
-					amountMinor: 100,
-					currency: 'USD',
-					bookedOn: '2026-10-14',
-					memo: 'Scoped detail',
-					source: 'manual'
-				})
-				.wait({ tier: 'global' })
-			const org = await db
-				.insert(app.organizations, {
-					name: 'Other detail workspace',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: userId
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: org.id,
-					userId,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'global' })
-			return { id: transaction.id, otherId: org.id }
-		}, organizationId)
+		const fixture = await financeFixture(
+			page,
+			'features/transaction-details.e2e:157',
+			organizationId
+		)
 		await navigateSidebar(page, 'Expenses')
 		await page
 			.getByRole('main')
@@ -254,106 +132,25 @@ for (const scenario of [
 			const organizationId = await page
 				.getByLabel('Current Workspace', { exact: true })
 				.inputValue()
-			const ownerId = await page.evaluate(() => window.workspaceSettingsTest.userId)
-			await page.evaluate(async () => {
-				const { app, db, userId } = window.workspaceSettingsTest
-				const profile = await db.one(app.profiles.where({ userId }), { tier: 'remote' })
-				if (!profile) throw new Error('Missing author profile')
-				await db
-					.update(app.profiles, profile.id, { displayName: 'Shared author' })
-					.wait({ tier: 'global' })
-			})
+			const ownerId = await financeFixture(page, 'features/transaction-details.e2e:257')
+			await financeFixture(page, 'features/transaction-details.e2e:258')
 			const subjectContext = await browser.newContext({ baseURL: new URL(page.url()).origin })
 			try {
 				const subject = await subjectContext.newPage()
 				await start(subject)
-				const subjectId = await subject.evaluate(() => window.workspaceSettingsTest.userId)
-				const fixture = await page.evaluate(
-					async ({ organizationId, subjectId, scenario }) => {
-						const { app, db } = window.workspaceSettingsTest
-						if (scenario.role !== 'viewer' && scenario.role !== 'member')
-							throw new Error('Invalid role')
-						if (scenario.mode !== 'all' && scenario.mode !== 'selected')
-							throw new Error('Invalid mode')
-						await db
-							.insert(app.organizationMembers, {
-								organizationId,
-								userId: subjectId,
-								role: scenario.role,
-								accountAccessMode: scenario.mode
-							})
-							.wait({ tier: 'global' })
-						const account = await db
-							.insert(app.accounts, {
-								organizationId,
-								name: 'Shared detail account',
-								kind: 'cash',
-								currency: 'USD'
-							})
-							.wait({ tier: 'global' })
-						if (scenario.grant)
-							await db
-								.insert(app.accountMemberships, {
-									organizationId,
-									userId: subjectId,
-									accountId: account.id,
-									access: 'read',
-									canDelete: false
-								})
-								.wait({ tier: 'global' })
-						const category = await db.one(
-							app.categories.where({ organizationId, kind: 'expense', isSystem: true })
-						)
-						if (!category) throw new Error('No Category')
-						const tag = await db
-							.insert(app.tags, { organizationId, name: 'Shared detail tag', kind: 'expense' })
-							.wait({ tier: 'global' })
-						const transaction = await db
-							.insert(app.transactions, {
-								organizationId,
-								accountId: account.id,
-								categoryId: category.id,
-								kind: 'expense',
-								amountMinor: 100,
-								currency: 'USD',
-								bookedOn: '2026-10-14',
-								memo: 'Shared detail memo',
-								source: 'manual'
-							})
-							.wait({ tier: 'global' })
-						await db
-							.insert(app.transactionTags, {
-								organizationId,
-								transactionId: transaction.id,
-								tagId: tag.id
-							})
-							.wait({ tier: 'global' })
-						const metadata = await db.one(
-							app.transactions.where({ id: transaction.id }).select('$createdAt'),
-							{ tier: 'remote' }
-						)
-						return { id: transaction.id, createdAt: metadata?.$createdAt.toISOString() }
-					},
-					{ organizationId, subjectId, scenario }
-				)
+				const subjectId = await financeFixture(subject, 'features/transaction-details.e2e:270')
+				const fixture = await financeFixture(page, 'features/transaction-details.e2e:271', {
+					organizationId,
+					subjectId,
+					scenario
+				})
 				await subject.reload()
 				await installWorkspaceSettingsTest(subject)
 				const selector = subject.getByLabel('Current Workspace', { exact: true })
 				await expect(selector.locator(`option[value="${organizationId}"]`)).toHaveCount(1)
 				await selectWorkspace(selector, organizationId)
 				if (scenario.edit) {
-					await subject.evaluate(async (id) => {
-						const { app, db, userId } = window.workspaceSettingsTest
-						const profile = await db.one(app.profiles.where({ userId }), { tier: 'remote' })
-						if (!profile) throw new Error('No editor profile')
-						await db
-							.update(app.profiles, profile.id, { displayName: 'Detail editor' })
-							.wait({ tier: 'global' })
-						await db.one(app.transactions.where({ id }), { tier: 'remote' })
-						await db
-							.update(app.transactions, id, { memo: 'Edited by member' })
-							.wait({ tier: 'global' })
-					}, fixture.id)
+					await financeFixture(subject, 'features/transaction-details.e2e:345', fixture.id)
 				}
 				// Direct navigation exercises permission enforcement independently of visible list links.
 				await subject.goto(`/expenses/${fixture.id}?workspace=${organizationId}`)

@@ -8,8 +8,8 @@ export function jazzFixtureAssets(): Pick<InlineConfig, 'resolve' | 'optimizeDep
 	const wasmEntry = createRequire(require.resolve('jazz-tools/package.json')).resolve('jazz-wasm')
 	return {
 		optimizeDeps: {
-			exclude: ['jazz-wasm'],
-			include: ['jazz-tools', 'jazz-tools/client', 'jazz-tools/local-first', 'xstate', 'zod']
+			exclude: ['jazz-tools', 'jazz-wasm'],
+			include: ['xstate', 'zod']
 		},
 		resolve: {
 			alias: [

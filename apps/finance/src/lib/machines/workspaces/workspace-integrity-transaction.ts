@@ -1,5 +1,5 @@
-import type { getDb } from 'jazz-tools/svelte'
-import { app } from '../../schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app } from '../../queries.js'
 import {
 	workspaceIntegrityAssessment,
 	type IntegrityAssessment,
@@ -22,7 +22,7 @@ export type IntegrityResult =
 			outcome: 'cancelled' | 'closed'
 			settlement: 'notStarted' | 'locallyPersisted' | 'unresolved'
 	  }
-type Db = Pick<ReturnType<typeof getDb>, 'beginTransaction'>
+type Db = Pick<JazzDb, 'beginTransaction'>
 type Transaction = ReturnType<Db['beginTransaction']>
 type Input = Omit<IntegrityAssessmentInput, 'records'> & { db: Db; expected: IntegrityPlan }
 

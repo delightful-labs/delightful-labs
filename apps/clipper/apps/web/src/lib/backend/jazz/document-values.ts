@@ -1,3 +1,4 @@
+import { encodeResumeObservations } from '../../reader/schema.js'
 import { newDocument } from '../../capture/document-schema.js'
 import type { CaptureDocument } from '../../capture/capture-document-schema.js'
 /** Persistence-only backing columns; callers read the named relationships. */
@@ -7,7 +8,7 @@ export function newDocumentValues(id: string, libraryId: string, sourceUrl: stri
 		libraryId,
 		sourceUrl: document.sourceUrl,
 		readingProgress: document.readingProgress,
-		resumePosition: document.resumePosition,
+		resumePosition: encodeResumeObservations(document.resumePosition),
 		status: document.status,
 		favorite: document.favorite,
 		attachmentId: null
@@ -19,7 +20,7 @@ export function documentValues(document: CaptureDocument) {
 		libraryId: document.library.id,
 		sourceUrl: document.sourceUrl,
 		readingProgress: document.readingProgress,
-		resumePosition: document.resumePosition,
+		resumePosition: encodeResumeObservations(document.resumePosition),
 		status: document.status,
 		favorite: document.favorite,
 		previousStatus: document.status === 'trashed' ? document.previousStatus : null,

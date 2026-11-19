@@ -1,4 +1,4 @@
-import type { Account } from '#lib/schema.js'
+import type { Account } from '#lib/queries.js'
 import type { ProviderSummary } from './types.js'
 import { required } from './identity.js'
 import { setup, types } from 'xstate'

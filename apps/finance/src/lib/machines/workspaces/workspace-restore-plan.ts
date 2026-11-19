@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { schema as s } from 'jazz-tools'
+import type { RowOf } from 'jazz-tools'
 import type { IntegrityCheckedArchive } from 'delightful-local-first/backup/envelope'
 import type { ArchivePayload } from 'delightful-local-first/backup/archive'
 import type { BackupBinding } from 'delightful-local-first/backup/binding'
@@ -17,7 +17,7 @@ import {
 	type Tag,
 	type TransactionRow,
 	type InternalTransfer
-} from '../../schema.js'
+} from '../../queries.js'
 import { stableUuid } from '../../domain/stable-uuid.js'
 import { setup, types, createAsyncLogic } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
@@ -30,17 +30,17 @@ export type FinanceRestoreGraph = {
 	tags: (Omit<Tag, 'archivedAt'> & { archivedAt: string | null })[]
 	transactions: TransactionRow[]
 	transfers: InternalTransfer[]
-	checks: s.RowOf<typeof app.checks>[]
-	transactionTags: s.RowOf<typeof app.transactionTags>[]
-	batches: s.RowOf<typeof app.transactionBatches>[]
-	templates: s.RowOf<typeof app.batchTemplates>[]
-	files: s.RowOf<typeof app.files>[]
-	links: s.RowOf<typeof app.transactionAttachments>[]
+	checks: RowOf<typeof app.checks>[]
+	transactionTags: RowOf<typeof app.transactionTags>[]
+	batches: RowOf<typeof app.transactionBatches>[]
+	templates: RowOf<typeof app.batchTemplates>[]
+	files: RowOf<typeof app.files>[]
+	links: RowOf<typeof app.transactionAttachments>[]
 	parts: { id: string; fileId: string; partIndex: number; sizeBytes: number; data: number[] }[]
-	member: s.RowOf<typeof app.organizationMembers>
+	member: RowOf<typeof app.organizationMembers>
 	source: {
-		file: s.RowOf<typeof app.files>
-		parts: Omit<s.RowOf<typeof app.fileParts>, 'data'>[]
+		file: RowOf<typeof app.files>
+		parts: Omit<RowOf<typeof app.fileParts>, 'data'>[]
 	}
 }
 export type FinanceRestorePlan = { graph: FinanceRestoreGraph; intent: RestoreJournalIntent }

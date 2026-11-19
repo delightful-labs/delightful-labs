@@ -1,7 +1,8 @@
+import type { RowOf } from 'jazz-tools'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Transaction, ReadTier, type schema } from 'jazz-tools'
 import { transactionCheckpointSchema } from '#lib/contracts/transaction-save-contract.js'
-import { app, type Check } from '#lib/schema.js'
+import { app, type Check } from '#lib/queries.js'
 import { createTransactionSaveMachine } from './transaction-save.js'
 import type { TransactionEntryObservation } from '#lib/contracts/transaction-entry-contract.js'
 import type { TransactionSaveValues } from '#lib/validation/transactions.js'
@@ -84,7 +85,7 @@ afterEach(() => {
 })
 
 const ledgerQuery = app.transactions.include({ tags: { tag: true }, check: true })
-type LedgerSnapshot = schema.RowOf<typeof ledgerQuery>
+type LedgerSnapshot = RowOf<typeof ledgerQuery>
 
 function fixture() {
 	vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce(transactionId).mockReturnValue(checkId)

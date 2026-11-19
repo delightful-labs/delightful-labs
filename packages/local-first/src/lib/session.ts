@@ -1,6 +1,7 @@
 export {
 	createSessionAcquisitionMachine,
-	selectAcquiredSession
+	selectAcquiredSession,
+	selectSessionAcquisitionAvailability
 } from './machines/identity/session-acquisition.js'
 export type {
 	SessionOwnerEvent,

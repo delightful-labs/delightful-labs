@@ -7,7 +7,7 @@ import {
 	selectAcquiredSession
 } from '../../machines/identity/session-acquisition.js'
 import { createJazzSessionAcquisition } from './session.js'
-import { createJazzStartupRegistry } from './startup.js'
+import { type JazzSessionResource, createJazzStartupRegistry } from './startup.js'
 import type { SessionOwnerReply } from '../../contracts/session.js'
 
 const sdk = vi.hoisted(() => ({ create: vi.fn<typeof createJazzClient>() }))
@@ -16,15 +16,19 @@ vi.mock('jazz-tools/client', () => ({ createJazzClient: sdk.create }))
 function session(): Awaited<ReturnType<typeof createJazzClient>> {
 	const unused = vi.fn(async () => {})
 	return {
-		getSnapshot: () => ({ status: 'signed-out' }),
+		getSnapshot: () => ({ status: 'signed-out', user: null, localFirst: false }),
+		db: vi.fn<() => JazzClient['db']>()(),
+		exportDeviceKey: () => {
+			throw new Error('No device account in the signed-out fixture')
+		},
 		subscribe: () => () => {},
-		createLocalFirst: unused,
-		restoreLocalFirst: unused,
-		loginWithBackend: unused,
-		linkWithBackend: unused,
-		logout: vi.fn(async () => {}),
+		createDeviceAccount: unused,
+		restoreDeviceAccount: unused,
+		reopenDeviceAccount: unused,
+		linkDeviceAccount: unused,
+		signOut: vi.fn(async () => {}),
 		retry: unused,
-		reauthenticate: unused,
+		refresh: unused,
 		close: vi.fn(async () => {})
 	}
 }
@@ -35,7 +39,7 @@ describe('Jazz session acquisition leaf', () => {
 		const config = {
 			scope: 'original',
 			serverUrl: 'http://127.0.0.1:9',
-			initial: 'local-first'
+			initial: 'device'
 		} satisfies JazzClientConfig
 		const adapter = createJazzSessionAcquisition(config)
 		config.scope = 'changed'
@@ -47,10 +51,10 @@ describe('Jazz session acquisition leaf', () => {
 		expect(sdk.create).toHaveBeenCalledExactlyOnceWith({
 			scope: 'original',
 			serverUrl: 'http://127.0.0.1:9',
-			initial: 'local-first'
+			initial: 'device'
 		})
 		expect(supplied.close).not.toHaveBeenCalled()
-		expect(supplied.logout).not.toHaveBeenCalled()
+		expect(supplied.signOut).not.toHaveBeenCalled()
 	})
 
 	it('does not invent an initial identity or storage policy', async () => {
@@ -89,7 +93,7 @@ describe('Jazz session acquisition leaf', () => {
 			owner.stop()
 		}
 		expect(existing.close).not.toHaveBeenCalled()
-		expect(existing.logout).not.toHaveBeenCalled()
+		expect(existing.signOut).not.toHaveBeenCalled()
 	})
 })
 
@@ -121,7 +125,7 @@ describe('Jazz registry availability observation', () => {
 			serverUrl: 'http://127.0.0.1:9'
 		})
 		const recipient = createActor(
-			createCallbackLogic<SessionOwnerReply<JazzSession<JazzClient>>, undefined>(() => {}),
+			createCallbackLogic<SessionOwnerReply<JazzSessionResource>, undefined>(() => {}),
 			{ input: undefined }
 		).start()
 		try {

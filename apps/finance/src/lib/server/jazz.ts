@@ -1,16 +1,24 @@
 import { developmentJazz } from './jazz-development.js'
-import { acceptLocalFirstAuth, createJazz, memory, sqlite, vercel } from 'jazz-tools/backend'
-import { app } from '../schema.js'
-import permissions from '../permissions.js'
+import {
+	acceptDeviceAccounts,
+	createJazz,
+	memory,
+	sqlite,
+	vercel,
+	perBranch
+} from 'jazz-tools/backend'
+import { app } from '../queries.js'
+import permissions from '../jazz.permissions.json' with { type: 'json' }
 
-// A separate alpha.60 store: restore Finance's backup into the new target.
+// Keep the qualified local store; Vercel uses the SDK's native environment/branch namespace.
 const store = process.env.VERCEL
 	? vercel({
+			namespace: ({ environment, branch }) =>
+				environment === 'production' ? 'production' : perBranch(branch),
 			vcpus: 1,
 			maxDriveBytes: 1024 ** 3,
 			blobs: 'sqlite',
-			idleMs: 60_000,
-			...(process.env.FINANCE_JAZZ_CORE_NAME ? { name: process.env.FINANCE_JAZZ_CORE_NAME } : {})
+			idleMs: 60_000
 		})
 	: process.env.FINANCE_EPHEMERAL_JAZZ === 'true' || process.env.VITEST
 		? memory()
@@ -30,7 +38,7 @@ const options = {
 	app,
 	permissions,
 	store,
-	authenticate: acceptLocalFirstAuth,
+	authenticate: acceptDeviceAccounts,
 	...(publicUrl ? { publicUrl } : {})
 }
 export const jazz =

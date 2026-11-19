@@ -12,14 +12,15 @@ if (!appId || !serverUrl) throw new Error('Disposable configuration missing')
 const session = await createBrowserSession({
 	scope: appId,
 	serverUrl,
-	initial: 'local-first',
+	initial: 'device',
+	localFirst: 'now',
 	client: loadLocalFirst,
 	driver: { type: 'persistent', dbName: 'disposable-native-export' }
 })
 const snapshot = session.getSnapshot(),
 	client = snapshot.client,
-	account = snapshot.account
-if (!client || !account) throw new Error('Disposable browser session not ready')
+	user = snapshot.user
+if (!client || !user) throw new Error('Disposable browser session not ready')
 await client.db.upgradeToLocalFirst(loadLocalFirst)
 const db = client.db
 if (!db.isLocalFirst()) throw new Error('Native export requires local-first storage')
@@ -33,7 +34,7 @@ const api = {
 			binding: {
 				applicationId: 'native-test',
 				workspaceId: graph.workspace,
-				identityId: account.id,
+				identityId: user.accountId,
 				generation: 1,
 				operationId: crypto.randomUUID(),
 				environment: 'disposable'

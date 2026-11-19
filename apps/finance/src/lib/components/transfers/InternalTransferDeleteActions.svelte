@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { transferDeleteText } from '#lib/forms/form-messages.js'
 	import { Button, Dialog, StatusMessage } from 'delightful-ui'
 	import type { InternalTransferDeleteChoice } from '#lib/machines/transfers/internal-transfer.js'
-	import type { TransferDeleteFeedback } from '#lib/machines/transactions/transaction-edit.js'
+	import type { TransferDeleteFeedback } from '#lib/contracts/worker-transfers.js'
 	import { m } from '#lib/paraglide/messages.js'
 
 	let {
@@ -31,7 +32,7 @@
 {/if}
 
 {#if feedback}
-	<StatusMessage variant={feedback.variant} text={feedback.label()} />
+	<StatusMessage variant={feedback.variant} text={transferDeleteText[feedback.message]()} />
 {/if}
 
 <Dialog

@@ -1,32 +1,13 @@
-import type { WorkspaceCreationDialogView } from 'delightful-local-first/workspace'
 import { createWorkspaceCreationOwner } from 'delightful-local-first/workspace/creation-owner'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import {
 	createWorkspaceCreationOperation,
 	type CreationBinding
 } from './workspace-creation-operation.js'
-import type { Organization } from '../../schema.js'
-export type WorkspaceCreationView = {
-	draftRevision: number
-	mode:
-		| 'unavailable'
-		| 'working'
-		| 'editing'
-		| 'invalid'
-		| 'recovered'
-		| 'complete'
-		| 'conflict'
-		| 'failed'
-		| 'unresolved'
-	name: string
-	workspace: Organization | undefined
-	canSubmit: boolean
-	canRetry: boolean
-	canCreateAnother: boolean
-}
-export function createWorkspaceCreationMachine(
-	db: Pick<ReturnType<typeof getDb>, 'all' | 'beginTransaction'>
-) {
+import type { Organization } from '../../queries.js'
+import type { WorkspaceCreationView } from '../../contracts/workspace-creation-view.js'
+export type { WorkspaceCreationView } from '../../contracts/workspace-creation-view.js'
+export function createWorkspaceCreationMachine(db: Pick<JazzDb, 'all' | 'beginTransaction'>) {
 	const operation = createWorkspaceCreationOperation(db)
 	return createWorkspaceCreationOwner<
 		import('./workspace-creation-journal.js').WorkspaceJournalRecord,
@@ -84,32 +65,5 @@ export function selectWorkspaceCreationReport(
 	}
 }
 
-/** The owner classifies feedback; consumers only translate the supplied descriptor. */
-export function workspaceCreationDialogPresentation(view: WorkspaceCreationView): Omit<
-	WorkspaceCreationDialogView,
-	'feedback'
-> & {
-	feedback: { kind: WorkspaceCreationView['mode']; priority: 'status' | 'alert'; visible: boolean }
-} {
-	return {
-		activity: view.mode === 'working' ? 'working' : 'idle',
-		content: view.mode === 'complete' ? 'complete' : 'fields',
-		canSubmit: view.canSubmit,
-		canOpen: view.mode !== 'unavailable',
-		canRetry: view.canRetry,
-		canCreateAnother: view.canCreateAnother,
-		fieldsEditable: view.canSubmit,
-		draftRevision: view.draftRevision,
-		attemptName: view.name,
-		feedback: {
-			kind: view.mode,
-			visible: view.mode !== 'working',
-			priority: ['invalid', 'conflict', 'failed', 'unresolved'].includes(view.mode)
-				? 'alert'
-				: 'status'
-		}
-	}
-}
-
-export type WorkspaceCreationCommand =
-	{ type: 'SUBMIT'; name: string } | { type: 'RETRY' | 'NEW' | 'CANCEL' }
+export { workspaceCreationDialogPresentation } from '../../contracts/workspace-creation-view.js'
+export type { WorkspaceCreationCommand } from '../../contracts/workspace-creation-view.js'

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "6aefd9d2fc7976320ecaa1fb997184badfbf2f53c97656270b2c131299d6fa5c"
+  },
+  "tables": {
+    "accounts": {
+      "columns": { "organizationId": "uuid" },
+      "relations": { "organization": { "rel": "organizations", "column": "organizationId" } }
+    },
+    "checks": {
+      "columns": {
+        "organizationId": "uuid",
+        "accountId": "uuid",
+        "checkNumber": { "type": "string", "transform": "checkNumber" },
+        "checkDate": { "type": "string", "transform": "dateOnly" },
+        "payerName": "string?",
+        "bankName": "string?",
+        "memoOnCheck": "string?"
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "transactions": { "reverse": "transactions", "relation": "check" }
+      }
+    },
+    "organizations": { "columns": { "name": "string" } },
+    "transactions": {
+      "columns": {
+        "organizationId": "uuid",
+        "accountId": "uuid",
+        "kind": { "enum": ["income", "expense"] },
+        "paymentMethod": { "enum": ["cash", "check", "transfer", "electronic"], "optional": true },
+        "checkId": "uuid?"
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "check": { "rel": "checks", "column": "checkId" },
+        "organization": { "rel": "organizations", "column": "organizationId" }
+      }
+    }
+  },
+  "transforms": {
+    "checkNumber": { "stored": "string", "view": "string" },
+    "dateOnly": { "stored": "string", "view": "string" }
+  }
+}

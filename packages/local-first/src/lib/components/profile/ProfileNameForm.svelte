@@ -3,10 +3,11 @@
 	import type { ProfileView } from '../../contracts/profile.js'
 	import FormFeedback from '../forms/FormFeedback.svelte'
 	import FormContent from '../forms/FormContent.svelte'
+	import type { FormFeedbackMessages } from '../../contracts/scoped-form.js'
 	const instanceId = $props.id()
 	const nameId = `${instanceId}-display-name`
 	let {
-		labels, reasonText,
+		labels, reasonText, defaultMessages,
 		profileId,
 		displayName,
 		view,
@@ -17,6 +18,7 @@
 	}: {
 		labels: {profile:string;description:string;invalid:string;displayName:string;save:string;saved:string;retry:string}
 		reasonText:(reason: import('../../contracts/profile.js').ProfileReason)=>string
+		defaultMessages: FormFeedbackMessages
 		profileId: string
 		displayName: string | null | undefined
 		view: ProfileView
@@ -29,7 +31,7 @@
 
 <Heading level="h2">{labels.profile}</Heading>
 <Text>{labels.description}</Text>
-<FormFeedback retryLabel={labels.retry}
+<FormFeedback retryLabel={labels.retry} {defaultMessages}
 	{view}
 	subject={labels.profile}
 	{reasonText}
@@ -53,7 +55,7 @@
 			<Button type="submit" disabled={!view.canSubmit}>{labels.save}</Button>
 		{/snippet}
 		{#snippet feedback(view)}
-			<FormFeedback retryLabel={labels.retry}
+			<FormFeedback retryLabel={labels.retry} {defaultMessages}
 				{view}
 				subject={labels.profile}
 				{reasonText}

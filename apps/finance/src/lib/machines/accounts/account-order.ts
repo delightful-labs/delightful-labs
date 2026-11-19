@@ -1,4 +1,4 @@
-import { setup, types } from 'xstate'
+import { setup, types, type SnapshotFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 type OrderEvent =
@@ -37,7 +37,7 @@ type NativeEvent0 =
 	| import('xstate').ErrorPlatformEvent
 
 const order = setup({
-	schemas: { context: types<{ ids: readonly string[] }>(), events: events0 }
+	schemas: { context: types<{ ids: readonly string[]; revision: number }>(), events: events0 }
 })
 const observe = ({ event }: { event: NativeEvent0 }) =>
 	event.type === 'RESET' || event.type === 'OBSERVE' ? { ids: event.ids } : {}
@@ -65,7 +65,7 @@ const move = ({ context, event }: { context: { ids: readonly string[] }; event: 
 export const accountOrderMachine = order.createMachine({
 	id: 'account-order',
 	initial: 'viewing',
-	context: { ids: [] },
+	context: { ids: [], revision: 0 },
 	on: {
 		RESET: (args) => {
 			return { target: '.viewing', context: observe(args) }
@@ -92,9 +92,23 @@ export const accountOrderMachine = order.createMachine({
 				DONE: { target: 'viewing' },
 				MOVE: (args) => {
 					if (!canMove(args)) return
-					return { context: move(args) }
+					return { context: { ...move(args), revision: args.context.revision + 1 } }
 				}
 			}
 		}
 	}
 })
+
+export function selectAccountOrderView(snapshot: SnapshotFrom<typeof accountOrderMachine>) {
+	return {
+		ids: snapshot.context.ids,
+		revision: snapshot.context.revision,
+		editing: snapshot.matches('editing'),
+		canToggle: snapshot.can({ type: 'EDIT' }) || snapshot.can({ type: 'DONE' }),
+		moves: snapshot.context.ids.map((id) => ({
+			id,
+			up: snapshot.can({ type: 'MOVE', id, direction: 'up' }),
+			down: snapshot.can({ type: 'MOVE', id, direction: 'down' })
+		}))
+	}
+}

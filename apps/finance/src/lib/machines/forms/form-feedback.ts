@@ -1,5 +1,6 @@
 export type {
 	FeedbackMessage,
 	FormFeedbackInput,
-	FormFeedbackLabel
+	FormFeedbackDescriptor,
+	FormFeedbackMessages
 } from 'delightful-local-first/forms/feedback'

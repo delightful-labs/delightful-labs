@@ -1,6 +1,6 @@
 import { Transaction } from 'jazz-tools'
 import { vi } from 'vitest'
-import type { Category, Organization } from '../../schema.js'
+import type { Category, Organization } from '../../queries.js'
 
 export const userId = '11111111-1111-4111-8111-111111111111'
 export const organizationId = '33333333-3333-4333-8333-333333333333'

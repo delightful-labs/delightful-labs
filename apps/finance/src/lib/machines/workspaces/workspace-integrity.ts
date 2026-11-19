@@ -1,7 +1,7 @@
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import { z } from 'zod'
-import { app } from '../../schema.js'
+import { app } from '../../queries.js'
 import {
 	workspaceIntegrityAssessment,
 	type IntegrityAssessment,
@@ -16,7 +16,7 @@ import {
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type Db = Pick<ReturnType<typeof getDb>, 'all' | 'beginTransaction' | 'getConfig'>
+type Db = Pick<JazzDb, 'all' | 'beginTransaction' | 'getConfig'>
 type Input = IntegrityScope & { db: Db }
 const prepare = createAsyncLogic({
 	run: async ({ input }: { input: Input }) => {

@@ -1,3 +1,4 @@
+import { financeFixture } from '../helpers/worker-fixture.js'
 import { expect } from '@playwright/test'
 import { test, start, installWorkspaceSettingsTest } from '../helpers/workspace.js'
 import {
@@ -6,7 +7,7 @@ import {
 	openAccountActions,
 	selectWorkspace
 } from '../helpers/ui.js'
-import type { OrganizationMember } from '../../src/lib/schema.js'
+import type { OrganizationMember } from '../../src/lib/queries.js'
 
 test(
 	'account list shows an empty result and newly created accounts',
@@ -65,26 +66,7 @@ test(
 		const firstWorkspaceId = await page
 			.getByLabel('Current Workspace', { exact: true })
 			.inputValue()
-		const secondWorkspaceId = await page.evaluate(async () => {
-			const { app, db, userId } = window.workspaceSettingsTest
-			const workspace = await db
-				.insert(app.organizations, {
-					name: 'Account form workspace',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: userId
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: workspace.id,
-					userId,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'global' })
-			return workspace.id
-		})
+		const secondWorkspaceId = await financeFixture(page, 'features/accounts.e2e:68')
 		await navigateSidebar(page, 'Accounts')
 		const modal = await openCreationModal(page, 'Add Account')
 		await modal.getByLabel('Account name').fill('Previous workspace draft')
@@ -121,46 +103,7 @@ test(
 		const firstWorkspaceId = await page
 			.getByLabel('Current Workspace', { exact: true })
 			.inputValue()
-		const fixture = await page.evaluate(async (organizationId) => {
-			const { app, db, userId } = window.workspaceSettingsTest
-			const second = await db
-				.insert(app.organizations, {
-					name: 'Other ledger',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: userId
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: second.id,
-					userId,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'global' })
-			const accounts = [
-				{ organizationId, name: 'Zebra checking', kind: 'bank', archivedAt: null },
-				{ organizationId, name: 'Alpha cash', kind: 'cash', archivedAt: null },
-				{ organizationId, name: 'Archived card', kind: 'card', archivedAt: new Date() },
-				{ organizationId: second.id, name: 'Business card', kind: 'card', archivedAt: null }
-			] satisfies Pick<
-				import('../../src/lib/schema.js').Account,
-				'organizationId' | 'name' | 'kind' | 'archivedAt'
-			>[]
-			const ids: string[] = []
-			for (const account of accounts) {
-				const row = await db
-					.insert(app.accounts, { ...account, archivedAt: null, currency: 'USD' })
-					.wait({ tier: 'global' })
-				if (account.archivedAt)
-					await db
-						.update(app.accounts, row.id, { archivedAt: account.archivedAt })
-						.wait({ tier: 'global' })
-				ids.push(row.id)
-			}
-			return { secondWorkspaceId: second.id, firstAccountId: ids[0] }
-		}, firstWorkspaceId)
+		const fixture = await financeFixture(page, 'features/accounts.e2e:124', firstWorkspaceId)
 		await navigateSidebar(page, 'Accounts')
 		const main = page.getByRole('main')
 		const names = main.getByRole('table').locator('tbody tr td:first-child')
@@ -171,11 +114,7 @@ test(
 		await expect(names).toHaveText(['Business card'])
 		await selectWorkspace(selector, firstWorkspaceId)
 		await expect(names).toHaveText(['Alpha cash', 'Zebra checking'])
-		await page.evaluate(async (id) => {
-			if (!id) throw new Error('Test account is missing.')
-			const { app, db } = window.workspaceSettingsTest
-			await db.update(app.accounts, id, { archivedAt: new Date() }).wait({ tier: 'global' })
-		}, fixture.firstAccountId)
+		await financeFixture(page, 'features/accounts.e2e:174', fixture.firstAccountId)
 		await expect(names).toHaveText(['Alpha cash'])
 	}
 )
@@ -186,36 +125,7 @@ test(
 	async ({ page, context }) => {
 		await start(page)
 		const organizationId = await page.getByLabel('Current Workspace', { exact: true }).inputValue()
-		const fixture = await page.evaluate(async (organizationId) => {
-			const { app, db } = window.workspaceSettingsTest
-			const account = await db
-				.insert(app.accounts, {
-					organizationId,
-					name: 'Archive checking',
-					kind: 'bank',
-					currency: 'USD'
-				})
-				.wait({ tier: 'global' })
-			const category = await db.one(
-				app.categories.where({ organizationId, kind: 'expense', isSystem: true }),
-				{ tier: 'remote' }
-			)
-			if (!category) throw new Error('Expense category is missing.')
-			const transaction = await db
-				.insert(app.transactions, {
-					organizationId,
-					accountId: account.id,
-					categoryId: category.id,
-					kind: 'expense',
-					amountMinor: 1200,
-					currency: 'USD',
-					bookedOn: '2026-10-13',
-					source: 'manual',
-					description: 'Retained archived history'
-				})
-				.wait({ tier: 'global' })
-			return { accountId: account.id, transactionId: transaction.id }
-		}, organizationId)
+		const fixture = await financeFixture(page, 'features/accounts.e2e:189', organizationId)
 		await navigateSidebar(page, 'Accounts')
 		const main = page.getByRole('main')
 		const accountActions = await openAccountActions(page, 'Archive checking')
@@ -234,26 +144,14 @@ test(
 			await context.setOffline(false)
 		}
 		await expect
-			.poll(() =>
-				page.evaluate(async (fixture) => {
-					const { app, db } = window.workspaceSettingsTest
-					const account = await db.one(app.accounts.where({ id: fixture.accountId }), {
-						tier: 'remote'
-					})
-					const transaction = await db.one(app.transactions.where({ id: fixture.transactionId }), {
-						tier: 'remote'
-					})
-					return {
-						archived: Boolean(account?.archivedAt),
-						retained: transaction?.id === fixture.transactionId
-					}
-				}, fixture)
-			)
+			.poll(() => financeFixture(page, 'features/accounts.e2e:238', fixture))
 			.toEqual({ archived: true, retained: true })
 		await navigateSidebar(page, 'Expenses')
 		await expect(main.getByText('Retained archived history', { exact: true })).toBeVisible()
 		await main.getByRole('link', { name: 'Add Expenses', exact: true }).click()
-		await expect(main.getByText('Add an account before recording a transaction.')).toBeVisible()
+		await expect(
+			main.getByRole('status').filter({ hasText: 'Add an account before recording a transaction.' })
+		).toBeVisible()
 		await page.goto('/accounts')
 		await expect(main.getByText('Start with one place you keep money.')).toBeVisible()
 	}
@@ -300,40 +198,12 @@ for (const scenario of archiveScenarios) {
 			try {
 				const subject = await subjectContext.newPage()
 				await start(subject)
-				const subjectId = await subject.evaluate(() => window.workspaceSettingsTest.userId)
-				const accountId = await page.evaluate(
-					async ({ organizationId, subjectId, scenario }) => {
-						const { app, db } = window.workspaceSettingsTest
-						const account = await db
-							.insert(app.accounts, {
-								organizationId,
-								name: 'Permission checking',
-								kind: 'bank',
-								currency: 'USD'
-							})
-							.wait({ tier: 'global' })
-						await db
-							.insert(app.organizationMembers, {
-								organizationId,
-								userId: subjectId,
-								role: scenario.role,
-								accountAccessMode: scenario.mode
-							})
-							.wait({ tier: 'global' })
-						if (scenario.grant)
-							await db
-								.insert(app.accountMemberships, {
-									organizationId,
-									accountId: account.id,
-									userId: subjectId,
-									access: scenario.grant,
-									canDelete: false
-								})
-								.wait({ tier: 'global' })
-						return account.id
-					},
-					{ organizationId, subjectId, scenario }
-				)
+				const subjectId = await financeFixture(subject, 'features/accounts.e2e:303')
+				const accountId = await financeFixture(page, 'features/accounts.e2e:304', {
+					organizationId,
+					subjectId,
+					scenario
+				})
 				await subject.reload()
 				await installWorkspaceSettingsTest(subject)
 				await subject.goto(`/accounts?workspace=${organizationId}`)
@@ -360,27 +230,11 @@ for (const scenario of archiveScenarios) {
 					await expect(row).toHaveCount(0)
 				} else {
 					await expect(archive).toHaveCount(0)
-					const outcome = await subject.evaluate(async (accountId) => {
-						const { app, db } = window.workspaceSettingsTest
-						try {
-							await db
-								.update(app.accounts, accountId, { archivedAt: new Date() })
-								.wait({ tier: 'global' })
-							return 'accepted'
-						} catch (error) {
-							return error instanceof Error ? error.message : 'unknown-error'
-						}
-					}, accountId)
+					const outcome = await financeFixture(subject, 'features/accounts.e2e:363', accountId)
 					expect(outcome).toMatch(/AuthorizationDenied|permission_denied/)
 				}
 				await expect
-					.poll(() =>
-						page.evaluate(async (id) => {
-							const { app, db } = window.workspaceSettingsTest
-							const account = await db.one(app.accounts.where({ id }), { tier: 'remote' })
-							return { exists: Boolean(account), archived: Boolean(account?.archivedAt) }
-						}, accountId)
-					)
+					.poll(() => financeFixture(page, 'features/accounts.e2e:378', accountId))
 					.toEqual({ exists: true, archived: scenario.write })
 			} finally {
 				await subjectContext.close()

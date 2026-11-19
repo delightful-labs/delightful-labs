@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createActor, createCallbackLogic, waitFor } from 'xstate'
 import type {
-	RestorationCapability,
+	NativeRestorationCapability,
 	RestorationEvent,
 	RestorationIdentity,
 	RestorationReport
@@ -29,7 +29,10 @@ const interruptions = [
 	'BINDING_INVALIDATED'
 ] satisfies RestorationEvent['type'][]
 
-function startFixture(overrides: Partial<RestorationCapability>, entry: 'fixed' | 'supplied') {
+function startFixture(
+	overrides: Partial<NativeRestorationCapability>,
+	entry: 'fixed' | 'supplied'
+) {
 	const scope = { binding: {}, attempt: 7 }
 	let current = true
 	const reports: RestorationReport[] = []
@@ -44,7 +47,7 @@ function startFixture(overrides: Partial<RestorationCapability>, entry: 'fixed' 
 		kind: 'ready',
 		identityId: 'restored-user'
 	}))
-	const capability: RestorationCapability = {
+	const capability: NativeRestorationCapability = {
 		parsePhrase: parse,
 		restoreIdentity: restore,
 		readIdentity: identity,
@@ -87,7 +90,7 @@ afterEach(() => {
 describe.each(['fixed', 'supplied'] satisfies ('fixed' | 'supplied')[])(
 	'restoration child protocol (%s)',
 	(entry) => {
-		const fixture = (overrides: Partial<RestorationCapability> = {}) =>
+		const fixture = (overrides: Partial<NativeRestorationCapability> = {}) =>
 			startFixture(overrides, entry)
 		it('reports correlated preparation, waits for a matching permit, and releases credentials on issue', async () => {
 			const pending = deferred<void>()

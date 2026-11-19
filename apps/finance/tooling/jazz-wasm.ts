@@ -4,6 +4,7 @@ import type { UserConfig } from 'vite'
 import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
 
 const require = createRequire(import.meta.url)
+const jazzRoot = dirname(require.resolve('jazz-tools/package.json'))
 export const jazzWasmEntry = createRequire(require.resolve('jazz-tools/package.json')).resolve(
 	'jazz-wasm'
 )
@@ -11,8 +12,13 @@ export const jazzWasmEntry = createRequire(require.resolve('jazz-tools/package.j
 /** Shared by the application and its isolated worker bundle proof. */
 export function workerRuntimeBuildConfig() {
 	return {
+		envPrefix: ['VITE_', 'PUBLIC_'],
 		resolve: {
 			alias: [
+				{
+					find: /^#jazz-broker-worker/,
+					replacement: join(jazzRoot, 'dist/worker/jazz-broker-worker.js')
+				},
 				{ find: /^jazz-wasm$/, replacement: jazzWasmEntry },
 				{
 					find: /^#jazz-wasm-binary/,
@@ -21,5 +27,5 @@ export function workerRuntimeBuildConfig() {
 			]
 		},
 		worker: jazzWorkerOptions('_app/immutable/assets/[name].[hash][extname]')
-	} satisfies Pick<UserConfig, 'resolve' | 'worker'>
+	} satisfies Pick<UserConfig, 'resolve' | 'worker' | 'envPrefix'>
 }

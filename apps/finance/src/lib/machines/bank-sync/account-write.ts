@@ -1,5 +1,5 @@
-import type { schema } from 'jazz-tools'
-import { app } from '#lib/schema.js'
+import type { RowOf } from 'jazz-tools'
+import { app } from '#lib/queries.js'
 import type { appAccountSchema } from '#lib/validation/accounts.js'
 import { createAuthorizationMachine } from './authorization.js'
 import { required } from './identity.js'
@@ -14,8 +14,8 @@ import {
 import { setup, types, createAsyncLogic } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type Link = schema.RowOf<typeof app.simplefinAccountLinks>
-type Account = schema.RowOf<typeof app.accounts>
+type Link = RowOf<typeof app.simplefinAccountLinks>
+type Account = RowOf<typeof app.accounts>
 export type AccountWrite = { work: OperationWork; provider: ProviderSummary; accountId: string } & (
 	{ kind: 'create'; values: ReturnType<typeof appAccountSchema.parse> } | { kind: 'map' }
 )

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EXPENSE, INCOME } from './transaction-kind.js'
-import type { TransactionRow } from '#lib/schema.js'
+import type { TransactionRow } from '#lib/queries.js'
 import {
 	findInternalTransferCounterparts,
 	inspectInternalTransferCounterparts,

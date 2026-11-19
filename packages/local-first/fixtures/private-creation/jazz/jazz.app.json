@@ -1,0 +1,16 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "c3a0e0188e82d5482cc86fb44b52a7ab53334f39c22953042d1dccc467876be0"
+  },
+  "tables": {
+    "creationOperations": {
+      "columns": { "ownerId": "uuid", "workspaceId": "uuid", "requestFingerprint": "string" }
+    },
+    "workspaces": {
+      "columns": { "ownerId": "uuid", "creationOperationId": "uuid" },
+      "relations": { "operation": { "rel": "creationOperations", "column": "creationOperationId" } }
+    }
+  }
+}

@@ -27,9 +27,13 @@ export function allowTestBrowserOrigin(url: string) {
 }
 
 export async function startLocalJazzServer(
-	options: StartLocalJazzServerOptions
+	options: Omit<StartLocalJazzServerOptions, 'schema' | 'permissions'> & {
+		schema?: Definition['app']
+		permissions?: Definition['permissions']
+	}
 ): Promise<LocalJazzServerHandle> {
-	const core = await startCore(options)
+	const { schema, permissions, ...coreOptions } = options
+	const core = await startCore(coreOptions)
 	const entry: RegisteredCore = {
 		core,
 		async open(definition) {
@@ -46,8 +50,10 @@ export async function startLocalJazzServer(
 	}
 	endpoints.set(core.url, entry)
 	try {
-		if (options.schema !== undefined)
-			await entry.open({ app: options.schema, permissions: options.permissions })
+		if (schema !== undefined) {
+			if (!permissions) throw new Error('Test permissions required')
+			await entry.open({ app: schema, permissions })
+		}
 	} catch (error) {
 		await core.stop()
 		endpoints.delete(core.url)
@@ -78,16 +84,10 @@ export async function deploy(options: DeployOptions) {
 	if (!entry) return deployCore(options)
 	if (!entry.app) {
 		const result = await deployCore({ ...options, serverUrl: entry.core.url })
-		await entry.open({ app: options.schema, permissions: options.permissions })
+		await entry.open({ app: options.app, permissions: options.permissions })
 		return result
 	}
-	return entry.app.redeploy({
-		app: options.schema,
-		permissions: options.permissions,
-		...(options.migration ? { migration: options.migration } : {}),
-		...(options.migrations ? { migrations: options.migrations } : {}),
-		...(options.schemas ? { schemas: options.schemas } : {})
-	})
+	return entry.app.redeploy({ app: options.app, permissions: options.permissions })
 }
 
 export async function nativeTestEndpoint(url: string, definition: Definition, authority: boolean) {
@@ -95,4 +95,11 @@ export async function nativeTestEndpoint(url: string, definition: Definition, au
 	if (!entry) return url
 	if (authority) return entry.core.url
 	return (await entry.open(definition)).url
+}
+
+/** The harness owns this authority until its core closes; no client/session is fabricated. */
+export async function nativeTestAuthority(url: string, definition: Definition) {
+	const entry = endpoints.get(url)
+	if (!entry) throw new Error('Unregistered disposable authority')
+	return (await entry.open(definition)).jazz.db
 }

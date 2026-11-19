@@ -1,9 +1,9 @@
-import { browser } from '$app/env'
 import type { InspectionEvent } from 'xstate'
 import { createLogger, debugEnabled } from './logger.js'
 import { logMachineFailure } from './machine-diagnostics.js'
 import { projectInspection, type ProjectedInspection } from './inspection-projection.js'
 
+const browser = typeof window !== 'undefined'
 const logger = createLogger('inspector')
 const origin = 'https://stately.ai'
 const lifetime = new AbortController()
@@ -29,12 +29,9 @@ export function openStateInspector() {
 		logger.warn('Inspector could not open')
 	}
 }
-export function inspectActor(event: InspectionEvent) {
+export function acceptInspection(projected: ProjectedInspection) {
 	if (!browser || !debugEnabled || lifetime.signal.aborted) return
-	logMachineFailure(event)
 	try {
-		const projected = projectInspection(event)
-		if (!projected) return
 		if (projected.type === '@xstate.actor') topology.set(projected.sessionId, projected)
 		else {
 			const previous = topology.get(projected.sessionId)
@@ -49,6 +46,17 @@ export function inspectActor(event: InspectionEvent) {
 		logger.warn('Inspector could not attach')
 	}
 }
+export function inspectActor(event: InspectionEvent) {
+	if (!browser || !debugEnabled || lifetime.signal.aborted) return
+	logMachineFailure(event)
+	try {
+		const projected = projectInspection(event)
+		if (projected) acceptInspection(projected)
+	} catch {
+		logger.warn('Inspector could not attach')
+	}
+}
+
 if (browser)
 	window.addEventListener(
 		'message',

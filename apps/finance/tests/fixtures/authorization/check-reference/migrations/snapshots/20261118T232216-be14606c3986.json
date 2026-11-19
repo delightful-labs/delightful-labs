@@ -1,0 +1,173 @@
+{
+  "accounts": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      }
+    }
+  },
+  "checks": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "checkNumber",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "checkDate",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "payerName",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "bankName",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "memoOnCheck",
+        "nullable": true
+      }
+    ],
+    "relations": {
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      },
+      "transactions": {
+        "kind": "reverse",
+        "table": "transactions",
+        "relation": "check"
+      }
+    }
+  },
+  "organizations": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      }
+    ]
+  },
+  "transactions": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false,
+        "references": "organizations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false,
+        "references": "accounts"
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "income",
+            "expense"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "cash",
+            "check",
+            "transfer",
+            "electronic"
+          ]
+        },
+        "name": "paymentMethod",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "checkId",
+        "nullable": true,
+        "references": "checks"
+      }
+    ],
+    "relations": {
+      "check": {
+        "kind": "forward",
+        "table": "checks",
+        "column": "checkId"
+      },
+      "organization": {
+        "kind": "forward",
+        "table": "organizations",
+        "column": "organizationId"
+      },
+      "account": {
+        "kind": "forward",
+        "table": "accounts",
+        "column": "accountId"
+      }
+    }
+  }
+}

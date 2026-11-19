@@ -5,7 +5,6 @@
 	import { InputText, Select } from 'delightful-ui'
 	import type {
 		AccountCreationReason,
-		AccountCreationScope,
 		AccountCreationView
 	} from '#lib/contracts/account-creation-contract.js'
 	import { m } from '#lib/paraglide/messages.js'
@@ -21,7 +20,7 @@
 		onreset,
 		onRetryReadiness
 	}: {
-		scope: AccountCreationScope
+		scope: unknown
 		defaultCurrency: AccountCurrency
 		view: AccountCreationView
 		trigger?: Snippet<[() => void, boolean]> | undefined

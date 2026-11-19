@@ -49,11 +49,16 @@ export function sameTransactionEntryScope(a: TransactionEntryScope, b: Transacti
 		a.transactionId === b.transactionId
 	)
 }
-export function writableTransactionAccounts(
-	f: Pick<
-		TransactionEntryObservation,
-		'accounts' | 'organizationId' | 'membership' | 'identityId' | 'grants'
-	>
+export function writableTransactionAccounts<
+	AccountRow extends TransactionEntryObservation['accounts'][number]
+>(
+	f: Omit<
+		Pick<
+			TransactionEntryObservation,
+			'accounts' | 'organizationId' | 'membership' | 'identityId' | 'grants'
+		>,
+		'accounts'
+	> & { accounts: readonly AccountRow[] }
 ) {
 	return f.accounts.filter(
 		(a) =>
@@ -290,35 +295,52 @@ function withAttachmentSelectionValidation(
 	schema: ReturnType<typeof independentTransactionFormSchema>,
 	observe: () => TransactionEntryObservation
 ) {
-	return z.preprocess((input, ctx) => {
-		if (!isFormRecord(input)) return input
-		const { attachments, ...values } = input
-		const selected = (Array.isArray(attachments) ? attachments : []).filter(
-			(file) =>
-				!(
-					typeof File !== 'undefined' &&
-					file instanceof File &&
-					file.name === '' &&
-					file.size === 0
+	return z.preprocess(
+		(input, ctx) => {
+			if (!isFormRecord(input)) return input
+			const { attachments, ...values } = input
+			const selected = (Array.isArray(attachments) ? attachments : []).filter(
+				(file) =>
+					!(
+						typeof File !== 'undefined' &&
+						file instanceof File &&
+						file.name === '' &&
+						file.size === 0
+					)
+			)
+			const files = selected.filter(
+				(file): file is File => typeof File !== 'undefined' && file instanceof File
+			)
+			if (files.length !== selected.length) {
+				ctx.addIssue({ code: 'custom', path: ['attachments'], message: 'invalidSelection' })
+				return z.NEVER
+			}
+			const selection = validateAttachmentSelection(
+				files,
+				observe().transaction?.attachments?.length ?? 0
+			)
+			if (selection.kind !== 'accepted') {
+				ctx.addIssue({ code: 'custom', path: ['attachments'], message: selection.kind })
+				return z.NEVER
+			}
+			return { values, attachments: files }
+		},
+		z
+			.object({
+				values: z.unknown(),
+				attachments: z.array(
+					z.custom<File>((value) => typeof File !== 'undefined' && value instanceof File)
 				)
-		)
-		const files = selected.filter(
-			(file): file is File => typeof File !== 'undefined' && file instanceof File
-		)
-		if (files.length !== selected.length) {
-			ctx.addIssue({ code: 'custom', path: ['attachments'], message: 'invalidSelection' })
-			return z.NEVER
-		}
-		const selection = validateAttachmentSelection(
-			files,
-			observe().transaction?.attachments?.length ?? 0
-		)
-		if (selection.kind !== 'accepted') {
-			ctx.addIssue({ code: 'custom', path: ['attachments'], message: selection.kind })
-			return z.NEVER
-		}
-		return values
-	}, schema)
+			})
+			.transform(async ({ values, attachments }, ctx) => {
+				const parsed = await schema.safeParseAsync(values)
+				if (!parsed.success) {
+					for (const issue of parsed.error.issues) ctx.addIssue({ ...issue })
+					return z.NEVER
+				}
+				return { ...parsed.data, attachments }
+			})
+	)
 }
 
 function isFormRecord(value: unknown): value is Record<string, unknown> {
@@ -328,17 +350,12 @@ function isFormRecord(value: unknown): value is Record<string, unknown> {
 export function createTransactionEntryFormOptions(
 	deps: TransactionFormPolicyDependencies & {
 		db: TransactionSaveDb
-		getAttachments?: () => readonly File[]
-		navigate?: (destination: string, signal: AbortSignal) => Promise<void>
+		navigate?: ((destination: string, signal: AbortSignal) => Promise<void>) | undefined
 	}
 ) {
 	const { common, schema } = transactionFormPolicy(deps)
 	const availability = common.availability
-	const persistence = createTransactionSubmissionMachine(
-		deps.db,
-		deps.observe,
-		deps.getAttachments ?? (() => [])
-	)
+	const persistence = createTransactionSubmissionMachine(deps.db, deps.observe)
 	const options = createSingleWriteFormOptions<
 		TransactionSaveValues,
 		void,
@@ -371,16 +388,11 @@ export function createTransactionEntryFormOptions(
 export function createTransactionEditFormOptions(
 	deps: TransactionFormPolicyDependencies & {
 		db: TransactionSaveDb
-		getAttachments?: () => readonly File[]
 	}
 ) {
 	const { common, schema } = transactionFormPolicy(deps)
 	const availability = common.availability
-	const persistence = createTransactionSubmissionMachine(
-		deps.db,
-		deps.observe,
-		deps.getAttachments ?? (() => [])
-	)
+	const persistence = createTransactionSubmissionMachine(deps.db, deps.observe)
 	return createSingleWriteFormOptions<
 		TransactionSaveValues,
 		void,
@@ -428,6 +440,7 @@ export function createTransactionEditFormOptions(
 			)
 		},
 		successContent: 'retain',
+		resetOnSuccess: true,
 		assessmentObservation: ({ request, observation }) => ({
 			...observation.facts,
 			intent: request.values

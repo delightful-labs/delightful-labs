@@ -1,0 +1,30 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "477985f2ad709671245c1173bc0ecf12a18deb8ddaf0aabcbbd350991b2d5b8d"
+  },
+  "tables": {
+    "internalTransfers": {
+      "read": {
+        "allOf": [
+          "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.expenseAmountMinor, currency = this.expenseCurrency, internalTransferId = this.id)",
+          "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.incomeAmountMinor, currency = this.incomeCurrency, internalTransferId = this.id)"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.expenseAmountMinor, currency = this.expenseCurrency, internalTransferId = this.id)",
+          "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.incomeAmountMinor, currency = this.incomeCurrency, internalTransferId = this.id)"
+        ]
+      },
+      "delete": {
+        "allOf": [
+          "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, internalTransferId = null)",
+          "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, internalTransferId = null)"
+        ]
+      }
+    },
+    "transactions": { "read": "true", "insert": "true", "update": "true" }
+  }
+}

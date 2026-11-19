@@ -261,7 +261,7 @@ export function testAppPreparationContents(intent: RestoreJournalIntent) {
 		// Bind graph content without a circular dependency on the preparation digest.
 		graphSha256: intent.plan.expectedGraphSha256,
 		status: 'incomplete'
-	} satisfies import('jazz-tools').schema.InsertOf<typeof testAppRestoreApp.restoreDestinations>
+	} satisfies import('jazz-tools').InsertOf<typeof testAppRestoreApp.restoreDestinations>
 }
 
 export function createTestAppPreparationWriteMachine(db: IdentitySource) {
@@ -291,7 +291,7 @@ export function createTestAppPreparationWriter(
 		})
 	// Return only a bounded comparison fact; SDK rows never enter actor snapshots.
 	const matches = (
-		row: import('jazz-tools').schema.RowOf<typeof testAppRestoreApp.restoreDestinations> | null,
+		row: import('jazz-tools').RowOf<typeof testAppRestoreApp.restoreDestinations> | null,
 		input: Input
 	) => {
 		if (!row) return { present: false, matches: false }

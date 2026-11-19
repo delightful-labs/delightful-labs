@@ -10,7 +10,7 @@ describe('application-owned Jazz startup registry', () => {
 		const config = {
 			scope: 'notes',
 			serverUrl: 'http://127.0.0.1:9999',
-			initial: 'local-first'
+			initial: 'device'
 		} satisfies JazzClientConfig
 		const first = registry.getJazzStartupBinding(config)
 		const second = registry.getJazzStartupBinding({ ...config })
@@ -28,20 +28,20 @@ describe('application-owned Jazz startup registry', () => {
 		const first = registry.getJazzStartupBinding({
 			scope: 'notes',
 			serverUrl: 'http://127.0.0.1:9999',
-			initial: 'local-first'
+			initial: 'device'
 		})
 		expect(() =>
 			registry.getJazzStartupBinding({
 				scope: 'different',
 				serverUrl: 'http://127.0.0.1:9999',
-				initial: 'local-first'
+				initial: 'device'
 			})
 		).toThrow('environment replacement requires coordinated cleanup')
 		expect(
 			registry.getJazzStartupBinding({
 				scope: 'notes',
 				serverUrl: 'http://127.0.0.1:9999',
-				initial: 'local-first'
+				initial: 'device'
 			}).owner
 		).toBe(first.owner)
 	})

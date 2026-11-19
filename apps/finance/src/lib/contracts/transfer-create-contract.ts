@@ -1,4 +1,4 @@
-import type { Account, AccountMembership, Category, OrganizationMember } from '../schema.js'
+import type { Account, AccountMembership, Category, OrganizationMember } from '../queries.js'
 import type { ScopedFormView } from './form-contract.js'
 
 export type InternalTransferEntryScope = {

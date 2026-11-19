@@ -1,10 +1,6 @@
-import { issueLocalWrite, persistLocal } from 'delightful-local-first/backend/jazz/data'
-import type { getDb } from 'jazz-tools/svelte'
-import { app, type Account, type Category, type Organization, type Tag } from './schema.js'
-import { ACCOUNT_CURRENCY, type AccountCurrency } from './domain/account-currency.js'
-import { appAccountSchema } from './validation/accounts.js'
-import { appCategorySchema } from './validation/categories.js'
-import { appTagSchema } from './validation/tags.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app, type Organization } from './queries.js'
+import type { AccountCurrency } from './domain/account-currency.js'
 import type { z } from 'zod'
 import {
 	appProfileSchema,
@@ -12,9 +8,11 @@ import {
 	workspaceSettingsFormSchema
 } from './validation/identity.js'
 
+export { createAccount, archiveAccount } from './data/accounts.js'
+
 export { stableUuid } from './domain/stable-uuid.js'
 
-type Db = ReturnType<typeof getDb>
+type Db = JazzDb
 
 export function saveProfileName(
 	db: Pick<Db, 'update'>,
@@ -46,54 +44,17 @@ export function workspaceNamingWrites(db: Pick<Db, 'update'>) {
 		values: { name: Organization['name']; defaultCurrency: AccountCurrency }
 	) {
 		const settings = workspaceSettingsFormSchema.parse(values)
-		return issueLocalWrite(() => db.update(app.organizations, workspaceId, settings))
+		const receipt = db.update(app.organizations, workspaceId, settings)
+		return {
+			write: async () => {
+				await receipt.wait({ tier: 'local' })
+			}
+		}
 	}
 	return {
 		issueRename,
-		persistLocal: (write: ReturnType<typeof issueRename>['write']) => persistLocal(write)
+		persistLocal: (write: ReturnType<typeof issueRename>['write']) => write()
 	}
 }
 
-export function createAccount(
-	db: Pick<Db, 'insert'>,
-	organizationId: string,
-	name: string,
-	kind: Account['kind'],
-	currency: AccountCurrency = ACCOUNT_CURRENCY.USD
-) {
-	const account = appAccountSchema.parse({ organizationId, name, kind, currency })
-	return db.insert(app.accounts, account).wait({ tier: 'local' })
-}
-
-export function archiveAccount(db: Pick<Db, 'update'>, accountId: Account['id']) {
-	return db.update(app.accounts, accountId, { archivedAt: new Date() }).wait({ tier: 'local' })
-}
-
-export function createCategory(
-	db: Pick<Db, 'insert'>,
-	organizationId: string,
-	name: string,
-	kind: Category['kind']
-) {
-	const category = appCategorySchema.parse({ organizationId, name, kind })
-	return db.insert(app.categories, category).wait({ tier: 'local' })
-}
-
-export function archiveCategory(db: Pick<Db, 'update'>, categoryId: Category['id']) {
-	return db.update(app.categories, categoryId, { archivedAt: new Date() }).wait({ tier: 'local' })
-}
-
-export function createTag(
-	db: Pick<Db, 'insert'>,
-	organizationId: string,
-	name: string,
-	kind: Category['kind'],
-	categoryId: string | null
-) {
-	const tag = appTagSchema.parse({ organizationId, name, kind, categoryId })
-	return db.insert(app.tags, tag).wait({ tier: 'local' })
-}
-
-export function archiveTag(db: Pick<Db, 'update'>, tagId: Tag['id']) {
-	return db.update(app.tags, tagId, { archivedAt: new Date() }).wait({ tier: 'local' })
-}
+export { createCategory, archiveCategory, createTag, archiveTag } from './data/classification.js'

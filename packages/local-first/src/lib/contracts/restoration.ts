@@ -11,9 +11,23 @@ export type RestorationCapability = Readonly<{
 	/** Total, synchronous predicate; checks session/environment, not the changing account. */
 	isCurrentBinding: (binding: object) => boolean
 	/** One issued operation. Settlement/rejection does not promise rollback or cancellation. */
-	restoreIdentity: (scope: RestorationScope, credential: string) => Promise<void>
 	readIdentity: (scope: RestorationScope) => Promise<RestorationIdentity>
-}>
+}> &
+	(
+		| Readonly<{
+				restoreIdentity: (scope: RestorationScope, credential: string) => Promise<void>
+				runtime?: never
+		  }>
+		| Readonly<{
+				runtime: import('./session-runtime.js').SessionRuntimeConnection
+				restoreIdentity?: never
+		  }>
+	)
+
+export type NativeRestorationCapability = Extract<
+	RestorationCapability,
+	{ restoreIdentity: (scope: RestorationScope, credential: string) => Promise<void> }
+>
 
 export type RestorationReport = RestorationScope &
 	(

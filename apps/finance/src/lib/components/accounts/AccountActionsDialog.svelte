@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Button, ButtonContent, Dialog, StatusMessage } from 'delightful-ui'
-	import ArchiveIcon from 'tdesign-icons-svg/src/folder-minus.svg?component'
+	import { Dialog, StatusMessage } from 'delightful-ui'
+	import AccountArchiveButton from './AccountArchiveButton.svelte'
 	import type { AccountArchiveView } from '#lib/machines/accounts/account-archive.js'
 	import type { AccountDeleteGrantView } from '#lib/machines/accounts/account-delete-grants.js'
-	import type { Account, AccountMembership, OrganizationMember } from '#lib/schema.js'
+	import type { Account, AccountMembership, OrganizationMember } from '#lib/queries.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import type { ComponentProps } from 'svelte'
 	import QueryContent from '../shared/QueryContent.svelte'
@@ -19,11 +19,7 @@
 	}: {
 		account: Account | undefined
 		archiveAction: 'available' | 'archiving' | 'disabled' | 'unavailable' | undefined
-		deleteGrantView: AccountDeleteGrantView & {
-			canManage: boolean
-			members: readonly OrganizationMember[]
-			grants: readonly AccountMembership[]
-		}
+		deleteGrantView: AccountDeleteGrantView
 		grantQueries: ComponentProps<typeof QueryContent>['queries']
 		open?: boolean
 		onArchive: () => void
@@ -47,24 +43,7 @@
 	{#if account}
 		<section>
 			<h3>{m['labels.actions']()}</h3>
-			{#if archiveAction && archiveAction !== 'unavailable'}
-				<Button
-					type="button"
-					disabled={archiveAction !== 'available'}
-					aria-busy={archiveAction === 'archiving'}
-					onclick={onArchive}
-				>
-					<ButtonContent
-						icon={ArchiveIcon}
-						loading={archiveAction === 'archiving'}
-						text={archiveAction === 'archiving'
-							? m['status.archiving_subject']({ subject: m['nouns.account']({ count: 1 }) })
-							: m['actions.archive_button']()}
-					/>
-				</Button>
-			{:else}
-				<p>{m['accounts.archive_restricted']()}</p>
-			{/if}
+			<AccountArchiveButton action={archiveAction} onarchive={onArchive} />
 			{#if deleteGrantView.canManage}
 				<QueryContent
 					queries={grantQueries}

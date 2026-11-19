@@ -10,7 +10,7 @@
 	}: {
 		start: string
 		end: string
-		onchange: (start: string, end: string) => void
+		onchange: (change: Partial<{ start: string; end: string }>) => void
 		onpreset: (days: number) => void
 	} = $props()
 
@@ -37,9 +37,9 @@
 		]
 	}
 
-	function changeRange(nextStart: string, nextEnd: string) {
-		selectCustom(nextStart, nextEnd)
-		onchange(nextStart, nextEnd)
+	function changeRange(change: Partial<{ start: string; end: string }>) {
+		selectCustom(change.start ?? start, change.end ?? end)
+		onchange(change)
 	}
 </script>
 
@@ -66,13 +66,13 @@
 			label={m['labels.start_subject']({ subject: m['nouns.date']({ count: 1 }) })}
 			value={start}
 			max={end}
-			oninput={(event) => changeRange(event.currentTarget.value, end)}
+			oninput={(event) => changeRange({ start: event.currentTarget.value })}
 		/>
 		<InputDate
 			label={m['labels.end_subject']({ subject: m['nouns.date']({ count: 1 }) })}
 			value={end}
 			min={start}
-			oninput={(event) => changeRange(start, event.currentTarget.value)}
+			oninput={(event) => changeRange({ end: event.currentTarget.value })}
 		/>
 	{/if}
 </div>

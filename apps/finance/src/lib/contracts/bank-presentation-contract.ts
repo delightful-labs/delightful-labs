@@ -1,6 +1,6 @@
 import type { SyncLogOutput } from './bank-sync-log.js'
 import { m } from '#lib/paraglide/messages.js'
-import type { Account, SyncAttempt, SyncAccountResult } from '../schema.js'
+import type { Account, SyncAttempt, SyncAccountResult } from '../queries.js'
 import type { Connection } from '../machines/bank-sync/types.js'
 export type BankSetupView =
 	| 'creating'
@@ -10,27 +10,9 @@ export type BankSetupView =
 	| 'verifying'
 	| 'save'
 	| 'saving'
-export type BankStatusKey =
-	| 'bank.idle_step'
-	| 'bank.locked'
-	| 'bank.waiting'
-	| 'bank.restricted'
-	| 'bank.working'
-	| 'bank.success'
-	| 'bank.partial_success'
-	| 'bank.cancelled'
-	| 'bank.failure'
-	| 'bank.mode_mismatch'
-	| 'bank.passkey_failure'
-	| 'bank.claim_failure'
-	| 'bank.invalid_setup_token'
-	| 'bank.account_already_linked'
-	| 'bank.save_failure'
-	| 'bank.other_tab'
-	| 'bank.locking_unavailable'
-	| 'bank.unlock_failure'
-	| 'bank.provider_failure'
-	| 'bank.mapping_failure'
+import type { z } from 'zod'
+import type { bankStatusKey, bankMessage } from './worker-banks.js'
+export type BankStatusKey = z.output<typeof bankStatusKey>
 type SetupStep = { id: string; label: () => string }
 export const bankSetupSteps = [
 	{ id: 'token', label: () => m['bank.step_token']() },
@@ -42,8 +24,8 @@ export const bankSetupSteps = [
 	{ id: 'verify', label: () => m['bank.step_verify']() },
 	{ id: 'connect', label: () => m['bank.step_connect']() }
 ] satisfies [SetupStep, ...SetupStep[]]
-export type BankMessage = { label: () => string }
-export type BankStatus = BankMessage & { key: BankStatusKey }
+export type BankMessage = z.output<typeof bankMessage>
+export type BankStatus = { key: BankStatusKey }
 export type LastSync = {
 	time: Date
 	outcomeKey: 'bank.succeeded' | 'bank.partial' | 'bank.failed'

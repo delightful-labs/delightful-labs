@@ -19,7 +19,7 @@ import {
 } from '../../machines/storage/organize.js'
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
 import type { TransactionResource } from './transaction.js'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 import { documentsQuery } from './queries.js'
 const tagHistorySchema = z.array(tagOperationSchema)
 const organizationHistorySchema = z.array(organizationOperationSchema)

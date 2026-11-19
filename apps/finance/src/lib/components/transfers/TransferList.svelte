@@ -1,45 +1,47 @@
 <script lang="ts">
-	import type { TransactionRow } from '#lib/schema.js'
-	import { groupTransactionsByDate } from '#lib/domain/transaction-groups.js'
+	import type {
+		WorkerTransferListView,
+		WorkerLedgerRecord
+	} from '#lib/contracts/worker-application.js'
 	import { formatMoney } from '#lib/domain/money.js'
 	import { getLocale } from '#lib/paraglide/runtime.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import { Text } from 'delightful-ui'
-	import TransactionList from '../transactions/TransactionList.svelte'
+	import TransactionListView from '../transactions/TransactionListView.svelte'
 	import AppLink from '../navigation/AppLink.svelte'
 	let {
-		pairs,
-		accountNames,
-		noAccountsSelected,
-		requestedPage,
+		view,
 		pageHref,
-		transferHref
+		transferHref,
+		onPage
 	}: {
-		pairs: readonly { id: string; expense: TransactionRow; income: TransactionRow }[]
-		accountNames: ReadonlyMap<string, string>
-		noAccountsSelected: boolean
-		requestedPage: number
+		view: WorkerTransferListView
 		pageHref: (page: number) => string
 		transferHref: (id: string) => string
+		onPage: (page: number) => void
 	} = $props()
-	const groups = $derived(groupTransactionsByDate(pairs.map((pair) => pair.expense)))
-	const incomeByExpense = $derived(new Map(pairs.map((pair) => [pair.expense.id, pair.income])))
+	const groups = $derived(view.groups.map((group) => ({ ...group, totals: new Map(group.totals) })))
+	const accountNames = $derived(new Map(view.accounts.map((account) => [account.id, account.name])))
+	const incomeByExpense = $derived(
+		new Map(view.pairs.map((pair) => [pair.expense.id, pair.income]))
+	)
 	const dateFormatter = $derived(
 		new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium', timeZone: 'UTC' })
 	)
 	function transactionHref(id: string) {
-		const pair = pairs.find((pair) => pair.expense.id === id)
-		return transferHref(pair?.id ?? id)
+		return transferHref(view.pairs.find((pair) => pair.expense.id === id)?.id ?? id)
 	}
-	function money(row: TransactionRow) {
+	function money(row: WorkerLedgerRecord) {
 		return formatMoney(row.amountMinor, row.currency, getLocale())
 	}
 </script>
 
-<TransactionList
+<TransactionListView
 	{groups}
-	{noAccountsSelected}
-	{requestedPage}
+	noAccountsSelected={view.noAccountsSelected}
+	page={view.page}
+	pageCount={view.pageCount}
+	{onPage}
 	{pageHref}
 	{transactionHref}
 	categoryNames={new Map()}
@@ -85,7 +87,7 @@
 			</li>
 		{/if}
 	{/snippet}
-</TransactionList>
+</TransactionListView>
 
 <style>
 	li :global(.transfer-link) {

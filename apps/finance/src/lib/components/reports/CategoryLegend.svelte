@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from 'delightful-ui'
-	import { formatMoney } from '#lib/domain/money.js'
+	import { formatSignedMoney } from '#lib/domain/money.js'
 	import { getLocale } from '#lib/paraglide/runtime.js'
 	let {
 		items,
@@ -10,7 +10,7 @@
 		onselect,
 		onclear
 	}: {
-		items: readonly { key: string; label: string; value: number; color: string }[]
+		items: readonly { key: string; label: string; value: bigint; color: string }[]
 		selectedKey: string | null
 		currency: string
 		allLabel: string
@@ -28,7 +28,7 @@
 				aria-pressed={selectedKey === slice.key}
 				onclick={() => onselect(slice.key)}
 				><span class="swatch" style:background={slice.color}></span><span>{slice.label}</span><span
-					class="amount">{formatMoney(slice.value, currency, getLocale())}</span
+					class="amount">{formatSignedMoney(slice.value, currency, getLocale())}</span
 				></button
 			>
 		</li>

@@ -1,0 +1,403 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "d0ce244a9ee3654f6eb35ad619f8869fc88ebe12976b2882fd9b27b5470a5d29"
+  },
+  "tables": {
+    "articleImages": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          {
+            "allOf": [
+              "exists libraries(id = this.libraryId, ownerId = session.user)",
+              "exists articles(id = this.articleId, libraryId = this.libraryId)"
+            ]
+          },
+          "status = 'pending'",
+          "assetId = null"
+        ]
+      },
+      "update": {
+        "old": {
+          "allOf": [
+            "exists libraries(id = this.libraryId, ownerId = session.user)",
+            { "anyOf": ["status = 'pending'", "status = 'failed'"] }
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "allOf": [
+                "exists libraries(id = this.libraryId, ownerId = session.user)",
+                "exists articles(id = this.articleId, libraryId = this.libraryId)"
+              ]
+            },
+            {
+              "anyOf": [
+                { "allOf": ["status = 'failed'", "assetId = null"] },
+                {
+                  "allOf": [
+                    "status = 'ready'",
+                    "exists assets(id = this.assetId, libraryId = this.libraryId)"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "articles": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists storageOperations(id = this.operationId, libraryId = this.libraryId)",
+          {
+            "anyOf": ["siteId = null", "exists sites(id = this.siteId, libraryId = this.libraryId)"]
+          }
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    },
+    "assets": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists storageOperations(id = this.operationId, libraryId = this.libraryId)"
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_account": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_atprotoSession": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_atprotoState": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_session": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_user": { "read": "false", "insert": "false", "update": "false", "delete": "false" },
+    "better_auth_verification": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "documentCaptures": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+        ]
+      },
+      "update": {
+        "old": "exists libraries(id = this.libraryId, ownerId = session.user)",
+        "new": {
+          "allOf": [
+            "exists libraries(id = this.libraryId, ownerId = session.user)",
+            "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "highlightAnchors": {
+      "read": "exists highlights(id = this.highlightId, libraryId = session.user)",
+      "insert": "exists highlights(id = this.highlightId, libraryId = session.user)",
+      "update": "false",
+      "delete": "false"
+    },
+    "highlights": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+        ]
+      },
+      "update": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+        ]
+      },
+      "delete": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+        ]
+      }
+    },
+    "libraries": {
+      "read": "ownerId = session.user",
+      "insert": {
+        "allOf": ["id = session.user", "ownerId = session.user", "bootstrapVersion = '1'"]
+      },
+      "update": {
+        "allOf": ["id = session.user", "ownerId = session.user", "bootstrapVersion = '1'"]
+      },
+      "delete": "false"
+    },
+    "libraryDocuments": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          {
+            "anyOf": [
+              {
+                "allOf": [
+                  "status = 'trashed'",
+                  {
+                    "anyOf": [
+                      "previousStatus = 'inbox'",
+                      "previousStatus = 'later'",
+                      "previousStatus = 'archive'"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  { "anyOf": ["status = 'inbox'", "status = 'later'", "status = 'archive'"] },
+                  "previousStatus = null"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              "attachmentId = null",
+              "exists articles(id = this.attachmentId, libraryId = this.libraryId)"
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": "exists libraries(id = this.libraryId, ownerId = session.user)",
+        "new": {
+          "allOf": [
+            "exists libraries(id = this.libraryId, ownerId = session.user)",
+            {
+              "anyOf": [
+                {
+                  "allOf": [
+                    "status = 'trashed'",
+                    {
+                      "anyOf": [
+                        "previousStatus = 'inbox'",
+                        "previousStatus = 'later'",
+                        "previousStatus = 'archive'"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    { "anyOf": ["status = 'inbox'", "status = 'later'", "status = 'archive'"] },
+                    "previousStatus = null"
+                  ]
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                "attachmentId = null",
+                "exists articles(id = this.attachmentId, libraryId = this.libraryId)"
+              ]
+            }
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "noteRevisions": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists notes(id = this.noteId, libraryId = this.libraryId)"
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    },
+    "notes": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          {
+            "allOf": [
+              "exists libraries(id = this.libraryId, ownerId = session.user)",
+              "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+            ]
+          },
+          {
+            "anyOf": [
+              "highlightId = null",
+              "exists highlights(id = this.highlightId, libraryId = this.libraryId, documentId = this.documentId)"
+            ]
+          }
+        ]
+      },
+      "update": {
+        "allOf": [
+          {
+            "allOf": [
+              "exists libraries(id = this.libraryId, ownerId = session.user)",
+              "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+            ]
+          },
+          {
+            "anyOf": [
+              "highlightId = null",
+              "exists highlights(id = this.highlightId, libraryId = this.libraryId, documentId = this.documentId)"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "allOf": [
+          {
+            "allOf": [
+              "exists libraries(id = this.libraryId, ownerId = session.user)",
+              "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+            ]
+          },
+          {
+            "anyOf": [
+              "highlightId = null",
+              "exists highlights(id = this.highlightId, libraryId = this.libraryId, documentId = this.documentId)"
+            ]
+          }
+        ]
+      }
+    },
+    "organizationOperations": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          {
+            "allOf": [
+              "exists libraries(id = this.libraryId, ownerId = session.user)",
+              "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "allOf": [
+                  "field = 'status'",
+                  { "anyOf": ["value = 'inbox'", "value = 'later'", "value = 'archive'"] }
+                ]
+              },
+              {
+                "allOf": [
+                  { "anyOf": ["field = 'favorite'", "field = 'trashed'"] },
+                  { "anyOf": ["value = 'true'", "value = 'false'"] }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    },
+    "publications": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "readerOperations": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          {
+            "anyOf": [
+              "field = 'theme'",
+              "field = 'font'",
+              "field = 'size'",
+              "field = 'spacing'",
+              "field = 'width'"
+            ]
+          }
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    },
+    "sites": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          {
+            "anyOf": [
+              "faviconId = null",
+              "exists assets(id = this.faviconId, libraryId = this.libraryId)"
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": "exists libraries(id = this.libraryId, ownerId = session.user)",
+        "new": {
+          "allOf": [
+            "exists libraries(id = this.libraryId, ownerId = session.user)",
+            {
+              "anyOf": [
+                "faviconId = null",
+                "exists assets(id = this.faviconId, libraryId = this.libraryId)"
+              ]
+            }
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "storageOperations": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "update": "false",
+      "delete": "false"
+    },
+    "tagOperations": {
+      "read": "exists libraries(id = this.libraryId, ownerId = session.user)",
+      "insert": {
+        "allOf": [
+          "exists libraries(id = this.libraryId, ownerId = session.user)",
+          "exists libraryDocuments(id = this.documentId, libraryId = this.libraryId)"
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    }
+  }
+}

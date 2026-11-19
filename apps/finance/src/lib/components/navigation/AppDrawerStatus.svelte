@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Button, ButtonContent, StatusMessage } from 'delightful-ui'
-	import type { BankSyncControls } from '#lib/runtime/bank-sync.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import SyncIcon from 'tdesign-icons-svg/src/refresh.svg?component'
 	import AppDrawerContentSection from './AppDrawerContentSection.svelte'
@@ -10,7 +9,7 @@
 		browserOffline,
 		syncConfigured
 	}: {
-		bankSync: BankSyncControls
+		bankSync: { visible: boolean; disabled: boolean; loading: boolean; sync: () => void }
 		syncConfigured: boolean
 		browserOffline: boolean
 	} = $props()

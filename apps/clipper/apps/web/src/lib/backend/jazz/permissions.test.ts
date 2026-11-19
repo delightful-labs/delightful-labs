@@ -1,13 +1,12 @@
-import { policySchema } from './schema-permissions.test-support.js'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => {
 	await fixture?.shutdown()

@@ -12,9 +12,9 @@ import type {
 	AccountCreationScope
 } from '#lib/contracts/account-creation-contract.js'
 import { accountFormSchema } from '#lib/validation/accounts.js'
-import type { Account } from '#lib/schema.js'
+import type { Account } from '#lib/queries.js'
 import { createSingleWriteFormOptions } from '../forms/scoped-form-policy.js'
-import type { OrganizationMember } from '#lib/schema.js'
+import type { OrganizationMember } from '#lib/queries.js'
 import { setup, types } from 'xstate'
 import type { SnapshotFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'

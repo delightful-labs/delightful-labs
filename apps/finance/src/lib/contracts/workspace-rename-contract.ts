@@ -1,4 +1,4 @@
-import type { Organization, OrganizationMember } from '../schema.js'
+import type { Organization, OrganizationMember } from '../queries.js'
 import type { ScopedFormView } from './form-contract.js'
 
 export type WorkspaceRenameReason =

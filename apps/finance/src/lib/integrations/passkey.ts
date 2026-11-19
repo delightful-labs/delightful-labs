@@ -1,3 +1,4 @@
+import { requestWebAuthn } from './webauthn.js'
 import { type BankTrace } from './diagnostics.js'
 import {
 	credentialEnvelopeSchema,
@@ -51,24 +52,27 @@ async function keyFor(
 ) {
 	signal.throwIfAborted()
 	const credential = await trace.step('passkey.assertion', () =>
-		navigator.credentials.get({
-			signal,
-			publicKey: {
-				challenge: random(32),
-				allowCredentials: [{ type: 'public-key', id: decode(credentialId) }],
-				userVerification: 'required',
-				extensions: { prf: { eval: { first: decode(salt) } } }
-			}
-		})
+		requestWebAuthn(
+			{
+				type: 'WEBAUTHN',
+				operation: 'get',
+				publicKey: {
+					challenge: random(32),
+					allowCredentials: [{ type: 'public-key', id: decode(credentialId) }],
+					userVerification: 'required',
+					extensions: { prf: { eval: { first: decode(salt) } } }
+				}
+			},
+			signal
+		)
 	)
-	const credentialMatched =
-		credential instanceof PublicKeyCredential && encode(credential.rawId) === credentialId
-	const output =
-		credential instanceof PublicKeyCredential
-			? credential.getClientExtensionResults().prf?.results?.first
-			: undefined
+	const credentialMatched = encode(credential.rawId) === credentialId
+	const output = credential.prfFirst
 	trace.log('passkey.assertion.result', { credentialMatched, prfResultPresent: Boolean(output) })
-	if (!credentialMatched || !output) throw new Error('passkey-unavailable')
+	if (!credentialMatched || !output) {
+		if (output) byteView(output).fill(0)
+		throw new Error('passkey-unavailable')
+	}
 	const bytes = byteView(output)
 	trace.log('passkey.prf.buffer', {
 		prfByteLength: bytes.byteLength,
@@ -118,35 +122,29 @@ export async function createPasskey(
 	appName: string,
 	trace: BankTrace
 ) {
-	trace.log('passkey.capabilities', {
-		secureContext: globalThis.isSecureContext,
-		webAuthnAvailable: Boolean(globalThis.PublicKeyCredential)
-	})
-	if (!globalThis.isSecureContext || !globalThis.PublicKeyCredential)
-		throw new Error('passkey-unavailable')
 	const created = await trace.step('passkey.create', () =>
-		navigator.credentials.create({
-			signal,
-			publicKey: {
-				challenge: random(32),
-				rp: { name: appName },
-				user: { id: text(scope.ownerId), name: scope.ownerId, displayName: appName },
-				pubKeyCredParams: [
-					{ type: 'public-key', alg: -7 },
-					{ type: 'public-key', alg: -257 }
-				],
-				authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
-				attestation: 'none',
-				extensions: { prf: {} }
-			}
-		})
+		requestWebAuthn(
+			{
+				type: 'WEBAUTHN',
+				operation: 'create',
+				publicKey: {
+					challenge: random(32),
+					rp: { name: appName },
+					user: { id: text(scope.ownerId), name: scope.ownerId, displayName: appName },
+					pubKeyCredParams: [
+						{ type: 'public-key', alg: -7 },
+						{ type: 'public-key', alg: -257 }
+					],
+					authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+					attestation: 'none',
+					extensions: { prf: {} }
+				}
+			},
+			signal
+		)
 	)
-	trace.log('passkey.create.result', {
-		prfEnabled:
-			created instanceof PublicKeyCredential &&
-			created.getClientExtensionResults().prf?.enabled === true
-	})
-	if (!(created instanceof PublicKeyCredential)) throw new Error('passkey-unavailable')
+	if (created.prfFirst) byteView(created.prfFirst).fill(0)
+	trace.log('passkey.create.result', { prfEnabled: created.prfEnabled })
 	return { credentialId: encode(created.rawId), prfSalt: encode(random(32)) }
 }
 

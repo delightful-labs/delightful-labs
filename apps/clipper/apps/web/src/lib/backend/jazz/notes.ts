@@ -1,7 +1,7 @@
 import type { z } from 'zod'
 import { ReadTier } from 'jazz-tools'
 import type { Db } from 'jazz-tools'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
 import type { TransactionResource } from './transaction.js'
 import {

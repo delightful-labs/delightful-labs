@@ -1,0 +1,243 @@
+{
+  "restoreAttachments": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "destinationId",
+        "nullable": false,
+        "references": "restoreDestinations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "operationId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "mediaType",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "fileName",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "sizeBytes",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "sha256",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Bytea"
+        },
+        "name": "contents",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "destination": {
+        "kind": "forward",
+        "table": "restoreDestinations",
+        "column": "destinationId"
+      }
+    }
+  },
+  "restoreDestinations": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "operationId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "payloadSha256",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "graphSha256",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "incomplete",
+            "active"
+          ]
+        },
+        "name": "status",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "attachments": {
+        "kind": "reverse",
+        "table": "restoreAttachments",
+        "relation": "destination"
+      },
+      "notebooks": {
+        "kind": "reverse",
+        "table": "restoreNotebooks",
+        "relation": "destination"
+      },
+      "notes": {
+        "kind": "reverse",
+        "table": "restoreNotes",
+        "relation": "destination"
+      }
+    }
+  },
+  "restoreNotebooks": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "destinationId",
+        "nullable": false,
+        "references": "restoreDestinations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "operationId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "title",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "destination": {
+        "kind": "forward",
+        "table": "restoreDestinations",
+        "column": "destinationId"
+      }
+    }
+  },
+  "restoreNotes": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "destinationId",
+        "nullable": false,
+        "references": "restoreDestinations"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "operationId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "notebookId",
+        "nullable": false,
+        "references": "restoreNotebooks"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "attachmentId",
+        "nullable": true,
+        "references": "restoreAttachments"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "body",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "name": "archived",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "destination": {
+        "kind": "forward",
+        "table": "restoreDestinations",
+        "column": "destinationId"
+      },
+      "notebook": {
+        "kind": "forward",
+        "table": "restoreNotebooks",
+        "column": "notebookId"
+      },
+      "attachment": {
+        "kind": "forward",
+        "table": "restoreAttachments",
+        "column": "attachmentId"
+      }
+    }
+  }
+}

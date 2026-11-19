@@ -136,7 +136,10 @@ export function jazzDev(enabled: boolean): Plugin {
 			const backendFiles = [
 				'/src/lib/server/jazz.ts',
 				'/src/lib/schema.ts',
-				'/src/lib/permissions.ts'
+				'/src/lib/permissions.ts',
+				'/src/lib/jazz.app.json',
+				'/src/lib/jazz.permissions.json',
+				'/src/lib/jazz.generated.ts'
 			]
 			if (!enabled || !backendFiles.some((path) => file.endsWith(path))) return
 			await server.restart()

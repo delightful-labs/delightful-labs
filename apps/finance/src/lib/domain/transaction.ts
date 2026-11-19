@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import type { TransactionRow } from '../schema.js'
+import type { TransactionRow } from '../queries.js'
 import {
 	appTransactionSchema,
 	independentTransactionSchema,

@@ -18,22 +18,17 @@ const windowBindingExports = ['serveBrowserWorkerHost']
 const publicEntries = [
 	'jazz-tools/client',
 	'jazz-tools/local-first',
-	'delightful-local-first/backend/jazz/session',
-	'delightful-local-first/backend/jazz/startup',
-	'delightful-local-first/session/workflow',
-	'delightful-local-first/worker/channel/workflow',
-	'delightful-local-first/worker/effect-drain/workflow',
+	'delightful-local-first/backend/jazz/session-runtime',
+	'delightful-local-first/session/runtime',
 	'delightful-local-first/backend/jazz/account-store/indexeddb',
 	'delightful-local-first/backend/jazz/worker-broker'
 ]
 const requiredImplementations = [
+	'src/lib/runtime/worker/account-store.ts',
 	'/jazz-tools/dist/session/create-jazz-session.js',
 	'/jazz-tools/dist/runtime/default-create-db.js',
-	'/delightful-local-first/dist/backend/jazz/session.js',
-	'/delightful-local-first/dist/backend/jazz/startup.js',
-	'/delightful-local-first/dist/machines/identity/session-acquisition.js',
-	'/delightful-local-first/dist/machines/lifecycle/worker-channel.js',
-	'/delightful-local-first/dist/machines/lifecycle/worker-effect-drain.js',
+	'/delightful-local-first/dist/backend/jazz/session-runtime.js',
+	'/delightful-local-first/dist/machines/identity/session-runtime.js',
 	'/delightful-local-first/dist/backend/jazz/indexeddb-account-store.js',
 	'/delightful-local-first/dist/machines/identity/indexeddb-account-store.js',
 	'/delightful-local-first/dist/storage/indexeddb-account-store-native.js',

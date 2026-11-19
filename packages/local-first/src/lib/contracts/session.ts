@@ -30,13 +30,22 @@ export type SessionStartupReport<Session extends object> =
 export type SessionStartupOutput = Readonly<{ outcome: 'closed' }>
 
 /** SDK status only: never a workspace permission, remote freshness, or retry-settlement claim. */
-export type SessionStatus = 'ready' | 'signed-out' | 'transitioning' | 'error' | 'closed'
+export type SessionStatus =
+	| 'starting'
+	| 'ready'
+	| 'signed-out'
+	| 'transitioning'
+	| 'error'
+	| 'closed'
 export type SessionReadinessScope = Readonly<{ binding: object; attachment: object }>
 export type SessionReadinessCapability = Readonly<{
 	readStatus: () => SessionStatus
 	subscribe: (notify: () => void) => () => void
-	retry: () => Promise<void>
-}>
+}> &
+	(
+		| Readonly<{ retry: () => Promise<void>; runtime?: never }>
+		| Readonly<{ runtime: import('./session-runtime.js').SessionRuntimeConnection; retry?: never }>
+	)
 export type SessionReadinessBinding = Readonly<{
 	binding: object
 	capability: SessionReadinessCapability

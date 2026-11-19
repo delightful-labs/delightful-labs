@@ -1,6 +1,6 @@
 import { INCOME, EXPENSE } from './transaction-kind.js'
 import { m } from '../paraglide/messages.js'
-import type { Category } from '../schema.js'
+import type { Category } from '../queries.js'
 
 /** Edit the starter set here. Keep keys stable when changing translated labels. */
 export function workspaceStarterCategories(): {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { bankMessageText } from '#lib/forms/bank-messages.js'
 	import { Button, Details } from 'delightful-ui'
 	import type {
 		BankMessage,
@@ -57,7 +58,7 @@
 
 {#snippet failure(message: BankMessage | undefined)}
 	{#if message}<dt>{m['labels.description']()}</dt>
-		<dd>{message.label()}</dd>{/if}
+		<dd>{bankMessageText(message)}</dd>{/if}
 {/snippet}
 
 <section aria-label={m['bank.log_title']()}>
@@ -68,7 +69,7 @@
 			<select value={connectionId} onchange={(event) => onConnection(event.currentTarget.value)}>
 				{#each connections as connection (connection.id)}
 					<option value={connection.id}
-						>{`${dates.format(connection.claimedAt)} — ${connection.ownerId ? initiator(connection.ownerId) : m['developer.unavailable']()} (${connection.status.label()})`}</option
+						>{`${dates.format(connection.claimedAt)} — ${connection.ownerId ? initiator(connection.ownerId) : m['developer.unavailable']()} (${bankMessageText(connection.status)})`}</option
 					>
 				{/each}
 			</select>
@@ -78,7 +79,7 @@
 		<p>{m['labels.no_subjects_yet']({ subjects: m['bank.log_title']() })}</p>
 	{/if}
 	{#each attempts as attempt (attempt.id)}
-		<Details summary={`${dates.format(attempt.startedAt)} — ${attempt.outcome.label()}`}>
+		<Details summary={`${dates.format(attempt.startedAt)} — ${bankMessageText(attempt.outcome)}`}>
 			<dl>
 				<dt>{m['labels.start_subject']({ subject: m['nouns.date']({ count: 1 }) })}</dt>
 				<dd>
@@ -94,11 +95,11 @@
 				<dd>{initiator(attempt.initiatedBy)}</dd>
 				{@render counts(attempt)}
 				<dt>{m['labels.status_subject']({ subject: m['bank.title']() })}</dt>
-				<dd>{attempt.importSettlement.label()}</dd>
+				<dd>{bankMessageText(attempt.importSettlement)}</dd>
 				{@render failure(attempt.failure)}
 			</dl>
 			{#each accounts.filter((row) => row.attemptId === attempt.id) as account (account.id)}
-				<Details summary={`${account.accountName} — ${account.outcome.label()}`}>
+				<Details summary={`${account.accountName} — ${bankMessageText(account.outcome)}`}>
 					<dl>
 						{@render counts(account)}
 						{@render failure(account.failure)}

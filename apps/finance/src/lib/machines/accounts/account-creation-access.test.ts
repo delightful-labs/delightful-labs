@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { OrganizationMember } from '#lib/schema.js'
+import type { OrganizationMember } from '#lib/queries.js'
 import { accountCreationAccessMachine } from './account-creation-access.js'
 import { createActor } from 'xstate'
 

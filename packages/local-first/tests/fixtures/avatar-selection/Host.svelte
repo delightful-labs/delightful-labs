@@ -18,6 +18,10 @@
 		close: 'Close', remove: 'Remove avatar', clear: 'Clear draft', edit: 'Edit avatar',
 		invalid: 'Invalid image', save: 'Save avatar', saved: 'Saved', cropTitle: 'Crop avatar', retry: 'Retry'
 	}
+	const emptyMessage = () => ''
+	const defaultMessages = { unknown: emptyMessage, loading: emptyMessage, loadFailed: emptyMessage,
+		saved: emptyMessage, completionFailed: emptyMessage, interruptedSaved: emptyMessage,
+		archiveFailed: emptyMessage, saveFailed: emptyMessage, settling: emptyMessage }
 </script>
 <button onclick={() => revision += 1}>Reset draft</button>
 <button onclick={() => profileId = profileId === 'one' ? 'two' : 'one'}>Change profile</button>
@@ -26,7 +30,7 @@
 <p role="status" aria-label="Selected file">{selected}</p>
 <p role="status" aria-label="Removals">{removals}</p>
 {#if mounted}
-	<ProfileAvatarForm {profileId} {view} {labels} avatarData={null} mimeType={null}
+	<ProfileAvatarForm {profileId} {view} {labels} {defaultMessages} avatarData={null} mimeType={null}
 		reasonText={() => ''} validateFile={(file) => file.type === 'image/png'} accept="image/*"
 		onsubmit={(event) => event.preventDefault()} onreset={(event) => event.preventDefault()}
 		oninput={() => {}} onRetryReadiness={() => {}} onRemove={() => removals += 1}

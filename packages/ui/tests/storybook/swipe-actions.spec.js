@@ -612,48 +612,50 @@ test.describe('native mobile touch gestures', () => {
 		)
 	})
 
-	test('full touch swipes dismiss in both directions and report one action each', async ({
-		page
-	}) => {
-		const group = await openStory(page, 'dismiss-on-full-swipe')
-		const session = await page.context().newCDPSession(page)
-		for (const { direction, expected } of [
-			{ direction: 'right', expected: 'trash / left / swipe' },
-			{ direction: 'left', expected: 'archive / right / swipe' }
-		]) {
-			const point = await gesture(
-				group,
-				direction === 'right' ? 'right' : 'left'
-			)
-			await touchGesture(
-				page,
-				session,
-				path(point, {
-					x: point.x + point.sign * point.width * 0.91,
-					y: point.y
-				})
-			)
-			await expect(
-				page.locator('output[aria-label="Chosen action"]')
-			).toHaveText(expected)
-			await expect(group).toHaveCount(0)
-			// Accessibility removal starts before dismissal finishes moving the reset control.
-			await expect(
-				page.getByRole('group', {
-					name: actionsName,
-					exact: true,
-					includeHidden: true
-				})
-			).toHaveJSProperty('hidden', true)
-			await page.getByRole('button', { name: 'Reset item', exact: true }).tap()
-			await expect(group.getByRole('link')).toBeVisible()
-		}
-		await expect(page.locator('output[aria-label="Action count"]')).toHaveText(
-			'2'
-		)
-		await expect(page).not.toHaveURL(/#saved-article$/)
-		await session.detach()
-	})
+	// Each direction starts from a fresh story. Reset has separate coverage and
+	// must not make this native swipe case depend on another touch hit target.
+	for (const { direction, expected } of [
+		{ direction: 'right', expected: 'trash / left / swipe' },
+		{ direction: 'left', expected: 'archive / right / swipe' }
+	]) {
+		test(`a full touch swipe dismisses ${direction} and reports one action`, async ({
+			page
+		}) => {
+			const group = await openStory(page, 'dismiss-on-full-swipe')
+			const session = await page.context().newCDPSession(page)
+			try {
+				const point = await gesture(
+					group,
+					direction === 'right' ? 'right' : 'left'
+				)
+				await touchGesture(
+					page,
+					session,
+					path(point, {
+						x: point.x + point.sign * point.width * 0.91,
+						y: point.y
+					})
+				)
+				await expect(
+					page.locator('output[aria-label="Chosen action"]')
+				).toHaveText(expected)
+				await expect(
+					page.locator('output[aria-label="Action count"]')
+				).toHaveText('1')
+				await expect(group).toHaveCount(0)
+				await expect(
+					page.getByRole('group', {
+						name: actionsName,
+						exact: true,
+						includeHidden: true
+					})
+				).toHaveJSProperty('hidden', true)
+				await expect(page).not.toHaveURL(/#saved-article$/)
+			} finally {
+				await session.detach()
+			}
+		})
+	}
 
 	test('short touch swipes reveal the underlay for a native action tap in both directions', async ({
 		page

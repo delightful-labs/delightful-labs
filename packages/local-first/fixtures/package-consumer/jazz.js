@@ -1,58 +1,42 @@
-// The fixture is a host: its own Jazz instance issues the handle consumed by the built adapter.
-import { createAccountManager, exportLocalFirstSecret } from 'jazz-tools'
+// Typed package host; native key generation/parser, built adapters and workflows.
+// Real SDK session/database drain is covered by native consumer/browser qualification.
+import { generateAuthSecret } from 'jazz-tools'
 import { RecoveryPhrase } from 'jazz-tools/passphrase'
 import { createJazzRecoveryAdapter } from 'delightful-local-first/backend/jazz/recovery'
 import { createJazzRestorationAdapter } from 'delightful-local-first/backend/jazz/restoration'
 import { restorationMachine } from 'delightful-local-first/restoration/workflow'
 import { createActor, createCallbackLogic, waitFor } from 'xstate'
 
-/** @type {string | null} */
-let stored = null
-const manager = await createAccountManager({
-	appId: 'recovery-package-consumer',
-	serverUrl: 'http://127.0.0.1:9',
-	store: {
-		read: async () => stored,
-		update: async (transform) => {
-			stored = transform(stored)
-		}
+const key = generateAuthSecret()
+/** @type {import('jazz-tools/client').JazzUser} */
+const user = {
+	kind: 'device',
+	accountId: crypto.randomUUID(),
+	identity: { issuer: 'device', subject: 'package-host' },
+	claims: {}
+}
+/** @type {import('jazz-tools/client').JazzSessionSnapshot<unknown>} */
+let snapshot = { status: 'ready', user, localFirst: true }
+const session = {
+	getSnapshot: () => snapshot,
+	exportDeviceKey: () => key,
+	restoreDeviceAccount: async (/** @type {string} */ credential) => {
+		if (credential !== key) throw new Error('Package restoration changed the credential')
+		snapshot = { status: 'ready', user, localFirst: true }
 	}
-})
-const account = manager.createLocalFirst()
-const adapter = createJazzRecoveryAdapter(() => manager.getLoggedIn())
+}
+const adapter = createJazzRecoveryAdapter(() => session)
 try {
-	const scope = adapter.observeAccount(account)
+	const scope = adapter.observeSession()
 	if (scope.kind !== 'available') throw new Error('Packaged adapter did not accept the host scope')
 	const phrase = await adapter.capability.readPhrase(scope)
 	// Compare booleans so generated credential material cannot enter a failed assertion/report.
-	if (RecoveryPhrase.toSecret(phrase) !== exportLocalFirstSecret(account)) {
+	if (RecoveryPhrase.toSecret(phrase) !== key) {
 		throw new Error('Packaged adapter did not recover the host-issued root')
 	}
-	if (manager.getLoggedIn() !== account)
+	if (session.getSnapshot().user !== user)
 		throw new Error('Packaged adapter changed the host session')
 
-	// A minimal typed host double qualifies built adapter/workflow interoperability with the
-	// real SDK parser and account manager. It does not qualify Jazz's real session/client drain.
-	const unexpected = async () => {
-		throw new Error('Unexpected package-host lifecycle call')
-	}
-	/** @type {import('jazz-tools/client').JazzSession<unknown>} */
-	const session = {
-		getSnapshot: () => {
-			const selected = manager.getLoggedIn()
-			return selected ? { status: 'ready', account: selected } : { status: 'signed-out' }
-		},
-		subscribe: () => () => {},
-		restoreLocalFirst: async (credential) => {
-			manager.restoreLocalFirst(credential)
-		},
-		createLocalFirst: unexpected,
-		loginWithBackend: unexpected,
-		linkWithBackend: unexpected,
-		logout: unexpected,
-		retry: unexpected,
-		close: unexpected
-	}
 	const restorationAdapter = createJazzRestorationAdapter(session, () => session)
 	const restorationScope = { binding: restorationAdapter.binding, attempt: 1 }
 	/** @type {import('delightful-local-first/restoration/workflow').RestorationInput['reportTo'] & {stop():void}} */
@@ -76,11 +60,13 @@ try {
 	try {
 		restoration.start()
 		const completed = await waitFor(restoration, (snapshot) => snapshot.status === 'done')
-		if (completed.output?.outcome !== 'restored' || completed.output.identityId !== account.id) {
+		if (
+			completed.output?.outcome !== 'restored' ||
+			completed.output.identityId !== user.accountId
+		) {
 			throw new Error('Packaged restoration did not recover the intended identity')
 		}
-		const selected = manager.getLoggedIn()
-		if (!selected || exportLocalFirstSecret(selected) !== RecoveryPhrase.toSecret(phrase)) {
+		if (session.exportDeviceKey() !== RecoveryPhrase.toSecret(phrase)) {
 			throw new Error('Packaged restoration did not preserve the host-issued root')
 		}
 	} finally {
@@ -90,5 +76,4 @@ try {
 	}
 } finally {
 	adapter.invalidate()
-	manager.logout()
 }

@@ -1,5 +1,12 @@
 # Connected Jazz session / Chrome extension teardown reproducer
 
+This is the historical alpha.60 investigation. Its disposable runner and fixture
+are preserved at [commit 51b8e878](https://github.com/delightful-labs/delightful-labs/tree/51b8e8780526eef299c2093e7528ae013515eca7/apps/clipper/apps/web/tooling/repro-extension-teardown).
+Use that checkout and its lockfile to reproduce the campaign below. The obsolete
+runner has been removed from current source so native SDK upgrades do not maintain
+an unused second backend and account implementation. Current worker and packaged
+extension suites qualify the supported runtime.
+
 This manual diagnostic is independent of Clipper's application, DLF and XState.
 It creates a disposable one-table Jazz backend, an extension with a native toolbar
 listener, and fresh browser profiles. The options page opens a Jazz local-first

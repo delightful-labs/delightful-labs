@@ -1,3 +1,5 @@
+import * as imageWorker from '../../runtime/worker/image-render.js'
+import { renderEditorPixels } from '../../domain/image-editor-pixels.js'
 /** Minimal native pixel-buffer stand-in for Node; tests exercise the real pixel math. */
 export class TestImageData implements ImageData {
 	readonly colorSpace: PredefinedColorSpace = 'srgb'
@@ -18,6 +20,7 @@ import * as platform from '../../domain/image-editor-platform.js'
 /** Deterministic native adapters; owner tests still invoke the real editor statechart. */
 export function mockEditorPlatform() {
 	vi.stubGlobal('ImageData', TestImageData)
+	mockEditorRendering()
 	const source = new TestImageData(
 		4,
 		4,
@@ -41,4 +44,12 @@ export function mockEditorPlatform() {
 		.mockResolvedValue(new Blob(['edited'], { type: 'image/png' }))
 	const release = vi.spyOn(platform, 'releaseEditorCanvas')
 	return { source, bitmap, canvas, canvasResource, decode, read, paint, encode, release }
+}
+
+/** Replace only the browser transport; keep the actual image pixel implementation. */
+export function mockEditorRendering() {
+	return vi.spyOn(imageWorker, 'renderImageInWorker').mockImplementation(async (input, signal) => {
+		signal.throwIfAborted()
+		return renderEditorPixels(input.source, input.selection, input.adjustments)
+	})
 }

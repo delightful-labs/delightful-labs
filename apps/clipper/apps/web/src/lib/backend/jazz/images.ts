@@ -11,7 +11,7 @@ import { imageRowSchema, processedImageSchema } from '../../images/schema.js'
 import { z } from 'zod'
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
 import type { TransactionResource } from './transaction.js'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 export function createImageRecords(
 	db: Pick<Db, 'one' | 'subscribe' | 'beginTransaction'>,
 	libraryId: string,

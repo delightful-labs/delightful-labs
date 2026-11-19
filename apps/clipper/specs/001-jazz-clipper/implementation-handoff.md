@@ -1,5 +1,31 @@
 # Article notes — implementation started
 
+## Historical isolated Jazz alpha.66 schema qualification — 2026-11-17
+
+Active Clipper remains on alpha.60. The Finance worker-upgrade branch now has an
+isolated native Clipper schema/permission/reading port, recorded in the
+[shared upgrade qualification](../../../finance/specs/013-local-first-startup/worker-jazz-alpha66-research.md#clipper-native-schema-foundation).
+Its unpatched alpha.66 source preserves the stored schema and permission bundle;
+native generation/history, selected strict types and 57 cases pass. These include
+two-replica reading convergence after offline restarts, offline notes and an
+actual alpha.60 SQLite store opened/edited/reopened with alpha.66.
+
+The candidate uses the native resume-position set plus existing Clipper codecs
+at record boundaries. It does not patch nullable transforms or introduce a new
+storage format. It removes the unused auth-only App, reading-column wrapper and
+policy-fixture schema clone. Full app/extension/session and Better Auth/provider
+qualification remain open; this is not an SDK switch or release approval.
+The historical qualification above predates PR51. Its schema overlay must be reconciled
+with the approved required `notes.documentId`, same-document policy and native migration
+history below before the coordinated SDK upgrade; it must not restore the earlier optional
+Note document model. Active alpha.60 production repair is retained unchanged.
+
+The maintained alpha.67 candidate is now reconciled with that repair: a fresh native run passes
+61 cases, strict annotation/migration types, exact schema/permission identity and an actual
+alpha.60 historical production-store reopen with retained app ID. See the
+[reconciliation evidence](../../../finance/specs/013-local-first-startup/worker-session-resource-decision.md#reconcile-merged-pr51-before-further-coordinated-sdk-work).
+This supersedes the overlay conflict, while full session/backend adoption remains open.
+
 ## Production schema lineage repair — test profiles disposable
 
 Production PR #50 (`f3827565`) returns Jazz 503 and sign-in 500 because its store

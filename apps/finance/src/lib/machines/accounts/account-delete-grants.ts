@@ -1,5 +1,5 @@
 import { ORGANIZATION_ROLE } from '#lib/domain/organization-role.js'
-import type { Account, AccountMembership, OrganizationMember } from '#lib/schema.js'
+import type { Account, AccountMembership, OrganizationMember } from '#lib/queries.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { SnapshotFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
@@ -324,14 +324,41 @@ function required<Value>(value: Value | undefined): Value {
 	return value
 }
 
-export type AccountDeleteGrantView = {
-	busy: boolean
-	result: Result | undefined
-}
+export type AccountDeleteGrantView =
+	import('../../contracts/worker-accounts.js').WorkerAccountAccessView
 
 export function selectAccountDeleteGrantView(
 	snapshot: SnapshotFrom<ReturnType<typeof createAccountDeleteGrantMachine>>
 ): AccountDeleteGrantView {
-	const busy = typeof snapshot.value === 'object' && 'operating' in snapshot.value
-	return { busy, result: snapshot.context.result }
+	const { observation, result } = snapshot.context
+	const role = observation.membership?.role
+	return {
+		busy: typeof snapshot.value === 'object' && 'operating' in snapshot.value,
+		canManage:
+			observation.sessionReady &&
+			!!observation.identityId &&
+			!!observation.organizationId &&
+			!!observation.binding &&
+			!observation.failed &&
+			observation.membership?.userId === observation.identityId &&
+			observation.membership.organizationId === observation.organizationId &&
+			(role === ORGANIZATION_ROLE.OWNER || role === ORGANIZATION_ROLE.ADMIN),
+		loading: observation.loading,
+		failed: observation.failed,
+		members: observation.members.filter((member) => member.role === ORGANIZATION_ROLE.MEMBER),
+		grants: [...observation.grants],
+		result: result
+			? {
+					outcome: result.outcome,
+					request: result.request ? { accountId: result.request.accountId } : undefined
+				}
+			: undefined
+	}
+}
+
+export function selectAccountDeleteGrantReport(
+	snapshot: SnapshotFrom<ReturnType<typeof createAccountDeleteGrantMachine>>
+) {
+	const { binding, identityId, organizationId } = snapshot.context.observation
+	return { binding, identityId, organizationId, view: selectAccountDeleteGrantView(snapshot) }
 }

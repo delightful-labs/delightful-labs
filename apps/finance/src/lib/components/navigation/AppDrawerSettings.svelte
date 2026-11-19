@@ -3,7 +3,6 @@
 	import AppNavigationLink from './AppNavigationLink.svelte'
 	import { NavigationGroup, Navigation } from 'delightful-ui'
 	import type { ComponentProps } from 'svelte'
-	import type { Organization } from '#lib/schema.js'
 	import AppDrawerContentSection from './AppDrawerContentSection.svelte'
 	import WorkspaceSelector from '../workspaces/WorkspaceSelector.svelte'
 	import QueryContent from '../shared/QueryContent.svelte'
@@ -21,7 +20,7 @@
 	}: {
 		pathname: string
 		onNavigate: () => void
-		organizations: readonly Organization[] | undefined
+		organizations: ComponentProps<typeof WorkspaceSelector>['organizations']
 		organizationId: string | null
 		organizationQueries: ComponentProps<typeof QueryContent>['queries']
 		onOrganizationChange: (value: string) => void

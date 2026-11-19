@@ -1,16 +1,15 @@
-import { policySchema } from './schema-permissions.test-support.js'
 import { beforeAll, afterAll, expect, it, vi } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
 import { readerHistorySchema, projectReaderState } from '../../reader/schema.js'
-import type { ReaderChange } from '../../reader/schema.js'
+import type { ReaderChange, ReaderDocumentState, ReadingPosition } from '../../reader/schema.js'
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => {
 	await fixture?.shutdown()
@@ -63,24 +62,26 @@ it('persists independent reading fields and causally ordered positions with priv
 	await change(a, { documentId: null, field: 'size', value: 24 })
 	await change(a, { documentId: null, field: 'theme', value: 'light' })
 	const pos = {
-		version: 1 as const,
+		version: 1,
 		offset: 5,
 		quote: 'able',
 		prefix: 'Read',
 		suffix: ' content',
 		progress: 0.5,
 		interactedAt: new Date()
-	}
+	} satisfies ReadingPosition
 	await change(a, { documentId: a.documentId, field: 'position', value: pos })
 	const rows = await a.db.all(app.readerOperations.where({ libraryId: a.id }))
-	const state = projectReaderState(
-		readerHistorySchema.parse(rows),
-		await a.db.all(
-			app.libraryDocuments
-				.where({ libraryId: a.id })
-				.select('id', 'readingProgress', 'resumePosition')
-		)
+	const observed = Promise.withResolvers<ReaderDocumentState[]>()
+	const release = a.records.reader.capability.subscribeDocuments(observed.resolve, () =>
+		observed.reject(new Error('Reading observation failed'))
 	)
+	let state: ReturnType<typeof projectReaderState>
+	try {
+		state = projectReaderState(readerHistorySchema.parse(rows), await observed.promise)
+	} finally {
+		release()
+	}
 	expect(state.preferences).toMatchObject({ theme: 'light', size: 24 })
 	expect(state.positions[a.documentId]).toEqual(pos)
 	expect(rows.find((row) => row.field === 'theme' && row.value === '"light"')?.parents).toBe(

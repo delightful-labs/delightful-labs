@@ -39,16 +39,16 @@ beforeAll(async () => {
 		serverUrl: server.url,
 		app,
 		permissions,
-		initial: 'local-first',
+		initial: 'device',
 		driver: { type: 'memory' }
 	})
 	sessions.push(session)
 	const first = session.getSnapshot()
-	if (first.status !== 'ready' || !first.client || !first.account)
+	if (first.status !== 'ready' || !first.client || !first.user)
 		throw new Error('Disposable client startup failed')
 	db = first.client.db
 	writer = server.jazz.db
-	identityId = first.account.id
+	identityId = first.user.accountId
 	db.onMutationError(() => {})
 }, 30000)
 afterAll(async () => {

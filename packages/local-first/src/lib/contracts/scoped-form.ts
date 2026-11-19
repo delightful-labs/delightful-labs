@@ -1,7 +1,7 @@
 /** SDK-, actor-, schema- and localization-free operation/view protocols.
  * Consumer feedback rendering may decorate these views without becoming a shared workflow input.
  */
-export type FormIssue = { path: readonly PropertyKey[]; code: string; message?: string }
+export type FormIssue = { path: readonly PropertyKey[]; code: string; message?: string | undefined }
 /** A validation leaf only; I/O/resource workflows belong in an invoked operation actor. */
 export type FormSchema<Values> = {
 	parseAsync: (value: unknown) => PromiseLike<Values>
@@ -43,7 +43,7 @@ export type FormResult<Result, Reason> =
 	| FormOperationResult<Result, Reason>
 	| (FormRecovery & { outcome: 'invalid'; issues: readonly FormIssue[]; settlement: 'notStarted' })
 export type ScopedFormView<Result, Reason> = {
-	feedbackLabels?: readonly FormFeedbackLabel<Result, Reason>[]
+	feedbackDescriptors?: readonly FormFeedbackDescriptor[]
 	readiness: FormReadiness<Reason> | { kind: 'observing' | 'failed' | 'closed' }
 	content: { kind: 'fields' } | { kind: 'success'; value: Result }
 	activity:
@@ -131,7 +131,7 @@ export type FeedbackMessage =
 	| { text: string; role: 'status' | 'alert' }
 	| { paragraphs: readonly string[]; role: 'alert' }
 export type FormFeedbackInput<Result, Reason> = {
-	view: Omit<ScopedFormView<Result, Reason>, 'feedbackLabels'>
+	view: Omit<ScopedFormView<Result, Reason>, 'feedbackDescriptors'>
 	subject: string
 	reasonText: (reason: Reason) => string
 	validationMessages: readonly string[]
@@ -149,7 +149,34 @@ export type FormFeedbackInput<Result, Reason> = {
 	blockedRole: (reason: Reason) => 'alert' | 'status'
 }
 
-export type FormFeedbackLabel<Result, Reason> = {
+/** State-selected message identifiers; view data can cross a native Worker boundary. */
+export const FORM_FEEDBACK = Object.freeze({
+	loading: 'loading',
+	readinessBlocked: 'readinessBlocked',
+	loadFailed: 'loadFailed',
+	saved: 'saved',
+	completionFailed: 'completionFailed',
+	invalid: 'invalid',
+	blocked: 'blocked',
+	interruptedSaved: 'interruptedSaved',
+	unknown: 'unknown',
+	operationFailed: 'operationFailed',
+	settling: 'settling'
+})
+export type FormFeedbackKind = (typeof FORM_FEEDBACK)[keyof typeof FORM_FEEDBACK]
+export type FormFeedbackDescriptor = {
 	section: 'readiness' | 'result'
-	label(input: FormFeedbackInput<Result, Reason>): readonly FeedbackMessage[]
+	message: FormFeedbackKind
+}
+/** UI-owned translation callbacks. They never enter the workflow or its views. */
+export type FormFeedbackMessages = {
+	unknown: () => string
+	loading: (input: { subject: string }) => string
+	loadFailed: (input: { subject: string }) => string
+	saved: (input: { subject: string }) => string
+	completionFailed: () => string
+	interruptedSaved: () => string
+	archiveFailed: (input: { subject: string }) => string
+	saveFailed: (input: { subject: string }) => string
+	settling: () => string
 }

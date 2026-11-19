@@ -47,9 +47,15 @@ import { openNativeJazzSession as createJazzSession } from './helpers/native-jaz
 import type { AccountStore, JazzSession } from 'jazz-tools/client'
 import { PersistedWriteRejectedError } from 'jazz-tools'
 import type { LocalJazzServerHandle } from 'jazz-tools/testing'
-import { deploy, startLocalJazzServer, allowTestBrowserOrigin } from './helpers/jazz-test-server.js'
-import { previousApp as app, app as isolationApp, type Organization } from '../src/lib/schema.js'
-import isolationPermissions, { previousPermissions as permissions } from '../src/lib/permissions.js'
+import {
+	nativeTestAuthority,
+	deploy,
+	startLocalJazzServer,
+	allowTestBrowserOrigin
+} from './helpers/jazz-test-server.js'
+import { app, app as isolationApp, type Organization } from '../src/lib/queries.js'
+import permissions from '../src/lib/jazz.permissions.json' with { type: 'json' }
+const isolationPermissions = permissions
 import { createActor, toPromise, createAsyncLogic } from 'xstate'
 
 function jazzRuntimeAssets(): Plugin {
@@ -84,7 +90,7 @@ const legacyFinanceBackupProfile = {
 const legacyFinanceBackupReader = financeBackupReader.provide({
 	actors: {
 		authority: createAsyncLogic<void, JazzArchiveReaderInput>({
-			run: ({ input }) => readFinanceAuthority(input, app)
+			run: ({ input }) => readFinanceAuthority(input)
 		}),
 		relations: createAsyncLogic<void, JazzArchiveReaderInput>({
 			run: ({ input }) => readFinanceRelations(input)
@@ -398,14 +404,9 @@ beforeAll(async () => {
 		appId: crypto.randomUUID(),
 		schema: app,
 		permissions,
-		inMemory: true,
-		allowLocalFirstAuth: true
+		inMemory: true
 	})
-	for (const initial of [
-		'local-first',
-		'local-first',
-		{ backendSecret: server.backendSecret }
-	] satisfies ('local-first' | { backendSecret: string })[]) {
+	for (const initial of ['device', 'device'] satisfies 'device'[]) {
 		const session = await createJazzSession({
 			appId: server.appId,
 			app,
@@ -417,14 +418,12 @@ beforeAll(async () => {
 		sessions.push(session)
 	}
 	const first = sessions[0]?.getSnapshot(),
-		other = sessions[1]?.getSnapshot(),
-		admin = sessions[2]?.getSnapshot()
-	if (!first?.client || !first.account || !other?.client || !admin?.client)
-		throw new Error('Missing disposable clients')
+		other = sessions[1]?.getSnapshot()
+	if (!first?.client || !first.user || !other?.client) throw new Error('Missing disposable clients')
 	owner = first.client.db
-	ownerId = first.account.id
+	ownerId = first.user.accountId
 	foreign = other.client.db
-	authority = admin.client.db
+	authority = await nativeTestAuthority(server.url, { app, permissions })
 	owner.onMutationError(() => {})
 	original = identifiers()
 	const seeded = await owner.transaction((tx) => stage(tx, original, plain))
@@ -606,14 +605,13 @@ describe('private restore-operation isolation candidate', () => {
 		// Fresh alpha.60 restore target: ordinary and private clients use the released schema.
 		candidateServer = await startLocalJazzServer({
 			appId: crypto.randomUUID(),
-			inMemory: true,
-			allowLocalFirstAuth: true
+			inMemory: true
 		})
 		await deploy({
 			appId: candidateServer.appId,
 			serverUrl: candidateServer.url,
 			adminSecret: candidateServer.adminSecret,
-			schema: isolationApp,
+			app: isolationApp,
 			permissions: isolationPermissions
 		})
 		const ordinarySession = await createJazzSession({
@@ -623,13 +621,13 @@ describe('private restore-operation isolation candidate', () => {
 			serverUrl: candidateServer.url,
 			driver: { type: 'memory' },
 			store,
-			initial: 'local-first'
+			initial: 'device'
 		})
 		clients.push(ordinarySession)
 		const current = ordinarySession.getSnapshot()
-		if (!current.client || !current.account) throw new Error('Missing ordinary owner')
+		if (!current.client || !current.user) throw new Error('Missing ordinary owner')
 		ordinary = current.client.db
-		identity = current.account.id
+		identity = current.user.accountId
 		ordinary.onMutationError(() => {})
 		const normalId = crypto.randomUUID()
 		const initial = await ordinary.transaction((tx) => {
@@ -647,30 +645,27 @@ describe('private restore-operation isolation candidate', () => {
 		})
 		await initial.wait({ tier: 'global' })
 		await ordinary.all(isolationApp.organizations, { tier: 'remote' })
-		for (const index of [0, 1, 2]) {
+		for (const index of [0, 1]) {
 			const session = await createJazzSession({
 				appId: candidateServer.appId,
 				app: isolationApp,
 				permissions: isolationPermissions,
 				serverUrl: candidateServer.url,
 				driver: { type: 'memory' },
-				...(index === 0
-					? { store }
-					: {
-							initial:
-								index === 1 ? 'local-first' : { backendSecret: candidateServer.backendSecret }
-						})
+				...(index === 0 ? { store } : { initial: 'device' })
 			})
 			clients.push(session)
 		}
 		const first = clients[1]?.getSnapshot(),
-			foreign = clients[2]?.getSnapshot(),
-			backend = clients[3]?.getSnapshot()
-		if (first?.account?.id !== identity || !first.client || !foreign?.client || !backend?.client)
+			foreign = clients[2]?.getSnapshot()
+		if (first?.user?.accountId !== identity || !first.client || !foreign?.client)
 			throw new Error('Missing isolation clients')
 		candidate = first.client.db
 		stranger = foreign.client.db
-		admin = backend.client.db
+		admin = await nativeTestAuthority(candidateServer.url, {
+			app: isolationApp,
+			permissions: isolationPermissions
+		})
 		candidate.onMutationError(() => {})
 	})
 	afterAll(async () => {
@@ -943,7 +938,8 @@ describe('private restore-operation isolation candidate', () => {
 		})
 		clients.push(recovered)
 		const state = recovered.getSnapshot()
-		if (!state.client || state.account?.id !== identity) throw new Error('Missing recovered owner')
+		if (!state.client || state.user?.accountId !== identity)
+			throw new Error('Missing recovered owner')
 		candidate = state.client.db
 		candidate.onMutationError(() => {})
 		expect(
@@ -1155,14 +1151,13 @@ describe('browser replica separation', () => {
 			try {
 				serving = await startLocalJazzServer({
 					appId: crypto.randomUUID(),
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				await deploy({
 					appId: serving.appId,
 					serverUrl: serving.url,
 					adminSecret: serving.adminSecret,
-					schema: isolationApp,
+					app: isolationApp,
 					permissions: isolationPermissions
 				})
 				const page = await browser.newPage()
@@ -1178,12 +1173,12 @@ describe('browser replica separation', () => {
 							appId,
 							serverUrl,
 							driver: { type: 'persistent', dbName: 'ordinary' },
-							initial: 'local-first'
+							initial: 'device'
 						})
 						const state = ordinarySession.getSnapshot()
-						if (!state.client || !state.account) throw new Error('Missing persistent owner')
+						if (!state.client || !state.user) throw new Error('Missing persistent owner')
 						const ordinary = state.client.db,
-							ownerId = state.account.id
+							ownerId = state.user.accountId
 						await ordinary.all(api.app.organizations, { tier: 'remote' })
 						const existingId = crypto.randomUUID()
 						const existing = await ordinary.transaction((tx) => {
@@ -1204,7 +1199,7 @@ describe('browser replica separation', () => {
 						const restore = await api.openAccountClient({
 							appId,
 							serverUrl,
-							account: state.account,
+							key: ordinarySession.exportDeviceKey(),
 							driver: { type: 'persistent', dbName: 'restore-' + crypto.randomUUID() }
 						})
 						const workspace = crypto.randomUUID(),
@@ -1333,7 +1328,9 @@ describe('browser replica separation', () => {
 				expect(result.stagedSnapshots.length).toBeGreaterThan(0)
 				expect(result.stagedSnapshots.every((count) => count === 0)).toBe(true)
 				expect(result).toMatchObject({
-					before: { writerLocal: 0, ordinaryRemote: 0, ordinaryLocal: 0 },
+					// Native Jazz retains the private writer's own accepted rows. The
+					// ordinary replica must remain empty until atomic publication.
+					before: { writerLocal: 1, ordinaryRemote: 0, ordinaryLocal: 0 },
 					subscriptionErrors: [],
 					published: 1,
 					archived: 1,
@@ -1574,9 +1571,15 @@ describe('browser replica separation', () => {
 			)
 			if (checked.outcome !== 'integrityChecked') throw new Error('Missing checked source')
 			const gate = Promise.withResolvers<boolean>()
-			const adapter = createFinanceRestoreAdapter(owner, sample, checked.archive, () => {
-				throw new Error('Validation cannot acquire transaction custody')
-			})
+			const adapter = createFinanceRestoreAdapter(
+				owner,
+				sample,
+				checked.archive,
+				() => {
+					throw new Error('Validation cannot acquire transaction custody')
+				},
+				() => true
+			)
 			const destination = adapter.destination.provide({
 					actors: { fingerprint: createAsyncLogic({ run: () => gate.promise }) }
 				}),
@@ -1943,12 +1946,12 @@ describe('browser replica separation', () => {
 						appId,
 						serverUrl,
 						driver: { type: 'persistent', dbName: 'ordinary' },
-						...(fresh ? { initial: 'local-first' } : {})
+						...(fresh ? { initial: 'device' } : {})
 					})
 					window.financeRecoveryOwner = session
 					const state = session.getSnapshot()
-					if (!state.account || !state.client) throw new Error('Missing recovery identity')
-					return state.account.id
+					if (!state.user || !state.client) throw new Error('Missing recovery identity')
+					return state.user.accountId
 				},
 				{ appId, serverUrl, fresh }
 			)
@@ -1964,7 +1967,7 @@ describe('browser replica separation', () => {
 				async ({ sample, serverUrl, generation, heldWriteId }) => {
 					const api = window.financeRestoreRecovery,
 						state = window.financeRecoveryOwner.getSnapshot()
-					if (!state.account) throw new Error('Missing recovery owner')
+					if (!state.user) throw new Error('Missing recovery owner')
 					const opened = api.prepareArchiveOpen(new Uint8Array(sample.file)),
 						opening = api
 							.createActor(api.createArchiveEnvelopeMachine(), { input: { request: opened } })
@@ -2004,7 +2007,7 @@ describe('browser replica separation', () => {
 					const client = await window.financeRestoreIsolation.openAccountClient({
 						appId: sample.intent.operation.applicationId,
 						serverUrl,
-						account: state.account,
+						key: window.financeRecoveryOwner.exportDeviceKey(),
 						driver: { type: 'persistent', dbName: 'restore-' + sample.intent.operation.operationId }
 					})
 					const operation = sample.intent.operation
@@ -2079,8 +2082,7 @@ describe('browser replica separation', () => {
 				appId: crypto.randomUUID(),
 				schema: isolationApp,
 				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
+				inMemory: true
 			})
 			const browser = await chromium.launch({ channel: 'chromium' }),
 				page = await browser.newPage()
@@ -2116,7 +2118,7 @@ describe('browser replica separation', () => {
 				).toEqual({ commits: [], operations: [] })
 				await page.evaluate(async () => {
 					const runtime = window.financeRecoveryRuntime
-					await runtime.client.shutdown({ waitForSync: true })
+					await runtime.client.shutdown()
 					runtime.archive.release()
 					runtime.opened.release()
 				})
@@ -2129,8 +2131,8 @@ describe('browser replica separation', () => {
 			return page.evaluate(async (workspaceId) => {
 				const session = window.financeRecoveryOwner.getSnapshot(),
 					db = session.client?.db
-				if (!db || !session.account) throw new Error('Missing ordinary account')
-				const userId = session.account.id
+				if (!db || !session.user) throw new Error('Missing ordinary account')
+				const userId = session.user.accountId
 				const app = window.financeRestoreIsolation.app,
 					originalId = crypto.randomUUID()
 				const original = await db.transaction((tx) => {
@@ -2182,15 +2184,21 @@ describe('browser replica separation', () => {
 				| 'acquisition'
 				| 'commit'
 				| 'rollback'
-				| 'close'
+				| 'artifacts'
 				| 'open-rejected'
 				| 'commit-rejected' = 'none'
 		) {
 			await page.evaluate(
-				async ({ sample, serverUrl, mode, fault }) => {
+				async ({ sample, mode, fault }) => {
 					const api = window.financeRestoreRecovery,
-						account = window.financeRecoveryOwner.getSnapshot().account
-					if (!account) throw new Error('Missing selected account')
+						selected = window.financeRecoveryOwner.getSnapshot(),
+						account = selected.user,
+						db = selected.client?.db
+					if (!account || !db) throw new Error('Missing selected account')
+					const isCurrent = () => {
+						const now = window.financeRecoveryOwner.getSnapshot()
+						return now.status === 'ready' && now.user === account && now.client?.db === db
+					}
 					const opened = api.prepareArchiveOpen(new Uint8Array(sample.file))
 					const checked = await api.toPromise(
 						api
@@ -2221,19 +2229,13 @@ describe('browser replica separation', () => {
 					const plan = planned.plan.read(),
 						binding = { ...sourceBinding, workspaceId: operation.destinationWorkspaceId }
 					const stats = {
-						acquisitions: 0,
-						opened: 0,
-						closeAttempts: 0,
 						releases: 0,
+						releaseAttempts: 0,
 						transactions: 0,
 						rollbackAttempts: 0
 					}
-					let releaseAcquisition = () => {},
-						releaseTransaction = () => {},
+					let releaseTransaction = () => {},
 						commits: () => string[] = () => []
-					const acquisition = new Promise<void>((resolve) => {
-						releaseAcquisition = resolve
-					})
 					let transactionDidOpen = () => {}
 					const transactionOpened = new Promise<void>((resolve) => {
 						transactionDidOpen = resolve
@@ -2243,13 +2245,16 @@ describe('browser replica separation', () => {
 					})
 					const machine = api.createFinanceRestoreSession(
 						{
-							account,
-							serverUrl,
+							db,
+							isCurrent,
 							binding,
 							intent: plan.intent,
 							databaseName: sample.databaseName,
 							mode,
 							releaseArtifacts: () => {
+								stats.releaseAttempts++
+								if (fault === 'artifacts' && stats.releaseAttempts === 1)
+									throw new Error('Controlled artifact release failure')
 								stats.releases++
 								planning.release()
 								checked.archive.release()
@@ -2262,7 +2267,8 @@ describe('browser replica separation', () => {
 								{ ...sample, ...plan },
 								checked.archive,
 								fault === 'commit' ? 'financial-graph' : undefined,
-								retain
+								retain,
+								isCurrent
 							)
 							commits = () => [...adapter.commits]
 							if (fault === 'open-rejected')
@@ -2278,36 +2284,22 @@ describe('browser replica separation', () => {
 									throw new Error('Injected lost commit receipt after native commit')
 								}
 							}
-							if (fault === 'rollback') {
-								const open = adapter.writer.open,
-									rollback = adapter.writer.rollback
-								adapter.writer.open = () => {
-									const value = open()
-									stats.transactions++
-									transactionDidOpen()
-									return transaction.then(() => value)
-								}
+							const open = adapter.writer.open,
+								rollback = adapter.writer.rollback
+							adapter.writer.open = () => {
+								stats.transactions++
+								const value = open()
+								transactionDidOpen()
+								return fault === 'acquisition' || fault === 'rollback'
+									? transaction.then(() => value)
+									: value
+							}
+							if (fault === 'rollback')
 								adapter.writer.rollback = (value) => {
 									stats.rollbackAttempts++
 									return stats.rollbackAttempts <= 2 ? Promise.resolve(false) : rollback(value)
 								}
-							}
 							return adapter
-						},
-						async (config) => {
-							stats.acquisitions++
-							const client = await window.financeRestoreIsolation.openAccountClient(config)
-							stats.opened++
-							if (fault === 'acquisition' || fault === 'close') await acquisition
-							return {
-								...client,
-								shutdown: (settings?: Parameters<typeof client.shutdown>[0]) => {
-									stats.closeAttempts++
-									return fault === 'close' && stats.closeAttempts === 1
-										? Promise.reject(new Error('Controlled close failure'))
-										: client.shutdown(settings)
-								}
-							}
 						}
 					)
 					const actor = api.createActor(machine)
@@ -2316,7 +2308,6 @@ describe('browser replica separation', () => {
 						stats,
 						transactionOpened,
 						commits: () => commits(),
-						releaseAcquisition: () => releaseAcquisition(),
 						releaseTransaction: () => releaseTransaction()
 					}
 					actor.start()
@@ -2357,14 +2348,101 @@ describe('browser replica separation', () => {
 			{ name: 'firefox', engine: firefox },
 			{ name: 'webkit', engine: webkit }
 		])(
-			'$name application restore factory owns native client and artifact release',
+			'$name retires a restore binding after native same-account replacement and A → B → A',
 			async ({ name, engine }) => {
 				const core = await startLocalJazzServer({
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
+				})
+				const browser = await engine.launch({
+					headless: true,
+					...(name === 'chromium' ? { channel: 'chromium' } : {})
+				})
+				try {
+					const page = await browser.newPage()
+					await openOwner(page, core.appId, core.url, true)
+					for (const throughOtherAccount of [false, true]) {
+						const result = await page.evaluate(
+							async ({ file, appId, serverUrl, throughOtherAccount }) => {
+								const api = window.financeRestoreRecovery,
+									session = window.financeRecoveryOwner,
+									selected = session.getSnapshot()
+								if (!selected.user || !selected.client) throw new Error('Missing current account')
+								const key = session.exportDeviceKey()
+								let starts = 0
+								const controller = api
+									.createActor(
+										api.createWorkspaceRestoreController(undefined, (options) => {
+											starts++
+											return api.createFinanceWorkspaceRestore(options)
+										})
+									)
+									.start()
+								const request = api.prepareWorkspaceRestoreFile(
+									new File([new Uint8Array(file)], 'backup.dlf'),
+									''
+								)
+								api.bindWorkspaceRestoreFile(request, session, {
+									appId,
+									serverUrl,
+									environment: 'dev'
+								})
+								controller.send({ type: 'SUBMIT', request })
+								await api.waitFor(
+									controller,
+									(state) => api.selectWorkspaceRestoreReport(state).view.canConfirm
+								)
+								if (throughOtherAccount) await session.createDeviceAccount()
+								await session.restoreDeviceAccount(key)
+								await api.waitFor(
+									controller,
+									(state) => !api.selectWorkspaceRestoreReport(state).view.busy
+								)
+								controller.send({ type: 'CONFIRM' })
+								const now = session.getSnapshot(),
+									report = api.selectWorkspaceRestoreReport(controller.getSnapshot())
+								const result = {
+									starts,
+									sameIdentity: now.user?.accountId === selected.user.accountId,
+									replacedClient: now.client !== selected.client,
+									status: now.status,
+									view: report.view
+								}
+								controller.stop()
+								return result
+							},
+							{ file: retainedFile, appId: core.appId, serverUrl: core.url, throughOtherAccount }
+						)
+						expect(result).toMatchObject({
+							starts: 0,
+							sameIdentity: true,
+							replacedClient: true,
+							status: 'ready',
+							view: { busy: false, canConfirm: false, canOpen: false }
+						})
+					}
+				} finally {
+					await browser.close()
+					await core.stop()
+				}
+			},
+			60_000
+		)
+
+		it.each([
+			{ name: 'chromium', engine: chromium },
+			{ name: 'firefox', engine: firefox },
+			{ name: 'webkit', engine: webkit }
+		])(
+			'$name application restore factory borrows the native Db and owns artifact release',
+			async ({ name, engine }) => {
+				const core = await startLocalJazzServer({
+					appId: crypto.randomUUID(),
+					schema: isolationApp,
+					permissions: isolationPermissions,
+					inMemory: true
 				})
 				const browser = await engine.launch({
 						headless: true,
@@ -2377,10 +2455,16 @@ describe('browser replica separation', () => {
 					const results = await page.evaluate(
 						async ({ sample, serverUrl }) => {
 							const api = window.financeRestoreRecovery,
-								account = window.financeRecoveryOwner.getSnapshot().account,
+								selected = window.financeRecoveryOwner.getSnapshot(),
+								account = selected.user,
+								db = selected.client?.db,
 								operation = sample.intent.operation
-							if (!account) throw new Error('Missing ordinary identity')
-							const authorizedAccount = account
+							if (!account || !db) throw new Error('Missing ordinary identity')
+							const currentDb = db
+							const isCurrent = () => {
+								const now = window.financeRecoveryOwner.getSnapshot()
+								return now.status === 'ready' && now.user === account && now.client?.db === db
+							}
 							async function run(mode: 'new' | 'resume') {
 								const opened = api.prepareArchiveOpen(new Uint8Array(sample.file)),
 									checked = await api.toPromise(
@@ -2413,34 +2497,19 @@ describe('browser replica separation', () => {
 								)
 								if (planned.outcome !== 'planned') throw new Error('Missing browser plan')
 								const events: string[] = []
-								const machine = api.createFinanceWorkspaceRestore(
-									{
-										account: authorizedAccount,
-										serverUrl,
-										mode,
-										databaseName: sample.databaseName,
-										binding: { ...sourceBinding, workspaceId: operation.destinationWorkspaceId },
-										archive: checked.archive,
-										plan: planning,
-										releaseFile: () => {
-											events.push('releaseFile')
-											opened.release()
-										}
-									},
-									async (config) => {
-										events.push('acquire')
-										const client = await window.financeRestoreIsolation.openAccountClient(config)
-										return {
-											...client,
-											shutdown: (settings?: Parameters<typeof client.shutdown>[0]) => {
-												events.push('close')
-												return client.shutdown(settings).then(() => {
-													events.push('closed')
-												})
-											}
-										}
+								const machine = api.createFinanceWorkspaceRestore({
+									db: currentDb,
+									isCurrent,
+									mode,
+									databaseName: sample.databaseName,
+									binding: { ...sourceBinding, workspaceId: operation.destinationWorkspaceId },
+									archive: checked.archive,
+									plan: planning,
+									releaseFile: () => {
+										events.push('releaseFile')
+										opened.release()
 									}
-								)
+								})
 								const actor = api.createActor(machine).start(),
 									result = await api.toPromise(actor)
 								let planReleased = false,
@@ -2460,7 +2529,8 @@ describe('browser replica separation', () => {
 									events,
 									planReleased,
 									archiveReleased,
-									snapshot: JSON.stringify(actor.getSnapshot())
+									snapshot: JSON.stringify(actor.getSnapshot()),
+									applicationReady: isCurrent()
 								}
 							}
 							return {
@@ -2479,7 +2549,7 @@ describe('browser replica separation', () => {
 					})
 					expect(results.created).toMatchObject({
 						result: { outcome: 'complete', record: { checkpoint: { kind: 'complete' } } },
-						events: ['acquire', 'close', 'closed', 'releaseFile'],
+						events: ['releaseFile'],
 						planReleased: true,
 						archiveReleased: true
 					})
@@ -2489,8 +2559,10 @@ describe('browser replica separation', () => {
 						planReleased: true,
 						archiveReleased: true
 					})
-					for (const value of Object.values(results))
+					for (const value of Object.values(results)) {
+						expect(value.applicationReady).toBe(true)
 						expect(value.snapshot).not.toContain('Exact restore')
+					}
 					expect(await retainedSource(page, sample)).toEqual({
 						file: sample.graph.source.file,
 						hash: sample.intent.archive.payloadSha256,
@@ -2514,8 +2586,7 @@ describe('browser replica separation', () => {
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				const browser = await engine.launch({
 						headless: true,
@@ -2528,18 +2599,7 @@ describe('browser replica separation', () => {
 						async ({ file, appId, serverUrl }) => {
 							const api = window.financeRestoreRecovery,
 								session = window.financeRecoveryOwner,
-								gate = Promise.withResolvers<void>(),
-								acquired = Promise.withResolvers<void>()
-							const actor = api
-								.createActor(
-									api.createWorkspaceRestoreController(undefined, async (config) => {
-										const client = await window.financeRestoreIsolation.openAccountClient(config)
-										acquired.resolve()
-										await gate.promise
-										return client
-									})
-								)
-								.start()
+								actor = api.createActor(api.createWorkspaceRestoreController()).start()
 							const request = api.prepareWorkspaceRestoreFile(
 								new File([new Uint8Array(file)], 'backup.dlf'),
 								''
@@ -2556,25 +2616,20 @@ describe('browser replica separation', () => {
 							)
 							const binding = actor.getSnapshot().context.binding
 							if (!binding) throw new Error('Missing derived binding')
-							actor.send({ type: 'CONFIRM' })
-							await acquired.promise
 							actor.send({ type: 'CANCEL' })
-							const retainedWhileAcquiring = api.selectWorkspaceRestoreReport(actor.getSnapshot())
-								.view.busy
-							gate.resolve()
 							await api.waitFor(
 								actor,
 								(snapshot) => !api.selectWorkspaceRestoreReport(snapshot).view.busy
 							)
+
 							const view = api.selectWorkspaceRestoreReport(actor.getSnapshot()).view,
 								serialized = JSON.stringify(actor.getSnapshot())
 							actor.stop()
 							await session.close()
-							return { binding, view, retainedWhileAcquiring, serialized }
+							return { binding, view, serialized }
 						},
 						{ file: retainedFile, appId: core.appId, serverUrl: core.url }
 					)
-					expect(first.retainedWhileAcquiring).toBe(true)
 					expect(first.view.message).toBe('cancelled')
 					expect(first.serialized).not.toContain('Keep this memo')
 					expect(await openOwner(page, core.appId, core.url, false)).toBe(identity)
@@ -2582,21 +2637,20 @@ describe('browser replica separation', () => {
 						async ({ file, appId, serverUrl }) => {
 							const api = window.financeRestoreRecovery,
 								session = window.financeRecoveryOwner
-							let closeAttempts = 0
+							let releaseAttempts = 0
 							const actor = api
 									.createActor(
-										api.createWorkspaceRestoreController(undefined, async (config) => {
-											const client = await window.financeRestoreIsolation.openAccountClient(config)
-											return {
-												...client,
-												shutdown: async (options) => {
-													closeAttempts++
-													if (closeAttempts === 1)
-														throw new Error('Injected close failure before native close')
-													await client.shutdown(options)
+										api.createWorkspaceRestoreController(undefined, (options) =>
+											api.createFinanceWorkspaceRestore({
+												...options,
+												releaseFile: () => {
+													releaseAttempts++
+													if (releaseAttempts === 1)
+														throw new Error('Injected artifact release failure')
+													options.releaseFile()
 												}
-											}
-										})
+											})
+										)
 									)
 									.start(),
 								request = api.prepareWorkspaceRestoreFile(
@@ -2645,13 +2699,25 @@ describe('browser replica separation', () => {
 									})
 									.start()
 							)
-							let acquisitions = 0
+							let historyTransactionAttempts = 0
 							const history = api
 									.createActor(
-										api.createWorkspaceRestoreController(undefined, async () => {
-											acquisitions++
-											throw new Error('Completed history cannot acquire a client')
-										})
+										api.createWorkspaceRestoreController(undefined, (options) =>
+											api.createFinanceWorkspaceRestore({
+												...options,
+												db: new Proxy(options.db, {
+													get(target, key) {
+														if (key === 'beginTransaction')
+															return () => {
+																historyTransactionAttempts++
+																throw new Error('Completed history cannot open a transaction')
+															}
+														const value = Reflect.get(target, key)
+														return typeof value === 'function' ? value.bind(target) : value
+													}
+												})
+											})
+										)
 									)
 									.start(),
 								historicalFile = api.prepareWorkspaceRestoreFile(
@@ -2676,8 +2742,8 @@ describe('browser replica separation', () => {
 								view,
 								journal,
 								historicalView,
-								acquisitions,
-								closeAttempts,
+								historyTransactionAttempts,
+								releaseAttempts,
 								nativeInterruption,
 								blockedView
 							}
@@ -2692,11 +2758,11 @@ describe('browser replica separation', () => {
 						editable: false,
 						message: 'failed'
 					})
-					expect(resumed.closeAttempts).toBe(2)
+					expect(resumed.releaseAttempts).toBe(2)
 					expect(resumed.view).toMatchObject({ message: undefined, busy: false, canOpen: false })
 					expect(resumed.nativeInterruption).toBe('closed')
 					expect(resumed.historicalView.message).toBe('done')
-					expect(resumed.acquisitions).toBe(0)
+					expect(resumed.historyTransactionAttempts).toBe(0)
 					expect(resumed.journal.record?.checkpoint.kind).toBe('complete')
 					const intent = resumed.journal.record?.intent
 					if (!intent) throw new Error('Missing durable resumed intent')
@@ -2723,7 +2789,7 @@ describe('browser replica separation', () => {
 				async ({ sample, limits }) => {
 					const api = window.financeRestoreRecovery,
 						state = window.financeRecoveryOwner.getSnapshot()
-					if (!state.client || !state.account) throw new Error('Missing ordinary owner')
+					if (!state.client || !state.user) throw new Error('Missing ordinary owner')
 					const files: number[][] = []
 					const request = api.prepareJazzArchiveExport({
 						db: state.client.db,
@@ -2731,7 +2797,7 @@ describe('browser replica separation', () => {
 						binding: {
 							applicationId: 'delightful-finances',
 							environment: 'disposable',
-							identityId: state.account.id,
+							identityId: state.user.accountId,
 							workspaceId: sample.graph.workspace.id,
 							operationId: crypto.randomUUID(),
 							generation: 0
@@ -2780,18 +2846,13 @@ describe('browser replica separation', () => {
 				appId: crypto.randomUUID(),
 				schema: isolationApp,
 				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
+				inMemory: true
 			})
 			const browser = await chromium.launch({ channel: 'chromium' }),
 				page = await browser.newPage()
-			const backend = await createJazzSession({
-				appId: core.appId,
+			const backend = await nativeTestAuthority(core.url, {
 				app: isolationApp,
-				permissions: isolationPermissions,
-				serverUrl: core.url,
-				driver: { type: 'memory' },
-				initial: { backendSecret: core.backendSecret }
+				permissions: isolationPermissions
 			})
 			try {
 				const identity = await openOwner(page, core.appId, core.url, true),
@@ -2804,7 +2865,7 @@ describe('browser replica separation', () => {
 						)
 					).outcome
 				).toBe('complete')
-				const db = backend.getSnapshot().client?.db
+				const db = backend
 				if (!db) throw new Error('Missing corruption injector')
 				const part = await db.one(
 					isolationApp.fileParts
@@ -2827,7 +2888,6 @@ describe('browser replica separation', () => {
 				})
 				expect(captured.files).toEqual([])
 			} finally {
-				await backend.close()
 				await browser.close()
 				await core.stop()
 			}
@@ -2843,8 +2903,7 @@ describe('browser replica separation', () => {
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				const browser = await engine.launch({
 						headless: true,
@@ -2960,8 +3019,7 @@ describe('browser replica separation', () => {
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				const profile = await mkdtemp(resolve(tmpdir(), 'finance-restore-recovery-'))
 				const context = await engine.launchPersistentContext(profile, {
@@ -2986,7 +3044,7 @@ describe('browser replica separation', () => {
 							...window.financeRestoreSessionRuntime.stats,
 							commits: window.financeRestoreSessionRuntime.commits().length
 						}))
-					).toMatchObject({ acquisitions: 1, closeAttempts: 1, releases: 1, commits: 3 })
+					).toMatchObject({ releases: 1, commits: 3 })
 					expect(
 						await page.evaluate(() =>
 							JSON.stringify(window.financeRestoreSessionRuntime.actor.getSnapshot())
@@ -3038,7 +3096,7 @@ describe('browser replica separation', () => {
 							...window.financeRestoreSessionRuntime.stats,
 							commits: window.financeRestoreSessionRuntime.commits()
 						}))
-					).toMatchObject({ acquisitions: 0, closeAttempts: 0, releases: 1, commits: [] })
+					).toMatchObject({ releases: 1, commits: [] })
 					expect(
 						await page.evaluate(async (existingWorkspaceId) => {
 							const db = window.financeRecoveryOwner.getSnapshot().client?.db
@@ -3064,14 +3122,13 @@ describe('browser replica separation', () => {
 		it.each(['CANCEL', 'SHUTDOWN', 'INVALIDATE'] satisfies (
 			'CANCEL' | 'SHUTDOWN' | 'INVALIDATE'
 		)[])(
-			'session owner retains late client acquisition after %s',
+			'session owner drains a pending shared-Db transaction after %s',
 			async (interruption) => {
 				const core = await startLocalJazzServer({
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				const browser = await chromium.launch({ channel: 'chromium' }),
 					page = await browser.newPage()
@@ -3080,7 +3137,7 @@ describe('browser replica separation', () => {
 						sample = await recoverySample(retainedFile, core.appId, identity)
 					await startOwnedSession(page, sample, core.url, 'new', 'acquisition')
 					await expect
-						.poll(() => page.evaluate(() => window.financeRestoreSessionRuntime.stats.opened))
+						.poll(() => page.evaluate(() => window.financeRestoreSessionRuntime.stats.transactions))
 						.toBe(1)
 					await page.evaluate(
 						({ interruption, operation }) => {
@@ -3108,8 +3165,8 @@ describe('browser replica separation', () => {
 							status: window.financeRestoreSessionRuntime.actor.getSnapshot().status,
 							...window.financeRestoreSessionRuntime.stats
 						}))
-					).toMatchObject({ status: 'active', closeAttempts: 0, releases: 0 })
-					await page.evaluate(() => window.financeRestoreSessionRuntime.releaseAcquisition())
+					).toMatchObject({ status: 'active', releases: 0 })
+					await page.evaluate(() => window.financeRestoreSessionRuntime.releaseTransaction())
 					const result = await page.evaluate(() =>
 						window.financeRestoreRecovery.toPromise(window.financeRestoreSessionRuntime.actor)
 					)
@@ -3125,7 +3182,7 @@ describe('browser replica separation', () => {
 							...window.financeRestoreSessionRuntime.stats,
 							commits: window.financeRestoreSessionRuntime.commits()
 						}))
-					).toMatchObject({ acquisitions: 1, closeAttempts: 1, releases: 1, commits: [] })
+					).toMatchObject({ releases: 1, commits: [] })
 				} finally {
 					await browser.close()
 					await core.stop()
@@ -3140,8 +3197,7 @@ describe('browser replica separation', () => {
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				const browser = await chromium.launch({ channel: 'chromium' }),
 					page = await browser.newPage()
@@ -3167,7 +3223,7 @@ describe('browser replica separation', () => {
 					expect(result.state).toBe('restartRequired')
 					expect(result.status).toBe('active')
 					expect(result.after).toEqual(result.before)
-					expect(result.after).toMatchObject({ acquisitions: 1, closeAttempts: 0, releases: 0 })
+					expect(result.after).toMatchObject({ releases: 0 })
 					// A real document restart discards no journal and does not automatically resume writes.
 					await page.reload()
 					expect(await openOwner(page, core.appId, core.url, false)).toBe(identity)
@@ -3192,13 +3248,12 @@ describe('browser replica separation', () => {
 			},
 			60_000
 		)
-		it('file controller offers restart after a native crash and resumes the same destination after reload', async () => {
+		it('file controller offers restart after a restore actor crash and resumes the same destination after reload', async () => {
 			const core = await startLocalJazzServer({
 				appId: crypto.randomUUID(),
 				schema: isolationApp,
 				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
+				inMemory: true
 			})
 			const browser = await chromium.launch({ channel: 'chromium' }),
 				page = await browser.newPage()
@@ -3208,29 +3263,17 @@ describe('browser replica separation', () => {
 					async ({ file, appId, serverUrl }) => {
 						const api = window.financeRestoreRecovery,
 							session = window.financeRecoveryOwner
-						let acquisitions = 0,
-							closes = 0
+						let factories = 0
 						const actor = api
 							.createActor(
-								api.createWorkspaceRestoreController(undefined, async (config) => {
-									acquisitions++
-									const client = await window.financeRestoreIsolation.openAccountClient(config)
-									return {
-										...client,
-										db: new Proxy(client.db, {
-											get(target, key, receiver) {
-												if (key === 'getAuthState')
-													return () => {
-														throw new Error('Injected native guard crash')
-													}
-												return Reflect.get(target, key, receiver)
-											}
-										}),
-										shutdown: (settings) => {
-											closes++
-											return client.shutdown(settings)
-										}
+								api.createWorkspaceRestoreController(undefined, (options) => {
+									factories++
+									const machine = api.createFinanceWorkspaceRestore(options)
+									// Fail the public actor-logic transition on this test instance only.
+									machine.transition = () => {
+										throw new Error('Injected restore actor crash')
 									}
+									return machine
 								})
 							)
 							.start()
@@ -3254,8 +3297,7 @@ describe('browser replica separation', () => {
 						actor.send({ type: 'RETRY_RELEASE' })
 						return {
 							binding,
-							acquisitions,
-							closes,
+							factories,
 							view: api.selectWorkspaceRestoreReport(actor.getSnapshot()).view,
 							nativeStatus: actor.getSnapshot().context.native?.getSnapshot().status
 						}
@@ -3263,8 +3305,7 @@ describe('browser replica separation', () => {
 					{ file: retainedFile, appId: core.appId, serverUrl: core.url }
 				)
 				expect(first).toMatchObject({
-					acquisitions: 1,
-					closes: 0,
+					factories: 1,
 					nativeStatus: 'error',
 					view: {
 						busy: true,
@@ -3311,15 +3352,14 @@ describe('browser replica separation', () => {
 				await core.stop()
 			}
 		}, 60_000)
-		it.each(['rollback', 'close'] satisfies ('rollback' | 'close')[])(
+		it.each(['rollback', 'artifacts'] satisfies ('rollback' | 'artifacts')[])(
 			'session owner keeps resources after unconfirmed %s',
 			async (fault) => {
 				const core = await startLocalJazzServer({
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				const browser = await chromium.launch({ channel: 'chromium' }),
 					page = await browser.newPage()
@@ -3338,20 +3378,22 @@ describe('browser replica separation', () => {
 							])
 						})
 					else
-						await expect
-							.poll(() => page.evaluate(() => window.financeRestoreSessionRuntime.stats.opened))
-							.toBe(1)
+						await page.evaluate(async () => {
+							const runtime = window.financeRestoreSessionRuntime
+							await window.financeRestoreRecovery.waitFor(runtime.actor, (snapshot) =>
+								snapshot.matches('artifactsBlocked')
+							)
+						})
 					await page.evaluate((fault) => {
 						const runtime = window.financeRestoreSessionRuntime
 						runtime.actor.send({ type: 'CANCEL' })
 						if (fault === 'rollback') runtime.releaseTransaction()
-						else runtime.releaseAcquisition()
 					}, fault)
 					await page.evaluate(async (fault) => {
 						const api = window.financeRestoreRecovery,
 							runtime = window.financeRestoreSessionRuntime
 						await api.waitFor(runtime.actor, (snapshot) =>
-							snapshot.matches(fault === 'rollback' ? 'rollbackBlocked' : 'clientBlocked')
+							snapshot.matches(fault === 'rollback' ? 'rollbackBlocked' : 'artifactsBlocked')
 						)
 					}, fault)
 					expect(
@@ -3362,7 +3404,7 @@ describe('browser replica separation', () => {
 					).toMatchObject({
 						status: 'active',
 						releases: 0,
-						closeAttempts: fault === 'rollback' ? 0 : 1
+						releaseAttempts: fault === 'rollback' ? 0 : 1
 					})
 					await page.evaluate(() =>
 						window.financeRestoreSessionRuntime.actor.send({ type: 'RETRY_RELEASE' })
@@ -3378,7 +3420,7 @@ describe('browser replica separation', () => {
 						await page.evaluate(() => window.financeRestoreSessionRuntime.stats)
 					).toMatchObject({
 						releases: 1,
-						closeAttempts: fault === 'rollback' ? 1 : 2,
+						releaseAttempts: fault === 'rollback' ? 1 : 2,
 						...(fault === 'rollback' ? { transactions: 1, rollbackAttempts: 3 } : {})
 					})
 				} finally {
@@ -3393,8 +3435,7 @@ describe('browser replica separation', () => {
 				appId: crypto.randomUUID(),
 				schema: isolationApp,
 				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
+				inMemory: true
 			})
 			const browser = await chromium.launch({ channel: 'chromium' }),
 				page = await browser.newPage()
@@ -3412,131 +3453,167 @@ describe('browser replica separation', () => {
 						...window.financeRestoreSessionRuntime.stats,
 						commits: window.financeRestoreSessionRuntime.commits()
 					}))
-				).toMatchObject({ acquisitions: 0, releases: 1, commits: [] })
+				).toMatchObject({ releases: 1, commits: [] })
 			} finally {
 				await browser.close()
 				await core.stop()
 			}
 		})
 
-		it('session owner drains an accepted commit before close and resumes without replay', async () => {
-			const core = await startLocalJazzServer({
-				appId: crypto.randomUUID(),
-				schema: isolationApp,
-				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
-			})
-			const backend = await createJazzSession({
-				appId: core.appId,
-				app: isolationApp,
-				permissions: isolationPermissions,
-				serverUrl: core.url,
-				driver: { type: 'memory' },
-				initial: { backendSecret: core.backendSecret }
-			})
-			const observer = backend.getSnapshot().client?.db
-			if (!observer) throw new Error('Missing independent authority')
-			const proxy = createSilentJazzProxy(core.url),
-				profile = await mkdtemp(resolve(tmpdir(), 'finance-restore-recovery-'))
-			await proxy.listen(0)
-			const context = await chromium.launchPersistentContext(profile, {
-				channel: 'chromium',
-				headless: true
-			})
-			try {
-				const page = context.pages()[0] ?? (await context.newPage())
-				await page.exposeFunction('pauseRecoveryReplies', () => proxy.pauseServerReplies())
-				const identity = await openOwner(page, core.appId, proxy.url, true),
-					sample = await recoverySample(retainedFile, core.appId, identity)
-				await observeOwnerCatalog(page, sample.graph.workspace.id)
-				await startOwnedSession(page, sample, proxy.url, 'new', 'commit')
-				await expect
-					.poll(
-						async () =>
-							(
-								await observer.all(
-									isolationApp.transactions.where({ organizationId: sample.graph.workspace.id }),
-									{ tier: 'remote' }
-								)
-							).length,
-						{ timeout: 10_000 }
-					)
-					.toBe(sample.graph.transactions.length)
-				await page.evaluate(async () => {
-					const api = window.financeRestoreRecovery,
-						runtime = window.financeRestoreSessionRuntime
-					runtime.actor.send({ type: 'CANCEL' })
-					await api.waitFor(
-						runtime.actor,
-						(snapshot) =>
-							snapshot.matches('waitingForPending') || snapshot.matches('settlingCommit')
-					)
+		it.each(['cancel', 'native replacement'] satisfies ('cancel' | 'native replacement')[])(
+			'session owner drains an accepted commit after %s and resumes without replay',
+			async (interruption) => {
+				const core = await startLocalJazzServer({
+					appId: crypto.randomUUID(),
+					schema: isolationApp,
+					permissions: isolationPermissions,
+					inMemory: true
 				})
-				expect(
-					await page.evaluate(() => ({
-						...window.financeRestoreSessionRuntime.stats,
-						status: window.financeRestoreSessionRuntime.actor.getSnapshot().status
-					}))
-				).toMatchObject({ status: 'active', closeAttempts: 0, releases: 0 })
-				expect(
-					await observer.all(
-						isolationApp.organizationMembers.where({ organizationId: sample.graph.workspace.id }),
-						{ tier: 'remote' }
+				const backend = await nativeTestAuthority(core.url, {
+					app: isolationApp,
+					permissions: isolationPermissions
+				})
+				const observer = backend
+				if (!observer) throw new Error('Missing independent authority')
+				const proxy = createSilentJazzProxy(core.url),
+					profile = await mkdtemp(resolve(tmpdir(), 'finance-restore-recovery-'))
+				await proxy.listen(0)
+				const context = await chromium.launchPersistentContext(profile, {
+					channel: 'chromium',
+					headless: true
+				})
+				try {
+					const page = context.pages()[0] ?? (await context.newPage())
+					await page.exposeFunction('pauseRecoveryReplies', () => proxy.pauseServerReplies())
+					const identity = await openOwner(page, core.appId, proxy.url, true),
+						sample = await recoverySample(retainedFile, core.appId, identity)
+					await observeOwnerCatalog(page, sample.graph.workspace.id)
+					await startOwnedSession(page, sample, proxy.url, 'new', 'commit')
+					await expect
+						.poll(
+							async () =>
+								(
+									await observer.all(
+										isolationApp.transactions.where({ organizationId: sample.graph.workspace.id }),
+										{ tier: 'remote' }
+									)
+								).length,
+							{ timeout: 10_000 }
+						)
+						.toBe(sample.graph.transactions.length)
+					await page.evaluate(
+						async ({ interruption, operation }) => {
+							const api = window.financeRestoreRecovery,
+								runtime = window.financeRestoreSessionRuntime
+							if (interruption === 'cancel') runtime.actor.send({ type: 'CANCEL' })
+							else {
+								const session = window.financeRecoveryOwner,
+									selected = session.getSnapshot()
+								if (!selected.user) throw new Error('Missing original identity')
+								const key = session.exportDeviceKey()
+								const unsubscribe = session.subscribe(() => {
+									const now = session.getSnapshot()
+									if (
+										now.status !== 'ready' ||
+										now.user !== selected.user ||
+										now.client !== selected.client
+									)
+										runtime.actor.send({
+											type: 'INVALIDATE',
+											binding: {
+												applicationId: operation.applicationId,
+												environment: operation.environment,
+												identityId: operation.identityId,
+												operationId: operation.operationId,
+												workspaceId: operation.destinationWorkspaceId,
+												generation: 1
+											}
+										})
+								})
+								const replacement = session.createDeviceAccount()
+								void replacement.catch(() => {})
+								runtime.finishReplacement = async () => {
+									await replacement
+									unsubscribe()
+									await session.restoreDeviceAccount(key)
+									delete runtime.finishReplacement
+								}
+							}
+							await api.waitFor(
+								runtime.actor,
+								(snapshot) =>
+									snapshot.matches('waitingForPending') || snapshot.matches('settlingCommit')
+							)
+						},
+						{ interruption, operation: sample.intent.operation }
 					)
-				).toEqual([])
-				proxy.resume()
-				expect(
-					(
+					expect(
+						await page.evaluate(() => ({
+							...window.financeRestoreSessionRuntime.stats,
+							status: window.financeRestoreSessionRuntime.actor.getSnapshot().status
+						}))
+					).toMatchObject({ status: 'active', releases: 0 })
+					expect(
+						await observer.all(
+							isolationApp.organizationMembers.where({ organizationId: sample.graph.workspace.id }),
+							{ tier: 'remote' }
+						)
+					).toEqual([])
+					proxy.resume()
+					expect(
+						(
+							await page.evaluate(() =>
+								window.financeRestoreRecovery.toPromise(window.financeRestoreSessionRuntime.actor)
+							)
+						).outcome
+					).toBe(interruption === 'cancel' ? 'cancelled' : 'invalidated')
+					expect(
+						await page.evaluate(() => ({
+							...window.financeRestoreSessionRuntime.stats,
+							commits: window.financeRestoreSessionRuntime.commits().length
+						}))
+					).toMatchObject({ releases: 1, commits: 2 })
+					await page.evaluate(async () => {
+						await window.financeRestoreSessionRuntime.finishReplacement?.()
+					})
+					await startOwnedSession(page, sample, proxy.url, 'resume')
+					expect(
 						await page.evaluate(() =>
 							window.financeRestoreRecovery.toPromise(window.financeRestoreSessionRuntime.actor)
 						)
-					).outcome
-				).toBe('cancelled')
-				expect(
-					await page.evaluate(() => ({
-						...window.financeRestoreSessionRuntime.stats,
-						commits: window.financeRestoreSessionRuntime.commits().length
-					}))
-				).toMatchObject({ closeAttempts: 1, releases: 1, commits: 2 })
-				await startOwnedSession(page, sample, proxy.url, 'resume')
-				expect(
-					await page.evaluate(() =>
-						window.financeRestoreRecovery.toPromise(window.financeRestoreSessionRuntime.actor)
-					)
-				).toMatchObject({ outcome: 'complete', record: { checkpoint: { kind: 'complete' } } })
-				expect(
-					await page.evaluate(() => window.financeRestoreSessionRuntime.commits().length)
-				).toBe(1)
-				const actual = await page.evaluate(async (sample) => {
-					const api = window.financeRestoreRecovery,
-						db = window.financeRecoveryOwner.getSnapshot().client?.db
-					if (!db) throw new Error('Missing ordinary client')
-					const rows = await api.readRecovery(
-						db,
-						api.recoveryQueries(sample.graph, sample.intent.operation.operationId),
-						'remote'
-					)
-					return api.canonicalRecovery(rows.slice(1, 13))
-				}, sample)
-				expect(actual).toBe(canonicalRecovery(financeGraphRows(sample.graph)))
-			} finally {
-				proxy.resume()
-				await context.close()
-				await backend.close()
-				await proxy.close()
-				await core.stop()
-				await rm(profile, { recursive: true, force: true })
-			}
-		}, 60_000)
+					).toMatchObject({ outcome: 'complete', record: { checkpoint: { kind: 'complete' } } })
+					expect(
+						await page.evaluate(() => window.financeRestoreSessionRuntime.commits().length)
+					).toBe(1)
+					const actual = await page.evaluate(async (sample) => {
+						const api = window.financeRestoreRecovery,
+							db = window.financeRecoveryOwner.getSnapshot().client?.db
+						if (!db) throw new Error('Missing ordinary client')
+						const rows = await api.readRecovery(
+							db,
+							api.recoveryQueries(sample.graph, sample.intent.operation.operationId),
+							'remote'
+						)
+						return api.canonicalRecovery(rows.slice(1, 13))
+					}, sample)
+					expect(actual).toBe(canonicalRecovery(financeGraphRows(sample.graph)))
+				} finally {
+					proxy.resume()
+					await context.close()
+					await proxy.close()
+					await core.stop()
+					await rm(profile, { recursive: true, force: true })
+				}
+			},
+			60_000
+		)
 
 		it('retained source access follows current roles and cannot be changed after publication', async () => {
 			const core = await startLocalJazzServer({
 				appId: crypto.randomUUID(),
 				schema: isolationApp,
 				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
+				inMemory: true
 			})
 			const browser = await chromium.launch({ channel: 'chromium' }),
 				page = await browser.newPage()
@@ -3558,13 +3635,13 @@ describe('browser replica separation', () => {
 					serverUrl: core.url,
 					driver: { type: 'memory' },
 					store,
-					initial: 'local-first'
+					initial: 'device'
 				})
 				readers.push(session)
 				const state = session.getSnapshot()
-				if (!state.account || !state.client) throw new Error('Missing real reader identity')
+				if (!state.user || !state.client) throw new Error('Missing real reader identity')
 				state.client.db.onMutationError(() => {})
-				return { session, db: state.client.db, identity: state.account.id }
+				return { session, db: state.client.db, identity: state.user.accountId }
 			}
 			try {
 				const identity = await openOwner(page, core.appId, core.url, true),
@@ -3750,12 +3827,12 @@ describe('browser replica separation', () => {
 				const revoked = await page.evaluate(
 					async ({ sample, serverUrl }) => {
 						const api = window.financeRestoreIsolation,
-							account = window.financeRecoveryOwner.getSnapshot().account
+							account = window.financeRecoveryOwner.getSnapshot().user
 						if (!account) throw new Error('Missing original identity')
 						const client = await api.openAccountClient({
 							appId: sample.intent.operation.applicationId,
 							serverUrl,
-							account,
+							key: window.financeRecoveryOwner.exportDeviceKey(),
 							driver: { type: 'memory' }
 						})
 						try {
@@ -3829,8 +3906,7 @@ describe('browser replica separation', () => {
 				appId: crypto.randomUUID(),
 				schema: isolationApp,
 				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
+				inMemory: true
 			})
 			const browser = await chromium.launch({ channel: 'chromium' }),
 				page = await browser.newPage()
@@ -3895,8 +3971,7 @@ describe('browser replica separation', () => {
 				appId: crypto.randomUUID(),
 				schema: isolationApp,
 				permissions: isolationPermissions,
-				inMemory: true,
-				allowLocalFirstAuth: true
+				inMemory: true
 			})
 			const browser = await chromium.launch({ channel: 'chromium' }),
 				page = await browser.newPage()
@@ -3984,20 +4059,15 @@ describe('browser replica separation', () => {
 					appId: crypto.randomUUID(),
 					schema: isolationApp,
 					permissions: isolationPermissions,
-					inMemory: true,
-					allowLocalFirstAuth: true
+					inMemory: true
 				})
 				const proxy = createSilentJazzProxy(core.url),
 					profile = await mkdtemp(resolve(tmpdir(), 'finance-restore-recovery-'))
-				const backend = await createJazzSession({
-					appId: core.appId,
+				const backend = await nativeTestAuthority(core.url, {
 					app: isolationApp,
-					permissions: isolationPermissions,
-					serverUrl: core.url,
-					driver: { type: 'memory' },
-					initial: { backendSecret: core.backendSecret }
+					permissions: isolationPermissions
 				})
-				const observer = backend.getSnapshot().client?.db
+				const observer = backend
 				if (!observer) throw new Error('Missing independent serving authority')
 				await proxy.listen(0)
 				const options = { headless: true, ...(name === 'chromium' ? { channel: 'chromium' } : {}) }
@@ -4353,7 +4423,6 @@ describe('browser replica separation', () => {
 					).toEqual([[], [], [], [], [], []])
 				} finally {
 					await context.close()
-					await backend.close()
 					await proxy.close()
 					await core.stop()
 					await rm(profile, { recursive: true, force: true })

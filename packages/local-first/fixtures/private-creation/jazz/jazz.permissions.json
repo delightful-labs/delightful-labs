@@ -1,0 +1,26 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "e01f338b6e71aaabc07e9384cc02d9c8540653e03a11e64634d44f6be85fae3f"
+  },
+  "tables": {
+    "creationOperations": {
+      "read": "ownerId = session.user",
+      "insert": "ownerId = session.user",
+      "update": "false",
+      "delete": "false"
+    },
+    "workspaces": {
+      "read": "ownerId = session.user",
+      "insert": {
+        "allOf": [
+          "ownerId = session.user",
+          "exists creationOperations(id = this.creationOperationId, ownerId = session.user, workspaceId = this.id)"
+        ]
+      },
+      "update": "false",
+      "delete": "false"
+    }
+  }
+}

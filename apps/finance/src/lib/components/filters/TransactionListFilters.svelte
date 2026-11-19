@@ -15,13 +15,13 @@
 		currencies,
 		onchange
 	}: {
-		title?: string
+		title?: string | undefined
 		closeControl?: Snippet | undefined
 		headingLevel?: 'h1' | 'h2'
 		value: TransactionListFilters
 		categories: ReadonlyMap<string, string>
 		currencies: readonly string[]
-		onchange: (value: TransactionListFilters) => void
+		onchange: (change: Partial<TransactionListFilters>) => void
 	} = $props()
 </script>
 
@@ -33,24 +33,24 @@
 				label={m['actions.search_subject']({ subject: m['nouns.transaction']({ count: 2 }) })}
 				type="search"
 				value={value.query}
-				oninput={(event) => onchange({ ...value, query: event.currentTarget.value })}
+				oninput={(event) => onchange({ query: event.currentTarget.value })}
 			/>
 		{/snippet}
 		{#snippet filters()}
 			<DateRangeFilter
 				start={value.start}
 				end={value.end}
-				onchange={(start, end) => onchange({ ...value, start, end })}
+				{onchange}
 				onpreset={(days) => {
 					const date = new Date()
 					date.setDate(date.getDate() - (days - 1))
-					onchange({ ...value, start: todayDateOnly(date), end: todayDateOnly() })
+					onchange({ start: todayDateOnly(date), end: todayDateOnly() })
 				}}
 			/>
 			<Select
 				label={m['actions.filter_subject']({ subject: m['nouns.category']({ count: 1 }) })}
 				value={value.categoryId}
-				onchange={(event) => onchange({ ...value, categoryId: event.currentTarget.value })}
+				onchange={(event) => onchange({ categoryId: event.currentTarget.value })}
 			>
 				<option value=""
 					>{m['labels.all_subjects']({ subjects: m['nouns.category']({ count: 2 }) })}</option
@@ -61,7 +61,7 @@
 				<Select
 					label={m['actions.filter_subject']({ subject: m['labels.currency']() })}
 					value={value.currency}
-					onchange={(event) => onchange({ ...value, currency: event.currentTarget.value })}
+					onchange={(event) => onchange({ currency: event.currentTarget.value })}
 				>
 					<option value="">{m['archive_filter.all']()}</option>
 					{#each currencies as code (code)}<option value={code}>{code}</option>{/each}

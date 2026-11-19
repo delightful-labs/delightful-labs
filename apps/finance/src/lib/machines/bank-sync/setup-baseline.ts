@@ -1,4 +1,4 @@
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import type { CredentialScope } from '#lib/validation/integrations.js'
 import type { Connection, Dependencies } from './types.js'
 import { setup, types, createAsyncLogic } from 'xstate'

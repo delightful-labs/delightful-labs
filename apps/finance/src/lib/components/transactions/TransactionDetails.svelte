@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte'
-	import { SYSTEM_ACCOUNT_ID } from 'jazz-tools'
 	import { Details } from 'delightful-ui'
-	import type { TransactionDetail } from '#lib/schema.js'
+	import type { z } from 'zod'
+	import type { workerTransactionMetadata } from '#lib/contracts/worker-images.js'
 	import { getLocale } from '#lib/paraglide/runtime.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import Avatar, { type AvatarImage } from '../identity/Avatar.svelte'
@@ -17,17 +17,18 @@
 		creatorProfile,
 		editorProfile
 	}: {
-		transaction: TransactionDetail | undefined | null
+		transaction: z.output<typeof workerTransactionMetadata> | undefined | null
 		form: Snippet
 		actions?: Snippet
 		attachments?: Snippet
 		creatorProfile: AttributionProfile | null | undefined
 		editorProfile: AttributionProfile | null | undefined
 	} = $props()
-	function authorName(accountId: string, profile: AttributionProfile | null | undefined) {
-		return accountId === SYSTEM_ACCOUNT_ID
-			? m['bank.system_account_name']()
-			: profile?.displayName || accountId
+	function authorName(
+		author: z.output<typeof workerTransactionMetadata>['$createdBy'],
+		profile: AttributionProfile | null | undefined
+	) {
+		return author.system ? m['bank.system_account_name']() : profile?.displayName || author.account
 	}
 	const timestamps = $derived(
 		new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium', timeStyle: 'short' })
@@ -47,7 +48,7 @@
 					avatarMimeType={creatorProfile?.avatarMimeType}
 					alt=""
 				/>
-				<span>{authorName(transaction.$createdBy.account, creatorProfile)}</span>
+				<span>{authorName(transaction.$createdBy, creatorProfile)}</span>
 			</dd>
 			<dt>{m['transactions.created_at']()}</dt>
 			<dd>
@@ -62,7 +63,7 @@
 					avatarMimeType={editorProfile?.avatarMimeType}
 					alt=""
 				/>
-				<span>{authorName(transaction.$updatedBy.account, editorProfile)}</span>
+				<span>{authorName(transaction.$updatedBy, editorProfile)}</span>
 			</dd>
 			<dt>{m['transactions.updated_at']()}</dt>
 			<dd>

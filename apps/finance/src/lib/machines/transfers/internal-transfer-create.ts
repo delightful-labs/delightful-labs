@@ -7,20 +7,20 @@ import {
 	type AccountMembership,
 	type Category,
 	type OrganizationMember
-} from '#lib/schema.js'
+} from '#lib/queries.js'
 import {
 	amountMinorValue,
 	dateOnlyText,
 	defaultTransactionCategory
 } from '#lib/validation/transactions.js'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import { z } from 'zod'
 import { createJazzTransactionActors } from '../persistence/jazz-transaction-actors.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { OutputFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type JazzTransaction = ReturnType<ReturnType<typeof getDb>['beginTransaction']>
+type JazzTransaction = ReturnType<JazzDb['beginTransaction']>
 type LocalWrite = { txId: Promise<string>; wait(options: { tier: 'local' }): Promise<void> }
 type Transaction = Pick<JazzTransaction, 'one' | 'all' | 'insert' | 'rollback'> & {
 	commit(): LocalWrite
@@ -39,7 +39,9 @@ export type InternalTransferCreateInput = {
 	expenseCurrency: string
 	incomeCurrency: string
 	bookedOn: string
-	trackWrite: (write: { transactionId: string; operation: 'create'; transferId: string }) => void
+	trackWrite?:
+		| ((write: { transactionId: string; operation: 'create'; transferId: string }) => void)
+		| undefined
 }
 type Identifiers = {
 	expenseTransactionId: string
@@ -650,7 +652,7 @@ export function createInternalTransferCreateMachine() {
 												patch = { ...patch, transactionId: event.output }
 												context = { ...args.context, ...patch }
 												enq(() =>
-													context.request.trackWrite({
+													context.request.trackWrite?.({
 														transactionId: event.output,
 														operation: 'create',
 														transferId: required(context.identifiers).transferId

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { getDb } from 'jazz-tools/svelte'
-import type { InternalTransfer, TransactionDetail } from '#lib/schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import type { InternalTransfer, TransactionDetail } from '#lib/queries.js'
 import type { TransactionEntryObservation } from '#lib/contracts/transaction-entry-contract.js'
 import { createTransactionEditFormOptions, transactionEntryScope } from './transaction-entry.js'
 import { createTransactionEditMachine } from './transaction-edit.js'
@@ -69,7 +69,7 @@ function fixture() {
 		tags: [],
 		transaction
 	} as unknown as TransactionEntryObservation
-	const db = {} as ReturnType<typeof getDb>
+	const db = {} as JazzDb
 	const options = createTransactionEditFormOptions({ binding, observe: () => facts, db })
 	const requests: TransferMutationRequest[] = []
 	const capturedScope = { binding, workspaceId: organizationId, generation: 7 }

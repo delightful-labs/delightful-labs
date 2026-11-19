@@ -1,7 +1,7 @@
 import { createActor, createAsyncLogic, setup, toPromise, types } from 'xstate'
 import type { Db } from 'jazz-tools'
 import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
-import { app } from '../../backend/jazz/schema.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
 import { newDocumentValues } from '../../backend/jazz/document-values.js'
 
 type Input = {

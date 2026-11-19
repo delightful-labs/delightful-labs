@@ -1,0 +1,49 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "d38ef8d55e4ac1e3c6a09bc8994a3cc06b2fe0b6be71562864742d3a5496cd4e"
+  },
+  "tables": {
+    "notebookInvitations": {
+      "columns": {
+        "notebookId": "uuid",
+        "codeDigest": "string",
+        "role": { "enum": ["collaborator"] },
+        "expiresAt": "float?",
+        "revoked": "boolean",
+        "consumedAccountId": "uuid?",
+        "consumedOperationId": "string?",
+        "consumedMembershipId": "uuid?"
+      },
+      "relations": { "notebook": { "rel": "notebooks", "column": "notebookId" } }
+    },
+    "notebookMembers": {
+      "columns": {
+        "notebookId": "uuid",
+        "accountId": "uuid",
+        "role": { "enum": ["collaborator"] },
+        "invitationId": "uuid?"
+      },
+      "relations": { "notebook": { "rel": "notebooks", "column": "notebookId" } }
+    },
+    "notebookRedemptions": {
+      "columns": {
+        "operationId": "string",
+        "invitationId": "uuid",
+        "notebookId": "uuid",
+        "accountId": "uuid",
+        "membershipId": "uuid",
+        "acceptedAt": "float"
+      },
+      "relations": {
+        "invitation": { "rel": "notebookInvitations", "column": "invitationId" },
+        "notebook": { "rel": "notebooks", "column": "notebookId" }
+      }
+    },
+    "notebooks": {
+      "columns": { "name": "string" },
+      "relations": { "members": { "reverse": "notebookMembers", "relation": "notebook" } }
+    }
+  }
+}

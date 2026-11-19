@@ -1,4 +1,4 @@
-import type { OrganizationMember } from '../schema.js'
+import type { OrganizationMember } from '../queries.js'
 import type {
 	IntegrityIssue,
 	IntegrityScope

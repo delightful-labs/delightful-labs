@@ -1,4 +1,4 @@
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { canManageBankCredentials } from '#lib/domain/organization-permissions.js'
 import { stableUuid } from '#lib/data.js'
 import { simplefinDemo } from '#lib/integrations/simplefin.js'

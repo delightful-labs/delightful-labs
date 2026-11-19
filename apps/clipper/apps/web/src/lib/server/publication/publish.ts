@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ReadTier } from 'jazz-tools'
-import { app } from '../../backend/jazz/schema.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
 import type { Jazz } from 'jazz-tools/backend'
 import { createActor, createAsyncLogic, matchesState, setup, toPromise, types } from 'xstate'
 import type { ActorRefFrom } from 'xstate'

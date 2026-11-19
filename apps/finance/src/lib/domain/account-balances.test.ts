@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { calculateAccountBalances } from './account-balances.js'
 import { account, id } from '#lib/machines/bank-sync/test-fixtures.js'
-import type { TransactionRow } from '#lib/schema.js'
+import type { TransactionRow } from '#lib/queries.js'
 
 const transaction = (values: {
 	amountMinor: number

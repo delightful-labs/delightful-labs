@@ -1,4 +1,4 @@
-import type { Organization } from '../schema.js'
+import type { Organization } from '../queries.js'
 import type { ActorRef, Snapshot } from 'xstate'
 
 export { sameInitializationRequest } from 'delightful-local-first/workspace/startup-contracts'
@@ -18,11 +18,11 @@ export type WorkspaceNavigationFacts = WorkspaceRoute & {
 	ready: boolean
 	loading: boolean
 	error: unknown
-	organizations: readonly Organization[]
+	organizations: readonly Pick<Organization, 'id' | 'name'>[]
 	access: NavigationAccess
 }
 export type NavigationStatus =
-	'waiting' | 'directory' | 'global' | 'scoped' | 'unavailable' | 'failed'
+	'waiting' | 'updating' | 'directory' | 'global' | 'scoped' | 'unavailable' | 'failed'
 export type NavigationReport = { generation: number; status: NavigationStatus }
 export type NavigationStatusEvent = { type: 'NAVIGATION_STATUS'; report: NavigationReport }
 export type NavigationRecipient = ActorRef<Snapshot<unknown>, NavigationStatusEvent>

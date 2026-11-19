@@ -40,7 +40,7 @@ function fixture(initial: AccountObservation) {
 	let observation = initial
 	const listeners = new Set<() => void>()
 	const binding = {}
-	const host: AccountHost = {
+	const host = {
 		read: () => observation,
 		readiness: {
 			binding: {},
@@ -69,7 +69,7 @@ function fixture(initial: AccountObservation) {
 				readIdentity: async () => ({ kind: 'unavailable' })
 			}
 		}
-	}
+	} satisfies AccountHost
 	return {
 		host,
 		emit(value: AccountObservation) {

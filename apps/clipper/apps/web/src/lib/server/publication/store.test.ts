@@ -6,9 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp } from 'jazz-tools/testing'
-import { app } from '../../backend/jazz/schema.js'
-import permissions from '../../backend/jazz/permissions.js'
-import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
+import permissions from '../../backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { newDocumentValues } from '../../backend/jazz/document-values.js'
 import { createPublicationStore } from './store.js'
 import { toFirstPublicationWrite } from './first-write.js'
@@ -26,7 +25,7 @@ let fixture: PolicyTestApp
 const publishingDid = 'did:plc:ewvi7nxzyoun6zhxrhs64oiz'
 const createdAt = '2026-11-17T12:00:00.000Z'
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => fixture?.shutdown())
 

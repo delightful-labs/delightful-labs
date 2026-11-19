@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Transaction } from 'jazz-tools'
 import { createSyncLogRetentionCoordinator } from './log-retention-coordinator.js'
 import { createSyncLogRetentionMachine, type RetentionScope } from './log-retention.js'
-import type { SyncAttempt } from '#lib/schema.js'
+import type { SyncAttempt } from '#lib/queries.js'
 import type { createBankSetupMachine } from './setup.js'
 import type { LoggedOperationResult } from './logged-operation.js'
 import { createBankSyncMachine, selectBankView } from './index.js'
@@ -603,7 +603,7 @@ describe('bank-owned log retention', () => {
 							authorization: createAsyncLogic({ run: async () => true }),
 							history: createAsyncLogic({ run: async (): Promise<SyncAttempt[]> => rows }),
 							accounts: createAsyncLogic({
-								run: async (): Promise<import('#lib/schema.js').SyncAccountResult[]> => []
+								run: async (): Promise<import('#lib/queries.js').SyncAccountResult[]> => []
 							}),
 							open: createAsyncLogic({ run: () => opening.promise }),
 							rollback: createAsyncLogic({ run: () => rollback.promise })

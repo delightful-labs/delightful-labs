@@ -1,17 +1,16 @@
-import { policySchema } from './schema-permissions.test-support.js'
 import { beforeAll, afterAll, expect, it } from 'vitest'
 import { createActor, toPromise, setup } from 'xstate'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
 import { imageRowSchema } from '../../images/schema.js'
 import type { ImageStageRef } from '../../contracts/images.js'
 import type { ImageWrite } from '../../images/schema.js'
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => fixture?.shutdown())
 const bytes = new Uint8Array(

@@ -5,9 +5,9 @@ import { expect, test as base, type BrowserContext, type Page } from '@playwrigh
 import type { LocalJazzServerHandle } from 'jazz-tools/testing'
 import { startLocalJazzServer, allowTestBrowserOrigin } from './helpers/jazz-test-server.js'
 import type { Db } from 'jazz-tools/backend'
-import { openNativeJazzSession as createJazzSession } from './helpers/native-jazz.js'
-import { app } from '../src/lib/schema.js'
-import permissions from '../src/lib/permissions.js'
+import { nativeTestAuthority } from './helpers/jazz-test-server.js'
+import { app } from '../src/lib/queries.js'
+import permissions from '../src/lib/jazz.permissions.json' with { type: 'json' }
 import { createSilentJazzProxy } from './helpers/silent-jazz-proxy.js'
 import {
 	closeCreationModal,
@@ -44,22 +44,7 @@ const test = base.extend<{
 		}
 	},
 	authority: async ({ remote }, use) => {
-		const session = await createJazzSession({
-			appId: remote.backend.appId,
-			app,
-			permissions,
-			driver: { type: 'memory' },
-			serverUrl: remote.backend.url,
-			initial: { backendSecret: remote.backend.backendSecret },
-			env: 'test'
-		})
-		try {
-			const client = session.getSnapshot().client
-			if (!client) throw new Error('Expected backend authority client')
-			await use(client.db)
-		} finally {
-			await session.close()
-		}
+		await use(await nativeTestAuthority(remote.backend.url, { app, permissions }))
 	},
 	profile: async ({}, use) => {
 		const profile = await mkdtemp(join(tmpdir(), 'delightful-stalled-startup-'))

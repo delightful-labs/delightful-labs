@@ -1,179 +1,177 @@
 <script lang="ts">
 	import 'delightful-ui/theme.css'
-	import { createJazzSessionReadinessAdapter } from 'delightful-local-first/backend/jazz/session-readiness'
-	import { createJazzRestorationAdapter } from 'delightful-local-first/backend/jazz/restoration'
-	import { inspectActor } from '#lib/diagnostics/inspector.js'
 	import {
 		PUBLIC_JAZZ_APP_ID,
 		PUBLIC_JAZZ_SERVER_URL,
 		PUBLIC_SIMPLEFIN_DEMO
 	} from '$app/env/public'
-	import { onDestroy, onMount, setContext, type Snippet } from 'svelte'
-	import { createActor } from 'xstate'
-	import { prepareWorkspaceRestoreFile } from '#lib/machines/workspaces/workspace-restore.js'
+	import { onMount, type Snippet } from 'svelte'
 	import { fromStore, readable } from 'svelte/store'
-	import {
-		createApplicationReadinessMachine,
-		selectApplicationWorkspaceRestore
-	} from '#lib/machines/runtime/application-readiness.js'
-	import { readinessKey, type ReadinessContext } from '#lib/runtime/bank-sync.js'
-	import { JazzSessionProvider } from 'jazz-tools/svelte'
-	import type { JazzClientConfig } from 'jazz-tools/client'
-	import DeveloperMenu from '#lib/components/diagnostics/DeveloperMenu.svelte'
-	import DemoViewport from '#lib/components/diagnostics/DemoViewport.svelte'
-	import JazzStartup from '#lib/components/startup/JazzStartup.svelte'
-	import PwaUpdateIntegration from '#lib/components/pwa/PwaUpdateIntegration.svelte'
-	import SessionStartup from '#lib/components/startup/SessionStartup.svelte'
-	import WorkspaceBackup from '#lib/components/workspaces/WorkspaceBackup.svelte'
-	import WorkspaceBootstrap from '#lib/components/workspaces/WorkspaceBootstrap.svelte'
-	import MutationRejectionNotice from '#lib/components/shared/MutationRejectionNotice.svelte'
+	import WorkerImageEditor from '#lib/components/worker/WorkerImageEditor.svelte'
+	import { afterNavigate, goto, onNavigate } from '$app/navigation'
 	import { page } from '$app/state'
-	import { goto } from '$app/navigation'
-	import { queryLinksKey, type QueryLinkContext } from '#lib/filters/query-links.js'
-	import { browser } from '$app/env'
 	import { SkipControl } from 'delightful-ui'
 	import { m } from '#lib/paraglide/messages.js'
-	import { workspaceRoute } from '#lib/domain/workspace-routes.js'
-	import { financeFiltersKey, type FinanceFilters } from '#lib/filters/finance-filters.js'
-	import {
-		getCurrentJazzSession,
-		getCurrentSessionAvailability,
-		getJazzStartupBinding,
-		loadLocalFirstClient,
-		prepareLocalFirstSession
-	} from '#lib/runtime/jazz-session.js'
+	import WorkspaceIntegrityNotice from '#lib/components/workspaces/WorkspaceIntegrityNotice.svelte'
+	import MutationRejectionNotice from '#lib/components/shared/MutationRejectionNotice.svelte'
+	import JazzStartup from '#lib/components/startup/JazzStartup.svelte'
+	import DemoViewport from '#lib/components/diagnostics/DemoViewport.svelte'
+	import DeveloperMenu from '#lib/components/diagnostics/DeveloperMenu.svelte'
+	import AppDrawerStatus from '#lib/components/navigation/AppDrawerStatus.svelte'
+	import WorkspaceBackup from '#lib/components/workspaces/WorkspaceBackup.svelte'
+	import WorkerAccounts from '#lib/components/worker/WorkerAccounts.svelte'
+	import { createFinanceWorkerClient } from '#lib/runtime/worker/client.js'
+	import { setFinanceWorker, type FinanceWorkerClient } from '#lib/runtime/worker/context.js'
 
-	let { children }: { children: Snippet } = $props()
-	const routeWorkspaceId = $derived(browser ? workspaceRoute(page.url.search).workspaceId : null)
-	const accountFilter = $state<{ scope: string | null; ids: string[] | null }>({
-		scope: null,
-		ids: null
-	})
-	$effect.pre(() => {
-		if (accountFilter.scope !== routeWorkspaceId) {
-			accountFilter.scope = routeWorkspaceId
-			accountFilter.ids = null
+	let { children: routeContent }: { children: Snippet } = $props()
+	let client = $state.raw<FinanceWorkerClient>()
+	let serverUrl = $state('')
+	const emptyImageEditor = readable(null)
+	const imageEditor = $derived(client?.imageEditor ?? emptyImageEditor)
+	const live = $derived(client ? fromStore(client.view) : undefined)
+	setFinanceWorker({
+		get client() {
+			if (!client) throw new Error('Finance worker has not mounted')
+			return client
 		}
 	})
-	const financeFilters: FinanceFilters = {
-		get activeOrganizationId() {
-			return routeWorkspaceId
-		},
-		get selectedAccountIds() {
-			return accountFilter.scope === routeWorkspaceId ? accountFilter.ids : null
-		},
-		set selectedAccountIds(value) {
-			accountFilter.scope = routeWorkspaceId
-			accountFilter.ids = value
-		}
-	}
-
-	setContext<QueryLinkContext>(queryLinksKey, {
-		get href() {
-			return browser ? page.url.href : undefined
-		},
-		keys: ['workspace']
-	})
-	setContext(financeFiltersKey, financeFilters)
-
-	const serverUrl = browser
-		? new URL(
-				PUBLIC_JAZZ_SERVER_URL === 'same-origin' ? '/jazz' : PUBLIC_JAZZ_SERVER_URL || '/jazz',
-				window.location.origin
-			).href
-		: '/jazz'
-	const legacyScope = PUBLIC_JAZZ_SERVER_URL !== 'same-origin' ? PUBLIC_JAZZ_APP_ID : ''
-	const applicationId = legacyScope || serverUrl.replace(/\/+$/, '')
-	const jazzConfig = {
-		...(legacyScope ? { scope: legacyScope } : {}),
-		client: loadLocalFirstClient,
-		serverUrl,
-		initial: 'local-first'
-	} satisfies JazzClientConfig
-
-	const actor = createActor(
-		createApplicationReadinessMachine(
-			{
-				readHref: () => `${page.url.pathname}${page.url.search}${page.url.hash}`,
-				navigate: (destination) => goto(destination),
-				reload: () => window.location.reload()
-			},
-			(session) => createJazzRestorationAdapter(session, getCurrentJazzSession),
-			createJazzSessionReadinessAdapter,
-			{
-				appId: applicationId,
-				serverUrl: jazzConfig.serverUrl,
-				environment: browser ? window.location.origin : 'finance'
-			},
-			prepareLocalFirstSession
-		),
-		{ inspect: inspectActor }
-	).start()
-	const snapshot = readable(actor.getSnapshot(), (set) => {
-		const subscription = actor.subscribe(set)
-		return () => subscription.unsubscribe()
-	})
-	const readiness: ReadinessContext = { actor, snapshot }
-	setContext(readinessKey, readiness)
-	const startupState = fromStore(snapshot)
-	const jazzSession = $derived(startupState.current.context.session)
-	const restoreView = $derived(selectApplicationWorkspaceRestore(startupState.current))
-	let startupAvailability = $state<ReturnType<typeof getCurrentSessionAvailability>>()
 	onMount(() => {
-		const startup = getJazzStartupBinding(jazzConfig)
-		const subscription = startup.owner.subscribe(() => {
-			startupAvailability = getCurrentSessionAvailability()
-		})
-		actor.send({ type: 'START', startup })
-		return () => subscription.unsubscribe()
+		serverUrl = new URL(
+			PUBLIC_JAZZ_SERVER_URL === 'same-origin' ? '/jazz' : PUBLIC_JAZZ_SERVER_URL || '/jazz',
+			window.location.origin
+		).href
+		const owner = createFinanceWorkerClient(
+			{
+				serverUrl,
+				scope:
+					(PUBLIC_JAZZ_SERVER_URL !== 'same-origin' ? PUBLIC_JAZZ_APP_ID : '') ||
+					serverUrl.replace(/\/+$/, ''),
+				environment: window.location.origin
+			},
+			async (destination, signal, origin, replace = false) => {
+				signal.throwIfAborted()
+				if (`${location.pathname}${location.search}${location.hash}` !== origin) return
+				await goto(destination, {
+					replace,
+					shallow: replace && new URL(destination, location.href).pathname === location.pathname,
+					state: page.state
+				})
+			}
+		)
+		client = owner
+		owner.observeRoute()
+		return () => owner.close()
 	})
-	// The machine completes only after its workspace/bank children finish cleanup.
-	onDestroy(() => actor.send({ type: 'SHUTDOWN' }))
+	afterNavigate(() => client?.observeRoute())
+
+	onNavigate((navigation) => {
+		if (!navigation.from?.route.id?.startsWith('/(transactions)/')) return
+		if (!navigation.to?.route.id?.startsWith('/(transactions)/')) return
+		if (navigation.from?.url.pathname === navigation.to.url.pathname) return
+		if (!document.startViewTransition) return
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+		return new Promise<void>((resolve) => {
+			const transition = document.startViewTransition(async () => {
+				// Let SvelteKit update the page after the browser captures the old view.
+				resolve()
+				await navigation.complete
+			})
+			// A skipped or failed capture must never hold up navigation.
+			void transition.updateCallbackDone.catch(() => resolve())
+		})
+	})
 </script>
 
 <SkipControl href="#main-content">{m['navigation.skip_to_main_content']()}</SkipControl>
-
-<DeveloperMenu appId={applicationId} serverUrl={jazzConfig.serverUrl} />
-
 <DemoViewport enabled={PUBLIC_SIMPLEFIN_DEMO === 'true'} />
-
-<MutationRejectionNotice
-	notice={startupState.current.context.mutationNotice}
-	onDismiss={() => actor.send({ type: 'DISMISS_MUTATION_REJECTION' })}
-/>
-
-{#snippet startup()}
-	<SessionStartup waitingForOtherVersion={startupAvailability !== undefined} />
-{/snippet}
-
-{#if restoreView.visibleOutsideSettings && (page.url.pathname !== '/settings/workspace' || !startupState.current.matches( { running: 'ready' } ))}
-	<WorkspaceBackup
-		kind="restore"
-		view={{ ...restoreView, editable: false }}
-		onrestore={(file, password) =>
-			actor.send({
-				type: 'WORKSPACE_RESTORE',
-				request: prepareWorkspaceRestoreFile(file, password)
-			})}
-		oncommand={(type) => actor.send({ type: 'WORKSPACE_RESTORE_COMMAND', command: { type } })}
-	/>
-{/if}
-{#if !jazzSession || startupState.current.hasTag('startup-error')}
-	<PwaUpdateIntegration />
-{/if}
 <main id="main-content">
-	{#if startupState.current.hasTag('startup-error')}
-		<SessionStartup waitingForOtherVersion={startupAvailability !== undefined} />
-	{:else if jazzSession}
-		<JazzSessionProvider session={jazzSession} fallback={startup}>
-			{#key startupState.current.context.attachmentRevision}
-				<WorkspaceBootstrap>{@render children()}</WorkspaceBootstrap>
-			{/key}
-		</JazzSessionProvider>
+	{#if client}
+		<DeveloperMenu appId={PUBLIC_JAZZ_APP_ID} {serverUrl} />
+		<WorkerAccounts
+			view={client.view}
+			location={client.location}
+			recovery={client.recovery}
+			onRestore={client.restoreIdentity}
+			onRetryRecoveryNavigation={client.retryRecoveryNavigation}
+			onRetryWorkspaceNavigation={client.retryWorkspaceNavigation}
+			onSelectWorkspace={client.navigateWorkspace}
+			onArchive={client.archiveAccount}
+			onAccountCreation={client.accountCreationCommand}
+			onAccountOrder={client.accountOrderCommand}
+			onClassification={client.classificationCommand}
+			onTransactionEntry={client.transactionEntryCommand}
+			onTransactionEdit={client.transactionEditCommand}
+			onSelectTransaction={client.navigateTransaction}
+			onLedgerPage={client.selectLedgerPage}
+			onLedgerFilters={client.setLedgerFilters}
+			onSelectAccount={client.selectAccount}
+			onSelectAllAccounts={client.selectAllAccounts}
+		>
+			{#snippet footer()}
+				<AppDrawerStatus
+					syncConfigured
+					browserOffline={live?.current.bank?.offline ?? true}
+					bankSync={{
+						visible: live?.current.bank?.view.mode.kind === 'connected',
+						disabled:
+							!live?.current.bank?.canSync || live.current.bank.view.activity.kind === 'working',
+						loading: live?.current.bank?.view.activity.kind === 'working',
+						sync: () => {
+							if (live) client?.bankCommand({ type: 'SYNC' }, live.current)
+						}
+					}}
+				/>
+			{/snippet}
+			{#snippet notices(view)}
+				<MutationRejectionNotice
+					notice={view.mutationRejected}
+					onDismiss={() => client?.dismissMutationNotice(view)}
+				/>
+				{#if view.workspaceIntegrity}<WorkspaceIntegrityNotice
+						view={view.workspaceIntegrity}
+						onRetry={() => client?.retryIntegrity(view)}
+					/>{/if}
+				{#if view.status === 'starting'}<JazzStartup />{/if}
+				{#if view.workspaceStartup === 'checking'}<JazzStartup workspace />{/if}
+				{#if view.canRetrySession}<JazzStartup error onRetry={() => client?.retrySession()} />{/if}
+				{#if view.backup?.canReload && page.url.pathname !== '/settings/workspace'}
+					<WorkspaceBackup
+						kind="download"
+						view={view.backup}
+						ondownload={(protection, password) => client?.startBackup(protection, password, view)}
+						oncancel={() => client?.backupCommand('CANCEL', view)}
+						onreload={() => client?.backupCommand('RELOAD', view)}
+					/>
+				{/if}
+				{#if view.workspaceStartup === 'failed' || view.workspaceStartup === 'unavailable'}<JazzStartup
+						workspace
+						error
+						{...view.canRetryInitialization
+							? { onRetry: () => client?.retryInitialization(view) }
+							: {}}
+					/>{/if}
+			{/snippet}
+			{#snippet children()}
+				{@render routeContent()}
+			{/snippet}
+		</WorkerAccounts>
 	{:else}
-		<JazzStartup
-			error={startupState.current.hasTag('startup-error')}
-			onRetry={() => actor.send({ type: 'RETRY' })}
+		<JazzStartup />
+	{/if}
+	{#if client && live?.current.workspaceRestore?.visibleOutsideSettings && (page.url.pathname !== '/settings/workspace' || !live.current.workspaceNavigation?.showContent)}
+		<WorkspaceBackup
+			kind="restore"
+			view={live.current.workspaceRestore}
+			onrestore={(file, password) => client?.startWorkspaceRestore(file, password, live.current)}
+			oncommand={(command) => client?.workspaceRestoreCommand(command, live.current)}
 		/>
+	{/if}
+	{#if client && $imageEditor}
+		{#key $imageEditor.port}<WorkerImageEditor
+				file={$imageEditor.file}
+				port={$imageEditor.port}
+				onfinish={client.closeImageEditor}
+			/>{/key}
 	{/if}
 </main>

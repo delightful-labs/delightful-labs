@@ -5,8 +5,8 @@ import { join } from 'node:path'
 import { makeSignature } from 'better-auth/crypto'
 import { createJazz, sqlite } from 'jazz-tools/backend'
 import { z } from 'zod'
-import { app } from '../../backend/jazz/schema.js'
-import permissions from '../../backend/jazz/permissions.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
+import permissions from '../../backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { createAuthServer } from './server.js'
 
 const origin = 'https://example.invalid'

@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { Account } from '#lib/schema.js'
+import type { Account } from '#lib/queries.js'
 import type { BankSource, Connection, Dependencies, Observation } from './types.js'
 
 export const id = (value: number) =>

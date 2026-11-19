@@ -1,11 +1,10 @@
 import { ReadTier } from 'jazz-tools'
-import { app } from '../src/lib/backend/jazz/schema.js'
+import { app } from '../src/lib/backend/jazz/jazz.generated.js'
 import { createJazzClient } from 'jazz-tools/client'
 import { browserAccountStore, fixtureServerUrl } from './browser-account-store.js'
 import { createLibraryRecords } from '../src/lib/backend/jazz/records.js'
 import { readConnection } from '../src/lib/backend/jazz/read-connection.js'
-import wasmUrl from '#jazz-wasm-binary?url'
-import { JAZZ_RUNTIME_VERSION } from '../src/lib/offline/runtime-version.js'
+import { jazzRuntimeSources } from '../src/lib/backend/jazz/runtime-sources.js'
 /** Test fixture access only. The production UI never imports this Window client. */
 const serverUrl = fixtureServerUrl()
 const session = await createJazzClient({
@@ -13,26 +12,26 @@ const session = await createJazzClient({
 	store: browserAccountStore(serverUrl),
 	client: () => import('jazz-tools/local-first'),
 	env: 'clipper',
-	initial: 'local-first',
-	runtimeSources: { wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION }
+	initial: 'device',
+	runtimeSources: jazzRuntimeSources
 })
 await session.getSnapshot().client?.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
 /** Warm this independent test replica before taking its authority offline. */
 export async function ready() {
-	const { account, client } = session.getSnapshot()
-	if (!account || !client) throw new Error('Fixture account unavailable')
-	const library = await client.db.one(app.libraries.where({ id: account.id }), {
+	const { user, client } = session.getSnapshot()
+	if (!user || !client) throw new Error('Fixture account unavailable')
+	const library = await client.db.one(app.libraries.where({ id: user.accountId }), {
 		tier: ReadTier.LocalFirst
 	})
 	if (!library) throw new Error('Fixture library unavailable')
 }
 await ready()
 export function currentLibraryRecords() {
-	const { account, client } = session.getSnapshot()
-	if (!account || !client) throw new Error('Fixture account unavailable')
+	const { user, client } = session.getSnapshot()
+	if (!user || !client) throw new Error('Fixture account unavailable')
 	return createLibraryRecords(
 		client.db,
-		account.id,
+		user.accountId,
 		() => session.getSnapshot().client === client,
 		readConnection(client.db)
 	)

@@ -5,7 +5,7 @@ import type {
 	Tag,
 	OrganizationMember,
 	TransactionDetail
-} from '../schema.js'
+} from '../queries.js'
 import type { TransactionSaveValues } from '../validation/transactions.js'
 import type { ScopedFormView } from './form-contract.js'
 
@@ -16,20 +16,23 @@ export type TransactionEntryScope = {
 	kind: TransactionDetail['kind']
 	transactionId?: TransactionDetail['id'] | null
 }
+export const TRANSACTION_ENTRY_REASON = Object.freeze({
+	sessionUnavailable: 'sessionUnavailable',
+	selectWorkspace: 'selectWorkspace',
+	loadFailed: 'loadFailed',
+	loading: 'loading',
+	readOnly: 'readOnly',
+	noAccounts: 'noAccounts',
+	noCategories: 'noCategories',
+	unavailableReference: 'unavailableReference',
+	ambiguousTagName: 'ambiguousTagName',
+	checkRetained: 'checkRetained',
+	saveUnresolved: 'saveUnresolved',
+	attachmentsFailed: 'attachmentsFailed',
+	linkedTransferRequiresUnlink: 'linkedTransferRequiresUnlink'
+})
 export type TransactionEntryReason =
-	| 'sessionUnavailable'
-	| 'selectWorkspace'
-	| 'loadFailed'
-	| 'loading'
-	| 'readOnly'
-	| 'noAccounts'
-	| 'noCategories'
-	| 'unavailableReference'
-	| 'ambiguousTagName'
-	| 'checkRetained'
-	| 'saveUnresolved'
-	| 'attachmentsFailed'
-	| 'linkedTransferRequiresUnlink'
+	(typeof TRANSACTION_ENTRY_REASON)[keyof typeof TRANSACTION_ENTRY_REASON]
 export type TransactionEntryObservation = TransactionEntryScope & {
 	sessionReady: boolean
 	loading: boolean
@@ -40,6 +43,7 @@ export type TransactionEntryObservation = TransactionEntryScope & {
 	categories: readonly Category[]
 	tags: readonly Tag[]
 	intent?: TransactionSaveValues
-	transaction?: TransactionDetail | null
+	transaction?:
+		(Omit<TransactionDetail, 'attachments'> & { attachments: readonly { id: string }[] }) | null
 }
 export type TransactionEntryView = ScopedFormView<unknown, TransactionEntryReason>

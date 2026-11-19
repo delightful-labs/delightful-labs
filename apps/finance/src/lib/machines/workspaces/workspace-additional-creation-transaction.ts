@@ -1,5 +1,5 @@
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import { createWorkspaceCreationTransaction } from 'delightful-local-first/workspace/creation/workflow'
 import type {
 	WorkspaceCreationAttempt as SharedAttempt,
@@ -8,7 +8,7 @@ import type {
 } from 'delightful-local-first/workspace/creation/contracts'
 import { ACCOUNT_ACCESS } from '../../domain/account-access.js'
 import { ORGANIZATION_ROLE } from '../../domain/organization-role.js'
-import { app, type Organization } from '../../schema.js'
+import { app, type Organization } from '../../queries.js'
 import type { WorkspaceCreationAttempt } from '../../domain/workspace-creation.js'
 import { workspaceCreationAttemptSchema } from '../../validation/identity.js'
 import type {
@@ -18,7 +18,7 @@ import type {
 import { setup, types } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type Db = Pick<ReturnType<typeof getDb>, 'beginTransaction'>
+type Db = Pick<JazzDb, 'beginTransaction'>
 type Transaction = ReturnType<Db['beginTransaction']>
 type Attempt = SharedAttempt<WorkspaceCreationAttempt>
 // Keep uncertain native receipts with their database lifetime; never roll back an issued commit

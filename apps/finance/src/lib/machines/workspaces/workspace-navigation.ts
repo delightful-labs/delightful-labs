@@ -1,6 +1,6 @@
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import { app } from '../../schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app } from '../../queries.js'
 import {
 	switchedWorkspaceHref,
 	workspaceHref,
@@ -14,7 +14,7 @@ import type {
 	NavigationStatusEvent,
 	WorkspaceNavigate
 } from '../../contracts/workspace-orchestration-contract.js'
-import { setup, types, createAsyncLogic } from 'xstate'
+import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 export type { WorkspaceNavigationFacts } from '../../contracts/workspace-orchestration-contract.js'
@@ -37,9 +37,10 @@ function defaultWorkspaceHref(context: Context, workspaceId: string | null) {
 type Event =
 	| { type: 'OBSERVED'; facts: WorkspaceNavigationFacts }
 	| { type: 'SELECT'; workspaceId: string }
+	| { type: 'NAVIGATE'; destination: string; replace: boolean }
 	| { type: 'REEVALUATE' | 'RETRY' | 'SHUTDOWN' }
 export function createWorkspaceNavigationMachine(
-	db: Pick<ReturnType<typeof getDb>, 'one'>,
+	db: Pick<JazzDb, 'one'>,
 	navigate: WorkspaceNavigate
 ) {
 	const actors = {
@@ -63,6 +64,7 @@ export function createWorkspaceNavigationMachine(
 	const events0 = {
 		OBSERVED: types<EventPayload<Event, 'OBSERVED'>>(),
 		SELECT: types<EventPayload<Event, 'SELECT'>>(),
+		NAVIGATE: types<EventPayload<Event, 'NAVIGATE'>>(),
 		REEVALUATE: types<EventPayload<Event, 'REEVALUATE'>>(),
 		RETRY: types<EventPayload<Event, 'RETRY'>>(),
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
@@ -102,10 +104,16 @@ export function createWorkspaceNavigationMachine(
 		initial: 'assessing',
 		on: {
 			SHUTDOWN: { target: '.closed' },
+			NAVIGATE: ({ event }) => ({
+				target: '.navigating.updating',
+				reenter: true,
+				context: { emptyEntry: undefined, destination: event.destination, replace: event.replace }
+			}),
 			SELECT: (args) => {
 				const { context } = args
 				return {
 					target: '.navigating',
+					reenter: true,
 					context: {
 						emptyEntry: undefined,
 						replace: false,
@@ -341,21 +349,29 @@ export function createWorkspaceNavigationMachine(
 				}
 			},
 			navigating: {
-				entry: (args, enq) => {
-					let context = args.context
-					let patch = {}
-					patch = {
-						...patch,
-						...((args) => ({ resolving: (({ context }) => context.facts)(args) }))(args)
+				initial: 'active',
+				states: {
+					active: {
+						entry: ({ context }, enq) =>
+							enq.sendTo(context.recipient, {
+								type: 'NAVIGATION_STATUS',
+								report: { generation: context.facts.generation, status: 'waiting' }
+							})
+					},
+					updating: {
+						entry: ({ context }, enq) =>
+							enq.sendTo(context.recipient, {
+								type: 'NAVIGATION_STATUS',
+								report: { generation: context.facts.generation, status: 'updating' }
+							})
+					},
+					closing: {
+						on: { SHUTDOWN: {}, OBSERVED: {}, REEVALUATE: {}, SELECT: {}, NAVIGATE: {}, RETRY: {} }
 					}
-					context = { ...args.context, ...patch }
-					enq.sendTo(context.recipient, {
-						type: 'NAVIGATION_STATUS',
-						report: { generation: context.facts.generation, status: 'waiting' }
-					})
-					return { context: patch }
 				},
+				entry: ({ context }) => ({ context: { resolving: context.facts } }),
 				on: {
+					SHUTDOWN: { target: '.closing' },
 					REEVALUATE: (args, enq) => {
 						const { context } = args
 						if (
@@ -370,7 +386,12 @@ export function createWorkspaceNavigationMachine(
 						}
 						enq.sendTo(context.recipient, {
 							type: 'NAVIGATION_STATUS',
-							report: { generation: context.facts.generation, status: 'waiting' }
+							report: {
+								generation: context.facts.generation,
+								status: matchesState({ navigating: 'updating' }, args.value)
+									? 'updating'
+									: 'waiting'
+							}
 						})
 						return {}
 					}
@@ -386,6 +407,7 @@ export function createWorkspaceNavigationMachine(
 						}
 					},
 					onDone: (args) => {
+						if (matchesState({ navigating: 'closing' }, args.value)) return { target: 'closed' }
 						const { context } = args
 						if (
 							context.destination ===
@@ -395,7 +417,9 @@ export function createWorkspaceNavigationMachine(
 						}
 						return { target: 'settled' }
 					},
-					onError: { target: 'failed' }
+					onError: ({ value }) => ({
+						target: matchesState({ navigating: 'closing' }, value) ? 'closed' : 'failed'
+					})
 				}
 			},
 			waiting: {

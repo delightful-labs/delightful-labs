@@ -1,5 +1,5 @@
 import { INCOME } from './transaction-kind.js'
-import type { Account, TransactionRow } from '#lib/schema.js'
+import type { Account, TransactionRow } from '#lib/queries.js'
 
 type BalanceTransaction = Pick<TransactionRow, 'accountId' | 'amountMinor' | 'currency' | 'kind'>
 

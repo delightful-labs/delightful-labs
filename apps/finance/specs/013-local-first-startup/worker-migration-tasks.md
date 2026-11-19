@@ -1,5 +1,270 @@
 # Finance worker migration: foundation-first tasks
 
+## Merge requirement — updated November 18
+
+The user requires **full Finance integration in PR46 before merging**, superseding the earlier
+inactive-foundation merge/freeze checkpoint. Do not recommend merging merely because isolated
+worker cases pass. Keep working on this same PR through normal application SDK/source adoption,
+production SvelteKit route wiring, feature and permission parity, financial-save correctness,
+full-app/offline verification and removal of superseded main-thread ownership. Small visual bugs
+may be recorded and deferred. The user has also directed **no further tests until all integration
+code is complete**; batch the final verification, then fix its failures.
+
+SDK adoption promotes the already-qualified alpha.67 native schema, generated query bindings and
+shared session adapter into normal source. Keep one Jazz version/peer identity across Finance,
+Local First and Clipper, retaining the existing qualified bridge/backend/provider corrections
+without new patch behavior. Production routes consume the application's single worker client;
+they must not mount a second SDK session or retain old query/controller roots alongside it.
+Native SvelteKit owns navigation, Window owns DOM/platform-only effects, and the worker owns
+domain observations, workflows, validation, projections and persistence. Reuse the existing
+scoped forms and feature charts, exposing bounded views and scoped commands rather than a
+universal SDK facade or a generic RPC service. Final checks cover actual routes, not only the
+isolated composite worker fixture.
+
+## Current source and verification status — November 19
+
+PR46 integrates alpha.67 and one application worker into the normal SvelteKit
+app. Preserve the other agents’ commits. Finance’s integration, functional repairs and the user-approved retained broker
+fixes are implemented and locally qualified. Passing final code-head hosted CI
+remains a merge requirement.
+
+Current implementation decisions:
+
+- Native SvelteKit updates query parameters immediately. Controls send partial
+  edits; Window merges against its current URL, then `OBSERVE_ROUTE` supplies it
+  to the worker’s XState actor. Filtering, balances, grouping and pagination stay
+  in the worker. Query edits preserve form DOM; another page/workspace waits for
+  its own worker view.
+- Keep the identity profile while route subscriptions restart. Workspace
+  selection must not revoke an identity-bound workspace creation operation.
+- Recovery distinguishes invalid phrases from SDK failures. Invalid input
+  retains its draft; the existing validation report clears a validated phrase.
+  Drain financial work before Retry. Invoke Local First’s existing
+  `createSessionChangeMachine` to call native Jazz `retry()`, await settlement,
+  then refresh the existing session observer. Reopening a failed acquisition and
+  retrying a retained SDK session use that same public contract. Add no selection
+  replay, credential cache or replacement session owner.
+- Subscribe to the image-editor store with native Svelte store syntax. Reuse the
+  loaded attachment File; remove the duplicate hydration query and assembly
+  actors. The existing replacement transaction still checks transaction/account,
+  file identity and current permission.
+- Use existing success/cancellation/reset events for file-picker and creation
+  cleanup. Mounting a payment selector only initializes its presentation; it must
+  not emit a fabricated edit that clears successful-save feedback. Keep deletion
+  feedback outside the deleted transaction’s metadata subtree.
+- Keep native backup hydration and serializable authority commit. Directly await
+  reads within the selected snapshot: overlapping alpha.67 browser capture
+  queries stalled; sequential reads pass the restoration cases. Add no global
+  queue, read-tier workaround, replacement archive format or migration.
+- Register native page transitions in the persistent root layout so Back/Forward
+  retains the callback when route content is replaced.
+- Clipper Window SDK consumers, application workers and native fixtures share
+  one `runtime-sources.ts` broker/Wasm configuration. Remove the obsolete
+  alpha.60 manual reproducer rather than port its unused account implementation.
+- Real-route browser checks use the production artifact and native service-worker
+  asset cache, including offline creation of the CPU image worker. Nine standalone
+  component scenarios retain their development module host in a separate suite.
+  Keep all scenarios in CI and `test:e2e`; do not introduce fixture modules into
+  the normal production build.
+
+Qualification evidence is cumulative across the broad runs and affected repairs,
+not a claim of one final all-green run:
+
+| Surface                    | Current evidence                                                                                                                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Finance units              | All 1,799 cases covered green: 1,615 in the full run and all 184 native policy/backup cases rerun with local-server permission after sandbox listener denial. Static and browser-test types pass with zero Svelte errors/warnings.                                       |
+| Actual Finance routes      | All 270 unique real-route scenarios covered green across broad runs and targeted repairs. The six cases affected by hosted CI now pass: production developer controls/sample draining, repeated startup failures, and account-archive feedback.                          |
+| Standalone components      | 9/9 passed on the development fixture host. Coverage ownership checks assign all 44 browser test files without duplicate application scenarios.                                                                                                                          |
+| Finance native worker      | Fresh full 66/66 Chromium/Firefox/WebKit application-worker cases and 42/42 SDK/session binding cases pass with the updated shared patch.                                                                                                                                |
+| Native backup/restoration  | 107/107 passed at the integration checkpoint, including browser-process restarts, partial writes, rollback, permission repair and exact historical data. Actual production-route archive exports and independent reopening pass.                                         |
+| Production/offline/bundles | Fresh 19/19 PWA cases pass with the retained SDK fixes. Audited Window: 864 modules with no Jazz runtime/financial projections. Application worker: 604 modules with no Svelte UI. Provider, image and SDK broker workers remain separate.                               |
+| Production startup         | 7/7 passed at the integration checkpoint and in its hosted CI, including cold local work, silent connections, partial permission data, later server rejection and cold bank history. Final code-head CI repeats this gate.                                               |
+| Clipper                    | Fresh full 32/32 native worker cases pass, including all five fresh/expired/forged/wrong-audience/wrong-identity proof cases and offline edits across visible Retry. Previous 1,029 units and web/extension static/browser checks pass; final code-head CI repeats them. |
+| Local First                | Native snapshot capture/export: fresh 20/20 pass with ordered snapshot reads and native Vite resolution. Previous 1,250 units, static/package and complete consumer qualification pass; final code-head CI repeats all affected gates.                                   |
+
+The user approved porting the two existing alpha.60 broker responsibilities on
+November 19. The shared alpha.67 patch now forwards the joining peer’s current
+proof while keeping owner identity/audience fixed and native signature/expiry
+verification intact. Explicit Retry drains locally with `waitForSync: false`;
+account replacement and sign-out retain synchronization requirements. Both the
+readable SDK implementation and its shipped broker bundle carry the same fix.
+No application credential cache, token-renewal policy or extra SDK owner exists.
+
+Hosted CI at `e92c1bdf` identified fixture/configuration issues now repaired:
+the general production host explicitly enables the developer controls it tests;
+the no-account assertion targets form status instead of a second pane; the
+startup fault test proves another blocked fetch and waits for retained account
+content before querying identity. Local First follows Jazz’s recommended Vite
+exclusion for the SDK and performs native snapshot reads sequentially, matching
+Finance’s qualified capture path. No extra dependency patch addresses this
+snapshot concurrency limitation.
+
+The [upgrade plan](worker-jazz-upgrade-plan.md#november-18-qualification-retained-broker-patch-responsibilities)
+records approval, source evidence and qualification. The lock changes only the
+shared SDK patch fingerprint and its three corresponding injected peer contexts;
+a frozen offline install and monorepo package-identity checks pass.
+
+Hosted CI at `6fa7c94b` passes every actual Finance application, native startup,
+offline, unit, static and build job. All Foundation jobs and Clipper's web,
+extension, tooling/build and 32 native worker cases pass. Three remaining
+fixture expectations are corrected without application or additional SDK changes:
+
+- Finance's two pure presentation cases mount through the existing standalone
+  component document instead of waiting for an unrelated account startup. All
+  nine component cases pass locally on that fixture host.
+- Clipper's backend reading-position assertion uses the existing
+  `resumeObservationsSchema` to decode its stored observation set before checking
+  the resolved date and unchanged article metadata.
+- Clipper's cold restart after deliberate provider/native sign-out asserts the
+  retained signed-out state and absence of the previous article. Its existing
+  explicit Create account action then opens a fresh library offline. This follows
+  Clipper's recorded sign-out contract; automatic account creation is first-use
+  behavior, not permission to undo an explicit sign-out on restart.
+
+The complete corrected Clipper production/offline suite passes 12/12 locally,
+including Chromium, Firefox and WebKit startup, full-process restarts, reconnect,
+reading-position/metadata synchronization, annotations and consented updates.
+Clipper static qualification reports zero Svelte errors and warnings.
+
+The previously skipped sample-data suite exposed the same overlapping native
+snapshot-read stall in Clipper's optional seed-presence check. Four direct awaits
+replace `Promise.all`; its existing serializable recheck/commit, authority guard,
+offline skip and shutdown settlement remain unchanged. Both sample-data browser
+cases and all 11 existing seeding/lifecycle tests pass on the final repair source.
+Temporary phase-only diagnostics are removed.
+
+Remaining before merge: upload this final fixture batch to the same
+PR46 and verify its code-head hosted CI. No further Finance feature migration or shared
+broker decision remains. Keep small cosmetic follow-ups separate. User servers,
+production data and storage namespaces remain unchanged. No Paraglide generation
+is authorized.
+
+## Earlier inactive implementation checkpoint — November 18
+
+The maintained isolated candidate targets **alpha.67**; the active app remains alpha.60.
+Use the [current resource/implementation record](worker-session-resource-decision.md) and
+[maintained candidate runner](../../tests/worker-upgrade/README.md) before older version-specific
+entries below. Candidate source cleanup and all concurrent PR46 updates are preserved.
+
+Qualified worker slices now include native SDK/session/storage custody, account creation/archive,
+income/expense entry and selected editing, exact balances and bounded filtered ledger pages,
+workspace initialization, recovery-key display and **private account restoration and native post-recovery navigation**. Archive,
+initialization and forms share one restartable SDK-bound group. Recovery reuses Local First's actors;
+raw phrases never enter Finance's inspected state. Actual cross-profile restoration recovers existing
+transactions and survives a full offline process restart. Pending offline uploads preserve Jazz's
+native account-switch refusal and resume ordinary Finance without retrying.
+
+Latest local qualification: **2,016 Finance units** (70 host), zero-warning static/browser types,
+and **66 actual Chromium/Firefox/WebKit application cases**. The preceding fresh artifact also
+passes 200 schema/restore and 42 worker/session cases. Shared recovery coordination accepts the typed session connection and an explicit private-root
+recipient; **1,250 Local First units** pass. Hosted Finance/Foundation/Clipper pass at
+`ff6a4bd0`; the classification/edit-stability commit requires its own hosted result. Worker routing now reuses the existing workspace-navigation chart, with native default/switch,
+denied scope, legacy details and navigation drain qualified. Shared URL filters/pages, non-blocking native
+history replacement, input focus and back/forward are also qualified. Worker account masks now reuse the legacy
+checkbox presentation and selection calculation; exact ledger totals, full balances, all/none,
+new accounts, workspace/SDK reset and routed page reset are qualified. Transaction detail links
+and native Back/Forward/Back to List retain filters and requested pages; SDK replacement rebinds
+the observed detail without retaining its old data. Account ordering now reuses its existing chart with Worker-owned IndexedDB preferences,
+serialized/coalesced writes, shutdown flush and native offline restart qualification. The user
+approved no legacy localStorage migration. The candidate now binds the existing AppShell/PageLayout/drawer to Worker views and commands,
+including scoped/current links and native mobile focus/history behavior. W12/W13/W16 remain
+partial: production route mounting and remaining account/grant/settings/transfers,
+provider/PWA footer, attachment and workspace/archive UI parity precede activation.
+Classification now reuses the shared category/tag forms, policy and native leaves in four fixed
+children of that same Worker group. Shared one-pass history counts ignore sidebar selection;
+create/archive, protected-system refusal, held-write shutdown and cold offline history are covered.
+Removing duplicate command-time observations prevents a proven same-scope form withdrawal, without
+adding a queue/cache. See the [merge handoff](worker-session-resource-decision.md#pr46-scope-freeze-and-merge-handoff)
+for exact qualification and remaining work. The earlier inactive merge checkpoint was superseded by the full-integration requirement above;
+minor visual defects remain deferred; the candidate's generic Accounts title is recorded for later polish.
+W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
+The intermittent check/account-move failure remains an explicit activation blocker.
+Finance has no sign-out or explicit new-identity screen; do not add those as parity work.
+Automatic native identity creation is already qualified at startup.
+
+Latest main `1de0ea1a` / merged PR51 is preserved. Its Clipper schema-lineage repair is now
+reconciled in the alpha.67 candidate: **61 fresh native cases**, strict annotation/migration
+types, exact two-schema/permission identity and actual alpha.60 historical SQLite reopen pass.
+Full Clipper session/backend adoption and remaining Finance shell parity are still open.
+
+## Historical qualification snapshots
+
+**2026-11-17 release update:** target alpha.66 for the coordinated upgrade.
+The [actual-code audit and revised order](worker-jazz-alpha66-research.md)
+retain the private session actor and awaited SDK factory, and move the isolated
+schema/permission/history foundation ahead of broader caller adoption. All
+alpha.65 results below retain their original version scope; active pins remain
+alpha.60. Alpha.66's new immediate factory passed 24 native lifecycle cases but
+lost a late-resource close failure in a separate source-level reproduction, so
+it does not replace Finance's awaited acquisition/close protocol.
+
+The isolated Finance alpha.66 authoring slice now passes strict selected types,
+native generation/history and **138 tests**, including retained alpha.60 SQLite
+records and another native write/close/reopen. Schema and permission identities
+remain unchanged. The [qualified scope](worker-jazz-alpha66-research.md#finance-native-schema-foundation)
+keeps Clipper, broad caller/backup/restore adoption and the remaining upgrade
+gates open. Active app dependencies and source stay alpha.60.
+
+Clipper's isolated native schema/reading port now passes the same pipeline with
+57 cases, unchanged schema/permission identities, actual two-replica offline
+convergence and retained alpha.60 SQLite reading data. It uses native resume
+sets and existing record codecs instead of repairing nullable SDK transforms.
+The [qualified scope](worker-jazz-alpha66-research.md#clipper-native-schema-foundation)
+keeps full adoption and the remaining upgrade gates open; Finance's 138 cases
+also pass after the fixture reuse.
+
+The next Finance checkpoint extends the schema mode to **176 passing tests**:
+the prior 138, all 37 existing backup cases and one real alpha.60 v1 archive
+independently opened/validated on alpha.66. The candidate reader drops its
+previous-schema override and uses current native generated queries. Historical
+archives are generated under their own old SDK/schema, preserving exact amounts,
+IDs and attachment bytes without a compatibility layer. See the
+[backup evidence](worker-jazz-alpha66-research.md#finance-backup-caller-and-retained-archive).
+The full restore workflow/browser harness remains next; staging/publication and
+identity/write-drain qualification are still required before adoption.
+
+The shared-Db restore slice now passes **12 native browser cases**, four each in
+Chromium/Firefox/WebKit; the combined Finance alpha.66 proof passes **188 tests**.
+It retains the existing charts and ports only public user metadata/row types.
+Real old-file restore, exact attachment/source bytes, journal reuse after page
+reload without repeated writes, cancellation, same-account replacement and
+A → B → A pass with development freezing enabled. See the
+[restore evidence](worker-jazz-alpha66-research.md#finance-shared-db-restore-browser-slice).
+The next restore gate is interruption after authority acceptance, pending-write
+drain/resume without replay, conflict/cleanup recovery and broader policy/role
+checks. Memory-driver browser success does not qualify persistent-worker storage.
+
+Accepted-commit interruption/drain now passes six more real-browser cases:
+cancellation and native replacement in Chromium/Firefox/WebKit, with responses
+held after authority acceptance. The same journal resumes without replaying the
+financial write; release waits for settlement. The combined proof passes **194
+tests**, including 18 browser restore cases. The original alpha.60 pair also
+passes using the same extracted test probe. See the
+[drain evidence](worker-jazz-alpha66-research.md#accepted-commit-interruption-and-drain).
+Conflict/blocked-cleanup recovery and broader policy/role coverage remain open,
+along with the worker/session and coordinated adoption gates.
+
+The next bounded recovery checks also pass across all three browsers: a real
+changed destination refuses resume without writes or journal-evidence replacement,
+and failed artifact cleanup retains custody until retry releases once without
+repeating Jazz commits. The combined proof passes **200 tests**, including 24
+browser restore cases; the application charts remain unchanged. See the
+[conflict/cleanup evidence](worker-jazz-alpha66-research.md#destination-conflict-and-artifact-cleanup-retry).
+Broader policy/role and rollback/restart/conflict/cleanup variants remain open.
+Return to the alpha.66 worker/session foundation before broader caller adoption;
+memory-driver restore success does not qualify persistent worker ownership.
+
+The alpha.66 worker/session foundation now passes **30 native cases** after the
+200 schema/restore checks, with strict private-adapter/fixture types and native
+Svelte checks. The same SDK bridge, actor and recovery adapters need no behavior
+changes. Full-process offline Finance save/edit retention, actor lifetime with
+development freezing, and SDK/AccountStore/broker close pass in all three browsers.
+An unpatched control retains identity but loses its edited row after cold restart;
+keep the existing bridge, with no new patch behavior. See the
+[worker qualification and cleanup findings](worker-jazz-alpha66-research.md#alpha66-persistent-worker-and-private-session-adapter).
+The old Clipper caller overlay remains incomplete; actual shared-owner adoption,
+backend/auth, retained Finance destinations and full-patch parity remain open.
+
 Current direction, 2026-11-16: implement the approved
 [simpler native-worker design](worker-simple-design.md). Do not extend the F4
 grant/call population or add its inbox. Keep W01–W21's product/parity requirements,
@@ -15,7 +280,77 @@ using the [alpha.61–65 research](worker-jazz-release-research.md), then the pl
 worker-owned UI read slice. Keep live behavior until its replacement is qualified.
 The shared-helper extension-origin regression is corrected and all 12 extension
 browser cases pass locally. All hosted Finance, Clipper and foundation checks
-pass at the C1 cleanup head `abf31082`; the subsequent C2 head needs a fresh hosted run.
+pass at the final C2 head `d8c0820e`. PR #39 is merged at `fb380114`.
+The next branch starts at that exact tree and follows the
+[coordinated SDK compatibility plan](worker-jazz-upgrade-plan.md) before C3–C5.
+Fresh preview cores are approved for Clipper only. Finance must preserve access
+to existing preview and production data; its destination inventory and retention
+gate are recorded in that plan.
+U1's isolated alpha.65 worker bridge now passes strict types and 15 native
+Finance SDK/IDB cases across Chromium/Firefox/WebKit. Workspace pins and the
+active patch remain alpha.60; full shared-session/backend qualification is next.
+U2a's shared native recovery/restoration/readiness candidate now passes strict
+types and all 18 native cases. [Its qualification](worker-jazz-upgrade-plan.md#u2a-shared-native-session-adapter-qualification)
+records the scope guarantees and remaining Finance/Clipper caller adoption; U2
+remains open until those consumers are adapted and qualified together.
+U2b's source review found Finance's independent workspace-restore database also
+depends on the removed opaque account handle. Its
+[ownership proposal and qualification gates](worker-restore-session-decision.md)
+now record the user's approval and the shared application Db implementation.
+On alpha.60, strict types, 1,928 unit tests and all 107 restore qualification
+tests pass, including actual native identity replacement with a pending write
+and journal resume without replay. The alpha.65 consumer port remains open;
+this does not complete U2 or qualify an SDK/backend data upgrade.
+U2b's isolated native Svelte/recovery slice now passes strict types, zero Svelte
+warnings and all 21 native cases, including the actual Finance recovery UI under
+`JazzProvider` in all three engines. [The qualification](worker-jazz-upgrade-plan.md#u2b-native-svelte-session-boundary)
+records its per-provider scope and remaining layout/Clipper host/startup work.
+Clipper's inactive native startup caller now passes types and 46 startup tests
+and removes 86 net production lines. Expanded worker-host coverage exposed
+XState development traversal of the new SDK session's throwing `db` getter;
+an actual SDK/browser diagnostic confirms it. The
+[resource-custody decision](worker-session-resource-decision.md) now records the
+approved actor boundary and its first implemented acquisition/observation/close
+slice. It passes 234 affected tests and 30 native browser cases, including nine
+actual SDK/development-XState cases. Identity/recovery commands and actual caller
+adoption remain next; the raw-session Clipper overlay still fails 15/67 cases.
+Keep application domain drains, and do not add an SDK patch or hide that failure
+in a fixture. U2 remains open, and active alpha.60 behavior is unchanged.
+The approved shared app-binding extension is now implemented: the private Jazz
+adapter supplies the ready Db/identity to an inert app construction function,
+and the generic session actor publishes only its returned capability record.
+Clipper's active account adapter and candidate constructor reuse one extracted
+root/library/capture builder. Shared types/tests, active Clipper tests/full types,
+alpha.67 candidate constructor/native tests and focused three-engine Worker
+checks pass. [Exact boundary and next batch](worker-session-resource-decision.md#app-binding-function-approved-and-implemented).
+The shared create/restore/sign-out path and reused recovery capability now also
+pass 132 shared tests and 21 focused native cases, including an actual Worker
+create → recover/hide → sign-out → same-identity restore and close during a held
+restore receipt. [Current command contract and exact evidence](worker-session-resource-decision.md#create-restore-and-recovery-implemented-host-wiring-pending).
+Clipper's actual candidate worker host now uses the shared actor connection,
+identity-change source and close invocation. Strict candidate types, all 69
+Clipper candidate tests, 72 active-SDK Clipper tests, 272 shared identity/backend
+tests and 21 focused three-engine native cases pass. This clears the prior 15
+raw-SDK getter failures without weakening development freezing or adding an SDK
+facade. [Current ownership and exact evidence](worker-session-resource-decision.md#clipper-host-adoption-qualified-in-the-candidate).
+Next port Finance's actual worker/UI callers to that same boundary, retaining
+its independent workspace/restore Db and application domain drains. U2 remains
+open; pins stay alpha.60 and the coordinated U3–U5 gates still apply.
+
+Finance's application/restore charts now take identity, mutation observation and
+borrowed-Db restore bindings through one native session module. Its restore
+controller consumes domain capabilities instead of a native session. The
+alpha.67 port changes that module, preserving the chart; all 24 candidate native
+restore cases and nine directly affected alpha.60 native cases pass.
+[Exact binding boundary and remaining worker adoption](worker-session-resource-decision.md#finance-session-binding-isolated-from-the-restore-chart).
+The first actual Finance Worker/Svelte read slice is now qualified on the
+alpha.67 candidate: workspace selection and accounts render through bounded
+views, with 13 host tests and nine three-engine native cases covering stale
+bindings, failed disposal, UI detachment, malformed replies and offline process
+restarts with retained edits. [Implementation and next write boundary](worker-session-resource-decision.md#first-finance-worker-and-svelte-read-slice).
+C3–C5 are implemented for that isolated slice; production activation/full caller
+parity and U2/U5 remain open. The existing UI still owns its alpha.60 session.
+
 Prior results below retain their historical scope; no replacement runtime cutover
 has been qualified.
 
@@ -46,12 +381,15 @@ retain their product/parity requirements, not the abandoned implementation plan.
       The [C2 audit and qualification](#c2-unused-window-account-storage-removal)
       records the removed dependency group, tooling and retained tests.
 - [ ] **C3 — Replace the import catalog with the real application worker.**
-      `application.worker.ts` currently reports factory types rather than running
-      Finance. During cleanup, remove build-proof requirements that keep abandoned
+      **Candidate read slice implemented; production activation pending.**
+      The active alpha.60 `application.worker.ts` reports factory types rather
+      than running Finance. During cleanup, remove build-proof requirements that keep abandoned
       components present. During the read slice, replace the catalog with the
       actual worker entry. Keep meaningful emitted-graph checks for UI isolation,
       SDK/Wasm assets, self-contained worker output and public package boundaries.
-- [ ] **C4 — Give the session lifecycle one owner.** Reuse Local First startup/
+- [ ] **C4 — Give the session lifecycle one owner.** The candidate read host uses
+      the shared owner; remaining Finance workflows/drains and production callers
+      still need adoption. Reuse Local First startup/
       acquisition and the native Jazz session, with one Finance application
       worker/session owner. Use the newer SDK's immediate local-first startup
       and public session operations after a coordinated upgrade is qualified;
@@ -60,15 +398,62 @@ retain their product/parity requirements, not the abandoned implementation plan.
       it must not maintain a matching application/domain lifecycle. Preserve real
       domain drains, identity binding, startup interruption and shutdown outcomes.
 - [ ] **C5 — Move one read-only Finance view before adding infrastructure.**
-      Start with an accounts list scoped to the selected organization, subject to
-      confirming its existing component/query boundary. Send only the bounded
+      **Candidate accounts view implemented and qualified; live route replacement
+      pending.** The view is an accounts list scoped to the selected organization. Send only the bounded
       fields Svelte renders through a small validated command/view union. Keep
       ordinary Svelte subscription/rendering; do not send complete XState
       snapshots or build a generic remote Jazz/actor API. Qualify identity/scope
       replacement, late views, unsubscribe and offline restart.
-- [ ] **C6 — Move one existing financial workflow intact.** After the read slice,
-      move one existing form/workflow's application logic into the worker, reusing
-      its validation, transaction, permissions and outcome handling. Keep DOM,
+- [ ] **C6 — Move one existing financial workflow intact.** The candidate now
+      uses the existing archive workflow through the actual UI, including scoped
+      permissions, feedback and issued-write drain; 18 host cases and 12 native
+      cases pass with all 1,946 Finance units. Production activation and the
+      remaining forms/app integration stay open.
+      **Account creation also implemented:** its original scoped form/policy and
+      actual AccountForm UI run against the Worker. Shared message descriptors
+      replace callback-bearing views; native Zod strips private checkpoints from
+      wire results. One SDK-bound forms owner drains before replacement, and
+      session plus workspace revisions reject stale commands. All 1,954 units
+      (25 host), 54 shared form cases, public consumers and 15 three-engine native
+      cases pass. See the [form transport and resource model](worker-session-resource-decision.md#worker-owned-account-creation-and-form-transport).
+      **Manual entry also implemented in the candidate:** existing transaction
+      policy/staged persistence and real TransactionForm now save income/expense
+      without attachments. One query owner replaces duplicated observer/forwarding
+      blocks. Both fixed forms drain before SDK replacement/close. All 1,961 units
+      (32 host) and 18 native cases pass, including retained UI-created expenses
+      through two offline process restarts; the fresh 200-schema/42-session proof
+      also passes. [Current transaction/query ownership](worker-session-resource-decision.md#worker-owned-manual-transaction-entry-without-attachments).
+      **Balances and ledger also implemented in the candidate:** reuse existing
+      filters, exact bigint grouping and shared list rendering. Native Worker
+      queries project at most 25 rows; Window sends scoped page/filter intents.
+      All 1,965 Finance units (33 host), 21 three-engine native cases and the
+      fresh 200-schema/42-session proof pass. Two existing full-app pagination
+      cases preserve legacy behavior. [Ledger ownership and qualification](worker-session-resource-decision.md#worker-owned-balances-and-bounded-ledger-projection).
+      **Selected editing implemented in the candidate:** existing edit policy,
+      draft comparison and staged save run under a third fixed drained form.
+      Native detail reads include check/tag and attachment metadata without bytes.
+      All 1,966 units (34 host) and 27 native cases pass, including cold retained
+      edits. The check/account-move failure reproduced once and remains an open
+      activation blocker; later passing runs do not resolve it. [Editing evidence](worker-session-resource-decision.md#worker-owned-selected-transaction-editing).
+      **Workspace initialization implemented in the candidate:** reuse the finite
+      initialization chart independently of local finance usability, and drain
+      its issued writes with the three forms. Broker host UUID and native Jazz
+      app scope are now separate. All 1,968 units (36 host), 30 native cases and
+      a fresh 200-schema/42-session proof pass. Actual authority cases create the
+      first workspace without fixture writes and retain it/account after an offline
+      process restart. [Startup evidence](worker-session-resource-decision.md#worker-owned-native-workspace-initialization).
+      **Recovery display implemented in the candidate:** reuse Local First's
+      existing private UI actor/dialog and translations; actual key export and
+      scope rechecks run in the Worker, returning only on a private reply port.
+      All 1,969 units (37 host) and 33 native cases pass, including no automatic
+      export and clearing on hide/detach/close. The native application matrix
+      also passes through the readable-source candidate assembler. [Recovery boundary](worker-session-resource-decision.md#existing-recovery-dialog-with-worker-owned-key-export).
+      Continue to
+      reuse the existing account archive chart/operation and its issued-write
+      drain first; supply membership/grant facts. Native create/archive leaves
+      are now shared in `data/accounts.ts` without Svelte imports, preserving
+      existing frontend exports and local settlement. Then move other forms/workflows into the worker, reusing
+      their validation, transaction, permissions and outcome handling. Keep DOM,
       focus and UI interaction behavior with Svelte. Retain operation identity,
       interruption and uncertain-write behavior; do not add a second command-owner
       framework or replay unknown mutations.
@@ -89,6 +474,46 @@ coordinated SDK upgrade, including its patch, backend/schema, auth and Vercel
 namespace boundaries. Then complete C3/C4/C5 as one real read slice, followed by
 C6. Qualification is required before replacing live behavior; the first cleanup
 must not turn into a runtime cutover or a new account-data migration.
+
+### Continuous simplification during implementation
+
+The user reiterated on 2026-11-17 that identifying cleanup is part of every SDK
+upgrade and worker slice. Apply this during U1–U5 and C3–C7, using the shared
+[native-library and integration guidance](../../../../docs/engineering/dependencies.md#prefer-native-library-behavior-and-small-integration-surfaces).
+Keep the seven tasks above; this is how we execute them, rather than a separate
+cleanup phase after migration.
+
+For the code touched by each slice:
+
+- Check the actual installed library APIs and existing app/shared code for a
+  simpler supported solution. Look for wrappers, duplicated lifecycle state,
+  manual schema/type copies and SDK workarounds that native behavior replaces.
+- Concentrate SDK lifecycle/platform differences in thin adapters. Share behavior
+  through Local First when both Finance and Clipper actually need it; keep native
+  domain schemas, permissions and queries in their owning app. Avoid a universal
+  SDK facade or abstractions built for hypothetical future callers.
+- Remove superseded code and implementation-specific fixtures when the replacement
+  is adopted and qualified. Preserve financial identity, settlement, evidence and
+  resource-drain behavior; fewer files alone does not establish a simplification.
+- Add a short note to the existing handoff describing what was reused or removed
+  and what remains. For deferred cleanup or an SDK limitation, record the concrete
+  code/API, evidence and adoption prerequisite. Discuss an uncertain architectural
+  choice with the user before implementing it. A missing SDK feature does not
+  automatically justify another workaround.
+
+The isolated alpha.66 candidate already demonstrates this approach: it removes
+Finance's text-column wrapper, Clipper's reading-column wrapper and Finance's
+per-read previous-schema override, while reusing native transforms/sets, existing
+record codecs and the existing restore charts. The restore probe is shared by the
+old and candidate test harnesses. Keep candidate-only removals distinct from
+active-source adoption, and retain genuinely historical evidence separately.
+
+The [offline-edit investigation](worker-pr39-ci-offline-edit.md#hosted-recurrence-native-protocol-error)
+now contains a real hosted native `protocol` error followed by an already-committed
+rollback refusal. Keep the original error and unknown-write protection; review
+uncommitted rollback versus committed settlement during C6 rather than adding
+retry infrastructure. The separate workspace-settings failure still lacks its
+nested cause. Neither failure is established as fixed by the alpha.66 candidate.
 
 ## C1: unused grant/call removal
 
@@ -159,9 +584,9 @@ Finance unit tests and all 12 native SDK/IDB cases pass across Chromium, Firefox
 and WebKit. Application/Svelte/service-worker, worker-proof and browser-fixture
 types pass, along with E2E scope checks and both production builds. The 36 removed
 unit cases and 17 dedicated test-workspace cases exercised the retired bridge;
-SDK/IDB and financial domain coverage remain. Current-head hosted CI is still
-required before merging; the C1 head `abf31082` passed every hosted Finance,
-Clipper and foundation workflow.
+SDK/IDB and financial domain coverage remain. Hosted CI passed at `d8c0820e`:
+every Finance, Clipper and foundation workflow is green. The user merged PR #39
+at `fb380114`; this deletion-only checkpoint is complete.
 
 This completes the deletion-only checkpoint. C3's actual application worker,
 C4's lifecycle integration and C5's read view remain unimplemented. Review and
@@ -503,8 +928,10 @@ identity and storage. No production UI handoff is implied.
       an app-local replacement for its scoped form machine.
       Keep FormData extraction, native inputs, focus and presentation in Window.
       Keep validation, eligibility, draft/workflow authority, submissions and result
-      selection in worker actors. Replace callback-bearing feedback labels in wire
-      views with selected serializable descriptors; retain Finance's current wording
+      selection in worker actors. The first account-creation slice replaces callback-bearing feedback labels in
+      wire views with selected serializable descriptors and qualifies reactive locale;
+      other feature-specific input/reset/navigation/private-file boundaries remain.
+      For those features, retain Finance's current wording
       and reactive locale. Specify draft revisions, out-of-order input, reset,
       navigation acknowledgement, cancellation and late completion. Qualify shared
       API changes with existing consumers; don't create another form workflow.
@@ -534,7 +961,8 @@ workflow decisions from worker internals.
       on W12. Replace WorkspaceBootstrap's data/query/aggregation responsibilities
       with worker projections. Preserve exact balances, workspace navigation and
       account-order edit/done/move and persisted preference behavior. Keep disclosure,
-      responsive layout, route observation and native storage primitives in Window.
+      responsive layout, route observation and Window-only primitives in Window. Account-order
+      IndexedDB transactions belong in the Worker and are qualified in the current candidate.
 - [ ] **W14 — Prove the first read-only vertical slice.** Depends on W13.
       Render existing accounts presentation from the worker's list projection in an
       isolated migration preview. Verify no page SDK/query owner, bounded output,
@@ -609,3 +1037,30 @@ while native custody is qualified; activation waits for W06. W17–W19 branch on
 after their shared prerequisites. The first implementation step is W01's concrete
 inventory/baseline, followed by the bounded W02 bundle proof and W03 custody
 design; it is not a wholesale restart or merge of PR #67.
+
+### November 18 — integrated source batch, awaiting qualification
+
+The actual SvelteKit root now owns one application worker. Login/recovery,
+workspace initialization/creation/settings/integrity, profiles, accounts/grants,
+classification, ledger/overview, transaction editing/files, transfers, bank sync
+and optional developer/demo writes bind that worker's existing charts and SDK.
+The old Window SDK provider and superseded readiness/coordinator components are
+removed. UI-only navigation, WebAuthn, image editing and PWA consent remain narrow
+host effects. Image pixel computation uses a dedicated worker.
+
+Finance, Clipper and Local First share the native alpha.67 session/schema APIs.
+The public Local First session adapter owns the SDK facade. Replaced source
+patches and the unused alpha.60 dependency patch are removed; the historical
+comparison source remains frozen in Git. Disposable schema fixtures now use
+native generated bindings, while real app browser setup and race controls run
+against the actual app worker's native SDK session. The restoration experiment
+also uses public native sessions and the harness's existing authority, rather
+than importing SDK session internals. Historical schema/backup compatibility is
+covered separately by the frozen-producer upgrade cases.
+
+The qualification and repair status at the top of this document supersedes this
+source checkpoint. Remaining before merge: finish the code, grouped final
+static/unit/native/browser qualification, fixing every functional failure, the
+PWA/offline and bundle audit, and publishing the completed changes and exact
+results on PR46. Minor visual follow-ups may be recorded separately. Earlier
+green inactive checkpoints are not merge evidence for this batch.

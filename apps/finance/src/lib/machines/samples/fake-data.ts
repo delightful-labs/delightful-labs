@@ -1,5 +1,5 @@
 import { ReadTier, type Db } from 'jazz-tools'
-import { app } from '../../schema.js'
+import { app } from '../../queries.js'
 import type { FakeDataPlan } from '../../domain/fake-data.js'
 import { createJazzTransactionActors } from '../persistence/jazz-transaction-actors.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'

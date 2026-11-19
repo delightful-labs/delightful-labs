@@ -53,7 +53,8 @@ if (!appId || !serverUrl) throw new Error('Missing qualification configuration')
 const session = await createJazzClient({
 	scope: appId,
 	serverUrl,
-	initial: 'local-first',
+	initial: 'device',
+	localFirst: 'now',
 	client: () => import('jazz-tools/local-first')
 })
 const client = session.getSnapshot().client

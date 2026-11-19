@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createPolicyTestApp, type PolicyTestApp, type TestDb } from 'jazz-tools/testing'
-import { app } from '../../schema.js'
-import permissions from '../../permissions.js'
+import { app } from '../../queries.js'
+import permissions from '../../jazz.permissions.json' with { type: 'json' }
 import { prepareWorkspaceCreation } from '../../domain/workspace-creation.js'
 import { createAdditionalWorkspaceTransaction } from './workspace-additional-creation-transaction.js'
 import { createActor, toPromise } from 'xstate'
