@@ -18,10 +18,11 @@ import { createSampleTransactionsMachine } from './sample-transactions.js'
 export function createWorkerSamples(
 	db: Pick<JazzDb, 'all' | 'beginTransaction'>,
 	kind: TransactionKind,
-	observe: () => FinanceFormsObservation
+	observe: () => FinanceFormsObservation,
+	binding: object
 ) {
 	const facts = () => ({ ...observe().transaction, kind })
-	const creation = createTransactionEntryFormOptions({ binding: db, db, observe: facts })
+	const creation = createTransactionEntryFormOptions({ binding, db, observe: facts })
 	return createSampleTransactionsMachine({
 		logic: creation.operation,
 		prepare: (index, scope) => {

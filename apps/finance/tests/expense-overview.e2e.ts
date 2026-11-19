@@ -85,7 +85,7 @@ test(
 		await seed(page)
 		const overview = page.getByRole('region', { name: 'Expenses by Category', exact: true })
 		const chart = overview.locator('.chart')
-		const list = overview.getByRole('region')
+		const list = overview.getByRole('region', { name: 'Expenses in this period', exact: true })
 		const desktopChart = await chart.boundingBox()
 		const desktopList = await list.boundingBox()
 		if (!desktopChart || !desktopList) throw new Error('Missing layout')

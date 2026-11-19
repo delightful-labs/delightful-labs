@@ -8,7 +8,7 @@ import {
 	sqlite
 } from 'jazz-tools/backend'
 import { app } from '../src/lib/backend/jazz/jazz.generated.js'
-import permissions from '../src/lib/backend/jazz/jazz.permissions.json'
+import permissions from '../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 
 /** Disposable browser-test authority, using the same SDK backend path as the app. */
 export async function startJazzAuthority(input: {

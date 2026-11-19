@@ -5,7 +5,7 @@ import { openLibrarySearch, openLibraryFilters } from '../library-popovers.js'
 import { test, expect } from '@playwright/test'
 import { startLocalJazzServer } from '../browser-core.js'
 import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
-import permissions from '../../src/lib/backend/jazz/jazz.permissions.json'
+import permissions from '../../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 let authority: Awaited<ReturnType<typeof startLocalJazzServer>>
 const authorityOptions = {
 	appId: '2db98ae3-fcf1-41e8-b7d3-9818496bde60',

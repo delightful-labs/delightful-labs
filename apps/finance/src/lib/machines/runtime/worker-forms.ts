@@ -3,6 +3,7 @@ import { createWorkerSamples } from '../samples/worker-samples.js'
 import { selectSampleTransactionsView } from '../samples/sample-transactions.js'
 import { workerSamplesView } from '../../contracts/worker-forms.js'
 import { transactionEntryScope } from '../transactions/transaction-entry.js'
+import { canWriteAccount } from '../../domain/organization-permissions.js'
 import { debugEnabled } from '../../diagnostics/logger.js'
 import { createWorkspaceIntegrityOwner } from '../workspaces/workspace-integrity-owner.js'
 import {
@@ -203,8 +204,18 @@ export function createFinanceFormsMachine(
 		>
 	}
 ) {
-	const sampleIncome = createWorkerSamples(dependencies.db, INCOME, dependencies.observe)
-	const sampleExpense = createWorkerSamples(dependencies.db, EXPENSE, dependencies.observe)
+	const sampleIncome = createWorkerSamples(
+		dependencies.db,
+		INCOME,
+		dependencies.observe,
+		dependencies.binding
+	)
+	const sampleExpense = createWorkerSamples(
+		dependencies.db,
+		EXPENSE,
+		dependencies.observe,
+		dependencies.binding
+	)
 	const integrity = createWorkspaceIntegrityOwner(dependencies.db)
 	const mutations = createCallbackLogic<never>(({ sendBack }) =>
 		dependencies.db.onMutationError(() => sendBack({ type: 'MUTATION_REJECTED' }))
@@ -368,7 +379,19 @@ export function createFinanceFormsMachine(
 				? details.view
 				: null
 		return {
-			editable: context.edit?.fieldsEditable ?? false,
+			editable: Boolean(
+				current.sessionReady &&
+				!current.loading &&
+				!current.failed &&
+				current.transaction &&
+				current.membership?.userId === current.identityId &&
+				canWriteAccount(
+					current.membership,
+					current.organizationId,
+					current.transaction.accountId,
+					current.grants
+				)
+			),
 			images: view?.images ?? [],
 			blockedIds: context.removals?.removingIds ?? []
 		}
@@ -1405,6 +1428,8 @@ export function createFinanceFormsMachine(
 						enq.sendTo('archive', { type: 'OBSERVE', observation: event.observation.archive })
 						enq.sendTo('order', { type: 'OBSERVE', observation: event.observation.order })
 						if (event.observation.navigation.pathname !== context.observation.navigation.pathname) {
+							enq.sendTo('transaction', { type: 'CANCEL' })
+							enq.sendTo('transferCreation', { type: 'CANCEL' })
 							enq.sendTo('transaction', { type: 'RESET' })
 							enq.sendTo('transferCreation', { type: 'RESET' })
 							enq.sendTo('createCategory', { type: 'RESET' })
@@ -1933,6 +1958,10 @@ export function selectFinanceFormsView(
 	if (
 		!context.edit ||
 		context.editObservation !== context.observation.edit ||
+		context.details?.observation !== context.observation.edit ||
+		context.transferCreationObservation !== context.observation.transferCreate ||
+		context.profileNameObservation !== context.observation.profile ||
+		context.profileAvatarObservation !== context.observation.profile ||
 		!context.creation ||
 		!context.transaction ||
 		context.creationObservation !== context.observation.creation ||

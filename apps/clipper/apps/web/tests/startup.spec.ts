@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
 import { app } from '../src/lib/backend/jazz/jazz.generated.js'
-import permissions from '../src/lib/backend/jazz/jazz.permissions.json'
+import permissions from '../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { openLibrarySearch, closeLibraryPopovers, openLibraryFilters } from './library-popovers.js'
 declare global {
 	interface Window {

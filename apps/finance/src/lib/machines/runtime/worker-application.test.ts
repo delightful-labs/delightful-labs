@@ -2137,6 +2137,51 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+	it('retries native session errors on the retained owner and waits for settlement before reattaching', async () => {
+		const f = fixture(),
+			held = Promise.withResolvers<'completed' | 'bindingChanged'>()
+		f.changeIdentity
+			.mockRejectedValueOnce(new Error('Selection persistence still unavailable'))
+			.mockImplementationOnce(() => held.promise)
+		try {
+			await f.start()
+			f.publishSession({ status: 'error' })
+			await waitFor(f.actor, (snapshot) => snapshot.matches('failed'))
+			f.actor.send({ type: 'RETRY_SESSION' })
+			await vi.waitFor(() => expect(f.changeIdentity).toHaveBeenCalledTimes(1))
+			await waitFor(f.actor, (snapshot) => snapshot.matches('failed'))
+			f.actor.send({ type: 'RETRY_SESSION' })
+			await vi.waitFor(() => expect(f.changeIdentity).toHaveBeenCalledTimes(2))
+			expect(f.changeIdentity).toHaveBeenLastCalledWith({ operation: 'retry' })
+			expect(f.actor.getSnapshot().matches('retryingSession')).toBe(true)
+			expect(f.view().canRetrySession).toBe(false)
+			f.actor.send({ type: 'RETRY_SESSION' })
+			f.publishSession(f.ready({}))
+			expect(f.actor.getSnapshot().context.forms).toBeUndefined()
+			held.resolve('completed')
+			await waitFor(f.actor, (snapshot) => !!snapshot.context.ready)
+			expect(f.changeIdentity).toHaveBeenCalledTimes(2)
+			expect(f.open).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve('completed')
+			f.stop()
+		}
+	})
+	it('retries failed acquisition through the same session change contract', async () => {
+		const f = fixture()
+		f.open.mockRejectedValueOnce(new Error('Native acquisition unavailable'))
+		try {
+			f.actor.start()
+			f.runtime.start()
+			await waitFor(f.actor, (snapshot) => snapshot.matches('failed'))
+			f.actor.send({ type: 'RETRY_SESSION' })
+			await waitFor(f.actor, (snapshot) => !!snapshot.context.ready)
+			expect(f.open).toHaveBeenCalledTimes(2)
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
 	it('does not acknowledge clean close when query disposal throws', async () => {
 		const f = fixture()
 		try {
@@ -2269,7 +2314,7 @@ describe('worker restoration and financial drain', () => {
 				})
 			)
 			await waitFor(r.actor, (s) => s.status === 'done')
-			expect(f.view().identityRestore).toMatchObject({ busy: false, error: true })
+			expect(f.view().identityRestore).toMatchObject({ busy: false, feedback: 'invalidPhrase' })
 			expect(f.changeIdentity).not.toHaveBeenCalled()
 			expect(f.actor.getSnapshot().context.forms?.owner).toBe(previous)
 			expect(f.queries).toHaveLength(1)
@@ -2306,7 +2351,7 @@ describe('worker restoration and financial drain', () => {
 			expect(f.changeIdentity).toHaveBeenCalledOnce()
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
 			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
-			expect(f.view().identityRestore).toMatchObject({ busy: false, error: false })
+			expect(f.view().identityRestore).toMatchObject({ busy: false, feedback: 'none' })
 			expect(f.view().archiveFeedback).toBeNull()
 			expect(f.view().selection.workspaceId).toBeNull()
 			expect(
@@ -2329,7 +2374,7 @@ describe('worker restoration and financial drain', () => {
 			await waitFor(r.actor, (s) => s.status === 'done')
 			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
 			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
-			expect(f.view().identityRestore).toMatchObject({ busy: false, error: true })
+			expect(f.view().identityRestore).toMatchObject({ busy: false, feedback: 'sessionFailed' })
 			expect(f.changeIdentity).toHaveBeenCalledOnce()
 			f.actor.send({
 				type: 'RESTORATION_FINISHED',
@@ -2337,7 +2382,7 @@ describe('worker restoration and financial drain', () => {
 				result: { mutation: 'settled', outcome: 'restored' },
 				view: f.actor.getSnapshot().context.session.view.get()
 			})
-			expect(f.view().identityRestore.error).toBe(true)
+			expect(f.view().identityRestore.feedback).toBe('sessionFailed')
 			expect(f.changeIdentity).toHaveBeenCalledOnce()
 		} finally {
 			f.stop()
@@ -2403,7 +2448,11 @@ describe('worker restoration and financial drain', () => {
 			held.resolve()
 			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
 			expect(f.view().selection).toEqual({ workspaceId: null, revision: 2 })
-			expect(f.view().identityRestore).toMatchObject({ busy: false, error: false, canSubmit: true })
+			expect(f.view().identityRestore).toMatchObject({
+				busy: false,
+				feedback: 'none',
+				canSubmit: true
+			})
 			expect(f.changeIdentity).not.toHaveBeenCalled()
 		} finally {
 			held.resolve()
@@ -2451,7 +2500,7 @@ describe('worker restoration and financial drain', () => {
 			await waitFor(r.actor, (s) => s.status === 'done')
 			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
 			parsed.resolve('late-secret')
-			expect(f.view().identityRestore).toMatchObject({ busy: false, error: false })
+			expect(f.view().identityRestore).toMatchObject({ busy: false, feedback: 'none' })
 			expect(f.changeIdentity).not.toHaveBeenCalled()
 		} finally {
 			parsed.resolve('late-secret')
@@ -2495,7 +2544,7 @@ describe('worker recovery native navigation ownership', () => {
 			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
 			expect(f.view().identityRestore).toMatchObject({
 				busy: false,
-				error: false,
+				feedback: 'none',
 				navigationError: true,
 				canRetryNavigation: true
 			})
@@ -2505,7 +2554,7 @@ describe('worker recovery native navigation ownership', () => {
 			await waitFor(next.actor, (s) => s.status === 'done')
 			expect(f.view().identityRestore).toMatchObject({
 				busy: false,
-				error: false,
+				feedback: 'none',
 				navigationError: false,
 				canRetryNavigation: false
 			})

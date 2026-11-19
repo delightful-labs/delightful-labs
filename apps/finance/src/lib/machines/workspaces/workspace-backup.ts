@@ -65,9 +65,10 @@ const readerActors = {
 	}),
 	authority: leaf(readFinanceAuthority),
 	metadata: leaf(readFinanceMetadata),
-	relations: leaf((input) =>
-		Promise.all([readFinanceRelations(input), readFinanceSources(input)]).then(() => {})
-	),
+	relations: leaf(async (input) => {
+		await readFinanceRelations(input)
+		await readFinanceSources(input)
+	}),
 	files: leaf(readFinanceFiles),
 	parts: leaf(readFinanceParts),
 	validate: leaf(prepareFinanceFiles),

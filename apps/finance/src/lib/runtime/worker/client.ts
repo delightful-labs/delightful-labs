@@ -27,6 +27,7 @@ import {
 	transactionListQuery
 } from '../../domain/transaction-list-routes.js'
 import { withQueryParams } from '../../domain/query-params.js'
+import { workspaceRoute } from '../../domain/workspace-routes.js'
 import { get, writable, type Readable } from 'svelte/store'
 import { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/worker-broker'
 import brokerUrl from '#jazz-broker-worker?sharedworker&url'
@@ -99,7 +100,7 @@ export function createFinanceWorkerClient(
 		identityRestore: {
 			canSubmit: false,
 			busy: false,
-			error: false,
+			feedback: 'none',
 			draftRevision: 0,
 			navigationOnly: false,
 			navigationError: false,
@@ -131,7 +132,9 @@ export function createFinanceWorkerClient(
 		overview: null,
 		ledger: null
 	})
+	let transportFailed = false
 	const fail = () => {
+		transportFailed = true
 		// Keep the close receipt listener: a data fault never authorizes termination.
 		worker.removeEventListener('message', receiveView)
 		state.update((view) => ({
@@ -144,7 +147,7 @@ export function createFinanceWorkerClient(
 				navigationOnly: false,
 				navigationError: false,
 				busy: false,
-				error: true
+				feedback: 'sessionFailed'
 			},
 			workspaceNavigation: null,
 			accounts: [],
@@ -166,7 +169,7 @@ export function createFinanceWorkerClient(
 			transactionEntry: null,
 			transactionEdit: null,
 			samples: null,
-			canRetrySession: false,
+			canRetrySession: true,
 			canRetryInitialization: false,
 			workspaceIntegrity: null,
 			mutationRejected: false,
@@ -256,7 +259,7 @@ export function createFinanceWorkerClient(
 				navigationOnly: false,
 				navigationError: false,
 				busy: false,
-				error: false
+				feedback: 'none'
 			},
 			workspaceNavigation: null,
 			accounts: [],
@@ -431,6 +434,7 @@ export function createFinanceWorkerClient(
 		if (current.status === 'closed') return
 		const href = relativeHref()
 		if (observedRouteHref === href) return
+		const previous = observedRouteHref ? new URL(observedRouteHref, location.href) : undefined
 		observedRouteHref = href
 		observedLocation.set(new URL(location.href))
 		window.addEventListener('popstate', observeRoute)
@@ -442,8 +446,15 @@ export function createFinanceWorkerClient(
 			revision: revision + 1
 		})
 		revision += 1
-		// Keep the last bounded render until the Worker classifies the new route.
-		// Older views and commands are rejected by their selection revision.
+		// Query edits preserve the current form. A different page or workspace
+		// waits for its own worker view instead of mounting with the previous page's form.
+		if (
+			previous &&
+			(previous.pathname !== location.pathname ||
+				previous.searchParams.get('workspace') !==
+					new URLSearchParams(location.search).get('workspace'))
+		)
+			state.update((view) => ({ ...view, workspaceNavigation: null }))
 
 		worker.postMessage(command)
 	}
@@ -462,7 +473,13 @@ export function createFinanceWorkerClient(
 					type: 'NAVIGATE_WORKSPACE',
 					workspaceId,
 					sessionRevision: current.sessionRevision,
-					selection: current.selection
+					selection:
+						observedRouteHref === undefined
+							? current.selection
+							: {
+									workspaceId: workspaceRoute(location.search).workspaceId,
+									revision
+								}
 				})
 			)
 		},
@@ -668,7 +685,10 @@ export function createFinanceWorkerClient(
 					selection: scope.selection
 				})
 			),
-		retrySession: () => worker.postMessage(financeWorkerCommand.parse({ type: 'RETRY_SESSION' })),
+		retrySession: () => {
+			if (transportFailed) window.location.reload()
+			else worker.postMessage(financeWorkerCommand.parse({ type: 'RETRY_SESSION' }))
+		},
 		retryInitialization: (scope: WorkerCommandScope) =>
 			worker.postMessage(
 				financeWorkerCommand.parse({

@@ -4,7 +4,6 @@
 	import { transactionKindForPath, transactionPages } from '#lib/domain/transaction-kind.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import type { Snippet } from 'svelte'
-	import { onNavigate } from '$app/navigation'
 	import { page } from '$app/state'
 	import TransactionWorkspace from '#lib/components/transactions/TransactionWorkspace.svelte'
 	import TransactionView from '#lib/components/transactions/TransactionView.svelte'
@@ -17,23 +16,6 @@
 	const heading = $derived(m[config.noun]({ count: config.count }))
 	const index = $derived(pathname === config.path)
 	const listHref = $derived(page.params.id ? `${config.path}${url.search}` : undefined)
-
-	onNavigate((navigation) => {
-		if (!navigation.to?.route.id?.startsWith('/(transactions)/')) return
-		if (navigation.from?.url.pathname === navigation.to.url.pathname) return
-		if (!document.startViewTransition) return
-		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-		return new Promise<void>((resolve) => {
-			const transition = document.startViewTransition(async () => {
-				// Let SvelteKit update the page after the browser captures the old view.
-				resolve()
-				await navigation.complete
-			})
-			// A skipped or failed capture must never hold up navigation.
-			void transition.updateCallbackDone.catch(() => resolve())
-		})
-	})
 </script>
 
 <TransactionWorkspace

@@ -793,7 +793,7 @@ describe('transaction attachment permissions', () => {
 		}
 	})
 
-	it('hydrates and edits a saved attachment through both real child machines', async () => {
+	it('edits an already loaded saved attachment through both real child machines', async () => {
 		const { file, link } = await imageLink()
 		await db
 			.insert(app.fileParts, {
@@ -806,7 +806,13 @@ describe('transaction attachment permissions', () => {
 		const platform = mockEditorPlatform()
 		const observation = {
 			editable: true,
-			images: [{ id: link.id, fileId: file.id }],
+			images: [
+				{
+					id: link.id,
+					fileId: file.id,
+					file: new File([new Uint8Array([1, 2, 3, 4])], 'receipt.png', { type: 'image/png' })
+				}
+			],
 			blockedIds: []
 		}
 		const settle = vi.fn((write: import('jazz-tools').WriteHandle) => write.wait({ tier: 'local' }))
@@ -954,7 +960,13 @@ describe('transaction attachment permissions', () => {
 			platform.decode.mockReturnValue(pending.promise)
 			const observation = {
 				editable: true,
-				images: [{ id: link.id, fileId: file.id }],
+				images: [
+					{
+						id: link.id,
+						fileId: file.id,
+						file: new File([new Uint8Array([1, 2, 3, 4])], 'receipt.png', { type: 'image/png' })
+					}
+				],
 				blockedIds: []
 			}
 			const actor = createActor(savedTransactionImageEditorMachine, {
@@ -972,7 +984,11 @@ describe('transaction attachment permissions', () => {
 					observation: {
 						editable: change !== 'permission',
 						images: [
-							{ id: link.id, fileId: change === 'replacement' ? crypto.randomUUID() : file.id }
+							{
+								...observation.images[0]!,
+								id: link.id,
+								fileId: change === 'replacement' ? crypto.randomUUID() : file.id
+							}
 						],
 						blockedIds: change === 'removal' ? [link.id] : []
 					}

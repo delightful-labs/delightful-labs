@@ -1328,7 +1328,9 @@ describe('browser replica separation', () => {
 				expect(result.stagedSnapshots.length).toBeGreaterThan(0)
 				expect(result.stagedSnapshots.every((count) => count === 0)).toBe(true)
 				expect(result).toMatchObject({
-					before: { writerLocal: 0, ordinaryRemote: 0, ordinaryLocal: 0 },
+					// Native Jazz retains the private writer's own accepted rows. The
+					// ordinary replica must remain empty until atomic publication.
+					before: { writerLocal: 1, ordinaryRemote: 0, ordinaryLocal: 0 },
 					subscriptionErrors: [],
 					published: 1,
 					archived: 1,

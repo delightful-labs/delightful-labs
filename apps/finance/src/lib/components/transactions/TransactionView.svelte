@@ -4,7 +4,7 @@
 	import { getFinanceWorker } from '#lib/runtime/worker/context.js'
 	import type { TransactionKind } from '#lib/domain/transaction-kind.js'
 	import PageLayout from '../navigation/PageLayout.svelte'
-	import PageHeader from '../navigation/PageHeader.svelte'
+	import WorkerLedgerFilters from '../worker/WorkerLedgerFilters.svelte'
 	import FloatingActionLink from '../navigation/FloatingActionLink.svelte'
 	import WorkerLedger from '../worker/WorkerLedger.svelte'
 	import WorkerAccountCreation from '../worker/WorkerAccountCreation.svelte'
@@ -41,8 +41,13 @@
 
 <PageLayout {navigation}>
 	{#snippet pageHeading()}
-		{#if showHeading}<PageHeader title={heading} />{/if}
-		{@render closeControl?.()}
+		<WorkerLedgerFilters
+			view={state.current}
+			value={transactionListLocation(location.current.search).filters}
+			title={showHeading ? heading : m['nouns.transaction']({ count: 2 })}
+			{closeControl}
+			onchange={(change) => client.setLedgerFilters(change, state.current)}
+		/>
 	{/snippet}
 	{#if state.current.transactionKind === kind}
 		{#if state.current.status === 'ready' && state.current.accounts.length === 0}
@@ -50,6 +55,7 @@
 			<WorkerAccountCreation view={state.current} onsend={client.accountCreationCommand} />
 		{/if}
 		<WorkerLedger
+			showFilters={false}
 			view={state.current}
 			filters={transactionListLocation(location.current.search).filters}
 			onOpen={client.navigateTransaction}

@@ -19,7 +19,7 @@ import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { app } from '../../web/src/lib/backend/jazz/jazz.generated.js'
-import permissions from '../../web/src/lib/backend/jazz/jazz.permissions.json'
+import permissions from '../../web/src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { connectionSchema } from '../src/connection.js'
 import { z } from 'zod'
 const machineEvidenceSchema = z.object({

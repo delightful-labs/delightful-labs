@@ -160,7 +160,6 @@
 	})
 	function syncPaymentMethod(element: HTMLSelectElement) {
 		activeCheckFieldsKey = element.value === PAYMENT_METHOD.CHECK ? PAYMENT_METHOD.CHECK : ''
-		void tick().then(() => element.dispatchEvent(new Event('input', { bubbles: true })))
 	}
 	const issues = $derived(
 		view.feedback.kind === 'result' && view.feedback.result.outcome === 'invalid'
@@ -307,7 +306,11 @@
 						name="paymentMethod"
 						defaultValue={initialTransaction?.paymentMethod ?? ''}
 						{@attach syncPaymentMethod}
-						onchange={(event) => syncPaymentMethod(event.currentTarget)}
+						onchange={(event) => {
+							const element = event.currentTarget
+							syncPaymentMethod(element)
+							void tick().then(() => element.dispatchEvent(new Event('input', { bubbles: true })))
+						}}
 					>
 						<option value="">{m['labels.unspecified']()}</option>
 						<option value={PAYMENT_METHOD.CASH}>{m['labels.cash']()}</option>

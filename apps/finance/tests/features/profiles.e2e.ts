@@ -13,6 +13,9 @@ test(
 		await navigateSidebar(page, 'Account')
 		await expect(page).toHaveURL(`/account?workspace=${organizationId}`)
 		const main = page.getByRole('main')
+		const metadata = main.locator('details').filter({
+			has: page.locator('summary').filter({ hasText: 'Metadata' })
+		})
 		await expect(main.getByLabel('Display name', { exact: true })).toBeEnabled()
 		await page.context().setOffline(true)
 		try {
@@ -39,7 +42,7 @@ test(
 		await selectWorkspace(selector, organizationId)
 		await page.goto(`/expenses/${fixture.transactionId}?workspace=${organizationId}`)
 		await main.locator('summary').filter({ hasText: 'Metadata' }).click()
-		await expect(main.getByText('Offline profile owner', { exact: true })).toHaveCount(2)
+		await expect(metadata.getByText('Offline profile owner', { exact: true })).toHaveCount(2)
 		await navigateSidebar(page, 'Account')
 		await main.getByLabel('Display name', { exact: true }).fill('')
 		await main.getByRole('button', { name: 'Save', exact: true }).click()
@@ -48,8 +51,8 @@ test(
 		).toHaveText('Profile Display name saved.')
 		await page.goto(`/expenses/${fixture.transactionId}?workspace=${organizationId}`)
 		await main.locator('summary').filter({ hasText: 'Metadata' }).click()
-		await expect(main.getByText(fixture.userId, { exact: true })).toHaveCount(2)
-		await expect(main.getByText('Offline profile owner', { exact: true })).toHaveCount(0)
+		await expect(metadata.getByText(fixture.userId, { exact: true })).toHaveCount(2)
+		await expect(metadata.getByText('Offline profile owner', { exact: true })).toHaveCount(0)
 	}
 )
 

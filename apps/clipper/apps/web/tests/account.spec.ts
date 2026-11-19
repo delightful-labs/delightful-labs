@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { app } from '../src/lib/backend/jazz/jazz.generated.js'
-import permissions from '../src/lib/backend/jazz/jazz.permissions.json'
+import permissions from '../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 
 let authority: Awaited<ReturnType<typeof startLocalJazzServer>>
 let dataDir: string

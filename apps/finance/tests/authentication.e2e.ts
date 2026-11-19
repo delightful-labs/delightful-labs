@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { financeFixture } from './helpers/worker-fixture.js'
 import {
 	prepareSidebar,
@@ -566,35 +569,55 @@ async function currentIdentity(page: Page) {
 test(
 	'startup network failures can retry repeatedly without replacing the saved identity',
 	{ tag: ['@identity'] },
-	async ({ page, context }) => {
-		await createAccount(page, 'Network retained checking')
-		const identity = await currentIdentity(page)
-		expect(identity).toBeTruthy()
-		let blocked = 0
-		let failing = true
-		await context.route(/\.wasm(?:\?|$)/, async (route) => {
-			if (failing) {
-				blocked += 1
-				await route.abort('internetdisconnected')
-			} else await route.continue()
+	async ({ playwright, baseURL }) => {
+		if (!baseURL) throw new Error('Missing Finance origin')
+		const profile = await mkdtemp(join(tmpdir(), 'finance-auth-startup-'))
+		let context = await playwright.chromium.launchPersistentContext(profile, {
+			baseURL,
+			serviceWorkers: 'block'
 		})
-		await page.reload()
-		const retry = page.getByRole('button', { name: 'Try again', exact: true })
-		await expect(retry).toBeVisible()
-		await expect(page.getByRole('alert')).toHaveText('Your finances could not be opened.')
-		expect(blocked).toBeGreaterThan(0)
-		await retry.click()
-		await expect(retry).toBeVisible()
-		failing = false
-		await retry.click()
-		await expect(
-			page.getByRole('button', { name: 'Toggle Main navigation', exact: true })
-		).toBeVisible()
-		expect(await currentIdentity(page)).toBe(identity)
-		await page.goto('/accounts')
-		await expect(
-			page.getByRole('cell', { name: 'Network retained checking', exact: true })
-		).toBeVisible()
+		let page = context.pages()[0] ?? (await context.newPage())
+		try {
+			await createAccount(page, 'Network retained checking')
+			const identity = await currentIdentity(page)
+			expect(identity).toBeTruthy()
+			await context.close()
+			context = await playwright.chromium.launchPersistentContext(profile, {
+				baseURL,
+				serviceWorkers: 'block'
+			})
+			page = context.pages()[0] ?? (await context.newPage())
+			let blocked = 0
+			let failing = true
+			await context.route(/\.wasm(?:\?|$)/, async (route) => {
+				if (failing) {
+					blocked += 1
+					await route.abort('internetdisconnected')
+				} else await route.continue()
+			})
+			await page.goto('/accounts')
+			const retry = page.getByRole('button', { name: 'Try again', exact: true })
+			await expect(retry).toBeVisible()
+			await expect(
+				page.getByRole('alert').filter({ hasText: 'Your finances could not be opened.' })
+			).toHaveText('Your finances could not be opened.')
+			expect(blocked).toBeGreaterThan(0)
+			await retry.click()
+			await expect(retry).toBeVisible()
+			failing = false
+			await retry.click()
+			await expect(
+				page.getByRole('button', { name: 'Toggle Main navigation', exact: true })
+			).toBeVisible()
+			await expect.poll(() => currentIdentity(page)).toBe(identity)
+			await page.goto('/accounts')
+			await expect(
+				page.getByRole('cell', { name: 'Network retained checking', exact: true })
+			).toBeVisible()
+		} finally {
+			await context.close()
+			await rm(profile, { recursive: true, force: true })
+		}
 	}
 )
 
@@ -614,22 +637,19 @@ test(
 		page.on('pageerror', (error) => messages.push(error.message))
 		page.on('request', (request) => urls.push(request.url()))
 		await page.goto('/login')
-		await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
+		await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeEnabled()
 		await financeFixture(page, 'authentication.e2e:680')
-		await page.getByRole('button', { name: 'Login', exact: true }).click()
-		const retry = page.getByRole('button', { name: 'Try again', exact: true })
-		await expect(retry).toBeVisible()
-		await expect(page.getByRole('alert')).toHaveText('Your finances could not be opened.')
-		expect(await currentIdentity(page)).toBe(identity)
-		await expect(page.getByLabel('Recovery phrase', { exact: true })).toHaveCount(0)
-		await retry.click()
-		await expect.poll(() => financeFixture(page, 'authentication.e2e:704')).toBe(2)
-		await expect(retry).toBeVisible()
-		await retry.click()
-		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
-		expect(await currentIdentity(page)).toBe(identity)
-		await expectEmptyRecoveryDraft(page)
-		await expect(page.getByRole('main').getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0)
+		for (const attempts of [1, 2]) {
+			await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
+			await page.getByRole('button', { name: 'Login', exact: true }).click()
+			await expect(page.getByRole('main').getByRole('alert').filter({ hasText: /\S/ })).toHaveText(
+				'The account could not be restored. Please try again.'
+			)
+			await expect.poll(() => financeFixture(page, 'authentication.e2e:704')).toBe(attempts)
+			expect(await currentIdentity(page)).toBe(identity)
+			await expectEmptyRecoveryDraft(page)
+			await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeEnabled()
+		}
 		await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
 		await page.getByRole('button', { name: 'Login', exact: true }).click()
 		await expect(page).toHaveURL((url) => url.pathname === '/')
@@ -663,6 +683,7 @@ test(
 		const phrase = RecoveryPhrase.fromSecret(generateAuthSecret())
 		await page.goto('/login')
 		await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
+		await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeEnabled()
 		await financeFixture(page, 'authentication.e2e:744')
 		await page.getByRole('button', { name: 'Login', exact: true }).click()
 		const retry = page.getByRole('button', { name: 'Try again', exact: true })
@@ -671,14 +692,16 @@ test(
 		const selected = await currentIdentity(page)
 		expect(selected).toBeTruthy()
 		expect(selected).not.toBe(previous)
-		await expect(page.getByLabel('Recovery phrase', { exact: true })).toHaveCount(0)
+		await expectEmptyRecoveryDraft(page)
+		await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeDisabled()
 		await retry.click()
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
-		expect(await currentIdentity(page)).toBe(selected)
+		await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeEnabled()
+		await expect.poll(() => currentIdentity(page)).toBe(selected)
 		await expectEmptyRecoveryDraft(page)
 		await page.reload()
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
-		expect(await currentIdentity(page)).toBe(selected)
+		await expect.poll(() => currentIdentity(page)).toBe(selected)
 		await page.goto('/accounts')
 		await expect(
 			page.getByRole('cell', { name: 'Previous selection checking', exact: true })
@@ -698,6 +721,7 @@ test(
 		await page.getByRole('button', { name: 'Close', exact: true }).click()
 		await page.goto('/login')
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
+		await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeEnabled()
 		await financeFixture(page, 'authentication.e2e:790')
 		try {
 			await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
@@ -749,6 +773,7 @@ test(
 		await page.getByRole('button', { name: 'Close', exact: true }).click()
 		await page.goto('/login')
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
+		await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeEnabled()
 		await financeFixture(page, 'countRestores')
 		await page.evaluate(async () => {
 			window.recoveryNavigationTest = { restoreCalls: 0, navigationFailures: 0 }

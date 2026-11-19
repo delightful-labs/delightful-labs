@@ -249,10 +249,20 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				).toHaveCount(0)
 				const aside = page.locator('aside')
 				await aside.getByRole('link', { name: 'Expenses', exact: true }).click()
+				// This standalone host has no SvelteKit route boundary. Wait for the
+				// worker's new route view before editing its replacement form.
+				await browserExpect
+					.poll(() =>
+						page.evaluate(
+							() => window.financeWorkerReadFixture.state().workspaceNavigation?.showContent
+						)
+					)
+					.toBe(true)
 				await page.getByLabel('Category', { exact: true }).selectOption(categoryId)
 				await page.getByLabel('Amount', { exact: true }).fill('10.00')
 				await page.getByLabel('Date', { exact: true }).fill('2026-11-18')
 				await page.getByLabel('Description', { exact: true }).fill('Classification history')
+				await browserExpect(page.getByLabel('Category', { exact: true })).toHaveValue(categoryId)
 				await page.getByRole('button', { name: /save transaction/i }).click()
 				await browserExpect(
 					page.getByRole('status').filter({ hasText: /transaction saved/i })
@@ -716,7 +726,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				)
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
-					.toMatchObject({ busy: false, error: true })
+					.toMatchObject({ busy: false, feedback: 'sessionFailed' })
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
 					identity
 				)
@@ -818,7 +828,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
 					temporary
 				)
-				await browserExpect(input).toHaveValue('')
+				await browserExpect(input).toHaveValue('not a recovery phrase')
 				await page.evaluate(() => {
 					window.financeWorkerReadFixture.route('/login')
 					window.financeWorkerReadFixture.failNextNavigation()
@@ -830,7 +840,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					.toBe(original.identityId)
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
-					.toMatchObject({ busy: false, error: false })
+					.toMatchObject({ busy: false, feedback: 'none' })
 				await browserExpect(input).toHaveValue('')
 				await browserExpect(
 					page

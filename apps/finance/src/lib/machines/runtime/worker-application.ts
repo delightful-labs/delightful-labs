@@ -57,6 +57,8 @@ import {
 } from 'xstate'
 import {
 	sessionCloseMachine,
+	createSessionChangeMachine,
+	type SessionRuntimeChangeInput,
 	type SessionRuntimeObservation,
 	type SessionRuntimeView
 } from 'delightful-local-first/session/runtime'
@@ -114,6 +116,7 @@ type Context = Input & {
 	route: WorkspaceRoute | undefined
 	restorationOutcome: RecoveryResult['outcome'] | undefined
 	restorationAttempt: number
+	validatedRestorationAttempt: number
 	settledRestoration: RestorationFinished | undefined
 	ready: Ready | undefined
 	selection: WorkerSelection
@@ -136,29 +139,32 @@ type Context = Input & {
 	readBinding: object | undefined
 	sessionStatus: SessionRuntimeView['status']
 }
-const observeSession = createCallbackLogic<never, FinanceWorkerSession>(({ input, sendBack }) => {
-	let active = true
-	const publish = (view: SessionRuntimeView<FinanceWorkerCapabilities>) => {
-		if (active) sendBack({ type: 'SESSION', view })
-	}
-	const read = () => {
-		try {
-			publish(input.view.get())
-		} catch {
-			sendBack({ type: 'NATIVE_FAILED' })
+const observeSession = createCallbackLogic<{ type: 'REFRESH' }, FinanceWorkerSession>(
+	({ input, receive, sendBack }) => {
+		let active = true
+		const publish = (view: SessionRuntimeView<FinanceWorkerCapabilities>) => {
+			if (active) sendBack({ type: 'SESSION', view })
+		}
+		const read = () => {
+			try {
+				publish(input.view.get())
+			} catch {
+				sendBack({ type: 'NATIVE_FAILED' })
+			}
+		}
+		const sub = input.view.subscribe({
+			next: publish,
+			error: () => sendBack({ type: 'NATIVE_FAILED' }),
+			complete: read
+		})
+		receive(read)
+		read()
+		return () => {
+			active = false
+			sub.unsubscribe()
 		}
 	}
-	const sub = input.view.subscribe({
-		next: publish,
-		error: () => sendBack({ type: 'NATIVE_FAILED' }),
-		complete: read
-	})
-	read()
-	return () => {
-		active = false
-		sub.unsubscribe()
-	}
-})
+)
 
 function archiveObservation(context: Context): ArchiveObservation {
 	return {
@@ -460,6 +466,7 @@ export function createFinanceWorkerMachine({
 				READ_DISPOSAL_FAILED: types()
 			},
 			children: {
+				sessionObservation: types<ActorRefFrom<typeof observeSession>>(),
 				queries: types<ActorRefFrom<typeof financeQueriesMachine>>(),
 				forms: types<ActorRefFrom<ReturnType<typeof createFinanceFormsMachine>>>()
 			}
@@ -468,6 +475,7 @@ export function createFinanceWorkerMachine({
 			observeSession,
 			queries: financeQueriesMachine,
 			closeSession: sessionCloseMachine,
+			retrySession: createSessionChangeMachine<SessionRuntimeChangeInput>((input) => input),
 			closeStore,
 			closeBroker
 		}
@@ -483,6 +491,7 @@ export function createFinanceWorkerMachine({
 			restoration: undefined,
 			restorationOutcome: undefined,
 			restorationAttempt: 0,
+			validatedRestorationAttempt: 0,
 			settledRestoration: undefined,
 			ready: undefined,
 			selection: { workspaceId: null, revision: 0 },
@@ -502,6 +511,7 @@ export function createFinanceWorkerMachine({
 		output: () => ({ outcome: 'closed' }),
 		invoke: [
 			{
+				id: 'sessionObservation',
 				src: 'observeSession',
 				input: ({ context }) => context.session,
 				onError: {
@@ -658,7 +668,10 @@ export function createFinanceWorkerMachine({
 							}
 						}
 					},
-					RECOVERY_VALIDATED: {},
+					RECOVERY_VALIDATED: ({ context, event }) => {
+						if (event.attempt !== context.restoration?.scope.attempt) return
+						return { context: { validatedRestorationAttempt: event.attempt } }
+					},
 					RECOVERY_DRAIN_REQUESTED: ({ context, event }, enq) => {
 						if (event.attempt !== context.restoration?.scope.attempt) return
 						if (context.forms) enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
@@ -687,7 +700,8 @@ export function createFinanceWorkerMachine({
 							view.stage === 'failed' ||
 							view.stage === 'closed' ||
 							view.stage === 'openFailed' ||
-							view.stage === 'observerFailed'
+							view.stage === 'observerFailed' ||
+							(view.status === 'error' && ready?.status !== 'ready')
 						) {
 							const next = {
 								...context,
@@ -695,7 +709,11 @@ export function createFinanceWorkerMachine({
 								...withdrawn,
 								sessionStatus: view.status
 							}
-							return { target: '#finance-worker.failed', context: next }
+							if (context.forms) enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
+							return {
+								target: context.forms ? '#finance-worker.retiringForms' : '#finance-worker.failed',
+								context: { ...next, sessionStatus: 'error' }
+							}
 						}
 						if (ready?.status !== 'ready') {
 							const next = {
@@ -1202,6 +1220,8 @@ export function createFinanceWorkerMachine({
 							input: ({ context, self }) => ({
 								ready: required(context.ready),
 								initialWorkspaces: context.facts?.workspaces ?? null,
+								// Route reads share the identity. Retain its profile while subscriptions restart.
+								initialProfile: context.facts?.profile,
 								selection: context.selection,
 								transactionId: context.transactionId,
 								binding: required(context.readBinding),
@@ -1311,7 +1331,9 @@ export function createFinanceWorkerMachine({
 									: undefined
 							return {
 								target:
-									view.stage === 'active' && settled.result.outcome !== 'restorationChildFailed'
+									view.stage === 'active' &&
+									view.status !== 'error' &&
+									settled.result.outcome !== 'restorationChildFailed'
 										? ready
 											? '#finance-worker.running.ready'
 											: '#finance-worker.running.waiting'
@@ -1481,11 +1503,36 @@ export function createFinanceWorkerMachine({
 			cleanupFailed: { on: { CLOSE: {}, NATIVE_FAILED: {} } },
 			failed: {
 				on: {
-					RETRY_SESSION: ({ context }, enq) => {
+					SELECT_CONTEXT: ({ context, event }) =>
+						event.selection.revision > context.selection.revision
+							? {
+									context: {
+										selection: event.selection,
+										transactionKind: event.kind,
+										transactionId: event.transactionId ?? null
+									}
+								}
+							: undefined,
+					RETRY_SESSION: ({ context }) => {
 						if (context.forms || context.restoration) return
-						enq.sendTo(context.session.owner, { type: 'RETRY' })
-						return { target: 'running.waiting' }
+						return { target: 'retryingSession' }
 					}
+				}
+			},
+			retryingSession: {
+				invoke: {
+					src: 'retrySession',
+					input: ({ context }) => ({
+						session: context.session,
+						scope: { binding: context.session.binding, attempt: context.sessionRevision },
+						change: { operation: 'retry' }
+					}),
+					onDone: ({ event }, enq) => {
+						if (event.output.outcome !== 'completed') return { target: 'failed' }
+						enq.sendTo('sessionObservation', { type: 'REFRESH' })
+						return { target: 'running.waiting' }
+					},
+					onError: { target: 'failed' }
 				}
 			},
 			closed: { type: 'final' }
@@ -1562,11 +1609,14 @@ export function selectFinanceWorkerView(
 			navigationError: context.restorationOutcome === 'navigationFailed',
 			canRetryNavigation:
 				selectFinanceNavigationRetry(snapshot, context.sessionRevision) !== undefined,
-			error:
-				context.restorationOutcome === 'invalid' ||
-				context.restorationOutcome === 'restoreFailed' ||
-				context.restorationOutcome === 'restorationChildFailed',
-			draftRevision: context.restorationAttempt
+			feedback:
+				context.restorationOutcome === 'invalid'
+					? 'invalidPhrase'
+					: context.restorationOutcome === 'restoreFailed' ||
+						  context.restorationOutcome === 'restorationChildFailed'
+						? 'sessionFailed'
+						: 'none',
+			draftRevision: context.validatedRestorationAttempt
 		},
 		workspaceNavigation: context.route
 			? {

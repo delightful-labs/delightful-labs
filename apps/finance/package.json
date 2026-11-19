@@ -24,7 +24,7 @@
 		"test:unit": "vitest",
 		"test:worker-bindings": "pnpm check:tests && vitest run --config vitest.worker-bindings.config.ts",
 		"test": "pnpm test:unit --run && pnpm test:e2e",
-		"test:e2e": "playwright test",
+		"test:e2e": "playwright test && playwright test --config tests/config/playwright.form-presentation.config.ts",
 		"test:pwa": "playwright test --config tests/config/playwright.pwa.config.ts",
 		"test:auth": "playwright test --config tests/config/playwright.auth.config.ts",
 		"test:permissions": "playwright test --config tests/config/playwright.permissions.config.ts",

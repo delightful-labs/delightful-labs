@@ -1,5 +1,13 @@
 # Browser coverage ownership
 
+The worker integration qualifies real Finance routes against the production
+build so offline worker creation uses the real service-worker asset cache.
+The nine standalone component scenarios in `component-presentation.e2e.ts`
+retain Vite's development source-module host through
+`tests/config/playwright.form-presentation.config.ts`. Both run in CI and through
+`pnpm test:e2e`; no scenario is removed. The application and fixture hosts run
+separately so they cannot overwrite each other's generated environment.
+
 Finance browser tests should exercise the application boundary: route/query resolution, translated
 feedback, financial validation and formatting, permissions, actual subscriptions, persistence,
 offline behavior, and wiring to DUI/DLF. Shared code alone is not evidence that a Finance test can

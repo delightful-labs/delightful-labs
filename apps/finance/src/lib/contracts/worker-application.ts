@@ -439,7 +439,7 @@ export const financeWorkerView = z.strictObject({
 		navigationOnly: z.boolean(),
 		navigationError: z.boolean(),
 		canRetryNavigation: z.boolean(),
-		error: z.boolean(),
+		feedback: z.enum(['none', 'invalidPhrase', 'sessionFailed']),
 		draftRevision: z.number().int().nonnegative()
 	}),
 	workspaces: z.array(workerWorkspace).nullable(),

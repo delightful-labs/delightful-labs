@@ -1,7 +1,7 @@
 import { extensionPublicKey } from '../../tooling/extension-identity.js'
 import { defineConfig, loadEnv } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { jazzWasmEntry as wasm } from '../web/tooling/jazz-wasm.js'
+import { jazzWasmEntry as wasm, jazzBrokerWorkerEntry } from '../web/tooling/jazz-wasm.js'
 import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
 import { dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
@@ -71,6 +71,7 @@ export default defineConfig(({ mode }) => {
 		],
 		resolve: {
 			alias: [
+				{ find: /^#jazz-broker-worker/, replacement: jazzBrokerWorkerEntry },
 				{ find: /^jazz-wasm$/, replacement: wasm },
 				{ find: /^#jazz-wasm-binary/, replacement: join(dirname(wasm), 'jazz_wasm_bg.wasm') },
 				{ find: '$app/env/public', replacement: resolve('src/environment.ts') }

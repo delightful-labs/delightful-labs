@@ -4,9 +4,7 @@ import { bindWorkerConnectivity } from '../../offline/connectivity.js'
 import { createActor } from 'xstate'
 
 import { z } from 'zod'
-import wasmUrl from '#jazz-wasm-binary?url'
 import { accountInput } from '../../backend/jazz/account.js'
-import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
 import { projectRuntime } from './views.js'
 import { commandSchema } from './protocol.js'
 import { recoveryView } from './recovery-owner.js'
@@ -119,7 +117,7 @@ export function serveApplicationWorker(options: {
 			serverUrl,
 			env: 'clipper',
 			store: accountStore,
-			runtimeSources: { wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION, browserWorkerHost: broker }
+			runtimeSources: { browserWorkerHost: broker }
 		})
 		const actor = createActor(workerHostMachine, {
 			input: {

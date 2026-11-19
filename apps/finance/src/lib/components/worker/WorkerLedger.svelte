@@ -2,7 +2,7 @@
 	import { StatusMessage } from 'delightful-ui'
 	import TransactionListItem from '../transactions/TransactionListItem.svelte'
 	import TransactionListView from '../transactions/TransactionListView.svelte'
-	import TransactionListFilters from '../filters/TransactionListFilters.svelte'
+	import WorkerLedgerFilters from './WorkerLedgerFilters.svelte'
 	import type { TransactionListFilters as Filters } from '../../filters/transaction-list-filters.js'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
 	import { transactionPages } from '../../domain/transaction-kind.js'
@@ -13,12 +13,14 @@
 	let {
 		view,
 		filters,
+		showFilters = true,
 		onOpen,
 		onPage,
 		onFilters
 	}: {
 		view: FinanceWorkerView
 		filters?: Filters | undefined
+		showFilters?: boolean
 		onOpen: (id: string, scope: WorkerCommandScope) => void
 		onPage: (page: number, scope: WorkerCommandScope) => void
 		onFilters: (filters: Partial<Filters>, scope: WorkerCommandScope) => void
@@ -28,14 +30,6 @@
 	)
 	const categoryNames = $derived(new Map(view.ledger?.categories ?? []))
 	const tagNames = $derived(new Map(view.ledger?.tags ?? []))
-	const filterCategories = $derived(
-		new Map(
-			view.ledger?.filterCategories.map(([id, name]) => [
-				id,
-				name ?? m['status.unavailable_subject']({ subject: m['nouns.category']({ count: 1 }) })
-			]) ?? []
-		)
-	)
 	const scope = $derived({ sessionRevision: view.sessionRevision, selection: view.selection })
 	function transactionHref(id: string) {
 		return withQueryParams(
@@ -62,12 +56,11 @@
 </script>
 
 {#if view.ledger}
-	<TransactionListFilters
-		value={filters ?? view.ledger.filters}
-		categories={filterCategories}
-		currencies={view.ledger.currencies}
-		onchange={(filters) => onFilters(filters, scope)}
-	/>
+	{#if showFilters}<WorkerLedgerFilters
+			{view}
+			value={filters}
+			onchange={(filters) => onFilters(filters, scope)}
+		/>{/if}
 	{#if !view.ledger.rangeValid}
 		<p role="status">{m['errors.date_range_invalid']()}</p>
 	{:else}

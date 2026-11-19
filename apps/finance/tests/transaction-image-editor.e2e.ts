@@ -189,6 +189,12 @@ test(
 		await left.press('Escape')
 		await expect(dialog).toBeHidden()
 		expect(await savedImage(page, ledger.transactionId)).toEqual(original)
+		await page.evaluate(async () => {
+			await navigator.serviceWorker.ready
+		})
+		await expect
+			.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+			.toBe(true)
 		await page.context().setOffline(true)
 		try {
 			dialog = await editor(page)

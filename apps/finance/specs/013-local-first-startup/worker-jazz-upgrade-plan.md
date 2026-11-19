@@ -787,3 +787,42 @@ handoff; do not attribute it to Finance's changes or call it fixed from a later
 passing run. Ledger checkpoint `05ce9fb5` passed Finance, Foundation and Clipper.
 The Finance ledger/editor commits change no Clipper product source. Full Clipper
 extension qualification remains an activation gate.
+
+## November 18 qualification: retained broker patch responsibilities
+
+The full alpha.67 application upgrade remains unmerged. Native Clipper worker
+qualification passes 27/32 cases after sharing the exact broker asset across
+Window clients, application workers and fixture SDK consumers. Five existing
+long-lived-broker cases fail: fresh joining proof, expired proof, forged proof,
+wrong audience and wrong identity. The fresh joining worker clock is verified
+independently; changing request interception did not resolve the failure.
+
+Source inspection confirms alpha.67 still calls `acceptPeer` without the joining
+peer proof. The native adapter uses the physical broker runtime’s original
+`selfSignedClientProof`, which expires while the broker remains alive. The real
+error is `token expired` at subscriber admission. Retry after offline edits also
+hits `GracefulShutdownSyncError` because the SDK waits for remote synchronization
+before replacing its failed connection.
+
+These are two existing alpha.60 patch responsibilities, not a proposed new
+application credential or call-owner layer. Their source is preserved at
+`51b8e878:patches/jazz-tools@2.0.0-alpha.60.patch`. They were not included in the
+initial alpha.67 bridge/backend/provider patch.
+
+Proposed disposition, pending user decision:
+
+1. Port the existing joining-proof path through broker bootstrap, the peer record
+   and `acceptPeer`. Keep owner identity and audience fixed; let native
+   `acceptSubscriberWithSelfSignedProof` verify signature and expiry. Maintain the
+   published broker bundle and its readable source together. Add no token cache,
+   renewal policy or application authorization implementation.
+2. Port the existing retry shutdown option: explicit retry uses native local
+   drain (`waitForSync: false`); sign-out and account replacement keep their
+   existing synchronization requirement. The physical replica and pending writes
+   remain native SDK responsibilities.
+3. Qualify all five existing negative/fresh proof cases, offline edits across
+   visible Retry, and both apps’ native session/binding cases before upload.
+
+The alternative is to leave this upgrade unmerged until an upstream release
+passes these requirements. Do not remove the existing negative tests or treat a
+fresh-session worker fixture as long-lived broker qualification.

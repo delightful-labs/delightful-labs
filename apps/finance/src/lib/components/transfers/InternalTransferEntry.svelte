@@ -19,7 +19,7 @@
 </script>
 
 {#if state.current.transferCreation}
-	{#key `${state.current.sessionRevision}:${state.current.selection.revision}`}
+	{#key `${state.current.sessionRevision}:${state.current.selection.workspaceId}`}
 		<PairedTransferForm
 			accounts={state.current.transferCreation.accounts}
 			view={state.current.transferCreation.form}

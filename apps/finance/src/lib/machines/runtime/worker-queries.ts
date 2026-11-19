@@ -23,6 +23,7 @@ export type FinanceWorkerReady = Extract<
 type Input = {
 	ready: FinanceWorkerReady
 	initialWorkspaces: WorkerWorkspace[] | null
+	initialProfile?: z.output<typeof workerProfile> | null | undefined
 	transactionId: string | null
 	selection: WorkerSelection
 	binding: object
@@ -169,7 +170,12 @@ export const financeQueriesMachine = setup({
 }).createMachine({
 	id: 'finance-queries',
 	initial: 'running',
-	context: ({ input }) => ({ ...input, ...empty, workspaces: input.initialWorkspaces }),
+	context: ({ input }) => ({
+		...input,
+		...empty,
+		workspaces: input.initialWorkspaces,
+		profile: input.initialProfile
+	}),
 	states: {
 		running: {
 			invoke: [

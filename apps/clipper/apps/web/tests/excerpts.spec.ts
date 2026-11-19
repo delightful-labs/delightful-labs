@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { createJazz, remote, acceptDeviceAccounts } from 'jazz-tools/backend'
 import { app } from '../src/lib/backend/jazz/jazz.generated.js'
-import permissions from '../src/lib/backend/jazz/jazz.permissions.json'
+import permissions from '../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { browserCoreSecret } from './browser-core.js'
 import { startLocalJazzServer } from './browser-core.js'
 import { openAddLink } from './add-link.js'

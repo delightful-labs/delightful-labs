@@ -6,9 +6,9 @@
 		PUBLIC_SIMPLEFIN_DEMO
 	} from '$app/env/public'
 	import { onMount, type Snippet } from 'svelte'
-	import { fromStore } from 'svelte/store'
+	import { fromStore, readable } from 'svelte/store'
 	import WorkerImageEditor from '#lib/components/worker/WorkerImageEditor.svelte'
-	import { afterNavigate, goto } from '$app/navigation'
+	import { afterNavigate, goto, onNavigate } from '$app/navigation'
 	import { page } from '$app/state'
 	import { SkipControl } from 'delightful-ui'
 	import { m } from '#lib/paraglide/messages.js'
@@ -26,7 +26,8 @@
 	let { children: routeContent }: { children: Snippet } = $props()
 	let client = $state.raw<FinanceWorkerClient>()
 	let serverUrl = $state('')
-	const imageEditor = $derived(client ? fromStore(client.imageEditor) : undefined)
+	const emptyImageEditor = readable(null)
+	const imageEditor = $derived(client?.imageEditor ?? emptyImageEditor)
 	const live = $derived(client ? fromStore(client.view) : undefined)
 	setFinanceWorker({
 		get client() {
@@ -62,6 +63,24 @@
 		return () => owner.close()
 	})
 	afterNavigate(() => client?.observeRoute())
+
+	onNavigate((navigation) => {
+		if (!navigation.from?.route.id?.startsWith('/(transactions)/')) return
+		if (!navigation.to?.route.id?.startsWith('/(transactions)/')) return
+		if (navigation.from?.url.pathname === navigation.to.url.pathname) return
+		if (!document.startViewTransition) return
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+		return new Promise<void>((resolve) => {
+			const transition = document.startViewTransition(async () => {
+				// Let SvelteKit update the page after the browser captures the old view.
+				resolve()
+				await navigation.complete
+			})
+			// A skipped or failed capture must never hold up navigation.
+			void transition.updateCallbackDone.catch(() => resolve())
+		})
+	})
 </script>
 
 <SkipControl href="#main-content">{m['navigation.skip_to_main_content']()}</SkipControl>
@@ -116,6 +135,15 @@
 				{#if view.status === 'starting'}<JazzStartup />{/if}
 				{#if view.workspaceStartup === 'checking'}<JazzStartup workspace />{/if}
 				{#if view.canRetrySession}<JazzStartup error onRetry={() => client?.retrySession()} />{/if}
+				{#if view.backup?.canReload && page.url.pathname !== '/settings/workspace'}
+					<WorkspaceBackup
+						kind="download"
+						view={view.backup}
+						ondownload={(protection, password) => client?.startBackup(protection, password, view)}
+						oncancel={() => client?.backupCommand('CANCEL', view)}
+						onreload={() => client?.backupCommand('RELOAD', view)}
+					/>
+				{/if}
 				{#if view.workspaceStartup === 'failed' || view.workspaceStartup === 'unavailable'}<JazzStartup
 						workspace
 						error
@@ -139,10 +167,10 @@
 			oncommand={(command) => client?.workspaceRestoreCommand(command, live.current)}
 		/>
 	{/if}
-	{#if client && imageEditor?.current}
-		{#key imageEditor.current.port}<WorkerImageEditor
-				file={imageEditor.current.file}
-				port={imageEditor.current.port}
+	{#if client && $imageEditor}
+		{#key $imageEditor.port}<WorkerImageEditor
+				file={$imageEditor.file}
+				port={$imageEditor.port}
 				onfinish={client.closeImageEditor}
 			/>{/key}
 	{/if}

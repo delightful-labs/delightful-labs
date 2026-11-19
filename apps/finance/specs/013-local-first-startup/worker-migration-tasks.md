@@ -23,103 +23,78 @@ isolated composite worker fixture.
 
 ## Current source and verification status — November 18
 
-Canonical source now pins alpha.67 and mounts the single worker in the normal
-application layout and routes. Grouped qualification found SDK/type and fixture
-drift, which has been repaired. Local First's 1,250 units, its package consumer
-types/runtime, Finance's production build and zero-warning static checks, and
-Clipper's web/extension static checks pass. The Finance unit batch passed 1,796
-cases with one obsolete bundle-proof failure; all 11 bundle-proof cases passed
-after its repair. Clipper's unit batch passed 1,027 cases with two obsolete
-account-storage fixture failures; both cases passed after their native API port.
-These are scoped results, not a fresh final all-green run. Prior inactive
-candidate pass counts below apply to the preceding checkpoint.
+PR46 integrates alpha.67 and one application worker into the normal SvelteKit
+app. Preserve the other agents’ commits. Finance’s integration and collected
+functional repairs are implemented. The shared SDK broker qualification and
+final-head hosted CI remain merge requirements.
 
-The repair batch keeps SDK sessions opaque in the retained shared startup owner,
-uses an opaque local-settlement capability for workspace naming, aligns validated
-worker views with native presentation contracts, ports browser fixtures to the
-actual worker-owned session, and removes the final obsolete main-thread recovery
-integration. Finance workflow database types now use Jazz's native `Db` export
-rather than the removed Svelte provider's `getDb` type.
+Current implementation decisions:
 
-The actual-route browser batch then passed 17 cases and exposed six failures
-before stopping. The failures concern save/validation feedback, rapid filter
-updates and attachment processing. Worker fixture setup now observes our own
-shared native session adapter, without aliasing or replacing the SDK. Static
-scenario operations run inside the real application worker; there is no worker
-eval service or Window SDK session.
+- Native SvelteKit updates query parameters immediately. Controls send partial
+  edits; Window merges against its current URL, then `OBSERVE_ROUTE` supplies it
+  to the worker’s XState actor. Filtering, balances, grouping and pagination stay
+  in the worker. Query edits preserve form DOM; another page/workspace waits for
+  its own worker view.
+- Keep the identity profile while route subscriptions restart. Workspace
+  selection must not revoke an identity-bound workspace creation operation.
+- Recovery distinguishes invalid phrases from SDK failures. Invalid input
+  retains its draft; the existing validation report clears a validated phrase.
+  Drain financial work before Retry. Invoke Local First’s existing
+  `createSessionChangeMachine` to call native Jazz `retry()`, await settlement,
+  then refresh the existing session observer. Reopening a failed acquisition and
+  retrying a retained SDK session use that same public contract. Add no selection
+  replay, credential cache or replacement session owner.
+- Subscribe to the image-editor store with native Svelte store syntax. Reuse the
+  loaded attachment File; remove the duplicate hydration query and assembly
+  actors. The existing replacement transaction still checks transaction/account,
+  file identity and current permission.
+- Use existing success/cancellation/reset events for file-picker and creation
+  cleanup. Mounting a payment selector only initializes its presentation; it must
+  not emit a fabricated edit that clears successful-save feedback. Keep deletion
+  feedback outside the deleted transaction’s metadata subtree.
+- Keep native backup hydration and serializable authority commit. Directly await
+  reads within the selected snapshot: overlapping alpha.67 browser capture
+  queries stalled; sequential reads pass the restoration cases. Add no global
+  queue, read-tier workaround, replacement archive format or migration.
+- Register native page transitions in the persistent root layout so Back/Forward
+  retains the callback when route content is replaced.
+- Clipper Window SDK consumers, application workers and native fixtures share
+  one `runtime-sources.ts` broker/Wasm configuration. Remove the obsolete
+  alpha.60 manual reproducer rather than port its unused account implementation.
+- Real-route browser checks use the production artifact and native service-worker
+  asset cache, including offline creation of the CPU image worker. Nine standalone
+  component scenarios retain their development module host in a separate suite.
+  Keep all scenarios in CI and `test:e2e`; do not introduce fixture modules into
+  the normal production build.
 
-The current repair batch prevents incoming tag DTOs from emitting synthetic
-user-input notifications and clearing feedback. Pica 10.0.3's ImageBitmap
-orientation fallback attempts DOM canvas creation inside a worker; using its
-supported OffscreenCanvas source avoids that path without an SDK/library patch.
-The user selected native SvelteKit query updates. Controls now send only edited
-fields, the Window merges them with its current URL and uses native shallow
-replacement, and `OBSERVE_ROUTE` delivers that URL to the worker's XState actor.
-Actual route controls read Window URL state rather than waiting for a projected
-worker DTO. The superseded worker-led filter navigation branch is removed;
-standalone context hosts retain their direct filter event. Filtering, exact
-totals and pagination calculation remain worker-owned. Native SvelteKit's current
-`goto` options and `page.shallow.url` preserve focused controls and query links.
+Qualification evidence is cumulative across the broad runs and affected repairs,
+not a claim of one final all-green run:
 
-The user renewed the code-first instruction: **run no more tests until all code
-is complete**, then run the final checks together and repair the collected issues.
-The repairs above have not yet been verified.
+| Surface                    | Current evidence                                                                                                                                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Finance units              | Full 1,797-case run passed. Final worker-root suite: 72/72 passed, including two new native Retry cases. Static and browser-test types pass with zero Svelte errors/warnings.                                                                                       |
+| Actual Finance routes      | All 270 unique real-route scenarios covered green across the broad run and targeted repairs. Includes rapid filters, permissions, offline financial saves, files, transfers, bank sync, profiles and recovery.                                                      |
+| Standalone components      | 9/9 passed on the development fixture host. Coverage ownership checks assign all 44 browser test files without duplicate application scenarios.                                                                                                                     |
+| Finance native worker      | All 66 distinct Chromium/Firefox/WebKit cases covered green. Latest full run: 65/66; the standalone classification fixture then waits for the worker’s new route view before editing, asserts the selected category before saving, and passes in all three engines. |
+| Native backup/restoration  | 107/107 passed, including browser-process restarts, partial writes, rollback, permission repair and exact historical data. Actual production-route password/recovery-key exports and independent archive reopening pass.                                            |
+| Production/offline/bundles | Final 19/19 PWA cases passed. Audited Window bundle: 864 modules, no Jazz runtime or financial projection implementation. Application worker: 604 modules, no Svelte UI. Provider, image and SDK broker workers remain separate.                                    |
+| Production startup         | 7/7 passed in the final production run: cold local reads/writes offline and under silent connections, partial permission data, later server rejection and cold bank history.                                                                                        |
+| Clipper                    | 1,029/1,029 units and web/extension static checks pass. Native workers: 27/32; five long-lived broker proof cases await the shared SDK patch decision.                                                                                                              |
+| Local First                | 1,250 units, static/package checks and complete package-consumer types/runtime checks pass. No new library lifecycle or SDK facade is introduced by the Finance Retry repair.                                                                                       |
 
-The code review also ports the Svelte recovery fixture off the deleted Window
-integration and moves startup fault injection from obsolete localStorage calls
-to the worker's actual IndexedDB opening. These retain existing recovery/retry
-assertions and use disposable native adapters only.
+The retained-broker failure and concrete proposal are recorded at the end of
+[the Jazz upgrade plan](worker-jazz-upgrade-plan.md). Alpha.67 admits subscribers
+with the owner’s original proof rather than the joining peer’s fresh proof.
+Offline Retry also requires failed-connection remote synchronization. These
+were existing alpha.60 patch responsibilities omitted from the initial alpha.67
+patch. The user decision on porting them is pending. Do not add an application
+credential framework, silently remove negative tests, or recommend merging while
+these five native cases remain unresolved.
 
-Remaining before merge: grouped final static/unit and native-browser qualification,
-actual-route save/draft/permission/file/bank/backup/restore checks, complete offline
-restart and PWA consent checks, production Window/worker bundle audit, then commit,
-push and hosted CI evidence on PR46. Retained-session credential lifetime must be
-qualified through the current SDK; the old private four-argument `acceptPeer`
-regression API no longer exists in alpha.67. Native rejection tests now cover the
-supported opening/peer admission API and do not claim in-place proof replacement.
-
-The next grouped run passed all **1,797 Finance units**, **42 native browser
-session/binding cases**, **1,029 Clipper units**, Finance static/test/service-worker
-types, production build/schema checks, and packed shared-library consumers.
-Production PWA coverage passed **18 of 19 cases**, including cold account,
-expense/income detail restarts, asset caching, update consent/draft preservation
-and the emitted provider worker. Transfer creation was blocked before its cold
-restart scenario. The broad 279-case app batch exposed bank failures before
-reaching the later workflows; do not count unrun scenarios as passing.
-
-The collected repair batch projects only `sessionRevision` and `selection` into
-commands, instead of spreading a full view that overwrote the command type.
-It forwards Window online/offline observations through the worker's XState root,
-removing the ineffective worker-global network observer. Transfer creation now
-uses the same SDK binding token as the other scoped forms, rather than comparing
-that token with the database object. Native lock-failure injection moves to the
-worker, and lint cleanup removes unused imports/declarations.
-
-The next grouped checks passed all 1,797 Finance units, zero-warning static and
-test types, and all 66 native application-worker cases across Chromium, Firefox
-and WebKit. The previously blocked production transfer cold-restart case also
-passes. The actual-route batch progressed to 56 passing cases before its 20-failure
-limit; 200 cases remained unrun. Its collected repairs memoize the workspace
-dialog's identity scope, keep optional profile lookup failure from blocking bank
-history, and restart only the history detail subscription when attempts change.
-Static worker fixtures now inject provider/bootstrap and journal faults at their
-actual owners. Unused fixture path declarations and the unused production image
-editor default are removed. The final route-admission argument and these actual
-route repairs still require the next grouped verification; none of the unrun
-application scenarios is counted as passing.
-
-The subsequent production run passed all **19 PWA cases**. The application batch
-passed 81 cases and stopped at 20 failures, leaving 175 unrun. Its collected
-repairs pass all 1,797 units and zero-warning static/test types again. Pagination
-now creates browser history entries. Fixture operations receive the page URL
-explicitly, wait for the mounted worker after reload, and install startup faults
-through the existing static fixture channel before OPEN, rather than rewriting
-worker responses. Workspace preparation gates and preference-storage failures
-target the actual worker APIs. Recovery drain coverage checks the retained form's
-cleared phrase and disabled submission; the issued-write acknowledgement and
-native restore-count assertions remain. These browser repairs and the full native
-backup/restoration experiment are still under qualification. The upload is a
-source checkpoint, not approval to merge.
+Remaining before merge: resolve the shared SDK decision and qualify its retained fixes in both apps; upload this repair batch to
+the same PR46 and inspect final-head hosted CI. Keep small cosmetic follow-ups
+separate. User servers, production data and storage namespaces remain unchanged.
+No Paraglide generation is authorized.
 
 ## Earlier inactive implementation checkpoint — November 18
 

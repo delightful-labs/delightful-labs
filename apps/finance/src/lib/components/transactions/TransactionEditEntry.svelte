@@ -151,7 +151,7 @@
 							/>{/if}
 					{/snippet}
 				</TransactionForm>
-			{:else if entry.form.readiness.kind === 'ready'}
+			{:else if liveView.current.status === 'ready'}
 				<p>{m['transactions.unavailable']()}</p>
 			{/if}
 			{#if details?.transaction}
@@ -161,17 +161,15 @@
 					editorProfile={details.editorProfile}
 				>
 					{#snippet form()}{/snippet}
-					{#snippet actions()}
-						<InternalTransferDeleteActions
-							transactionId={entry.transactionId}
-							available={transfer?.deleteAvailable ?? false}
-							pending={transfer?.deletePending ?? false}
-							feedback={transfer?.deleteFeedback ?? null}
-							onDelete={(choice) => transferCommand({ type: 'DELETE_LINKED_TRANSFER', choice })}
-						/>
-					{/snippet}
 				</TransactionDetails>
 			{/if}
+			<InternalTransferDeleteActions
+				transactionId={entry.transactionId}
+				available={transfer?.deleteAvailable ?? false}
+				pending={transfer?.deletePending ?? false}
+				feedback={transfer?.deleteFeedback ?? null}
+				onDelete={(choice) => transferCommand({ type: 'DELETE_LINKED_TRANSFER', choice })}
+			/>
 		{/key}
 		{#if category}
 			<CategoryForm

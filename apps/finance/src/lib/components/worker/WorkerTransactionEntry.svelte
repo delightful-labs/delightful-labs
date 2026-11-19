@@ -17,7 +17,9 @@
 		oncancel?: (() => void) | undefined
 		onsend: (command: WorkerFormCommand, scope: WorkerCommandScope) => void
 	} = $props()
-	const scopeKey = $derived(`${view.sessionRevision}:${view.selection.revision}`)
+	const scopeKey = $derived(
+		`${view.sessionRevision}:${view.selection.workspaceId}:${entry?.kind}:${view.transactionId ?? ''}`
+	)
 	function send(command: WorkerFormCommand) {
 		onsend(command, { sessionRevision: view.sessionRevision, selection: view.selection })
 	}

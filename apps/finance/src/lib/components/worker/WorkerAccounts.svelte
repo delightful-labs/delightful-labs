@@ -137,16 +137,23 @@
 	{#snippet footer()}{@render hostFooter?.()}{/snippet}
 	{#snippet children(navigation)}
 		{#if pageContent}
-			{@render notices?.(live.current)}
-			<WorkspaceScopeNotice
-				active={live.current.workspaceNavigation?.notice.active ?? false}
-				failed={live.current.workspaceNavigation?.notice.failed ?? false}
-				loading={live.current.workspaceNavigation?.notice.loading ?? false}
-				onRetry={onRetryWorkspaceNavigation}
-			/>
-			{#if live.current.workspaceNavigation?.showContent || route.current.pathname === '/login' || route.current.pathname === '/account'}
-				{@render pageContent(live.current)}
-			{/if}
+			<div class="application-page">
+				<div class="application-notices">
+					{@render notices?.(live.current)}
+					<WorkspaceScopeNotice
+						active={live.current.status !== 'failed' &&
+							(live.current.workspaceNavigation?.notice.active ?? false)}
+						failed={live.current.workspaceNavigation?.notice.failed ?? false}
+						loading={live.current.workspaceNavigation?.notice.loading ?? false}
+						onRetry={onRetryWorkspaceNavigation}
+					/>
+				</div>
+				<div class="application-content">
+					{#if live.current.workspaceNavigation?.showContent || (live.current.status !== 'ready' && (route.current.pathname === '/login' || route.current.pathname === '/account'))}
+						{@render pageContent(live.current)}
+					{/if}
+				</div>
+			</div>
 		{:else}
 			<PageLayout {navigation}>
 				{#snippet pageHeading()}<h1>
@@ -268,3 +275,19 @@
 		{/if}
 	{/snippet}
 </AppShell>
+
+<style>
+	.application-page {
+		display: flex;
+		flex-direction: column;
+		block-size: 100%;
+		min-block-size: 0;
+	}
+	.application-notices {
+		flex: 0 0 auto;
+	}
+	.application-content {
+		flex: 1 1 0%;
+		min-block-size: 0;
+	}
+</style>

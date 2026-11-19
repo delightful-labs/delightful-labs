@@ -17,7 +17,6 @@
 		if (!(form instanceof HTMLFormElement)) return
 		const phrase = new FormData(form).get('recoveryPhrase')
 		if (typeof phrase === 'string') onRestore(phrase)
-		form.reset()
 	}
 </script>
 
@@ -26,8 +25,8 @@
 	<LoginForm
 		canSubmit={view.identityRestore.canSubmit}
 		restoring={view.identityRestore.busy}
-		restoreError={view.identityRestore.error}
-		sessionError={view.status === 'failed'}
+		restoreError={view.identityRestore.feedback === 'invalidPhrase'}
+		sessionError={view.status === 'failed' || view.identityRestore.feedback === 'sessionFailed'}
 		draftRevision={view.identityRestore.draftRevision}
 		navigationOnly={view.identityRestore.navigationOnly}
 		navigationError={view.identityRestore.navigationError}

@@ -4,8 +4,7 @@ import { createJazzClient } from 'jazz-tools/client'
 import { browserAccountStore, fixtureServerUrl } from './browser-account-store.js'
 import { createLibraryRecords } from '../src/lib/backend/jazz/records.js'
 import { readConnection } from '../src/lib/backend/jazz/read-connection.js'
-import wasmUrl from '#jazz-wasm-binary?url'
-import { JAZZ_RUNTIME_VERSION } from '../src/lib/offline/runtime-version.js'
+import { jazzRuntimeSources } from '../src/lib/backend/jazz/runtime-sources.js'
 /** Test fixture access only. The production UI never imports this Window client. */
 const serverUrl = fixtureServerUrl()
 const session = await createJazzClient({
@@ -14,7 +13,7 @@ const session = await createJazzClient({
 	client: () => import('jazz-tools/local-first'),
 	env: 'clipper',
 	initial: 'device',
-	runtimeSources: { wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION }
+	runtimeSources: jazzRuntimeSources
 })
 await session.getSnapshot().client?.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
 /** Warm this independent test replica before taking its authority offline. */

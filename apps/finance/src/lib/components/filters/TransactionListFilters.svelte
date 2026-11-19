@@ -15,7 +15,7 @@
 		currencies,
 		onchange
 	}: {
-		title?: string
+		title?: string | undefined
 		closeControl?: Snippet | undefined
 		headingLevel?: 'h1' | 'h2'
 		value: TransactionListFilters

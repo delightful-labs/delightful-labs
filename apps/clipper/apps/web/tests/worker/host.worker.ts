@@ -4,14 +4,13 @@ import { createLibraryRecords } from '../../src/lib/backend/jazz/records.js'
 import { brokerHostClient } from '../../src/lib/runtime/worker/broker-channel.js'
 import { diagnosticText } from '../../src/lib/diagnostics/machines.js'
 import { createJazzClient } from 'jazz-tools/client'
-import wasmUrl from '#jazz-wasm-binary?url'
+import { jazzRuntimeSources } from '../../src/lib/backend/jazz/runtime-sources.js'
 import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
 import { createWorkerAccountStore } from '../../src/lib/runtime/worker/account-store.js'
 import {
 	accountStorageClient,
 	accountStorageKey
 } from '../../src/lib/runtime/worker/storage-channel.js'
-import { JAZZ_RUNTIME_VERSION } from '../../src/lib/offline/runtime-version.js'
 self.onmessage = async ({ data }) => {
 	const storage = accountStorageClient(data.port)
 	const brokerHost = brokerHostClient(data.broker, data.brokerControl, data.brokerScope, {
@@ -26,7 +25,7 @@ self.onmessage = async ({ data }) => {
 			env: 'clipper',
 			initial: 'device',
 			store: createWorkerAccountStore(key, storage),
-			runtimeSources: { browserWorkerHost: brokerHost, wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION }
+			runtimeSources: { ...jazzRuntimeSources, browserWorkerHost: brokerHost }
 		})
 		try {
 			await session

@@ -1,9 +1,8 @@
-import { JAZZ_RUNTIME_VERSION } from '../../offline/runtime-version.js'
+import { jazzRuntimeSources } from './runtime-sources.js'
 import { createLibraryCapability } from './library.js'
 import { createLibraryRecords } from './records.js'
 import { readConnection } from './read-connection.js'
 import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
-import wasmUrl from '#jazz-wasm-binary?url'
 import type { JazzClientConfig } from 'jazz-tools/client'
 import {
 	type JazzSessionResource,
@@ -174,7 +173,6 @@ function bindHost(
 // Constructing the registry is inert; only browser mount requests an attachment.
 const registry = createJazzStartupRegistry()
 const localFirst = () => import('jazz-tools/local-first')
-const runtimeSources = Object.freeze({ wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION })
 export function accountInput(
 	config: JazzClientConfig,
 	libraryFactory: LibraryFactory = createLibraryCapability
@@ -186,7 +184,7 @@ export function accountInput(
 			client: localFirst,
 			initial: 'device',
 			localFirst: 'now',
-			runtimeSources: config.runtimeSources ?? runtimeSources
+			runtimeSources: { ...jazzRuntimeSources, ...config.runtimeSources }
 		}),
 		bind: (session) =>
 			bindHost(
@@ -206,7 +204,7 @@ export function existingAccountInput(
 		startup: registry.getJazzStartupBinding({
 			...config,
 			client: localFirst,
-			runtimeSources: config.runtimeSources ?? runtimeSources
+			runtimeSources: { ...jazzRuntimeSources, ...config.runtimeSources }
 		}),
 		bind: (session) =>
 			bindHost(

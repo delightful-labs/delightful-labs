@@ -327,12 +327,19 @@ function withAttachmentSelectionValidation(
 		},
 		z
 			.object({
-				values: schema,
+				values: z.unknown(),
 				attachments: z.array(
 					z.custom<File>((value) => typeof File !== 'undefined' && value instanceof File)
 				)
 			})
-			.transform(({ values, attachments }) => ({ ...values, attachments }))
+			.transform(async ({ values, attachments }, ctx) => {
+				const parsed = await schema.safeParseAsync(values)
+				if (!parsed.success) {
+					for (const issue of parsed.error.issues) ctx.addIssue({ ...issue })
+					return z.NEVER
+				}
+				return { ...parsed.data, attachments }
+			})
 	)
 }
 
@@ -433,6 +440,7 @@ export function createTransactionEditFormOptions(
 			)
 		},
 		successContent: 'retain',
+		resetOnSuccess: true,
 		assessmentObservation: ({ request, observation }) => ({
 			...observation.facts,
 			intent: request.values

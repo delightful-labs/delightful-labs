@@ -300,9 +300,12 @@ for (const recovery of ['same session', 'page reload', 'browser restart']) {
 				app: testAppRestoreApp,
 				permissions: {
 					...testAppRestorePermissions,
-					restoreDestinations: {
-						...testAppRestorePermissions.restoreDestinations,
-						insert: { with_check: { type: 'False' } }
+					tables: {
+						...testAppRestorePermissions.tables,
+						restoreDestinations: {
+							...testAppRestorePermissions.tables.restoreDestinations,
+							insert: 'false'
+						}
 					}
 				}
 			})

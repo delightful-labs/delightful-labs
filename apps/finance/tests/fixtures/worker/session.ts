@@ -3,7 +3,7 @@ type Session = Awaited<ReturnType<typeof createJazzClient>>
 let captured: Session | undefined
 /** The exact native session constructed by the application; this fixture never constructs another. */
 export function captureSession(session: Session) {
-	if (!captured || captured.getSnapshot().status === 'closed') captured = session
+	captured = session
 }
 export function getCurrentJazzSession() {
 	return captured

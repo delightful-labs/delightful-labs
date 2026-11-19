@@ -47,7 +47,7 @@ export const operation11 = async (organizationId: string) => {
 
 export const operation68 = async () => {
 	const { app, db, userId } = window.workspaceSettingsTest
-	return (await db.one(app.profiles.where({ userId })))?.displayName
+	return (await db.one(app.profiles.where({ userId }), { tier: 'local-first' }))?.displayName
 }
 
 export const operation79 = async () => {

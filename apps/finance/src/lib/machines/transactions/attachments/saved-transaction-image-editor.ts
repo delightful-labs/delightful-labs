@@ -1,25 +1,21 @@
-import type { Db as JazzDb } from 'jazz-tools'
-import { app } from '#lib/queries.js'
 import type { ImageEditorInput, ImageEditorOutput } from '../../images/image-editor.js'
 import {
 	transactionAttachmentReplacementMachine,
 	type AttachmentReplacementInput,
 	type AttachmentReplacementOutput
 } from './transaction-attachment-replacement.js'
-import { attachmentFile, completeAttachmentParts } from '#lib/domain/transaction-attachments.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { OutputFrom, SnapshotFrom } from 'xstate'
 import type { EventPayload } from '../../../contracts/event-payload.js'
 
-type ImageReference = { id: string; fileId: string }
+type ImageReference = { id: string; fileId: string; file: File }
 export type SavedImageObservation = {
 	editable: boolean
 	images: readonly ImageReference[]
 	blockedIds: readonly string[]
 }
-type Db = Pick<JazzDb, 'one' | 'beginTransaction'>
 type Input = {
-	db: Db
+	db: AttachmentReplacementInput['db']
 	transaction: AttachmentReplacementInput['transaction']
 	observation: SavedImageObservation
 }
@@ -43,34 +39,11 @@ function eligible(target: ImageReference, observation: SavedImageObservation): b
 		observation.images.some((image) => image.id === target.id && image.fileId === target.fileId)
 	)
 }
-const hydrate = createAsyncLogic({
-	run: ({ input }: { input: { db: Db; transactionId: string; target: ImageReference } }) =>
-		input.db.one(
-			app.transactionAttachments
-				.where({
-					id: input.target.id,
-					transactionId: input.transactionId,
-					fileId: input.target.fileId
-				})
-				.include({ file: { parts: true }, transaction: true }),
-			{ tier: 'local-first' }
-		)
-})
-function completeContents(row: OutputFrom<typeof hydrate>): boolean {
-	return row?.file != null && completeAttachmentParts(row.file) !== undefined
-}
-const assemble = createAsyncLogic({
-	run: async ({ input }: { input: NonNullable<OutputFrom<typeof hydrate>> }) =>
-		required(attachmentFile(required(input.file ?? undefined)))
-})
-
 const readBytes = createAsyncLogic({
 	run: async ({ input }: { input: File }) => new Uint8Array(await input.arrayBuffer())
 })
 type Context = Input & {
 	target: ImageReference | undefined
-	records: OutputFrom<typeof hydrate> | undefined
-	source: File | undefined
 	edited: File | undefined
 	bytes: Uint8Array | undefined
 	problem: Problem
@@ -102,8 +75,6 @@ export function createSavedTransactionImageEditor<
 			output: types<{ kind: 'closed' }>()
 		},
 		actors: {
-			hydrate,
-			assemble,
 			editor,
 			readBytes,
 			persist: transactionAttachmentReplacementMachine
@@ -117,8 +88,6 @@ export function createSavedTransactionImageEditor<
 		context: ({ input }) => ({
 			...input,
 			target: undefined,
-			records: undefined,
-			source: undefined,
 			edited: undefined,
 			bytes: undefined,
 			problem: null
@@ -152,8 +121,6 @@ export function createSavedTransactionImageEditor<
 					return {
 						context: {
 							target: undefined,
-							records: undefined,
-							source: undefined,
 							edited: undefined,
 							bytes: undefined
 						} satisfies Partial<Context>
@@ -169,73 +136,11 @@ export function createSavedTransactionImageEditor<
 						)
 							return
 						return {
-							target: 'hydrating',
+							target: 'editing',
 							context: {
 								target: context.observation.images.find((image) => image.id === event.attachmentId),
 								problem: null
 							} satisfies Partial<Context>
-						}
-					}
-				}
-			},
-			hydrating: {
-				invoke: {
-					src: 'hydrate',
-					input: ({ context }) => ({
-						db: context.db,
-						transactionId: context.transaction.id,
-						target: required(context.target)
-					}),
-					onDone: (args: {
-						context: Context
-						event: import('xstate').DoneActorEvent<OutputFrom<typeof hydrate>>
-						value: import('xstate').StateValue
-					}) => {
-						const { context, event } = args
-						if (
-							event.output !== null &&
-							event.output.transaction?.accountId === context.transaction.accountId &&
-							event.output.transaction.organizationId === context.transaction.organizationId &&
-							completeContents(event.output)
-						) {
-							return {
-								target: 'assembling',
-								context: { records: event.output } satisfies Partial<Context>
-							}
-						}
-						return {
-							target: 'idle',
-							context: {
-								problem: event.output === null ? 'conflict' : 'unavailable'
-							} satisfies Partial<Context>
-						}
-					},
-					onError: () => {
-						return {
-							target: 'idle',
-							context: { problem: 'unavailable' } satisfies Partial<Context>
-						}
-					}
-				}
-			},
-			assembling: {
-				invoke: {
-					src: 'assemble',
-					input: ({ context }) => required(context.records ?? undefined),
-					onDone: (args: {
-						context: Context
-						event: import('xstate').DoneActorEvent<OutputFrom<typeof assemble>>
-						value: import('xstate').StateValue
-					}) => {
-						return {
-							target: 'editing',
-							context: { source: args.event.output } satisfies Partial<Context>
-						}
-					},
-					onError: () => {
-						return {
-							target: 'idle',
-							context: { problem: 'unavailable' } satisfies Partial<Context>
 						}
 					}
 				}
@@ -246,7 +151,7 @@ export function createSavedTransactionImageEditor<
 					id: 'editor',
 					src: editor,
 					input: ({ context }: { context: Context }): ImageEditorInput => ({
-						file: required(context.source),
+						file: required(context.target).file,
 						mode: 'perspective'
 					}),
 					onDone: (args) => {
@@ -458,13 +363,10 @@ export function savedImageEditorReport(
 			: [],
 		disabledIds: target ? [...observation.blockedIds, target.id] : [...observation.blockedIds],
 		problem: snapshot.context.problem,
-		activity:
-			snapshot.matches('hydrating') || snapshot.matches('assembling')
-				? 'loading'
-				: snapshot.matches('editing')
-					? 'editing'
-					: snapshot.matches('readingBytes') || snapshot.matches('saving')
-						? 'saving'
-						: 'idle'
+		activity: snapshot.matches('editing')
+			? 'editing'
+			: snapshot.matches('readingBytes') || snapshot.matches('saving')
+				? 'saving'
+				: 'idle'
 	}
 }
