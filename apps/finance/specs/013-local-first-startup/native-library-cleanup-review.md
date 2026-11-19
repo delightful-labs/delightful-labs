@@ -1,7 +1,7 @@
 # Native-library cleanup specification
 
-Status: C01–C05 complete; C06 classification slice complete. Broader C06
-coordination review and C07–C10 remain open. Complete
+Status: C01–C07 complete, including explicit retained-owner dispositions for C06.
+C08–C10 remain open. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -66,8 +66,8 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01–C05 are complete. C06 classification is implemented and verified; the rest of
-C06 and C07–C10 remain open. The source evidence and constraints for each
+C01–C07 are complete. C06 includes the verified classification reduction and the
+retained-owner decisions below. C08–C10 remain open pending their acceptance evidence. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -81,9 +81,9 @@ do not mark an item complete merely because code moved to a smaller file.
       restored, expired, signed-out and offline identities retain their behavior/data.
 - [x] **C05:** The identified child-dependent policy decisions consume explicit
       reports; host rendering no longer enumerates private child actor trees.
-- [ ] **C06:** Reviewed feature owners remove repeated coordination, expose public
+- [x] **C06:** Reviewed feature owners remove repeated coordination, expose public
       reports/close results, and preserve draft, interruption and settlement semantics.
-- [ ] **C07:** Each receiving path decodes once; repeated view reset/subscription
+- [x] **C07:** Each receiving path decodes once; repeated view reset/subscription
       bookkeeping is reduced with no stale data or lost immediate pending feedback.
 - [ ] **C08:** Where native Svelte/XState bindings reduce code, adopt them without
       changing DOM resource ownership, error handling or graceful shutdown.
@@ -264,8 +264,8 @@ existing tests appropriate to the change; add coverage only for a real gap.
   Existing large-bundle warnings, isolated schema-location notices and rejected
   late UI/controller event diagnostics remain; none caused a failing check.
 
-Remaining: C06's classification slice is complete; review the remaining C06
-coordination before further grouping. C07–C10 remain open. No publishing, push, merge, storage migration or dependency
+Remaining: C08–C10. C06 classification and C07 are complete; retained feature
+owners and verification evidence are recorded below. No publishing, push, merge, storage migration or dependency
 change is part of this work. The Finance standalone routing fixture intentionally
 does not qualify SvelteKit's router itself; its existing browser suites retain
 that acceptance boundary.
@@ -364,7 +364,7 @@ Finish the shared session work before rewriting its host-observation plumbing.
 
 ### C06 — Reduce Finance's repeated feature coordination
 
-**Confirmed duplication; classification slice completed below, broader grouping remains under review.**
+**Completed with the classification owner and retained-owner dispositions below.**
 [worker-forms.ts](../../src/lib/machines/runtime/worker-forms.ts) is 2,052 lines
 and owns forms, bank sync/history, integrity, samples, attachments, transfers,
 backup, restore and navigation. It repeats snapshot admission/projection for
@@ -385,7 +385,7 @@ the ownership contract before changing all its view consumers.
 
 ### C07 — Remove repeated view-state bookkeeping and duplicate decoding
 
-**Confirmed.** Finance's [client.ts](../../src/lib/runtime/worker/client.ts)
+**Confirmed at review; completed in C07 below.** Finance's [client.ts](../../src/lib/runtime/worker/client.ts)
 lists nearly the same large nullable feature view in startup, failure, closed and
 context-selection paths. Both `receiveView` and `receiveControl` parse every
 reply with the same Zod union. Clipper's
@@ -751,19 +751,92 @@ Verification on November 19, Node 24.22.2 / pnpm 10.28.0:
 - `git fetch origin main` still showed no commits newer than `b69e6ad6`. The prior
   specification/corrections and C01–C05 commits remain preserved on this branch.
 
-### C06 remaining review boundary
+### C06 retained-owner dispositions
 
-C06 remains unchecked as a whole. Profile name/avatar still share their profile
-observation and existing shared scoped-form policies; workspace rename is already
-one scoped form with a different workspace observation. A new owner for either
-one or two forms has no demonstrated total-code benefit from this four-form
-experiment. Bank/history, transfer submission/editing, backups and restore also
-have distinct existing reports and actual settlement obligations; they are not a
-single ordinary form lifetime. Do not generalize the classification chart or
-move these blocks solely to shrink `worker-forms.ts`.
+The classification result is retained; further grouping is intentionally skipped.
+The follow-up discussion selected keeping existing owners and moving to C07's
+concrete deletions. This completes C06's reviewed scope without requiring every
+feature to acquire another chart.
 
-Discuss whether to retain those existing owners with explicit reviewed dispositions
-or review a concrete further reduction before changing their ownership. C07's
-empty-view/one-decode deletion can follow the now-stable external classification
-DTO without inventing another feature group. Remaining: broader C06 disposition
-and C07–C10; no push, merge, deployment, migration or dependency change.
+| Feature | Decision and source-backed reason |
+| --- | --- |
+| Profile name/avatar | Keep the existing two shared scoped forms and their profile observation. A new two-form group has no demonstrated total-code reduction from the four-form experiment. |
+| Workspace rename | Keep its single existing shared scoped form and workspace observation. It already has one resource/policy owner; another owner would add a forwarding layer. |
+| Bank/history | Keep separate existing invoked reports and shutdown results. Provider consent, unlocked credentials, sync settlement and history observation are distinct lifetimes. |
+| Transfers | Keep the mutation owner, submission and edit workflow contracts. Issued transfer settlement and interactive form lifetimes must remain explicit. |
+| Backup/restore | Keep the current public reports and real drain rules, including restore's existing busy/drain boundary. Grouping does not establish equivalent resource lifetimes. |
+
+No generalization of the classification chart, generic supervisor or relocated
+copies of these blocks is authorized by this disposition. Future changes require
+a demonstrated reduction and a concrete ownership review. These retain decisions
+reuse the implementation and verification already recorded; unchanged owners were
+not retested solely to document that they remain unchanged.
+
+## C07 completed deletion batch
+
+The receiving paths were rechecked against current source. Finance has three
+full empty-view lists (startup, failure, closure), not a surviving fourth
+context-selection list; its obsolete public selection controls were removed in
+C02. Two worker `message` listeners each decode the same reply union. Clipper's
+render client has one manual observer Set, current-value replay and first/last
+actor-subscription bookkeeping.
+
+1. Finance uses one local `emptyFinanceView` constructor, explicitly retaining
+   only session/selection/transaction scope from a prior view. Failure keeps its
+   existing identity/restore-feedback semantics; closure clears identity. All
+   feature views are withdrawn by the same constructor.
+2. Finance uses one native Worker message listener and one reply decode. After
+   transport failure, valid VIEW messages are still rejected; the listener remains
+   until the actual CLOSED control receipt so native resources are not released
+   early. Existing navigation, WebAuthn, image-editor and backup port validation
+   remains at the receiving boundary.
+3. Clipper uses Svelte's installed `writable` first/last subscriber lifecycle for
+   the render projection. Starting observation refreshes from the current actor
+   snapshot, including commands/receipts received while no subscriber existed.
+   Each subscription remains independent; `getView` stays synchronous. The native
+   client chart continues owning pending receipts, detach and real worker closure.
+
+This adds no transport wrapper or shared domain DTO. Clipper already projects its
+single optional library view through `projectRuntime`; no repeated full empty
+RuntimeView list was found, so no unused constructor is added there. Its existing
+single typed reply dispatch has no duplicate decoder to delete. Runtime payload
+projection and trust-boundary schemas are retained.
+
+Production difference against `ae973f70`: **74 fewer lines** (Finance 61; Clipper
+13). Two focused Clipper component cases cover subscription replay across an
+unobserved command/receipt interval and independent duplicate callbacks. Finance's
+existing malformed-view native case now starts with visible populated data and
+checks withdrawal, retained receiving scope, rejected late data and final closure.
+
+Verification on November 19, Node 24.22.2 / pnpm 10.28.0:
+
+- Finance and Clipper web Svelte checks: **0 errors / 0 warnings**. Finance test
+  and service-worker type checks passed. Changed-file Prettier/Oxfmt, Clipper
+  Oxlint and `git diff --check` passed.
+- Clipper focused native-client unit tests: **6/6**. Svelte render-subscription
+  component tests: **8/8**, including the two added replay/independence cases.
+  Existing feedback replacement, A → B → A mounts, unmount ownership and pending
+  handoff checks remain passing without a custom comparator or observer registry.
+- Finance native worker cases: **18/18**, six scenarios in each of Chromium,
+  Firefox and WebKit: scope/navigation replacement; phrase reveal/hide/detach;
+  restored identity with offline transactions; held archive drain before SDK
+  closure; populated-data withdrawal after malformed view and rejected late
+  views; and complete offline process restart with app/auth/Jazz unreachable.
+  The remaining 48 native cases were intentionally unselected.
+- Clipper native worker suite: **32/32**, including account A → B → A with an
+  attached surface, native search faults, resource custody, immediate/forced
+  shutdown and actual late surface receipts. Native annotation routes: **4/4**,
+  including pending feedback before delivery, Unicode edits/reload and explicit
+  recovery of oversized authored input. Total native browser cases: **54/54**.
+- Finance used one disposable native fixture build with isolated authorities/
+  browser profiles and an ephemeral listener. Clipper suites ran sequentially
+  within its project with separate disposable server/profile lifetimes; Finance
+  ran independently in its own generated directory. All type checks finished
+  before browser generation. All test listeners were disposed afterward.
+- No catalogs, generated Paraglide output, identities/storage keys, SDK patches,
+  dependencies or user/other-agent servers/data changed. `main` still has no
+  commits newer than `b69e6ad6`. Existing schema-location/late-event diagnostics
+  did not fail any case. Unrelated broad unit suites, extension and production
+  builds were not repeated for these bounded client-adapter changes.
+
+Remaining: C08–C10; no push, merge, deployment, migration or dependency change.

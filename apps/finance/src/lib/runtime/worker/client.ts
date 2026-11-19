@@ -55,39 +55,14 @@ function commandScope({ sessionRevision, selection }: WorkerCommandScope): Worke
 	return { sessionRevision, selection }
 }
 
-/** Window owns native transport and rendering only. Domain state stays in the Worker. */
-export function createFinanceWorkerClient(
-	configuration: FinanceWorkerConfiguration,
-	navigate: WorkspaceNavigate,
-	createWorker: () => Worker = () =>
-		new Worker(new URL('./application.worker.ts', import.meta.url), { type: 'module' })
-) {
-	const open = financeWorkerOpen.parse({
-		type: 'OPEN',
-		...configuration,
-		hostId: crypto.randomUUID()
-	})
-	const worker = createWorker()
-	const data = new MessageChannel(),
-		control = new MessageChannel()
-	const releaseBroker = serveBrowserWorkerHost(data.port1, control.port1, open.hostId, {
-		origin: location.origin,
-		brokerWorkerUrl: new URL(brokerUrl, location.href).href,
-		storage: {
-			getItem: (key) => localStorage.getItem(key),
-			setItem: (key, value) => localStorage.setItem(key, value)
-		},
-		open: (url, name) => new SharedWorker(url, { type: 'module', name })
-	})
-	const imageEditor = writable<{ file: File; port: MessagePort } | null>(null)
-	const observedLocation = writable(new URL(location.href))
-	let revision = 0
-	const state = writable<FinanceWorkerView>({
+/** Withdraw feature data while retaining the receiving scope for late-reply rejection. */
+function emptyFinanceView(view?: FinanceWorkerView): FinanceWorkerView {
+	return {
 		type: 'VIEW',
-		sessionRevision: 0,
-		transactionKind: EXPENSE,
-		transactionId: null,
-		selection: { workspaceId: null, revision },
+		sessionRevision: view?.sessionRevision ?? 0,
+		transactionKind: view?.transactionKind ?? EXPENSE,
+		transactionId: view?.transactionId ?? null,
+		selection: view?.selection ?? { workspaceId: null, revision: 0 },
 		status: 'starting',
 		identityId: null,
 		selectedAccountIds: null,
@@ -130,15 +105,45 @@ export function createFinanceWorkerClient(
 		transfers: null,
 		overview: null,
 		ledger: null
+	}
+}
+
+/** Window owns native transport and rendering only. Domain state stays in the Worker. */
+export function createFinanceWorkerClient(
+	configuration: FinanceWorkerConfiguration,
+	navigate: WorkspaceNavigate,
+	createWorker: () => Worker = () =>
+		new Worker(new URL('./application.worker.ts', import.meta.url), { type: 'module' })
+) {
+	const open = financeWorkerOpen.parse({
+		type: 'OPEN',
+		...configuration,
+		hostId: crypto.randomUUID()
 	})
+	const worker = createWorker()
+	const data = new MessageChannel(),
+		control = new MessageChannel()
+	const releaseBroker = serveBrowserWorkerHost(data.port1, control.port1, open.hostId, {
+		origin: location.origin,
+		brokerWorkerUrl: new URL(brokerUrl, location.href).href,
+		storage: {
+			getItem: (key) => localStorage.getItem(key),
+			setItem: (key, value) => localStorage.setItem(key, value)
+		},
+		open: (url, name) => new SharedWorker(url, { type: 'module', name })
+	})
+	const imageEditor = writable<{ file: File; port: MessagePort } | null>(null)
+	const observedLocation = writable(new URL(location.href))
+	let revision = 0
+	const state = writable(emptyFinanceView())
 	let transportFailed = false
 	const fail = () => {
 		transportFailed = true
-		// Keep the close receipt listener: a data fault never authorizes termination.
-		worker.removeEventListener('message', receiveView)
+		// Keep receiving control receipts: a data fault never authorizes termination.
 		state.update((view) => ({
-			...view,
+			...emptyFinanceView(view),
 			status: 'failed',
+			identityId: view.identityId,
 			identityRestore: {
 				...view.identityRestore,
 				canSubmit: false,
@@ -148,51 +153,19 @@ export function createFinanceWorkerClient(
 				busy: false,
 				feedback: 'sessionFailed'
 			},
-			workspaceNavigation: null,
-			accounts: [],
-			selectedAccountIds: null,
-			workspaces: null,
-			archiveFeedback: null,
-			recoveryAvailable: false,
-			workspaceStartup: null,
-			accountCreation: null,
-			accountArchive: null,
-			accountAccess: null,
-			accountOrder: null,
-			classification: null,
-			backup: null,
-			workspaceRestore: null,
-			workspaceCreation: null,
-			profile: null,
-			workspace: null,
-			transactionEntry: null,
-			transactionEdit: null,
-			samples: null,
-			canRetrySession: true,
-			canRetryInitialization: false,
-			workspaceIntegrity: null,
-			mutationRejected: false,
-			bank: null,
-			transactionDetails: null,
-			transferEdit: null,
-			transferCreation: null,
-			transfers: null,
-			overview: null,
-			ledger: null
+			canRetrySession: true
 		}))
 	}
-	const receiveView = (event: MessageEvent<unknown>) => {
+	const receive = (event: MessageEvent<unknown>) => {
 		const decoded = financeWorkerReply.safeParse(event.data)
 		if (!decoded.success) {
-			fail()
+			if (!transportFailed) fail()
 			return
 		}
-		if (decoded.data.type === 'VIEW' && decoded.data.selection.revision === revision)
-			state.set(decoded.data)
-	}
-	const receiveControl = (event: MessageEvent<unknown>) => {
-		const decoded = financeWorkerReply.safeParse(event.data)
-		if (!decoded.success || decoded.data.type === 'VIEW') return
+		if (decoded.data.type === 'VIEW') {
+			if (!transportFailed && decoded.data.selection.revision === revision) state.set(decoded.data)
+			return
+		}
 		if (decoded.data.type === 'INSPECTION') {
 			acceptInspection(decoded.data.event)
 			return
@@ -238,8 +211,7 @@ export function createFinanceWorkerClient(
 			fail()
 			return
 		}
-		worker.removeEventListener('message', receiveView)
-		worker.removeEventListener('message', receiveControl)
+		worker.removeEventListener('message', receive)
 		worker.removeEventListener('error', fail)
 		worker.removeEventListener('messageerror', fail)
 		window.removeEventListener('popstate', observeLocation)
@@ -249,7 +221,7 @@ export function createFinanceWorkerClient(
 		worker.terminate()
 		releaseBroker()
 		state.update((view) => ({
-			...view,
+			...emptyFinanceView(view),
 			status: 'closed',
 			identityRestore: {
 				...view.identityRestore,
@@ -259,43 +231,10 @@ export function createFinanceWorkerClient(
 				navigationError: false,
 				busy: false,
 				feedback: 'none'
-			},
-			workspaceNavigation: null,
-			accounts: [],
-			selectedAccountIds: null,
-			workspaces: null,
-			identityId: null,
-			archiveFeedback: null,
-			recoveryAvailable: false,
-			workspaceStartup: null,
-			accountCreation: null,
-			accountArchive: null,
-			accountAccess: null,
-			accountOrder: null,
-			classification: null,
-			backup: null,
-			workspaceRestore: null,
-			workspaceCreation: null,
-			profile: null,
-			workspace: null,
-			transactionEntry: null,
-			transactionEdit: null,
-			samples: null,
-			canRetrySession: false,
-			canRetryInitialization: false,
-			workspaceIntegrity: null,
-			mutationRejected: false,
-			bank: null,
-			transactionDetails: null,
-			transferEdit: null,
-			transferCreation: null,
-			transfers: null,
-			overview: null,
-			ledger: null
+			}
 		}))
 	}
-	worker.addEventListener('message', receiveView)
-	worker.addEventListener('message', receiveControl)
+	worker.addEventListener('message', receive)
 	worker.addEventListener('error', fail)
 	worker.addEventListener('messageerror', fail)
 	function relativeHref() {

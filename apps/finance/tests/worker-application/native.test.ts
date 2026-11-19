@@ -1631,6 +1631,23 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				page = await browser.newPage()
 			try {
 				await open(page, crypto.randomUUID())
+				const beforeWorkspace = crypto.randomUUID(),
+					beforeAccount = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Before fault'),
+						{ workspaceId: beforeWorkspace, accountId: beforeAccount }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					beforeWorkspace
+				)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Before fault', exact: true })
+				).toBeVisible()
+				const before = await page.evaluate(() => window.financeWorkerReadFixture.state())
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.badView())).toEqual({
 					ok: true
 				})
@@ -1640,6 +1657,18 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(
 					await page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore)
 				).toMatchObject({ canSubmit: false, canRetryNavigation: false, busy: false })
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state())).toMatchObject({
+					sessionRevision: before.sessionRevision,
+					selection: before.selection,
+					accounts: [],
+					classification: null,
+					workspaceNavigation: null,
+					ledger: null,
+					recoveryAvailable: false
+				})
+				await browserExpect(
+					page.getByRole('cell', { name: 'Before fault', exact: true })
+				).toHaveCount(0)
 				const workspaceId = crypto.randomUUID(),
 					accountId = crypto.randomUUID()
 				expect(
@@ -1660,6 +1689,14 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					page.getByRole('cell', { name: 'After fault', exact: true }).count()
 				).resolves.toBe(0)
 				await close(page)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state())).toMatchObject({
+					identityId: null,
+					accounts: [],
+					classification: null,
+					ledger: null,
+					recoveryAvailable: false,
+					canRetrySession: false
+				})
 			} finally {
 				await browser.close()
 			}

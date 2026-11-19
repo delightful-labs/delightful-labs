@@ -1,3 +1,4 @@
+import { writable } from 'svelte/store'
 import { readingProgressSchema } from '../../reader/schema.js'
 import { REALM_CLOSE_POLICY } from './close-policy.js'
 import type { WorkerCloseIssue } from './close-policy.js'
@@ -280,7 +281,6 @@ export function openApplicationClient(input: Input) {
 		post,
 		library: (initial: LibraryRender) => {
 			let view = initial
-			const observers = new Set<(view: LibraryRender) => void>()
 			const scope = initial.scope
 			const presentation = () => {
 				const context = actor.getSnapshot().context
@@ -299,27 +299,14 @@ export function openApplicationClient(input: Input) {
 					}
 				}
 			}
-			const render = () => {
-				const current = presentation()
-				for (const observe of observers) observe(current)
-			}
-			let portObservation: { unsubscribe: () => void } | undefined
+			const rendering = writable(presentation(), (set) => {
+				set(presentation())
+				const observation = actor.subscribe(() => set(presentation()))
+				return () => observation.unsubscribe()
+			})
 			const client: LibraryClient = {
 				getView: () => presentation(),
-				subscribe: (changed) => {
-					observers.add(changed)
-					portObservation ??= actor.subscribe(render)
-					changed(presentation())
-					return {
-						unsubscribe: () => {
-							observers.delete(changed)
-							if (!observers.size) {
-								portObservation?.unsubscribe()
-								portObservation = undefined
-							}
-						}
-					}
-				},
+				subscribe: (changed) => ({ unsubscribe: rendering.subscribe(changed) }),
 				send: (event) => post({ type: 'LIBRARY', scope, requestId: crypto.randomUUID(), event }),
 				authorizePublication: (did) =>
 					post({
@@ -363,7 +350,7 @@ export function openApplicationClient(input: Input) {
 								? { ...reader, progress: readingProgressSchema.parse(next.readerProgress) }
 								: reader
 					}
-					render()
+					rendering.set(presentation())
 				}
 			}
 		},
