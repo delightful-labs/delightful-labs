@@ -3,11 +3,14 @@ import netlifyAdapter from '@sveltejs/adapter-netlify'
 import vercelAdapter from '@sveltejs/adapter-vercel'
 import { sveltekit } from '@sveltejs/kit/vite'
 import { defineConfig } from 'vite'
-import { dirname, join } from 'node:path'
-import { jazzWasmEntry as wasmEntry, jazzBrokerWorkerEntry } from './tooling/jazz-wasm.js'
-import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
+import {
+	jazzWorkerOptions,
+	resolveJazzWorkerAssets
+} from 'delightful-local-first/backend/jazz/worker-build'
 import { jazzDev } from './tooling/jazz-dev.js'
 import svg from '@poppanator/sveltekit-svg'
+
+const assets = resolveJazzWorkerAssets(import.meta.url)
 
 export default defineConfig(({ command, mode }) => {
 	const development =
@@ -62,9 +65,9 @@ export default defineConfig(({ command, mode }) => {
 		},
 		resolve: {
 			alias: [
-				{ find: /^#jazz-broker-worker/, replacement: jazzBrokerWorkerEntry },
-				{ find: /^jazz-wasm$/, replacement: wasmEntry },
-				{ find: /^#jazz-wasm-binary/, replacement: join(dirname(wasmEntry), 'jazz_wasm_bg.wasm') }
+				{ find: /^#jazz-broker-worker/, replacement: assets.brokerEntry },
+				{ find: /^jazz-wasm$/, replacement: assets.wasmEntry },
+				{ find: /^#jazz-wasm-binary/, replacement: assets.wasmBinary }
 			]
 		},
 		plugins: [

@@ -1,6 +1,6 @@
 # Native-library cleanup specification
 
-Status: C01 and C02 complete; C03/C04 proposed for design review. Complete
+Status: C01–C03 complete; C04 proposed for design review. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -65,7 +65,7 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01 and C02 are complete; C03–C10 remain open. The source evidence and constraints for each
+C01–C03 are complete; C04–C10 remain open. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -73,7 +73,7 @@ do not mark an item complete merely because code moved to a smaller file.
       imports; existing source/test type checks pass without assertions or wider types.
 - [x] **C02:** Fixtures use the real Finance composition; obsolete fallback UI and
       fixture-only public controls are removed while native worker coverage remains.
-- [ ] **C03:** Both apps and shared fixtures consume one SDK asset-resolution
+- [x] **C03:** Both apps and shared fixtures consume one SDK asset-resolution
       boundary; consumer SDK identity, production assets and WebKit behavior remain valid.
 - [ ] **C04:** Clipper and Finance reuse the native session integration; linked,
       restored, expired, signed-out and offline identities retain their behavior/data.
@@ -155,10 +155,51 @@ existing tests appropriate to the change; add coverage only for a real gap.
   catalog generation or user-data operation was performed. Generated artifacts
   and disposable browser profiles/authorities stayed in this isolated checkout.
 
-Remaining: review the concrete C03/C04 proposal below before implementation;
-C03–C10 remain open. No shared integration runtime change has begun. The native
-fixture's routing adapter intentionally does not qualify SvelteKit's router itself;
-existing SvelteKit browser suites remain its acceptance boundary.
+- C01/C02 and the original handoff documents were committed as `c505acea`
+  after the user requested “Commit and continue”; that instruction approved the
+  concrete C03 proposal from the prior turn. No push, merge or deployment.
+- C03: added `resolveJazzWorkerAssets(consumerUrl)` to the existing Node-only
+  Local First `backend/jazz/worker-build` export. It returns three asset paths;
+  resolution starts at the consuming module's installed SDK and follows that
+  SDK's WASM dependency. Finance, Clipper web/extension, Local First fixtures and
+  Finance's restore experiment consume it. Deleted Clipper's path-only tooling
+  module and Finance's obsolete WASM re-export. A fresh source search finds the
+  broker production path and WASM binary filename only in this build boundary.
+  App aliases, environment prefixes, cache policy, asset names and WebKit's
+  `codeSplitting: false` are unchanged. No browser lifecycle or shared session
+  API changed. Documented Node-only usage in Local First's worker-broker guide.
+- C03 verification: Node 24.22.2/pnpm 10.28.0; Local First svelte-check (zero
+  diagnostics), library tsc and changed-file Oxlint passed. Packaged with
+  svelte-package directly, refreshed injected packages using frozen installation
+  without lifecycle scripts; monorepo package-link checks passed. The existing
+  packed transport consumer passed public types/native receipts/self-contained
+  workers plus the extended build-export checks for matching SDK/WASM versions,
+  SDK-relative broker identity and existence of all three assets.
+- C03 production builds: Finance full SSR/client/prerender build and Clipper web
+  SSR/client/Netlify output passed; Clipper extension build passed. Each has
+  exactly one broker worker and one WASM binary (same ZC330TX3 content hash).
+  Finance used Vite's native createBuilder/buildApp API with its existing
+  configuration and only the Paraglide compiler hook omitted, using existing
+  generated catalogs. Its initial build-API call built only the client and was
+  not counted as the full production check. Adapter-auto's local-target notice
+  and existing extension chunk-size warning remain; no hosted deployment was run.
+- C03 native checks: Finance WebKit detach/continued observation, held-archive
+  drain and cold offline process-restart scenarios all passed (3/3; 63 deliberately
+  unselected). Clipper's actual production-worker WebKit startup passed (1/1),
+  using one matching offline-a production build and disposable authority/profile.
+  Local First's changed fixture asset config passed both native archive-export
+  cases (2/2). Finance tests tsc, Clipper web svelte-check, extension svelte-check
+  and extension tsc passed; both Svelte checks report zero diagnostics.
+  Full C01/C02 suites were not repeated for this build-only change.
+- C03 checks used direct tool commands to avoid code/catalog generation. Outputs,
+  caches, parser bundles, packed temporary consumer and authorities remained in
+  this isolated checkout or disposable OS temporary directories. No storage keys,
+  dependencies, patches, credentials, user servers or user data changed.
+
+Remaining: review the refined C04 design below before runtime implementation;
+C04–C10 remain open. The native fixture's routing adapter intentionally does not
+qualify SvelteKit's router itself; existing SvelteKit browser suites retain that
+acceptance boundary.
 
 ## Proposed fixes
 
@@ -404,7 +445,7 @@ Finish each source batch before running its affected checks. Stop to discuss a
 material design choice; do not turn a source review into an all-at-once rewrite.
 Every progress report must include what remains.
 
-## Concrete next-slice proposal — C03/C04 (not implemented)
+## Concrete integration design — C03 implemented; C04 awaiting review
 
 C03: extend the existing Node-only `backend/jazz/worker-build` export with
 `resolveJazzWorkerAssets(consumerUrl: string | URL)`, returning the broker entry,
@@ -436,3 +477,33 @@ runtime's single binding token; preserve real library retirement and provider
 sign-out ordering rather than recreating its old session facade around the new
 runtime. No storage move, new supervisor, actor wrapper or generic transport is
 proposed. This proposal still requires user review before runtime work.
+
+
+### Refined C04 review boundary after the consumer audit
+
+The three Clipper tokens are compared in `sameAccountBinding`; the additional
+special case is `application-readiness.preparationReplaced`, which distinguishes
+pending local-first preparation from identity/client/db replacement. A blind
+field rename would lose that distinction. Proposed chart change: consume the
+shared runtime's one binding generation and native `localFirst` observation;
+keep domain/library admission withdrawn until native local readiness, and drain
+old library ownership before adopting a different generation. Remove the old
+SDK preparation/readiness/adoption façade only with the corresponding chart
+branches, not by copying it around the shared runtime.
+
+Provider/session order already has a supported integration: `OrderedSignOutInput`
+accepts `SessionRuntimeChangeInput`, and `createSessionChangeMachine` handles its
+native reports. Retain provider settlement and the existing post-provider session
+observation, then pass the captured runtime scope/binding to the shared ordered
+sign-out owner. No promise bridge or new shared wrapper is required. Restoration
+uses the existing session-change invocation in the same way. Keep recovery
+capabilities at the native session binding; Clipper owns library drain/admission,
+provider actions, navigation and extension sign-in rules. Session runtime close
+must finish before scoped account storage and broker release.
+
+This is a runtime ownership/API review, separate from the approved C03 build
+slice. Before implementation, review removal of the pending-preparation branches
+and the single-generation report contract together; qualify replacement during
+preparation, held-write/restore/sign-out interruption, provider refusal, expired
+backend identity and extension existing-account admission. Preserve the current
+storage key/backend and all independent native shutdown/identity/offline tests.

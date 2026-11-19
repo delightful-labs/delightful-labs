@@ -51,17 +51,24 @@ Finance, Clipper web and Clipper's extension use `jazzWorkerOptions` from the
 public `backend/jazz/worker-build` export. It supplies ES-module output with
 `codeSplitting: false`. This prevents a lazy chunk from importing the worker
 entry again and duplicating Jazz's account registry in affected WebKit builds.
-The helper has no Vite runtime/type dependency and introduces no runtime owner.
+This Node/build-only export has no Vite runtime/type dependency and introduces
+no runtime owner.
 
 ```ts
-import { jazzWorkerOptions } from 'delightful-local-first/backend/jazz/worker-build'
+import { jazzWorkerOptions, resolveJazzWorkerAssets } from 'delightful-local-first/backend/jazz/worker-build'
 
+const assets = resolveJazzWorkerAssets(import.meta.url)
+// Use assets.brokerEntry, assets.wasmEntry and assets.wasmBinary in app-owned aliases.
 export default { worker: jazzWorkerOptions() }
 ```
 
 An optional asset filename pattern preserves an app's existing output layout;
-Finance passes `_app/immutable/assets/[name].[hash][extname]`. Apps continue
-resolving Wasm from their own SDK installation. Single-bundle output includes
+Finance passes `_app/immutable/assets/[name].[hash][extname]`. The resolver uses
+the supplied consumer URL to locate its installed SDK, then resolves WASM from
+that SDK dependency. Keep app aliases, asset names, environment prefixes and
+caching policy in the consumer. Do not import this Node-only module into browser
+or worker runtime code. The pinned SDK broker export is a dev-server shim, so
+only this build boundary retains its production broker path. Single-bundle output includes
 the worker's lazy JavaScript dependencies up front; the Wasm binary remains a
 separate asset. See Finance's
 [research and qualification](../../../apps/finance/specs/013-local-first-startup/worker-webkit-startup-research.md).
