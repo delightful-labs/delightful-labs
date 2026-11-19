@@ -119,25 +119,6 @@ const events0 = {
 	SHUTDOWN: types<EventPayload<ImageEditorEvent, 'SHUTDOWN'>>(),
 	DISPLAY_FAILED: types<EventPayload<ImageEditorEvent, 'DISPLAY_FAILED'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<typeof decode>
-			| import('xstate').OutputFrom<typeof read>
-			| import('xstate').OutputFrom<typeof render>
-			| import('xstate').OutputFrom<typeof allocate>
-			| import('xstate').OutputFrom<typeof paint>
-			| import('xstate').OutputFrom<typeof encode>
-			| import('xstate').OutputFrom<typeof closeBitmap>
-			| import('xstate').OutputFrom<typeof closeCanvas>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Owns editing and export resources; callers drain SHUTDOWN before stopping the actor. */
 export const imageEditorMachine = setup({

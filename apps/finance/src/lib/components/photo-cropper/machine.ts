@@ -143,20 +143,6 @@ const events0 = {
 	CROP: types<{}>(),
 	CANCEL: types<{}>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof ownedActors0)['decode']>
-			| import('xstate').OutputFrom<(typeof ownedActors0)['crop']>
-			| import('xstate').OutputFrom<(typeof ownedActors0)['closeBitmap']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 export const photoCropperMachine = setup({
 	schemas: {

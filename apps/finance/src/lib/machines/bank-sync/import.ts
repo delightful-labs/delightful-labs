@@ -74,14 +74,7 @@ export function createImportMachine(dependencies: Dependencies) {
 		IMPORT_PROGRESS: types<EventPayload<ProgressEvent | { type: 'CANCEL' }, 'IMPORT_PROGRESS'>>(),
 		CANCEL: types<EventPayload<ProgressEvent | { type: 'CANCEL' }, 'CANCEL'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['mappings']>
-				| import('xstate').OutputFrom<(typeof actors)['categories']>
-				| import('xstate').OutputFrom<(typeof actors)['account']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

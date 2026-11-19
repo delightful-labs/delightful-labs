@@ -39,7 +39,6 @@ import {
 	financeRecoveryReply,
 	financeWorkerCommand,
 	financeWorkerReply,
-	workerContextCommand,
 	type FinanceWorkerView,
 	type WorkerCommandScope,
 	type FinanceWorkerConfiguration
@@ -320,58 +319,6 @@ export function createFinanceWorkerClient(
 	window.addEventListener('online', observeNetwork)
 	window.addEventListener('offline', observeNetwork)
 	const view: Readable<FinanceWorkerView> = { subscribe: state.subscribe }
-	function selectContext(
-		workspaceId: string | null,
-		kind: TransactionKind,
-		transactionId: string | null = null
-	) {
-		if (get(state).status === 'closed') return
-		const command = workerContextCommand.parse({
-			type: 'SELECT_CONTEXT',
-			selection: { workspaceId, revision: revision + 1 },
-			kind,
-			transactionId
-		})
-		revision = command.selection.revision
-		state.update((view) => ({
-			...view,
-			selection: command.selection,
-			transactionKind: command.kind,
-			transactionId: command.transactionId ?? null,
-			status: view.status === 'failed' ? 'failed' : 'loading',
-			workspaceNavigation: null,
-			accounts: [],
-			selectedAccountIds: null,
-			archiveFeedback: null,
-			recoveryAvailable: false,
-			workspaceStartup: null,
-			accountCreation: null,
-			accountArchive: null,
-			accountAccess: null,
-			accountOrder: null,
-			classification: null,
-			backup: null,
-			workspaceRestore: null,
-			workspaceCreation: null,
-			profile: null,
-			workspace: null,
-			transactionEntry: null,
-			transactionEdit: null,
-			samples: null,
-			canRetrySession: false,
-			canRetryInitialization: false,
-			workspaceIntegrity: null,
-			mutationRejected: false,
-			bank: null,
-			transactionDetails: null,
-			transferEdit: null,
-			transferCreation: null,
-			transfers: null,
-			overview: null,
-			ledger: null
-		}))
-		worker.postMessage(command)
-	}
 	const recoveryToken = Object.freeze({})
 	function currentRecoveryScope(view: FinanceWorkerView): RecoveryScope {
 		return view.recoveryAvailable && view.identityId
@@ -517,8 +464,6 @@ export function createFinanceWorkerClient(
 			)
 		},
 		recovery: { source: recoverySource, capability: recoveryCapability },
-		selectWorkspace: (workspaceId: string | null) =>
-			selectContext(workspaceId, get(state).transactionKind),
 		navigateTransaction: (transactionId: string | null, scope: WorkerCommandScope) =>
 			worker.postMessage(
 				financeWorkerCommand.parse({
@@ -528,10 +473,6 @@ export function createFinanceWorkerClient(
 					selection: scope.selection
 				})
 			),
-		selectTransaction: (transactionId: string | null) =>
-			selectContext(get(state).selection.workspaceId, get(state).transactionKind, transactionId),
-		selectTransactionKind: (kind: TransactionKind) =>
-			selectContext(get(state).selection.workspaceId, kind),
 		setAccountDeleteGrant: (
 			accountId: string,
 			userId: string,

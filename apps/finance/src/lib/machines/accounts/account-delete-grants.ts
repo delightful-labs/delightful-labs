@@ -84,10 +84,7 @@ export function createAccountDeleteGrantMachine(
 		SET_DELETE: types<EventPayload<Event, 'SET_DELETE'>>(),
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<(typeof actors)['writer']>>
-		| import('xstate').ErrorActorEvent
+
 	const workflow = setup({
 		schemas: {
 			context: types<Context>(),

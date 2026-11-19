@@ -293,22 +293,7 @@ export function createIndependentTransactionPersistenceMachine(db: TransactionDb
 		INVALIDATE: types<EventPayload<IndependentTransactionEvent, 'INVALIDATE'>>(),
 		SHUTDOWN: types<EventPayload<IndependentTransactionEvent, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['validate']>
-				| import('xstate').OutputFrom<(typeof actors)['open']>
-				| import('xstate').OutputFrom<(typeof actors)['read']>
-				| import('xstate').OutputFrom<(typeof actors)['prepare']>
-				| import('xstate').OutputFrom<(typeof actors)['stage']>
-				| import('xstate').OutputFrom<(typeof actors)['commit']>
-				| import('xstate').OutputFrom<(typeof actors)['settle']>
-				| import('xstate').OutputFrom<(typeof actors)['rollback']>
-				| import('xstate').OutputFrom<(typeof actors)['readEdit']>
-				| import('xstate').OutputFrom<(typeof actors)['readMoveCheck']>
-				| import('xstate').OutputFrom<(typeof actors)['update']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

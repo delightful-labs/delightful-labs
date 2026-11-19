@@ -31,16 +31,6 @@ type Observation = {
 const events1 = {
 	OBSERVE: types<EventPayload<{ type: 'OBSERVE'; source: Observation }, 'OBSERVE'>>()
 }
-type NativeEvent1 =
-	| import('xstate').InferEvents<typeof events1>
-	| import('xstate').DoneActorEvent<never>
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 const access = setup({
 	schemas: {
@@ -131,10 +121,7 @@ export function createAccountCreationAvailability(binding: object) {
 		SHUTDOWN: types<EventPayload<FormChildEvent<AccountCreationObservation>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<AccountCreationObservation>, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<(typeof actors)['access']>>
-		| import('xstate').ErrorActorEvent
+
 	const machine = setup({
 		schemas: {
 			context: types<Context>(),

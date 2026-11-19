@@ -48,10 +48,7 @@ export function createWorkspaceRenameAvailability(binding: object) {
 		SHUTDOWN: types<EventPayload<FormChildEvent<WorkspaceRenameObservation>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<WorkspaceRenameObservation>, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<never>
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<{ observation: FormObservation<WorkspaceRenameObservation> }>(),

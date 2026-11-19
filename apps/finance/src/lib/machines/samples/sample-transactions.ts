@@ -54,13 +54,7 @@ export function createSampleTransactionsMachine<
 		OBSERVE: types<EventPayload<Event, 'OBSERVE'>>(),
 		ADD: types<EventPayload<Event, 'ADD'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['prepare']>
-				| import('xstate').OutputFrom<(typeof actors)['write']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

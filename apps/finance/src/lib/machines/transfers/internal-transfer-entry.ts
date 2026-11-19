@@ -82,10 +82,7 @@ function createPersistence(dependencies: Dependencies) {
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<Event, 'OBSERVE'>>()
 	}
-	type NativeEvent1 =
-		| import('xstate').InferEvents<typeof events1>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<(typeof actors)['create']>>
-		| import('xstate').ErrorActorEvent
+
 	const workflow = setup({
 		schemas: {
 			context: types<Context>(),
@@ -295,10 +292,7 @@ export function createInternalTransferEntryAvailability(binding: object) {
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<Event, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<never>
-		| import('xstate').ErrorActorEvent
+
 	const machine = setup({
 		schemas: {
 			context: types<Context>(),

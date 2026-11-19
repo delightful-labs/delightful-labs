@@ -14,16 +14,6 @@ const events0 = {
 	CANCEL: types<EventPayload<WorkspacePersistenceEvent, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<WorkspacePersistenceEvent, 'SHUTDOWN'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof fakeDataSetup>>
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Own the feature gate and seed lifecycle; preserve the seed outcome and settlement for the startup owner. */
 export const workspaceFakeData = setup({

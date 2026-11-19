@@ -23,15 +23,7 @@ export function createAccountMappingMachine(dependencies: Dependencies) {
 		CANCEL: types<EventPayload<{ type: 'MAP' } | MappingInterruption, 'CANCEL'>>(),
 		SHUTDOWN: types<EventPayload<{ type: 'MAP' } | MappingInterruption, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['reconnect']>
-				| import('xstate').OutputFrom<(typeof actors)['createAccount']>
-				| import('xstate').OutputFrom<(typeof actors)['mapAccount']>
-				| import('xstate').OutputFrom<(typeof actors)['unlinkAccount']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

@@ -204,14 +204,7 @@ export function createLoggedBankOperationMachine(dependencies: Dependencies) {
 				>
 			>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['prepare']>
-				| import('xstate').OutputFrom<(typeof actors)['log']>
-				| import('xstate').OutputFrom<(typeof actors)['operation']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const workflow = setup({
 		schemas: {
 			context: types<Context>(),

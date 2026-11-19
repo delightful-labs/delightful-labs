@@ -94,28 +94,7 @@ const events1 = {
 	CANCEL: types<EventPayload<{ type: 'CANCEL' | 'SHUTDOWN' }, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<{ type: 'CANCEL' | 'SHUTDOWN' }, 'SHUTDOWN'>>()
 }
-type NativeEvent1 =
-	| import('xstate').InferEvents<typeof events1>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof readerActors)['resources']>
-			| import('xstate').OutputFrom<(typeof readerActors)['authority']>
-			| import('xstate').OutputFrom<(typeof readerActors)['metadata']>
-			| import('xstate').OutputFrom<(typeof readerActors)['relations']>
-			| import('xstate').OutputFrom<(typeof readerActors)['files']>
-			| import('xstate').OutputFrom<(typeof readerActors)['parts']>
-			| import('xstate').OutputFrom<(typeof readerActors)['validate']>
-			| import('xstate').OutputFrom<(typeof readerActors)['allocate']>
-			| import('xstate').OutputFrom<(typeof readerActors)['readPart']>
-			| import('xstate').OutputFrom<(typeof readerActors)['hash']>
-			| import('xstate').OutputFrom<(typeof readerActors)['deposit']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
+
 /** One finite domain reader, invoked separately for hydration and exclusive capture. */
 export const financeBackupReader = setup({
 	schemas: {

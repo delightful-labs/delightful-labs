@@ -1,11 +1,9 @@
 import { mount, unmount } from 'svelte'
 import { get } from 'svelte/store'
-import WorkerAccounts from '../../src/lib/components/worker/WorkerAccounts.svelte'
+import Application from './Application.svelte'
+import { observePage } from './route-state.svelte.js'
 import { createFinanceWorkerClient } from '../../src/lib/runtime/worker/client.js'
-import type {
-	FinanceWorkerConfiguration,
-	WorkerCommandScope
-} from '../../src/lib/contracts/worker-application.js'
+import type { FinanceWorkerConfiguration } from '../../src/lib/contracts/worker-application.js'
 
 let worker: Worker | undefined, client: ReturnType<typeof createFinanceWorkerClient> | undefined
 let component: ReturnType<typeof mount> | undefined
@@ -13,7 +11,7 @@ let scope = ''
 let navigationFailure = false,
 	navigationReceipt: ReturnType<typeof Promise.withResolvers<void>> | undefined
 let navigationCalls = 0
-let routeObserver: (() => void) | undefined
+const routeObserver = () => current().observeRoute()
 function current() {
 	if (!client) throw new Error('Fixture not open')
 	return client
@@ -22,31 +20,7 @@ function attach() {
 	const target = document.getElementById('app')
 	if (!target) throw new Error('Fixture target missing')
 	const owner = current()
-	component = mount(WorkerAccounts, {
-		target,
-		props: {
-			view: owner.view,
-			location: owner.location,
-			recovery: owner.recovery,
-			onRestore: owner.restoreIdentity,
-			onRetryRecoveryNavigation: owner.retryRecoveryNavigation,
-			onRetryWorkspaceNavigation: owner.retryWorkspaceNavigation,
-			onSelectWorkspace: (id: string) =>
-				routeObserver ? owner.navigateWorkspace(id) : owner.selectWorkspace(id),
-			onArchive: owner.archiveAccount,
-			onAccountCreation: owner.accountCreationCommand,
-			onAccountOrder: owner.accountOrderCommand,
-			onClassification: owner.classificationCommand,
-			onTransactionEntry: owner.transactionEntryCommand,
-			onTransactionEdit: owner.transactionEditCommand,
-			onSelectTransaction: (id: string | null, scope: WorkerCommandScope) =>
-				routeObserver ? owner.navigateTransaction(id, scope) : owner.selectTransaction(id),
-			onLedgerPage: owner.selectLedgerPage,
-			onLedgerFilters: owner.setLedgerFilters,
-			onSelectAccount: owner.selectAccount,
-			onSelectAllAccounts: owner.selectAllAccounts
-		}
-	})
+	component = mount(Application, { target, props: { client: owner } })
 }
 function request(message: unknown) {
 	if (!worker) throw new Error('Fixture Worker unavailable')
@@ -78,10 +52,6 @@ function request(message: unknown) {
 	return result
 }
 const fixture = {
-	followRoutes: () => {
-		routeObserver = () => current().observeRoute()
-		routeObserver()
-	},
 	failNextNavigation: () => {
 		navigationFailure = true
 	},
@@ -96,10 +66,11 @@ const fixture = {
 	route: (href: string) => {
 		history.pushState(null, '', href)
 		current().observeLocation()
-		routeObserver?.()
+		routeObserver()
 	},
 	open(configuration: FinanceWorkerConfiguration) {
 		scope = configuration.scope
+		if (location.pathname === '/') history.replaceState(null, '', '/accounts')
 		client = createFinanceWorkerClient(
 			configuration,
 			async (destination, signal, expectedHref, replace) => {
@@ -116,7 +87,7 @@ const fixture = {
 					return
 				if (replace) history.replaceState(null, '', destination)
 				else history.pushState(null, '', destination)
-				routeObserver?.()
+				routeObserver()
 			},
 			() => {
 				worker = new Worker(
@@ -126,6 +97,8 @@ const fixture = {
 				return worker
 			}
 		)
+		client.location.subscribe(observePage)
+		routeObserver()
 		attach()
 	},
 	recoveryReads: () => request({ type: 'TEST_RECOVERY_READS' }),
@@ -140,9 +113,6 @@ const fixture = {
 	archive: (accountId: string) => current().archiveAccount(accountId, get(current().view)),
 	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),
 	releaseArchive: () => request({ type: 'TEST_RELEASE_ARCHIVE' }),
-	selectTransaction: (id: string | null) => current().selectTransaction(id),
-	selectKind: (kind: 'income' | 'expense') => current().selectTransactionKind(kind),
-	select: (workspaceId: string) => current().selectWorkspace(workspaceId),
 	async detach() {
 		if (component) await unmount(component)
 		component = undefined
@@ -161,7 +131,6 @@ declare global {
 }
 document.addEventListener('click', (event) => {
 	if (
-		!routeObserver ||
 		event.defaultPrevented ||
 		event.button !== 0 ||
 		event.metaKey ||
@@ -184,4 +153,5 @@ document.addEventListener('click', (event) => {
 	current().observeLocation()
 	routeObserver()
 })
+window.addEventListener('popstate', routeObserver)
 window.financeWorkerReadFixture = fixture

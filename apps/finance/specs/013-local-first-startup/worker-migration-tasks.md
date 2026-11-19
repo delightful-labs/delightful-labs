@@ -23,10 +23,16 @@ isolated composite worker fixture.
 
 ## Current source and verification status — November 19
 
+PR46 is merged as `b69e6ad6`. All Finance, Clipper and Foundation qualification
+jobs passed on its final source commit `0aac2c92`. Both production deployments
+are READY on that merge commit. The subsequent
+[native-library cleanup review](native-library-cleanup-review.md) records new
+maintenance work; it is not unfinished worker integration.
+
 PR46 integrates alpha.67 and one application worker into the normal SvelteKit
-app. Preserve the other agents’ commits. Finance’s integration, functional repairs and the user-approved retained broker
-fixes are implemented and locally qualified. Passing final code-head hosted CI
-remains a merge requirement.
+app. The other agents’ commits are preserved. Finance’s integration, functional
+repairs and the user-approved retained broker fixes are implemented, locally
+qualified and passing final code-head hosted CI.
 
 Current implementation decisions:
 
@@ -133,11 +139,11 @@ offline skip and shutdown settlement remain unchanged. Both sample-data browser
 cases and all 11 existing seeding/lifecycle tests pass on the final repair source.
 Temporary phase-only diagnostics are removed.
 
-Remaining before merge: upload this final fixture batch to the same
-PR46 and verify its code-head hosted CI. No further Finance feature migration or shared
-broker decision remains. Keep small cosmetic follow-ups separate. User servers,
-production data and storage namespaces remain unchanged. No Paraglide generation
-is authorized.
+The final fixture batch was uploaded as `0aac2c92`, passed all hosted checks and
+merged in PR46. No Finance feature migration or shared broker decision remains.
+The cleanup review linked above is a separate maintenance backlog; there is no
+confirmed visual-defect list. User servers, production data and storage namespaces
+remain unchanged. No Paraglide generation is authorized.
 
 ## Earlier inactive implementation checkpoint — November 18
 
@@ -175,8 +181,10 @@ children of that same Worker group. Shared one-pass history counts ignore sideba
 create/archive, protected-system refusal, held-write shutdown and cold offline history are covered.
 Removing duplicate command-time observations prevents a proven same-scope form withdrawal, without
 adding a queue/cache. See the [merge handoff](worker-session-resource-decision.md#pr46-scope-freeze-and-merge-handoff)
-for exact qualification and remaining work. The earlier inactive merge checkpoint was superseded by the full-integration requirement above;
-minor visual defects remain deferred; the candidate's generic Accounts title is recorded for later polish.
+for exact qualification and remaining work. The earlier inactive merge checkpoint was superseded by the full-integration requirement above.
+The candidate's generic Accounts heading was superseded by the integrated SvelteKit
+pages and their own headings/titles. The November 19 source review found no confirmed
+outstanding visual defect from that note; do not carry it as an open polish task.
 W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
 The intermittent check/account-move failure remains an explicit activation blocker.
 Finance has no sign-out or explicit new-identity screen; do not add those as parity work.

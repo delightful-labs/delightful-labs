@@ -120,19 +120,7 @@ export function createSyncLogRetentionMachine(
 		})
 	}
 	const events0 = { CANCEL: types<EventPayload<{ type: 'CANCEL' }, 'CANCEL'>>() }
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['authorization']>
-				| import('xstate').OutputFrom<(typeof actors)['history']>
-				| import('xstate').OutputFrom<(typeof actors)['accounts']>
-				| import('xstate').OutputFrom<(typeof actors)['stage']>
-				| import('xstate').OutputFrom<(typeof actors)['open']>
-				| import('xstate').OutputFrom<(typeof actors)['commit']>
-				| import('xstate').OutputFrom<(typeof actors)['settle']>
-				| import('xstate').OutputFrom<(typeof actors)['rollback']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

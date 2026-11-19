@@ -69,14 +69,7 @@ export function createWorkspaceNavigationMachine(
 		RETRY: types<EventPayload<Event, 'RETRY'>>(),
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['profile']>
-				| import('xstate').OutputFrom<(typeof actors)['lookup']>
-				| import('xstate').OutputFrom<(typeof actors)['navigate']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

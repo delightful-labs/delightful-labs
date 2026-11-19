@@ -41,16 +41,7 @@ type Context = Input & {
 	result: ReconciliationResult | undefined
 }
 const events0 = { CHECK: types<EventPayload<{ type: 'CHECK' }, 'CHECK'>>() }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof read>>
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
+
 export const workspaceCreationReconciliation = setup({
 	schemas: {
 		context: types<Context>(),

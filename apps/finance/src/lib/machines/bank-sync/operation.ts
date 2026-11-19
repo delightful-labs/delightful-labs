@@ -195,22 +195,7 @@ export function createBankOperationMachine(dependencies: Dependencies) {
 				EventPayload<LockEvent | ProgressEvent | ErrorActorEvent | { type: 'CANCEL' }, 'CANCEL'>
 			>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['lock']>
-				| import('xstate').OutputFrom<(typeof actors)['prepare']>
-				| import('xstate').OutputFrom<(typeof actors)['authorize']>
-				| import('xstate').OutputFrom<(typeof actors)['disconnect']>
-				| import('xstate').OutputFrom<(typeof actors)['unlock']>
-				| import('xstate').OutputFrom<(typeof actors)['fetchProvider']>
-				| import('xstate').OutputFrom<(typeof actors)['mapAccounts']>
-				| import('xstate').OutputFrom<(typeof actors)['importTransactions']>
-				| import('xstate').OutputFrom<(typeof actors)['persistOutcome']>
-				| import('xstate').OutputFrom<(typeof actors)['mapAccounts']>
-				| import('xstate').OutputFrom<(typeof actors)['importTransactions']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const workflow = setup({
 		schemas: {
 			context: types<Context>(),

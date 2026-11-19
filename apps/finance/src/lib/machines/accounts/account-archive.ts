@@ -37,10 +37,7 @@ export function createAccountArchiveMachine(
 		CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof operation>>
-		| import('xstate').ErrorActorEvent
+
 	const workflow = setup({
 		schemas: {
 			context: types<Context>(),

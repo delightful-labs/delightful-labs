@@ -73,24 +73,6 @@ const events0 = {
 	CANCEL: types<EventPayload<IntegrityEvent, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<IntegrityEvent, 'SHUTDOWN'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<typeof open>
-			| import('xstate').OutputFrom<typeof read>
-			| import('xstate').OutputFrom<typeof workspaceIntegrityAssessment>
-			| import('xstate').OutputFrom<typeof linkProfile>
-			| import('xstate').OutputFrom<typeof commit>
-			| import('xstate').OutputFrom<typeof settle>
-			| import('xstate').OutputFrom<typeof rollback>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** One resource owner: reads/checks/staging/commit are states, never a transaction callback. */
 export const workspaceIntegrityTransaction = setup({

@@ -81,18 +81,7 @@ export function createCheckCreationMachine(db: CheckCreationDb) {
 		INVALIDATE: types<EventPayload<CheckCreationEvent, 'INVALIDATE'>>(),
 		SHUTDOWN: types<EventPayload<CheckCreationEvent, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['validate']>
-				| import('xstate').OutputFrom<(typeof actors)['open']>
-				| import('xstate').OutputFrom<(typeof actors)['stage']>
-				| import('xstate').OutputFrom<(typeof actors)['update']>
-				| import('xstate').OutputFrom<(typeof actors)['commit']>
-				| import('xstate').OutputFrom<(typeof actors)['settle']>
-				| import('xstate').OutputFrom<(typeof actors)['rollback']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

@@ -1,5 +1,10 @@
 # Finance worker migration: foundation-first tasks
 
+Current status: PR46 is merged and deployed. Use the maintained
+[task record](worker-migration-tasks.md#current-source-and-verification-status--november-19)
+and [native-library cleanup review](native-library-cleanup-review.md). The inactive
+candidate descriptions below retain their historical context.
+
 ## Merge requirement — updated November 18
 
 The user requires **full Finance integration in PR46 before merging**, superseding the earlier
@@ -57,8 +62,10 @@ children of that same Worker group. Shared one-pass history counts ignore sideba
 create/archive, protected-system refusal, held-write shutdown and cold offline history are covered.
 Removing duplicate command-time observations prevents a proven same-scope form withdrawal, without
 adding a queue/cache. See the [merge handoff](worker-session-resource-decision.md#pr46-scope-freeze-and-merge-handoff)
-for exact qualification and remaining work. The earlier inactive merge checkpoint was superseded by the full-integration requirement above;
-minor visual defects remain deferred; the candidate's generic Accounts title is recorded for later polish.
+for exact qualification and remaining work. The earlier inactive merge checkpoint was superseded by the full-integration requirement above.
+The candidate's generic Accounts heading was superseded by the integrated SvelteKit
+pages and their own headings/titles. The November 19 source review found no confirmed
+outstanding visual defect from that note; do not carry it as an open polish task.
 W20/W21 and coordinated SDK/backend/Clipper adoption remain open; an isolated slice is not activation.
 The intermittent check/account-move failure remains an explicit activation blocker.
 Finance has no sign-out or explicit new-identity screen; do not add those as parity work.

@@ -52,16 +52,7 @@ export function createAuthorizationMachine(dependencies: Dependencies) {
 		})
 	}
 	const events0 = { CHECK: types<EventPayload<{ type: 'CHECK' }, 'CHECK'>>() }
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['identity']>
-				| import('xstate').OutputFrom<(typeof actors)['membership']>
-				| import('xstate').OutputFrom<(typeof actors)['demoId']>
-				| import('xstate').OutputFrom<(typeof actors)['connections']>
-				| import('xstate').OutputFrom<(typeof actors)['connection']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

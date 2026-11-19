@@ -65,25 +65,6 @@ const events0 = {
 	CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof ownedActors1)['decode']>
-			| import('xstate').OutputFrom<(typeof ownedActors1)['initialize']>
-			| import('xstate').OutputFrom<(typeof ownedActors1)['canvas']>
-			| import('xstate').OutputFrom<(typeof ownedActors1)['resize']>
-			| import('xstate').OutputFrom<(typeof ownedActors1)['encode']>
-			| import('xstate').OutputFrom<(typeof ownedActors1)['read']>
-			| import('xstate').OutputFrom<(typeof ownedActors1)['closeBitmap']>
-			| import('xstate').OutputFrom<(typeof ownedActors1)['closeCanvas']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Decodes, resizes, encodes, reads, and releases resources for one image. */
 export const imageProcessingMachine = setup({

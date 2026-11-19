@@ -49,10 +49,7 @@ export function createWorkspaceIntegrityOwner(db: Db) {
 		REEVALUATE: types<EventPayload<Event, 'REEVALUATE'>>(),
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof workspaceIntegrity>>
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),
