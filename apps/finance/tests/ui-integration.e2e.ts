@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { prepareSidebar, openCreationModal, closeCreationModal } from './helpers/ui.js'
 import { expect, test, type Locator } from '@playwright/test'
 
@@ -114,14 +115,7 @@ test(
 			page.getByRole('main').getByRole('heading', { name: 'Accounts', exact: true })
 		).toBeVisible()
 		const status = page.locator('aside.inline-drawer').locator('[role="status"]').nth(1)
-		await page.evaluate(async () => {
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Test session is not ready.')
-			await db.disconnect()
-		})
+		await financeFixture(page, 'ui-integration.e2e:117')
 		await expect(status).toHaveText('Online')
 		await expect(status).not.toContainText(/synced|connected|saved/i)
 	}

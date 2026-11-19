@@ -3,7 +3,14 @@ import type { SyncStatus } from 'jazz-tools'
 import { readConnection } from './read-connection.js'
 
 it('registers before publishing the current link and releases the native subscription', () => {
-	let status: SyncStatus = { link: { state: 'connecting' }, pendingUploads: 0, synced: false }
+	let status: SyncStatus = {
+		link: { state: 'connecting' },
+		pendingUploads: 0,
+		oldestPendingAt: null,
+		rejected: 0,
+		lastError: null,
+		synced: false
+	}
 	let changed: (() => void) | undefined
 	const release = vi.fn()
 	const db = {
@@ -19,7 +26,14 @@ it('registers before publishing the current link and releases the native subscri
 	const next = vi.fn()
 	const stop = readConnection(db)(next)
 	expect(next.mock.calls).toEqual([['connecting']])
-	status = { link: { state: 'connected' }, pendingUploads: 0, synced: true }
+	status = {
+		link: { state: 'connected' },
+		pendingUploads: 0,
+		oldestPendingAt: null,
+		rejected: 0,
+		lastError: null,
+		synced: true
+	}
 	changed?.()
 	expect(next.mock.calls).toEqual([['connecting'], ['connected']])
 	stop()

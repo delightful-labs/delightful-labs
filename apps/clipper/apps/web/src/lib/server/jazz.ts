@@ -1,27 +1,27 @@
 import { configuredAuth } from './auth/handler.js'
 import { extensionOrigin } from '../../../../../tooling/extension-identity.js'
 import {
-	acceptLocalFirstAuth,
+	acceptDeviceAccounts,
 	createJazz,
 	memory,
+	perBranch,
 	remote,
 	sqlite,
 	vercel
 } from 'jazz-tools/backend'
-import { app } from '../backend/jazz/schema.js'
-import permissions from '../backend/jazz/permissions.js'
-import { jazzCoreName } from './jazz-core-name.js'
+import { app } from '../backend/jazz/jazz.generated.js'
+import permissions from '../backend/jazz/jazz.permissions.json' with { type: 'json' }
 
 // Jazz owns lazy acquisition, schema publication, sockets, and core lifecycle.
 // The local alpha.60 store has a separate path from the previous SDK's data.
-const coreName = jazzCoreName(process.env)
 const store = process.env.VERCEL
 	? vercel({
 			vcpus: 1,
 			maxDriveBytes: 1024 ** 3,
 			blobs: 'sqlite',
 			idleMs: 60_000,
-			...(coreName ? { name: coreName } : {})
+			namespace: ({ environment, branch }) =>
+				environment === 'production' ? 'production' : perBranch(branch)
 		})
 	: process.env.CLIPPER_TEST === 'true' && process.env.CLIPPER_TEST_CORE_URL
 		? remote({
@@ -53,8 +53,31 @@ export const jazz = createJazz({
 	store,
 	authenticate: async (request) => {
 		const auth = configuredAuth()
-		const session = auth ? await auth.api.getSession({ headers: request.headers }) : null
-		return session ? { userId: session.user.id } : acceptLocalFirstAuth(request)
+		const session = auth
+			? await auth.api.getSession({
+					headers: request.headers,
+					query: { disableCookieCache: true, disableRefresh: true }
+				})
+			: null
+		return session
+			? {
+					userId: session.user.id,
+					expiresAt: Math.floor(session.session.expiresAt.getTime() / 1000)
+				}
+			: acceptDeviceAccounts(request)
+	},
+	refresh: async (request, next) => {
+		const auth = configuredAuth()
+		if (!auth) return next(request)
+		const refreshed = await auth.api.getSession({
+			headers: request.headers,
+			query: { disableCookieCache: true },
+			returnHeaders: true
+		})
+		const response = await next(request)
+		for (const cookie of refreshed.headers.getSetCookie())
+			response.headers.append('Set-Cookie', cookie)
+		return response
 	},
 	allowedOrigins: [extensionOrigin],
 	...(publicUrl ? { publicUrl } : {})

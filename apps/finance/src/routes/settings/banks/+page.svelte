@@ -4,14 +4,12 @@
 	import { getPageNavigation } from '#lib/components/navigation/page-navigation.js'
 	const navigation = getPageNavigation()
 
-	import { getBankSync } from '#lib/runtime/bank-sync.js'
+	import WorkerBank from '#lib/components/worker/WorkerBank.svelte'
 	import { m } from '#lib/paraglide/messages.js'
-
-	const bankSync = getBankSync()
 </script>
 
 <svelte:head><title>{m['bank.title']()} · {m['app.name']()}</title></svelte:head>
 <PageLayout {navigation}>
 	{#snippet pageHeading()}<PageHeader title={m['bank.title']()} />{/snippet}
-	{@render bankSync.view()}
+	<WorkerBank />
 </PageLayout>

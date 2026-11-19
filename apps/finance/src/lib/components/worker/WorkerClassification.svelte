@@ -6,10 +6,7 @@
 	import TagForm from '../classification/TagForm.svelte'
 	import TagList from '../classification/TagList.svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
-	import type {
-		ClassificationForm,
-		WorkerAccountCreationCommand
-	} from '../../contracts/worker-forms.js'
+	import type { ClassificationForm, WorkerFormCommand } from '../../contracts/worker-forms.js'
 	let {
 		view,
 		kind,
@@ -19,13 +16,13 @@
 		kind: 'category' | 'tag'
 		onsend: (
 			form: ClassificationForm,
-			command: WorkerAccountCreationCommand,
+			command: WorkerFormCommand,
 			scope: WorkerCommandScope
 		) => void
 	} = $props()
 	const data = $derived(view.classification)
 	const scope = $derived(`${view.sessionRevision}:${view.selection.revision}`)
-	function send(form: ClassificationForm, command: WorkerAccountCreationCommand) {
+	function send(form: ClassificationForm, command: WorkerFormCommand) {
 		onsend(form, command, view)
 	}
 	function submit(form: ClassificationForm, event: SubmitEvent) {

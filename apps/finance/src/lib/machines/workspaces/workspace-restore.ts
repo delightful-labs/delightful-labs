@@ -33,7 +33,7 @@ import {
 import { createArchiveEnvelopeMachine } from 'delightful-local-first/backup/envelope/workflow'
 import { payloadLimits } from 'delightful-local-first/backup/archive'
 import { stableUuid } from '../../domain/stable-uuid.js'
-import { app } from '../../schema.js'
+import { app } from '../../queries.js'
 import { validateFinanceBackup } from '../../backup/workspace.js'
 import {
 	canonicalRecovery,

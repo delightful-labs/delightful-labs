@@ -2,13 +2,13 @@ import { createServer } from 'node:http'
 import { join } from 'node:path'
 import {
 	type CreateJazzOptions,
-	acceptLocalFirstAuth,
+	acceptDeviceAccounts,
 	createJazz,
 	memory,
 	sqlite
 } from 'jazz-tools/backend'
-import { app } from '../src/lib/backend/jazz/schema.js'
-import permissions from '../src/lib/backend/jazz/permissions.js'
+import { app } from '../src/lib/backend/jazz/jazz.generated.js'
+import permissions from '../src/lib/backend/jazz/jazz.permissions.json'
 
 /** Disposable browser-test authority, using the same SDK backend path as the app. */
 export async function startJazzAuthority(input: {
@@ -21,7 +21,7 @@ export async function startJazzAuthority(input: {
 		app,
 		permissions,
 		store: input.dataDir ? sqlite({ path: join(input.dataDir, 'core') }) : memory(),
-		authenticate: input.authenticate ?? acceptLocalFirstAuth,
+		authenticate: input.authenticate ?? acceptDeviceAccounts,
 		publicUrl: [`http://127.0.0.1:${input.port}/jazz`, `${input.origin}/jazz`],
 		allowedOrigins: [input.origin]
 	})

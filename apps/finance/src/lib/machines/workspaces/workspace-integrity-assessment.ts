@@ -1,12 +1,12 @@
 import { ORGANIZATION_ROLE } from '#lib/domain/organization-role.js'
-import type { schema } from 'jazz-tools'
-import { app, type Organization, type OrganizationMember } from '../../schema.js'
+import type { RowOf } from 'jazz-tools'
+import { app, type Organization, type OrganizationMember } from '../../queries.js'
 import { setup, types } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 export type IntegrityScope = { userId: string; organizationId: string; profileId: string }
 export type IntegrityRecords = {
-	profiles: schema.RowOf<typeof app.profiles>[]
+	profiles: RowOf<typeof app.profiles>[]
 	organizations: Organization[]
 	memberships: OrganizationMember[]
 }

@@ -1,6 +1,6 @@
 import pica, { type PicaCanvas } from 'pica'
 
-const resizer = pica()
+const resizer = pica({ features: ['js', 'wasm'] })
 
 export type ImageDimensions = { width: number; height: number }
 export type ImageProcessingOptions = {
@@ -31,11 +31,21 @@ export function fitImageDimensions(
 
 export function createImageCanvas(image: ImageBitmap, options: ImageProcessingOptions) {
 	const { width, height } = fitImageDimensions(image, options)
-	return resizer.createCanvas(width, height)
+	return resizer.createCanvas(width, height, { preferOffscreen: true })
 }
 
-export function resizeImage(image: ImageBitmap, canvas: PicaCanvas) {
-	return resizer.resize(image, canvas)
+export async function resizeImage(image: ImageBitmap, canvas: PicaCanvas) {
+	// Pica 10's ImageBitmap orientation fallback creates a DOM canvas even
+	// inside a worker. Its native canvas input avoids that fallback entirely.
+	const source = new OffscreenCanvas(image.width, image.height)
+	try {
+		const context = source.getContext('2d')
+		if (!context) throw new Error('Image canvas unavailable')
+		context.drawImage(image, 0, 0)
+		return await resizer.resize(source, canvas)
+	} finally {
+		releaseImageCanvas(source)
+	}
 }
 
 export function encodeImage(

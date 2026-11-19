@@ -1,13 +1,10 @@
 import { createWorkspaceStartupMachine as createSharedStartup } from 'delightful-local-first/workspace/startup'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import { workspaceInitialization } from './workspace-initialization.js'
 import { workspaceFakeData } from './workspace-fake-data.js'
 import type { SnapshotFrom, OutputFrom } from 'xstate'
 
-type Db = Pick<
-	ReturnType<typeof getDb>,
-	'all' | 'beginTransaction' | 'beginSerializableTransaction' | 'getConfig'
->
+type Db = Pick<JazzDb, 'all' | 'beginTransaction' | 'beginSerializableTransaction' | 'getConfig'>
 export function createWorkspaceStartupMachine(db: Db) {
 	return createSharedStartup<
 		Db,

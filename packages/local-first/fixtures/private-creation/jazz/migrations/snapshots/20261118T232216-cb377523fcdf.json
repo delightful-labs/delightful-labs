@@ -1,0 +1,53 @@
+{
+  "creationOperations": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "workspaceId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "requestFingerprint",
+        "nullable": false
+      }
+    ]
+  },
+  "workspaces": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "creationOperationId",
+        "nullable": false,
+        "references": "creationOperations"
+      }
+    ],
+    "relations": {
+      "operation": {
+        "kind": "forward",
+        "table": "creationOperations",
+        "column": "creationOperationId"
+      }
+    }
+  }
+}

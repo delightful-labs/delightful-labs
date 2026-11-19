@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { pageContent } from './helpers/ui.js'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -11,48 +12,7 @@ async function seed(
 	await expect(
 		pageContent(page).getByRole('button', { name: 'Add Account', exact: true })
 	).toBeEnabled({ timeout: 30_000 })
-	return page.evaluate(
-		async ({ count, kind, bookedOn }) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const [organization] = await db.all(app.organizations)
-			if (!organization) throw new Error('Missing organization')
-			const account = await db
-				.insert(app.accounts, {
-					organizationId: organization.id,
-					name: 'Workspace ledger',
-					kind: 'cash',
-					currency: 'USD'
-				})
-				.wait({ tier: 'local' })
-			const category = (
-				await db.all(app.categories.where({ organizationId: organization.id, kind }))
-			)[0]
-			if (!category) throw new Error('Missing transaction category')
-			for (let index = 0; index < count; index++) {
-				await db
-					.insert(app.transactions, {
-						organizationId: organization.id,
-						accountId: account.id,
-						categoryId: category.id,
-						kind,
-						amountMinor: 100,
-						currency: 'USD',
-						bookedOn,
-						description: `Seed ${index}`,
-						source: 'manual'
-					})
-					.wait({ tier: 'local' })
-			}
-			return organization.id
-		},
-		{ count, kind, bookedOn }
-	)
+	return financeFixture(page, 'transaction-workspace.e2e:14', { count, kind, bookedOn })
 }
 
 for (const desktop of [true, false]) {
@@ -88,64 +48,11 @@ for (const desktop of [true, false]) {
 				await expect(
 					initialList.getByRole('combobox', { name: 'Filter Currency', exact: true })
 				).toHaveCount(0)
-				const fixture = await page.evaluate(
-					async ({ workspaceId, kind, bookedOn }) => {
-						const schemaPath = '/src/lib/schema.ts'
-						const sessionPath = '/src/lib/runtime/jazz-session.ts'
-						const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-						const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-							await import(sessionPath)
-						const db = getCurrentJazzSession()?.getSnapshot().client?.db
-						if (!db) throw new Error('Missing database')
-						const account = await db
-							.insert(app.accounts, {
-								organizationId: workspaceId,
-								name: 'TZS ledger',
-								kind: 'cash',
-								currency: 'TZS'
-							})
-							.wait({ tier: 'local' })
-						const category = await db
-							.insert(app.categories, {
-								organizationId: workspaceId,
-								name: 'Travel filter',
-								kind,
-								isSystem: false
-							})
-							.wait({ tier: 'local' })
-						const tag = await db
-							.insert(app.tags, {
-								organizationId: workspaceId,
-								name: 'Business tag',
-								kind,
-								categoryId: category.id
-							})
-							.wait({ tier: 'local' })
-						const row = await db
-							.insert(app.transactions, {
-								organizationId: workspaceId,
-								accountId: account.id,
-								categoryId: category.id,
-								kind,
-								amountMinor: 1234,
-								currency: 'TZS',
-								bookedOn,
-								description: 'Conference ticket',
-								memo: 'Client visit',
-								source: 'manual'
-							})
-							.wait({ tier: 'local' })
-						await db
-							.insert(app.transactionTags, {
-								organizationId: workspaceId,
-								transactionId: row.id,
-								tagId: tag.id
-							})
-							.wait({ tier: 'local' })
-						return { categoryId: category.id }
-					},
-					{ workspaceId, kind, bookedOn: dates.today }
-				)
+				const fixture = await financeFixture(page, 'transaction-workspace.e2e:91', {
+					workspaceId,
+					kind,
+					bookedOn: dates.today
+				})
 				await page.goto(`${path}?workspace=${workspaceId}`)
 				const main = pageContent(page)
 				const rows = main.locator('.entries > li')
@@ -284,16 +191,7 @@ async function expectWorkspaceUrl(
 }
 
 async function savedCount(page: Page, description: string) {
-	return page.evaluate(async (description) => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing database')
-		return (await db.all(app.transactions)).filter((row) => row.description === description).length
-	}, description)
+	return financeFixture(page, 'transaction-workspace.e2e:287', description)
 }
 
 for (const desktop of [true, false]) {
@@ -502,19 +400,7 @@ for (const kind of ['income', 'expense']) {
 					await expect(dialog.getByRole('status')).toHaveText('Saved 25 of 25 sample transactions.')
 					await expect(add).toBeEnabled()
 					await expect
-						.poll(() =>
-							page.evaluate(async (kind) => {
-								const schemaPath = '/src/lib/schema.ts'
-								const sessionPath = '/src/lib/runtime/jazz-session.ts'
-								const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-								const {
-									getCurrentJazzSession
-								}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-								const db = getCurrentJazzSession()?.getSnapshot().client?.db
-								if (!db) throw new Error('Missing database')
-								return (await db.all(app.transactions)).filter((row) => row.kind === kind).length
-							}, kind)
-						)
+						.poll(() => financeFixture(page, 'transaction-workspace.e2e:506', kind))
 						.toBe(count)
 				}
 			} finally {
@@ -566,35 +452,7 @@ test(
 		expect((await gaps()).searchFilter).toBeGreaterThan(0)
 		const beforeData = await rightToggle.boundingBox()
 		if (!beforeData) throw new Error('Missing initial control geometry')
-		await page.evaluate(async (workspaceId) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const account = (await db.all(app.accounts.where({ organizationId: workspaceId })))[0]
-			const category = (
-				await db.all(app.categories.where({ organizationId: workspaceId, kind: 'expense' }))
-			)[0]
-			if (!account || !category) throw new Error('Missing ledger fixture')
-			for (let index = 0; index < 26; index++) {
-				await db
-					.insert(app.transactions, {
-						organizationId: workspaceId,
-						accountId: account.id,
-						categoryId: category.id,
-						kind: 'expense',
-						amountMinor: 100,
-						currency: 'USD',
-						bookedOn: '2026-10-19',
-						description: `Layout fixture ${index}`,
-						source: 'manual'
-					})
-					.wait({ tier: 'local' })
-			}
-		}, workspaceId)
+		await financeFixture(page, 'transaction-workspace.e2e:569', workspaceId)
 		await expect(drawer.locator('.entries > li')).toHaveCount(25)
 		await expect.poll(async () => (await rightToggle.boundingBox())?.x).toBe(beforeData.x)
 		await expect

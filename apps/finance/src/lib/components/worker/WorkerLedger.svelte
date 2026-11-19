@@ -12,14 +12,16 @@
 	import { m } from '../../paraglide/messages.js'
 	let {
 		view,
+		filters,
 		onOpen,
 		onPage,
 		onFilters
 	}: {
 		view: FinanceWorkerView
+		filters?: Filters | undefined
 		onOpen: (id: string, scope: WorkerCommandScope) => void
 		onPage: (page: number, scope: WorkerCommandScope) => void
-		onFilters: (filters: Filters, scope: WorkerCommandScope) => void
+		onFilters: (filters: Partial<Filters>, scope: WorkerCommandScope) => void
 	} = $props()
 	const groups = $derived(
 		view.ledger?.groups.map((group) => ({ ...group, totals: new Map(group.totals) })) ?? []
@@ -61,7 +63,7 @@
 
 {#if view.ledger}
 	<TransactionListFilters
-		value={view.ledger.filters}
+		value={filters ?? view.ledger.filters}
 		categories={filterCategories}
 		currencies={view.ledger.currencies}
 		onchange={(filters) => onFilters(filters, scope)}

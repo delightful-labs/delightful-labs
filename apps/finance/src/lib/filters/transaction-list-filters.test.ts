@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TransactionRow } from '#lib/schema.js'
+import type { TransactionRow } from '#lib/queries.js'
 import { groupTransactionsByDate } from '#lib/domain/transaction-groups.js'
 import { filterTransactions, type TransactionListFilters } from './transaction-list-filters.js'
 

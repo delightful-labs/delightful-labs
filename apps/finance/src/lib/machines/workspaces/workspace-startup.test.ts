@@ -1,15 +1,14 @@
+import type { RowOf } from 'jazz-tools'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Transaction, type schema } from 'jazz-tools'
-import { app } from '../../schema.js'
+import { app } from '../../queries.js'
 import { createWorkspaceStartupMachine } from './workspace-startup.js'
 import { workspaceReports } from './workspace-reports.fixture.js'
 import type { InitializationStatusEvent } from '../../contracts/workspace-orchestration-contract.js'
 import { creationFixture, profileId, userId, workspace } from './workspace-creation.fixture.js'
 
-const environment = vi.hoisted(() => ({ PUBLIC_FAKE_DATA: 'false' }))
-vi.mock('$app/env/public', () => environment)
 beforeEach(() => {
-	environment.PUBLIC_FAKE_DATA = 'false'
+	vi.stubEnv('PUBLIC_FAKE_DATA', 'false')
 })
 
 import { seedFixture } from '../samples/fake-data.fixture.js'
@@ -17,7 +16,7 @@ import { createActor, waitFor } from 'xstate'
 
 const secondUser = '77777777-7777-4777-8777-777777777777'
 const thirdUser = '88888888-8888-4888-8888-888888888888'
-const profile: schema.RowOf<typeof app.profiles> = {
+const profile: RowOf<typeof app.profiles> = {
 	id: profileId,
 	userId,
 	initialWorkspaceId: workspace.id,
@@ -155,7 +154,7 @@ describe('startup session ownership', () => {
 })
 
 function seededStartup() {
-	environment.PUBLIC_FAKE_DATA = 'true'
+	vi.stubEnv('PUBLIC_FAKE_DATA', 'true')
 	const seed = seedFixture()
 	const creation = creationFixture()
 	const reads = new Transaction('mergeable', () => {
@@ -273,3 +272,5 @@ describe('optional seed ownership', () => {
 		expect(f.rollback).not.toHaveBeenCalled()
 	})
 })
+
+afterEach(() => vi.unstubAllEnvs())

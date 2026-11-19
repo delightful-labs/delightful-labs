@@ -3,20 +3,22 @@
 	import FormFeedback from '../forms/FormFeedback.svelte'
 	import { formReasonText } from '../../forms/form-messages.js'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
-	import type { WorkerTransactionEntryCommand } from '../../contracts/worker-forms.js'
+	import type { WorkerFormCommand } from '../../contracts/worker-forms.js'
 	import { transactionPages } from '../../domain/transaction-kind.js'
 	import { m } from '../../paraglide/messages.js'
 	let {
 		view,
 		entry = view.transactionEntry,
-		onsend
+		onsend,
+		oncancel
 	}: {
 		entry?: FinanceWorkerView['transactionEntry'] | FinanceWorkerView['transactionEdit']
 		view: FinanceWorkerView
-		onsend: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => void
+		oncancel?: (() => void) | undefined
+		onsend: (command: WorkerFormCommand, scope: WorkerCommandScope) => void
 	} = $props()
 	const scopeKey = $derived(`${view.sessionRevision}:${view.selection.revision}`)
-	function send(command: WorkerTransactionEntryCommand) {
+	function send(command: WorkerFormCommand) {
 		onsend(command, { sessionRevision: view.sessionRevision, selection: view.selection })
 	}
 	function values(form: HTMLFormElement) {
@@ -26,7 +28,10 @@
 		)
 		return {
 			...fields,
-			tags: data.getAll('tags').filter((entry): entry is string => typeof entry === 'string')
+			tags: data.getAll('tags').filter((entry): entry is string => typeof entry === 'string'),
+			attachments: data
+				.getAll('attachments')
+				.filter((entry): entry is File => entry instanceof File && entry.size > 0)
 		}
 	}
 	function submit(event: SubmitEvent) {
@@ -72,7 +77,8 @@
 				onsubmit={submit}
 				oninput={input}
 				onreset={reset}
-				attachmentsEnabled={false}
+				{oncancel}
+				attachmentPickerRevision={entry.form.draftRevision}
 			/>
 		{/key}
 	{/if}

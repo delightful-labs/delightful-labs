@@ -1,11 +1,11 @@
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import { app } from '#lib/schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app } from '#lib/queries.js'
 import { TRANSACTION_ATTACHMENT_TYPES } from '#lib/domain/transaction-attachments.js'
 import { setup, types, createAsyncLogic } from 'xstate'
 
 const PART_BYTES = 256 * 1024
-type Db = Pick<ReturnType<typeof getDb>, 'all' | 'insert' | 'insertStreaming' | 'delete'>
+type Db = Pick<JazzDb, 'all' | 'insert' | 'insertStreaming' | 'delete'>
 export type TransactionAttachmentInput = {
 	db: Db
 	transaction: { id: string; accountId: string; organizationId: string }

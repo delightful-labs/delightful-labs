@@ -1,4 +1,4 @@
-import { app } from '../../backend/jazz/schema.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
 import { handleConfiguredAuth } from './completion-handler.js'
 import { createAuthServer, authConfiguration } from './server.js'
 

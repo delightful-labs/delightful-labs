@@ -1,1250 +1,1130 @@
-import { ACCOUNT_ACCESS } from '#lib/domain/account-access.js'
-import { ORGANIZATION_ROLE } from '#lib/domain/organization-role.js'
-import { INCOME, EXPENSE } from '#lib/domain/transaction-kind.js'
-import { TRANSACTION_SOURCE } from '#lib/domain/transaction-source.js'
-import { schema as s } from 'jazz-tools'
-import { type RowContext, type RowRefValue } from 'jazz-tools/permissions'
-import {
-	app,
-	previousApp,
-	type InternalTransfer,
-	type OrganizationMember,
-	type SyncAttempt,
-	type SyncAccountResult,
-	type Tag,
-	type TransactionRow
-} from './schema.js'
-import { checkReferenceCondition } from './authorization/check-reference-permissions.js'
+import type { schema as s } from 'jazz-tools'
+import { schema } from './schema.js'
 
-type Role = NonNullable<OrganizationMember['role']>
-type IdExpression = string | RowRefValue
-type TransactionContext = Pick<
-	RowContext<TransactionRow>,
-	| 'id'
-	| 'accountId'
-	| 'categoryId'
-	| 'organizationId'
-	| 'amountMinor'
-	| 'currency'
-	| 'kind'
-	| 'paymentMethod'
-	| 'checkDetailsId'
-	| 'checkId'
-	| 'internalTransferId'
->
-type InternalTransferContext = Pick<
-	RowContext<InternalTransfer>,
-	| 'id'
-	| 'organizationId'
-	| 'expenseTransactionId'
-	| 'incomeTransactionId'
-	| 'expenseAccountId'
-	| 'incomeAccountId'
-	| 'expenseAmountMinor'
-	| 'expenseCurrency'
-	| 'incomeAmountMinor'
-	| 'incomeCurrency'
-	| 'amountMinor'
-	| 'currency'
->
+const { definePermissions, exists, allowedTo, session, anyOf, allOf, ne, typed, from, outer } =
+	schema
 
-const normal = s.definePermissions(previousApp, (bindings) => {
-	const { policy, session, anyOf, allOf, allowedTo } = bindings
-	const isMember = (organizationId: IdExpression) =>
-		policy.organizationMembers.exists.where({ organizationId, userId: session.user })
+const mine = { userId: session.user }
 
-	const hasRole = (organizationId: IdExpression, role: Role) =>
-		policy.organizationMembers.exists.where({
-			organizationId,
-			userId: session.user,
-			role
-		})
+const isOrganizationMemberWithRole = (
+	organizationId: s.Uuid,
+	role: 'owner' | 'admin' | 'member' | 'viewer'
+) => exists.organizationMembers({ organizationId, userId: session.user, role })
 
-	const isAdmin = (organizationId: IdExpression) =>
-		anyOf([
-			hasRole(organizationId, ORGANIZATION_ROLE.OWNER),
-			hasRole(organizationId, ORGANIZATION_ROLE.ADMIN)
-		])
+const isAdmin = (organizationId: s.Uuid) =>
+	anyOf(
+		isOrganizationMemberWithRole(organizationId, 'owner'),
+		isOrganizationMemberWithRole(organizationId, 'admin')
+	)
 
-	const canReadAllAccounts = (organizationId: IdExpression) =>
-		anyOf([
-			policy.organizationMembers.exists.where({
-				organizationId,
-				userId: session.user,
-				role: ORGANIZATION_ROLE.MEMBER,
-				accountAccessMode: ACCOUNT_ACCESS.ALL
-			}),
-			policy.organizationMembers.exists.where({
-				organizationId,
-				userId: session.user,
-				role: ORGANIZATION_ROLE.VIEWER,
-				accountAccessMode: ACCOUNT_ACCESS.ALL
-			})
-		])
+const canReadMembership = (organizationId: s.Uuid) => anyOf(mine, isAdmin(organizationId))
 
-	const canWriteAllAccounts = (organizationId: IdExpression) =>
-		anyOf([
-			hasRole(organizationId, ORGANIZATION_ROLE.OWNER),
-			hasRole(organizationId, ORGANIZATION_ROLE.ADMIN),
-			policy.organizationMembers.exists.where({
-				organizationId,
-				userId: session.user,
-				role: ORGANIZATION_ROLE.MEMBER,
-				accountAccessMode: ACCOUNT_ACCESS.ALL
-			})
-		])
+const hasMembershipScope = (
+	organizationId: s.Uuid,
+	role: 'owner' | 'admin' | 'member' | 'viewer',
+	accountAccessMode: 'all' | 'selected'
+) => exists.organizationMembers({ organizationId, userId: session.user, role, accountAccessMode })
 
-	const canReadAccount = (accountId: IdExpression, organizationId: IdExpression) =>
-		anyOf([
+const isOrganizationMember = (organizationId: s.Uuid) =>
+	exists.organizationMembers({ organizationId, userId: session.user })
+
+const ownsIncompleteRestore = (workspaceId: s.Uuid) =>
+	exists.restoreOperations({ workspaceId, ownerId: session.user, status: 'incomplete' })
+
+const canReadAccountOrRestore = (organizationId: s.Uuid, accountId: s.Uuid) =>
+	anyOf(
+		anyOf(
 			isAdmin(organizationId),
-			canReadAllAccounts(organizationId),
-			allOf([
-				isMember(organizationId),
-				policy.accountMemberships.exists.where({
-					organizationId,
-					accountId,
-					userId: session.user
-				})
-			])
-		])
-
-	const canWriteAccount = (accountId: IdExpression, organizationId: IdExpression) =>
-		anyOf([
-			canWriteAllAccounts(organizationId),
-			allOf([
-				hasRole(organizationId, ORGANIZATION_ROLE.MEMBER),
-				policy.organizationMembers.exists.where({
-					organizationId,
-					userId: session.user,
-					accountAccessMode: ACCOUNT_ACCESS.SELECTED
-				}),
-				policy.accountMemberships.exists.where({
-					organizationId,
-					accountId,
-					userId: session.user,
-					access: 'write'
-				})
-			])
-		])
-
-	const canDeleteAccount = (accountId: IdExpression, organizationId: IdExpression) =>
-		anyOf([
-			isAdmin(organizationId),
-			allOf([
-				hasRole(organizationId, ORGANIZATION_ROLE.MEMBER),
-				policy.organizationMembers.exists.where({
-					organizationId,
-					userId: session.user,
-					accountAccessMode: ACCOUNT_ACCESS.SELECTED
-				}),
-				policy.accountMemberships.exists.where({
-					organizationId,
-					accountId,
-					userId: session.user,
-					canDelete: true
-				})
-			])
-		])
-
-	const canWriteTransferAccounts = (transfer: InternalTransferContext) =>
-		anyOf([
-			canWriteAllAccounts(transfer.organizationId),
-			allOf([
-				policy.organizationMembers.exists.where({
-					organizationId: transfer.organizationId,
-					userId: session.user,
-					role: ORGANIZATION_ROLE.MEMBER,
-					accountAccessMode: ACCOUNT_ACCESS.SELECTED
-				}),
-				policy.accountMemberships.exists.where({
-					organizationId: transfer.organizationId,
-					accountId: transfer.expenseAccountId,
-					userId: session.user,
-					access: 'write'
-				}),
-				policy.accountMemberships.exists.where({
-					organizationId: transfer.organizationId,
-					accountId: transfer.incomeAccountId,
-					userId: session.user,
-					access: 'write'
-				})
-			])
-		])
-
-	const transactionReferencesAreValid = (transaction: TransactionContext) =>
-		allOf([
-			policy.categories.exists.where({
-				id: transaction.categoryId,
-				organizationId: transaction.organizationId,
-				kind: transaction.kind,
-				archivedAt: { isNull: true }
-			}),
-			policy.accounts.exists.where({
-				id: transaction.accountId,
-				organizationId: transaction.organizationId,
-				currency: transaction.currency,
-				archivedAt: { isNull: true }
-			})
-		])
-
-	const canWriteTransaction = (transaction: TransactionContext) =>
-		allOf([
-			canWriteAccount(transaction.accountId, transaction.organizationId),
-			transactionReferencesAreValid(transaction),
-			{ checkDetailsId: { isNull: true } },
-			checkReferenceCondition({
-				transaction,
-				checkExists: (where) => policy.checks.exists.where(where)
-			})
-		])
-
-	const transferEndpointFactsMatch = (
-		transfer: InternalTransferContext,
-		marker: RowRefValue | { isNull: true } = transfer.id
-	) =>
-		allOf([
-			anyOf([
-				policy.transactions.exists.where({
-					id: transfer.expenseTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.expenseAccountId,
-					kind: EXPENSE,
-					amountMinor: transfer.expenseAmountMinor,
-					currency: transfer.expenseCurrency,
-					internalTransferId: marker
-				}),
-				policy.transactions.exists.where({
-					id: transfer.expenseTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.expenseAccountId,
-					kind: EXPENSE,
-					amountMinor: transfer.amountMinor,
-					currency: transfer.currency,
-					internalTransferId: marker
-				})
-			]),
-			anyOf([
-				policy.transactions.exists.where({
-					id: transfer.incomeTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.incomeAccountId,
-					kind: INCOME,
-					amountMinor: transfer.incomeAmountMinor,
-					currency: transfer.incomeCurrency,
-					internalTransferId: marker
-				}),
-				policy.transactions.exists.where({
-					id: transfer.incomeTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.incomeAccountId,
-					kind: INCOME,
-					amountMinor: transfer.amountMinor,
-					currency: transfer.currency,
-					internalTransferId: marker
-				})
-			])
-		])
-
-	const transferEndpointsAreUnlinked = (transfer: InternalTransferContext) =>
-		allOf([
-			policy.transactions.exists.where({
-				id: transfer.expenseTransactionId,
-				organizationId: transfer.organizationId,
-				internalTransferId: { isNull: true }
-			}),
-			policy.transactions.exists.where({
-				id: transfer.incomeTransactionId,
-				organizationId: transfer.organizationId,
-				internalTransferId: { isNull: true }
-			})
-		])
-
-	const transferEndpointsHaveMarkers = (transfer: InternalTransferContext) =>
-		allOf([
-			anyOf([
-				policy.transactions.exists.where({
-					id: transfer.expenseTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.expenseAccountId,
-					kind: EXPENSE,
-					amountMinor: transfer.expenseAmountMinor,
-					currency: transfer.expenseCurrency,
-					internalTransferId: { isNull: false }
-				}),
-				policy.transactions.exists.where({
-					id: transfer.expenseTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.expenseAccountId,
-					kind: EXPENSE,
-					amountMinor: transfer.amountMinor,
-					currency: transfer.currency,
-					internalTransferId: { isNull: false }
-				})
-			]),
-			anyOf([
-				policy.transactions.exists.where({
-					id: transfer.incomeTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.incomeAccountId,
-					kind: INCOME,
-					amountMinor: transfer.incomeAmountMinor,
-					currency: transfer.incomeCurrency,
-					internalTransferId: { isNull: false }
-				}),
-				policy.transactions.exists.where({
-					id: transfer.incomeTransactionId,
-					organizationId: transfer.organizationId,
-					accountId: transfer.incomeAccountId,
-					kind: INCOME,
-					amountMinor: transfer.amountMinor,
-					currency: transfer.currency,
-					internalTransferId: { isNull: false }
-				})
-			])
-		])
-
-	const transactionTransferRelationshipExists = (transaction: TransactionContext) =>
-		anyOf([
-			policy.internalTransfers.exists.where({
-				id: transaction.internalTransferId,
-				organizationId: transaction.organizationId,
-				expenseTransactionId: transaction.id,
-				expenseAccountId: transaction.accountId
-			}),
-			policy.internalTransfers.exists.where({
-				id: transaction.internalTransferId,
-				organizationId: transaction.organizationId,
-				incomeTransactionId: transaction.id,
-				incomeAccountId: transaction.accountId
-			})
-		])
-
-	const transactionFinancialFactsAreUnchanged = (transaction: TransactionContext) =>
-		policy.transactions.exists.where({
-			id: transaction.id,
-			organizationId: transaction.organizationId,
-			accountId: transaction.accountId,
-			kind: transaction.kind,
-			amountMinor: transaction.amountMinor,
-			currency: transaction.currency
-		})
-
-	const transactionTransferUpdateIsValid = (transaction: TransactionContext) =>
-		anyOf([
-			allOf([
-				transactionHasNoTransfer(),
-				anyOf([
-					policy.transactions.exists.where({
-						id: transaction.id,
-						internalTransferId: { isNull: true }
-					}),
-					allOf([
-						policy.transactions.exists.where({
-							id: transaction.id,
-							internalTransferId: { isNull: false }
-						}),
-						transactionFinancialFactsAreUnchanged(transaction)
-					])
-				])
-			]),
-			allOf([
-				transactionTransferRelationshipExists(transaction),
-				transactionFinancialFactsAreUnchanged(transaction)
-			])
-		])
-
-	const transactionHasNoTransfer = () => ({ internalTransferId: { isNull: true } })
-
-	policy.organizations.allowRead.where((organization) => isMember(organization.id))
-	policy.organizations.allowInsert.where({ ownerId: session.user })
-	policy.organizations.allowUpdate
-		.whereOld((organization) => isAdmin(organization.id))
-		.whereNew((organization) => isAdmin(organization.id))
-	policy.organizations.allowDelete.never()
-
-	policy.organizationMembers.allowRead.where((member) =>
-		anyOf([{ userId: session.user }, isAdmin(member.organizationId)])
-	)
-	policy.organizationMembers.allowInsert.where((member) =>
-		anyOf([
-			isAdmin(member.organizationId),
-			allOf([
-				{ userId: session.user, role: ORGANIZATION_ROLE.OWNER },
-				policy.organizations.exists.where({
-					id: member.organizationId,
-					ownerId: session.user
-				})
-			])
-		])
-	)
-	policy.organizationMembers.allowUpdate
-		.whereOld((member) => isAdmin(member.organizationId))
-		.whereNew((member) => isAdmin(member.organizationId))
-	policy.organizationMembers.allowDelete.where((member) =>
-		anyOf([{ userId: session.user }, isAdmin(member.organizationId)])
-	)
-
-	policy.profiles.allowRead.where((profile) =>
-		anyOf([
-			{ userId: session.user },
-			policy.exists(
-				policy.organizationMembers
-					.where({ profileId: profile.id })
-					.join(policy.organizationMembers, {
-						left: 'organizationId',
-						right: 'organizationId'
-					})
-					.where({ userId: session.user })
-			)
-		])
-	)
-	policy.profiles.allowInsert.where({ userId: session.user })
-	policy.profiles.allowUpdate.whereOld({ userId: session.user }).whereNew({ userId: session.user })
-	policy.profiles.allowDelete.never()
-
-	policy.accounts.allowRead.where((account) => canReadAccount(account.id, account.organizationId))
-	policy.accounts.allowInsert.where((account) =>
-		allOf([isAdmin(account.organizationId), { archivedAt: { isNull: true } }])
-	)
-	policy.accounts.allowUpdate
-		.whereOld((account) => canWriteAccount(account.id, account.organizationId))
-		.whereNew((account) => canWriteAccount(account.id, account.organizationId))
-	policy.accounts.allowDelete.never()
-
-	policy.accountMemberships.allowRead.where((grant) =>
-		anyOf([{ userId: session.user }, isAdmin(grant.organizationId)])
-	)
-	policy.accountMemberships.allowInsert.where((grant) => isAdmin(grant.organizationId))
-	policy.accountMemberships.allowUpdate
-		.whereOld((grant) => isAdmin(grant.organizationId))
-		.whereNew((grant) => isAdmin(grant.organizationId))
-	policy.accountMemberships.allowDelete.where((grant) => isAdmin(grant.organizationId))
-
-	policy.categories.allowRead.where((category) => isMember(category.organizationId))
-	policy.categories.allowInsert.where((category) =>
-		anyOf([
-			isAdmin(category.organizationId),
-			hasRole(category.organizationId, ORGANIZATION_ROLE.MEMBER)
-		])
-	)
-	policy.categories.allowUpdate
-		.whereOld((category) =>
-			allOf([
-				anyOf([
-					isAdmin(category.organizationId),
-					hasRole(category.organizationId, ORGANIZATION_ROLE.MEMBER)
-				]),
-				{ isSystem: false }
-			])
-		)
-		.whereNew((category) =>
-			allOf([
-				anyOf([
-					isAdmin(category.organizationId),
-					hasRole(category.organizationId, ORGANIZATION_ROLE.MEMBER)
-				]),
-				{ isSystem: false }
-			])
-		)
-	policy.categories.allowDelete.where((category) =>
-		allOf([isAdmin(category.organizationId), { isSystem: false }])
-	)
-
-	const tagReferencesAreValid = (tag: RowContext<Tag>) =>
-		allOf([
-			anyOf([{ kind: EXPENSE }, { kind: INCOME }]),
-			anyOf([
-				{ categoryId: { isNull: true } },
-				policy.categories.exists.where({
-					id: tag.categoryId,
-					organizationId: tag.organizationId,
-					kind: tag.kind
-				})
-			])
-		])
-
-	policy.tags.allowRead.where((tag) => isMember(tag.organizationId))
-	policy.tags.allowInsert.where((tag) =>
-		allOf([
-			anyOf([isAdmin(tag.organizationId), hasRole(tag.organizationId, ORGANIZATION_ROLE.MEMBER)]),
-			tagReferencesAreValid(tag)
-		])
-	)
-	policy.tags.allowUpdate
-		.whereOld((tag) =>
-			anyOf([isAdmin(tag.organizationId), hasRole(tag.organizationId, ORGANIZATION_ROLE.MEMBER)])
-		)
-		.whereNew((tag) =>
-			allOf([
-				anyOf([isAdmin(tag.organizationId), hasRole(tag.organizationId, ORGANIZATION_ROLE.MEMBER)]),
-				tagReferencesAreValid(tag),
-				// Kind and workspace are immutable so existing assignments stay compatible.
-				policy.tags.exists.where({
-					id: tag.id,
-					organizationId: tag.organizationId,
-					kind: tag.kind
-				})
-			])
-		)
-	policy.tags.allowDelete.where((tag) => isAdmin(tag.organizationId))
-
-	policy.transactions.allowRead.where((transaction) =>
-		canReadAccount(transaction.accountId, transaction.organizationId)
-	)
-	policy.transactions.allowInsert.where((transaction) =>
-		allOf([
-			canWriteTransaction(transaction),
-			// New manual endpoints must be grounded in existing account permissions, not in
-			// the new transfer that itself requires these endpoints. Orphan markers are an
-			// integrity boundary; complete-transfer facts and marker updates stay enforced.
-			anyOf([
-				transactionHasNoTransfer(),
-				{ source: TRANSACTION_SOURCE.MANUAL },
-				transactionTransferRelationshipExists(transaction)
-			])
-		])
-	)
-	policy.transactions.allowUpdate
-		.whereOld((transaction) => canWriteAccount(transaction.accountId, transaction.organizationId))
-		.whereNew((transaction) =>
-			allOf([
-				canWriteTransaction(transaction),
-				transactionTransferUpdateIsValid(transaction),
-				// Preserve tenancy, kind and provenance so edits cannot break provider deduplication.
-				policy.transactions.exists.where({
-					id: transaction.id,
-					organizationId: transaction.organizationId,
-					kind: transaction.kind,
-					source: transaction.source
-				}),
-				anyOf([
-					allOf([
-						{ externalId: { isNull: true } },
-						policy.transactions.exists.where({ id: transaction.id, externalId: { isNull: true } })
-					]),
-					policy.transactions.exists.where({
-						id: transaction.id,
-						externalId: transaction.externalId
-					})
-				])
-			])
-		)
-	policy.transactions.allowDelete.where((transaction) =>
-		allOf([
-			canDeleteAccount(transaction.accountId, transaction.organizationId),
-			transactionHasNoTransfer()
-		])
-	)
-
-	policy.internalTransfers.allowRead.where((transfer) =>
-		allOf([
-			allowedTo.read('expenseTransaction'),
-			allowedTo.read('incomeTransaction'),
-			anyOf([
-				transferEndpointFactsMatch(transfer),
-				transferEndpointsAreUnlinked(transfer),
-				transferEndpointsHaveMarkers(transfer)
-			])
-		])
-	)
-	policy.internalTransfers.allowInsert.where((transfer) =>
-		allOf([
-			// Existing unlinked endpoints anchor linking without circular marker-update grants.
-			// The final linked pair and a matching pending-unlink record are both valid states.
-			anyOf([
-				transferEndpointFactsMatch(transfer),
-				transferEndpointFactsMatch(transfer, { isNull: true })
-			]),
-			canWriteTransferAccounts(transfer)
-		])
-	)
-	policy.internalTransfers.allowUpdate.never()
-	policy.internalTransfers.allowDelete.where((transfer) => canWriteTransferAccounts(transfer))
-
-	policy.transactionTags.allowRead.where((link) =>
-		allOf([
-			allowedTo.read('transaction'),
-			policy.transactions.exists.where({
-				id: link.transactionId,
-				organizationId: link.organizationId
-			}),
-			policy.tags.exists.where({ id: link.tagId, organizationId: link.organizationId })
-		])
-	)
-	policy.transactionTags.allowInsert.where((link) =>
-		allOf([
-			allowedTo.update('transaction'),
 			anyOf(
-				([EXPENSE, INCOME] satisfies readonly TransactionRow['kind'][]).map((kind) =>
-					allOf([
-						policy.transactions.exists.where({
-							id: link.transactionId,
-							organizationId: link.organizationId,
-							kind
-						}),
-						policy.tags.exists.where({
-							id: link.tagId,
-							organizationId: link.organizationId,
-							kind,
-							archivedAt: { isNull: true }
-						})
-					])
-				)
+				hasMembershipScope(organizationId, 'member', 'all'),
+				hasMembershipScope(organizationId, 'viewer', 'all')
+			),
+			allOf(
+				isOrganizationMember(organizationId),
+				exists.accountMemberships({ organizationId, accountId, userId: session.user })
 			)
-		])
-	)
-	// Links are immutable; replace an assignment through delete/insert.
-	// Archived tags remain readable and removable from historical transactions.
-	policy.transactionTags.allowDelete.where((link) =>
-		allOf([
-			allowedTo.update('transaction'),
-			policy.transactions.exists.where({
-				id: link.transactionId,
-				organizationId: link.organizationId
-			}),
-			policy.tags.exists.where({ id: link.tagId, organizationId: link.organizationId })
-		])
+		),
+		ownsIncompleteRestore(organizationId)
 	)
 
-	policy.checks.allowRead.where((check) => canReadAccount(check.accountId, check.organizationId))
-	policy.checks.allowInsert.where((check) =>
-		allOf([
-			canWriteAccount(check.accountId, check.organizationId),
-			policy.accounts.exists.where({
-				id: check.accountId,
-				organizationId: check.organizationId,
-				archivedAt: { isNull: true }
-			})
-		])
+const canWriteAllAccounts = (organizationId: s.Uuid) =>
+	anyOf(
+		isOrganizationMemberWithRole(organizationId, 'owner'),
+		isOrganizationMemberWithRole(organizationId, 'admin'),
+		hasMembershipScope(organizationId, 'member', 'all')
 	)
-	policy.checks.allowUpdate
-		.whereOld((check) => canWriteAccount(check.accountId, check.organizationId))
-		.whereNew((check) =>
-			allOf([
-				canWriteAccount(check.accountId, check.organizationId),
-				policy.accounts.exists.where({
-					id: check.accountId,
-					organizationId: check.organizationId,
-					archivedAt: { isNull: true }
-				}),
-				// Moving a Check requires write access to both accounts and preserves its organization.
-				policy.checks.exists.where({
-					id: check.id,
-					organizationId: check.organizationId
-				})
-			])
+
+const hasSelectedAccountScope = (organizationId: s.Uuid) =>
+	exists.organizationMembers({
+		organizationId,
+		userId: session.user,
+		accountAccessMode: 'selected'
+	})
+
+const hasAccountWriteGrant = (organizationId: s.Uuid, accountId: s.Uuid) =>
+	exists.accountMemberships({ organizationId, accountId, userId: session.user, access: 'write' })
+
+const canWriteAccount = (organizationId: s.Uuid, accountId: s.Uuid) =>
+	anyOf(
+		canWriteAllAccounts(organizationId),
+		allOf(
+			isOrganizationMemberWithRole(organizationId, 'member'),
+			hasSelectedAccountScope(organizationId),
+			hasAccountWriteGrant(organizationId, accountId)
 		)
-	policy.checks.allowDelete.never()
-
-	// Retired embedded details cannot be read or mutated by production clients.
-	policy.checkDetails.allowRead.never()
-	policy.checkDetails.allowInsert.never()
-	policy.checkDetails.allowUpdate.never()
-	policy.checkDetails.allowDelete.never()
-
-	const ownsConnection = (connection: { organizationId: IdExpression; ownerId: IdExpression }) =>
-		allOf([isAdmin(connection.organizationId), { ownerId: session.user }])
-	policy.simplefinConnections.allowRead.where((connection) => isAdmin(connection.organizationId))
-	policy.simplefinConnections.allowInsert.where((connection) =>
-		allOf([ownsConnection(connection), { accessUrl: '' }])
-	)
-	policy.simplefinConnections.allowUpdate
-		.whereOld((connection) => ownsConnection(connection))
-		.whereNew((connection) =>
-			allOf([
-				ownsConnection(connection),
-				{ accessUrl: '' },
-				policy.simplefinConnections.exists.where({
-					id: connection.id,
-					organizationId: connection.organizationId,
-					ownerId: connection.ownerId
-				})
-			])
-		)
-	policy.simplefinConnections.allowDelete.where((connection) => ownsConnection(connection))
-
-	const ownsSyncAttempt = (
-		attempt: Pick<RowContext<SyncAttempt>, 'organizationId' | 'connectionId' | 'initiatedBy'>
-	) =>
-		allOf([
-			isAdmin(attempt.organizationId),
-			{ initiatedBy: session.user },
-			policy.simplefinConnections.exists.where({
-				id: attempt.connectionId,
-				organizationId: attempt.organizationId,
-				ownerId: attempt.initiatedBy
-			})
-		])
-	policy.simplefinSyncAttempts.allowRead.where((attempt) => isAdmin(attempt.organizationId))
-	policy.simplefinSyncAttempts.allowInsert.where((attempt) =>
-		allOf([
-			ownsSyncAttempt(attempt),
-			{ outcome: 'unfinished', finishedAt: { isNull: true }, importSettlement: 'notStarted' }
-		])
-	)
-	policy.simplefinSyncAttempts.allowUpdate
-		.whereOld((attempt) => allOf([ownsSyncAttempt(attempt), { outcome: 'unfinished' }]))
-		.whereNew((attempt) =>
-			allOf([
-				ownsSyncAttempt(attempt),
-				policy.simplefinSyncAttempts.exists.where({
-					id: attempt.id,
-					organizationId: attempt.organizationId,
-					connectionId: attempt.connectionId,
-					initiatedBy: attempt.initiatedBy,
-					startedAt: attempt.startedAt
-				})
-			])
-		)
-	policy.simplefinSyncAttempts.allowDelete.where((attempt) =>
-		allOf([
-			ownsSyncAttempt(attempt),
-			{ outcome: { ne: 'unfinished' }, finishedAt: { isNull: false } }
-		])
 	)
 
-	const ownsAccountResult = (
-		result: Pick<RowContext<SyncAccountResult>, 'attemptId' | 'organizationId' | 'accountId'>
-	) =>
-		allOf([
-			isAdmin(result.organizationId),
-			allowedTo.update('attempt'),
-			policy.simplefinSyncAttempts.exists.where({
-				id: result.attemptId,
-				organizationId: result.organizationId,
-				initiatedBy: session.user,
-				outcome: 'unfinished'
-			}),
-			policy.accounts.exists.where({
-				id: result.accountId,
-				organizationId: result.organizationId
-			})
-		])
-	policy.simplefinSyncAccountResults.allowRead.where(allowedTo.read('attempt'))
-	policy.simplefinSyncAccountResults.allowInsert.where((result) => ownsAccountResult(result))
-	policy.simplefinSyncAccountResults.allowUpdate
-		.whereOld((result) => ownsAccountResult(result))
-		.whereNew((result) =>
-			allOf([
-				ownsAccountResult(result),
-				policy.simplefinSyncAccountResults.exists.where({
-					id: result.id,
-					attemptId: result.attemptId,
-					organizationId: result.organizationId,
-					accountId: result.accountId,
-					accountName: result.accountName
-				})
-			])
-		)
-	policy.simplefinSyncAccountResults.allowDelete.where(allowedTo.delete('attempt'))
+const canReadWorkspaceOrRestore = (organizationId: s.Uuid) =>
+	anyOf(isOrganizationMember(organizationId), ownsIncompleteRestore(organizationId))
 
-	policy.simplefinAccountLinks.allowRead.where((link) => isAdmin(link.organizationId))
-	const validBankMapping = (link: {
-		organizationId: IdExpression
-		accountId: IdExpression
-		connectionId: IdExpression
-	}) =>
-		allOf([
-			isAdmin(link.organizationId),
-			policy.accounts.exists.where({
-				id: link.accountId,
-				organizationId: link.organizationId,
-				archivedAt: { isNull: true }
-			}),
-			policy.simplefinConnections.exists.where({
-				id: link.connectionId,
-				organizationId: link.organizationId,
-				status: 'active'
-			})
-		])
-	policy.simplefinAccountLinks.allowInsert.where((link) => validBankMapping(link))
-	policy.simplefinAccountLinks.allowUpdate
-		.whereOld((link) => isAdmin(link.organizationId))
-		.whereNew((link) => validBankMapping(link))
-	policy.simplefinAccountLinks.allowDelete.where((link) => isAdmin(link.organizationId))
+const canWriteAllAccountsOrRestore = (organizationId: s.Uuid) =>
+	anyOf(canWriteAllAccounts(organizationId), ownsIncompleteRestore(organizationId))
 
-	policy.transactionAttachments.allowRead.where(allowedTo.read('transaction'))
-	policy.transactionAttachments.allowInsert.where(allowedTo.update('transaction'))
-	policy.transactionAttachments.allowUpdate
-		.whereOld(allowedTo.update('transaction'))
-		.whereNew((attachment) =>
-			allOf([
-				allowedTo.update('transaction'),
-				policy.files.exists.where({
-					id: attachment.fileId,
-					transactionId: attachment.transactionId
-				})
-			])
-		)
-	policy.transactionAttachments.allowDelete.where(allowedTo.update('transaction'))
+const canEditWorkspaceData = (organizationId: s.Uuid) =>
+	anyOf(isAdmin(organizationId), isOrganizationMemberWithRole(organizationId, 'member'))
 
-	policy.files.allowRead.where((file) =>
-		allOf([
-			allowedTo.read('transaction'),
-			policy.transactionAttachments.exists.where({
-				fileId: file.id,
-				transactionId: file.transactionId
-			})
-		])
-	)
-	policy.files.allowInsert.where((file) =>
-		allOf([
-			{ transactionId: { isNull: false } },
-			allowedTo.update('transaction'),
-			policy.transactions.exists.where({ id: file.transactionId })
-		])
-	)
-	policy.files.allowUpdate.never()
-	policy.files.allowDelete.where((file) =>
-		allOf([
-			{ transactionId: { isNull: false } },
-			allowedTo.update('transaction'),
-			policy.transactions.exists.where({ id: file.transactionId })
-		])
-	)
-	policy.fileParts.allowRead.where(allowedTo.read('file'))
-	policy.fileParts.allowInsert.where(allowedTo.insert('file'))
-	policy.fileParts.allowUpdate.never()
-	policy.fileParts.allowDelete.where(allowedTo.delete('file'))
-	policy.uploads.allowRead.never()
-	policy.uploads.allowInsert.never()
-	policy.uploads.allowUpdate.never()
-	policy.uploads.allowDelete.never()
+const activeAccountMatches = (accountId: s.Uuid, organizationId: s.Uuid) =>
+	exists.accounts({ id: accountId, organizationId, archivedAt: null })
 
-	policy.transactionBatches.allowRead.where((batch) => isMember(batch.organizationId))
-	policy.transactionBatches.allowInsert.where((batch) => canWriteAllAccounts(batch.organizationId))
-	policy.transactionBatches.allowUpdate
-		.whereOld((batch) => canWriteAllAccounts(batch.organizationId))
-		.whereNew((batch) => canWriteAllAccounts(batch.organizationId))
-	policy.transactionBatches.allowDelete.where((batch) => isAdmin(batch.organizationId))
-	policy.batchTemplates.allowRead.where((template) => isMember(template.organizationId))
-	policy.batchTemplates.allowInsert.where((template) =>
-		canWriteAllAccounts(template.organizationId)
-	)
-	policy.batchTemplates.allowUpdate
-		.whereOld((template) => canWriteAllAccounts(template.organizationId))
-		.whereNew((template) => canWriteAllAccounts(template.organizationId))
-	policy.batchTemplates.allowDelete.where((template) => isAdmin(template.organizationId))
-})
+const accountMatches = (accountId: s.Uuid, organizationId: s.Uuid) =>
+	exists.accounts({ id: accountId, organizationId })
 
-export const previousPermissions = normal
-
-function originalRule(
-	table: string,
-	operation: 'select' | 'insert' | 'update',
-	phase: 'using' | 'with_check'
-) {
-	const rule = previousPermissions[table]?.[operation]?.[phase]
-	if (!rule) throw new Error('Missing Finance policy: ' + table + '.' + operation + '.' + phase)
-	return rule
-}
-const overrides = s.definePermissions(app, ({ policy, session, anyOf, allOf, raw, allowedTo }) => {
-	const recovery = (workspaceId: RowRefValue) =>
-		policy.restoreOperations.exists.where({
+const ownedRestoreSource = (sourceFileId: s.Uuid, workspaceId: s.Uuid) =>
+	allOf(
+		{ transactionId: null, accountId: null },
+		exists.restoreOperations({
+			sourceFileId,
 			workspaceId,
 			ownerId: session.user,
 			status: 'incomplete'
 		})
-	policy.restoreOperations.allowRead.where((row) =>
-		anyOf([
-			{ ownerId: session.user, status: 'incomplete' },
-			allOf([
-				{ status: 'active' },
-				policy.organizationMembers.exists.where({
-					organizationId: row.workspaceId,
-					userId: session.user,
-					role: { in: ['owner', 'admin'] }
-				})
-			])
-		])
 	)
-	policy.restoreOperations.allowInsert.where((row) =>
-		allOf([
-			{ ownerId: session.user, status: 'incomplete' },
-			policy.organizations.exists.where({
-				id: row.workspaceId,
-				ownerId: session.user,
-				restoreOperationId: row.id,
-				name: row.workspaceName,
-				kind: row.workspaceKind,
-				defaultCurrency: row.workspaceCurrency
+
+const canUpdateTransactionFile = (file: s.Row<typeof schema, 'files'>) =>
+	allOf(
+		{ transactionId: ne(null) },
+		allowedTo.update(file.transaction),
+		exists.transactions({ id: file.transactionId })
+	)
+
+const transactionMatches = (transactionId: s.Uuid, organizationId: s.Uuid) =>
+	exists.transactions({ id: transactionId, organizationId })
+
+const transferEndpointsFinancialsMatch = (
+	expenseTransactionId: s.Uuid,
+	organizationId: s.Uuid,
+	accountId: s.Uuid,
+	amountMinor: s.Value<'bigint'>,
+	currency: s.Value<'string'>,
+	internalTransferId: s.Uuid,
+	amountMinor2: s.Value<'bigint'>,
+	currency2: s.Value<'string'>,
+	incomeTransactionId: s.Uuid,
+	accountId2: s.Uuid,
+	amountMinor3: s.Value<'bigint'>,
+	currency3: s.Value<'string'>
+) =>
+	allOf(
+		anyOf(
+			exists.transactions({
+				id: expenseTransactionId,
+				organizationId,
+				accountId,
+				kind: 'expense',
+				amountMinor,
+				currency,
+				internalTransferId
+			}),
+			exists.transactions({
+				id: expenseTransactionId,
+				organizationId,
+				accountId,
+				kind: 'expense',
+				amountMinor: amountMinor2,
+				currency: currency2,
+				internalTransferId
 			})
-		])
-	)
-	policy.restoreOperations.allowUpdate
-		.whereOld({ ownerId: session.user, status: 'incomplete' })
-		.whereNew((row) =>
-			allOf([
-				{ ownerId: session.user, status: 'active' },
-				policy.restoreOperations.exists.where({
-					id: row.id,
-					workspaceId: row.workspaceId,
-					sourceFileId: row.sourceFileId,
-					ownerId: row.ownerId,
-					payloadSha256: row.payloadSha256,
-					graphSha256: row.graphSha256,
-					workspaceName: row.workspaceName,
-					workspaceKind: row.workspaceKind,
-					workspaceCurrency: row.workspaceCurrency,
-					status: 'incomplete'
-				})
-			])
+		),
+		anyOf(
+			exists.transactions({
+				id: incomeTransactionId,
+				organizationId,
+				accountId: accountId2,
+				kind: 'income',
+				amountMinor: amountMinor3,
+				currency: currency3,
+				internalTransferId
+			}),
+			exists.transactions({
+				id: incomeTransactionId,
+				organizationId,
+				accountId: accountId2,
+				kind: 'income',
+				amountMinor: amountMinor2,
+				currency: currency2,
+				internalTransferId
+			})
 		)
-	policy.restoreOperations.allowDelete.never()
-
-	// Owner membership is the publication boundary. The root remains hidden before it exists.
-	policy.organizationMembers.allowInsert.where((row) =>
-		allOf([
-			raw(originalRule('organizationMembers', 'insert', 'with_check')),
-			anyOf([
-				policy.organizations.exists.where({
-					id: row.organizationId,
-					restoreOperationId: { isNull: true }
-				}),
-				policy.restoreOperations.exists.where({
-					workspaceId: row.organizationId,
-					status: 'active'
-				})
-			])
-		])
 	)
-	policy.organizations.allowUpdate
-		.whereOld(raw(originalRule('organizations', 'update', 'using')))
-		.whereNew((row) =>
-			allOf([
-				raw(originalRule('organizations', 'update', 'with_check')),
-				// Old-schema edits map the unknown reference to null. A sealed operation
-				// keeps reconstruction closed after that loss; new bindings stay forbidden.
-				anyOf([
-					allOf([
-						{ restoreOperationId: { isNull: true } },
-						anyOf([
-							policy.organizations.exists.where({
-								id: row.id,
-								restoreOperationId: { isNull: true }
-							}),
-							policy.restoreOperations.exists.where({ workspaceId: row.id, status: 'active' })
-						])
-					]),
-					policy.organizations.exists.where({
-						id: row.id,
-						restoreOperationId: row.restoreOperationId
-					})
-				])
-			])
+
+const detachedTransactionMatches = (expenseTransactionId: s.Uuid, organizationId: s.Uuid) =>
+	exists.transactions({ id: expenseTransactionId, organizationId, internalTransferId: null })
+
+const linkedEndpointFinancialsMatch = (
+	expenseTransactionId: s.Uuid,
+	organizationId: s.Uuid,
+	accountId: s.Uuid,
+	kind: 'expense' | 'income',
+	amountMinor: s.Value<'bigint'>,
+	currency: s.Value<'string'>,
+	kind2: 'expense' | 'income',
+	amountMinor2: s.Value<'bigint'>,
+	currency2: s.Value<'string'>
+) =>
+	anyOf(
+		exists.transactions({
+			id: expenseTransactionId,
+			organizationId,
+			accountId,
+			kind,
+			amountMinor,
+			currency,
+			internalTransferId: ne(null)
+		}),
+		exists.transactions({
+			id: expenseTransactionId,
+			organizationId,
+			accountId,
+			kind: kind2,
+			amountMinor: amountMinor2,
+			currency: currency2,
+			internalTransferId: ne(null)
+		})
+	)
+
+const detachedEndpointFinancialsMatch = (
+	expenseTransactionId: s.Uuid,
+	organizationId: s.Uuid,
+	accountId: s.Uuid,
+	kind: 'expense' | 'income',
+	amountMinor: s.Value<'bigint'>,
+	currency: s.Value<'string'>,
+	kind2: 'expense' | 'income',
+	amountMinor2: s.Value<'bigint'>,
+	currency2: s.Value<'string'>
+) =>
+	anyOf(
+		exists.transactions({
+			id: expenseTransactionId,
+			organizationId,
+			accountId,
+			kind,
+			amountMinor,
+			currency,
+			internalTransferId: null
+		}),
+		exists.transactions({
+			id: expenseTransactionId,
+			organizationId,
+			accountId,
+			kind: kind2,
+			amountMinor: amountMinor2,
+			currency: currency2,
+			internalTransferId: null
+		})
+	)
+
+const canWriteBothAccounts = (organizationId: s.Uuid, accountId: s.Uuid, accountId2: s.Uuid) =>
+	anyOf(
+		canWriteAllAccounts(organizationId),
+		allOf(
+			hasMembershipScope(organizationId, 'member', 'selected'),
+			hasAccountWriteGrant(organizationId, accountId),
+			hasAccountWriteGrant(organizationId, accountId2)
 		)
-	policy.accounts.allowRead.where((row) =>
-		anyOf([raw(originalRule('accounts', 'select', 'using')), recovery(row.organizationId)])
-	)
-	policy.accounts.allowInsert.where((row) =>
-		anyOf([raw(originalRule('accounts', 'insert', 'with_check')), recovery(row.organizationId)])
-	)
-	policy.categories.allowRead.where((row) =>
-		anyOf([raw(originalRule('categories', 'select', 'using')), recovery(row.organizationId)])
-	)
-	policy.categories.allowInsert.where((row) =>
-		anyOf([raw(originalRule('categories', 'insert', 'with_check')), recovery(row.organizationId)])
-	)
-	policy.transactions.allowRead.where((row) =>
-		anyOf([raw(originalRule('transactions', 'select', 'using')), recovery(row.organizationId)])
-	)
-	policy.tags.allowRead.where((row) =>
-		anyOf([raw(originalRule('tags', 'select', 'using')), recovery(row.organizationId)])
-	)
-	policy.tags.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('tags', 'insert', 'with_check')),
-			allOf([
-				recovery(row.organizationId),
-				anyOf([
-					{ categoryId: { isNull: true } },
-					policy.categories.exists.where({
-						id: row.categoryId,
-						organizationId: row.organizationId,
-						kind: row.kind
-					})
-				])
-			])
-		])
-	)
-	policy.checks.allowRead.where((row) =>
-		anyOf([raw(originalRule('checks', 'select', 'using')), recovery(row.organizationId)])
-	)
-	policy.checks.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('checks', 'insert', 'with_check')),
-			allOf([
-				recovery(row.organizationId),
-				policy.accounts.exists.where({ id: row.accountId, organizationId: row.organizationId })
-			])
-		])
-	)
-	policy.transactionBatches.allowRead.where((row) =>
-		anyOf([
-			raw(originalRule('transactionBatches', 'select', 'using')),
-			recovery(row.organizationId)
-		])
-	)
-	policy.transactionBatches.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('transactionBatches', 'insert', 'with_check')),
-			recovery(row.organizationId)
-		])
-	)
-	policy.batchTemplates.allowRead.where((row) =>
-		anyOf([raw(originalRule('batchTemplates', 'select', 'using')), recovery(row.organizationId)])
-	)
-	policy.batchTemplates.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('batchTemplates', 'insert', 'with_check')),
-			recovery(row.organizationId)
-		])
-	)
-	policy.transactionTags.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('transactionTags', 'insert', 'with_check')),
-			allOf([
-				recovery(row.organizationId),
-				policy.transactions.exists.where({
-					id: row.transactionId,
-					organizationId: row.organizationId
-				}),
-				policy.tags.exists.where({ id: row.tagId, organizationId: row.organizationId })
-			])
-		])
-	)
-	policy.transactions.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('transactions', 'insert', 'with_check')),
-			allOf([
-				recovery(row.organizationId),
-				{ checkDetailsId: { isNull: true } },
-				policy.accounts.exists.where({
-					id: row.accountId,
-					organizationId: row.organizationId,
-					currency: row.currency
-				}),
-				policy.categories.exists.where({
-					id: row.categoryId,
-					organizationId: row.organizationId,
-					kind: row.kind
-				}),
-				checkReferenceCondition({
-					transaction: row,
-					checkExists: (where) => policy.checks.exists.where(where)
-				})
-			])
-		])
 	)
 
-	// Backup v1/v2 allow each side to fall back to the legacy shared amount/currency.
-	// Match the same resolved facts as validation; never fall back over an explicit value.
-	const restoredTransferEndpoint = (row: InternalTransferContext, side: 'expense' | 'income') => {
-		const amountMissing =
-			side === 'expense'
-				? { expenseAmountMinor: { isNull: true } }
-				: { incomeAmountMinor: { isNull: true } }
-		const amountPresent =
-			side === 'expense'
-				? { expenseAmountMinor: { isNull: false } }
-				: { incomeAmountMinor: { isNull: false } }
-		const currencyMissing =
-			side === 'expense'
-				? { expenseCurrency: { isNull: true } }
-				: { incomeCurrency: { isNull: true } }
-		const currencyPresent =
-			side === 'expense'
-				? { expenseCurrency: { isNull: false } }
-				: { incomeCurrency: { isNull: false } }
-		const endpoint = {
-			id: side === 'expense' ? row.expenseTransactionId : row.incomeTransactionId,
-			organizationId: row.organizationId,
-			accountId: side === 'expense' ? row.expenseAccountId : row.incomeAccountId,
-			kind: side,
-			internalTransferId: row.id
-		}
-		const amount = side === 'expense' ? row.expenseAmountMinor : row.incomeAmountMinor
-		const currency = side === 'expense' ? row.expenseCurrency : row.incomeCurrency
-		return anyOf([
-			allOf([
-				amountPresent,
-				currencyPresent,
-				policy.transactions.exists.where({ ...endpoint, amountMinor: amount, currency })
-			]),
-			allOf([
-				amountPresent,
-				currencyMissing,
-				policy.transactions.exists.where({
-					...endpoint,
-					amountMinor: amount,
-					currency: row.currency
-				})
-			]),
-			allOf([
-				amountMissing,
-				currencyPresent,
-				policy.transactions.exists.where({ ...endpoint, amountMinor: row.amountMinor, currency })
-			]),
-			allOf([
-				amountMissing,
-				currencyMissing,
-				policy.transactions.exists.where({
-					...endpoint,
-					amountMinor: row.amountMinor,
-					currency: row.currency
-				})
-			])
-		])
-	}
-	policy.internalTransfers.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('internalTransfers', 'insert', 'with_check')),
-			allOf([
-				recovery(row.organizationId),
-				restoredTransferEndpoint(row, 'expense'),
-				restoredTransferEndpoint(row, 'income')
-			])
-		])
+const transactionMatchesWithKind = (
+	expenseTransactionId: s.Uuid,
+	organizationId: s.Uuid,
+	accountId: s.Uuid,
+	kind: 'expense' | 'income',
+	internalTransferId: s.Uuid,
+	amountMinor: s.Value<'bigint'>,
+	currency: s.Value<'string'>
+) =>
+	exists.transactions({
+		id: expenseTransactionId,
+		organizationId,
+		accountId,
+		kind,
+		internalTransferId,
+		amountMinor,
+		currency
+	})
+
+const ownerIsMe = { ownerId: session.user }
+
+const workspacePublished = (organizationId: s.Uuid) =>
+	anyOf(
+		exists.organizations({ id: organizationId, restoreOperationId: null }),
+		exists.restoreOperations({ workspaceId: organizationId, status: 'active' })
 	)
 
-	policy.files.allowRead.where((row) =>
-		anyOf([
-			raw(originalRule('files', 'select', 'using')),
-			allOf([
-				{ transactionId: { isNull: true }, accountId: { isNull: true } },
-				policy.restoreOperations.exists.where({
-					sourceFileId: row.id,
-					workspaceId: row.organizationId,
-					ownerId: session.user,
-					status: 'incomplete'
-				})
-			]),
-			allOf([
-				{ transactionId: { isNull: true }, accountId: { isNull: true } },
-				policy.exists(
-					policy.restoreOperations
-						.where({ sourceFileId: row.id, workspaceId: row.organizationId, status: 'active' })
-						.join(policy.organizationMembers, { left: 'workspaceId', right: 'organizationId' })
-						.where({ userId: session.user, role: { in: ['owner', 'admin'] } })
-				)
-			])
-		])
+const canImportProviderTransaction = (
+	organizationId: s.Uuid,
+	accountId: s.Uuid,
+	connectionId: s.Uuid
+) =>
+	allOf(
+		isAdmin(organizationId),
+		activeAccountMatches(accountId, organizationId),
+		exists.simplefinConnections({ id: connectionId, organizationId, status: 'active' })
 	)
 
-	policy.files.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('files', 'insert', 'with_check')),
-			allOf([
-				{ transactionId: { isNull: true }, accountId: { isNull: true } },
-				policy.restoreOperations.exists.where({
-					sourceFileId: row.id,
-					workspaceId: row.organizationId,
-					ownerId: session.user,
-					status: 'incomplete'
-				})
-			]),
-			allOf([
-				policy.exists(
-					policy.transactions
-						.where({ id: row.transactionId })
-						.join(policy.restoreOperations, { left: 'organizationId', right: 'workspaceId' })
-						.where({ ownerId: session.user, status: 'incomplete' })
-				),
-				anyOf([
-					{ organizationId: { isNull: true } },
-					policy.transactions.exists.where({
-						id: row.transactionId,
-						organizationId: row.organizationId
-					})
-				]),
-				anyOf([
-					{ accountId: { isNull: true } },
-					policy.transactions.exists.where({ id: row.transactionId, accountId: row.accountId })
-				])
-			])
-		])
-	)
-	policy.transactionAttachments.allowInsert.where((row) =>
-		anyOf([
-			raw(originalRule('transactionAttachments', 'insert', 'with_check')),
-			allOf([
-				allowedTo.insert('file'),
-				policy.files.exists.where({ id: row.fileId, transactionId: row.transactionId })
-			])
-		])
-	)
-})
+const ownsAdminConnection = (organizationId: s.Uuid) => allOf(isAdmin(organizationId), ownerIsMe)
 
-function overridden(table: string, operation: 'select' | 'insert' | 'update') {
-	const rule = overrides[table]?.[operation]
-	if (!rule) throw new Error('Missing restore policy: ' + table + '.' + operation)
-	return rule
-}
-const operationRules = overrides.restoreOperations
-if (!operationRules) throw new Error('Missing restore operation policy')
-const permissions = {
-	...previousPermissions,
-	organizations: {
-		...previousPermissions.organizations,
-		update: overridden('organizations', 'update')
-	},
-	organizationMembers: {
-		...previousPermissions.organizationMembers,
-		insert: overridden('organizationMembers', 'insert')
+const canAppendSyncAccountResult = (
+	simplefinSyncAccountResult: s.Row<typeof schema, 'simplefinSyncAccountResults'>
+) =>
+	allOf(
+		isAdmin(simplefinSyncAccountResult.organizationId),
+		allowedTo.update(simplefinSyncAccountResult.attempt),
+		exists.simplefinSyncAttempts({
+			id: simplefinSyncAccountResult.attemptId,
+			organizationId: simplefinSyncAccountResult.organizationId,
+			initiatedBy: session.user,
+			outcome: 'unfinished'
+		}),
+		accountMatches(simplefinSyncAccountResult.accountId, simplefinSyncAccountResult.organizationId)
+	)
+
+const canStartSyncAttempt = (organizationId: s.Uuid, connectionId: s.Uuid, ownerId: s.Uuid) =>
+	allOf(
+		isAdmin(organizationId),
+		{ initiatedBy: session.user },
+		exists.simplefinConnections({ id: connectionId, organizationId, ownerId })
+	)
+
+const categoryMatches = (
+	categoryId: s.Uuid,
+	organizationId: s.Uuid,
+	kind: s.Operand<'expense' | 'income', 'enum'>
+) => exists.categories({ id: categoryId, organizationId, kind })
+
+const optionalCategoryMatches = (
+	categoryId: s.Uuid,
+	organizationId: s.Uuid,
+	kind: s.Operand<'expense' | 'income', 'enum'>
+) => anyOf({ categoryId: null }, categoryMatches(categoryId, organizationId, kind))
+
+const validOptionalCategoryKind = (
+	categoryId: s.Uuid,
+	organizationId: s.Uuid,
+	kind: s.Operand<'expense' | 'income', 'enum'>
+) =>
+	allOf(
+		anyOf({ kind: 'expense' }, { kind: 'income' }),
+		optionalCategoryMatches(categoryId, organizationId, kind)
+	)
+
+const fileMatches = (fileId: s.Uuid, transactionId: s.Uuid) =>
+	exists.files({ id: fileId, transactionId })
+
+const tagMatches = (tagId: s.Uuid, organizationId: s.Uuid) =>
+	exists.tags({ id: tagId, organizationId })
+
+const transactionTagTargetsMatch = (
+	transactionId: s.Uuid,
+	organizationId: s.Uuid,
+	kind: 'expense' | 'income',
+	tagId: s.Uuid,
+	kind2: 'expense' | 'income'
+) =>
+	allOf(
+		exists.transactions({ id: transactionId, organizationId, kind }),
+		exists.tags({ id: tagId, organizationId, kind: kind2, archivedAt: null })
+	)
+
+const validCheckReference = (checkId: s.Uuid, organizationId: s.Uuid, accountId: s.Uuid) =>
+	anyOf(
+		allOf(
+			{ checkId: null },
+			anyOf(
+				{ paymentMethod: null },
+				{ paymentMethod: 'cash' },
+				{ paymentMethod: 'transfer' },
+				{ paymentMethod: 'electronic' }
+			)
+		),
+		allOf(
+			{ paymentMethod: 'check', checkId: ne(null) },
+			exists.checks({ id: checkId, organizationId, accountId })
+		)
+	)
+
+const transactionWriteReferencesValid = (
+	organizationId: s.Uuid,
+	accountId: s.Uuid,
+	categoryId: s.Uuid,
+	kind: s.Operand<'expense' | 'income', 'enum'>,
+	currency: s.Value<'string'>,
+	checkId: s.Uuid
+) =>
+	allOf(
+		canWriteAccount(organizationId, accountId),
+		allOf(
+			exists.categories({ id: categoryId, organizationId, kind, archivedAt: null }),
+			exists.accounts({ id: accountId, organizationId, currency, archivedAt: null })
+		),
+		{ checkDetailsId: null },
+		validCheckReference(checkId, organizationId, accountId)
+	)
+
+const transferReferencesTransaction = (
+	internalTransferId: s.Uuid,
+	organizationId: s.Uuid,
+	expenseTransactionId: s.Uuid,
+	expenseAccountId: s.Uuid
+) =>
+	anyOf(
+		exists.internalTransfers({
+			id: internalTransferId,
+			organizationId,
+			expenseTransactionId,
+			expenseAccountId
+		}),
+		exists.internalTransfers({
+			id: internalTransferId,
+			organizationId,
+			incomeTransactionId: expenseTransactionId,
+			incomeAccountId: expenseAccountId
+		})
+	)
+
+export const permissions = definePermissions({
+	accountMemberships: {
+		read: (accountMembership) => canReadMembership(accountMembership.organizationId),
+		insert: (accountMembership) => isAdmin(accountMembership.organizationId),
+		update: (accountMembership) => isAdmin(accountMembership.organizationId),
+		delete: (accountMembership) => isAdmin(accountMembership.organizationId)
 	},
 	accounts: {
-		...previousPermissions.accounts,
-		select: overridden('accounts', 'select'),
-		insert: overridden('accounts', 'insert')
-	},
-	categories: {
-		...previousPermissions.categories,
-		select: overridden('categories', 'select'),
-		insert: overridden('categories', 'insert')
-	},
-	transactions: {
-		...previousPermissions.transactions,
-		select: overridden('transactions', 'select'),
-		insert: overridden('transactions', 'insert')
-	},
-	tags: {
-		...previousPermissions.tags,
-		select: overridden('tags', 'select'),
-		insert: overridden('tags', 'insert')
-	},
-	checks: {
-		...previousPermissions.checks,
-		select: overridden('checks', 'select'),
-		insert: overridden('checks', 'insert')
-	},
-	transactionTags: {
-		...previousPermissions.transactionTags,
-		insert: overridden('transactionTags', 'insert')
-	},
-	transactionBatches: {
-		...previousPermissions.transactionBatches,
-		select: overridden('transactionBatches', 'select'),
-		insert: overridden('transactionBatches', 'insert')
+		read: (account) => canReadAccountOrRestore(account.organizationId, account.id),
+		insert: (account) =>
+			anyOf(
+				allOf(isAdmin(account.organizationId), { archivedAt: null }),
+				ownsIncompleteRestore(account.organizationId)
+			),
+		update: (account) => canWriteAccount(account.organizationId, account.id),
+		delete: false
 	},
 	batchTemplates: {
-		...previousPermissions.batchTemplates,
-		select: overridden('batchTemplates', 'select'),
-		insert: overridden('batchTemplates', 'insert')
+		read: (batchTemplate) => canReadWorkspaceOrRestore(batchTemplate.organizationId),
+		insert: (batchTemplate) => canWriteAllAccountsOrRestore(batchTemplate.organizationId),
+		update: (batchTemplate) => canWriteAllAccounts(batchTemplate.organizationId),
+		delete: (batchTemplate) => isAdmin(batchTemplate.organizationId)
 	},
-	internalTransfers: {
-		...previousPermissions.internalTransfers,
-		insert: overridden('internalTransfers', 'insert')
+	categories: {
+		read: (category) => canReadWorkspaceOrRestore(category.organizationId),
+		insert: (category) =>
+			anyOf(
+				canEditWorkspaceData(category.organizationId),
+				ownsIncompleteRestore(category.organizationId)
+			),
+		update: (category) => allOf(canEditWorkspaceData(category.organizationId), { isSystem: false }),
+		delete: (category) => allOf(isAdmin(category.organizationId), { isSystem: false })
+	},
+	checkDetails: {
+		read: false,
+		insert: false,
+		update: false,
+		delete: false
+	},
+	checks: {
+		read: (check) => canReadAccountOrRestore(check.organizationId, check.accountId),
+		insert: (check) =>
+			anyOf(
+				allOf(
+					canWriteAccount(check.organizationId, check.accountId),
+					activeAccountMatches(check.accountId, check.organizationId)
+				),
+				allOf(
+					ownsIncompleteRestore(check.organizationId),
+					accountMatches(check.accountId, check.organizationId)
+				)
+			),
+		updateIf: (check) => canWriteAccount(check.organizationId, check.accountId),
+		updateTo: (check, old) =>
+			allOf(
+				canWriteAccount(check.organizationId, check.accountId),
+				activeAccountMatches(check.accountId, check.organizationId),
+				{ organizationId: old.organizationId }
+			),
+		delete: false
+	},
+	fileParts: {
+		read: (filePart) => allowedTo.read(filePart.file),
+		insert: (filePart) => allowedTo.insert(filePart.file),
+		update: false,
+		delete: (filePart) => allowedTo.delete(filePart.file)
 	},
 	files: {
-		...previousPermissions.files,
-		select: overridden('files', 'select'),
-		insert: overridden('files', 'insert')
+		read: (file) =>
+			anyOf(
+				allOf(
+					allowedTo.read(file.transaction),
+					exists.transactionAttachments({ fileId: file.id, transactionId: file.transactionId })
+				),
+				ownedRestoreSource(file.id, file.organizationId),
+				allOf(
+					{ transactionId: null, accountId: null },
+					exists(
+						from
+							.restoreOperations()
+							.join(from.organizationMembers('__join_0'), {
+								on: [['restoreOperations.workspaceId', '__join_0.organizationId']]
+							})
+							.where({
+								'restoreOperations.sourceFileId': outer('id'),
+								'restoreOperations.workspaceId': outer('organizationId'),
+								'restoreOperations.status': typed.text('active'),
+								'__join_0.userId': session.user,
+								'__join_0.role': [typed.text('owner'), typed.text('admin')]
+							})
+					)
+				)
+			),
+		insert: (file) =>
+			anyOf(
+				canUpdateTransactionFile(file),
+				ownedRestoreSource(file.id, file.organizationId),
+				allOf(
+					exists(
+						from
+							.transactions()
+							.join(from.restoreOperations('__join_0'), {
+								on: [['transactions.organizationId', '__join_0.workspaceId']]
+							})
+							.where({
+								'transactions.id': outer('transactionId'),
+								'__join_0.ownerId': session.user,
+								'__join_0.status': typed.text('incomplete')
+							})
+					),
+					anyOf(
+						{ organizationId: null },
+						transactionMatches(file.transactionId, file.organizationId)
+					),
+					anyOf({ accountId: null }, file.transaction.where({ accountId: file.accountId }))
+				)
+			),
+		update: false,
+		delete: (file) => canUpdateTransactionFile(file)
+	},
+	internalTransfers: {
+		read: (internalTransfer) =>
+			allOf(
+				allowedTo.read(internalTransfer.expenseTransaction),
+				allowedTo.read(internalTransfer.incomeTransaction),
+				anyOf(
+					transferEndpointsFinancialsMatch(
+						internalTransfer.expenseTransactionId,
+						internalTransfer.organizationId,
+						internalTransfer.expenseAccountId,
+						internalTransfer.expenseAmountMinor,
+						internalTransfer.expenseCurrency,
+						internalTransfer.id,
+						internalTransfer.amountMinor,
+						internalTransfer.currency,
+						internalTransfer.incomeTransactionId,
+						internalTransfer.incomeAccountId,
+						internalTransfer.incomeAmountMinor,
+						internalTransfer.incomeCurrency
+					),
+					allOf(
+						detachedTransactionMatches(
+							internalTransfer.expenseTransactionId,
+							internalTransfer.organizationId
+						),
+						detachedTransactionMatches(
+							internalTransfer.incomeTransactionId,
+							internalTransfer.organizationId
+						)
+					),
+					allOf(
+						linkedEndpointFinancialsMatch(
+							internalTransfer.expenseTransactionId,
+							internalTransfer.organizationId,
+							internalTransfer.expenseAccountId,
+							'expense',
+							internalTransfer.expenseAmountMinor,
+							internalTransfer.expenseCurrency,
+							'expense',
+							internalTransfer.amountMinor,
+							internalTransfer.currency
+						),
+						linkedEndpointFinancialsMatch(
+							internalTransfer.incomeTransactionId,
+							internalTransfer.organizationId,
+							internalTransfer.incomeAccountId,
+							'income',
+							internalTransfer.incomeAmountMinor,
+							internalTransfer.incomeCurrency,
+							'income',
+							internalTransfer.amountMinor,
+							internalTransfer.currency
+						)
+					)
+				)
+			),
+		insert: (internalTransfer) =>
+			anyOf(
+				allOf(
+					anyOf(
+						transferEndpointsFinancialsMatch(
+							internalTransfer.expenseTransactionId,
+							internalTransfer.organizationId,
+							internalTransfer.expenseAccountId,
+							internalTransfer.expenseAmountMinor,
+							internalTransfer.expenseCurrency,
+							internalTransfer.id,
+							internalTransfer.amountMinor,
+							internalTransfer.currency,
+							internalTransfer.incomeTransactionId,
+							internalTransfer.incomeAccountId,
+							internalTransfer.incomeAmountMinor,
+							internalTransfer.incomeCurrency
+						),
+						allOf(
+							detachedEndpointFinancialsMatch(
+								internalTransfer.expenseTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.expenseAccountId,
+								'expense',
+								internalTransfer.expenseAmountMinor,
+								internalTransfer.expenseCurrency,
+								'expense',
+								internalTransfer.amountMinor,
+								internalTransfer.currency
+							),
+							detachedEndpointFinancialsMatch(
+								internalTransfer.incomeTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.incomeAccountId,
+								'income',
+								internalTransfer.incomeAmountMinor,
+								internalTransfer.incomeCurrency,
+								'income',
+								internalTransfer.amountMinor,
+								internalTransfer.currency
+							)
+						)
+					),
+					canWriteBothAccounts(
+						internalTransfer.organizationId,
+						internalTransfer.expenseAccountId,
+						internalTransfer.incomeAccountId
+					)
+				),
+				allOf(
+					ownsIncompleteRestore(internalTransfer.organizationId),
+					anyOf(
+						allOf(
+							{ expenseAmountMinor: ne(null) },
+							{ expenseCurrency: ne(null) },
+							transactionMatchesWithKind(
+								internalTransfer.expenseTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.expenseAccountId,
+								'expense',
+								internalTransfer.id,
+								internalTransfer.expenseAmountMinor,
+								internalTransfer.expenseCurrency
+							)
+						),
+						allOf(
+							{ expenseAmountMinor: ne(null) },
+							{ expenseCurrency: null },
+							transactionMatchesWithKind(
+								internalTransfer.expenseTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.expenseAccountId,
+								'expense',
+								internalTransfer.id,
+								internalTransfer.expenseAmountMinor,
+								internalTransfer.currency
+							)
+						),
+						allOf(
+							{ expenseAmountMinor: null },
+							{ expenseCurrency: ne(null) },
+							transactionMatchesWithKind(
+								internalTransfer.expenseTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.expenseAccountId,
+								'expense',
+								internalTransfer.id,
+								internalTransfer.amountMinor,
+								internalTransfer.expenseCurrency
+							)
+						),
+						allOf(
+							{ expenseAmountMinor: null },
+							{ expenseCurrency: null },
+							transactionMatchesWithKind(
+								internalTransfer.expenseTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.expenseAccountId,
+								'expense',
+								internalTransfer.id,
+								internalTransfer.amountMinor,
+								internalTransfer.currency
+							)
+						)
+					),
+					anyOf(
+						allOf(
+							{ incomeAmountMinor: ne(null) },
+							{ incomeCurrency: ne(null) },
+							transactionMatchesWithKind(
+								internalTransfer.incomeTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.incomeAccountId,
+								'income',
+								internalTransfer.id,
+								internalTransfer.incomeAmountMinor,
+								internalTransfer.incomeCurrency
+							)
+						),
+						allOf(
+							{ incomeAmountMinor: ne(null) },
+							{ incomeCurrency: null },
+							transactionMatchesWithKind(
+								internalTransfer.incomeTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.incomeAccountId,
+								'income',
+								internalTransfer.id,
+								internalTransfer.incomeAmountMinor,
+								internalTransfer.currency
+							)
+						),
+						allOf(
+							{ incomeAmountMinor: null },
+							{ incomeCurrency: ne(null) },
+							transactionMatchesWithKind(
+								internalTransfer.incomeTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.incomeAccountId,
+								'income',
+								internalTransfer.id,
+								internalTransfer.amountMinor,
+								internalTransfer.incomeCurrency
+							)
+						),
+						allOf(
+							{ incomeAmountMinor: null },
+							{ incomeCurrency: null },
+							transactionMatchesWithKind(
+								internalTransfer.incomeTransactionId,
+								internalTransfer.organizationId,
+								internalTransfer.incomeAccountId,
+								'income',
+								internalTransfer.id,
+								internalTransfer.amountMinor,
+								internalTransfer.currency
+							)
+						)
+					)
+				)
+			),
+		update: false,
+		delete: (internalTransfer) =>
+			canWriteBothAccounts(
+				internalTransfer.organizationId,
+				internalTransfer.expenseAccountId,
+				internalTransfer.incomeAccountId
+			)
+	},
+	organizationMembers: {
+		read: (organizationMember) => canReadMembership(organizationMember.organizationId),
+		insert: (organizationMember) =>
+			allOf(
+				anyOf(
+					isAdmin(organizationMember.organizationId),
+					allOf(
+						{ userId: session.user, role: 'owner' },
+						organizationMember.organization.where(ownerIsMe)
+					)
+				),
+				workspacePublished(organizationMember.organizationId)
+			),
+		update: (organizationMember) => isAdmin(organizationMember.organizationId),
+		delete: (organizationMember) => canReadMembership(organizationMember.organizationId)
+	},
+	organizations: {
+		read: (organization) => isOrganizationMember(organization.id),
+		insert: ownerIsMe,
+		updateIf: (organization) => isAdmin(organization.id),
+		updateTo: (organization, old) =>
+			allOf(
+				isAdmin(organization.id),
+				anyOf(allOf({ restoreOperationId: null }, workspacePublished(organization.id)), {
+					restoreOperationId: old.restoreOperationId
+				})
+			),
+		delete: false
+	},
+	profiles: {
+		read: anyOf(
+			mine,
+			exists(
+				from
+					.organizationMembers()
+					.join(from.organizationMembers('__join_0'), {
+						on: [['organizationMembers.organizationId', '__join_0.organizationId']]
+					})
+					.where({ 'organizationMembers.profileId': outer('id'), '__join_0.userId': session.user })
+			)
+		),
+		insert: mine,
+		update: mine,
+		delete: false
+	},
+	restoreOperations: {
+		read: (restoreOperation) =>
+			anyOf(
+				{ ownerId: session.user, status: 'incomplete' },
+				allOf(
+					{ status: 'active' },
+					exists.organizationMembers({
+						organizationId: restoreOperation.workspaceId,
+						userId: session.user,
+						role: ['owner', 'admin']
+					})
+				)
+			),
+		insert: (restoreOperation) =>
+			allOf(
+				{ ownerId: session.user, status: 'incomplete' },
+				restoreOperation.workspace.where({
+					ownerId: session.user,
+					restoreOperationId: restoreOperation.id,
+					name: restoreOperation.workspaceName,
+					kind: restoreOperation.workspaceKind,
+					defaultCurrency: restoreOperation.workspaceCurrency
+				})
+			),
+		updateIf: { ownerId: session.user, status: 'incomplete' },
+		updateTo: (restoreOperation) =>
+			allOf(
+				{ ownerId: session.user, status: 'active' },
+				exists.restoreOperations({
+					id: restoreOperation.id,
+					workspaceId: restoreOperation.workspaceId,
+					sourceFileId: restoreOperation.sourceFileId,
+					ownerId: restoreOperation.ownerId,
+					payloadSha256: restoreOperation.payloadSha256,
+					graphSha256: restoreOperation.graphSha256,
+					workspaceName: restoreOperation.workspaceName,
+					workspaceKind: restoreOperation.workspaceKind,
+					workspaceCurrency: restoreOperation.workspaceCurrency,
+					status: 'incomplete'
+				})
+			),
+		delete: false
+	},
+	simplefinAccountLinks: {
+		read: (simplefinAccountLink) => isAdmin(simplefinAccountLink.organizationId),
+		insert: (simplefinAccountLink) =>
+			canImportProviderTransaction(
+				simplefinAccountLink.organizationId,
+				simplefinAccountLink.accountId,
+				simplefinAccountLink.connectionId
+			),
+		updateIf: (simplefinAccountLink) => isAdmin(simplefinAccountLink.organizationId),
+		updateTo: (simplefinAccountLink) =>
+			canImportProviderTransaction(
+				simplefinAccountLink.organizationId,
+				simplefinAccountLink.accountId,
+				simplefinAccountLink.connectionId
+			),
+		delete: (simplefinAccountLink) => isAdmin(simplefinAccountLink.organizationId)
+	},
+	simplefinConnections: {
+		read: (simplefinConnection) => isAdmin(simplefinConnection.organizationId),
+		insert: (simplefinConnection) =>
+			allOf(ownsAdminConnection(simplefinConnection.organizationId), { accessUrl: '' }),
+		updateIf: (simplefinConnection) => ownsAdminConnection(simplefinConnection.organizationId),
+		updateTo: (simplefinConnection, old) =>
+			allOf(
+				ownsAdminConnection(simplefinConnection.organizationId),
+				{ accessUrl: '' },
+				{ organizationId: old.organizationId, ownerId: old.ownerId }
+			),
+		delete: (simplefinConnection) => ownsAdminConnection(simplefinConnection.organizationId)
+	},
+	simplefinSyncAccountResults: {
+		read: (simplefinSyncAccountResult) => allowedTo.read(simplefinSyncAccountResult.attempt),
+		insert: (simplefinSyncAccountResult) => canAppendSyncAccountResult(simplefinSyncAccountResult),
+		updateIf: (simplefinSyncAccountResult) =>
+			canAppendSyncAccountResult(simplefinSyncAccountResult),
+		updateTo: (simplefinSyncAccountResult, old) =>
+			allOf(canAppendSyncAccountResult(simplefinSyncAccountResult), {
+				attemptId: old.attemptId,
+				organizationId: old.organizationId,
+				accountId: old.accountId,
+				accountName: old.accountName
+			}),
+		delete: (simplefinSyncAccountResult) => allowedTo.delete(simplefinSyncAccountResult.attempt)
+	},
+	simplefinSyncAttempts: {
+		read: (simplefinSyncAttempt) => isAdmin(simplefinSyncAttempt.organizationId),
+		insert: (simplefinSyncAttempt) =>
+			allOf(
+				canStartSyncAttempt(
+					simplefinSyncAttempt.organizationId,
+					simplefinSyncAttempt.connectionId,
+					simplefinSyncAttempt.initiatedBy
+				),
+				{ outcome: 'unfinished', finishedAt: null, importSettlement: 'notStarted' }
+			),
+		updateIf: (simplefinSyncAttempt) =>
+			allOf(
+				canStartSyncAttempt(
+					simplefinSyncAttempt.organizationId,
+					simplefinSyncAttempt.connectionId,
+					simplefinSyncAttempt.initiatedBy
+				),
+				{ outcome: 'unfinished' }
+			),
+		updateTo: (simplefinSyncAttempt, old) =>
+			allOf(
+				canStartSyncAttempt(
+					simplefinSyncAttempt.organizationId,
+					simplefinSyncAttempt.connectionId,
+					simplefinSyncAttempt.initiatedBy
+				),
+				{
+					organizationId: old.organizationId,
+					connectionId: old.connectionId,
+					initiatedBy: old.initiatedBy,
+					startedAt: old.startedAt
+				}
+			),
+		delete: (simplefinSyncAttempt) =>
+			allOf(
+				canStartSyncAttempt(
+					simplefinSyncAttempt.organizationId,
+					simplefinSyncAttempt.connectionId,
+					simplefinSyncAttempt.initiatedBy
+				),
+				{ outcome: ne('unfinished'), finishedAt: ne(null) }
+			)
+	},
+	tags: {
+		read: (tag) => canReadWorkspaceOrRestore(tag.organizationId),
+		insert: (tag) =>
+			anyOf(
+				allOf(
+					canEditWorkspaceData(tag.organizationId),
+					validOptionalCategoryKind(tag.categoryId, tag.organizationId, tag.kind)
+				),
+				allOf(
+					ownsIncompleteRestore(tag.organizationId),
+					optionalCategoryMatches(tag.categoryId, tag.organizationId, tag.kind)
+				)
+			),
+		updateIf: (tag) => canEditWorkspaceData(tag.organizationId),
+		updateTo: (tag, old) =>
+			allOf(
+				canEditWorkspaceData(tag.organizationId),
+				validOptionalCategoryKind(tag.categoryId, tag.organizationId, tag.kind),
+				{
+					organizationId: old.organizationId,
+					kind: old.kind
+				}
+			),
+		delete: (tag) => isAdmin(tag.organizationId)
 	},
 	transactionAttachments: {
-		...previousPermissions.transactionAttachments,
-		insert: overridden('transactionAttachments', 'insert')
+		read: (transactionAttachment) => allowedTo.read(transactionAttachment.transaction),
+		insert: (transactionAttachment) =>
+			anyOf(
+				allowedTo.update(transactionAttachment.transaction),
+				allOf(
+					allowedTo.insert(transactionAttachment.file),
+					fileMatches(transactionAttachment.fileId, transactionAttachment.transactionId)
+				)
+			),
+		updateIf: (transactionAttachment) => allowedTo.update(transactionAttachment.transaction),
+		updateTo: (transactionAttachment) =>
+			allOf(
+				allowedTo.update(transactionAttachment.transaction),
+				fileMatches(transactionAttachment.fileId, transactionAttachment.transactionId)
+			),
+		delete: (transactionAttachment) => allowedTo.update(transactionAttachment.transaction)
 	},
-	restoreOperations: operationRules
-}
-
-export default permissions
+	transactionBatches: {
+		read: (transactionBatch) => canReadWorkspaceOrRestore(transactionBatch.organizationId),
+		insert: (transactionBatch) => canWriteAllAccountsOrRestore(transactionBatch.organizationId),
+		update: (transactionBatch) => canWriteAllAccounts(transactionBatch.organizationId),
+		delete: (transactionBatch) => isAdmin(transactionBatch.organizationId)
+	},
+	transactionTags: {
+		read: (transactionTag) =>
+			allOf(
+				allowedTo.read(transactionTag.transaction),
+				transactionMatches(transactionTag.transactionId, transactionTag.organizationId),
+				tagMatches(transactionTag.tagId, transactionTag.organizationId)
+			),
+		insert: (transactionTag) =>
+			anyOf(
+				allOf(
+					allowedTo.update(transactionTag.transaction),
+					anyOf(
+						transactionTagTargetsMatch(
+							transactionTag.transactionId,
+							transactionTag.organizationId,
+							'expense',
+							transactionTag.tagId,
+							'expense'
+						),
+						transactionTagTargetsMatch(
+							transactionTag.transactionId,
+							transactionTag.organizationId,
+							'income',
+							transactionTag.tagId,
+							'income'
+						)
+					)
+				),
+				allOf(
+					ownsIncompleteRestore(transactionTag.organizationId),
+					transactionMatches(transactionTag.transactionId, transactionTag.organizationId),
+					tagMatches(transactionTag.tagId, transactionTag.organizationId)
+				)
+			),
+		delete: (transactionTag) =>
+			allOf(
+				allowedTo.update(transactionTag.transaction),
+				transactionMatches(transactionTag.transactionId, transactionTag.organizationId),
+				tagMatches(transactionTag.tagId, transactionTag.organizationId)
+			)
+	},
+	transactions: {
+		read: (transaction) =>
+			canReadAccountOrRestore(transaction.organizationId, transaction.accountId),
+		insert: (transaction) =>
+			anyOf(
+				allOf(
+					transactionWriteReferencesValid(
+						transaction.organizationId,
+						transaction.accountId,
+						transaction.categoryId,
+						transaction.kind,
+						transaction.currency,
+						transaction.checkId
+					),
+					anyOf(
+						{ internalTransferId: null },
+						{ source: 'manual' },
+						transferReferencesTransaction(
+							transaction.internalTransferId,
+							transaction.organizationId,
+							transaction.id,
+							transaction.accountId
+						)
+					)
+				),
+				allOf(
+					ownsIncompleteRestore(transaction.organizationId),
+					{ checkDetailsId: null },
+					transaction.account.where({
+						organizationId: transaction.organizationId,
+						currency: transaction.currency
+					}),
+					categoryMatches(transaction.categoryId, transaction.organizationId, transaction.kind),
+					validCheckReference(
+						transaction.checkId,
+						transaction.organizationId,
+						transaction.accountId
+					)
+				)
+			),
+		updateIf: (transaction) => canWriteAccount(transaction.organizationId, transaction.accountId),
+		updateTo: (transaction, old) =>
+			allOf(
+				transactionWriteReferencesValid(
+					transaction.organizationId,
+					transaction.accountId,
+					transaction.categoryId,
+					transaction.kind,
+					transaction.currency,
+					transaction.checkId
+				),
+				anyOf(
+					allOf(
+						{ internalTransferId: null },
+						anyOf(
+							exists.transactions({ id: transaction.id, internalTransferId: null }),
+							allOf(exists.transactions({ id: transaction.id, internalTransferId: ne(null) }), {
+								organizationId: old.organizationId,
+								accountId: old.accountId,
+								kind: old.kind,
+								amountMinor: old.amountMinor,
+								currency: old.currency
+							})
+						)
+					),
+					allOf(
+						transferReferencesTransaction(
+							transaction.internalTransferId,
+							transaction.organizationId,
+							transaction.id,
+							transaction.accountId
+						),
+						{
+							organizationId: old.organizationId,
+							accountId: old.accountId,
+							kind: old.kind,
+							amountMinor: old.amountMinor,
+							currency: old.currency
+						}
+					)
+				),
+				{ organizationId: old.organizationId, kind: old.kind, source: old.source },
+				anyOf(
+					allOf(
+						{ externalId: null },
+						exists.transactions({ id: transaction.id, externalId: null })
+					),
+					{ externalId: old.externalId }
+				)
+			),
+		delete: (transaction) =>
+			allOf(
+				anyOf(
+					isAdmin(transaction.organizationId),
+					allOf(
+						isOrganizationMemberWithRole(transaction.organizationId, 'member'),
+						hasSelectedAccountScope(transaction.organizationId),
+						exists.accountMemberships({
+							organizationId: transaction.organizationId,
+							accountId: transaction.accountId,
+							userId: session.user,
+							canDelete: true
+						})
+					)
+				),
+				{ internalTransferId: null }
+			)
+	},
+	uploads: {
+		read: false,
+		insert: false,
+		update: false,
+		delete: false
+	}
+})

@@ -72,21 +72,14 @@ const { createJazzSessionReadinessAdapter } =
 	await import('delightful-local-first/backend/jazz/session-readiness')
 let retries = 0
 let released = 0
-const unused = async () => {}
 const readinessBinding = createJazzSessionReadinessAdapter({
-	getSnapshot: () => ({ status: 'ready' }),
+	getSnapshot: () => ({ status: 'ready', user: null, localFirst: false }),
 	subscribe: () => () => {
 		released += 1
 	},
 	retry: async () => {
 		retries += 1
-	},
-	createLocalFirst: unused,
-	restoreLocalFirst: unused,
-	loginWithBackend: unused,
-	linkWithBackend: unused,
-	logout: unused,
-	close: unused
+	}
 })
 const readinessReporter = createActor(
 	createStepLogic({

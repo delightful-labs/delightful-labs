@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { imageEditorMachine, imageEditorPresentation } from './image-editor.js'
 import * as platform from '../../domain/image-editor-platform.js'
 import * as pixels from '../../domain/image-editor-pixels.js'
-import { TestImageData } from '../../testing/image-editor/fixtures.js'
+import { TestImageData, mockEditorRendering } from '../../testing/image-editor/fixtures.js'
 import { createActor, toPromise, waitFor, createAsyncLogic } from 'xstate'
 
 const cleanups: (() => void)[] = []
@@ -14,6 +14,7 @@ afterEach(() => {
 })
 
 function fixture(mimeType = 'image/png') {
+	mockEditorRendering()
 	const file = new File(['original'], 'receipt.png', { type: mimeType })
 	const source = new TestImageData(
 		4,

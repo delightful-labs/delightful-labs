@@ -46,7 +46,7 @@
 		"@xstate/test": "2.0.0-beta.0",
 		"delightful-ui": "workspace:*",
 		"fast-check": "4.10.2",
-		"jazz-tools": "2.0.0-alpha.60",
+		"jazz-tools": "2.0.0-alpha.67",
 		"oxfmt": "0.76.0",
 		"oxlint": "1.91.0",
 		"publint": "0.3.25",
@@ -437,6 +437,10 @@
 		"./backend/jazz/worker-broker": {
 			"types": "./dist/backend/jazz/worker-broker.d.ts",
 			"default": "./dist/backend/jazz/worker-broker.js"
+		},
+		"./backend/jazz/session-runtime": {
+			"types": "./dist/backend/jazz/session-runtime.d.ts",
+			"default": "./dist/backend/jazz/session-runtime.js"
 		}
 	},
 	"svelte": "./dist/index.js",
@@ -448,7 +452,7 @@
 	],
 	"peerDependencies": {
 		"delightful-ui": "0.0.25",
-		"jazz-tools": "2.0.0-alpha.60",
+		"jazz-tools": "2.0.0-alpha.67",
 		"svelte": "^5.57.2",
 		"xstate": "6.0.0-beta.1"
 	},

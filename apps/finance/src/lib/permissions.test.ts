@@ -1,17 +1,20 @@
+import type { InsertOf } from 'jazz-tools'
 import { Buffer } from 'node:buffer'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createPolicyTestApp, type PolicyTestApp, type TestDb } from 'jazz-tools/testing'
-import { app, type TransactionRow } from './schema.js'
+import { app, type TransactionRow } from './queries.js'
 import {
 	transactionAttachmentReplacementMachine,
 	type AttachmentReplacementInput
 } from './machines/transactions/attachments/transaction-attachment-replacement.js'
-import { savedTransactionImageEditorMachine } from './machines/transactions/attachments/saved-transaction-image-editor.js'
+import { createSavedTransactionImageEditor } from './machines/transactions/attachments/saved-transaction-image-editor.js'
+import { imageEditorMachine } from './machines/images/image-editor.js'
 import { mockEditorPlatform } from './testing/image-editor/fixtures.js'
 import { vi } from 'vitest'
-import permissions from './permissions.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createActor, toPromise, waitFor, createAsyncLogic } from 'xstate'
 
+const savedTransactionImageEditorMachine = createSavedTransactionImageEditor(imageEditorMachine)
 const organizationId = crypto.randomUUID()
 const otherOrganizationId = crypto.randomUUID()
 const accountId = crypto.randomUUID()
@@ -54,7 +57,7 @@ function transaction(kind: 'expense' | 'income') {
 		currency: 'USD',
 		bookedOn: '2026-10-23',
 		source: 'manual'
-	} satisfies import('jazz-tools').schema.InsertOf<typeof app.transactions>
+	} satisfies import('jazz-tools').InsertOf<typeof app.transactions>
 }
 
 async function createPermissionFixture() {
@@ -372,14 +375,14 @@ describe('tag permission integrity', () => {
 				organizationId,
 				name: 'Invalid',
 				kind: 'expense'
-			} satisfies import('jazz-tools').schema.InsertOf<typeof app.tags>
+			} satisfies import('jazz-tools').InsertOf<typeof app.tags>
 			if (kind === undefined) Reflect.deleteProperty(values, 'kind')
 			else Reflect.set(values, 'kind', kind)
 			await expect(
 				Promise.resolve().then(() => db.insert(app.tags, values).wait({ tier: 'global' }))
 			).rejects.toThrow()
 		}
-		const patch: Pick<import('./schema.js').Tag, 'kind'> = { kind: 'expense' }
+		const patch: Pick<import('./queries.js').Tag, 'kind'> = { kind: 'expense' }
 		Reflect.set(patch, 'kind', null)
 		await expect(
 			Promise.resolve().then(() =>

@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte'
 	import { INCOME, EXPENSE } from '#lib/domain/transaction-kind.js'
 	import { InputText, Select } from 'delightful-ui'
-	import type { Category } from '#lib/schema.js'
+	import type { Category } from '#lib/queries.js'
 	import type { ManagementView } from '#lib/contracts/management-contract.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import { formReasonText } from '#lib/forms/form-messages.js'

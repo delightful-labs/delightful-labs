@@ -17,6 +17,7 @@ const resizer = vi.hoisted(() => ({
 	resize: vi.fn(),
 	toBlob: vi.fn()
 }))
+const drawImage = vi.fn()
 vi.mock('pica', () => ({ default: () => resizer }))
 
 beforeEach(() =>
@@ -27,6 +28,9 @@ beforeEach(() =>
 				public width: number,
 				public height: number
 			) {}
+			getContext() {
+				return { drawImage }
+			}
 		}
 	)
 )
@@ -82,9 +86,12 @@ describe('shared image processing platform', () => {
 			quality: 0.85
 		}
 		const canvas = createImageCanvas(bitmap, options)
-		expect(resizer.createCanvas).toHaveBeenCalledExactlyOnceWith(128, 256)
+		expect(resizer.createCanvas).toHaveBeenCalledExactlyOnceWith(128, 256, {
+			preferOffscreen: true
+		})
 		await resizeImage(bitmap, canvas)
-		expect(resizer.resize).toHaveBeenCalledExactlyOnceWith(bitmap, canvas)
+		expect(drawImage).toHaveBeenCalledExactlyOnceWith(bitmap, 0, 0)
+		expect(resizer.resize).toHaveBeenCalledExactlyOnceWith(expect.any(OffscreenCanvas), canvas)
 		const blob = new Blob(['encoded'], { type: 'image/webp' })
 		resizer.toBlob.mockResolvedValueOnce(blob)
 		expect(await encodeImage(canvas, options)).toBe(blob)

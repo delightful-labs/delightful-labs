@@ -1,6 +1,6 @@
-import { createJazz, memory, acceptLocalFirstAuth } from 'jazz-tools/backend'
-import { app } from '../../src/lib/schema.js'
-import permissions from '../../src/lib/permissions.js'
+import { createJazz, memory, acceptDeviceAccounts } from 'jazz-tools/backend'
+import { app } from '../../src/lib/queries.js'
+import permissions from '../../src/lib/jazz.permissions.json' with { type: 'json' }
 import svg from '@poppanator/sveltekit-svg'
 import { createServer } from 'node:http'
 import { glob, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
@@ -746,7 +746,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				app,
 				permissions,
 				store: memory(),
-				authenticate: acceptLocalFirstAuth,
+				authenticate: acceptDeviceAccounts,
 				allowedOrigins: [origin]
 			})
 			const endpoint = createServer((request, response) => authority.nodeHandler(request, response))
@@ -918,7 +918,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				app,
 				permissions,
 				store: memory(),
-				authenticate: acceptLocalFirstAuth,
+				authenticate: acceptDeviceAccounts,
 				allowedOrigins: [origin]
 			})
 			const endpoint = createServer((request, response) => authority.nodeHandler(request, response))

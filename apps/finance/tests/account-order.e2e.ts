@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { openCreationModal, closeCreationModal } from './helpers/ui.js'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -6,24 +7,7 @@ async function addAccount(page: Page, name: string) {
 	await expect(
 		page.getByRole('main').getByRole('heading', { name: 'Accounts', exact: true })
 	).toBeVisible()
-	await page.evaluate(async (name) => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const snapshot = getCurrentJazzSession()?.getSnapshot()
-		if (!snapshot?.client || !snapshot.account) throw new Error('Test session is not ready.')
-		const db = snapshot.client.db
-		const workspace = await db.one(
-			app.organizations.where({ ownerId: snapshot.account.id, kind: 'personal' }),
-			{ tier: 'local-first' }
-		)
-		if (!workspace) throw new Error('Test workspace is not ready.')
-		await db
-			.insert(app.accounts, { organizationId: workspace.id, name, kind: 'bank', currency: 'USD' })
-			.wait({ tier: 'local' })
-	}, name)
+	await financeFixture(page, 'account-order.e2e:9', name)
 	await expect(page.getByRole('main').getByRole('cell', { name, exact: true })).toBeVisible()
 }
 
@@ -93,15 +77,8 @@ test(
 	'single account hides ordering and storage failure still allows session ordering',
 	{ tag: ['@accounts'] },
 	async ({ page }) => {
-		await page.addInitScript(() => {
-			const setItem = Storage.prototype.setItem
-			Storage.prototype.setItem = function (key: string, value: string) {
-				if (key.startsWith('finance-account-order:'))
-					throw new DOMException('Storage unavailable', 'QuotaExceededError')
-				setItem.call(this, key, value)
-			}
-		})
 		await addAccount(page, 'Alpha')
+		await financeFixture(page, 'failPreferencesStorage')
 		const accounts = await openAccounts(page)
 		await expect(accounts.getByRole('button', { name: 'Edit Order', exact: true })).toHaveCount(0)
 		await expect(accounts.getByRole('button', { name: /Move .* (up|down)/ })).toHaveCount(0)
@@ -136,55 +113,7 @@ test(
 		await settings.locator('summary').click()
 		const selector = page.getByLabel('Current Workspace', { exact: true })
 		const originalId = await selector.inputValue()
-		const otherId = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const snapshot = getCurrentJazzSession()?.getSnapshot()
-			if (!snapshot?.client || !snapshot.account) throw new Error('Test session is not ready.')
-			const db = snapshot.client.db
-			const workspace = await db
-				.insert(app.organizations, {
-					name: 'Other workspace',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: snapshot.account.id
-				})
-				.wait({ tier: 'local' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: workspace.id,
-					userId: snapshot.account.id,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'local' })
-			for (const name of ['Delta', 'Echo']) {
-				await db
-					.insert(app.accounts, {
-						organizationId: workspace.id,
-						name,
-						kind: 'bank',
-						currency: 'USD'
-					})
-					.wait({ tier: 'local' })
-			}
-			// Accounts must be created active; only the update policy allows archiving.
-			const archived = await db
-				.insert(app.accounts, {
-					organizationId: workspace.id,
-					name: 'Archived',
-					kind: 'bank',
-					currency: 'USD'
-				})
-				.wait({ tier: 'global' })
-			await db
-				.update(app.accounts, archived.id, { archivedAt: new Date() })
-				.wait({ tier: 'global' })
-			return workspace.id
-		})
+		const otherId = await financeFixture(page, 'account-order.e2e:139')
 		await accounts.getByRole('button', { name: 'Edit Order', exact: true }).click()
 		await accounts.getByRole('button', { name: 'Move Bravo up', exact: true }).click()
 		await expect(selector.locator(`option[value="${otherId}"]`)).toHaveCount(1)

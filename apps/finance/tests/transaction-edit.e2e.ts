@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 import { seedTransaction, persisted } from './helpers/transactions.js'
 
@@ -350,20 +351,7 @@ test(
 	{ tag: ['@transactions', '@transaction-edit', '@tags'] },
 	async ({ page }) => {
 		const seed = await seedTransaction(page)
-		await page.evaluate(async (id) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const date = new Date()
-			const bookedOn = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-			await db
-				.update(app.transactions, id, { bookedOn, description: 'Tagged cleanup row' })
-				.wait({ tier: 'local' })
-		}, seed.id)
+		await financeFixture(page, 'transaction-edit.e2e:353', seed.id)
 		for (const path of ['/expenses', '/']) {
 			await page.goto(path)
 			const row = page
@@ -371,16 +359,7 @@ test(
 				.filter({ has: page.getByText('Tagged cleanup row', { exact: true }) })
 			await expect(row.getByText('Historical', { exact: true })).toBeVisible()
 		}
-		await page.evaluate(async (id) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			await db.update(app.tags, id, { name: 'Renamed historical' }).wait({ tier: 'local' })
-		}, seed.tagId)
+		await financeFixture(page, 'transaction-edit.e2e:374', seed.tagId)
 		const row = page
 			.getByRole('listitem')
 			.filter({ has: page.getByText('Tagged cleanup row', { exact: true }) })
@@ -455,25 +434,7 @@ for (const kind of ['expense', 'income'] satisfies ('expense' | 'income')[]) {
 			await expect(category.locator('option:checked')).toHaveText('Category only change')
 			await expect(save).toBeEnabled()
 			const categoryOnlyId = await category.inputValue()
-			const createdRows = await page.evaluate(async () => {
-				const schemaPath = '/src/lib/schema.ts'
-				const sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const db = getCurrentJazzSession()?.getSnapshot().client?.db
-				if (!db) throw new Error('Missing database')
-				return (await db.all(app.categories))
-					.filter((row) =>
-						[
-							'First inline category',
-							'Second inline category',
-							'Category only change',
-							'Cancelled category'
-						].includes(row.name)
-					)
-					.map(({ id, name, kind }) => ({ id, name, kind }))
-			})
+			const createdRows = await financeFixture(page, 'transaction-edit.e2e:458')
 			expect(createdRows).toHaveLength(3)
 			expect(createdRows.every((row) => row.kind === kind)).toBe(true)
 			await save.click()

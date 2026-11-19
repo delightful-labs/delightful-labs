@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Tag } from '#lib/schema.js'
+	import type { Tag } from '#lib/queries.js'
 	import { tick } from 'svelte'
 	import { TagInput } from 'delightful-ui'
 	import { m } from '#lib/paraglide/messages.js'
@@ -18,9 +18,10 @@
 	const selectedTags = $derived(editedTags ?? initialTags)
 	let inputHost: HTMLDivElement | undefined = $state()
 	$effect(() => {
-		void selectedTags
+		if (editedTags === undefined) return
 		let active = true
-		// TagInput updates hidden fields without a native input event.
+		// Only a user edit changes the form. Fresh worker DTOs also replace
+		// initialTags, which must not clear save or validation feedback.
 		void tick().then(() => {
 			if (active) inputHost?.dispatchEvent(new Event('input', { bubbles: true }))
 		})

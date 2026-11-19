@@ -1,24 +1,8 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 
 async function records(page: Page) {
-	return page.evaluate(async () => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('No initialized Jazz database')
-		const [accounts, transactions] = await Promise.all([
-			db.all(app.accounts.orderBy('id'), { tier: 'remote' }),
-			db.all(app.transactions.orderBy('id'), { tier: 'remote' })
-		])
-		return {
-			accountIds: accounts.map((row) => row.id),
-			transactionIds: transactions.map((row) => row.id),
-			kinds: accounts.map((row) => row.kind).sort()
-		}
-	})
+	return financeFixture(page, 'fake-data.e2e:4')
 }
 
 test('fake data follows its own flag and survives refresh without duplication', async ({

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Account } from '#lib/schema.js'
+import type { Account } from '#lib/queries.js'
 import type {
 	AccountCreationObservation,
 	AccountCreationReason,

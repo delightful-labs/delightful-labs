@@ -1,11 +1,39 @@
+import { actorFixture } from './actor/session.js'
 import { createJazzClient } from 'jazz-tools/client'
 import wasmUrl from '#jazz-wasm-binary?url'
 import { brokerHostClient } from 'delightful-local-first/backend/jazz/worker-broker'
 import { createFinanceAccountStore } from '../../src/lib/runtime/worker/account-store.js'
-import { app } from '../../src/lib/schema.js'
+import { app } from '../../src/lib/queries.js'
+import { qualifyNativeSession } from './session-qualification.js'
 
 export type SdkCommand =
-	| { type: 'OPEN'; scope: string; brokerUrl: string; data: MessagePort; control: MessagePort }
+	| {
+			type: 'OPEN_ACTOR'
+			initial: 'device' | 'signed-out'
+			scope: string
+			brokerUrl: string
+			hold: boolean
+			data: MessagePort
+			control: MessagePort
+	  }
+	| { type: 'ACTOR_STATE' }
+	| { type: 'CREATE_ACTOR_IDENTITY' }
+	| { type: 'RECOVER_ACTOR_IDENTITY' }
+	| { type: 'RESTORE_ACTOR_IDENTITY'; hold: boolean }
+	| { type: 'READ_ACTOR_BINDING' }
+	| { type: 'CLOSE_ACTOR' }
+	| { type: 'SIGN_OUT_ACTOR'; stale: boolean; hold: boolean }
+	| { type: 'RELEASE_ACTOR_CHANGE' }
+	| { type: 'RELEASE_ACTOR_OPEN' }
+	| { type: 'DISPOSE_ACTOR' }
+	| {
+			type: 'OPEN'
+			scope: string
+			brokerUrl: string
+			data: MessagePort
+			control: MessagePort
+			failLoader: boolean
+	  }
 	| { type: 'READ'; organizationId: string }
 	| {
 			type: 'SEED'
@@ -16,10 +44,17 @@ export type SdkCommand =
 	  }
 	| { type: 'EDIT'; transactionId: string; amountMinor: number }
 	| { type: 'CLOSE' }
+	| { type: 'QUALIFY_SESSION' }
 export type SdkReply =
+	| { kind: 'actor-started' }
+	| { kind: 'actor-recovered'; cleared: boolean }
+	| { kind: 'actor-binding'; rows: number }
+	| { kind: 'actor-state'; state: ReturnType<typeof actorFixture.state> }
+	| { kind: 'actor-disposed'; receipt: Awaited<ReturnType<typeof actorFixture.dispose>> }
 	| { kind: 'opened'; accountId: string; localFirst: boolean; windowPresent: boolean }
 	| { kind: 'rows'; rows: { id: string; amountMinor: number; memo: string | null }[] }
 	| { kind: 'saved' }
+	| { kind: 'session-qualified'; report: Awaited<ReturnType<typeof qualifyNativeSession>> }
 	| { kind: 'closed'; sdkClosed: boolean; hostClosed: boolean }
 	| { kind: 'failed'; message: string; stack?: string }
 
@@ -28,13 +63,48 @@ let store: ReturnType<typeof createFinanceAccountStore> | undefined
 let broker: ReturnType<typeof brokerHostClient> | undefined
 function current() {
 	const snapshot = session?.getSnapshot()
-	if (!snapshot?.client || !snapshot.account) throw new Error('SDK fixture session unavailable')
-	return { db: snapshot.client.db, accountId: snapshot.account.id }
+	if (!session || !snapshot?.user) throw new Error('SDK fixture session unavailable')
+	return { db: session.db, accountId: snapshot.user.accountId }
 }
 
 // Disposable SDK controls, not an application runtime. The test owns operation
 // order, fixture seeding and browser-process restarts through these SDK leaves.
 async function execute(command: SdkCommand): Promise<SdkReply> {
+	if (command.type === 'OPEN_ACTOR') {
+		actorFixture.open(
+			command.initial,
+			command.scope,
+			command.brokerUrl,
+			command.hold,
+			command.data,
+			command.control
+		)
+		return { kind: 'actor-started' }
+	}
+	if (command.type === 'RECOVER_ACTOR_IDENTITY')
+		return { kind: 'actor-recovered', cleared: await actorFixture.recover() }
+	if (command.type === 'READ_ACTOR_BINDING')
+		return { kind: 'actor-binding', rows: await actorFixture.readBinding() }
+	if (command.type === 'DISPOSE_ACTOR')
+		return { kind: 'actor-disposed', receipt: await actorFixture.dispose() }
+	if (
+		command.type === 'ACTOR_STATE' ||
+		command.type === 'CREATE_ACTOR_IDENTITY' ||
+		command.type === 'RESTORE_ACTOR_IDENTITY' ||
+		command.type === 'CLOSE_ACTOR' ||
+		command.type === 'SIGN_OUT_ACTOR' ||
+		command.type === 'RELEASE_ACTOR_CHANGE' ||
+		command.type === 'RELEASE_ACTOR_OPEN'
+	) {
+		if (command.type === 'CREATE_ACTOR_IDENTITY') actorFixture.createIdentity()
+		if (command.type === 'RESTORE_ACTOR_IDENTITY') actorFixture.restoreIdentity(command.hold)
+		if (command.type === 'CLOSE_ACTOR') actorFixture.close()
+		if (command.type === 'SIGN_OUT_ACTOR') actorFixture.signOut(command.stale, command.hold)
+		if (command.type === 'RELEASE_ACTOR_CHANGE') actorFixture.releaseChange()
+		if (command.type === 'RELEASE_ACTOR_OPEN') actorFixture.releaseOpen()
+		return { kind: 'actor-state', state: actorFixture.state() }
+	}
+
 	if (command.type === 'OPEN') {
 		if (session || store || broker) throw new Error('SDK fixture already open')
 		const serverUrl = new URL('/jazz', location.origin).href
@@ -48,7 +118,12 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
 			scope: command.scope,
 			env: 'sdk-proof',
 			store,
-			initial: 'local-first',
+			initial: 'device',
+			localFirst: 'now',
+			client: () => {
+				if (command.failLoader) throw new Error('Expected SDK loader failure')
+				return import('jazz-tools/local-first')
+			},
 			runtimeSources: {
 				wasmUrl,
 				brokerWorkerUrl: command.brokerUrl,
@@ -57,7 +132,6 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
 			}
 		})
 		const { db, accountId } = current()
-		await db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
 		return {
 			kind: 'opened',
 			accountId,
@@ -66,9 +140,9 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
 		}
 	}
 	if (command.type === 'CLOSE') {
-		if (!session || !store || !broker) throw new Error('SDK fixture was not opened')
-		await session.close()
-		const sdkClosed = session.getSnapshot().status === 'closed'
+		if (!store || !broker) throw new Error('SDK fixture was not opened')
+		await session?.close()
+		const sdkClosed = session === undefined || session.getSnapshot().status === 'closed'
 		await store.close()
 		const receipt = await broker.close()
 		return {
@@ -78,6 +152,10 @@ async function execute(command: SdkCommand): Promise<SdkReply> {
 				receipt.scope === broker.host.identity.scope &&
 				receipt.requestId === broker.host.identity.requestId
 		}
+	}
+	if (command.type === 'QUALIFY_SESSION') {
+		if (!session) throw new Error('SDK session unavailable')
+		return { kind: 'session-qualified', report: await qualifyNativeSession(session) }
 	}
 	const { db, accountId } = current()
 	if (command.type === 'READ') {

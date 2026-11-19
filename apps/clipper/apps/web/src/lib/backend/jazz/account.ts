@@ -4,9 +4,11 @@ import { createLibraryRecords } from './records.js'
 import { readConnection } from './read-connection.js'
 import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
 import wasmUrl from '#jazz-wasm-binary?url'
-import type { JazzSession, JazzClientConfig } from 'jazz-tools/client'
-import type { JazzClient } from 'jazz-tools/client'
-import { createJazzStartupRegistry } from 'delightful-local-first/backend/jazz/startup'
+import type { JazzClientConfig } from 'jazz-tools/client'
+import {
+	type JazzSessionResource,
+	createJazzStartupRegistry
+} from 'delightful-local-first/backend/jazz/startup'
 import { createJazzSessionReadinessAdapter } from 'delightful-local-first/backend/jazz/session-readiness'
 import { createJazzRecoveryAdapter } from 'delightful-local-first/backend/jazz/recovery'
 import { createJazzRestorationAdapter } from 'delightful-local-first/backend/jazz/restoration'
@@ -18,19 +20,20 @@ import type {
 	ReadyAccountObservation
 } from '../../contracts/account.js'
 
-export type Session = JazzSession<JazzClient>
+export type Session = JazzSessionResource
 
 export type LibraryFactory = typeof createLibraryCapability
-function externallySignedIn(account: { identity: { issuer: string } }) {
-	return !['urn:jazz:local-first', 'urn:jazz:anonymous'].includes(account.identity.issuer)
+function externallySignedIn(user: { kind: 'device' | 'backend' }) {
+	return user.kind === 'backend'
 }
 function bindHost(
-	session: Session,
+	resource: Session,
 	libraryFactory: LibraryFactory,
 	cacheNamespace: string
 ): AccountHost {
+	const session = resource()
 	const readiness = createJazzSessionReadinessAdapter(session)
-	const recovery = createJazzRecoveryAdapter(() => session.getSnapshot().account)
+	const recovery = createJazzRecoveryAdapter(() => session)
 	const identities = new WeakMap<object, object>()
 	const candidates = new WeakMap<ReadyAccountObservation, () => AccountBinding>()
 	const identity = (resource: object) => {
@@ -43,18 +46,21 @@ function bindHost(
 	}
 	const read = (): AccountObservation => {
 		const snapshot = session.getSnapshot()
-		recovery.observeAccount(snapshot.account)
-		if (snapshot.status !== 'ready' || !snapshot.account || !snapshot.client) {
-			return { status: snapshot.status === 'ready' ? 'error' : snapshot.status }
+		recovery.observeSession()
+		if (snapshot.status !== 'ready' || !snapshot.user || !snapshot.client) {
+			return {
+				status:
+					snapshot.status === 'ready' || snapshot.status === 'starting' ? 'error' : snapshot.status
+			}
 		}
-		const account = snapshot.account
+		const user = snapshot.user
 		const client = snapshot.client
 		const db = client.db
 		const check = () => {
 			const now = session.getSnapshot()
 			if (
 				now.status !== 'ready' ||
-				now.account !== account ||
+				now.user !== user ||
 				now.client !== client ||
 				now.client?.db !== db
 			)
@@ -67,7 +73,7 @@ function bindHost(
 			}
 			const domain = createLibraryBinding({
 				db,
-				identityId: account.id,
+				identityId: user.accountId,
 				isCurrent: () => {
 					check()
 					return live()
@@ -78,7 +84,7 @@ function bindHost(
 			const observation: ReadyAccountObservation = {
 				status: 'ready',
 				localFirst: db.isLocalFirst(),
-				binding: identity(account),
+				binding: identity(user),
 				clientBinding: identity(client),
 				databaseBinding: identity(db),
 				prepare: () => {
@@ -88,28 +94,28 @@ function bindHost(
 				logout: () => {
 					// Native mutation admission stays bound to the selected identity.
 					admitted()
-					return session.logout()
+					return session.signOut()
 				},
 				logoutStatus: () => {
 					const now = session.getSnapshot()
 					if (
 						now.status === 'signed-out' ||
-						(now.status === 'ready' && now.account && !externallySignedIn(now.account))
+						(now.status === 'ready' && now.user && !externallySignedIn(now.user))
 					)
 						return 'signed-out'
-					if (now.status !== 'ready' || !now.account || !now.client) return 'unavailable'
-					return now.account === account && now.client === client && now.client.db === db && live()
+					if (now.status !== 'ready' || !now.user || !now.client) return 'unavailable'
+					return now.user === user && now.client === client && now.client.db === db && live()
 						? 'current'
 						: 'replaced'
 				},
-				accountId: account.id,
-				signedIn: externallySignedIn(account),
+				accountId: user.accountId,
+				signedIn: externallySignedIn(user),
 				root: domain.root,
 				recovery: {
 					capability: recovery.capability,
 					source: {
 						subscribe: (notify) => {
-							const publish = () => notify(recovery.observeAccount(session.getSnapshot().account))
+							const publish = () => notify(recovery.observeSession())
 							publish()
 							return session.subscribe(publish)
 						}
@@ -144,7 +150,7 @@ function bindHost(
 			return create()
 		},
 		readiness,
-		create: () => session.createLocalFirst(),
+		create: () => session.createDeviceAccount(),
 		signOut: async () => {
 			const response = await fetch('/api/auth/sign-out', {
 				method: 'POST',
@@ -156,7 +162,7 @@ function bindHost(
 			})
 			if (!response.ok) throw new Error('Provider sign-out failed')
 		},
-		logout: () => session.logout(),
+		logout: () => session.signOut(),
 		release: () => {
 			recovery.invalidate()
 			restored.invalidate()
@@ -178,7 +184,8 @@ export function accountInput(
 		startup: registry.getJazzStartupBinding({
 			...config,
 			client: localFirst,
-			initial: 'local-first',
+			initial: 'device',
+			localFirst: 'now',
 			runtimeSources: config.runtimeSources ?? runtimeSources
 		}),
 		bind: (session) =>
@@ -214,15 +221,15 @@ export function existingAccountInput(
 export function currentLibraryRecords() {
 	const session = registry.getCurrentJazzSession()
 	const snapshot = session?.getSnapshot()
-	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
+	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
 		throw new Error('Library scope unavailable')
-	const { account, client } = snapshot
+	const { user, client } = snapshot
 	return createLibraryRecords(
 		client.db,
-		account.id,
+		user.accountId,
 		() => {
 			const now = session.getSnapshot()
-			return now.status === 'ready' && now.account === account && now.client === client
+			return now.status === 'ready' && now.user === user && now.client === client
 		},
 		readConnection(client.db)
 	)
@@ -236,17 +243,14 @@ export async function requestCapture(
 ) {
 	const session = registry.getCurrentJazzSession()
 	const snapshot = session?.getSnapshot()
-	if (!session || snapshot?.status !== 'ready' || !snapshot.account || !snapshot.client)
+	if (!session || snapshot?.status !== 'ready' || !snapshot.user || !snapshot.client)
 		throw new Error('Account scope unavailable')
-	const { account, client } = snapshot
+	const { user, client } = snapshot
 	const db = client.db
 	return createLibraryCapture(db, () => {
 		const now = session.getSnapshot()
 		return (
-			now.status === 'ready' &&
-			now.account === account &&
-			now.client === client &&
-			now.client.db === db
+			now.status === 'ready' && now.user === user && now.client === client && now.client.db === db
 		)
 	})(operation, body, signal)
 }

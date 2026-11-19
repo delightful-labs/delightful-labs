@@ -1,0 +1,363 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "93bd6a074bf283218679edaa76d76ec7f96971eb36ff8f16111247968c88e349"
+  },
+  "tables": {
+    "accountMemberships": {
+      "columns": {
+        "organizationId": "uuid",
+        "userId": "uuid",
+        "accountId": "uuid",
+        "access": { "enum": ["read", "write"] },
+        "canDelete": "boolean"
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "organization": { "rel": "organizations", "column": "organizationId" }
+      }
+    },
+    "accounts": {
+      "columns": {
+        "organizationId": "uuid",
+        "name": { "type": "string", "transform": "accountName" },
+        "kind": { "enum": ["cash", "bank", "card"] },
+        "currency": { "type": "string", "transform": "accountCurrency" },
+        "archivedAt": "timestamp?"
+      },
+      "relations": {
+        "memberships": { "reverse": "accountMemberships", "relation": "account" },
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "transactions": { "reverse": "transactions", "relation": "account" }
+      }
+    },
+    "batchTemplates": {
+      "columns": { "organizationId": "uuid", "name": "string" },
+      "relations": { "organization": { "rel": "organizations", "column": "organizationId" } }
+    },
+    "categories": {
+      "columns": {
+        "organizationId": "uuid",
+        "name": "string",
+        "kind": { "enum": ["expense", "income"] },
+        "isSystem": "boolean",
+        "archivedAt": "timestamp?"
+      },
+      "relations": {
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "tags": { "reverse": "tags", "relation": "category" },
+        "transactions": { "reverse": "transactions", "relation": "category" }
+      }
+    },
+    "checkDetails": {
+      "columns": {
+        "transactionId": "uuid",
+        "organizationId": "uuid",
+        "accountId": "uuid",
+        "checkNumber": { "type": "string", "transform": "checkNumber" },
+        "checkDate": { "type": "string", "transform": "dateOnly" },
+        "payerName": "string?",
+        "bankName": "string?",
+        "memoOnCheck": "string?"
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "transaction": { "rel": "transactions", "column": "transactionId" }
+      }
+    },
+    "checks": {
+      "columns": {
+        "organizationId": "uuid",
+        "accountId": "uuid",
+        "checkNumber": { "type": "string", "transform": "checkNumber" },
+        "checkDate": { "type": "string", "transform": "dateOnly" },
+        "payerName": "string?",
+        "bankName": "string?",
+        "memoOnCheck": "string?"
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "transactions": { "reverse": "transactions", "relation": "check" }
+      }
+    },
+    "fileParts": {
+      "columns": { "fileId": "uuid", "partIndex": "int", "sizeBytes": "int", "data": "bytes?" },
+      "relations": { "file": { "rel": "files", "column": "fileId" } }
+    },
+    "files": {
+      "columns": {
+        "transactionId": "uuid?",
+        "accountId": "uuid?",
+        "organizationId": "uuid?",
+        "fileName": "string",
+        "mimeType": "string",
+        "sizeBytes": "int"
+      },
+      "relations": {
+        "parts": { "reverse": "fileParts", "relation": "file" },
+        "transaction": { "rel": "transactions", "column": "transactionId" }
+      }
+    },
+    "internalTransfers": {
+      "columns": {
+        "organizationId": "uuid",
+        "expenseTransactionId": "uuid",
+        "incomeTransactionId": "uuid",
+        "expenseAccountId": "uuid?",
+        "incomeAccountId": "uuid?",
+        "expenseAmountMinor": { "type": "bigint", "optional": true, "transform": "amountMinor" },
+        "expenseCurrency": { "type": "string", "optional": true, "transform": "currency" },
+        "incomeAmountMinor": { "type": "bigint", "optional": true, "transform": "amountMinor" },
+        "incomeCurrency": { "type": "string", "optional": true, "transform": "currency" },
+        "amountMinor": { "type": "bigint", "optional": true, "transform": "amountMinor" },
+        "currency": { "type": "string", "optional": true, "transform": "currency" }
+      },
+      "relations": {
+        "expenseAccount": { "rel": "accounts", "column": "expenseAccountId" },
+        "expenseTransaction": { "rel": "transactions", "column": "expenseTransactionId" },
+        "incomeAccount": { "rel": "accounts", "column": "incomeAccountId" },
+        "incomeTransaction": { "rel": "transactions", "column": "incomeTransactionId" },
+        "organization": { "rel": "organizations", "column": "organizationId" }
+      }
+    },
+    "organizationMembers": {
+      "columns": {
+        "organizationId": "uuid",
+        "userId": "uuid",
+        "profileId": "uuid?",
+        "role": { "enum": ["owner", "admin", "member", "viewer"] },
+        "accountAccessMode": { "enum": ["all", "selected"] }
+      },
+      "relations": {
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "profile": { "rel": "profiles", "column": "profileId" }
+      }
+    },
+    "organizations": {
+      "columns": {
+        "name": "string",
+        "kind": { "enum": ["personal", "business"] },
+        "defaultCurrency": "string",
+        "ownerId": "uuid",
+        "restoreOperationId": "uuid?"
+      },
+      "relations": {
+        "accounts": { "reverse": "accounts", "relation": "organization" },
+        "batchTemplates": { "reverse": "batchTemplates", "relation": "organization" },
+        "batches": { "reverse": "transactionBatches", "relation": "organization" },
+        "categories": { "reverse": "categories", "relation": "organization" },
+        "internalTransfers": { "reverse": "internalTransfers", "relation": "organization" },
+        "members": { "reverse": "organizationMembers", "relation": "organization" },
+        "restoreOperation": { "rel": "restoreOperations", "column": "restoreOperationId" },
+        "simplefinConnections": { "reverse": "simplefinConnections", "relation": "organization" },
+        "tags": { "reverse": "tags", "relation": "organization" },
+        "transactions": { "reverse": "transactions", "relation": "organization" }
+      }
+    },
+    "profiles": {
+      "columns": {
+        "userId": "uuid",
+        "initialWorkspaceId": "uuid?",
+        "displayName": "string?",
+        "avatarData": "bytes?",
+        "avatarMimeType": { "enum": ["image/png", "image/jpeg", "image/webp"], "optional": true }
+      },
+      "relations": { "memberships": { "reverse": "organizationMembers", "relation": "profile" } }
+    },
+    "restoreOperations": {
+      "columns": {
+        "workspaceId": "uuid",
+        "sourceFileId": "uuid",
+        "ownerId": "uuid",
+        "status": { "enum": ["incomplete", "active"] },
+        "payloadSha256": "string",
+        "graphSha256": "string",
+        "workspaceName": "string",
+        "workspaceKind": { "enum": ["personal", "business"] },
+        "workspaceCurrency": "string"
+      },
+      "relations": {
+        "sourceFile": { "rel": "files", "column": "sourceFileId" },
+        "workspace": { "rel": "organizations", "column": "workspaceId" }
+      }
+    },
+    "simplefinAccountLinks": {
+      "columns": {
+        "organizationId": "uuid",
+        "accountId": "uuid",
+        "connectionId": "uuid?",
+        "simplefinAccountId": "string",
+        "simplefinOrgId": "string?",
+        "availableBalance": "string?",
+        "balanceDate": "timestamp?"
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "connection": { "rel": "simplefinConnections", "column": "connectionId" },
+        "organization": { "rel": "organizations", "column": "organizationId" }
+      }
+    },
+    "simplefinConnections": {
+      "columns": {
+        "organizationId": "uuid",
+        "accessUrl": "string",
+        "ownerId": "uuid?",
+        "credentialVersion": "int?",
+        "credentialId": "string?",
+        "prfSalt": "string?",
+        "iv": "string?",
+        "ciphertext": "string?",
+        "lastOutcome": { "enum": ["succeeded", "partial", "failed"], "optional": true },
+        "importedCount": "int?",
+        "existingCount": "int?",
+        "omittedCount": "int?",
+        "status": { "enum": ["active", "error", "revoked"] },
+        "lastSyncAt": "timestamp?",
+        "lastError": "string?",
+        "claimedAt": "timestamp"
+      },
+      "relations": { "organization": { "rel": "organizations", "column": "organizationId" } }
+    },
+    "simplefinSyncAccountResults": {
+      "columns": {
+        "attemptId": "uuid",
+        "organizationId": "uuid",
+        "accountId": "uuid",
+        "accountName": "string",
+        "outcome": { "enum": ["unfinished", "succeeded", "partial", "failed", "cancelled"] },
+        "failureCode": {
+          "enum": [
+            "authorization",
+            "passkey",
+            "provider",
+            "mapping",
+            "import",
+            "interrupted",
+            "unexpected"
+          ],
+          "optional": true
+        },
+        "importedCount": { "type": "int", "optional": true, "transform": "syncCount" },
+        "existingCount": { "type": "int", "optional": true, "transform": "syncCount" },
+        "omittedCount": { "type": "int", "optional": true, "transform": "syncCount" }
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "attempt": { "rel": "simplefinSyncAttempts", "column": "attemptId" },
+        "organization": { "rel": "organizations", "column": "organizationId" }
+      }
+    },
+    "simplefinSyncAttempts": {
+      "columns": {
+        "organizationId": "uuid",
+        "connectionId": "uuid",
+        "initiatedBy": "uuid",
+        "startedAt": "timestamp",
+        "finishedAt": "timestamp?",
+        "outcome": { "enum": ["unfinished", "succeeded", "partial", "failed", "cancelled"] },
+        "importSettlement": {
+          "enum": ["notStarted", "locallyPersisted", "confirmed", "unresolved"]
+        },
+        "failureCode": {
+          "enum": [
+            "authorization",
+            "passkey",
+            "provider",
+            "mapping",
+            "import",
+            "interrupted",
+            "unexpected"
+          ],
+          "optional": true
+        },
+        "importedCount": { "type": "int", "optional": true, "transform": "syncCount" },
+        "existingCount": { "type": "int", "optional": true, "transform": "syncCount" },
+        "omittedCount": { "type": "int", "optional": true, "transform": "syncCount" }
+      },
+      "relations": {
+        "connection": { "rel": "simplefinConnections", "column": "connectionId" },
+        "organization": { "rel": "organizations", "column": "organizationId" }
+      }
+    },
+    "tags": {
+      "columns": {
+        "organizationId": "uuid",
+        "name": "string",
+        "kind": { "enum": ["expense", "income"] },
+        "categoryId": "uuid?",
+        "archivedAt": "timestamp?"
+      },
+      "relations": {
+        "category": { "rel": "categories", "column": "categoryId" },
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "transactionTags": { "reverse": "transactionTags", "relation": "tag" }
+      }
+    },
+    "transactionAttachments": {
+      "columns": { "transactionId": "uuid", "fileId": "uuid" },
+      "relations": {
+        "file": { "rel": "files", "column": "fileId" },
+        "transaction": { "rel": "transactions", "column": "transactionId" }
+      }
+    },
+    "transactionBatches": {
+      "columns": { "organizationId": "uuid", "name": "string?" },
+      "relations": { "organization": { "rel": "organizations", "column": "organizationId" } }
+    },
+    "transactionTags": {
+      "columns": { "organizationId": "uuid", "transactionId": "uuid", "tagId": "uuid" },
+      "relations": {
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "tag": { "rel": "tags", "column": "tagId" },
+        "transaction": { "rel": "transactions", "column": "transactionId" }
+      }
+    },
+    "transactions": {
+      "columns": {
+        "amountMinor": { "type": "bigint", "transform": "amountMinor" },
+        "kind": { "enum": ["expense", "income"] },
+        "currency": { "type": "string", "transform": "currency" },
+        "categoryId": "uuid",
+        "accountId": "uuid",
+        "organizationId": "uuid",
+        "bookedOn": { "type": "string", "transform": "dateOnly" },
+        "description": "string?",
+        "memo": "string?",
+        "paymentMethod": { "enum": ["cash", "check", "transfer", "electronic"], "optional": true },
+        "checkDetailsId": "uuid?",
+        "checkId": "uuid?",
+        "internalTransferId": "uuid?",
+        "source": { "enum": ["manual", "simplefin"] },
+        "externalId": { "type": "string", "optional": true, "transform": "externalId" },
+        "batchId": "uuid?"
+      },
+      "relations": {
+        "account": { "rel": "accounts", "column": "accountId" },
+        "attachments": { "reverse": "transactionAttachments", "relation": "transaction" },
+        "batch": { "rel": "transactionBatches", "column": "batchId" },
+        "category": { "rel": "categories", "column": "categoryId" },
+        "check": { "rel": "checks", "column": "checkId" },
+        "checkDetails": { "rel": "checkDetails", "column": "checkDetailsId" },
+        "internalTransfer": { "rel": "internalTransfers", "column": "internalTransferId" },
+        "organization": { "rel": "organizations", "column": "organizationId" },
+        "tags": { "reverse": "transactionTags", "relation": "transaction" }
+      }
+    },
+    "uploads": {
+      "columns": { "fileId": "uuid", "status": { "enum": ["pending", "complete", "failed"] } }
+    }
+  },
+  "transforms": {
+    "accountCurrency": { "stored": "string", "view": "string" },
+    "accountName": { "stored": "string", "view": "string" },
+    "amountMinor": { "stored": "bigint", "view": "int" },
+    "checkNumber": { "stored": "string", "view": "string" },
+    "currency": { "stored": "string", "view": "string" },
+    "dateOnly": { "stored": "string", "view": "string" },
+    "externalId": { "stored": "string", "view": "string" },
+    "syncCount": { "stored": "int", "view": "int" }
+  }
+}

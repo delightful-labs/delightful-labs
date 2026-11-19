@@ -13,16 +13,12 @@
 	import { untrack, tick, type Snippet } from 'svelte'
 	import { amountInputPattern, minorUnitsToInput } from '#lib/domain/money.js'
 	import { todayDateOnly } from '#lib/domain/date-only.js'
-	import type { Account, Category, Tag, TransactionDetail } from '#lib/schema.js'
+	import type { Account, Category, Tag, TransactionDetail } from '#lib/queries.js'
 	import type { InternalTransferCandidate } from '#lib/domain/internal-transfer.js'
-	import type {
-		InternalTransferLinkResult,
-		InternalTransferUnlinkResult
-	} from '#lib/machines/transfers/internal-transfer.js'
 	import type {
 		TransactionEditTransferState,
 		TransferStatusLabel
-	} from '#lib/machines/transactions/transaction-edit.js'
+	} from '#lib/contracts/worker-transfers.js'
 	import type { TransactionEntryView } from '#lib/contracts/transaction-entry-contract.js'
 	import FormFeedback from '../forms/FormFeedback.svelte'
 	import { formReasonText } from '#lib/forms/form-messages.js'
@@ -63,12 +59,10 @@
 		selectedTransferCandidateId = null,
 		writableTransferSuggestionIds = new Set<string>(),
 		transferLinkPending = false,
-		transferLinkResult = null,
 		transferStatusLabel = null,
 		transferUnlinkAvailable = false,
 		transferUnlinkWritable = false,
 		transferUnlinkPending = false,
-		transferUnlinkResult = null,
 		linkedCounterpartHref = null,
 		onLinkCounterpart,
 		onTransferSearchEnabledChange,
@@ -100,7 +94,7 @@
 		view: TransactionEntryView
 		onsubmit: (event: SubmitEvent) => void
 		onreset: (event: Event) => void
-		oncancel?: () => void
+		oncancel?: (() => void) | undefined
 		onaddcategory?: () => void
 		canAddCategory?: boolean
 		createdCategory?: Category | undefined
@@ -110,7 +104,7 @@
 		onattachmentschange?: (files: readonly File[]) => void
 		attachmentPickerRevision?: number
 		transferSuggestions?: readonly (InternalTransferCandidate & {
-			accountName: Account['name'] | undefined
+			accountName?: Account['name'] | undefined
 			description: TransactionDetail['description'] | undefined
 		})[]
 		transferSearchEnabled?: boolean
@@ -121,12 +115,10 @@
 		onSelectTransferCandidate?: (transactionId: string) => void
 		writableTransferSuggestionIds?: ReadonlySet<string>
 		transferLinkPending?: boolean
-		transferLinkResult?: InternalTransferLinkResult | null
 		transferStatusLabel?: TransferStatusLabel | null
 		transferUnlinkAvailable?: boolean
 		transferUnlinkWritable?: boolean
 		transferUnlinkPending?: boolean
-		transferUnlinkResult?: InternalTransferUnlinkResult | null
 		linkedCounterpartHref?: string | null
 		onLinkCounterpart?: (transactionId: string) => void
 		onUnlinkTransfer?: () => void

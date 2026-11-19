@@ -1,3 +1,9 @@
+import type { Db } from 'jazz-tools'
+import { createAccountDeleteGrantMachine } from '../accounts/account-delete-grants.js'
+import { createWorkspaceBackupMachine } from '../workspaces/workspace-backup.js'
+import { createWorkspaceRestoreController } from '../workspaces/workspace-restore.js'
+import { createProfileFormOptions } from '../identity/profile.js'
+import { createWorkspaceRenameFormOptions } from '../workspaces/workspace-rename.js'
 import {
 	createCategoryManagementFormOptions,
 	createTagManagementFormOptions
@@ -8,7 +14,7 @@ import { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordina
 import type { RecoveryRequest } from 'delightful-local-first/recovery/coordination'
 import type { SessionRuntimeIdentityChange } from 'delightful-local-first/session/runtime'
 import { createActor, waitFor, type ActorFromLogic } from 'xstate'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	createSessionRuntimeMachine,
 	createSessionRuntimeConnection,
@@ -36,13 +42,16 @@ import type { InputFrom } from 'xstate'
 import type { workspaceInitialization } from '../workspaces/workspace-initialization.js'
 import { creationFixture } from '../transactions/transaction-create.fixture.js'
 import { createFinanceFormsMachine } from './worker-forms.js'
-import { app } from '../../schema.js'
-import type {
-	WorkerTransactionEntryCommand,
-	WorkerAccountCreationCommand
-} from '../../contracts/worker-forms.js'
+import { app } from '../../queries.js'
+import type { WorkerFormCommand } from '../../contracts/worker-forms.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 
+beforeEach(() => {
+	const events = new EventTarget()
+	vi.stubGlobal('addEventListener', events.addEventListener.bind(events))
+	vi.stubGlobal('removeEventListener', events.removeEventListener.bind(events))
+})
+afterEach(() => vi.unstubAllGlobals())
 const userId = '10000000-0000-4000-8000-000000000001',
 	a = '20000000-0000-4000-8000-000000000001',
 	b = '20000000-0000-4000-8000-000000000002'
@@ -72,6 +81,35 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 	}[] = []
 	const grants: { publish: (rows: ArchiveObservation['grants']) => void; failed: () => void }[] = []
 	const transactionDb = creationFixture()
+	const formDb = {
+		...transactionDb.db,
+		one: (async () => null) satisfies Db['one'],
+		subscribe: vi.fn<Db['subscribe']>(() => () => {}),
+		onMutationError: vi.fn<Db['onMutationError']>(() => () => {}),
+		insert: (() => {
+			throw new Error('Unexpected fixture insert')
+		}) satisfies Db['insert'],
+		insertStreaming: (() => {
+			throw new Error('Unexpected fixture insertStreaming')
+		}) satisfies Db['insertStreaming'],
+		update: (() => {
+			throw new Error('Unexpected fixture update')
+		}) satisfies Db['update'],
+		delete: (() => {
+			throw new Error('Unexpected fixture delete')
+		}) satisfies Db['delete'],
+		transaction: (() => {
+			throw new Error('Unexpected fixture transaction')
+		}) satisfies Db['transaction'],
+		beginSerializableTransaction: (() => {
+			throw new Error('Unexpected fixture beginSerializableTransaction')
+		}) satisfies Db['beginSerializableTransaction'],
+		getConfig: vi.fn<Db['getConfig']>(() => ({})),
+		getAuthState: (() => {
+			throw new Error('Unexpected fixture getAuthState')
+		}) satisfies Db['getAuthState']
+	}
+
 	const ledgers: { publish: (rows: WorkerLedgerRecord[]) => void; failed: () => void }[] = []
 	const details: {
 		publish: (row: TransactionEntryObservation['transaction']) => void
@@ -114,6 +152,50 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		})
 	)
 	const capabilities: Omit<FinanceWorkerCapabilities, 'createForms'> = {
+		observeBankConnections: (_id, publish) => {
+			publish([])
+			return () => {}
+		},
+		observeBankLinks: (_id, publish) => {
+			publish([])
+			return () => {}
+		},
+		observeTransfers: (_id, publish) => {
+			publish([])
+			return () => {}
+		},
+		observeWorkspaceMembers: (_id, publish) => {
+			publish([])
+			return () => {}
+		},
+		observeAccountGrants: (_id, publish) => {
+			publish([])
+			return () => {}
+		},
+		observeProfile: (publish) => {
+			publish({
+				id: '22222222-2222-4222-8222-222222222222',
+				userId,
+				displayName: null,
+				avatarData: null,
+				avatarMimeType: null
+			})
+			return () => {}
+		},
+		observeWorkspace: (id, publish) => {
+			publish({
+				id,
+				name: 'Fixture workspace',
+				ownerId: userId,
+				kind: 'personal',
+				defaultCurrency: 'USD'
+			})
+			return () => {}
+		},
+		prepareWorkspaceRestore: () => {
+			throw new Error('Restore is outside this root fixture')
+		},
+
 		observeWorkspaces: (publish, failed) => {
 			const release = vi.fn(() => {
 				order.push('directory')
@@ -206,8 +288,34 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		localFirst: true,
 		capabilities: {
 			...capabilities,
-			createForms: (observe, _archive, navigate, accountOrderStorage) =>
+			createForms: (observe, _archive, navigate, accountOrderStorage, transferDispatch) =>
 				createFinanceFormsMachine({
+					transferDispatch,
+					creationKey: JSON.stringify(['unit', userId]),
+					accountAccess: createAccountDeleteGrantMachine(
+						vi.fn(async () => {}),
+						() => observe().accountAccess
+					),
+					backup: createWorkspaceBackupMachine({
+						db: formDb,
+						observe: () => observe().backup,
+						environment: 'unit',
+						handoff: { dispatch: async () => 'dispatched' }
+					}),
+					restore: createWorkspaceRestoreController(vi.fn(async () => {})),
+					reload: vi.fn(),
+					profile: createProfileFormOptions({
+						binding,
+						observe: () => observe().profile,
+						saveName: vi.fn(async () => {}),
+						saveAvatar: vi.fn(async () => {})
+					}),
+					workspace: createWorkspaceRenameFormOptions({
+						binding,
+						observe: () => observe().workspace,
+						issueRename: () => ({ write: async () => {} }),
+						persistLocal: vi.fn(async () => {})
+					}),
 					binding,
 					accountOrderStorage,
 					classification: {
@@ -228,7 +336,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 					create: createWrite,
 					archive: archiveWrite,
 					navigation: createWorkspaceNavigationMachine({ one: async () => null }, navigate),
-					db: transactionDb.db,
+					db: formDb,
 					initialization: {
 						db: initialization ?? { ...transactionDb.db, getConfig: () => ({ serverUrl: '' }) },
 						userId
@@ -316,10 +424,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		recoveryRead,
 		createWrite,
 		transactionDb,
-		enter: (
-			command: WorkerTransactionEntryCommand,
-			scope = selectFinanceWorkerView(actor.getSnapshot())
-		) =>
+		enter: (command: WorkerFormCommand, scope = selectFinanceWorkerView(actor.getSnapshot())) =>
 			actor.send({
 				type: 'TRANSACTION_ENTRY',
 				command,
@@ -332,10 +437,7 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 				kind,
 				selection: { ...selectFinanceWorkerView(actor.getSnapshot()).selection, revision }
 			}),
-		create: (
-			command: WorkerAccountCreationCommand,
-			scope = selectFinanceWorkerView(actor.getSnapshot())
-		) =>
+		create: (command: WorkerFormCommand, scope = selectFinanceWorkerView(actor.getSnapshot())) =>
 			actor.send({
 				type: 'ACCOUNT_CREATION',
 				command,
@@ -550,10 +652,8 @@ describe('Finance worker ownership and selected accounts', () => {
 			}
 		}
 	)
-	it('reads direct URL filters/pages and changes them only after native history observations', async () => {
-		const f = fixture(),
-			history = Promise.withResolvers<void>()
-		f.navigate.mockImplementationOnce(() => history.promise)
+	it('reads browser URL filters/pages without requesting another navigation', async () => {
+		const f = fixture()
 		try {
 			await f.start()
 			f.actor.send({
@@ -576,27 +676,13 @@ describe('Finance worker ownership and selected accounts', () => {
 				bookedOn: '2026-11-18',
 				description: 'Rent ' + i,
 				memo: null,
+				internalTransferId: null,
 				tagNames: []
 			}))
 			last(f.ledgers).publish(records)
 			expect(f.view().ledger).toMatchObject({ page: 2, pageCount: 2, filters: { query: 'rent' } })
 			expect(f.view().ledger?.groups.flatMap((g) => g.transactions)).toHaveLength(5)
 			const scope = f.view()
-			f.actor.send({
-				type: 'SET_LEDGER_FILTERS',
-				selection: scope.selection,
-				sessionRevision: scope.sessionRevision,
-				filters: { start: '2026-11-18', end: '', categoryId: '', currency: 'USD', query: 'rent 29' }
-			})
-			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
-			expect(f.navigate).toHaveBeenLastCalledWith(
-				'/expenses?workspace=' + a + '&q=rent+29&keep=yes&start=2026-11-18&currency=USD#row',
-				expect.any(AbortSignal),
-				expect.stringContaining('page=2'),
-				true
-			)
-			expect(f.view().ledger?.page).toBe(2)
-			expect(f.view().workspaceNavigation).toMatchObject({ status: 'updating', showContent: true })
 			const subscriptions = f.directory.length
 			f.actor.send({
 				type: 'OBSERVE_ROUTE',
@@ -606,8 +692,8 @@ describe('Finance worker ownership and selected accounts', () => {
 				revision: 2
 			})
 			expect(f.directory).toHaveLength(subscriptions)
-			history.resolve()
 			await vi.waitFor(() => expect(f.view().workspaceNavigation?.status).toBe('scoped'))
+			expect(f.navigate).not.toHaveBeenCalled()
 			last(f.queries).publish([row('Wallet')])
 			last(f.ledgers).publish(records)
 			expect(f.view().ledger).toMatchObject({
@@ -626,7 +712,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				selection: scope.selection,
 				sessionRevision: scope.sessionRevision
 			})
-			expect(f.navigate).toHaveBeenCalledOnce()
+			expect(f.navigate).not.toHaveBeenCalled()
 			f.actor.send({
 				type: 'OBSERVE_ROUTE',
 				pathname: '/expenses',
@@ -643,15 +729,14 @@ describe('Finance worker ownership and selected accounts', () => {
 				selection: f.view().selection,
 				sessionRevision: f.view().sessionRevision
 			})
-			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledTimes(2))
+			await vi.waitFor(() => expect(f.navigate).toHaveBeenCalledOnce())
 			expect(f.navigate).toHaveBeenLastCalledWith(
 				'/expenses?workspace=' + a + '&q=rent&keep=yes#row',
 				expect.any(AbortSignal),
 				expect.any(String),
-				true
+				false
 			)
 		} finally {
-			history.resolve()
 			f.stop()
 		}
 	})
@@ -697,6 +782,7 @@ describe('Finance worker ownership and selected accounts', () => {
 					bookedOn: '2026-11-18',
 					description: 'From A',
 					memo: null,
+					internalTransferId: null,
 					tagNames: []
 				},
 				{
@@ -710,6 +796,7 @@ describe('Finance worker ownership and selected accounts', () => {
 					bookedOn: '2026-11-18',
 					description: 'From B',
 					memo: null,
+					internalTransferId: null,
 					tagNames: []
 				}
 			]
@@ -827,6 +914,7 @@ describe('Finance worker ownership and selected accounts', () => {
 					bookedOn: '2026-11-18',
 					description: 'Rent',
 					memo: null,
+					internalTransferId: null,
 					tagNames: []
 				}
 			])
@@ -921,6 +1009,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				bookedOn: '2026-11-18',
 				description: 'Record ' + i,
 				memo: null,
+				internalTransferId: null,
 				tagNames: i === 29 ? ['Tail'] : []
 			}))
 			last(f.ledgers).publish(values)
@@ -1203,7 +1292,7 @@ describe('Finance worker ownership and selected accounts', () => {
 					bookedOn: '2026-11-18',
 					tags: []
 				}
-			} satisfies WorkerTransactionEntryCommand
+			} satisfies WorkerFormCommand
 			f.enter(command, old)
 			expect(f.transactionDb.insert).not.toHaveBeenCalled()
 			f.enter(command)

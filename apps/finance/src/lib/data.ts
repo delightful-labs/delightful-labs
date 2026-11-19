@@ -1,6 +1,5 @@
-import { issueLocalWrite, persistLocal } from 'delightful-local-first/backend/jazz/data'
-import type { getDb } from 'jazz-tools/svelte'
-import { app, type Organization } from './schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app, type Organization } from './queries.js'
 import type { AccountCurrency } from './domain/account-currency.js'
 import type { z } from 'zod'
 import {
@@ -13,7 +12,7 @@ export { createAccount, archiveAccount } from './data/accounts.js'
 
 export { stableUuid } from './domain/stable-uuid.js'
 
-type Db = ReturnType<typeof getDb>
+type Db = JazzDb
 
 export function saveProfileName(
 	db: Pick<Db, 'update'>,
@@ -45,11 +44,16 @@ export function workspaceNamingWrites(db: Pick<Db, 'update'>) {
 		values: { name: Organization['name']; defaultCurrency: AccountCurrency }
 	) {
 		const settings = workspaceSettingsFormSchema.parse(values)
-		return issueLocalWrite(() => db.update(app.organizations, workspaceId, settings))
+		const receipt = db.update(app.organizations, workspaceId, settings)
+		return {
+			write: async () => {
+				await receipt.wait({ tier: 'local' })
+			}
+		}
 	}
 	return {
 		issueRename,
-		persistLocal: (write: ReturnType<typeof issueRename>['write']) => persistLocal(write)
+		persistLocal: (write: ReturnType<typeof issueRename>['write']) => write()
 	}
 }
 

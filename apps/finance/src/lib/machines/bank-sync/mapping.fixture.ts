@@ -1,6 +1,7 @@
+import type { RowOf } from 'jazz-tools'
 import { afterEach, vi } from 'vitest'
 import { Transaction, type schema } from 'jazz-tools'
-import { app, type Account } from '#lib/schema.js'
+import { app, type Account } from '#lib/queries.js'
 import { createAccountWriteMachine, type AccountWrite } from './account-write.js'
 import { accountWriteTransaction } from './account-write-transaction.js'
 import { createAccountCreationMachine } from './account-create.js'
@@ -14,7 +15,7 @@ import type { bankLock } from './lock.js'
 import { createActor, createCallbackLogic, createAsyncLogic } from 'xstate'
 import type { InputFrom } from 'xstate'
 
-type Link = schema.RowOf<typeof app.simplefinAccountLinks>
+type Link = RowOf<typeof app.simplefinAccountLinks>
 export const provider = {
 	id: 'provider-checking',
 	name: 'Provider Checking',

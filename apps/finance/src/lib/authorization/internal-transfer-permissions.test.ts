@@ -1,91 +1,8 @@
+import type { InsertOf } from 'jazz-tools'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema as s } from 'jazz-tools'
 import { createPolicyTestApp, type PolicyTestApp, type TestDb } from 'jazz-tools/testing'
-
-const app = s.defineApp(
-	{
-		transactions: s.table(
-			{
-				organizationId: s.uuid(),
-				accountId: s.uuid(),
-				kind: s.enum('expense', 'income'),
-				amountMinor: s.string(),
-				currency: s.string(),
-				internalTransferId: s.uuid().optional()
-			},
-			{}
-		),
-		internalTransfers: s.table(
-			{
-				organizationId: s.uuid(),
-				expenseTransactionId: s.uuid(),
-				incomeTransactionId: s.uuid(),
-				expenseAccountId: s.uuid(),
-				incomeAccountId: s.uuid(),
-				expenseAmountMinor: s.string().optional(),
-				expenseCurrency: s.string().optional(),
-				incomeAmountMinor: s.string().optional(),
-				incomeCurrency: s.string().optional(),
-				amountMinor: s.string(),
-				currency: s.string()
-			},
-			{
-				expenseTransaction: s.rel('transactions', 'expenseTransactionId'),
-				incomeTransaction: s.rel('transactions', 'incomeTransactionId')
-			}
-		)
-	},
-	{ migrations: 'none' }
-)
-
-const permissions = s.definePermissions(app, ({ policy, allOf }) => {
-	const transferEndpointsMatch = (
-		transfer: import('jazz-tools/permissions').RowContext<s.RowOf<typeof app.internalTransfers>>
-	) =>
-		allOf([
-			policy.transactions.exists.where({
-				id: transfer.expenseTransactionId,
-				organizationId: transfer.organizationId,
-				accountId: transfer.expenseAccountId,
-				kind: 'expense',
-				amountMinor: transfer.expenseAmountMinor,
-				currency: transfer.expenseCurrency,
-				internalTransferId: transfer.id
-			}),
-			policy.transactions.exists.where({
-				id: transfer.incomeTransactionId,
-				organizationId: transfer.organizationId,
-				accountId: transfer.incomeAccountId,
-				kind: 'income',
-				amountMinor: transfer.incomeAmountMinor,
-				currency: transfer.incomeCurrency,
-				internalTransferId: transfer.id
-			})
-		])
-	const transferEndpointsAreUnlinked = (
-		transfer: import('jazz-tools/permissions').RowContext<s.RowOf<typeof app.internalTransfers>>
-	) =>
-		allOf([
-			policy.transactions.exists.where({
-				id: transfer.expenseTransactionId,
-				organizationId: transfer.organizationId,
-				accountId: transfer.expenseAccountId,
-				internalTransferId: { isNull: true }
-			}),
-			policy.transactions.exists.where({
-				id: transfer.incomeTransactionId,
-				organizationId: transfer.organizationId,
-				accountId: transfer.incomeAccountId,
-				internalTransferId: { isNull: true }
-			})
-		])
-	policy.transactions.allowRead.always()
-	policy.transactions.allowInsert.always()
-	policy.transactions.allowUpdate.always()
-	policy.internalTransfers.allowRead.where(transferEndpointsMatch)
-	policy.internalTransfers.allowInsert.where(transferEndpointsMatch)
-	policy.internalTransfers.allowDelete.where(transferEndpointsAreUnlinked)
-})
+import { app } from '../../../tests/fixtures/authorization/internal-transfer/jazz.generated.js'
+import permissions from '../../../tests/fixtures/authorization/internal-transfer/jazz.permissions.json' with { type: 'json' }
 
 const organizationId = crypto.randomUUID()
 const foreignOrganizationId = crypto.randomUUID()
@@ -103,7 +20,7 @@ let fixture: PolicyTestApp
 let db: TestDb
 
 function transfer(
-	overrides: Partial<import('jazz-tools').schema.InsertOf<typeof app.internalTransfers>> = {}
+	overrides: Partial<import('jazz-tools').InsertOf<typeof app.internalTransfers>> = {}
 ) {
 	return {
 		organizationId,
@@ -118,7 +35,7 @@ function transfer(
 		amountMinor: '4500',
 		currency: 'USD',
 		...overrides
-	} satisfies import('jazz-tools').schema.InsertOf<typeof app.internalTransfers>
+	} satisfies import('jazz-tools').InsertOf<typeof app.internalTransfers>
 }
 
 beforeEach(async () => {
@@ -170,23 +87,25 @@ describe('positive Check-style transfer endpoint lookups', () => {
 		).resolves.toBeUndefined()
 	})
 
-	it('evaluates atomic unlink deletion against alpha.60 final-state predicates', async () => {
+	it('retains the original relationship when native delete admission rejects clearing both markers atomically', async () => {
 		await db.insert(app.internalTransfers, transfer(), { id: transferId }).wait({ tier: 'global' })
 		const unlink = await db.transaction((tx) => {
 			tx.update(app.transactions, expenseTransactionId, { internalTransferId: null })
 			tx.update(app.transactions, incomeTransactionId, { internalTransferId: null })
 			tx.delete(app.internalTransfers, transferId)
 		})
-		await expect(unlink.wait({ tier: 'global' })).resolves.toBeUndefined()
+		await expect(unlink.wait({ tier: 'global' })).rejects.toMatchObject({
+			code: 'permission_denied'
+		})
 		expect(
 			await db.one(app.internalTransfers.where({ id: transferId }), { tier: 'remote' })
-		).toBeNull()
+		).toMatchObject({ id: transferId })
 		expect(
 			await db.one(app.transactions.where({ id: expenseTransactionId }), { tier: 'remote' })
-		).toMatchObject({ internalTransferId: null })
+		).toMatchObject({ internalTransferId: transferId })
 		expect(
 			await db.one(app.transactions.where({ id: incomeTransactionId }), { tier: 'remote' })
-		).toMatchObject({ internalTransferId: null })
+		).toMatchObject({ internalTransferId: transferId })
 	})
 
 	it('accepts clearing both endpoint markers before deleting the relationship', async () => {

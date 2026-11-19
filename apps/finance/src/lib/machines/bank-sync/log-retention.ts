@@ -1,5 +1,5 @@
 import { ReadTier } from 'jazz-tools'
-import { app, type SyncAttempt, type SyncAccountResult } from '#lib/schema.js'
+import { app, type SyncAttempt, type SyncAccountResult } from '#lib/queries.js'
 import { canManageBankCredentials } from '#lib/domain/organization-permissions.js'
 import { createJazzTransactionActors } from '../persistence/jazz-transaction-actors.js'
 import { required } from './identity.js'

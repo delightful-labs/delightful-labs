@@ -1,6 +1,6 @@
 import { createWorkspaceCreationOperation as createSharedOperation } from 'delightful-local-first/workspace/creation-operation'
-import type { getDb } from 'jazz-tools/svelte'
-import type { Organization } from '../../schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import type { Organization } from '../../queries.js'
 import { workspaceNameFormSchema } from '../../validation/identity.js'
 import { prepareWorkspaceCreation } from '../../domain/workspace-creation.js'
 import {
@@ -46,7 +46,7 @@ export type CreationResult =
 			settlement: WorkspacePersistenceResult['settlement']
 	  }
 
-type Db = Pick<ReturnType<typeof getDb>, 'all' | 'beginTransaction'>
+type Db = Pick<JazzDb, 'all' | 'beginTransaction'>
 export function createWorkspaceCreationOperation(db: Db) {
 	const persist = createWorkspacePersistence(db)
 	return createSharedOperation<

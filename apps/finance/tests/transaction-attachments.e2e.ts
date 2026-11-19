@@ -1,44 +1,13 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 import { seedTransaction } from './helpers/transactions.js'
 
 async function attachmentState(page: Page, transactionId: string) {
-	return page.evaluate(async (transactionId) => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing database')
-		const links = await db.all(app.transactionAttachments.where({ transactionId }))
-		return Promise.all(
-			links.map(async ({ id, fileId }) => {
-				const file = await db.one(app.files.where({ id: fileId }), { tier: 'local-first' })
-				const parts = await db.all(app.fileParts.where({ fileId }).orderBy('partIndex'))
-				return {
-					id,
-					fileId,
-					fileName: file?.fileName,
-					mimeType: file?.mimeType,
-					parts: parts.length,
-					bytes: parts.flatMap((part) => [...(part.data ?? [])])
-				}
-			})
-		)
-	}, transactionId)
+	return financeFixture(page, 'transaction-attachments.e2e:5', transactionId)
 }
 
 async function findTransactionByDescription(page: Page, description: string) {
-	return page.evaluate(async (description) => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing database')
-		return (await db.all(app.transactions.where({ description })))[0]?.id
-	}, description)
+	return financeFixture(page, 'transaction-attachments.e2e:32', description)
 }
 
 const onePixelPng = Buffer.from(
@@ -101,40 +70,15 @@ test(
 		await page.getByRole('button', { name: 'Remove receipt.png', exact: true }).press('Enter')
 		await expect.poll(() => attachmentState(page, transactionId)).toHaveLength(0)
 		if (!fileId || !attached) throw new Error('Uploaded file was not found')
-		const retained = await page.evaluate(async (fileId) => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			return db.one(app.files.where({ id: fileId }), { tier: 'local-first' })
-		}, fileId)
+		const retained = await financeFixture(page, 'transaction-attachments.e2e:104', fileId)
 		// Unlinked contents are deliberately hidden by Finance's file policy.
 		expect(retained).toBeNull()
 		// Reattaching the original reference proves removal retained the same file
 		// and bytes, without relying on a mismatched cross-transaction reference.
-		const reattached = await page.evaluate(
-			async ({ fileId, transactionId }) => {
-				const schemaPath = '/src/lib/schema.ts',
-					sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const db = getCurrentJazzSession()?.getSnapshot().client?.db
-				if (!db) throw new Error('Missing database')
-				await db
-					.insert(app.transactionAttachments, { transactionId, fileId })
-					.wait({ tier: 'global' })
-				const file = await db.one(app.files.where({ id: fileId }), { tier: 'remote' })
-				const parts = await db.all(app.fileParts.where({ fileId }).orderBy('partIndex'), {
-					tier: 'remote'
-				})
-				return { id: file?.id, bytes: parts.flatMap((part) => [...(part.data ?? [])]) }
-			},
-			{ fileId, transactionId }
-		)
+		const reattached = await financeFixture(page, 'transaction-attachments.e2e:118', {
+			fileId,
+			transactionId
+		})
 		expect(reattached.id).toBe(fileId)
 		expect(reattached.bytes).toEqual(attached.bytes)
 	}

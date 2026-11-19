@@ -1,6 +1,6 @@
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import { app } from '../../schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app } from '../../queries.js'
 import {
 	switchedWorkspaceHref,
 	workspaceHref,
@@ -40,7 +40,7 @@ type Event =
 	| { type: 'NAVIGATE'; destination: string; replace: boolean }
 	| { type: 'REEVALUATE' | 'RETRY' | 'SHUTDOWN' }
 export function createWorkspaceNavigationMachine(
-	db: Pick<ReturnType<typeof getDb>, 'one'>,
+	db: Pick<JazzDb, 'one'>,
 	navigate: WorkspaceNavigate
 ) {
 	const actors = {

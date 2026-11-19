@@ -153,3 +153,28 @@ export async function toMarginHighlight(
 	if ((await textFingerprint(normalizedSourceText)) !== anchor.textHash) throw projectionError()
 	return record
 }
+
+/** Omit absent JSON properties at the native Jazz storage boundary. */
+export function marginRecordValue(value: MarginRecord) {
+	const { modifiedAt, ...record } = value
+	const times = modifiedAt === undefined ? {} : { modifiedAt }
+	const selector = value.target.selector
+	const quote =
+		selector === undefined
+			? undefined
+			: {
+					type: selector.type,
+					exact: selector.exact,
+					...(selector.prefix === undefined ? {} : { prefix: selector.prefix }),
+					...(selector.suffix === undefined ? {} : { suffix: selector.suffix })
+				}
+	if (record.motivation === 'highlighting') {
+		if (!quote) throw projectionError()
+		return { ...record, ...times, target: { source: record.target.source, selector: quote } }
+	}
+	return {
+		...record,
+		...times,
+		target: { source: record.target.source, ...(quote ? { selector: quote } : {}) }
+	}
+}

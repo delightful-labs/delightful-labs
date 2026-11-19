@@ -1,94 +1,55 @@
 <script lang="ts">
+	import { untrack } from 'svelte'
+	import { fromStore } from 'svelte/store'
+	import { page } from '$app/state'
+	import { getFinanceWorker } from '#lib/runtime/worker/context.js'
 	import { getPageNavigation } from '#lib/components/navigation/page-navigation.js'
-	const navigation = getPageNavigation()
-	import { EXPENSE } from '#lib/domain/transaction-kind.js'
-	import { resolveInternalTransferLinks } from '#lib/domain/internal-transfer.js'
-	import { transactionTagNames } from '#lib/domain/transaction-tags.js'
-	import { getContext, onMount } from 'svelte'
-	import { createQuerySubscription } from 'delightful-local-first/backend/jazz/data'
-	import { app } from '#lib/schema.js'
-	import { financeFiltersKey, type FinanceFilters } from '#lib/filters/finance-filters.js'
-	import { m } from '#lib/paraglide/messages.js'
-	import QueryContent from '#lib/components/shared/QueryContent.svelte'
 	import ExpenseOverview from '#lib/components/reports/ExpenseOverview.svelte'
-	import { browser } from '$app/env'
 	import {
 		loadOverviewFilters,
 		saveOverviewFilters,
 		type OverviewFilters
 	} from '#lib/filters/overview-filters.js'
-	const filters = getContext<FinanceFilters>(financeFiltersKey)
-	const overviewFiltersKey = $derived(
-		`finance-overview-filters:${filters.activeOrganizationId ?? 'none'}`
+	import type { TransactionListFilters } from '#lib/filters/transaction-list-filters.js'
+	import { withQueryParams } from '#lib/domain/query-params.js'
+	import { m } from '#lib/paraglide/messages.js'
+	const client = getFinanceWorker().client
+	const liveView = fromStore(client.view)
+	const url = $derived(page.shallow?.url ?? page.url)
+	const navigation = getPageNavigation()
+	const preferenceKey = $derived(
+		`finance-overview-filters:${liveView.current.selection.workspaceId ?? 'none'}`
 	)
-	let overviewFilters = $state<OverviewFilters | null>(null)
-	onMount(() => {
-		overviewFilters = loadOverviewFilters(overviewFiltersKey)
-	})
+	let preference = $state<{ key: string; filters: OverviewFilters | null }>()
 	$effect(() => {
-		if (browser) saveOverviewFilters(overviewFiltersKey, overviewFilters)
+		const key = preferenceKey
+		untrack(() => (preference = { key, filters: loadOverviewFilters(key) }))
 	})
-	const transactions = createQuerySubscription(() =>
-		filters.activeOrganizationId
-			? app.transactions
-					.where({ organizationId: filters.activeOrganizationId })
-					.orderBy('bookedOn', 'desc')
-			: undefined
-	)
-	const categories = createQuerySubscription(() =>
-		filters.activeOrganizationId
-			? app.categories.where({ organizationId: filters.activeOrganizationId })
-			: undefined
-	)
-	const tags = createQuerySubscription(() =>
-		filters.activeOrganizationId
-			? app.tags.where({ organizationId: filters.activeOrganizationId })
-			: undefined
-	)
-	const links = createQuerySubscription(() =>
-		filters.activeOrganizationId
-			? app.transactionTags.where({ organizationId: filters.activeOrganizationId })
-			: undefined
-	)
-	const transfers = createQuerySubscription(() =>
-		filters.activeOrganizationId
-			? app.internalTransfers.where({ organizationId: filters.activeOrganizationId })
-			: undefined
-	)
-	const transferResolution = $derived(
-		resolveInternalTransferLinks(transfers.current ?? [], transactions.current ?? [])
-	)
-	const visibleTransactions = $derived(
-		(transactions.current ?? []).filter(
-			(transaction) =>
-				transaction.kind === EXPENSE &&
-				(filters.selectedAccountIds === null ||
-					filters.selectedAccountIds.includes(transaction.accountId))
-		)
-	)
-	const categoryNames = $derived(
-		new Map((categories.current ?? []).map((row) => [row.id, row.name]))
-	)
-	const tagNamesByTransaction = $derived(
-		transactionTagNames(tags.current ?? [], links.current ?? [])
-	)
+	function change(filters: TransactionListFilters) {
+		saveOverviewFilters(preferenceKey, {
+			start: filters.start,
+			end: filters.end,
+			categoryId: filters.categoryId || null,
+			currency: filters.currency
+		})
+		client.setOverviewFilters(filters, liveView.current)
+	}
 </script>
 
 <svelte:head><title>{m['navigation.overview']()} · {m['app.name']()}</title></svelte:head>
-<QueryContent
-	queries={[transactions, categories, tags, links, transfers]}
-	loadingMessage={m['status.loading_subject']({ subject: m['nouns.transaction']({ count: 2 }) })}
-	errorMessage={m['errors.load_subject']({ subject: m['nouns.transaction']({ count: 2 }) })}
->
-	{#key JSON.stringify([filters.activeOrganizationId, filters.selectedAccountIds])}
+{#if preference?.key === preferenceKey}
+	{#key preferenceKey}
 		<ExpenseOverview
 			{navigation}
-			transactions={visibleTransactions}
-			{categoryNames}
-			{tagNamesByTransaction}
-			internalTransferResolution={transferResolution}
-			filters={overviewFilters}
-			onfilterschange={(value) => (overviewFilters = value)}
+			data={liveView.current.overview}
+			filters={preference.filters}
+			scope={`${liveView.current.sessionRevision}:${liveView.current.selection.revision}`}
+			onfilterschange={change}
+			onPage={(number) => client.selectLedgerPage(number, liveView.current)}
+			pageHref={(number) =>
+				withQueryParams(`${url.pathname}${url.search}${url.hash}`, {
+					page: number > 1 ? number : null
+				})}
 		/>
 	{/key}
-</QueryContent>
+{/if}

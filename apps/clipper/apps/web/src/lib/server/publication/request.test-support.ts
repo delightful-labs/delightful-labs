@@ -1,7 +1,7 @@
 import { createActor, createAsyncLogic, setup, toPromise, types } from 'xstate'
 import { makeSignature } from 'better-auth/crypto'
 import type { PolicyTestApp } from 'jazz-tools/testing'
-import { app } from '../../backend/jazz/schema.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
 import { createAuthServer } from '../auth/server.js'
 import { publicationOwnerFixture } from './owner.test-support.js'
 

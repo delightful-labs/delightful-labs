@@ -1,14 +1,14 @@
 import { PersistedWriteRejectedError } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import { z } from 'zod'
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { appCheckSchema } from '#lib/validation/checks.js'
 import type { FormInterruption, FormSettlement } from '#lib/contracts/form-contract.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { OutputFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-export type CheckCreationDb = Pick<ReturnType<typeof getDb>, 'beginTransaction'>
+export type CheckCreationDb = Pick<JazzDb, 'beginTransaction'>
 const requestSchema = z.strictObject({
 	id: z.uuid(),
 	values: appCheckSchema,

@@ -1,0 +1,147 @@
+{
+  "internalTransfers": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "expenseTransactionId",
+        "nullable": false,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "incomeTransactionId",
+        "nullable": false,
+        "references": "transactions"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "expenseAccountId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "incomeAccountId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "expenseAmountMinor",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "expenseCurrency",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "incomeAmountMinor",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "incomeCurrency",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "amountMinor",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "currency",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "expenseTransaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "expenseTransactionId"
+      },
+      "incomeTransaction": {
+        "kind": "forward",
+        "table": "transactions",
+        "column": "incomeTransactionId"
+      }
+    }
+  },
+  "transactions": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "organizationId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "accountId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "expense",
+            "income"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "amountMinor",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "currency",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "internalTransferId",
+        "nullable": true
+      }
+    ]
+  }
+}

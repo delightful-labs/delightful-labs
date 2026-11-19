@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Page } from '@playwright/test'
 
 async function openCreation(page: Page, route: string, label: string) {
@@ -109,17 +110,7 @@ test(
 		await dialog.getByLabel('Currency', { exact: true }).selectOption('TZS')
 		await dialog.getByRole('button', { name: 'Add Account', exact: true }).click()
 		await expect(dialog.getByRole('status')).toContainText('Modal checking')
-		const savedCurrency = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const [account] = await db.all(app.accounts.where({ name: 'Modal checking' }))
-			return account?.currency
-		})
+		const savedCurrency = await financeFixture(page, 'creation-modals.e2e:112')
 		expect(savedCurrency).toBe('TZS')
 		await dialog.getByRole('button', { name: 'Close', exact: true }).click()
 		await expect(
@@ -149,33 +140,7 @@ for (const entity of ['category', 'tag', 'account']) {
 			const field = `${entity[0]?.toUpperCase()}${entity.slice(1)} name`
 			const { dialog } = await openCreation(page, route, label)
 			await dialog.getByLabel(field, { exact: true }).fill('Old workspace draft')
-			const workspaceId = await page.evaluate(async () => {
-				const schemaPath = '/src/lib/schema.ts'
-				const sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const snapshot = getCurrentJazzSession()?.getSnapshot()
-				if (!snapshot?.client || !snapshot.account) throw new Error('Test session is not ready.')
-				const db = snapshot.client.db
-				const workspace = await db
-					.insert(app.organizations, {
-						name: 'Second modal workspace',
-						kind: 'business',
-						defaultCurrency: 'USD',
-						ownerId: snapshot.account.id
-					})
-					.wait({ tier: 'global' })
-				await db
-					.insert(app.organizationMembers, {
-						organizationId: workspace.id,
-						userId: snapshot.account.id,
-						role: 'owner',
-						accountAccessMode: 'all'
-					})
-					.wait({ tier: 'global' })
-				return workspace.id
-			})
+			const workspaceId = await financeFixture(page, 'creation-modals.e2e:152')
 			const selector = page.getByLabel('Current Workspace', { exact: true })
 			await expect(selector.locator(`option[value="${workspaceId}"]`)).toHaveCount(1)
 			// Exercise a scope update while the modal owns focus, as with an external workspace change.

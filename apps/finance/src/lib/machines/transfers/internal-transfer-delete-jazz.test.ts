@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createPolicyTestApp, type PolicyTestApp, type TestDb } from 'jazz-tools/testing'
-import { app } from '../../schema.js'
-import permissions from '../../permissions.js'
+import { app } from '../../queries.js'
+import permissions from '../../jazz.permissions.json' with { type: 'json' }
 
 const session = {
 	user_id: 'internal-transfer-delete-local-test',

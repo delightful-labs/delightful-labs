@@ -1,4 +1,4 @@
-import type { TransactionRow } from '#lib/schema.js'
+import type { TransactionRow } from '#lib/queries.js'
 
 export type TransactionListFilters = {
 	start: string

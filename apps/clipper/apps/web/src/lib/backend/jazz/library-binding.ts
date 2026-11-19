@@ -4,7 +4,7 @@ import type { RootAccess } from '../../contracts/account.js'
 import type { createLibraryCapability } from './library.js'
 import { createLibraryRecords } from './records.js'
 import { readConnection } from './read-connection.js'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 
 /** Native construction only. Return capabilities, never the Db or SDK session. */
 export function createLibraryBinding(

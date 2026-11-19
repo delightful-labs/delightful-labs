@@ -286,7 +286,7 @@ export type BackupObservation = {
 	loading: boolean
 	failed: boolean
 }
-function sameObservation(a: BackupObservation, b: BackupObservation) {
+export function sameBackupObservation(a: BackupObservation, b: BackupObservation) {
 	return Object.entries(a).every(([key, value]) =>
 		Object.entries(b).some(([other, item]) => key === other && value === item)
 	)
@@ -397,7 +397,7 @@ export function createWorkspaceBackupMachine(options: Options) {
 			invalidating: (args: { value: import('xstate').StateValue }) =>
 				matchesState({ exporting: 'invalidating' }, args.value),
 			changed: ({ context, event }: { context: Context; event: NativeEvent0 }) =>
-				event.type === 'OBSERVE' && !sameObservation(context.facts, event.facts)
+				event.type === 'OBSERVE' && !sameBackupObservation(context.facts, event.facts)
 		},
 		actions: {}
 	})
@@ -457,7 +457,7 @@ export function createWorkspaceBackupMachine(options: Options) {
 							generation,
 							isCurrent: () =>
 								self.getSnapshot().context.generation === generation &&
-								sameObservation(facts, options.observe())
+								sameBackupObservation(facts, options.observe())
 						}
 					},
 					onDone: (args) => {
@@ -692,4 +692,8 @@ export function selectWorkspaceBackup(snapshot: WorkspaceBackupSnapshot): {
 			message === 'dataChanged' ||
 			message === 'password'
 	}
+}
+
+export function selectWorkspaceBackupReport(snapshot: WorkspaceBackupSnapshot) {
+	return { facts: snapshot.context.facts, view: selectWorkspaceBackup(snapshot) }
 }

@@ -1,4 +1,4 @@
-import type { Organization } from '../schema.js'
+import type { Organization } from '../queries.js'
 import type { ActorRef, Snapshot } from 'xstate'
 
 export { sameInitializationRequest } from 'delightful-local-first/workspace/startup-contracts'

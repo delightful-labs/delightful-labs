@@ -33,3 +33,8 @@ export function transactionIdForPath(pathname: string): string | null {
 	const parsed = z.uuid().safeParse(/^\/(?:expenses|income)\/([^/]+)$/.exec(pathname)?.[1])
 	return parsed.success ? parsed.data : null
 }
+
+export function transferIdForPath(pathname: string): string | null {
+	const parsed = z.uuid().safeParse(/^\/transfers\/([^/]+)$/.exec(pathname)?.[1])
+	return parsed.success ? parsed.data : null
+}

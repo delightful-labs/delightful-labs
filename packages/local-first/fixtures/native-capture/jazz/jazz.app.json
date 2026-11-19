@@ -1,0 +1,25 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "730c0fddc4ba7b60b9b5aa52a1b34f4ee724faa2405e2c9e55a203bb8aa48ada"
+  },
+  "tables": {
+    "entries": {
+      "columns": { "workspaceId": "uuid", "fileId": "uuid", "revision": "int" },
+      "relations": {
+        "file": { "rel": "files", "column": "fileId" },
+        "workspace": { "rel": "workspaces", "column": "workspaceId" }
+      }
+    },
+    "files": {
+      "columns": { "workspaceId": "uuid", "revision": "int", "sizeBytes": "int" },
+      "relations": { "parts": { "reverse": "parts", "relation": "file" } }
+    },
+    "parts": {
+      "columns": { "workspaceId": "uuid", "fileId": "uuid", "partIndex": "int", "data": "bytes" },
+      "relations": { "file": { "rel": "files", "column": "fileId" } }
+    },
+    "workspaces": { "columns": { "revision": "int", "allowed": "boolean", "visible": "boolean" } }
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Account, Category } from '../schema.js'
+import type { Account, Category } from '../queries.js'
 import {
 	appTransactionSchema,
 	defaultTransactionCategory,

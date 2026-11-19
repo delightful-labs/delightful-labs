@@ -7,7 +7,7 @@ import {
 	applicableTransactionTags
 } from './transaction-entry.js'
 import type { TransactionEntryObservation } from '#lib/contracts/transaction-entry-contract.js'
-import type { Tag } from '#lib/schema.js'
+import type { Tag } from '#lib/queries.js'
 import { initialTransition } from 'xstate'
 
 const binding = {}

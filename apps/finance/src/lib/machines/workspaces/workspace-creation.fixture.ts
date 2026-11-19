@@ -5,7 +5,7 @@ import { createAdditionalWorkspaceTransaction } from './workspace-additional-cre
 import { workspaceInitialization } from './workspace-initialization.js'
 import { createWorkspacePersistence } from './workspace-creation-persistence.js'
 import type { WorkspaceCreationAttempt } from '../../domain/workspace-creation.js'
-import { type Organization } from '../../schema.js'
+import { type Organization } from '../../queries.js'
 import { createActor } from 'xstate'
 
 export const userId = '11111111-1111-4111-8111-111111111111'

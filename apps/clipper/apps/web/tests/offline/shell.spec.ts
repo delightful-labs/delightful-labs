@@ -3,7 +3,7 @@ import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from '../acco
 import { closeLibraryPopovers, openLibrarySearch, openLibraryFilters } from '../library-popovers.js'
 import { openAddLink } from '../add-link.js'
 import { readingControls, closeReadingControls, visibleReadingParagraph } from '../reader-ui.js'
-import { app } from '../../src/lib/backend/jazz/schema.js'
+import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
 import { test, expect, chromium, firefox, webkit } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'

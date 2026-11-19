@@ -11,15 +11,15 @@ import {
 } from '../../web/tests/account-ui.js'
 import { openArticleActions } from '../../web/tests/article-actions.js'
 import type { BrowserContext, Page } from '@playwright/test'
-import { createJazz, remote, acceptLocalFirstAuth } from 'jazz-tools/backend'
+import { createJazz, remote, acceptDeviceAccounts } from 'jazz-tools/backend'
 import { browserCoreSecret } from '../../web/tests/browser-core.js'
 import { startLocalJazzServer } from '../../web/tests/browser-core.js'
 import { createServer } from 'node:http'
 import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { app } from '../../web/src/lib/backend/jazz/schema.js'
-import permissions from '../../web/src/lib/backend/jazz/permissions.js'
+import { app } from '../../web/src/lib/backend/jazz/jazz.generated.js'
+import permissions from '../../web/src/lib/backend/jazz/jazz.permissions.json'
 import { connectionSchema } from '../src/connection.js'
 import { z } from 'zod'
 const machineEvidenceSchema = z.object({
@@ -66,7 +66,7 @@ test.beforeAll(async () => {
 		app,
 		permissions,
 		store: remote({ url: authority.url, appId: authority.appId, secret: browserCoreSecret }),
-		authenticate: acceptLocalFirstAuth
+		authenticate: acceptDeviceAccounts
 	})
 	await audit.ready()
 	await new Promise<void>((resolve) =>

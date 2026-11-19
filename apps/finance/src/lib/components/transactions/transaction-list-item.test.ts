@@ -1,6 +1,8 @@
+import type { WorkerTransferListView } from '#lib/contracts/worker-application.js'
+import { groupTransactionsByDate } from '#lib/domain/transaction-groups.js'
 import { expect, it } from 'vitest'
 import { render } from 'svelte/server'
-import type { TransactionRow } from '#lib/schema.js'
+import type { TransactionRow } from '#lib/queries.js'
 import TransactionListItem from './TransactionListItem.svelte'
 import TransferList from '../transfers/TransferList.svelte'
 import { queryLinksKey, type QueryLinkContext } from '#lib/filters/query-links.js'
@@ -62,30 +64,42 @@ it('keeps a useful accessible name when category and description are unavailable
 })
 
 it('renders transfer rows with independent dates, currencies, descriptions and a scoped destination', () => {
+	const pairs: WorkerTransferListView['pairs'] = [
+		{
+			id: 'transfer',
+			expense: { ...transaction, tagNames: [] },
+			income: {
+				...transaction,
+				tagNames: [],
+				id: 'income',
+				kind: 'income',
+				accountId: 'savings',
+				bookedOn: '2026-10-24',
+				currency: 'EUR',
+				amountMinor: 4000,
+				description: 'Received transfer'
+			}
+		}
+	]
 	const { body } = render(TransferList, {
 		props: {
-			pairs: [
-				{
-					id: 'transfer',
-					expense: transaction,
-					income: {
-						...transaction,
-						id: 'income',
-						kind: 'income',
-						accountId: 'savings',
-						bookedOn: '2026-10-24',
-						currency: 'EUR',
-						amountMinor: 4000,
-						description: 'Received transfer'
-					}
-				}
-			],
-			accountNames: new Map([
-				['checking', 'Checking'],
-				['savings', 'Savings']
-			]),
-			noAccountsSelected: false,
-			requestedPage: 1,
+			view: {
+				pairs,
+				selected: null,
+				accounts: [
+					{ id: 'checking', name: 'Checking', kind: 'cash', currency: 'USD' },
+					{ id: 'savings', name: 'Savings', kind: 'cash', currency: 'USD' }
+				],
+				groups: groupTransactionsByDate(pairs.map((pair) => pair.expense)).map((group) => ({
+					...group,
+					totals: [...group.totals]
+				})),
+				noAccountsSelected: false,
+				page: 1,
+				pageCount: 1,
+				requestedPage: 1
+			},
+			onPage: () => {},
 			pageHref: (page) => `/transfers?page=${page}`,
 			transferHref: (id) => `/transfers/${id}`
 		},

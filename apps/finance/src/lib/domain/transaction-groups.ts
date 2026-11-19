@@ -1,4 +1,4 @@
-import type { TransactionRow } from '../schema.js'
+import type { TransactionRow } from '../queries.js'
 
 export type TransactionListRow = Pick<
 	TransactionRow,

@@ -1,4 +1,4 @@
-import type { Category, Tag, OrganizationMember } from '../schema.js'
+import type { Category, Tag, OrganizationMember } from '../queries.js'
 import type { ScopedFormView } from './form-contract.js'
 export type ManagementScope = {
 	identityId: string | null

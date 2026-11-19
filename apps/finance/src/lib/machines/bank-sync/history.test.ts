@@ -1,5 +1,6 @@
+import { bankMessageText } from '../../forms/bank-messages.js'
 import { expect, it } from 'vitest'
-import type { SyncAttempt } from '#lib/schema.js'
+import type { SyncAttempt } from '#lib/queries.js'
 import { selectBankLogPresentation } from './history.js'
 
 const attempt: SyncAttempt = {
@@ -35,7 +36,7 @@ it.each([
 		const row = { ...attempt, outcome, importSettlement }
 		const view = selectBankLogPresentation({ connections: [], attempts: [row], accounts: [] })
 			.attempts[0]
-		expect(view?.importSettlement.label()).toBe(expected)
+		expect(view ? bankMessageText(view.importSettlement) : undefined).toBe(expected)
 		expect(row.importSettlement).toBe(importSettlement)
 	}
 )
@@ -55,7 +56,9 @@ it('preserves uncertainty and import-failure details when some rows were saved',
 		accounts: []
 	}).attempts[0]
 	if (!view) throw new Error('Missing attempt presentation')
-	expect(view.outcome.label()).toBe('Failed')
-	expect(view.importSettlement.label()).not.toBe('Saved')
-	expect(view.failure?.label()).toBe('Could not save Transactions.')
+	expect(bankMessageText(view.outcome)).toBe('Failed')
+	expect(bankMessageText(view.importSettlement)).not.toBe('Saved')
+	expect(view.failure ? bankMessageText(view.failure) : undefined).toBe(
+		'Could not save Transactions.'
+	)
 })

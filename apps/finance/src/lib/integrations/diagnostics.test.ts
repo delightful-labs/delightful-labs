@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const environment = vi.hoisted(() => ({ PUBLIC_DEBUG: 'true' }))
-vi.mock('$app/env/public', () => environment)
-
 beforeEach(() => {
 	vi.resetModules()
 	vi.useFakeTimers()
@@ -13,7 +10,7 @@ afterEach(() => {
 })
 
 it.each(['true', 'false'])('cleans up trace heartbeats on success with debug=%s', async (flag) => {
-	environment.PUBLIC_DEBUG = flag
+	vi.stubEnv('PUBLIC_DEBUG', flag)
 	const info = vi.spyOn(console, 'info').mockImplementation(() => {})
 	const { createBankTrace } = await import('./diagnostics.js')
 	let finish: (value: number) => void = () => {}
@@ -38,7 +35,7 @@ it.each(['true', 'false'])('cleans up trace heartbeats on success with debug=%s'
 })
 
 it('preserves rejection, clears its timer, and excludes sensitive error details', async () => {
-	environment.PUBLIC_DEBUG = 'true'
+	vi.stubEnv('PUBLIC_DEBUG', 'true')
 	vi.spyOn(console, 'info').mockImplementation(() => {})
 	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 	const { createBankTrace, safeBankError } = await import('./diagnostics.js')
@@ -63,3 +60,5 @@ it('preserves rejection, clears its timer, and excludes sensitive error details'
 	})
 	expect(safeBankError(new Error('unauthorized'))).toMatchObject({ reason: 'unauthorized' })
 })
+
+afterEach(() => vi.unstubAllEnvs())

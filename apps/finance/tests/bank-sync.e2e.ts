@@ -1,3 +1,5 @@
+import { financeFixture } from './helpers/worker-fixture.js'
+import { installWorkerFault } from './helpers/startup-failure.js'
 import {
 	holdWorkspaceWrite,
 	machineErrors,
@@ -15,36 +17,7 @@ import {
 } from './helpers/ui.js'
 
 async function syncLog(page: Page) {
-	return page.evaluate(async () => {
-		const schemaPath = '/src/lib/schema.ts',
-			sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-			await import(sessionPath)
-		const db = getCurrentJazzSession()?.getSnapshot().client?.db
-		if (!db) throw new Error('Missing database')
-		const attempts = await db.all(app.simplefinSyncAttempts)
-		const accounts = await db.all(app.simplefinSyncAccountResults)
-		return {
-			attempts: attempts.map((row) => ({
-				id: row.id,
-				connectionId: row.connectionId,
-				outcome: row.outcome,
-				importedCount: row.importedCount,
-				existingCount: row.existingCount,
-				omittedCount: row.omittedCount,
-				importSettlement: row.importSettlement
-			})),
-			accounts: accounts.map((row) => ({
-				attemptId: row.attemptId,
-				accountName: row.accountName,
-				outcome: row.outcome,
-				importedCount: row.importedCount,
-				existingCount: row.existingCount,
-				omittedCount: row.omittedCount
-			}))
-		}
-	})
+	return financeFixture(page, 'bank-sync.e2e:18')
 }
 
 async function installPasskey(page: Page) {
@@ -246,22 +219,7 @@ test(
 		).toHaveCount(0)
 		await page.getByRole('button', { name: 'Add Account “Provider Savings”', exact: true }).click()
 		await expect(page.getByText('Linked to Provider Savings', { exact: true })).toBeVisible()
-		await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const session = getCurrentJazzSession()?.getSnapshot()
-			const db = session?.client?.db,
-				userId = session?.account?.id
-			if (!db || !userId) throw new Error('Missing session')
-			const [profile] = await db.all(app.profiles.where({ userId }))
-			if (!profile) throw new Error('Missing profile')
-			await db
-				.update(app.profiles, profile.id, { displayName: 'Sync Operator' })
-				.wait({ tier: 'local' })
-		})
+		await financeFixture(page, 'bank-sync.e2e:249')
 		expect(await syncLog(page)).toEqual({ attempts: [], accounts: [] })
 		const history = page.getByRole('region', { name: 'Sync history', exact: true })
 		await expect(
@@ -321,20 +279,7 @@ test(
 		await expect(
 			firstAttempt.locator('summary').filter({ hasText: 'Provider Savings — Succeeded' })
 		).toBeVisible()
-		const savedBalances = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const links = await db.all(app.simplefinAccountLinks)
-			return links.map(({ availableBalance, balanceDate }) => ({
-				availableBalance,
-				balanceDate: balanceDate?.toISOString()
-			}))
-		})
+		const savedBalances = await financeFixture(page, 'bank-sync.e2e:324')
 		expect(savedBalances).toHaveLength(2)
 		expect(savedBalances).toEqual(
 			expect.arrayContaining([
@@ -342,49 +287,13 @@ test(
 				{ availableBalance: '90.00', balanceDate: new Date(1792000000 * 1000).toISOString() }
 			])
 		)
-		const edited = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const rows = await db.all(app.transactions.where({ source: 'simplefin' }))
-			const row = rows.find((value) => value.kind === 'expense')
-			if (!row) throw new Error('Missing imported expense')
-			await db
-				.update(app.transactions, row.id, {
-					description: 'User description',
-					memo: 'User notes',
-					amountMinor: 5678
-				})
-				.wait({ tier: 'global' })
-			return { id: row.id, externalId: row.externalId }
-		})
+		const edited = await financeFixture(page, 'bank-sync.e2e:345')
 
 		await sync.click()
 		await expect(page.getByText(/Imported: 0; already present: 2; omitted: 2/)).toBeVisible()
 		await expect(sync).toBeEnabled()
 		expect((await syncLog(page)).attempts).toHaveLength(2)
-		const afterRepeat = await page.evaluate(async (id) => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const rows = await db.all(app.transactions.where({ source: 'simplefin' }), { tier: 'remote' })
-			const row = rows.find((value) => value.id === id)
-			return {
-				count: rows.length,
-				description: row?.description,
-				memo: row?.memo,
-				amountMinor: row?.amountMinor,
-				externalId: row?.externalId
-			}
-		}, edited.id)
+		const afterRepeat = await financeFixture(page, 'bank-sync.e2e:370', edited.id)
 		expect(afterRepeat).toEqual({
 			count: 2,
 			description: 'User description',
@@ -435,86 +344,7 @@ test(
 			)
 		).toBeVisible()
 		// Older records exercise pagination without issuing additional provider operations.
-		const seededConnections = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const connection = (await db.all(app.simplefinConnections)).find(
-				(row) => row.status === 'active'
-			)
-			if (!connection?.ownerId) throw new Error('Missing owned connection')
-			for (let index = 0; index < 21; index += 1) {
-				const id = crypto.randomUUID()
-				const startedAt = new Date(Date.UTC(2020, 0, 1, 0, 0, index))
-				await db
-					.insert(
-						app.simplefinSyncAttempts,
-						{
-							organizationId: connection.organizationId,
-							connectionId: connection.id,
-							initiatedBy: connection.ownerId,
-							startedAt,
-							finishedAt: null,
-							outcome: 'unfinished',
-							importSettlement: 'notStarted',
-							failureCode: null,
-							importedCount: null,
-							existingCount: null,
-							omittedCount: null
-						},
-						{ id }
-					)
-					.wait({ tier: 'global' })
-				if (index > 0)
-					await db
-						.update(app.simplefinSyncAttempts, id, {
-							outcome: 'succeeded',
-							finishedAt: startedAt,
-							importedCount: 0,
-							existingCount: 0,
-							omittedCount: 0
-						})
-						.wait({ tier: 'global' })
-			}
-			const otherConnectionId = crypto.randomUUID()
-			await db
-				.insert(
-					app.simplefinConnections,
-					{
-						organizationId: connection.organizationId,
-						ownerId: connection.ownerId,
-						accessUrl: '',
-						status: 'revoked',
-						claimedAt: new Date()
-					},
-					{ id: otherConnectionId }
-				)
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.simplefinSyncAttempts, {
-					organizationId: connection.organizationId,
-					connectionId: otherConnectionId,
-					initiatedBy: connection.ownerId,
-					startedAt: new Date(),
-					finishedAt: null,
-					outcome: 'unfinished',
-					importSettlement: 'notStarted',
-					failureCode: null,
-					importedCount: null,
-					existingCount: null,
-					omittedCount: null
-				})
-				.wait({ tier: 'global' })
-			return {
-				current: connection.id,
-				other: otherConnectionId,
-				organizationId: connection.organizationId
-			}
-		})
+		const seededConnections = await financeFixture(page, 'bank-sync.e2e:438')
 		await expect(history.locator(':scope > details')).toHaveCount(20)
 		await history.getByRole('button', { name: 'More Sync history', exact: true }).click()
 		await expect(history.locator(':scope > details')).toHaveCount(24)
@@ -587,20 +417,7 @@ test(
 		const providerRequests: string[] = []
 		page.on('pageerror', (error) => errors.push(error.message))
 		await installPasskey(page)
-		await page.addInitScript(() => {
-			const request = navigator.locks.request.bind(navigator.locks)
-			let failed = false
-			Object.defineProperty(navigator.locks, 'request', {
-				configurable: true,
-				value: (...args: Parameters<typeof request>) => {
-					if (!failed && args[0].startsWith('simplefin:')) {
-						failed = true
-						throw new Error('Synthetic lock acquisition failure')
-					}
-					return request(...args)
-				}
-			})
-		})
+		await installWorkerFault(page, 'fail-bank-lock-once')
 		await page.context().route('**/api/simplefin', async (route) => {
 			providerRequests.push(route.request().url())
 			await route.abort()
@@ -957,29 +774,7 @@ for (const failure of ['start', 'result']) {
 				.click()
 			await expect(page.getByText('Linked to Log Failure Checking', { exact: true })).toBeVisible()
 
-			await page.evaluate(async (failure) => {
-				const schemaPath = '/src/lib/schema.ts',
-					sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const db = getCurrentJazzSession()?.getSnapshot().client?.db
-				if (!db) throw new Error('Missing database')
-				const prototype: object | null = Object.getPrototypeOf(db)
-				if (!prototype) throw new Error('Missing database prototype')
-				const method = failure === 'start' ? 'insert' : 'update'
-				const original: unknown = Object.getOwnPropertyDescriptor(prototype, method)?.value
-				if (typeof original !== 'function') throw new Error('Missing database method')
-				Object.defineProperty(prototype, method, {
-					configurable: true,
-					writable: true,
-					value: function (this: object, ...args: unknown[]): unknown {
-						if (args[0] === app.simplefinSyncAttempts)
-							throw new Error('Synthetic log persistence failure')
-						return Reflect.apply(original, this, args)
-					}
-				})
-			}, failure)
+			await financeFixture(page, 'bank-sync.e2e:960', failure)
 			await sync.click()
 			const main = pageContent(page)
 
@@ -995,18 +790,7 @@ for (const failure of ['start', 'result']) {
 				)
 			).toBeVisible()
 			expect(operations).toEqual(['claim', 'discover', 'sync'])
-			const imported = await page.evaluate(async () => {
-				const schemaPath = '/src/lib/schema.ts',
-					sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const db = getCurrentJazzSession()?.getSnapshot().client?.db
-				if (!db) throw new Error('Missing database')
-				return (await db.all(app.transactions)).filter(
-					(row) => row.description === 'Import despite logging failure'
-				).length
-			})
+			const imported = await financeFixture(page, 'bank-sync.e2e:998')
 			expect(imported).toBe(1)
 			if (failure === 'start') {
 				expect((await syncLog(page)).attempts).toHaveLength(0)
@@ -1063,120 +847,7 @@ test(
 		).toBeEnabled()
 		const organizationId = new URL(page.url()).searchParams.get('workspace')
 		if (!organizationId) throw new Error('Missing workspace scope')
-		const seeded = await page.evaluate(async (organizationId) => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const snapshot = getCurrentJazzSession()?.getSnapshot(),
-				db = snapshot?.client?.db,
-				userId = snapshot?.account?.id
-			if (!db || !userId) throw new Error('Missing database/session')
-			const connection = (await db.all(app.simplefinConnections.where({ organizationId }))).find(
-				(row) => row.status === 'active'
-			)
-			if (!connection) throw new Error('Missing connected bank')
-			const connectionId = connection.id,
-				otherConnectionId = crypto.randomUUID(),
-				accountId = crypto.randomUUID()
-			const oldest = crypto.randomUUID(),
-				child = crypto.randomUUID(),
-				unfinished = crypto.randomUUID(),
-				otherAttempt = crypto.randomUUID()
-			await db
-				.insert(
-					app.accounts,
-					{ organizationId, name: 'Retention ledger', kind: 'bank', currency: 'USD' },
-					{ id: accountId }
-				)
-				.wait({ tier: 'global' })
-			await Promise.all(
-				Array.from({ length: 101 }, async (_, index) => {
-					const id = index === 0 ? oldest : crypto.randomUUID(),
-						time = new Date(Date.UTC(2020, 0, 1, 0, 0, index))
-					await db
-						.insert(
-							app.simplefinSyncAttempts,
-							{
-								organizationId,
-								connectionId,
-								initiatedBy: userId,
-								startedAt: time,
-								outcome: 'unfinished',
-								importSettlement: 'notStarted',
-								importedCount: 0,
-								existingCount: 0,
-								omittedCount: 0
-							},
-							{ id }
-						)
-						.wait({ tier: 'global' })
-					if (index === 0)
-						await db
-							.insert(
-								app.simplefinSyncAccountResults,
-								{
-									organizationId,
-									attemptId: id,
-									accountId,
-									accountName: 'Old bank ledger',
-									outcome: 'succeeded',
-									importedCount: 0,
-									existingCount: 0,
-									omittedCount: 0
-								},
-								{ id: child }
-							)
-							.wait({ tier: 'global' })
-					await db
-						.update(app.simplefinSyncAttempts, id, { outcome: 'succeeded', finishedAt: time })
-						.wait({ tier: 'global' })
-				})
-			)
-			await db
-				.insert(
-					app.simplefinSyncAttempts,
-					{
-						organizationId,
-						connectionId,
-						initiatedBy: userId,
-						startedAt: new Date(),
-						outcome: 'unfinished',
-						importSettlement: 'notStarted'
-					},
-					{ id: unfinished }
-				)
-				.wait({ tier: 'global' })
-			await db
-				.insert(
-					app.simplefinConnections,
-					{
-						organizationId,
-						ownerId: userId,
-						accessUrl: '',
-						status: 'revoked',
-						claimedAt: new Date()
-					},
-					{ id: otherConnectionId }
-				)
-				.wait({ tier: 'global' })
-			await db
-				.insert(
-					app.simplefinSyncAttempts,
-					{
-						organizationId,
-						connectionId: otherConnectionId,
-						initiatedBy: userId,
-						startedAt: new Date(),
-						outcome: 'unfinished',
-						importSettlement: 'notStarted'
-					},
-					{ id: otherAttempt }
-				)
-				.wait({ tier: 'global' })
-			return { oldest, child, unfinished, otherAttempt, connectionId, otherConnectionId }
-		}, organizationId)
+		const seeded = await financeFixture(page, 'bank-sync.e2e:1066', organizationId)
 		await page.reload()
 		await expect(page.getByRole('region', { name: 'Sync history', exact: true })).toBeVisible()
 		await expect.poll(async () => (await syncLog(page)).attempts.length).toBe(102)
@@ -1264,35 +935,7 @@ test(
 		await expect(history.locator(':scope > details')).toHaveCount(1)
 		await navigateSidebar(page, 'Accounts')
 		await expect(history).toHaveCount(0)
-		await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const userId = getCurrentJazzSession()?.getSnapshot().account?.id
-			if (!userId) throw new Error('Missing identity')
-			const profileQuery = app.profiles.where({ userId: { in: [userId] } })
-			const blocked = profileQuery._build()
-			let prototype: object | null = Object.getPrototypeOf(profileQuery)
-			while (prototype && !Object.prototype.hasOwnProperty.call(prototype, '_build'))
-				prototype = Object.getPrototypeOf(prototype)
-			if (!prototype) throw new Error('Missing query builder prototype')
-			const original: unknown = Object.getOwnPropertyDescriptor(prototype, '_build')?.value
-			if (typeof original !== 'function') throw new Error('Missing query builder method')
-			Object.defineProperty(prototype, '_build', {
-				configurable: true,
-				writable: true,
-				value: function (this: object, ...args: unknown[]): unknown {
-					const result: unknown = Reflect.apply(original, this, args)
-					if (result === blocked) {
-						document.documentElement.dataset.profileLookupFailed = 'true'
-						throw new Error('Synthetic optional profile lookup failure')
-					}
-					return result
-				}
-			})
-		})
+		await financeFixture(page, 'bank-sync.e2e:1267')
 		await openSidebarSection(page, 'Settings')
 		await navigateSidebar(page, 'Bank sync')
 		await expect(page.locator('html')).toHaveAttribute('data-profile-lookup-failed', 'true')
@@ -1402,7 +1045,7 @@ for (const interruption of ['switch', 'recover'] satisfies ('switch' | 'recover'
 				await pageContent(page)
 					.getByRole('button', { name: 'Sync now (last 90 days)', exact: true })
 					.click()
-				await expect.poll(() => gate.evaluate((value) => value.started)).toBe(true)
+				await expect.poll(() => gate.status().then((value) => value.started)).toBe(true)
 				if (interruption === 'switch') {
 					await selectWorkspace(page.getByLabel('Current Workspace', { exact: true }), destination)
 					await expect(page).toHaveURL(`/settings/banks?workspace=${destination}`)
@@ -1411,39 +1054,26 @@ for (const interruption of ['switch', 'recover'] satisfies ('switch' | 'recover'
 					).toHaveCount(0)
 				} else {
 					await requestRecovery(page, phrase)
-					expect(await gate.evaluate((value) => value.restores)).toBe(0)
+					expect(await gate.status().then((value) => value.restores)).toBe(0)
 				}
-				await gate.evaluate((value) => value.release())
+				await gate.release()
 				if (interruption === 'switch')
 					await expect(
 						page.getByLabel('SimpleFIN Bridge setup token', { exact: true })
 					).toBeVisible()
 				else {
-					await expect.poll(() => gate.evaluate((value) => value.restores)).toBe(1)
+					await expect.poll(() => gate.status().then((value) => value.restores)).toBe(1)
 					await expect(page.getByLabel('Current Workspace', { exact: true })).toHaveValue(source)
 				}
 				await expect
 					.poll(async () => (await syncLog(page)).attempts)
 					.toMatchObject([{ outcome: 'cancelled', importSettlement: 'locallyPersisted' }])
-				const rows = await page.evaluate(async () => {
-					const schemaPath = '/src/lib/schema.ts',
-						sessionPath = '/src/lib/runtime/jazz-session.ts'
-					const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-					const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-						await import(sessionPath)
-					const db = getCurrentJazzSession()?.getSnapshot().client?.db
-					if (!db) throw new Error('Missing SDK database')
-					return (await db.all(app.transactions)).map(({ organizationId, description }) => ({
-						organizationId,
-						description
-					}))
-				})
+				const rows = await financeFixture(page, 'bank-sync.e2e:1428')
 				expect(rows).toEqual([{ organizationId: source, description: 'Held import write' }])
 				expect(operations).toEqual(['claim', 'discover', 'sync'])
 				expect(errors).toEqual([])
 			} finally {
-				await gate.evaluate((value) => value.restore())
-				await gate.dispose()
+				await gate.restore()
 			}
 		}
 	)
@@ -1454,15 +1084,7 @@ test(
 	{ tag: ['@bank-sync'] },
 	async ({ page, context }) => {
 		const errors = machineErrors(page)
-		let workerCount = 0,
-			closedWorkers = 0
-		page.on('worker', (worker) => {
-			if (!worker.url().includes('simplefin.worker')) return
-			workerCount += 1
-			worker.on('close', () => {
-				closedWorkers += 1
-			})
-		})
+
 		const pending = Promise.withResolvers<void>(),
 			release = Promise.withResolvers<void>()
 		const operations: string[] = []
@@ -1506,108 +1128,34 @@ test(
 			.getByRole('button', { name: 'Add Account “Resilient Checking”', exact: true })
 			.click()
 		await expect(page.getByText('Linked to Resilient Checking', { exact: true })).toBeVisible()
-		await page.evaluate(
-			async ({ provider, transactions }) => {
-				const schemaPath = '/src/lib/schema.ts',
-					sessionPath = '/src/lib/runtime/jazz-session.ts',
-					identityPath = '/src/lib/domain/stable-uuid.ts',
-					providerPath = '/src/lib/integrations/simplefin.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const { stableUuid }: typeof import('../src/lib/domain/stable-uuid.js') = await import(
-					identityPath
-				)
-				const { providerAccountIdentity }: typeof import('../src/lib/integrations/simplefin.js') =
-					await import(providerPath)
-				const db = getCurrentJazzSession()?.getSnapshot().client?.db
-				if (!db) throw new Error('Missing database')
-				const [link] = await db.all(app.simplefinAccountLinks)
-				if (!link) throw new Error('Missing linked account')
-				const [category] = await db.all(
-					app.categories.where({
-						organizationId: link.organizationId,
-						isSystem: true,
-						kind: 'expense'
-					})
-				)
-				if (!category) throw new Error('Missing system expense category')
-				await Promise.all(
-					transactions.slice(0, 225).map(async (raw) => {
-						const externalId = JSON.stringify([providerAccountIdentity(provider), raw.id])
-						const id = await stableUuid(link.organizationId, `simplefin-transaction:${externalId}`)
-						await db
-							.insert(
-								app.transactions,
-								{
-									organizationId: link.organizationId,
-									accountId: link.accountId,
-									categoryId: category.id,
-									kind: 'expense',
-									bookedOn: '2026-10-14',
-									amountMinor: 100,
-									currency: 'USD',
-									description: raw.description,
-									source: 'simplefin',
-									externalId
-								},
-								{ id }
-							)
-							.wait({ tier: 'global' })
-					})
-				)
-			},
-			{ provider, transactions }
-		)
+		await financeFixture(page, 'bank-sync.e2e:1509', { provider, transactions })
 		const sync = pageContent(page).getByRole('button', {
 			name: 'Sync now (last 90 days)',
 			exact: true
 		})
 		await sync.click()
 		await pending.promise
-		await expect.poll(() => closedWorkers).toBe(1)
+		await expect
+			.poll(async () => (await financeFixture(page, 'providerWorkerStatus')).closed)
+			.toBe(1)
 		await navigateSidebar(page, 'Accounts')
 		await expect(page.getByRole('heading', { name: 'Accounts', exact: true })).toBeVisible()
 		await expect(
 			page.locator('aside').getByRole('button', { name: 'Sync now (last 90 days)', exact: true })
 		).toBeDisabled()
-		expect(workerCount).toBe(2)
-		expect(closedWorkers).toBe(1)
+		expect((await financeFixture(page, 'providerWorkerStatus')).created).toBe(2)
+		expect((await financeFixture(page, 'providerWorkerStatus')).closed).toBe(1)
 		release.resolve()
 		await expect
 			.poll(async () => (await syncLog(page)).attempts)
 			.toMatchObject([{ outcome: 'succeeded', importedCount: 1, existingCount: 225 }])
-		await expect.poll(() => closedWorkers).toBe(2)
+		await expect
+			.poll(async () => (await financeFixture(page, 'providerWorkerStatus')).closed)
+			.toBe(2)
 		await openSidebarSection(page, 'Settings')
 		await navigateSidebar(page, 'Bank sync')
 		await expect(sync).toBeEnabled()
-		const metrics = await page.evaluateHandle(async () => {
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const original = db.all,
-				descriptor = Object.getOwnPropertyDescriptor(db, 'all')
-			let queries = 0
-			Object.defineProperty(db, 'all', {
-				configurable: true,
-				writable: true,
-				value: function (this: object, ...args: unknown[]): unknown {
-					queries += 1
-					return Reflect.apply(original, this, args)
-				}
-			})
-			return {
-				get queries() {
-					return queries
-				},
-				restore() {
-					if (descriptor) Object.defineProperty(db, 'all', descriptor)
-					else Reflect.deleteProperty(db, 'all')
-				}
-			}
-		})
+		await financeFixture(page, 'installReadMetrics')
 		try {
 			const started = performance.now()
 			await sync.click()
@@ -1615,13 +1163,15 @@ test(
 				pageContent(page).getByText(/Imported: 0; already present: 226; omitted: 0/)
 			).toBeVisible()
 			const durationMs = Math.round(performance.now() - started)
-			const queries = await metrics.evaluate((value) => value.queries)
+			const queries = await financeFixture(page, 'readMetrics')
 			expect(queries).toBeLessThan(30)
 			await test.info().attach('repeat-sync-measurement', {
 				body: JSON.stringify({ durationMs, existing: 226, queries }),
 				contentType: 'application/json'
 			})
-			await expect.poll(() => closedWorkers).toBe(3)
+			await expect
+				.poll(async () => (await financeFixture(page, 'providerWorkerStatus')).closed)
+				.toBe(3)
 			const newest = page
 				.getByRole('region', { name: 'Sync history', exact: true })
 				.locator(':scope > details')
@@ -1633,8 +1183,7 @@ test(
 			expect(operations).toEqual(['claim', 'discover', 'sync', 'sync'])
 			expect(errors).toEqual([])
 		} finally {
-			await metrics.evaluate((value) => value.restore())
-			await metrics.dispose()
+			await financeFixture(page, 'restoreReadMetrics')
 		}
 	}
 )
@@ -1647,27 +1196,7 @@ for (const failure of ['http', 'json', 'schema', 'bootstrap', 'reply'] satisfies
 		{ tag: ['@bank-sync'] },
 		async ({ page, context }) => {
 			const operations: string[] = []
-			if (failure === 'reply')
-				await page.addInitScript(() => {
-					const NativeWorker = window.Worker
-					window.Worker = class extends NativeWorker {
-						private bankWorker: boolean
-						constructor(url: string | URL, options?: WorkerOptions) {
-							super(url, options)
-							this.bankWorker = String(url).includes('simplefin.worker')
-						}
-						postMessage(message: unknown, options?: Transferable[] | StructuredSerializeOptions) {
-							if (this.bankWorker)
-								queueMicrotask(() =>
-									this.dispatchEvent(new MessageEvent('message', { data: undefined }))
-								)
-							else if (Array.isArray(options)) super.postMessage(message, options)
-							else super.postMessage(message, options)
-						}
-					}
-				})
-			if (failure === 'bootstrap')
-				await context.route('**/*simplefin.worker*', (route) => route.abort())
+
 			await context.route('**/api/simplefin', async (route) => {
 				const operation = resilienceOperation(route.request().postDataJSON())
 				operations.push(operation)
@@ -1683,6 +1212,8 @@ for (const failure of ['http', 'json', 'schema', 'bootstrap', 'reply'] satisfies
 				else await route.fulfill({ json: { accounts: [{ id: 'missing-required-fields' }] } })
 			})
 			await connectResilienceBank(page)
+			if (failure === 'bootstrap') await financeFixture(page, 'failProviderBootstrap')
+			if (failure === 'reply') await financeFixture(page, 'failProviderReply')
 			const sync = pageContent(page).getByRole('button', {
 				name: 'Sync now (last 90 days)',
 				exact: true
@@ -1777,30 +1308,7 @@ test(
 			await page.getByRole('button', { name: `Add Account “${account.name}”`, exact: true }).click()
 			await expect(page.getByText(`Linked to ${account.name}`, { exact: true })).toBeVisible()
 		}
-		const before = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing disposable test database')
-			const accounts = await db.all(app.accounts)
-			const links = await db.all(app.simplefinAccountLinks)
-			const checking = accounts.find((account) => account.name === 'Reconnect Checking')
-			if (!checking) throw new Error('Missing created checking account')
-			await db
-				.update(app.accounts, checking.id, { name: 'Renamed Checking' })
-				.wait({ tier: 'local' })
-			// Exercise missing-link recovery while retaining a second mapping unchanged.
-			const removed = links.find((link) => link.accountId === checking.id)
-			if (!removed) throw new Error('Missing original link')
-			await db.delete(app.simplefinAccountLinks, removed.id).wait({ tier: 'local' })
-			return {
-				accountIds: accounts.map((account) => account.id).sort(),
-				retained: links.filter((link) => link.id !== removed.id)
-			}
-		})
+		const before = await financeFixture(page, 'bank-sync.e2e:1780')
 		await page.getByRole('button', { name: 'Disconnect Bank sync', exact: true }).click()
 		await expect(page.getByRole('button', { name: 'Create Passkey', exact: true })).toBeVisible()
 		// Re-run setup with a different PRF credential; the original passkey cannot unlock this envelope.
@@ -1840,20 +1348,7 @@ test(
 		await expect(
 			page.getByRole('button', { name: 'Reconnect existing accounts', exact: true })
 		).toHaveCount(0)
-		const after = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing disposable test database')
-			return {
-				accountIds: (await db.all(app.accounts)).map((account) => account.id).sort(),
-				links: await db.all(app.simplefinAccountLinks),
-				transactions: await db.all(app.transactions)
-			}
-		})
+		const after = await financeFixture(page, 'bank-sync.e2e:1843')
 		expect(after.accountIds).toEqual(before.accountIds)
 		expect(after.links).toHaveLength(2)
 		expect(after.links).toEqual(expect.arrayContaining(before.retained))

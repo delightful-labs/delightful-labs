@@ -1,3 +1,4 @@
+import { queryFacts } from './worker-query.fixture.js'
 import { expect, it } from 'vitest'
 import { selectWorkerLedger, emptyLedgerFilters } from './worker-ledger.js'
 import { workerLedgerView } from '../../contracts/worker-application.js'
@@ -6,7 +7,7 @@ import type { FinanceQueryFacts } from './worker-queries.js'
 const organizationId = '20000000-0000-4000-8000-000000000001'
 const categoryId = '50000000-0000-4000-8000-000000000001'
 function facts(): FinanceQueryFacts {
-	return {
+	return queryFacts({
 		binding: {},
 		status: 'ready',
 		transaction: undefined,
@@ -31,6 +32,7 @@ function facts(): FinanceQueryFacts {
 				organizationId,
 				accountId: '30000000-0000-4000-8000-000000000001',
 				categoryId,
+				internalTransferId: null,
 				kind: 'expense',
 				amountMinor: 1234,
 				currency: 'USD',
@@ -44,6 +46,7 @@ function facts(): FinanceQueryFacts {
 				organizationId,
 				accountId: '30000000-0000-4000-8000-000000000002',
 				categoryId,
+				internalTransferId: null,
 				kind: 'expense',
 				amountMinor: 5000,
 				currency: 'TZS',
@@ -57,6 +60,7 @@ function facts(): FinanceQueryFacts {
 				organizationId,
 				accountId: '30000000-0000-4000-8000-000000000001',
 				categoryId,
+				internalTransferId: null,
 				kind: 'income',
 				amountMinor: 10000,
 				currency: 'USD',
@@ -66,7 +70,7 @@ function facts(): FinanceQueryFacts {
 				tagNames: []
 			}
 		]
-	}
+	})
 }
 it('combines worker filters, keeps archived category names and projects only display fields', () => {
 	const view = selectWorkerLedger(

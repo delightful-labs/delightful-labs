@@ -1,0 +1,38 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "ff66b6a3bb83125ca988e62ecea86ad5bc3db918e4a5f5bed9089e5b00656f5a"
+  },
+  "tables": {
+    "notebookInvitations": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "notebookMembers": {
+      "read": "accountId = session.user",
+      "insert": {
+        "allOf": [
+          { "allOf": ["accountId = session.user", "invitationId = null", "role = 'collaborator'"] },
+          "exists notebooks(id = this.notebookId, $createdBy.account = session.user)"
+        ]
+      },
+      "update": "false",
+      "delete": "accountId = session.user"
+    },
+    "notebookRedemptions": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "notebooks": {
+      "read": "exists notebookMembers(notebookId = this.id, accountId = session.user)",
+      "insert": "true",
+      "update": "false",
+      "delete": "false"
+    }
+  }
+}

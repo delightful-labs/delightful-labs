@@ -1,6 +1,6 @@
 <script lang="ts" generics="Row extends TransactionListRow = TransactionRow">
 	import type { Snippet } from 'svelte'
-	import type { TransactionRow } from '#lib/schema.js'
+	import type { TransactionRow } from '#lib/queries.js'
 	import { Details, Heading, Pagination, Text } from 'delightful-ui'
 	import Icon from '../navigation/AppIcon.svelte'
 	import ChevronDown from 'tdesign-icons-svg/src/chevron-down.svg?component'

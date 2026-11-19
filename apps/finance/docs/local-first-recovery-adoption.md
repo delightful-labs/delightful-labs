@@ -75,3 +75,10 @@ workflow unit suite was added: the retired machine and its tests are deleted, an
 its workflow, adapter, SSR, and synthetic browser coverage. Other authentication and domain suites
 were not rerun. This qualifies the reviewed snapshot in this local host graph, not every SDK version,
 browser, release package, or full MVP capability.
+
+## Application worker adoption (November 18)
+
+The normal layout now uses `WorkerRecovery` and the single application worker's
+private recovery channel. The obsolete `RecoveryPhraseIntegration` component and
+its main-thread `getJazzSession` dependency have been removed. Historical
+qualification above describes the preceding integration.

@@ -9,12 +9,17 @@ import {
 	readerHistorySchema,
 	sameReaderField,
 	readerDocumentStateSchema,
-	encodeReaderValue
+	encodeReaderValue,
+	encodeResumeObservations,
+	resumeObservationsSchema
 } from '../../reader/schema.js'
 import type { ReaderChange, ReaderOperation } from '../../reader/schema.js'
 import { transactionLifecycle, transactionReceipt } from './transaction.js'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 import type { ReaderCapability, ReaderStageSpawner } from '../../contracts/reader.js'
+const nativeReaderDocumentStateSchema = readerDocumentStateSchema.extend({
+	resumePosition: resumeObservationsSchema
+})
 export function createReaderRecords(
 	db: Pick<Db, 'one' | 'all' | 'beginTransaction' | 'subscribe'>,
 	libraryId: string,
@@ -53,7 +58,7 @@ export function createReaderRecords(
 							const { progress, ...resumePosition } = draft.value
 							resource.tx.update(app.libraryDocuments, draft.documentId, {
 								readingProgress: progress,
-								resumePosition
+								resumePosition: encodeResumeObservations(resumePosition)
 							})
 						},
 						insertPreference: (resource, { draft, operationId, parents }) => {
@@ -104,7 +109,7 @@ export function createReaderRecords(
 						.select('id', 'readingProgress', 'resumePosition'),
 					{
 						onUpdate: (rows) => {
-							const parsed = z.array(readerDocumentStateSchema).safeParse(rows)
+							const parsed = z.array(nativeReaderDocumentStateSchema).safeParse(rows)
 							if (!parsed.success) {
 								error()
 								return

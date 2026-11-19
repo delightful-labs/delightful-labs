@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createActor, createAsyncLogic, toPromise, waitFor } from 'xstate'
-import type { Account } from '#lib/schema.js'
+import type { Account } from '#lib/queries.js'
 import { stableUuid } from '#lib/data.js'
 import { createAccountReconnectMachine } from './account-reconnect.js'
 import { mappingFixture, provider, work, link } from './mapping.fixture.js'

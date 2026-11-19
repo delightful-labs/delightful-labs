@@ -1,18 +1,19 @@
 <script lang="ts">
+	import { transferStatusText } from '#lib/forms/form-messages.js'
 	import { Button } from 'delightful-ui'
 	import AppLink from '#lib/components/navigation/AppLink.svelte'
 	import { formatMoney } from '#lib/domain/money.js'
 	import type { InternalTransferCandidate } from '#lib/domain/internal-transfer.js'
-	import type { TransactionRow } from '#lib/schema.js'
+	import type { TransactionRow } from '#lib/queries.js'
 	import type {
 		TransactionEditTransferState,
 		TransferStatusLabel
-	} from '#lib/machines/transactions/transaction-edit.js'
+	} from '#lib/contracts/worker-transfers.js'
 	import { getLocale } from '#lib/paraglide/runtime.js'
 	import { m } from '#lib/paraglide/messages.js'
 
 	type Suggestion = InternalTransferCandidate & {
-		accountName: string | undefined
+		accountName?: string | undefined
 		description: TransactionRow['description'] | undefined
 	}
 	let {
@@ -54,7 +55,7 @@
 	function formatDate(value: string) {
 		return dates.format(new Date(`${value}T00:00:00.000Z`))
 	}
-	const statusMessage = $derived(statusLabel?.() ?? '')
+	const statusMessage = $derived(statusLabel ? transferStatusText[statusLabel]() : '')
 </script>
 
 <section aria-labelledby="transfer-suggestions-heading">

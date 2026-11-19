@@ -10,7 +10,6 @@ export function startLocalJazzServer(input: Parameters<typeof startCore>[0]) {
 	return startCore({
 		...store,
 		adminSecret: browserCoreSecret,
-		backendSecret: browserCoreSecret + '-backend',
-		allowLocalFirstAuth: true
+		backendSecret: browserCoreSecret + '-backend'
 	})
 }

@@ -7,6 +7,10 @@
 	"printWidth": 100,
 	"sortPackageJson": false,
 	"ignorePatterns": [
+		"**/jazz.generated.ts",
+		"**/jazz.app.json",
+		"**/jazz.permissions.json",
+		"**/migrations/snapshots/**",
 		"**/node_modules/**",
 		"**/.svelte-kit/**",
 		"**/.netlify/**",

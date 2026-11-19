@@ -5,7 +5,7 @@ import { brokerHostClient } from '../../src/lib/runtime/worker/broker-channel.js
 import { diagnosticText } from '../../src/lib/diagnostics/machines.js'
 import { createJazzClient } from 'jazz-tools/client'
 import wasmUrl from '#jazz-wasm-binary?url'
-import { app } from '../../src/lib/backend/jazz/schema.js'
+import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
 import { createWorkerAccountStore } from '../../src/lib/runtime/worker/account-store.js'
 import {
 	accountStorageClient,
@@ -24,7 +24,7 @@ self.onmessage = async ({ data }) => {
 			client: () => import('jazz-tools/local-first'),
 			serverUrl: data.serverUrl,
 			env: 'clipper',
-			initial: 'local-first',
+			initial: 'device',
 			store: createWorkerAccountStore(key, storage),
 			runtimeSources: { browserWorkerHost: brokerHost, wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION }
 		})
@@ -32,16 +32,16 @@ self.onmessage = async ({ data }) => {
 			await session
 				.getSnapshot()
 				.client?.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
-			const { account, client } = session.getSnapshot()
-			if (!account || !client) throw new Error('Worker account unavailable')
-			const before = await client.db.one(app.libraries.where({ id: account.id }), {
+			const { user, client } = session.getSnapshot()
+			if (!user || !client) throw new Error('Worker account unavailable')
+			const before = await client.db.one(app.libraries.where({ id: user.accountId }), {
 				tier: 'local-first'
 			})
 			const documentId = crypto.randomUUID()
 			const write = client.db.insert(
 				app.storageOperations,
 				{
-					libraryId: account.id,
+					libraryId: user.accountId,
 					payloadHash: 'worker-host-proof'
 				},
 				{ id: documentId }
@@ -52,7 +52,7 @@ self.onmessage = async ({ data }) => {
 			})
 			const records = createLibraryRecords(
 				client.db,
-				account.id,
+				user.accountId,
 				() => session.getSnapshot().client === client
 			)
 			const saving = createActor(records.articles.saveMachine, {
@@ -75,7 +75,7 @@ self.onmessage = async ({ data }) => {
 			}
 			self.postMessage({
 				type: 'READY',
-				accountId: account.id,
+				accountId: user.accountId,
 				existing: !!before,
 				domainSaved: saved,
 				written: after?.payloadHash === 'worker-host-proof',

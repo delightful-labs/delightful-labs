@@ -1,3 +1,4 @@
+import { financeFixture } from '../helpers/worker-fixture.js'
 import { expect } from '@playwright/test'
 import { test, start, installWorkspaceSettingsTest } from '../helpers/workspace.js'
 import {
@@ -14,28 +15,7 @@ test(
 	async ({ page }) => {
 		await start(page)
 		const organizationId = await page.getByLabel('Current Workspace', { exact: true }).inputValue()
-		const categoryId = await page.evaluate(async (organizationId) => {
-			const { app, db } = window.workspaceSettingsTest
-			await db
-				.insert(app.categories, {
-					organizationId,
-					name: 'Archived choice',
-					kind: 'expense',
-					isSystem: false,
-					archivedAt: new Date()
-				})
-				.wait({ tier: 'global' })
-			return (
-				await db
-					.insert(app.categories, {
-						organizationId,
-						name: 'Tag category',
-						kind: 'expense',
-						isSystem: false
-					})
-					.wait({ tier: 'global' })
-			).id
-		}, organizationId)
+		const categoryId = await financeFixture(page, 'features/tags.e2e:17', organizationId)
 		await navigateSidebar(page, 'Tags')
 		await expect(page).toHaveURL(`/settings/tags?workspace=${organizationId}`)
 		const main = page.getByRole('main')
@@ -72,10 +52,7 @@ test(
 				.filter({ has: page.getByRole('rowheader', { name: 'Categorized tag', exact: true }) })
 				.getByRole('cell', { name: 'Tag category', exact: true })
 		).toBeVisible()
-		await page.evaluate(async (id) => {
-			const { app, db } = window.workspaceSettingsTest
-			await db.update(app.categories, id, { archivedAt: new Date() }).wait({ tier: 'global' })
-		}, categoryId)
+		await financeFixture(page, 'features/tags.e2e:75', categoryId)
 		await expect(
 			main
 				.getByRole('row')
@@ -107,50 +84,7 @@ test(
 	async ({ page, context }) => {
 		await start(page)
 		const firstId = await page.getByLabel('Current Workspace', { exact: true }).inputValue()
-		const fixture = await page.evaluate(async (organizationId) => {
-			const { app, db, userId } = window.workspaceSettingsTest
-			const category = await db
-				.insert(app.categories, {
-					organizationId,
-					name: 'Retained tag category',
-					kind: 'expense',
-					isSystem: false
-				})
-				.wait({ tier: 'global' })
-			const tag = await db
-				.insert(app.tags, {
-					organizationId,
-					name: 'Archive tag',
-					kind: category.kind,
-					categoryId: category.id
-				})
-				.wait({ tier: 'global' })
-			const org = await db
-				.insert(app.organizations, {
-					name: 'Second tag workspace',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: userId
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: org.id,
-					userId,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.categories, {
-					organizationId: org.id,
-					name: 'Second category',
-					kind: 'income',
-					isSystem: false
-				})
-				.wait({ tier: 'global' })
-			return { secondId: org.id, tagId: tag.id, categoryId: category.id }
-		}, firstId)
+		const fixture = await financeFixture(page, 'features/tags.e2e:110', firstId)
 		await navigateSidebar(page, 'Tags')
 		const main = page.getByRole('main')
 		const modal = await openCreationModal(page, 'Add Tag')
@@ -185,16 +119,7 @@ test(
 			await context.setOffline(false)
 		}
 		await expect
-			.poll(() =>
-				page.evaluate(async ({ tagId, categoryId }) => {
-					const { app, db } = window.workspaceSettingsTest
-					const tag = await db.one(app.tags.where({ id: tagId }), { tier: 'remote' })
-					return {
-						archived: Boolean(tag?.archivedAt),
-						categoryRetained: tag?.categoryId === categoryId
-					}
-				}, fixture)
-			)
+			.poll(() => financeFixture(page, 'features/tags.e2e:189', fixture))
 			.toEqual({ archived: true, categoryRetained: true })
 		await navigateSidebar(page, 'Categories')
 		const categoryRow = main
@@ -217,32 +142,12 @@ for (const role of ['admin', 'member', 'viewer']) {
 			try {
 				const subject = await otherContext.newPage()
 				await start(subject)
-				const subjectId = await subject.evaluate(() => window.workspaceSettingsTest.userId)
-				const tagId = await page.evaluate(
-					async ({ organizationId, subjectId, role }) => {
-						const { app, db } = window.workspaceSettingsTest
-						if (role !== 'admin' && role !== 'member' && role !== 'viewer')
-							throw new Error('Invalid role')
-						await db
-							.insert(app.organizationMembers, {
-								organizationId,
-								userId: subjectId,
-								role,
-								accountAccessMode: 'all'
-							})
-							.wait({ tier: 'global' })
-						return (
-							await db
-								.insert(app.tags, {
-									organizationId,
-									name: 'Permission tag',
-									kind: 'expense'
-								})
-								.wait({ tier: 'global' })
-						).id
-					},
-					{ organizationId, subjectId, role }
-				)
+				const subjectId = await financeFixture(subject, 'features/tags.e2e:220')
+				const tagId = await financeFixture(page, 'features/tags.e2e:221', {
+					organizationId,
+					subjectId,
+					role
+				})
 				await subject.reload()
 				await installWorkspaceSettingsTest(subject)
 				const selector = subject.getByLabel('Current Workspace', { exact: true })
@@ -263,34 +168,10 @@ for (const role of ['admin', 'member', 'viewer']) {
 					await expect(blocked.getByRole('button', { name: 'Add Tag', exact: true })).toBeDisabled()
 					await blocked.getByRole('button', { name: 'Cancel', exact: true }).click()
 					await expect(row.getByRole('button')).toHaveCount(0)
-					const outcomes = await subject.evaluate(
-						async ({ organizationId, tagId }) => {
-							const { app, db } = window.workspaceSettingsTest
-							const results: string[] = []
-							try {
-								await db
-									.insert(app.tags, {
-										organizationId,
-										name: 'Forbidden tag',
-										kind: 'expense'
-									})
-									.wait({ tier: 'global' })
-								results.push('accepted')
-							} catch (error) {
-								results.push(error instanceof Error ? error.message : 'unknown-error')
-							}
-							try {
-								await db
-									.update(app.tags, tagId, { archivedAt: new Date() })
-									.wait({ tier: 'global' })
-								results.push('accepted')
-							} catch (error) {
-								results.push(error instanceof Error ? error.message : 'unknown-error')
-							}
-							return results
-						},
-						{ organizationId, tagId }
-					)
+					const outcomes = await financeFixture(subject, 'features/tags.e2e:266', {
+						organizationId,
+						tagId
+					})
 					for (const outcome of outcomes)
 						expect(outcome).toMatch(/AuthorizationDenied|permission_denied/)
 				} else {
@@ -306,12 +187,7 @@ for (const role of ['admin', 'member', 'viewer']) {
 					await expect(row).toHaveCount(0)
 				}
 				await expect
-					.poll(() =>
-						page.evaluate(async (id) => {
-							const { app, db } = window.workspaceSettingsTest
-							return Boolean((await db.one(app.tags.where({ id }), { tier: 'remote' }))?.archivedAt)
-						}, tagId)
-					)
+					.poll(() => financeFixture(page, 'features/tags.e2e:310', tagId))
 					.toBe(role !== 'viewer')
 			} finally {
 				await otherContext.close()
@@ -329,59 +205,7 @@ for (const kind of ['expense', 'income']) {
 			const organizationId = await page
 				.getByLabel('Current Workspace', { exact: true })
 				.inputValue()
-			const fixture = await page.evaluate(
-				async ({ organizationId, kind }) => {
-					const { app, db } = window.workspaceSettingsTest
-					if (kind !== 'expense' && kind !== 'income') throw new Error('Invalid kind')
-					const account = await db
-						.insert(app.accounts, {
-							organizationId,
-							name: 'Tag entry account',
-							kind: 'cash',
-							currency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					const category = await db
-						.insert(app.categories, {
-							organizationId,
-							name: 'Selected tag category',
-							kind,
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-					const previous = await db
-						.insert(app.categories, {
-							organizationId,
-							name: 'Existing tag category',
-							kind,
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-					const tag = await db
-						.insert(app.tags, {
-							organizationId,
-							name: 'Existing tag',
-							kind,
-							categoryId: previous.id
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.tags, {
-							organizationId,
-							name: 'Archived entry tag',
-							kind,
-							archivedAt: new Date()
-						})
-						.wait({ tier: 'global' })
-					return {
-						accountId: account.id,
-						categoryId: category.id,
-						previousId: previous.id,
-						tagId: tag.id
-					}
-				},
-				{ organizationId, kind }
-			)
+			const fixture = await financeFixture(page, 'features/tags.e2e:332', { organizationId, kind })
 			const navigation = page.getByRole('navigation')
 			await navigation
 				.getByRole('link', { name: kind === 'expense' ? 'Expenses' : 'Income', exact: true })
@@ -421,35 +245,7 @@ for (const kind of ['expense', 'income']) {
 				`${kind === 'income' ? '/income' : '/expenses'}?workspace=${organizationId}`
 			)
 			await expect
-				.poll(() =>
-					page.evaluate(
-						async ({ organizationId, fixture }) => {
-							const { app, db } = window.workspaceSettingsTest
-							const transactions = await db.all(
-								app.transactions.where({ organizationId, memo: 'Tagged entry' }),
-								{ tier: 'remote' }
-							)
-							const transaction = transactions[0]
-							if (!transaction) return null
-							const links = await db.all(
-								app.transactionTags.where({ transactionId: transaction.id }),
-								{ tier: 'remote' }
-							)
-							const tags = await db.all(app.tags.where({ organizationId }), { tier: 'remote' })
-							return {
-								transactions: transactions.length,
-								links: links.length,
-								existingCategory: tags.find((tag) => tag.id === fixture.tagId)?.categoryId,
-								newCategory: tags.find((tag) => tag.name === 'New tag')?.categoryId,
-								removed: tags.some((tag) => tag.name === 'Removed tag'),
-								linkedNames: links
-									.map((link) => tags.find((tag) => tag.id === link.tagId)?.name)
-									.sort()
-							}
-						},
-						{ organizationId, fixture }
-					)
-				)
+				.poll(() => financeFixture(page, 'features/tags.e2e:425', { organizationId, fixture }))
 				.toEqual({
 					transactions: 1,
 					links: 2,
@@ -473,23 +269,7 @@ for (const kind of ['expense', 'income']) {
 			await expect(page).toHaveURL(
 				`${kind === 'income' ? '/income' : '/expenses'}?workspace=${organizationId}`
 			)
-			await expect
-				.poll(() =>
-					page.evaluate(async (organizationId) => {
-						const { app, db } = window.workspaceSettingsTest
-						const transaction = await db.one(
-							app.transactions.where({ organizationId, memo: 'No tags entry' }),
-							{ tier: 'remote' }
-						)
-						if (!transaction) return -1
-						return (
-							await db.all(app.transactionTags.where({ transactionId: transaction.id }), {
-								tier: 'remote'
-							})
-						).length
-					}, organizationId)
-				)
-				.toBe(0)
+			await expect.poll(() => financeFixture(page, 'features/tags.e2e:478', organizationId)).toBe(0)
 		}
 	)
 }
@@ -500,26 +280,7 @@ test(
 	async ({ page }) => {
 		await start(page)
 		const organizationId = await page.getByLabel('Current Workspace', { exact: true }).inputValue()
-		const tagId = await page.evaluate(async (organizationId) => {
-			const { app, db } = window.workspaceSettingsTest
-			await db
-				.insert(app.accounts, {
-					organizationId,
-					name: 'Retry tag account',
-					kind: 'cash',
-					currency: 'USD'
-				})
-				.wait({ tier: 'global' })
-			return (
-				await db
-					.insert(app.tags, {
-						organizationId,
-						name: 'Archive while selected',
-						kind: 'expense'
-					})
-					.wait({ tier: 'global' })
-			).id
-		}, organizationId)
+		const tagId = await financeFixture(page, 'features/tags.e2e:503', organizationId)
 		await navigateSidebar(page, 'Expenses')
 		await page.getByRole('link', { name: 'Add Expenses', exact: true }).click()
 		const main = page.getByRole('main')
@@ -536,22 +297,12 @@ test(
 		await expect(
 			main.getByRole('button', { name: 'Remove Archive while selected', exact: true })
 		).toBeVisible()
-		await page.evaluate(async (id) => {
-			const { app, db } = window.workspaceSettingsTest
-			await db.update(app.tags, id, { archivedAt: new Date() }).wait({ tier: 'global' })
-		}, tagId)
+		await financeFixture(page, 'features/tags.e2e:539', tagId)
 		await main.getByRole('button', { name: 'Save Transaction', exact: true }).click()
 		await expect(
 			main.getByRole('alert').filter({ hasText: 'Could not save Transaction.' })
 		).toHaveText('Could not save Transaction.')
-		const partial = await page.evaluate(async (organizationId) => {
-			const { app, db } = window.workspaceSettingsTest
-			return (
-				await db.all(app.transactions.where({ organizationId, memo: 'Retry tagged entry' }), {
-					tier: 'remote'
-				})
-			).length
-		}, organizationId)
+		const partial = await financeFixture(page, 'features/tags.e2e:547', organizationId)
 		expect(partial).toBe(0)
 		await expect(main.getByLabel('Amount', { exact: true })).toHaveValue('5')
 		await main.getByRole('button', { name: 'Remove Archive while selected', exact: true }).click()
@@ -560,21 +311,7 @@ test(
 		await main.getByRole('button', { name: 'Save Transaction', exact: true }).click()
 		await expect(page).toHaveURL(`/expenses?workspace=${organizationId}`)
 		await expect
-			.poll(() =>
-				page.evaluate(async (organizationId) => {
-					const { app, db } = window.workspaceSettingsTest
-					const transaction = await db.one(
-						app.transactions.where({ organizationId, memo: 'Retry tagged entry' }),
-						{ tier: 'remote' }
-					)
-					if (!transaction) return []
-					const links = await db.all(app.transactionTags.where({ transactionId: transaction.id }), {
-						tier: 'remote'
-					})
-					const tags = await db.all(app.tags.where({ organizationId }), { tier: 'remote' })
-					return links.map((link) => tags.find((tag) => tag.id === link.tagId)?.name).sort()
-				}, organizationId)
-			)
+			.poll(() => financeFixture(page, 'features/tags.e2e:564', organizationId))
 			.toEqual(['Replacement tag'])
 	}
 )
@@ -585,53 +322,7 @@ test(
 	async ({ page, context }) => {
 		await start(page)
 		const firstId = await page.getByLabel('Current Workspace', { exact: true }).inputValue()
-		const fixture = await page.evaluate(async (organizationId) => {
-			const { app, db, userId } = window.workspaceSettingsTest
-			await db
-				.insert(app.accounts, {
-					organizationId,
-					name: 'First tag account',
-					kind: 'cash',
-					currency: 'USD'
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.tags, { organizationId, name: 'First workspace tag', kind: 'expense' })
-				.wait({ tier: 'global' })
-			const org = await db
-				.insert(app.organizations, {
-					name: 'Offline tag workspace',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: userId
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: org.id,
-					userId,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'global' })
-			const account = await db
-				.insert(app.accounts, {
-					organizationId: org.id,
-					name: 'Offline tag account',
-					kind: 'cash',
-					currency: 'USD'
-				})
-				.wait({ tier: 'global' })
-			const category = await db
-				.insert(app.categories, {
-					organizationId: org.id,
-					name: 'Offline tag category',
-					kind: 'expense',
-					isSystem: false
-				})
-				.wait({ tier: 'global' })
-			return { organizationId: org.id, accountId: account.id, categoryId: category.id }
-		}, firstId)
+		const fixture = await financeFixture(page, 'features/tags.e2e:588', firstId)
 		await navigateSidebar(page, 'Expenses')
 		await page.getByRole('link', { name: 'Add Expenses', exact: true }).click()
 		const main = page.getByRole('main')
@@ -665,27 +356,7 @@ test(
 			await context.setOffline(false)
 		}
 		await expect
-			.poll(() =>
-				page.evaluate(async (fixture) => {
-					const { app, db } = window.workspaceSettingsTest
-					const transaction = await db.one(
-						app.transactions.where({
-							organizationId: fixture.organizationId,
-							memo: 'Offline tag entry'
-						}),
-						{ tier: 'remote' }
-					)
-					const tag = await db.one(
-						app.tags.where({ organizationId: fixture.organizationId, name: 'Offline new tag' }),
-						{ tier: 'remote' }
-					)
-					if (!transaction || !tag) return null
-					const links = await db.all(app.transactionTags.where({ transactionId: transaction.id }), {
-						tier: 'remote'
-					})
-					return { categoryId: tag.categoryId, tags: links.map((link) => link.tagId) }
-				}, fixture)
-			)
+			.poll(() => financeFixture(page, 'features/tags.e2e:669', fixture))
 			.toEqual({ categoryId: fixture.categoryId, tags: [expect.any(String)] })
 	}
 )

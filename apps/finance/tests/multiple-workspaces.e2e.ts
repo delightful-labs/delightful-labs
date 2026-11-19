@@ -1,3 +1,5 @@
+import { financeFixture } from './helpers/worker-fixture.js'
+import { installWorkerFault } from './helpers/startup-failure.js'
 import { test, expect, type Page } from '@playwright/test'
 import { installWorkspaceSettingsTest as harness } from './helpers/workspace.js'
 import {
@@ -71,12 +73,7 @@ test(
 		await expect(dialog.getByLabel('Workspace name', { exact: true })).toHaveValue(
 			'Pending workspace'
 		)
-		expect(
-			await page.evaluate(async () => {
-				const { db, app } = window.workspaceSettingsTest
-				return (await db.all(app.organizations)).length
-			})
-		).toBe(1)
+		expect(await financeFixture(page, 'multiple-workspaces.e2e:75')).toBe(1)
 		await create(page, 'Created in a modal')
 		await dialog.getByRole('button', { name: 'Close', exact: true }).click()
 		await expect(dialog).not.toBeVisible()
@@ -91,20 +88,7 @@ test(
 		const dialog = await openCreationModal(page, 'Create Workspace')
 		await dialog.getByLabel('Workspace name', { exact: true }).fill('Quiet workspace')
 		// Hold ID generation so the submitting presentation can be checked without a timing race.
-		const gate = await page.evaluateHandle(() => {
-			const digest = crypto.subtle.digest.bind(crypto.subtle)
-			let release = () => {}
-			const pending = new Promise<void>((resolve) => {
-				release = resolve
-			})
-			crypto.subtle.digest = (algorithm, data) => pending.then(() => digest(algorithm, data))
-			return {
-				release: () => {
-					crypto.subtle.digest = digest
-					release()
-				}
-			}
-		})
+		await financeFixture(page, 'holdWorkspacePreparation')
 		try {
 			await dialog.getByRole('button', { name: 'Create Workspace', exact: true }).click()
 			await expect(dialog.getByRole('status')).toHaveText('Preparing your workspace…')
@@ -117,8 +101,7 @@ test(
 				dialog.getByRole('button', { name: 'Create Workspace', exact: true })
 			).toBeDisabled()
 		} finally {
-			await gate.evaluate((control) => control.release())
-			await gate.dispose()
+			await financeFixture(page, 'releaseWorkspacePreparation')
 		}
 		await expect(dialog.getByRole('status')).toHaveText('Workspace saved.')
 	}
@@ -202,22 +185,7 @@ test(
 		await start(page)
 		const secondId = workspaceId(await create(page, 'Filter workspace B'))
 		await closeCreationModal(page)
-		const firstId = await page.evaluate(async (secondId) => {
-			const { db, app } = window.workspaceSettingsTest
-			const organizations = await db.all(app.organizations)
-			const first = organizations.find((organization) => organization.id !== secondId)
-			if (!first) throw new Error('Missing initial workspace')
-			for (const account of [
-				{ organizationId: first.id, name: 'Filter checking' },
-				{ organizationId: first.id, name: 'Filter cash' },
-				{ organizationId: secondId, name: 'Business checking' }
-			]) {
-				await db
-					.insert(app.accounts, { ...account, kind: 'bank', currency: 'USD' })
-					.wait({ tier: 'global' })
-			}
-			return first.id
-		}, secondId)
+		const firstId = await financeFixture(page, 'multiple-workspaces.e2e:205', secondId)
 		await prepareSidebar(page)
 		const selector = page.getByLabel('Current Workspace', { exact: true })
 		await selectWorkspace(selector, firstId)
@@ -268,26 +236,7 @@ test(
 				.filter({ hasText: 'Same · ' })
 		).toHaveCount(2)
 		await harness(page)
-		const state = await page.evaluate(async () => {
-			const { db, app, userId } = window.workspaceSettingsTest
-			const [organizations, profiles, categories, accounts, transactions, memberships] =
-				await Promise.all([
-					db.all(app.organizations),
-					db.all(app.profiles.where({ userId })),
-					db.all(app.categories),
-					db.all(app.accounts),
-					db.all(app.transactions),
-					db.all(app.organizationMembers.where({ userId }))
-				])
-			return {
-				organizations,
-				profiles: profiles.length,
-				categories,
-				accounts: accounts.length,
-				transactions: transactions.length,
-				memberships
-			}
-		})
+		const state = await financeFixture(page, 'multiple-workspaces.e2e:271')
 		expect(state.organizations).toHaveLength(3)
 		expect(state.profiles).toBe(1)
 		expect(state.accounts).toBe(0)
@@ -313,40 +262,7 @@ test(
 	async ({ page, context }) => {
 		await start(page)
 		const second = await create(page, 'Second')
-		const ids = await page.evaluate(async () => {
-			const { db, app } = window.workspaceSettingsTest
-			const organizations = await db.all(app.organizations.orderBy('id'))
-			for (const [index, organization] of organizations.entries()) {
-				const account = await db
-					.insert(app.accounts, {
-						organizationId: organization.id,
-						name: `Account ${index}`,
-						kind: 'cash',
-						currency: 'USD',
-						archivedAt: null
-					})
-					.wait({ tier: 'global' })
-				const categories = await db.all(
-					app.categories.where({ organizationId: organization.id, kind: 'expense', isSystem: true })
-				)
-				const category = categories[0]
-				if (!category) throw new Error('Missing category')
-				await db
-					.insert(app.transactions, {
-						organizationId: organization.id,
-						accountId: account.id,
-						categoryId: category.id,
-						kind: 'expense',
-						amountMinor: 100,
-						currency: 'USD',
-						bookedOn: '2026-10-21',
-						description: `Ledger ${organization.id}`,
-						source: 'manual'
-					})
-					.wait({ tier: 'global' })
-			}
-			return organizations.map((row) => row.id)
-		})
+		const ids = await financeFixture(page, 'multiple-workspaces.e2e:316')
 		const secondId = workspaceId(second)
 		const firstId = ids.find((id) => id !== secondId)
 		if (!firstId || !secondId) throw new Error('Missing workspace identities')
@@ -387,12 +303,7 @@ test(
 				.locator(`option[value="${workspaceId(href)}"]`)
 		).toHaveText('Offline workspace')
 		await harness(page)
-		expect(
-			await page.evaluate(async () => {
-				const { db, app } = window.workspaceSettingsTest
-				return (await db.all(app.organizations)).length
-			})
-		).toBe(2)
+		expect(await financeFixture(page, 'multiple-workspaces.e2e:391')).toBe(2)
 	}
 )
 
@@ -401,37 +312,7 @@ test(
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
 		await start(page)
-		const organizationId = await page.evaluate(async () => {
-			const { db, app, userId } = window.workspaceSettingsTest
-			const preparationPath = '/src/lib/domain/workspace-creation.ts'
-			const journalPath = '/src/lib/machines/workspaces/workspace-creation-journal.ts'
-			const { prepareWorkspaceCreation }: typeof import('../src/lib/domain/workspace-creation.js') =
-				await import(preparationPath)
-			const {
-				workspaceCreationJournal
-			}: typeof import('../src/lib/machines/workspaces/workspace-creation-journal.js') =
-				await import(journalPath)
-			const xstatePath = '/node_modules/.vite/deps/xstate.js'
-			const { createActor, waitFor }: typeof import('xstate') = await import(xstatePath)
-			const profile = (await db.all(app.profiles.where({ userId })))[0]
-			if (!profile) throw new Error('Missing profile')
-			const attempt = await prepareWorkspaceCreation({
-				organizationId: crypto.randomUUID(),
-				profileId: profile.id,
-				userId,
-				name: 'Recovered workspace'
-			})
-			const config = db.getConfig()
-			const environment = JSON.stringify([config.appId, config.serverUrl ?? ''])
-			const key = JSON.stringify([environment, userId])
-			const actor = createActor(workspaceCreationJournal, {
-				input: { key, mode: 'write', record: { key, attempt } }
-			}).start()
-			const result = await waitFor(actor, (snapshot) => snapshot.status === 'done')
-			actor.stop()
-			if (result.output?.outcome !== 'succeeded') throw new Error('Journal write failed')
-			return attempt.organizationId
-		})
+		const organizationId = await financeFixture(page, 'multiple-workspaces.e2e:404')
 		await page.reload()
 		await openCreationModal(page, 'Create Workspace')
 		const dialog = creationDialog(page, 'Create Workspace')
@@ -444,39 +325,13 @@ test(
 			dialog.getByRole('link', { name: 'Open Workspace: Recovered workspace', exact: true })
 		).toHaveCount(0)
 		await harness(page)
-		const observed = await page.evaluate(async () => {
-			const { db, app, userId } = window.workspaceSettingsTest
-			const journalPath = '/src/lib/machines/workspaces/workspace-creation-journal.ts'
-			const {
-				workspaceCreationJournal
-			}: typeof import('../src/lib/machines/workspaces/workspace-creation-journal.js') =
-				await import(journalPath)
-			const xstatePath = '/node_modules/.vite/deps/xstate.js'
-			const { createActor, waitFor }: typeof import('xstate') = await import(xstatePath)
-			const config = db.getConfig(),
-				key = JSON.stringify([JSON.stringify([config.appId, config.serverUrl ?? '']), userId])
-			const reader = createActor(workspaceCreationJournal, {
-				input: { key, mode: 'read' }
-			}).start()
-			const read = await waitFor(reader, (snapshot) => snapshot.status === 'done')
-			reader.stop()
-			if (read.output?.outcome !== 'succeeded' || !read.output.record)
-				throw new Error('Original attempt was not retained')
-			return {
-				ids: (await db.all(app.organizations)).map((row) => row.id),
-				journaledId: read.output.record.attempt.organizationId
-			}
-		})
+		const observed = await financeFixture(page, 'multiple-workspaces.e2e:447')
 		expect(observed.journaledId).toBe(organizationId)
 		expect(observed.ids).toHaveLength(1)
 		expect(observed.ids.includes(organizationId)).toBe(false)
 		await page.reload()
 		await harness(page)
-		const ids = await page.evaluate(async () =>
-			(
-				await window.workspaceSettingsTest.db.all(window.workspaceSettingsTest.app.organizations)
-			).map((row) => row.id)
-		)
+		const ids = await financeFixture(page, 'multiple-workspaces.e2e:475')
 		expect(ids).toHaveLength(1)
 		expect(ids.includes(organizationId)).toBe(false)
 	}
@@ -487,40 +342,7 @@ test(
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
 		await start(page)
-		const { workspaceId, transactionId } = await page.evaluate(async () => {
-			const { db, app } = window.workspaceSettingsTest
-			const workspace = (await db.all(app.organizations))[0]
-			if (!workspace) throw new Error('Missing workspace')
-			const account = await db
-				.insert(app.accounts, {
-					organizationId: workspace.id,
-					name: 'Legacy account',
-					kind: 'cash',
-					currency: 'USD',
-					archivedAt: null
-				})
-				.wait({ tier: 'global' })
-			const category = (
-				await db.all(
-					app.categories.where({ organizationId: workspace.id, kind: 'expense', isSystem: true })
-				)
-			)[0]
-			if (!category) throw new Error('Missing category')
-			const transaction = await db
-				.insert(app.transactions, {
-					organizationId: workspace.id,
-					accountId: account.id,
-					categoryId: category.id,
-					kind: 'expense',
-					amountMinor: 100,
-					currency: 'USD',
-					bookedOn: '2026-10-21',
-					description: 'Legacy detail',
-					source: 'manual'
-				})
-				.wait({ tier: 'global' })
-			return { workspaceId: workspace.id, transactionId: transaction.id }
-		})
+		const { workspaceId, transactionId } = await financeFixture(page, 'multiple-workspaces.e2e:490')
 		await page.goto(`/expenses/${transactionId}`)
 		await expect(page).toHaveURL(`/expenses/${transactionId}?workspace=${workspaceId}`)
 		await page.goto('/expenses?workspace=77777777-7777-4777-8777-777777777777')
@@ -538,54 +360,12 @@ test(
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
 		await start(page)
-		const legacyId = await page.evaluate(async () => {
-			const { db, app, userId } = window.workspaceSettingsTest
-			const profile = (await db.all(app.profiles.where({ userId })))[0]
-			if (!profile) throw new Error('Missing profile')
-			await db
-				.update(app.profiles, profile.id, { displayName: 'Preserved identity' })
-				.wait({ tier: 'global' })
-			const workspace = await db
-				.insert(app.organizations, {
-					name: 'Legacy business',
-					kind: 'business',
-					ownerId: userId,
-					defaultCurrency: 'USD'
-				})
-				.wait({ tier: 'global' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: workspace.id,
-					userId,
-					role: 'owner',
-					accountAccessMode: 'all',
-					profileId: null
-				})
-				.wait({ tier: 'global' })
-			return workspace.id
-		})
+		const legacyId = await financeFixture(page, 'multiple-workspaces.e2e:541')
 		await page.goto(`/expenses?workspace=${legacyId}`)
 		await expect(page.getByRole('heading', { name: 'Expenses', exact: true })).toBeVisible()
 		await harness(page)
 		await expect
-			.poll(async () =>
-				page.evaluate(async (id) => {
-					const { db, app, userId } = window.workspaceSettingsTest
-					const categories = await db.all(app.categories.where({ organizationId: id }), {
-						tier: 'remote'
-					})
-					const member = (
-						await db.all(app.organizationMembers.where({ organizationId: id, userId }), {
-							tier: 'remote'
-						})
-					)[0]
-					return {
-						count: categories.length,
-						system: categories.every((row) => row.isSystem),
-						linked: member?.profileId != null
-					}
-				}, legacyId)
-			)
+			.poll(async () => financeFixture(page, 'multiple-workspaces.e2e:572', legacyId))
 			.toEqual({ count: 0, system: true, linked: true })
 		await page.goto('/settings/workspace')
 		await expect(
@@ -593,17 +373,7 @@ test(
 		).toBeEnabled()
 		const href = await create(page, 'Edited workspace')
 		await harness(page)
-		await page.evaluate(async (id) => {
-			const { db, app } = window.workspaceSettingsTest
-			const optional = (
-				await db.all(app.categories.where({ organizationId: id, isSystem: false }))
-			)[0]
-			if (!optional) throw new Error('Missing optional starter')
-			await db.delete(app.categories, optional.id).wait({ tier: 'global' })
-			await db
-				.update(app.organizations, id, { name: 'Edited after creation' })
-				.wait({ tier: 'global' })
-		}, workspaceId(href))
+		await financeFixture(page, 'multiple-workspaces.e2e:596', workspaceId(href))
 		await page.reload()
 		await expect(
 			page
@@ -611,15 +381,10 @@ test(
 				.locator(`option[value="${workspaceId(href)}"]`)
 		).toHaveText('Edited after creation')
 		await harness(page)
-		expect(
-			await page.evaluate(async (id) => {
-				const { db, app, userId } = window.workspaceSettingsTest
-				return {
-					count: (await db.all(app.categories.where({ organizationId: id }))).length,
-					profile: (await db.all(app.profiles.where({ userId })))[0]?.displayName
-				}
-			}, workspaceId(href))
-		).toEqual({ count: 7, profile: 'Preserved identity' })
+		expect(await financeFixture(page, 'multiple-workspaces.e2e:615', workspaceId(href))).toEqual({
+			count: 7,
+			profile: 'Preserved identity'
+		})
 	}
 )
 
@@ -628,40 +393,13 @@ test(
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
 		await start(page)
-		const before = await page.evaluate(async () => {
-			const { db, app, userId } = window.workspaceSettingsTest
-			const profile = (await db.all(app.profiles.where({ userId })))[0]
-			if (!profile) throw new Error('Missing initial profile')
-			await db
-				.update(app.profiles, profile.id, { initialWorkspaceId: null })
-				.wait({ tier: 'global' })
-			return {
-				profileId: profile.id,
-				organizations: (await db.all(app.organizations)).map((row) => row.id).sort(),
-				memberships: (await db.all(app.organizationMembers.where({ userId })))
-					.map((row) => row.id)
-					.sort()
-			}
-		})
+		const before = await financeFixture(page, 'multiple-workspaces.e2e:631')
 		await page.reload()
 		await expect(
 			page.getByText('Your workspaces could not be prepared.', { exact: true })
 		).toBeVisible()
 		await harness(page)
-		const after = await page.evaluate(async () => {
-			const { db, app, userId } = window.workspaceSettingsTest
-			const profiles = await db.all(app.profiles.where({ userId }), { tier: 'remote' })
-			return {
-				profiles: profiles.map((row) => ({
-					id: row.id,
-					initialWorkspaceId: row.initialWorkspaceId
-				})),
-				organizations: (await db.all(app.organizations)).map((row) => row.id).sort(),
-				memberships: (await db.all(app.organizationMembers.where({ userId })))
-					.map((row) => row.id)
-					.sort()
-			}
-		})
+		const after = await financeFixture(page, 'multiple-workspaces.e2e:651')
 		expect(after).toEqual({
 			profiles: [{ id: before.profileId, initialWorkspaceId: null }],
 			organizations: before.organizations,
@@ -675,13 +413,7 @@ test(
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
 		await start(page)
-		const workspaceId = await page.evaluate(async () => {
-			const { db, app, userId } = window.workspaceSettingsTest
-			const member = (await db.all(app.organizationMembers.where({ userId })))[0]
-			if (!member) throw new Error('Missing membership')
-			await db.delete(app.organizationMembers, member.id).wait({ tier: 'global' })
-			return member.organizationId
-		})
+		const workspaceId = await financeFixture(page, 'multiple-workspaces.e2e:678')
 		await page.goto(`/expenses?workspace=${workspaceId}`)
 		await expect(
 			page.getByRole('main').locator('p[aria-hidden="true"]').filter({
@@ -695,15 +427,10 @@ test(
 			})
 		).toBeVisible()
 		await harness(page)
-		expect(
-			await page.evaluate(async () => {
-				const { db, app, userId } = window.workspaceSettingsTest
-				return {
-					memberships: (await db.all(app.organizationMembers.where({ userId }))).length,
-					profiles: (await db.all(app.profiles.where({ userId }))).length
-				}
-			})
-		).toEqual({ memberships: 0, profiles: 1 })
+		expect(await financeFixture(page, 'multiple-workspaces.e2e:699')).toEqual({
+			memberships: 0,
+			profiles: 1
+		})
 	}
 )
 
@@ -711,18 +438,7 @@ test(
 	'journal storage failure blocks creation and permits explicit recovery',
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
-		await page.addInitScript(() => {
-			sessionStorage.setItem('deny-workspace-journal', 'true')
-			const open = indexedDB.open.bind(indexedDB)
-			indexedDB.open = (name, version) => {
-				if (
-					name === 'delightful-finances-workspace-attempts' &&
-					sessionStorage.getItem('deny-workspace-journal') === 'true'
-				)
-					throw new DOMException('Journal unavailable', 'QuotaExceededError')
-				return open(name, version)
-			}
-		})
+		await installWorkerFault(page, 'fail-workspace-journal')
 		await page.goto('/settings/workspace')
 		const dialog = await openCreationModal(page, 'Create Workspace')
 		await expect(
@@ -735,13 +451,8 @@ test(
 			'Workspace creation could not finish. Check local storage and retry the same attempt.'
 		)
 		await harness(page)
-		expect(
-			await page.evaluate(async () => {
-				const { db, app } = window.workspaceSettingsTest
-				return (await db.all(app.organizations)).length
-			})
-		).toBe(1)
-		await page.evaluate(() => sessionStorage.removeItem('deny-workspace-journal'))
+		expect(await financeFixture(page, 'multiple-workspaces.e2e:739')).toBe(1)
+		await financeFixture(page, 'releaseWorkspaceJournal')
 		await creationDialog(page, 'Create Workspace')
 			.getByRole('button', { name: 'Try again', exact: true })
 			.click()
@@ -760,37 +471,17 @@ test(
 		const href = await create(page, 'Protected workspace')
 		const id = workspaceId(href)
 		await expect
-			.poll(async () =>
-				page.evaluate(async (workspaceId) => {
-					const { db, app } = window.workspaceSettingsTest
-					return (await db.all(app.organizations.where({ id: workspaceId }), { tier: 'remote' }))[0]
-						?.name
-				}, id)
-			)
+			.poll(async () => financeFixture(page, 'multiple-workspaces.e2e:764', id))
 			.toBe('Protected workspace')
 		const other = await browser.newContext()
 		try {
 			const outsider = await other.newPage()
 			await start(outsider)
-			const rejected = await outsider.evaluate(async (workspaceId) => {
-				const { db, app } = window.workspaceSettingsTest
-				try {
-					await db
-						.update(app.organizations, workspaceId, { name: 'Unauthorized rename' })
-						.wait({ tier: 'global' })
-					return false
-				} catch {
-					return true
-				}
-			}, id)
+			const rejected = await financeFixture(outsider, 'multiple-workspaces.e2e:775', id)
 			expect(rejected).toBe(true)
-			expect(
-				await page.evaluate(async (workspaceId) => {
-					const { db, app } = window.workspaceSettingsTest
-					return (await db.all(app.organizations.where({ id: workspaceId }), { tier: 'remote' }))[0]
-						?.name
-				}, id)
-			).toBe('Protected workspace')
+			expect(await financeFixture(page, 'multiple-workspaces.e2e:788', id)).toBe(
+				'Protected workspace'
+			)
 		} finally {
 			await other.close()
 		}
@@ -840,12 +531,7 @@ for (const duplicate of [false, true]) {
 		{ tag: ['@workspaces'] },
 		async ({ page }) => {
 			await start(page)
-			const id = await page.evaluate(async () => {
-				const { db, app } = window.workspaceSettingsTest
-				const row = (await db.all(app.organizations))[0]
-				if (!row) throw new Error('Missing workspace')
-				return row.id
-			})
+			const id = await financeFixture(page, 'multiple-workspaces.e2e:843')
 			const href = duplicate
 				? `/expenses?workspace=${id}&workspace=${id}`
 				: '/expenses?workspace=invalid'
@@ -874,12 +560,7 @@ test(
 		await start(page)
 		const target = workspaceId(await create(page, 'Selection destination'))
 		await closeCreationModal(page)
-		const first = await page.evaluate(async (target) => {
-			const { db, app } = window.workspaceSettingsTest
-			const row = (await db.all(app.organizations)).find((row) => row.id !== target)
-			if (!row) throw new Error('Missing initial workspace')
-			return row.id
-		}, target)
+		const first = await financeFixture(page, 'multiple-workspaces.e2e:877', target)
 		const selector = page.getByLabel('Select Workspace', { exact: true })
 		await selector.selectOption(first)
 		await expect(page).toHaveURL(`/settings/workspace?workspace=${first}`)
@@ -889,20 +570,7 @@ test(
 		await expect(dialog.getByLabel('Workspace name', { exact: true })).toHaveValue(
 			'Creation across selection'
 		)
-		const gate = await page.evaluateHandle(() => {
-			const digest = crypto.subtle.digest.bind(crypto.subtle)
-			let release = () => {}
-			const pending = new Promise<void>((resolve) => {
-				release = resolve
-			})
-			crypto.subtle.digest = (algorithm, data) => pending.then(() => digest(algorithm, data))
-			return {
-				release: () => {
-					crypto.subtle.digest = digest
-					release()
-				}
-			}
-		})
+		await financeFixture(page, 'holdWorkspacePreparation')
 		try {
 			await dialog.getByRole('button', { name: 'Create Workspace', exact: true }).click()
 			await expect(dialog.getByRole('status')).toHaveText('Preparing your workspace…')
@@ -912,19 +580,11 @@ test(
 			await openCreationModal(page, 'Create Workspace')
 			await expect(dialog.getByRole('status')).toHaveText('Preparing your workspace…')
 		} finally {
-			await gate.evaluate((control) => control.release())
-			await gate.dispose()
+			await financeFixture(page, 'releaseWorkspacePreparation')
 		}
 		await expect(dialog.getByRole('status')).toHaveText('Workspace saved.')
 		await expect(page).toHaveURL(`/settings/workspace?workspace=${target}`)
-		expect(
-			await page.evaluate(async () => {
-				const { db, app } = window.workspaceSettingsTest
-				return (await db.all(app.organizations)).filter(
-					(row) => row.name === 'Creation across selection'
-				).length
-			})
-		).toBe(1)
+		expect(await financeFixture(page, 'multiple-workspaces.e2e:921')).toBe(1)
 		expect(errors).toEqual([])
 	}
 )

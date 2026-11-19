@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { app } from '../../schema.js'
+import { app } from '../../queries.js'
 import {
 	brokenRecords,
 	integrityFixture,

@@ -1,11 +1,11 @@
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import {
 	transactionAttachmentRemovalMachine,
 	type TransactionAttachmentRemovalResult
 } from './transaction-attachment-removal.js'
 import { setup, types } from 'xstate'
 
-type Db = Pick<ReturnType<typeof getDb>, 'all' | 'delete'>
+type Db = Pick<JazzDb, 'all' | 'delete'>
 export type TransactionAttachmentManagerInput = {
 	db: Db
 	transactionId: string
@@ -169,3 +169,17 @@ export const transactionAttachmentManagerMachine = setup({
 		closed: { type: 'final' }
 	}
 })
+
+/** Public removal report; callers do not inspect the manager's queue or raw errors. */
+export function selectTransactionAttachmentRemovalView(
+	snapshot: import('xstate').SnapshotFrom<typeof transactionAttachmentManagerMachine>
+) {
+	const c = snapshot.context
+	return {
+		transactionId: c.transactionId,
+		removingIds: [...(c.currentAttachmentId ? [c.currentAttachmentId] : []), ...c.queue],
+		failedIds: c.results
+			.filter((item) => item.result.outcome === 'failed')
+			.map((item) => item.attachmentId)
+	}
+}

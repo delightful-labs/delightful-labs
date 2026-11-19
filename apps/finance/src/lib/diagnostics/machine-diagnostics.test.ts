@@ -1,12 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createActor, createMachine, setup, createAsyncLogic } from 'xstate'
 
-const environment = vi.hoisted(() => ({ PUBLIC_DEBUG: 'true' }))
-vi.mock('$app/env/public', () => environment)
-
 beforeEach(() => {
 	vi.resetModules()
-	environment.PUBLIC_DEBUG = 'true'
+	vi.stubEnv('PUBLIC_DEBUG', 'true')
 	vi.spyOn(console, 'error').mockImplementation(() => {})
 	vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
@@ -318,7 +315,7 @@ it('redacts credentials, payloads and query data while retaining technical failu
 })
 
 it('disabled diagnostics do not inspect inputs or emit logs', async () => {
-	environment.PUBLIC_DEBUG = 'false'
+	vi.stubEnv('PUBLIC_DEBUG', 'false')
 	const { logJazzInitializationFailure, logMachineFailure } =
 		await import('./machine-diagnostics.js')
 	const access = vi.fn(() => {
@@ -351,3 +348,5 @@ it('diagnostic collection failures preserve the original startup error boundary'
 		{ diagnosticsAvailable: false }
 	)
 })
+
+afterEach(() => vi.unstubAllEnvs())

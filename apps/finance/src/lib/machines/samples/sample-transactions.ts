@@ -1,3 +1,4 @@
+import type { WorkspaceResourceRelease } from '../../contracts/workspace-resource-release.js'
 import type { AppTransaction } from '#lib/domain/transaction.js'
 import type {
 	FormChildEvent,
@@ -19,27 +20,30 @@ type CreationInput<Values = AppTransaction> = FormOperationInput<
 	TransactionEntryObservation
 >
 type Result = FormOperationResult<void, TransactionEntryReason>
-type Event = FormChildEvent<TransactionEntryObservation> | { type: 'ADD' }
+export type SampleBatchScope = TransactionEntryScope & { accountIds: readonly string[] | null }
+type Event = FormChildEvent<TransactionEntryObservation> | { type: 'ADD'; scope?: SampleBatchScope }
 
 /** Batch iteration owns the current creation child until its transaction has settled. */
 export function createSampleTransactionsMachine<
 	Logic extends import('xstate').AnyActorLogic
 >(operation: {
 	logic: Logic
-	prepare: (index: number) => import('xstate').InputFrom<Logic>
+	prepare: (index: number, scope?: SampleBatchScope) => import('xstate').InputFrom<Logic>
 	result: (output: import('xstate').OutputFrom<Logic>) => Result | undefined
 	recipient: (
 		actor: import('xstate').ActorRefFrom<Logic>
 	) => import('xstate').ActorRef<Snapshot<Result>, FormChildEvent<TransactionEntryObservation>>
 }) {
 	type Context = {
+		scope: SampleBatchScope | undefined
 		saved: number
 		request: { input: import('xstate').InputFrom<Logic> } | undefined
 		lastResult: Result | undefined
 	}
 	const actors = {
 		prepare: createAsyncLogic({
-			run: ({ input }: { input: number }) => Promise.resolve({ input: operation.prepare(input) })
+			run: ({ input }: { input: { index: number; scope: SampleBatchScope | undefined } }) =>
+				Promise.resolve({ input: operation.prepare(input.index, input.scope) })
 		}),
 		write: operation.logic
 	}
@@ -60,6 +64,7 @@ export function createSampleTransactionsMachine<
 	const model = setup({
 		schemas: {
 			context: types<Context>(),
+			output: types<WorkspaceResourceRelease>(),
 			events: events0,
 			children: {
 				prepare: types<import('xstate').ActorRefFrom<(typeof actors)['prepare']>>(),
@@ -77,13 +82,24 @@ export function createSampleTransactionsMachine<
 	})
 	return model.createMachine({
 		initial: 'idle',
-		context: { saved: 0, request: undefined, lastResult: undefined },
+		context: { scope: undefined, saved: 0, request: undefined, lastResult: undefined },
+		output: ({ context }) => ({
+			outcome:
+				context.lastResult?.settlement === 'unknown'
+					? 'unresolved'
+					: context.lastResult?.outcome === 'failed' || context.lastResult?.outcome === 'partial'
+						? 'releasedWithFailure'
+						: 'released'
+		}),
 		on: { SHUTDOWN: { target: '.closed' }, CANCEL: { target: '.cancelled' } },
 		states: {
 			idle: {
 				on: {
-					ADD: () => {
-						return { target: 'preparing', context: { saved: 0, lastResult: undefined } }
+					ADD: ({ event }) => {
+						return {
+							target: 'preparing',
+							context: { scope: event.scope, saved: 0, lastResult: undefined }
+						}
 					}
 				}
 			},
@@ -91,7 +107,7 @@ export function createSampleTransactionsMachine<
 				invoke: model.createInvoke({
 					id: 'prepare',
 					src: actors.prepare,
-					input: ({ context }) => context.saved,
+					input: ({ context }) => ({ index: context.saved, scope: context.scope }),
 					onDone: (args) => {
 						return { target: 'saving', context: { request: args.event.output } }
 					},
@@ -251,22 +267,31 @@ export function createSampleTransactionsMachine<
 			},
 			complete: {
 				on: {
-					ADD: () => {
-						return { target: 'preparing', context: { saved: 0, lastResult: undefined } }
+					ADD: ({ event }) => {
+						return {
+							target: 'preparing',
+							context: { scope: event.scope, saved: 0, lastResult: undefined }
+						}
 					}
 				}
 			},
 			partial: {
 				on: {
-					ADD: () => {
-						return { target: 'preparing', context: { saved: 0, lastResult: undefined } }
+					ADD: ({ event }) => {
+						return {
+							target: 'preparing',
+							context: { scope: event.scope, saved: 0, lastResult: undefined }
+						}
 					}
 				}
 			},
 			failure: {
 				on: {
-					ADD: () => {
-						return { target: 'preparing', context: { saved: 0, lastResult: undefined } }
+					ADD: ({ event }) => {
+						return {
+							target: 'preparing',
+							context: { scope: event.scope, saved: 0, lastResult: undefined }
+						}
 					}
 				}
 			},
@@ -284,4 +309,14 @@ export function createSampleTransactionsMachine<
 			}
 		}
 	})
+}
+
+export function selectSampleTransactionsView(
+	snapshot: import('xstate').SnapshotFrom<ReturnType<typeof createSampleTransactionsMachine>>
+) {
+	return {
+		busy: snapshot.matches('saving') || snapshot.matches('preparing') || snapshot.matches('next'),
+		saved: snapshot.context.saved,
+		failed: snapshot.matches('failure') || snapshot.matches('partial')
+	}
 }

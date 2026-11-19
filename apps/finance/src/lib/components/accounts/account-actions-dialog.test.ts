@@ -15,6 +15,8 @@ const props = {
 	archiveAction: 'available',
 	deleteGrantView: {
 		busy: false,
+		loading: false,
+		failed: false,
 		result: undefined,
 		canManage: true,
 		members: [

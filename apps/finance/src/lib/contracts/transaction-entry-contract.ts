@@ -5,7 +5,7 @@ import type {
 	Tag,
 	OrganizationMember,
 	TransactionDetail
-} from '../schema.js'
+} from '../queries.js'
 import type { TransactionSaveValues } from '../validation/transactions.js'
 import type { ScopedFormView } from './form-contract.js'
 

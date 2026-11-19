@@ -14,9 +14,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { makeSignature } from 'better-auth/crypto'
-import { acceptLocalFirstAuth } from 'jazz-tools/backend'
+import { acceptDeviceAccounts } from 'jazz-tools/backend'
 import { createAuthServer } from '../../src/lib/server/auth/server.js'
-import { app } from '../../src/lib/backend/jazz/schema.js'
+import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
 import { startJazzAuthority } from '../jazz-authority.js'
 import { staticShellServer } from './server.js'
 import { openAddLink } from '../add-link.js'
@@ -66,7 +66,12 @@ for (const mode of ['linked', 'existing', 'expired'])
 				dataDir: directory,
 				authenticate: async (request) => {
 					const session = await auth.api.getSession({ headers: request.headers })
-					return session ? { userId: session.user.id } : acceptLocalFirstAuth(request)
+					return session
+						? {
+								userId: session.user.id,
+								expiresAt: Math.floor(session.session.expiresAt.getTime() / 1000)
+							}
+						: acceptDeviceAccounts(request)
 				}
 			})
 			auth = createAuthServer({ db: () => authority.backend.db, schema: app }, { origin, secret })

@@ -34,7 +34,7 @@ const privateInvitation = {
 	consumedAccountId: null,
 	consumedOperationId: null,
 	consumedMembershipId: null
-} satisfies import('jazz-tools').schema.InsertOf<typeof app.notebookInvitations>
+} satisfies import('jazz-tools').InsertOf<typeof app.notebookInvitations>
 
 beforeAll(async () => {
 	fixture = await createPolicyTestApp(app, invitationPermissions, expect)

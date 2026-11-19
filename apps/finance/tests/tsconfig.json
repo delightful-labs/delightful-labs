@@ -1,7 +1,7 @@
 {
 	"extends": "../tsconfig.json",
 	"include": ["./**/*.ts", "../scripts/check-e2e-scopes.ts"],
-	"exclude": ["./worker-upgrade/candidate"],
+	"exclude": ["./worker-upgrade/candidate", "./worker-upgrade/fixtures"],
 	"compilerOptions": {
 		"noEmit": true,
 		"paths": {

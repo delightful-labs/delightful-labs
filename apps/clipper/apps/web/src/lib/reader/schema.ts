@@ -55,6 +55,27 @@ export function decodeResumePosition(value: unknown) {
 	const position = encodedResumePositionSchema.parse(value)
 	return resumePositionSchema.parse({ ...position, interactedAt: new Date(position.interactedAt) })
 }
+const resumeObservationSchema = z.string().transform((key, context) => {
+	try {
+		return { key, position: decodeResumePosition(JSON.parse(key)) }
+	} catch {
+		context.addIssue({ code: 'custom', message: 'Invalid stored resume position' })
+		return z.NEVER
+	}
+})
+export const resumeObservationsSchema = z.array(resumeObservationSchema).transform((candidates) => {
+	candidates.sort(
+		(a, b) =>
+			a.position.interactedAt.getTime() - b.position.interactedAt.getTime() ||
+			(a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+	)
+	return candidates.at(-1)?.position ?? null
+})
+export function encodeResumeObservations(value: ResumePosition | null) {
+	return value === null
+		? []
+		: [JSON.stringify(encodeResumePosition(resumePositionSchema.parse(value)))]
+}
 export function encodeReaderValue(change: ReaderChange) {
 	return JSON.stringify(
 		change.field === 'position'

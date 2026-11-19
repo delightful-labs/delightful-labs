@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { openAccountActions, openCreationModal, selectWorkspace } from './helpers/ui.js'
 
@@ -120,71 +121,7 @@ test(
 		await expect(
 			page.getByRole('main').getByRole('button', { name: 'Add Account', exact: true })
 		).toBeEnabled()
-		const seed = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			const [organization] = await db.all(app.organizations)
-			if (!organization) throw new Error('Missing organization')
-			const organizationId = organization.id
-			const account = await db
-				.insert(app.accounts, { organizationId, name: 'Ledger', kind: 'bank', currency: 'USD' })
-				.wait({ tier: 'local' })
-			const category = await db
-				.insert(app.categories, {
-					organizationId,
-					name: 'Expense category',
-					kind: 'expense',
-					isSystem: false
-				})
-				.wait({ tier: 'local' })
-			const expenseTag = await db
-				.insert(app.tags, {
-					organizationId,
-					name: 'Expense only',
-					kind: 'expense',
-					categoryId: category.id
-				})
-				.wait({ tier: 'local' })
-			await db
-				.insert(app.tags, { organizationId, name: 'Income only', kind: 'income' })
-				.wait({ tier: 'local' })
-			const historical = await db
-				.insert(app.tags, { organizationId, name: 'Archived history', kind: 'expense' })
-				.wait({ tier: 'local' })
-			const transaction = await db
-				.insert(app.transactions, {
-					organizationId,
-					accountId: account.id,
-					categoryId: category.id,
-					kind: 'expense',
-					amountMinor: 100,
-					currency: 'USD',
-					bookedOn: '2026-10-19',
-					source: 'manual',
-					memo: 'Original history'
-				})
-				.wait({ tier: 'local' })
-			await db
-				.insert(app.transactionTags, {
-					organizationId,
-					transactionId: transaction.id,
-					tagId: historical.id
-				})
-				.wait({ tier: 'local' })
-			await db.update(app.tags, historical.id, { archivedAt: new Date() }).wait({ tier: 'global' })
-			return {
-				organizationId,
-				categoryId: category.id,
-				expenseTagId: expenseTag.id,
-				historicalId: historical.id,
-				transactionId: transaction.id
-			}
-		})
+		const seed = await financeFixture(page, 'duplicate-names.e2e:123')
 		await page.goto('/expenses')
 		await expect(
 			page.getByRole('main').getByText('Archived history', { exact: false })
@@ -225,20 +162,7 @@ test(
 				page.getByRole('main').getByRole('listitem').filter({ hasText: 'Shared inline' })
 			).toHaveCount(1)
 		}
-		const persisted = await page.evaluate(async (seed) => {
-			const schemaPath = '/src/lib/schema.ts',
-				sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Missing database')
-			return {
-				tags: await db.all(app.tags.where({ organizationId: seed.organizationId })),
-				links: await db.all(app.transactionTags.where({ organizationId: seed.organizationId })),
-				transactions: await db.all(app.transactions.where({ organizationId: seed.organizationId }))
-			}
-		}, seed)
+		const persisted = await financeFixture(page, 'duplicate-names.e2e:228', seed)
 		expect(
 			persisted.tags
 				.filter((tag) => tag.name === 'Shared inline')
@@ -274,46 +198,7 @@ for (const entity of ['Category', 'Tag'] satisfies readonly ('Category' | 'Tag')
 				await expect(group).toHaveCount(0)
 			}
 			await expect(main.getByRole('button', { name: `Add ${entity}`, exact: true })).toBeEnabled()
-			const secondId = await page.evaluate(async (entity) => {
-				const schemaPath = '/src/lib/schema.ts',
-					sessionPath = '/src/lib/runtime/jazz-session.ts'
-				const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-				const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-					await import(sessionPath)
-				const session = getCurrentJazzSession()?.getSnapshot()
-				const db = session?.client?.db
-				const userId = session?.account?.id
-				if (!db || !userId) throw new Error('Missing session')
-				const [organization] = await db.all(app.organizations)
-				if (!organization) throw new Error('Missing workspace')
-				for (const name of ['Alpha active', 'Zulu history']) {
-					const values = { organizationId: organization.id, name, kind: 'expense' } satisfies {
-						organizationId: string
-						name: string
-						kind: 'expense'
-					}
-					if (entity === 'Category')
-						await db.insert(app.categories, { ...values, isSystem: false }).wait({ tier: 'local' })
-					else await db.insert(app.tags, values).wait({ tier: 'local' })
-				}
-				const second = await db
-					.insert(app.organizations, {
-						name: 'Empty filter workspace',
-						kind: 'business',
-						defaultCurrency: 'USD',
-						ownerId: userId
-					})
-					.wait({ tier: 'local' })
-				await db
-					.insert(app.organizationMembers, {
-						organizationId: second.id,
-						userId,
-						role: 'owner',
-						accountAccessMode: 'all'
-					})
-					.wait({ tier: 'local' })
-				return second.id
-			}, entity)
+			const secondId = await financeFixture(page, 'duplicate-names.e2e:277', entity)
 			const active = group.getByRole('radio', { name: 'Default (not archived)', exact: true })
 			const archived = group.getByRole('radio', { name: 'Archived only', exact: true })
 			const all = group.getByRole('radio', { name: 'All', exact: true })

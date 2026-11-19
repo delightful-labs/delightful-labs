@@ -1,4 +1,4 @@
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import type { AccountWrite } from './account-write.js'
 import type { Dependencies } from './types.js'
 import { required } from './identity.js'

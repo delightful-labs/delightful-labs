@@ -11,8 +11,13 @@ import type { SessionOwnerRef } from '../../session.js'
 import type { SessionScope } from '../../contracts/session.js'
 
 type Session = JazzSession<JazzClient>
-type Owner = ActorRefFrom<ReturnType<typeof createSessionAcquisitionMachine<Session>>>
-export type JazzStartupBinding = Readonly<{ owner: SessionOwnerRef<Session>; scope: SessionScope }>
+/** Native SDK facades stay opaque to machine-context freezing and inspection. */
+export type JazzSessionResource = () => Session
+type Owner = ActorRefFrom<ReturnType<typeof createSessionAcquisitionMachine<JazzSessionResource>>>
+export type JazzStartupBinding = Readonly<{
+	owner: SessionOwnerRef<JazzSessionResource>
+	scope: SessionScope
+}>
 
 /** One registry per host application lifetime. Layout attachments do not own acquisition. */
 export function createJazzStartupRegistry(
@@ -31,7 +36,7 @@ export function createJazzStartupRegistry(
 	}
 
 	function getCurrentJazzSession(): Session | undefined {
-		return shared ? selectAcquiredSession(shared.owner.getSnapshot()) : undefined
+		return shared ? selectAcquiredSession(shared.owner.getSnapshot())?.() : undefined
 	}
 
 	/** Browser mount binding only. The retained owner survives layout detach and pending SDK creation. */
@@ -41,8 +46,17 @@ export function createJazzStartupRegistry(
 		}
 		if (!shared) {
 			const adapter = acquire(config)
-			const owner = createActor(createSessionAcquisitionMachine<Session>(), {
-				input: adapter
+			const owner = createActor(createSessionAcquisitionMachine<JazzSessionResource>(), {
+				input: {
+					binding: adapter.binding,
+					capability: {
+						...adapter.capability,
+						open: async () => {
+							const session = await adapter.capability.open()
+							return () => session
+						}
+					}
+				}
 			}).start()
 			shared = { owner, binding: adapter.binding, config: { ...config } }
 		}

@@ -32,3 +32,33 @@ export const formMessages: FormFeedbackMessages = {
 	saveFailed: (input) => m['errors.save_subject'](input),
 	settling: () => m['forms.settling']()
 }
+
+import type { TransferStatusLabel, TransferDeleteFeedback } from '../contracts/worker-transfers.js'
+export const transferStatusText = {
+	loadingTransactions: () =>
+		m['status.loading_subject']({ subject: m['nouns.transaction']({ count: 2 }) }),
+	loadTransactionsFailed: () =>
+		m['errors.load_subject']({ subject: m['nouns.transaction']({ count: 2 }) }),
+	settling: () => m['forms.settling'](),
+	transferSaved: () => m['status.saved_subject']({ subject: m['nouns.transfer']({ count: 1 }) }),
+	cancelled: () => m['status.cancelled'](),
+	saveTransferFailed: () =>
+		m['errors.save_subject']({ subject: m['nouns.transfer']({ count: 1 }) }),
+	recoveryRequired: () => m['transfers.recovery_required']()
+} satisfies Record<TransferStatusLabel, () => string>
+export const transferDeleteText = {
+	settling: () => m['forms.settling'](),
+	deletedBoth: () => m['transfers.delete_saved_both'](),
+	deletedSelected: () => m['transfers.delete_saved_selected'](),
+	recoveryRequired: () => m['transfers.recovery_required'](),
+	deleteFailed: () => m['errors.save_subject']({ subject: m['nouns.transaction']({ count: 2 }) })
+} satisfies Record<TransferDeleteFeedback['message'], () => string>
+
+import type { InternalTransferEntryReason } from '../contracts/transfer-create-contract.js'
+export const internalTransferEntryReasonLabels = {
+	...formReasonText,
+	insufficientAccounts: () => m['transfers.insufficient_accounts'](),
+	permissionChanged: () => m['forms.read_only'](),
+	incompatible: () => m['transfers.incompatible'](),
+	unavailable: () => m['errors.save_subject']({ subject: m['nouns.transfer']({ count: 1 }) })
+} satisfies Record<InternalTransferEntryReason, () => string>

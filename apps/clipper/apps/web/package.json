@@ -10,7 +10,7 @@
 		"check": "pnpm prepare && svelte-check --tsconfig tsconfig.json --fail-on-warnings && tsc --project src/service-worker/tsconfig.json",
 		"prepare": "pnpm jazz:generate && svelte-kit sync",
 		"dev:agent": "pnpm dev --mode agent --port 5180",
-		"jazz:generate": "jazz-tools validate --schema-dir src/lib/backend/jazz",
+		"jazz:generate": "jazz-tools generate --schema-dir src/lib/backend/jazz",
 		"build:parser-worker:dev": "pnpm build:parser-worker --outfile=.clipper-dev/parser/extract-worker.mjs",
 		"build:parser-worker": "esbuild src/lib/server/capture/extract-worker.ts --bundle --platform=node --format=esm --target=node24 --external:jsdom --external:@mozilla/readability --external:dompurify --outfile=.netlify/v1/parser/extract-worker.mjs"
 	},
@@ -26,8 +26,8 @@
 		"dompurify": "3.4.17",
 		"i18next": "26.7.1",
 		"ipaddr.js": "2.3.0",
-		"jazz-napi": "2.0.0-alpha.60",
-		"jazz-tools": "2.0.0-alpha.60",
+		"jazz-napi": "2.0.0-alpha.67",
+		"jazz-tools": "2.0.0-alpha.67",
 		"jsdom": "29.1.1",
 		"microlighter": "2.2.0",
 		"minisearch": "7.2.0",
@@ -37,7 +37,7 @@
 		"ws": "8.22.1",
 		"xstate": "6.0.0-beta.1",
 		"zod": "4.6.7",
-		"better-auth": "1.7.18",
+		"better-auth": "1.7.22",
 		"@kingironman2011/better-auth-bsky": "0.3.2"
 	},
 	"devDependencies": {

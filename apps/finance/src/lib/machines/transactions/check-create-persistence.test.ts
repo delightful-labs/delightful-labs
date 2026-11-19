@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Transaction } from 'jazz-tools'
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { createCheckCreationMachine, type CheckCreationInput } from './check-create-persistence.js'
 import { createActor, toPromise, waitFor, createAsyncLogic } from 'xstate'
 

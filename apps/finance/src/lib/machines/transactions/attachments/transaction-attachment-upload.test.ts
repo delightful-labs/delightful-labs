@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import type { TransactionAttachmentInput } from './transaction-attachment-upload.js'
 import { transactionAttachmentUploadMachine } from './transaction-attachment-upload.js'
 import { createActor, toPromise } from 'xstate'

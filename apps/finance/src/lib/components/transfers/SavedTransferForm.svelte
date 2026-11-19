@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { InputCurrency, InputDate, InputText, Select } from 'delightful-ui'
-	import type { Account, TransactionRow } from '#lib/schema.js'
+	import type { Account, TransactionRow } from '#lib/queries.js'
 	import { minorUnitsToInput } from '#lib/domain/money.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import AppLink from '../navigation/AppLink.svelte'
@@ -8,7 +8,17 @@
 		expense,
 		income,
 		accounts
-	}: { expense: TransactionRow; income: TransactionRow; accounts: readonly Account[] } = $props()
+	}: {
+		expense: Pick<
+			TransactionRow,
+			'id' | 'accountId' | 'amountMinor' | 'currency' | 'bookedOn' | 'description'
+		>
+		income: Pick<
+			TransactionRow,
+			'id' | 'accountId' | 'amountMinor' | 'currency' | 'bookedOn' | 'description'
+		>
+		accounts: readonly Pick<Account, 'id' | 'name' | 'currency'>[]
+	} = $props()
 	const id = $props.id()
 </script>
 

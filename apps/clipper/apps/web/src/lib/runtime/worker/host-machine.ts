@@ -134,7 +134,7 @@ const actors = {
 	application,
 	owner,
 	tagForm: tagFormMachine,
-	close: createAsyncLogic({ run: ({ input }: { input: Session }) => input.close() }),
+	close: createAsyncLogic({ run: ({ input }: { input: Session }) => input().close() }),
 	closeTransport: createAsyncLogic<WorkerHostClosed, () => Promise<WorkerHostClosed>>({
 		run: ({ input }) => input()
 	})

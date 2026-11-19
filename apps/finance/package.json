@@ -5,11 +5,11 @@
 	"type": "module",
 	"scripts": {
 		"paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy cookie baseLocale --emit-ts-declarations",
-		"dev": "vite dev",
-		"dev:network": "vite dev --host 0.0.0.0",
-		"dev:agent": "vite dev --config vite.e2e.config.ts --port 5180",
+		"dev": "pnpm jazz:generate && vite dev",
+		"dev:network": "pnpm jazz:generate && vite dev --host 0.0.0.0",
+		"dev:agent": "pnpm jazz:generate && vite dev --config vite.e2e.config.ts --port 5180",
 		"precheck": "pnpm paraglide",
-		"prebuild": "pnpm paraglide",
+		"prebuild": "pnpm jazz:check && pnpm paraglide",
 		"pretest:unit": "pnpm paraglide",
 		"pretest:e2e": "pnpm paraglide",
 		"build": "vite build",
@@ -34,7 +34,9 @@
 		"test:description": "playwright test --config tests/config/playwright.transaction-description.config.ts",
 		"test:startup": "playwright test --config tests/config/playwright.startup.config.ts",
 		"test:fake-data": "playwright test --config tests/config/playwright.fake-data.config.ts",
-		"check:e2e": "node --experimental-strip-types scripts/check-e2e-scopes.ts"
+		"check:e2e": "node --experimental-strip-types scripts/check-e2e-scopes.ts",
+		"jazz:generate": "jazz-tools generate --schema-dir src/lib",
+		"jazz:check": "jazz-tools generate --check --schema-dir src/lib"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "^2.18.2",
@@ -64,7 +66,7 @@
 		"@xstate/svelte": "6.0.0-beta.0",
 		"delightful-local-first": "workspace:*",
 		"delightful-ui": "workspace:*",
-		"jazz-tools": "2.0.0-alpha.60",
+		"jazz-tools": "2.0.0-alpha.67",
 		"layerchart": "^2.9.0",
 		"pica": "^10.0.3",
 		"tdesign-icons-svg": "^0.4.7",

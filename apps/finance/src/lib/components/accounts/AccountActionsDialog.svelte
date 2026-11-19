@@ -3,7 +3,7 @@
 	import AccountArchiveButton from './AccountArchiveButton.svelte'
 	import type { AccountArchiveView } from '#lib/machines/accounts/account-archive.js'
 	import type { AccountDeleteGrantView } from '#lib/machines/accounts/account-delete-grants.js'
-	import type { Account, AccountMembership, OrganizationMember } from '#lib/schema.js'
+	import type { Account, AccountMembership, OrganizationMember } from '#lib/queries.js'
 	import { m } from '#lib/paraglide/messages.js'
 	import type { ComponentProps } from 'svelte'
 	import QueryContent from '../shared/QueryContent.svelte'
@@ -19,11 +19,7 @@
 	}: {
 		account: Account | undefined
 		archiveAction: 'available' | 'archiving' | 'disabled' | 'unavailable' | undefined
-		deleteGrantView: AccountDeleteGrantView & {
-			canManage: boolean
-			members: readonly OrganizationMember[]
-			grants: readonly AccountMembership[]
-		}
+		deleteGrantView: AccountDeleteGrantView
 		grantQueries: ComponentProps<typeof QueryContent>['queries']
 		open?: boolean
 		onArchive: () => void

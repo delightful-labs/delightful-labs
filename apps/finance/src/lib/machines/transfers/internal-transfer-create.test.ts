@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Transaction } from 'jazz-tools'
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { createInternalTransferCreateMachine } from './internal-transfer-create.js'
 import { createActor, waitFor } from 'xstate'
 

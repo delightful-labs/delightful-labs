@@ -2,9 +2,8 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createActor, SimulatedClock, toPromise } from 'xstate'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp } from 'jazz-tools/testing'
-import { app } from '../../backend/jazz/schema.js'
-import permissions from '../../backend/jazz/permissions.js'
-import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
+import permissions from '../../backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { createPreviewRequest, handlePreviewRequest } from './request.js'
 import type { PreviewAuth } from './request.js'
 import { origin, requestFixture } from './request.test-support.js'
@@ -12,7 +11,7 @@ import { createPublicationOwner } from './owner.test-support.js'
 
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => fixture?.shutdown())
 const setup = (name: string) => requestFixture({ fixture, name })

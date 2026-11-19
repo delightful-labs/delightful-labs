@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { bankStatusText } from '#lib/forms/bank-messages.js'
 	import Icon from '../navigation/AppIcon.svelte'
 	import {
 		Button,
@@ -58,7 +59,7 @@
 	const setupView = $derived(view.mode.kind === 'setup' ? view.mode.stage : null)
 
 	let token = $state('')
-	const statusText = $derived(status?.label() ?? '')
+	const statusText = $derived(status ? bankStatusText(status) : '')
 	const outcomeText = $derived(
 		outcome
 			? m['bank.result_time_outcome_imported_existing_omitted']({

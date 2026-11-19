@@ -1,3 +1,4 @@
+import { financeFixture } from './helpers/worker-fixture.js'
 import {
 	prepareSidebar,
 	openCreationModal,
@@ -193,16 +194,7 @@ test(
 		const phrase = page.getByLabel('Your recovery phrase', { exact: true })
 		await expect(phrase).toBeVisible()
 		// One public SDK operation on Finance's existing session, not a new provider/client.
-		await page.evaluate(async () => {
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const {
-				getCurrentJazzSession,
-				loadLocalFirstClient
-			}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-			const session = getCurrentJazzSession()
-			if (!session) throw new Error('Test session is not ready')
-			await session.createLocalFirst()
-		})
+		await financeFixture(page, 'replaceDeviceAccount')
 		await expect(phrase).toHaveCount(0)
 		await expect.poll(() => currentIdentity(page)).not.toBe(identity)
 		const show = page.getByRole('button', { name: 'Show Recovery phrase', exact: true })
@@ -250,26 +242,7 @@ test(
 	async ({ page, browser, baseURL }) => {
 		await saveDisplayName(page, 'Recovered owner')
 		// Confirm synchronization without including recovery secrets in output.
-		await expect
-			.poll(() =>
-				page.evaluate(async () => {
-					const schemaPath = '/src/lib/schema.ts'
-					const sessionPath = '/src/lib/runtime/jazz-session.ts'
-					const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-					const {
-						getCurrentJazzSession,
-						loadLocalFirstClient
-					}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-					const snapshot = getCurrentJazzSession()?.getSnapshot()
-					if (!snapshot?.client || !snapshot.account) throw new Error('Session not ready')
-					return (
-						await snapshot.client.db.one(app.profiles.where({ userId: snapshot.account.id }), {
-							tier: 'remote'
-						})
-					)?.displayName
-				})
-			)
-			.toBe('Recovered owner')
+		await expect.poll(() => financeFixture(page, 'authentication.e2e:255')).toBe('Recovered owner')
 		await page.getByRole('button', { name: 'Show Recovery phrase' }).click()
 		const phrase = await page.getByLabel('Your recovery phrase').inputValue()
 		await page.getByRole('button', { name: 'Close', exact: true }).click()
@@ -291,35 +264,7 @@ test(
 )
 
 async function avatarRecord(page: Page, remote = false) {
-	return page.evaluate(async (remote) => {
-		const schemaPath = '/src/lib/schema.ts'
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-		const {
-			getCurrentJazzSession,
-			loadLocalFirstClient
-		}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-		const snapshot = getCurrentJazzSession()?.getSnapshot()
-		if (!snapshot?.client || !snapshot.account) throw new Error('Session not ready')
-		const profile = await snapshot.client.db.one(
-			app.profiles.where({ userId: snapshot.account.id }),
-			remote ? { tier: 'remote' } : {}
-		)
-		if (!profile) throw new Error('Profile not ready')
-		const bytes = profile.avatarData
-		return {
-			id: profile.id,
-			userId: profile.userId,
-			displayName: profile.displayName ?? null,
-			mimeType: profile.avatarMimeType ?? null,
-			byteLength: bytes?.byteLength ?? 0,
-			checksum: bytes
-				? Array.from(
-						new Uint8Array(await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes)))
-					).join(',')
-				: null
-		}
-	}, remote)
+	return financeFixture(page, 'authentication.e2e:294', remote)
 }
 
 async function avatarImage(page: Page, width: number, height: number, noisy = false) {
@@ -615,14 +560,7 @@ declare global {
 }
 
 async function currentIdentity(page: Page) {
-	return page.evaluate(async () => {
-		const sessionPath = '/src/lib/runtime/jazz-session.ts'
-		const {
-			getCurrentJazzSession,
-			loadLocalFirstClient
-		}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-		return getCurrentJazzSession()?.getSnapshot().account?.id
-	})
+	return financeFixture(page, 'authentication.e2e:618')
 }
 
 test(
@@ -677,23 +615,7 @@ test(
 		page.on('request', (request) => urls.push(request.url()))
 		await page.goto('/login')
 		await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
-		await page.evaluate(async () => {
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const {
-				getCurrentJazzSession,
-				loadLocalFirstClient
-			}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-			const client = getCurrentJazzSession()?.getSnapshot().client
-			if (!client) throw new Error('Test session is not ready.')
-			window.authFailureTest = { shutdownAttempts: 0, storageFailures: 0 }
-			const shutdown = client.shutdown.bind(client)
-			client.shutdown = async (options) => {
-				window.authFailureTest.shutdownAttempts += 1
-				if (window.authFailureTest.shutdownAttempts <= 2)
-					throw new Error('Private simulated shutdown failure')
-				return shutdown(options)
-			}
-		})
+		await financeFixture(page, 'authentication.e2e:680')
 		await page.getByRole('button', { name: 'Login', exact: true }).click()
 		const retry = page.getByRole('button', { name: 'Try again', exact: true })
 		await expect(retry).toBeVisible()
@@ -701,7 +623,7 @@ test(
 		expect(await currentIdentity(page)).toBe(identity)
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toHaveCount(0)
 		await retry.click()
-		await expect.poll(() => page.evaluate(() => window.authFailureTest.shutdownAttempts)).toBe(2)
+		await expect.poll(() => financeFixture(page, 'authentication.e2e:704')).toBe(2)
 		await expect(retry).toBeVisible()
 		await retry.click()
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
@@ -741,22 +663,11 @@ test(
 		const phrase = RecoveryPhrase.fromSecret(generateAuthSecret())
 		await page.goto('/login')
 		await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
-		await page.evaluate(() => {
-			window.authFailureTest = { shutdownAttempts: 0, storageFailures: 0 }
-			const setItem = Storage.prototype.setItem
-			Storage.prototype.setItem = function (key, value) {
-				if (key.startsWith('jazz-account-selection-v1:')) {
-					Storage.prototype.setItem = setItem
-					window.authFailureTest.storageFailures += 1
-					throw new DOMException('Simulated local selection failure', 'QuotaExceededError')
-				}
-				return setItem.call(this, key, value)
-			}
-		})
+		await financeFixture(page, 'authentication.e2e:744')
 		await page.getByRole('button', { name: 'Login', exact: true }).click()
 		const retry = page.getByRole('button', { name: 'Try again', exact: true })
 		await expect(retry).toBeVisible()
-		expect(await page.evaluate(() => window.authFailureTest.storageFailures)).toBe(1)
+		expect(await financeFixture(page, 'authentication.e2e:759')).toBe(1)
 		const selected = await currentIdentity(page)
 		expect(selected).toBeTruthy()
 		expect(selected).not.toBe(previous)
@@ -787,32 +698,7 @@ test(
 		await page.getByRole('button', { name: 'Close', exact: true }).click()
 		await page.goto('/login')
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
-		await page.evaluate(async () => {
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const schemaPath = '/src/lib/schema.ts'
-			const { getCurrentJazzSession }: typeof import('../src/lib/runtime/jazz-session.js') =
-				await import(sessionPath)
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const db = getCurrentJazzSession()?.getSnapshot().client?.db
-			if (!db) throw new Error('Test session is not ready.')
-			const account = await db.one(app.accounts)
-			if (!account) throw new Error('Missing recovery account')
-			await db.disconnect()
-			await db
-				.insert(app.accounts, {
-					organizationId: account.organizationId,
-					name: 'Pending recovery qualification',
-					kind: 'cash',
-					currency: 'USD'
-				})
-				.wait({ tier: 'local' })
-			window.authFailureTest = {
-				shutdownAttempts: 0,
-				storageFailures: 0,
-				releaseSharedClient: () => db.reconnect(),
-				abortShutdown: () => db.abortGracefulShutdown()
-			}
-		})
+		await financeFixture(page, 'authentication.e2e:790')
 		try {
 			await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
 			await page.getByRole('button', { name: 'Login', exact: true }).click()
@@ -820,7 +706,7 @@ test(
 			// shutdown error and retains the original client; frozen sessions stay intact.
 			await expect
 				.poll(async () => {
-					await page.evaluate(() => window.authFailureTest.abortShutdown?.())
+					await financeFixture(page, 'authentication.e2e:823')
 					return page.getByRole('main').getByRole('alert').filter({ hasText: /\S/ }).isVisible()
 				})
 				.toBe(true)
@@ -831,9 +717,7 @@ test(
 			await expectEmptyRecoveryDraft(page)
 			await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeEnabled()
 		} finally {
-			await page.evaluate(async () => {
-				await window.authFailureTest.releaseSharedClient?.()
-			})
+			await financeFixture(page, 'authentication.e2e:834')
 		}
 		await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
 		await page.getByRole('button', { name: 'Login', exact: true }).click()
@@ -865,20 +749,9 @@ test(
 		await page.getByRole('button', { name: 'Close', exact: true }).click()
 		await page.goto('/login')
 		await expect(page.getByLabel('Recovery phrase', { exact: true })).toBeVisible()
+		await financeFixture(page, 'countRestores')
 		await page.evaluate(async () => {
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const {
-				getCurrentJazzSession,
-				loadLocalFirstClient
-			}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-			const session = getCurrentJazzSession()
-			if (!session) throw new Error('Session unavailable')
 			window.recoveryNavigationTest = { restoreCalls: 0, navigationFailures: 0 }
-			// Count each SDK restore transition through its public subscription.
-			session.subscribe(() => {
-				if (session.getSnapshot().pending === 'restoreLocalFirst')
-					window.recoveryNavigationTest.restoreCalls += 1
-			})
 
 			const NativeURL = URL
 			window.URL = class extends NativeURL {
@@ -903,7 +776,10 @@ test(
 		await page.getByRole('button', { name: 'Try again', exact: true }).click()
 		await expect(page).toHaveURL((url) => url.pathname === '/')
 		await expect(page.getByLabel('Current Workspace', { exact: true })).toHaveValue(workspaceId)
-		expect(await page.evaluate(() => window.recoveryNavigationTest)).toEqual({
+		expect({
+			...(await page.evaluate(() => window.recoveryNavigationTest)),
+			restoreCalls: await financeFixture(page, 'restoreCount')
+		}).toEqual({
 			restoreCalls: 1,
 			navigationFailures: 1
 		})
@@ -925,35 +801,7 @@ test(
 		await page.getByRole('button', { name: 'Show Recovery phrase', exact: true }).click()
 		const phrase = await page.getByLabel('Your recovery phrase', { exact: true }).inputValue()
 		await page.getByRole('button', { name: 'Close', exact: true }).click()
-		const previousWorkspace = await page.evaluate(async () => {
-			const schemaPath = '/src/lib/schema.ts'
-			const sessionPath = '/src/lib/runtime/jazz-session.ts'
-			const { app }: typeof import('../src/lib/schema.js') = await import(schemaPath)
-			const {
-				getCurrentJazzSession,
-				loadLocalFirstClient
-			}: typeof import('../src/lib/runtime/jazz-session.js') = await import(sessionPath)
-			const snapshot = getCurrentJazzSession()?.getSnapshot()
-			if (!snapshot?.client || !snapshot.account) throw new Error('Missing session')
-			const db = snapshot.client.db
-			const workspace = await db
-				.insert(app.organizations, {
-					name: 'Additional workspace',
-					kind: 'business',
-					defaultCurrency: 'USD',
-					ownerId: snapshot.account.id
-				})
-				.wait({ tier: 'local' })
-			await db
-				.insert(app.organizationMembers, {
-					organizationId: workspace.id,
-					userId: snapshot.account.id,
-					role: 'owner',
-					accountAccessMode: 'all'
-				})
-				.wait({ tier: 'local' })
-			return workspace.id
-		})
+		const previousWorkspace = await financeFixture(page, 'authentication.e2e:928')
 		await page.goto(`/login?workspace=${previousWorkspace}`)
 		await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase)
 		await page.getByRole('button', { name: 'Login', exact: true }).click()

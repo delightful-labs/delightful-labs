@@ -20,6 +20,16 @@ const metadata = JSON.parse(readFileSync(join(directory, 'sdk-metadata.json'), '
 assert.equal(metadata.version, '2.0.0-alpha.67')
 const app = mkdtempSync(join(directory, 'backend-'))
 cpSync(join(source, 'src'), join(app, 'src'), { recursive: true })
+for (const name of ['gateway-auth.integration.test.ts', 'jazz.ts']) {
+	const file = join(app, 'src/lib/server', name)
+	writeFileSync(
+		file,
+		readFileSync(file, 'utf8').replace(
+			'../../../../../tooling/extension-identity.js',
+			'../../../tooling/extension-identity.js'
+		)
+	)
+}
 for (const name of ['package.json', 'pnpm-lock.yaml', '.npmrc', 'tsconfig.schema.json'])
 	cpSync(join(source, name), join(app, name))
 mkdirSync(join(app, 'tooling'))
@@ -27,8 +37,7 @@ cpSync(
 	join(workspace, 'apps/clipper/tooling/extension-identity.ts'),
 	join(app, 'tooling/extension-identity.ts')
 )
-run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'clipper-backend.patch')])
-run('git', ['apply', join(proof, 'clipper-backend.patch')])
+
 json(join(app, 'tsconfig.backend.json'), {
 	extends: './tsconfig.schema.json',
 	include: ['src/lib/server/gateway-auth.integration.test.ts']
@@ -74,7 +83,7 @@ control('unpatched-account', 'expected 401 to be 200')
 writeFileSync(test, original)
 
 // Reuse only the existing backend file's two hunks, byte-for-byte. No new patch behavior.
-const existing = readFileSync(join(workspace, 'patches/jazz-tools@2.0.0-alpha.60.patch'), 'utf8')
+const existing = readFileSync(join(workspace, 'patches/jazz-tools@2.0.0-alpha.67.patch'), 'utf8')
 assert.ok(existing.startsWith('diff --git a/dist/backend/create-jazz.js'))
 const backendPatch = existing.slice(0, existing.indexOf('\ndiff --git ', 1)) + '\n'
 const patch = join(directory, 'backend-compatibility.patch')
@@ -93,9 +102,7 @@ run('pnpm', testArgs)
 const withAuth = process.argv.includes('--auth')
 const authReport = join(app, 'auth-results.json')
 if (withAuth) {
-	run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'clipper-auth.patch')])
-	run('git', ['apply', join(proof, 'clipper-auth.patch')])
-	copyCandidate(join(proof, 'candidate/backend'), app)
+	copyCandidate(join(proof, 'fixtures/backend'), app)
 	json(join(app, 'tsconfig.auth.json'), {
 		extends: './tsconfig.schema.json',
 		include: ['src/lib/server/auth/*.ts', 'src/lib/server/jazz.ts']

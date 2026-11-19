@@ -53,8 +53,8 @@ it('bundles real SDK implementations, lazy chunks and a binary Wasm module', asy
 	expect(manifestSchema.parse(decoded).publicEntries.map((entry) => entry.entry)).toEqual(
 		expect.arrayContaining([
 			'jazz-tools/local-first',
-			'delightful-local-first/backend/jazz/session',
-			'delightful-local-first/worker/channel/workflow',
+			'delightful-local-first/backend/jazz/session-runtime',
+			'delightful-local-first/session/runtime',
 			'delightful-local-first/backend/jazz/account-store/indexeddb',
 			'delightful-local-first/backend/jazz/worker-broker'
 		])
@@ -66,8 +66,14 @@ it('bundles real SDK implementations, lazy chunks and a binary Wasm module', asy
 }, 20_000)
 
 it.each([
-	{ factory: 'createFinanceAccountStore', implementation: 'indexeddb-account-store.js' },
-	{ factory: 'brokerHostClient', implementation: 'worker-broker.js' }
+	{
+		factory: 'createFinanceAccountStore',
+		implementation: 'src/lib/runtime/worker/account-store.ts'
+	},
+	{
+		factory: 'brokerHostClient',
+		implementation: '/delightful-local-first/dist/backend/jazz/worker-broker.js'
+	}
 ])(
 	'refuses a worker that omits the $factory implementation',
 	async ({ factory, implementation }) => {
@@ -78,14 +84,12 @@ it.each([
 				if (!id.endsWith('/runtime/worker/application.worker.ts')) return
 				return code
 					.split('\n')
-					.filter(
-						(line) => !line.includes(`import { ${factory} }`) && line.trim() !== `${factory},`
-					)
+					.filter((line) => !line.includes(`import { ${factory}`) && line.trim() !== `${factory},`)
 					.join('\n')
 			}
 		}
 		await expect(bundle(remove)).rejects.toThrow(
-			`Worker proof omitted implementation: /delightful-local-first/dist/backend/jazz/${implementation}`
+			`Worker proof omitted implementation: ${implementation}`
 		)
 	},
 	20_000

@@ -5,7 +5,7 @@ packages:
 
 patchedDependencies:
   '@kingironman2011/better-auth-bsky@0.3.2': apps/clipper/patches/better-auth-bsky-0.3.2-better-auth-1.7.patch
-  jazz-tools@2.0.0-alpha.60: patches/jazz-tools@2.0.0-alpha.60.patch
+  jazz-tools@2.0.0-alpha.67: patches/jazz-tools@2.0.0-alpha.67.patch
 
 # Keep injected peer-specific UI copies current after packaging.
 syncInjectedDepsAfterScripts:
@@ -27,7 +27,7 @@ packageExtensions:
 # Existing Clipper compatibility allowance; scoped to this SDK's peer.
 peerDependencyRules:
   allowedVersions:
-    'jazz-tools@2.0.0-alpha.60>better-auth': '1.7.18'
+    'jazz-tools@2.0.0-alpha.67>better-auth': '1.7.22'
 
 onlyBuiltDependencies:
   - esbuild

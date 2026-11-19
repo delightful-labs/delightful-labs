@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url'
 import { clipperProofVersions } from './clipper-versions.mjs'
 import { checkSchema } from './schema.mjs'
 import { checkFinanceWorker } from './worker-read.mjs'
-import { copyCandidate } from './copy-candidate.mjs'
 
 // Upgrade experiment only: reuse the maintained Finance fixture in a disposable
 // project, with its own dependencies. No workspace pin or installed SDK is edited.
@@ -141,24 +140,6 @@ for (const path of [
 	mkdirSync(dirname(target), { recursive: true })
 	cpSync(join(finance, path), target, { recursive: true })
 }
-run('git', ['apply', '--check', '--whitespace=error-all', join(proof, 'fixture.patch')], app)
-run('git', ['apply', join(proof, 'fixture.patch')], app)
-copyCandidate(join(proof, 'candidate/fixture'), app)
-if (workerOnly) {
-	for (const path of ['sdk-session.worker.ts', 'actor/session.ts']) {
-		const worker = join(app, 'tests/worker-bindings', path)
-		writeFileSync(
-			worker,
-			readFileSync(worker, 'utf8').replace(/src\/lib\/schema\.js/g, 'src/lib/queries.js')
-		)
-	}
-}
-run(
-	'git',
-	['apply', '--check', '--whitespace=error-all', join(proof, 'consumer-session.patch')],
-	app
-)
-run('git', ['apply', join(proof, 'consumer-session.patch')], app)
 json(join(app, 'package.json'), {
 	name: 'finance-jazz-upgrade-proof',
 	private: true,
@@ -197,66 +178,7 @@ json(join(app, 'tsconfig.json'), {
 	]
 })
 run('pnpm', ['install', '--ignore-scripts'], app)
-// Compile the selected shared session adapters against the candidate, then test their
-// normal public package exports. Unrelated library code keeps its built output.
-const library = join(finance, '../../packages/local-first')
-const sources = join(app, 'session-adapters')
-for (const path of [
-	'src/lib/backend/jazz/recovery-phrase.ts',
-	'src/lib/backend/jazz/restoration.ts',
-	'src/lib/backend/jazz/session-readiness.ts',
-	'src/lib/contracts/session-runtime.ts',
-	'src/lib/contracts/recovery-phrase.ts',
-	'src/lib/contracts/restoration.ts',
-	'src/lib/contracts/session.ts'
-]) {
-	mkdirSync(dirname(join(sources, path)), { recursive: true })
-	cpSync(join(library, path), join(sources, path))
-}
-run(
-	'git',
-	['apply', '--check', '--whitespace=error-all', join(proof, 'session-adapters.patch')],
-	sources
-)
-run('git', ['apply', join(proof, 'session-adapters.patch')], sources)
-copyCandidate(join(proof, 'candidate/local-first'), sources)
-const adapted = join(directory, 'adapted-local-first')
-mkdirSync(adapted)
-run('tar', ['-xzf', join(directory, 'local-first.tgz'), '-C', adapted])
-const adaptedManifest = JSON.parse(readFileSync(join(adapted, 'package/package.json'), 'utf8'))
-adaptedManifest.exports['./backend/jazz/session-runtime'] = {
-	types: './dist/backend/jazz/session-runtime.d.ts',
-	default: './dist/backend/jazz/session-runtime.js'
-}
-json(join(adapted, 'package/package.json'), adaptedManifest)
-json(join(sources, 'tsconfig.json'), {
-	compilerOptions: {
-		target: 'ES2024',
-		module: 'NodeNext',
-		moduleResolution: 'NodeNext',
-		lib: ['ES2024', 'DOM'],
-		strict: true,
-		exactOptionalPropertyTypes: true,
-		noUncheckedIndexedAccess: true,
-		skipLibCheck: true,
-		declaration: true,
-		rootDir: './src/lib',
-		outDir: join(adapted, 'package/dist')
-	},
-	include: [
-		'src/lib/backend/jazz/recovery-phrase.ts',
-		'src/lib/backend/jazz/restoration.ts',
-		'src/lib/backend/jazz/session-readiness.ts',
-		'src/lib/backend/jazz/session-runtime.ts'
-	]
-})
-run('pnpm', ['exec', 'tsc', '--project', 'session-adapters/tsconfig.json'], app)
-run('tar', ['-czf', join(directory, 'adapted-local-first.tgz'), '-C', adapted, 'package'])
-run(
-	'pnpm',
-	['add', '--ignore-scripts', 'delightful-local-first@file:../adapted-local-first.tgz'],
-	app
-)
+// Use the same maintained, packed Local First exports as both applications.
 const installed = createRequire(join(app, 'package.json'))
 const wasm = createRequire(installed.resolve('jazz-tools/package.json'))
 if (

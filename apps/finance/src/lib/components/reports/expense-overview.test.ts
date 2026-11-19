@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'svelte/server'
 import ExpenseOverview from '#lib/components/reports/ExpenseOverview.svelte'
 import CategoryLegend from '#lib/components/reports/CategoryLegend.svelte'
-import type { TransactionRow } from '#lib/schema.js'
-import { resolveInternalTransferLinks } from '#lib/domain/internal-transfer.js'
+import type { TransactionRow } from '#lib/queries.js'
+import { selectWorkerOverview } from '#lib/machines/runtime/worker-overview.js'
+import { queryFacts } from '#lib/machines/runtime/worker-query.fixture.js'
+import type { WorkerTransferRecord } from '#lib/contracts/worker-transfers.js'
 
 function row(
 	id: string,
@@ -32,19 +34,31 @@ function row(
 		batchId: null
 	}
 }
-function overview(
-	transactions: TransactionRow[],
-	internalTransferResolution = resolveInternalTransferLinks([], transactions)
-) {
+function overview(transactions: TransactionRow[], transfers: WorkerTransferRecord[] = []) {
+	const data = selectWorkerOverview(
+		queryFacts({
+			transactions: transactions.map((row) => ({ ...row, tagNames: [] })),
+			transfers,
+			categories: ['food', 'travel'].map((id) => ({
+				id,
+				organizationId: 'org',
+				name: id === 'food' ? 'Food' : 'Travel',
+				kind: 'expense',
+				isSystem: false,
+				archivedAt: null
+			}))
+		}),
+		{ start: '2026-09-24', end: '2026-10-23', query: '', categoryId: '', currency: 'USD' },
+		1,
+		null
+	)
 	return render(ExpenseOverview, {
 		props: {
-			transactions,
-			internalTransferResolution,
-			categoryNames: new Map([
-				['food', 'Food'],
-				['travel', 'Travel']
-			]),
-			tagNamesByTransaction: new Map()
+			data,
+			scope: 'org',
+			onfilterschange: () => {},
+			onPage: () => {},
+			pageHref: (page) => `/?page=${page}`
 		}
 	}).body
 }
@@ -107,19 +121,28 @@ describe('expense overview presentation', () => {
 				incomeTransactionId: 'pending-income'
 			}
 		]
-		const markers = [
-			...transactions.map(({ id, internalTransferId }) => ({ id, internalTransferId })),
-			{ id: 'shared-income', internalTransferId: 'transfer-a' },
-			{ id: 'pending-income', internalTransferId: null }
-		]
-		const html = overview(transactions, resolveInternalTransferLinks(links, markers))
+		const html = overview(
+			transactions,
+			links.map((link) => ({
+				...link,
+				organizationId: 'org',
+				expenseAccountId: null,
+				incomeAccountId: null,
+				expenseAmountMinor: null,
+				incomeAmountMinor: null,
+				expenseCurrency: null,
+				incomeCurrency: null,
+				amountMinor: null,
+				currency: null
+			}))
+		)
 		expect(html).toContain('$5.00')
 		expect(html).not.toContain('$10.00')
 		expect(html).toContain('ordinary-food')
 		expect(html).not.toContain('linked-marker')
 		expect(html).not.toContain('linked-food')
 		expect(html).not.toContain('linked-travel')
-		const legend = html.match(/<ul class="legend\b[^>]*>([\s\S]*?)<\/ul>/)?.[1]
+		const legend = html.match(/<ul\b[^>]*>([\s\S]*?)<\/ul>/)?.[1]
 		expect(legend).toBeDefined()
 		expect(legend).toContain('Food')
 		expect(legend).not.toContain('Travel')
@@ -134,7 +157,7 @@ describe('expense overview presentation', () => {
 	it('provides keyboard selection controls with the selected category exposed', () => {
 		const html = render(CategoryLegend, {
 			props: {
-				items: [{ key: 'food', label: 'Food', value: 1234, color: 'red' }],
+				items: [{ key: 'food', label: 'Food', value: 1234n, color: 'red' }],
 				selectedKey: 'food',
 				currency: 'USD',
 				allLabel: 'All Categories',

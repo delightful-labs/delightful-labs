@@ -10,12 +10,13 @@
 	import TransactionView from '#lib/components/transactions/TransactionView.svelte'
 
 	let { children }: { children: Snippet } = $props()
-	const pathname = $derived(page.url.pathname)
+	const url = $derived(page.shallow?.url ?? page.url)
+	const pathname = $derived(url.pathname)
 	const kind = $derived(transactionKindForPath(pathname))
 	const config = $derived(transactionPages[kind])
 	const heading = $derived(m[config.noun]({ count: config.count }))
 	const index = $derived(pathname === config.path)
-	const listHref = $derived(page.params.id ? `${config.path}${page.url.search}` : undefined)
+	const listHref = $derived(page.params.id ? `${config.path}${url.search}` : undefined)
 
 	onNavigate((navigation) => {
 		if (!navigation.to?.route.id?.startsWith('/(transactions)/')) return

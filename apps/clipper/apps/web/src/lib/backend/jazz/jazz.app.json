@@ -1,0 +1,674 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "034aefd149d177fc2df0b29c280e7f35577b889ab7ddcadafd59c450fa1148dc"
+  },
+  "tables": {
+    "articleImages": {
+      "columns": {
+        "libraryId": "uuid",
+        "articleId": "uuid",
+        "sourceUrl": "string",
+        "status": "string",
+        "assetId": "uuid?",
+        "retryable": "boolean"
+      },
+      "relations": {
+        "article": { "rel": "articles", "column": "articleId" },
+        "asset": { "rel": "assets", "column": "assetId" },
+        "library": { "rel": "libraries", "column": "libraryId" }
+      }
+    },
+    "articles": {
+      "columns": {
+        "libraryId": "uuid",
+        "operationId": "uuid",
+        "title": "string",
+        "excerpt": "string?",
+        "author": "string?",
+        "publishedAt": "string?",
+        "language": "string?",
+        "siteId": "uuid?",
+        "source": {
+          "json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "canonicalUrl": {
+                    "anyOf": [
+                      { "format": "uri", "maxLength": 8192, "type": "string" },
+                      { "type": "null" }
+                    ]
+                  },
+                  "resolvedUrl": { "format": "uri", "maxLength": 8192, "type": "string" }
+                },
+                "required": ["resolvedUrl", "canonicalUrl"],
+                "type": "object"
+              },
+              { "type": "null" }
+            ]
+          },
+          "optional": true
+        },
+        "html": "string",
+        "text": "string"
+      },
+      "relations": {
+        "library": { "rel": "libraries", "column": "libraryId" },
+        "operation": { "rel": "storageOperations", "column": "operationId" },
+        "site": { "rel": "sites", "column": "siteId" }
+      }
+    },
+    "assets": {
+      "columns": {
+        "libraryId": "uuid",
+        "operationId": "uuid",
+        "mediaType": "string",
+        "payload": "bytes"
+      },
+      "relations": {
+        "library": { "rel": "libraries", "column": "libraryId" },
+        "operation": { "rel": "storageOperations", "column": "operationId" }
+      }
+    },
+    "better_auth_account": {
+      "columns": {
+        "accountId": "string",
+        "providerId": "string",
+        "userId": "uuid",
+        "accessToken": "string?",
+        "refreshToken": "string?",
+        "idToken": "string?",
+        "accessTokenExpiresAt": "timestamp?",
+        "refreshTokenExpiresAt": "timestamp?",
+        "scope": "string?",
+        "password": "string?",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      },
+      "relations": { "userIdRelation": { "rel": "better_auth_user", "column": "userId" } }
+    },
+    "better_auth_atprotoSession": {
+      "columns": {
+        "did": "string",
+        "sessionData": "string",
+        "userId": "uuid?",
+        "handle": "string",
+        "pdsUrl": "string",
+        "updatedAt": "timestamp"
+      },
+      "relations": { "userIdRelation": { "rel": "better_auth_user", "column": "userId" } }
+    },
+    "better_auth_atprotoState": {
+      "columns": { "stateKey": "string", "stateData": "string", "expiresAt": "timestamp" }
+    },
+    "better_auth_session": {
+      "columns": {
+        "expiresAt": "timestamp",
+        "token": "string",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp",
+        "ipAddress": "string?",
+        "userAgent": "string?",
+        "userId": "uuid"
+      },
+      "relations": { "userIdRelation": { "rel": "better_auth_user", "column": "userId" } }
+    },
+    "better_auth_user": {
+      "columns": {
+        "name": "string",
+        "email": "string",
+        "emailVerified": "boolean",
+        "image": "string?",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp",
+        "atprotoDid": "string?",
+        "atprotoHandle": "string?"
+      }
+    },
+    "better_auth_verification": {
+      "columns": {
+        "identifier": "string",
+        "value": "string",
+        "expiresAt": "timestamp",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "documentCaptures": {
+      "columns": {
+        "libraryId": "uuid",
+        "documentId": "uuid",
+        "operationId": "uuid?",
+        "failure": "string?"
+      },
+      "relations": {
+        "document": { "rel": "libraryDocuments", "column": "documentId" },
+        "library": { "rel": "libraries", "column": "libraryId" }
+      }
+    },
+    "highlightAnchors": {
+      "columns": {
+        "highlightId": "uuid",
+        "kind": { "enum": ["source", "reader"] },
+        "normalizationVersion": "string",
+        "textHash": "string",
+        "textLengthCodePoints": "int?",
+        "sourceDate": "timestamp?",
+        "range": {
+          "json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "additionalProperties": false,
+            "properties": {
+              "after": { "type": "string" },
+              "before": { "type": "string" },
+              "end": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
+              "matched": { "type": "string" },
+              "start": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
+              "version": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" }
+            },
+            "required": ["before", "matched", "after"],
+            "type": "object"
+          }
+        },
+        "sourceCodePointPosition": {
+          "json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "end": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
+                  "start": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" }
+                },
+                "required": ["start", "end"],
+                "type": "object"
+              },
+              { "type": "null" }
+            ]
+          },
+          "optional": true
+        }
+      },
+      "relations": { "highlight": { "rel": "highlights", "column": "highlightId" } }
+    },
+    "highlights": {
+      "columns": { "libraryId": "uuid", "documentId": "uuid", "source": "string" },
+      "relations": {
+        "anchors": { "reverse": "highlightAnchors", "relation": "highlight" },
+        "document": { "rel": "libraryDocuments", "column": "documentId" },
+        "library": { "rel": "libraries", "column": "libraryId" },
+        "notes": { "reverse": "notes", "relation": "highlight" }
+      }
+    },
+    "libraries": {
+      "columns": { "ownerId": "uuid", "bootstrapVersion": "string" },
+      "relations": { "publications": { "reverse": "publications", "relation": "library" } }
+    },
+    "libraryDocuments": {
+      "columns": {
+        "libraryId": "uuid",
+        "sourceUrl": "string?",
+        "readingProgress": { "array": "string", "merge": "g-set", "transform": "readingProgress" },
+        "resumePosition": { "array": "string", "merge": "g-set" },
+        "status": { "enum": ["inbox", "later", "archive", "trashed"] },
+        "favorite": "boolean",
+        "previousStatus": { "enum": ["inbox", "later", "archive"], "optional": true },
+        "attachmentId": "uuid?"
+      },
+      "relations": {
+        "attachment": { "rel": "articles", "column": "attachmentId" },
+        "captures": { "reverse": "documentCaptures", "relation": "document" },
+        "library": { "rel": "libraries", "column": "libraryId" }
+      }
+    },
+    "noteRevisions": {
+      "columns": {
+        "libraryId": "uuid",
+        "noteId": "uuid",
+        "text": "string",
+        "parents": "string",
+        "editedAt": "string"
+      },
+      "relations": {
+        "library": { "rel": "libraries", "column": "libraryId" },
+        "note": { "rel": "notes", "column": "noteId" }
+      }
+    },
+    "notes": {
+      "columns": {
+        "libraryId": "uuid",
+        "documentId": "uuid",
+        "source": "string?",
+        "highlightId": "uuid?",
+        "text": { "type": "string", "default": "", "merge": "text" }
+      },
+      "relations": {
+        "document": { "rel": "libraryDocuments", "column": "documentId" },
+        "highlight": { "rel": "highlights", "column": "highlightId" },
+        "library": { "rel": "libraries", "column": "libraryId" }
+      }
+    },
+    "organizationOperations": {
+      "columns": {
+        "libraryId": "uuid",
+        "documentId": "uuid",
+        "field": "string",
+        "value": "string",
+        "parents": "string"
+      },
+      "relations": {
+        "document": { "rel": "libraryDocuments", "column": "documentId" },
+        "library": { "rel": "libraries", "column": "libraryId" }
+      }
+    },
+    "publications": {
+      "columns": {
+        "libraryId": "uuid",
+        "highlightId": "uuid?",
+        "noteId": "uuid?",
+        "publishingDid": "string",
+        "lifecycle": {
+          "json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": { "state": { "const": "private", "type": "string" } },
+                "required": ["state"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": { "state": { "const": "requested", "type": "string" } },
+                "required": ["state"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "record": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "$type": { "const": "at.margin.note", "type": "string" },
+                          "createdAt": {
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "type": "string"
+                          },
+                          "modifiedAt": {
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "type": "string"
+                          },
+                          "motivation": { "const": "highlighting", "type": "string" },
+                          "target": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "selector": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "exact": { "minLength": 1, "type": "string" },
+                                  "prefix": { "type": "string" },
+                                  "suffix": { "type": "string" },
+                                  "type": { "const": "TextQuoteSelector", "type": "string" }
+                                },
+                                "required": ["type", "exact"],
+                                "type": "object"
+                              },
+                              "source": { "format": "uri", "type": "string" }
+                            },
+                            "required": ["source", "selector"],
+                            "type": "object"
+                          }
+                        },
+                        "required": ["$type", "createdAt", "motivation", "target"],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "$type": { "const": "at.margin.note", "type": "string" },
+                          "body": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "format": { "const": "text/plain", "type": "string" },
+                              "value": { "type": "string" }
+                            },
+                            "required": ["value", "format"],
+                            "type": "object"
+                          },
+                          "createdAt": {
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "type": "string"
+                          },
+                          "modifiedAt": {
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "type": "string"
+                          },
+                          "motivation": { "const": "commenting", "type": "string" },
+                          "target": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "selector": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "exact": { "minLength": 1, "type": "string" },
+                                  "prefix": { "type": "string" },
+                                  "suffix": { "type": "string" },
+                                  "type": { "const": "TextQuoteSelector", "type": "string" }
+                                },
+                                "required": ["type", "exact"],
+                                "type": "object"
+                              },
+                              "source": { "format": "uri", "type": "string" }
+                            },
+                            "required": ["source"],
+                            "type": "object"
+                          }
+                        },
+                        "required": ["$type", "createdAt", "motivation", "target", "body"],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "state": { "const": "issued", "type": "string" },
+                  "uri": { "maxLength": 8192, "type": "string" }
+                },
+                "required": ["state", "uri", "record"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "state": { "const": "published", "type": "string" },
+                  "uri": { "maxLength": 8192, "type": "string" }
+                },
+                "required": ["state", "uri"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "cid": { "type": "string" },
+                  "state": { "const": "unpublishing", "type": "string" },
+                  "uri": { "maxLength": 8192, "type": "string" }
+                },
+                "required": ["state", "uri", "cid"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "state": { "const": "unpublished", "type": "string" },
+                  "uri": { "maxLength": 8192, "type": "string" }
+                },
+                "required": ["state", "uri"],
+                "type": "object"
+              }
+            ]
+          }
+        }
+      },
+      "relations": {
+        "highlight": { "rel": "highlights", "column": "highlightId" },
+        "library": { "rel": "libraries", "column": "libraryId" },
+        "note": { "rel": "notes", "column": "noteId" }
+      }
+    },
+    "readerOperations": {
+      "columns": { "libraryId": "uuid", "field": "string", "value": "string", "parents": "string" },
+      "relations": { "library": { "rel": "libraries", "column": "libraryId" } }
+    },
+    "sites": {
+      "columns": {
+        "libraryId": "uuid",
+        "origin": "string",
+        "name": "string?",
+        "faviconId": "uuid?"
+      },
+      "relations": {
+        "favicon": { "rel": "assets", "column": "faviconId" },
+        "library": { "rel": "libraries", "column": "libraryId" }
+      }
+    },
+    "storageOperations": {
+      "columns": { "libraryId": "uuid", "payloadHash": "string" },
+      "relations": { "library": { "rel": "libraries", "column": "libraryId" } }
+    },
+    "tagOperations": {
+      "columns": {
+        "libraryId": "uuid",
+        "documentId": "uuid",
+        "key": "string",
+        "name": "string",
+        "assigned": "boolean",
+        "parents": "string"
+      },
+      "relations": {
+        "document": { "rel": "libraryDocuments", "column": "documentId" },
+        "library": { "rel": "libraries", "column": "libraryId" }
+      }
+    }
+  },
+  "history": {
+    "8a5130d42577": {
+      "tables": {
+        "articleImages": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "articleId": { "type": "uuid", "references": "articles" },
+            "sourceUrl": "string",
+            "status": "string",
+            "assetId": { "type": "uuid", "optional": true, "references": "assets" },
+            "retryable": "boolean"
+          }
+        },
+        "articles": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "operationId": { "type": "uuid", "references": "storageOperations" },
+            "title": "string",
+            "excerpt": "string?",
+            "author": "string?",
+            "publishedAt": "string?",
+            "language": "string?",
+            "siteId": { "type": "uuid", "optional": true, "references": "sites" },
+            "source": {
+              "json": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "canonicalUrl": {
+                        "anyOf": [
+                          { "format": "uri", "maxLength": 8192, "type": "string" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "resolvedUrl": { "format": "uri", "maxLength": 8192, "type": "string" }
+                    },
+                    "required": ["resolvedUrl", "canonicalUrl"],
+                    "type": "object"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "optional": true
+            },
+            "html": "string",
+            "text": "string"
+          }
+        },
+        "assets": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "operationId": { "type": "uuid", "references": "storageOperations" },
+            "mediaType": "string",
+            "payload": "bytes"
+          }
+        },
+        "better_auth_account": {
+          "columns": {
+            "accountId": "string",
+            "providerId": "string",
+            "userId": { "type": "uuid", "references": "better_auth_user" },
+            "accessToken": "string?",
+            "refreshToken": "string?",
+            "idToken": "string?",
+            "accessTokenExpiresAt": "timestamp?",
+            "refreshTokenExpiresAt": "timestamp?",
+            "scope": "string?",
+            "password": "string?",
+            "createdAt": "timestamp",
+            "updatedAt": "timestamp"
+          }
+        },
+        "better_auth_atprotoSession": {
+          "columns": {
+            "did": "string",
+            "sessionData": "string",
+            "userId": { "type": "uuid", "optional": true, "references": "better_auth_user" },
+            "handle": "string",
+            "pdsUrl": "string",
+            "updatedAt": "timestamp"
+          }
+        },
+        "better_auth_atprotoState": {
+          "columns": { "stateKey": "string", "stateData": "string", "expiresAt": "timestamp" }
+        },
+        "better_auth_session": {
+          "columns": {
+            "expiresAt": "timestamp",
+            "token": "string",
+            "createdAt": "timestamp",
+            "updatedAt": "timestamp",
+            "ipAddress": "string?",
+            "userAgent": "string?",
+            "userId": { "type": "uuid", "references": "better_auth_user" }
+          }
+        },
+        "better_auth_user": {
+          "columns": {
+            "name": "string",
+            "email": "string",
+            "emailVerified": "boolean",
+            "image": "string?",
+            "createdAt": "timestamp",
+            "updatedAt": "timestamp",
+            "atprotoDid": "string?",
+            "atprotoHandle": "string?"
+          }
+        },
+        "better_auth_verification": {
+          "columns": {
+            "identifier": "string",
+            "value": "string",
+            "expiresAt": "timestamp",
+            "createdAt": "timestamp",
+            "updatedAt": "timestamp"
+          }
+        },
+        "documentCaptures": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "documentId": { "type": "uuid", "references": "libraryDocuments" },
+            "operationId": "uuid?",
+            "failure": "string?"
+          }
+        },
+        "libraries": { "columns": { "ownerId": "uuid", "bootstrapVersion": "string" } },
+        "libraryDocuments": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "sourceUrl": "string?",
+            "readingProgress": { "array": "string", "merge": "g-set" },
+            "resumePosition": { "array": "string", "merge": "g-set" },
+            "status": { "enum": ["inbox", "later", "archive", "trashed"] },
+            "favorite": "boolean",
+            "previousStatus": { "enum": ["inbox", "later", "archive"], "optional": true },
+            "attachmentId": { "type": "uuid", "optional": true, "references": "articles" }
+          }
+        },
+        "noteRevisions": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "noteId": { "type": "uuid", "references": "notes" },
+            "text": "string",
+            "parents": "string",
+            "editedAt": "string"
+          }
+        },
+        "notes": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "documentId": { "type": "uuid", "references": "libraryDocuments" }
+          }
+        },
+        "organizationOperations": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "documentId": { "type": "uuid", "references": "libraryDocuments" },
+            "field": "string",
+            "value": "string",
+            "parents": "string"
+          }
+        },
+        "readerOperations": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "field": "string",
+            "value": "string",
+            "parents": "string"
+          }
+        },
+        "sites": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "origin": "string",
+            "name": "string?",
+            "faviconId": { "type": "uuid", "optional": true, "references": "assets" }
+          }
+        },
+        "storageOperations": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "payloadHash": "string"
+          }
+        },
+        "tagOperations": {
+          "columns": {
+            "libraryId": { "type": "uuid", "references": "libraries" },
+            "documentId": { "type": "uuid", "references": "libraryDocuments" },
+            "key": "string",
+            "name": "string",
+            "assigned": "boolean",
+            "parents": "string"
+          }
+        }
+      }
+    }
+  },
+  "migrations": [
+    {
+      "from": "8a5130d42577",
+      "createTables": ["highlightAnchors", "highlights", "publications"],
+      "migrate": {
+        "notes": {
+          "source": { "add": "string", "default": null },
+          "highlightId": { "add": "uuid", "default": null },
+          "text": { "add": "string", "default": "" }
+        }
+      }
+    }
+  ],
+  "transforms": { "readingProgress": { "stored": { "array": "string" }, "view": "float" } }
+}

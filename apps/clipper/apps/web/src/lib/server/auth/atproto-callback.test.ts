@@ -8,8 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createJazz, sqlite } from 'jazz-tools/backend'
 import { createAuthServer } from './server.js'
-import { app } from '../../backend/jazz/schema.js'
-import permissions from '../../backend/jazz/permissions.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
+import permissions from '../../backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { identityAuthorizationScope, publicationAuthorizationScope } from './authorization.js'
 
 const pluginRequire = createRequire(import.meta.resolve('@kingironman2011/better-auth-bsky'))

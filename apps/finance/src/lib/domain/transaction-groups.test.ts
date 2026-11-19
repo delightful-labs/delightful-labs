@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TransactionRow } from '../schema.js'
+import type { TransactionRow } from '../queries.js'
 import { groupTransactionsByDate, paginateTransactionGroups } from './transaction-groups.js'
 
 function row(id: string, bookedOn: string, amountMinor: number, currency = 'USD'): TransactionRow {

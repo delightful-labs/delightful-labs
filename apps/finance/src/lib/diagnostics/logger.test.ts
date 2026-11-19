@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const environment = vi.hoisted(() => ({ PUBLIC_DEBUG: 'false', dev: false }))
-vi.mock('$app/env/public', () => environment)
-vi.mock('$app/env', () => environment)
-
 beforeEach(() => vi.resetModules())
 afterEach(() => vi.restoreAllMocks())
 
@@ -14,8 +10,8 @@ it.each([
 	{ flag: '', dev: true, enabled: false },
 	{ flag: 'TRUE', dev: false, enabled: false }
 ])('uses only the explicit debug flag: $flag, dev=$dev', async ({ flag, dev, enabled }) => {
-	environment.PUBLIC_DEBUG = flag
-	environment.dev = dev
+	vi.stubEnv('PUBLIC_DEBUG', flag)
+	vi.stubEnv('DEV', dev)
 	const info = vi.spyOn(console, 'info').mockImplementation(() => {})
 	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 	const error = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -35,3 +31,5 @@ it.each([
 		expect(error).not.toHaveBeenCalled()
 	}
 })
+
+afterEach(() => vi.unstubAllEnvs())

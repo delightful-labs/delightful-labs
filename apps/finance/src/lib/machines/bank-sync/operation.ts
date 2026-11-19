@@ -1,4 +1,4 @@
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { createBankTrace } from '#lib/integrations/diagnostics.js'
 import { unlockCredential } from '#lib/integrations/passkey.js'
 import {

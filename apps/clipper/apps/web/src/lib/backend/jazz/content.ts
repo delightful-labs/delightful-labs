@@ -1,6 +1,6 @@
 import type { Transaction } from 'jazz-tools'
 import type { PreparedSave } from '../../contracts/storage.js'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 /** One selected atomic publication batch; Article owns its content and capture evidence. */
 export function insertPreparedContent(
 	tx: Pick<Transaction, 'insert' | 'upsert'>,

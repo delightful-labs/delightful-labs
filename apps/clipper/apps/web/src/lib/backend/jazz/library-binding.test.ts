@@ -3,13 +3,12 @@ import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
 import { createLibraryBinding, createLibraryCapture } from './library-binding.js'
 import { createLibraryCapability } from './library.js'
-import { policySchema } from './schema-permissions.test-support.js'
-import permissions from './permissions.js'
-import { app } from './schema.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
+import { app } from './jazz.generated.js'
 
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => fixture?.shutdown())
 afterEach(() => vi.unstubAllGlobals())

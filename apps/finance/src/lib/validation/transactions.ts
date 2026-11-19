@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { appTagSchema } from './tags.js'
 import { checkNumberText } from './checks.js'
 import { parseAmountMinor } from '../domain/money.js'
-import type { Account, Category, TransactionRow } from '../schema.js'
+import type { Account, Category, TransactionRow } from '../queries.js'
 
 export { checkNumberText } from './checks.js'
 
@@ -235,6 +235,7 @@ export const transactionLedgerRecordSchema = z.strictObject({
 	kind: z.enum([INCOME, EXPENSE]),
 	description: z.string().nullable(),
 	memo: z.string().nullable(),
+	internalTransferId: z.uuid().nullable().default(null),
 	tagNames: z.array(appTagSchema.shape.name)
 })
 export const transactionListRowSchema = transactionLedgerRecordSchema.pick({

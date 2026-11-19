@@ -1,6 +1,6 @@
 <script lang="ts" generics="Row extends TransactionListRow = TransactionRow">
 	import type { ComponentProps } from 'svelte'
-	import type { TransactionRow } from '../../schema.js'
+	import type { TransactionRow } from '../../queries.js'
 	import {
 		paginateTransactionGroups,
 		type TransactionListRow

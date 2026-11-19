@@ -1,4 +1,4 @@
-import type { Account, OrganizationMember } from '../schema.js'
+import type { Account, OrganizationMember } from '../queries.js'
 import type { ScopedFormView } from './form-contract.js'
 
 export const ACCOUNT_CREATION_REASON = Object.freeze({

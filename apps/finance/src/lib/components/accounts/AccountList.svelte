@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { ACCOUNT_KIND } from '#lib/domain/account-kind.js'
 	import { Button, Table, StatusMessage } from 'delightful-ui'
-	import type { AccountArchiveView } from '#lib/machines/accounts/account-archive.js'
-	import type { AccountDeleteGrantView } from '#lib/machines/accounts/account-delete-grants.js'
-	import type { AccountMembership, OrganizationMember } from '#lib/schema.js'
+	import type { WorkerAccountArchiveView } from '#lib/contracts/worker-accounts.js'
+	import type { AccountMembership, OrganizationMember } from '#lib/queries.js'
 	import AccountArchiveFeedback from './AccountArchiveFeedback.svelte'
-	import { projectAccountArchiveFeedback } from '../../contracts/account-archive-feedback.js'
 	import AccountActionsDialog from './AccountActionsDialog.svelte'
 	import { m } from '#lib/paraglide/messages.js'
 	import { formatSignedMoney } from '#lib/domain/money.js'
 	import { getLocale } from '#lib/paraglide/runtime.js'
-	import { onDestroy, untrack, type ComponentProps } from 'svelte'
+	import type { ComponentProps } from 'svelte'
 
 	let {
 		view,
@@ -18,29 +16,18 @@
 		deleteGrantView,
 		onDeleteGrant,
 		balances,
-		grantQueries,
-		onActionsOpenChange
+		grantQueries
 	}: {
-		view: AccountArchiveView
+		view: WorkerAccountArchiveView
 		onArchive: (accountId: string) => void
-		deleteGrantView: AccountDeleteGrantView & {
-			canManage: boolean
-			members: readonly OrganizationMember[]
-			grants: readonly AccountMembership[]
-		}
+		deleteGrantView: ComponentProps<typeof AccountActionsDialog>['deleteGrantView']
 		onDeleteGrant: (accountId: string, userId: string, canDelete: boolean) => void
 		balances: ReadonlyMap<string, bigint> | null
 		grantQueries: ComponentProps<typeof AccountActionsDialog>['grantQueries']
-		onActionsOpenChange: (open: boolean) => void
 	} = $props()
 
 	let selectedAccountId = $state<string | null>(null)
 	let dialogOpen = $state(false)
-	$effect(() => {
-		const open = dialogOpen
-		untrack(() => onActionsOpenChange(open))
-	})
-	onDestroy(() => onActionsOpenChange(false))
 	const selectedAccount = $derived(
 		view.kind === 'ready'
 			? view.rows.find((row) => row.account.id === selectedAccountId)?.account
@@ -69,7 +56,7 @@
 		text={m['errors.load_subject']({ subject: m['nouns.account']({ count: 2 }) })}
 	/>
 {:else if view.kind === 'ready'}
-	<AccountArchiveFeedback feedback={projectAccountArchiveFeedback(view.feedback)} />
+	<AccountArchiveFeedback feedback={view.feedback} />
 	{#if view.rows.length === 0}
 		<p>{m['accounts.empty.title']()}</p>
 	{:else}

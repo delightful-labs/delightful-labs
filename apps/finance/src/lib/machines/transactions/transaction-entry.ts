@@ -295,35 +295,45 @@ function withAttachmentSelectionValidation(
 	schema: ReturnType<typeof independentTransactionFormSchema>,
 	observe: () => TransactionEntryObservation
 ) {
-	return z.preprocess((input, ctx) => {
-		if (!isFormRecord(input)) return input
-		const { attachments, ...values } = input
-		const selected = (Array.isArray(attachments) ? attachments : []).filter(
-			(file) =>
-				!(
-					typeof File !== 'undefined' &&
-					file instanceof File &&
-					file.name === '' &&
-					file.size === 0
+	return z.preprocess(
+		(input, ctx) => {
+			if (!isFormRecord(input)) return input
+			const { attachments, ...values } = input
+			const selected = (Array.isArray(attachments) ? attachments : []).filter(
+				(file) =>
+					!(
+						typeof File !== 'undefined' &&
+						file instanceof File &&
+						file.name === '' &&
+						file.size === 0
+					)
+			)
+			const files = selected.filter(
+				(file): file is File => typeof File !== 'undefined' && file instanceof File
+			)
+			if (files.length !== selected.length) {
+				ctx.addIssue({ code: 'custom', path: ['attachments'], message: 'invalidSelection' })
+				return z.NEVER
+			}
+			const selection = validateAttachmentSelection(
+				files,
+				observe().transaction?.attachments?.length ?? 0
+			)
+			if (selection.kind !== 'accepted') {
+				ctx.addIssue({ code: 'custom', path: ['attachments'], message: selection.kind })
+				return z.NEVER
+			}
+			return { values, attachments: files }
+		},
+		z
+			.object({
+				values: schema,
+				attachments: z.array(
+					z.custom<File>((value) => typeof File !== 'undefined' && value instanceof File)
 				)
-		)
-		const files = selected.filter(
-			(file): file is File => typeof File !== 'undefined' && file instanceof File
-		)
-		if (files.length !== selected.length) {
-			ctx.addIssue({ code: 'custom', path: ['attachments'], message: 'invalidSelection' })
-			return z.NEVER
-		}
-		const selection = validateAttachmentSelection(
-			files,
-			observe().transaction?.attachments?.length ?? 0
-		)
-		if (selection.kind !== 'accepted') {
-			ctx.addIssue({ code: 'custom', path: ['attachments'], message: selection.kind })
-			return z.NEVER
-		}
-		return values
-	}, schema)
+			})
+			.transform(({ values, attachments }) => ({ ...values, attachments }))
+	)
 }
 
 function isFormRecord(value: unknown): value is Record<string, unknown> {
@@ -333,17 +343,12 @@ function isFormRecord(value: unknown): value is Record<string, unknown> {
 export function createTransactionEntryFormOptions(
 	deps: TransactionFormPolicyDependencies & {
 		db: TransactionSaveDb
-		getAttachments?: () => readonly File[]
-		navigate?: (destination: string, signal: AbortSignal) => Promise<void>
+		navigate?: ((destination: string, signal: AbortSignal) => Promise<void>) | undefined
 	}
 ) {
 	const { common, schema } = transactionFormPolicy(deps)
 	const availability = common.availability
-	const persistence = createTransactionSubmissionMachine(
-		deps.db,
-		deps.observe,
-		deps.getAttachments ?? (() => [])
-	)
+	const persistence = createTransactionSubmissionMachine(deps.db, deps.observe)
 	const options = createSingleWriteFormOptions<
 		TransactionSaveValues,
 		void,
@@ -376,16 +381,11 @@ export function createTransactionEntryFormOptions(
 export function createTransactionEditFormOptions(
 	deps: TransactionFormPolicyDependencies & {
 		db: TransactionSaveDb
-		getAttachments?: () => readonly File[]
 	}
 ) {
 	const { common, schema } = transactionFormPolicy(deps)
 	const availability = common.availability
-	const persistence = createTransactionSubmissionMachine(
-		deps.db,
-		deps.observe,
-		deps.getAttachments ?? (() => [])
-	)
+	const persistence = createTransactionSubmissionMachine(deps.db, deps.observe)
 	return createSingleWriteFormOptions<
 		TransactionSaveValues,
 		void,

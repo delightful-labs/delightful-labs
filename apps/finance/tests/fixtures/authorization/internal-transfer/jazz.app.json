@@ -1,0 +1,38 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "1fb5832e41c247442af4e5d65384eaabff9ebbedfd7e488b67309829460d6ba9"
+  },
+  "tables": {
+    "internalTransfers": {
+      "columns": {
+        "organizationId": "uuid",
+        "expenseTransactionId": "uuid",
+        "incomeTransactionId": "uuid",
+        "expenseAccountId": "uuid",
+        "incomeAccountId": "uuid",
+        "expenseAmountMinor": "string?",
+        "expenseCurrency": "string?",
+        "incomeAmountMinor": "string?",
+        "incomeCurrency": "string?",
+        "amountMinor": "string",
+        "currency": "string"
+      },
+      "relations": {
+        "expenseTransaction": { "rel": "transactions", "column": "expenseTransactionId" },
+        "incomeTransaction": { "rel": "transactions", "column": "incomeTransactionId" }
+      }
+    },
+    "transactions": {
+      "columns": {
+        "organizationId": "uuid",
+        "accountId": "uuid",
+        "kind": { "enum": ["expense", "income"] },
+        "amountMinor": "string",
+        "currency": "string",
+        "internalTransferId": "uuid?"
+      }
+    }
+  }
+}

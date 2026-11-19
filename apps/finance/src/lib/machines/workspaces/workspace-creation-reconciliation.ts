@@ -1,14 +1,14 @@
 import { ACCOUNT_ACCESS } from '#lib/domain/account-access.js'
 import { ORGANIZATION_ROLE } from '#lib/domain/organization-role.js'
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import { app, type Organization } from '../../schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app, type Organization } from '../../queries.js'
 import type { WorkspaceCreationAttempt } from '../../domain/workspace-creation.js'
 import { setup, types, createAsyncLogic } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 type Input = {
-	db: Pick<ReturnType<typeof getDb>, 'all'>
+	db: Pick<JazzDb, 'all'>
 	attempt: WorkspaceCreationAttempt
 }
 export type ReconciliationResult =

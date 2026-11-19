@@ -6,7 +6,7 @@ import type {
 
 /** Bind the host's acquired session without reading, subscribing, creating, or replacing it. */
 export function createJazzSessionReadinessAdapter<Client>(
-	session: JazzSession<Client>
+	session: Pick<JazzSession<Client>, 'getSnapshot' | 'subscribe' | 'retry'>
 ): SessionReadinessBinding & {
 	capability: Extract<SessionReadinessCapability, { retry: () => Promise<void> }>
 } {

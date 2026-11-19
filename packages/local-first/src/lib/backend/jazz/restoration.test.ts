@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAccountManager, exportLocalFirstSecret } from 'jazz-tools'
+import { generateAuthSecret } from 'jazz-tools'
 import { RecoveryPhrase } from 'jazz-tools/passphrase'
 import type { JazzSession, JazzSessionSnapshot } from 'jazz-tools/client'
 import { createJazzRestorationAdapter } from './restoration.js'
@@ -18,44 +18,37 @@ function deferred<Value>() {
 	return { promise, resolve, reject }
 }
 
-const managers: Awaited<ReturnType<typeof createAccountManager>>[] = []
-
+function userFor(account: { id: string }) {
+	return {
+		accountId: account.id,
+		kind: 'device',
+		identity: { issuer: 'device', subject: account.id },
+		claims: {}
+	} satisfies import('jazz-tools/client').JazzUser
+}
 // A typed host-session double isolates this adapter from database/client lifecycle. Phrase parsing
 // uses the real SDK. The later Finance adoption qualifies the real session and its drain protocol.
 async function fixture() {
-	let stored: string | null = null
-	const manager = await createAccountManager({
-		appId: 'restoration-adapter-unit',
-		serverUrl: 'http://127.0.0.1:9',
-		store: {
-			read: async () => stored,
-			update: async (transform) => {
-				stored = transform(stored)
-			}
-		}
-	})
-	managers.push(manager)
-	const account = manager.createLocalFirst()
-	let snapshot: JazzSessionSnapshot<unknown> = { status: 'ready', account }
+	const account = { id: crypto.randomUUID() },
+		key = generateAuthSecret()
+	let snapshot: JazzSessionSnapshot<unknown> = {
+		status: 'ready',
+		user: userFor(account),
+		localFirst: true
+	}
 	const unused = vi.fn(async () => {
 		throw new Error('Unexpected host lifecycle operation')
 	})
 	const restore = vi.fn(async (_credential: string) => {})
-	const session: JazzSession<unknown> = {
+	const session = {
 		getSnapshot: () => snapshot,
 		subscribe: vi.fn(() => () => {}),
-		restoreLocalFirst: restore,
-		createLocalFirst: unused,
-		loginWithBackend: unused,
-		linkWithBackend: unused,
-		logout: unused,
-		retry: unused,
-		close: unused
-	}
-	let current: JazzSession<unknown> | undefined = session
+		restoreDeviceAccount: restore
+	} satisfies Pick<JazzSession<unknown>, 'getSnapshot' | 'restoreDeviceAccount' | 'subscribe'>
+	let current: typeof session | undefined = session
 	const adapter = createJazzRestorationAdapter(session, () => current)
 	return {
-		manager,
+		key,
 		account,
 		session,
 		restore,
@@ -80,7 +73,6 @@ beforeEach(() => {
 	)
 })
 afterEach(() => {
-	for (const manager of managers.splice(0)) manager.logout()
 	vi.restoreAllMocks()
 	vi.unstubAllGlobals()
 })
@@ -88,7 +80,7 @@ afterEach(() => {
 describe('Jazz restoration leaf adapter', () => {
 	it('parses a real SDK phrase and calls only the supplied host restore', async () => {
 		const f = await fixture()
-		const root = exportLocalFirstSecret(f.account)
+		const root = f.key
 		const parsed = await f.adapter.capability.parsePhrase(RecoveryPhrase.fromSecret(root))
 		expect(parsed === root).toBe(true)
 		await f.adapter.capability.restoreIdentity(f.scope, parsed)
@@ -142,7 +134,7 @@ describe('Jazz restoration leaf adapter', () => {
 		'projects %s as unavailable without invalidating the session binding',
 		async (status) => {
 			const f = await fixture()
-			f.observe({ status, account: f.account })
+			f.observe({ status, user: userFor(f.account), localFirst: false })
 			expect(await f.adapter.capability.readIdentity(f.scope)).toEqual({ kind: 'unavailable' })
 			expect(f.adapter.capability.isCurrentBinding(f.scope.binding)).toBe(true)
 		}
@@ -150,17 +142,17 @@ describe('Jazz restoration leaf adapter', () => {
 
 	it('retains the binding across expected account replacement and requires a ready account', async () => {
 		const f = await fixture()
-		f.observe({ status: 'ready' })
+		f.observe({ status: 'ready', user: null, localFirst: false })
 		expect(await f.adapter.capability.readIdentity(f.scope)).toEqual({ kind: 'unavailable' })
-		const replacement = f.manager.createLocalFirst()
-		f.observe({ status: 'ready', account: replacement })
+		const replacement = { id: crypto.randomUUID() }
+		f.observe({ status: 'ready', user: userFor(replacement), localFirst: true })
 		expect(f.adapter.capability.isCurrentBinding(f.scope.binding)).toBe(true)
 		expect(await f.adapter.capability.readIdentity(f.scope)).toEqual({
 			kind: 'ready',
 			identityId: replacement.id
 		})
 		f.adapter.invalidate()
-		expect(f.manager.getLoggedIn() === replacement).toBe(true)
+		expect(f.session.getSnapshot().user?.accountId).toBe(replacement.id)
 		expect(f.unused).not.toHaveBeenCalled()
 	})
 

@@ -2,9 +2,9 @@ import type { PaymentMethod } from '#lib/domain/payment-method.js'
 import { TRANSACTION_SOURCE, type TransactionSource } from '#lib/domain/transaction-source.js'
 import type { TransactionKind } from '#lib/domain/transaction-kind.js'
 import { PersistedWriteRejectedError } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import { z } from 'zod'
-import { app, type Tag, type TransactionRow, type Check } from '#lib/schema.js'
+import { app, type Tag, type TransactionRow, type Check } from '#lib/queries.js'
 import { normalizedName } from '#lib/domain/names.js'
 import { appTagSchema } from '#lib/validation/tags.js'
 import { independentTransactionSchema } from '#lib/validation/transactions.js'
@@ -15,7 +15,7 @@ import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { OutputFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-type TransactionDb = Pick<ReturnType<typeof getDb>, 'beginTransaction'>
+type TransactionDb = Pick<JazzDb, 'beginTransaction'>
 type Transaction = ReturnType<TransactionDb['beginTransaction']>
 const inputSchema = z.strictObject({
 	transactionId: z.uuid(),

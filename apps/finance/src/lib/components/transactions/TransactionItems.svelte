@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TransactionListItem from './TransactionListItem.svelte'
-	import type { TransactionRow } from '#lib/schema.js'
+	import type { TransactionRow } from '#lib/queries.js'
 	let {
 		transactions,
 		categoryNames,

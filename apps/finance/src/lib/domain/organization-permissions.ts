@@ -1,6 +1,6 @@
 import { ACCOUNT_ACCESS } from '#lib/domain/account-access.js'
 import { ORGANIZATION_ROLE } from '#lib/domain/organization-role.js'
-import type { OrganizationMember } from '../schema.js'
+import type { OrganizationMember } from '../queries.js'
 
 export function canManageBankCredentials(
 	membership: OrganizationMember | null | undefined,

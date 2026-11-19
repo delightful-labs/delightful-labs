@@ -2,7 +2,7 @@
 	import AccountForm from '../accounts/AccountForm.svelte'
 	import type { Snippet } from 'svelte'
 	import type { FinanceWorkerView, WorkerCommandScope } from '../../contracts/worker-application.js'
-	import type { WorkerAccountCreationCommand } from '../../contracts/worker-forms.js'
+	import type { WorkerFormCommand } from '../../contracts/worker-forms.js'
 	let {
 		view,
 		trigger,
@@ -10,13 +10,13 @@
 	}: {
 		trigger?: Snippet<[() => void, boolean]> | undefined
 		view: FinanceWorkerView
-		onsend: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => void
+		onsend: (command: WorkerFormCommand, scope: WorkerCommandScope) => void
 	} = $props()
 	const scopeKey = $derived(`${view.sessionRevision}:${view.selection.revision}`)
 	const currency = $derived(
 		view.workspaces?.find((row) => row.id === view.selection.workspaceId)?.defaultCurrency ?? 'USD'
 	)
-	function send(command: WorkerAccountCreationCommand) {
+	function send(command: WorkerFormCommand) {
 		onsend(command, { sessionRevision: view.sessionRevision, selection: view.selection })
 	}
 	function submit(event: SubmitEvent) {

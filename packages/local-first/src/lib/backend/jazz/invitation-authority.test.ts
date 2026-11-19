@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { schema as s, type Db, type Transaction } from 'jazz-tools'
+import { type Db, type Transaction } from 'jazz-tools'
 import { RequestAuthenticationError, NoJazzAccountError, type Jazz } from 'jazz-tools/backend'
-import { createPolicyTestApp, type PolicyTestApp } from 'jazz-tools/testing'
+import { testApp, createPolicyTestApp, type PolicyTestApp } from 'jazz-tools/testing'
 import { createActor } from 'xstate'
 import { deferred } from '../../../../tests/helpers/deferred.js'
 import { createInvitationAuthorityMachine } from '../../machines/workspaces/invitation-authority.js'
@@ -9,13 +9,11 @@ import type { SerializableWriteHandle } from 'jazz-tools'
 import { createJazzInvitationAuthority } from './invitation-authority.js'
 
 // This is a native delegation fixture, not the future invitation schema or its access policy.
-const app = s.defineApp({ notes: s.table({ text: s.string() }, {}) }, { migrations: 'none' })
-const permissions = s.definePermissions(app, ({ policy }) => {
-	policy.notes.allowRead.always()
-	policy.notes.allowInsert.always()
-	policy.notes.allowUpdate.always()
-	policy.notes.allowDelete.always()
-})
+const app = testApp({ tables: { notes: { columns: { text: 'string' } } } })
+const permissions = {
+	tables: { notes: { read: 'true', insert: 'true', update: 'true', delete: 'true' } }
+}
+
 const session = {
 	user_id: 'invitation-adapter-user',
 	authMode: 'local-first',

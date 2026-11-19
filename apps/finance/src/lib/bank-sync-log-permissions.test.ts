@@ -1,3 +1,4 @@
+import type { InsertOf } from 'jazz-tools'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import {
 	createPolicyTestApp,
@@ -5,8 +6,8 @@ import {
 	type PolicyTestSession,
 	type TestDb
 } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './queries.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createSyncLogMachine } from './machines/bank-sync/sync-log.js'
 import {
 	createActor,
@@ -48,7 +49,7 @@ const attempt = () =>
 		startedAt,
 		outcome: 'unfinished',
 		importSettlement: 'notStarted'
-	}) satisfies import('jazz-tools').schema.InsertOf<typeof app.simplefinSyncAttempts>
+	}) satisfies import('jazz-tools').InsertOf<typeof app.simplefinSyncAttempts>
 beforeAll(async () => {
 	fixture = await createPolicyTestApp(app, permissions, expect)
 	owner = fixture.as(ownerSession)

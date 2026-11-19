@@ -2,9 +2,8 @@ import { beforeAll, afterAll, expect, it } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp, PolicyTestSession } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
-import { policySchema } from './schema-permissions.test-support.js'
+import { app } from './jazz.generated.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createLibraryRecords } from './records.js'
 import { newDocumentValues } from './document-values.js'
 import type { AnnotationMutation } from '../../annotations/schema.js'
@@ -14,12 +13,11 @@ import { toMarginDocumentNote, toMarginHighlight } from '../../annotations/margi
 import {
 	annotationNoteRowSchema,
 	highlightRowSchema,
-	nativeRangeSchema,
 	textFingerprint
 } from '../../annotations/schema.js'
 let fixture: PolicyTestApp
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => fixture?.shutdown())
 async function owner(name: string) {
@@ -207,7 +205,7 @@ it('projects native document notes and verified source anchors while refusing re
 				kind: 'source',
 				normalizationVersion: 'source-fixture-v1',
 				textHash: await textFingerprint(text),
-				range: nativeRangeSchema.parse(a.db.textAnchors().captureRange(text, 2, 18)),
+				range: a.db.textAnchors().captureRange(text, 2, 18),
 				sourceDate: createdAt,
 				textLengthCodePoints: Array.from(text).length,
 				sourceCodePointPosition: { start: 2, end: 17 }

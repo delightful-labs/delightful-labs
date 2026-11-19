@@ -3,7 +3,7 @@ import { createTransactionImportMachine } from './import-transaction.js'
 import { createAuthorizationMachine } from './authorization.js'
 import { account, connection, dependencies, id, source } from './test-fixtures.js'
 import type { BankTrace } from '#lib/integrations/diagnostics.js'
-import type { TransactionRow } from '#lib/schema.js'
+import type { TransactionRow } from '#lib/queries.js'
 import { createActor, toPromise, createAsyncLogic } from 'xstate'
 import type { InputFrom } from 'xstate'
 

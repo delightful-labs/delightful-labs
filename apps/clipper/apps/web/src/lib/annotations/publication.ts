@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { marginRecordSchema } from './margin.js'
+import { marginRecordSchema, marginRecordValue } from './margin.js'
 import { lowercaseUuidSchema } from '../validation/values.js'
 import {
 	atRecordUriSchema,
@@ -66,7 +66,10 @@ export function publicationValues(publication: Publication) {
 		highlightId: 'highlightId' in source ? source.highlightId : null,
 		noteId: 'noteId' in source ? source.noteId : null,
 		publishingDid,
-		lifecycle
+		lifecycle:
+			lifecycle.state === 'issued'
+				? { ...lifecycle, record: marginRecordValue(lifecycle.record) }
+				: lifecycle
 	}
 }
 

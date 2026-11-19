@@ -1,0 +1,1422 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "d08434f1846a58709838aedd788f7ae95b90f741f27311d831a9a70663151741"
+  },
+  "tables": {
+    "accountMemberships": {
+      "read": {
+        "anyOf": [
+          "userId = session.user",
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+            ]
+          }
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      },
+      "update": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      },
+      "delete": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      }
+    },
+    "accounts": {
+      "read": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'viewer', accountAccessMode = 'all')"
+                ]
+              },
+              {
+                "allOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user)",
+                  "exists accountMemberships(organizationId = this.organizationId, accountId = this.id, userId = session.user)"
+                ]
+              }
+            ]
+          },
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "allOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              "archivedAt = null"
+            ]
+          },
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "update": {
+        "anyOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+            ]
+          },
+          {
+            "allOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+              "exists accountMemberships(organizationId = this.organizationId, accountId = this.id, userId = session.user, access = 'write')"
+            ]
+          }
+        ]
+      },
+      "delete": "false"
+    },
+    "batchTemplates": {
+      "read": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user)",
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+            ]
+          },
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "update": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+        ]
+      },
+      "delete": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      }
+    },
+    "categories": {
+      "read": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user)",
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')"
+            ]
+          },
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "update": {
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')"
+            ]
+          },
+          "isSystem = false"
+        ]
+      },
+      "delete": {
+        "allOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+            ]
+          },
+          "isSystem = false"
+        ]
+      }
+    },
+    "checkDetails": { "read": "false", "insert": "false", "update": "false", "delete": "false" },
+    "checks": {
+      "read": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'viewer', accountAccessMode = 'all')"
+                ]
+              },
+              {
+                "allOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user)",
+                  "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user)"
+                ]
+              }
+            ]
+          },
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+                      "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user, access = 'write')"
+                    ]
+                  }
+                ]
+              },
+              "exists accounts(id = this.accountId, organizationId = this.organizationId, archivedAt = null)"
+            ]
+          },
+          {
+            "allOf": [
+              "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')",
+              "exists accounts(id = this.accountId, organizationId = this.organizationId)"
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": {
+          "anyOf": [
+            {
+              "anyOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+              ]
+            },
+            {
+              "allOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+                "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user, access = 'write')"
+              ]
+            }
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+                  ]
+                },
+                {
+                  "allOf": [
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+                    "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user, access = 'write')"
+                  ]
+                }
+              ]
+            },
+            "exists accounts(id = this.accountId, organizationId = this.organizationId, archivedAt = null)",
+            "exists checks(id = this.id, organizationId = this.organizationId)"
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "fileParts": {
+      "read": "allowedTo.read(file)",
+      "insert": "allowedTo.insert(file)",
+      "update": "false",
+      "delete": "allowedTo.delete(file)"
+    },
+    "files": {
+      "read": {
+        "anyOf": [
+          {
+            "allOf": [
+              "allowedTo.read(transaction)",
+              "exists transactionAttachments(fileId = this.id, transactionId = this.transactionId)"
+            ]
+          },
+          {
+            "allOf": [
+              { "allOf": ["transactionId = null", "accountId = null"] },
+              "exists restoreOperations(sourceFileId = this.id, workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+            ]
+          },
+          {
+            "allOf": [
+              { "allOf": ["transactionId = null", "accountId = null"] },
+              "exists (from restoreOperations join organizationMembers as __join_0 on restoreOperations.workspaceId = __join_0.organizationId where restoreOperations.sourceFileId = outer.id and restoreOperations.workspaceId = outer.organizationId and restoreOperations.status = text('active') and __join_0.userId = session.user and __join_0.role in [text('owner'), text('admin')])"
+            ]
+          }
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "allOf": [
+              "transactionId != null",
+              "allowedTo.update(transaction)",
+              "exists transactions(id = this.transactionId)"
+            ]
+          },
+          {
+            "allOf": [
+              { "allOf": ["transactionId = null", "accountId = null"] },
+              "exists restoreOperations(sourceFileId = this.id, workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+            ]
+          },
+          {
+            "allOf": [
+              "exists (from transactions join restoreOperations as __join_0 on transactions.organizationId = __join_0.workspaceId where transactions.id = outer.transactionId and __join_0.ownerId = session.user and __join_0.status = text('incomplete'))",
+              {
+                "anyOf": [
+                  "organizationId = null",
+                  "exists transactions(id = this.transactionId, organizationId = this.organizationId)"
+                ]
+              },
+              {
+                "anyOf": [
+                  "accountId = null",
+                  "exists transactions(id = this.transactionId, accountId = this.accountId)"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "update": "false",
+      "delete": {
+        "allOf": [
+          "transactionId != null",
+          "allowedTo.update(transaction)",
+          "exists transactions(id = this.transactionId)"
+        ]
+      }
+    },
+    "internalTransfers": {
+      "read": {
+        "allOf": [
+          "allowedTo.read(expenseTransaction)",
+          "allowedTo.read(incomeTransaction)",
+          {
+            "anyOf": [
+              {
+                "allOf": [
+                  {
+                    "anyOf": [
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.expenseAmountMinor, currency = this.expenseCurrency, internalTransferId = this.id)",
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.amountMinor, currency = this.currency, internalTransferId = this.id)"
+                    ]
+                  },
+                  {
+                    "anyOf": [
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.incomeAmountMinor, currency = this.incomeCurrency, internalTransferId = this.id)",
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.amountMinor, currency = this.currency, internalTransferId = this.id)"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, internalTransferId = null)",
+                  "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, internalTransferId = null)"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "anyOf": [
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.expenseAmountMinor, currency = this.expenseCurrency, internalTransferId != null)",
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.amountMinor, currency = this.currency, internalTransferId != null)"
+                    ]
+                  },
+                  {
+                    "anyOf": [
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.incomeAmountMinor, currency = this.incomeCurrency, internalTransferId != null)",
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.amountMinor, currency = this.currency, internalTransferId != null)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.expenseAmountMinor, currency = this.expenseCurrency, internalTransferId = this.id)",
+                          "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.amountMinor, currency = this.currency, internalTransferId = this.id)"
+                        ]
+                      },
+                      {
+                        "anyOf": [
+                          "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.incomeAmountMinor, currency = this.incomeCurrency, internalTransferId = this.id)",
+                          "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.amountMinor, currency = this.currency, internalTransferId = this.id)"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.expenseAmountMinor, currency = this.expenseCurrency, internalTransferId = null)",
+                          "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', amountMinor = this.amountMinor, currency = this.currency, internalTransferId = null)"
+                        ]
+                      },
+                      {
+                        "anyOf": [
+                          "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.incomeAmountMinor, currency = this.incomeCurrency, internalTransferId = null)",
+                          "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', amountMinor = this.amountMinor, currency = this.currency, internalTransferId = null)"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'selected')",
+                      "exists accountMemberships(organizationId = this.organizationId, accountId = this.expenseAccountId, userId = session.user, access = 'write')",
+                      "exists accountMemberships(organizationId = this.organizationId, accountId = this.incomeAccountId, userId = session.user, access = 'write')"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "allOf": [
+              "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')",
+              {
+                "anyOf": [
+                  {
+                    "allOf": [
+                      "expenseAmountMinor != null",
+                      "expenseCurrency != null",
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', internalTransferId = this.id, amountMinor = this.expenseAmountMinor, currency = this.expenseCurrency)"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "expenseAmountMinor != null",
+                      "expenseCurrency = null",
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', internalTransferId = this.id, amountMinor = this.expenseAmountMinor, currency = this.currency)"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "expenseAmountMinor = null",
+                      "expenseCurrency != null",
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', internalTransferId = this.id, amountMinor = this.amountMinor, currency = this.expenseCurrency)"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "expenseAmountMinor = null",
+                      "expenseCurrency = null",
+                      "exists transactions(id = this.expenseTransactionId, organizationId = this.organizationId, accountId = this.expenseAccountId, kind = 'expense', internalTransferId = this.id, amountMinor = this.amountMinor, currency = this.currency)"
+                    ]
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "allOf": [
+                      "incomeAmountMinor != null",
+                      "incomeCurrency != null",
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', internalTransferId = this.id, amountMinor = this.incomeAmountMinor, currency = this.incomeCurrency)"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "incomeAmountMinor != null",
+                      "incomeCurrency = null",
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', internalTransferId = this.id, amountMinor = this.incomeAmountMinor, currency = this.currency)"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "incomeAmountMinor = null",
+                      "incomeCurrency != null",
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', internalTransferId = this.id, amountMinor = this.amountMinor, currency = this.incomeCurrency)"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "incomeAmountMinor = null",
+                      "incomeCurrency = null",
+                      "exists transactions(id = this.incomeTransactionId, organizationId = this.organizationId, accountId = this.incomeAccountId, kind = 'income', internalTransferId = this.id, amountMinor = this.amountMinor, currency = this.currency)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "update": "false",
+      "delete": {
+        "anyOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+            ]
+          },
+          {
+            "allOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'selected')",
+              "exists accountMemberships(organizationId = this.organizationId, accountId = this.expenseAccountId, userId = session.user, access = 'write')",
+              "exists accountMemberships(organizationId = this.organizationId, accountId = this.incomeAccountId, userId = session.user, access = 'write')"
+            ]
+          }
+        ]
+      }
+    },
+    "organizationMembers": {
+      "read": {
+        "anyOf": [
+          "userId = session.user",
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+            ]
+          }
+        ]
+      },
+      "insert": {
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              {
+                "allOf": [
+                  { "allOf": ["userId = session.user", "role = 'owner'"] },
+                  "exists organizations(id = this.organizationId, ownerId = session.user)"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              "exists organizations(id = this.organizationId, restoreOperationId = null)",
+              "exists restoreOperations(workspaceId = this.organizationId, status = 'active')"
+            ]
+          }
+        ]
+      },
+      "update": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      },
+      "delete": {
+        "anyOf": [
+          "userId = session.user",
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+            ]
+          }
+        ]
+      }
+    },
+    "organizations": {
+      "read": "exists organizationMembers(organizationId = this.id, userId = session.user)",
+      "insert": "ownerId = session.user",
+      "update": {
+        "old": {
+          "anyOf": [
+            "exists organizationMembers(organizationId = this.id, userId = session.user, role = 'owner')",
+            "exists organizationMembers(organizationId = this.id, userId = session.user, role = 'admin')"
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "anyOf": [
+                "exists organizationMembers(organizationId = this.id, userId = session.user, role = 'owner')",
+                "exists organizationMembers(organizationId = this.id, userId = session.user, role = 'admin')"
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "allOf": [
+                    "restoreOperationId = null",
+                    {
+                      "anyOf": [
+                        "exists organizations(id = this.id, restoreOperationId = null)",
+                        "exists restoreOperations(workspaceId = this.id, status = 'active')"
+                      ]
+                    }
+                  ]
+                },
+                "exists organizations(id = this.id, restoreOperationId = this.restoreOperationId)"
+              ]
+            }
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "profiles": {
+      "read": {
+        "anyOf": [
+          "userId = session.user",
+          "exists (from organizationMembers join organizationMembers as __join_0 on organizationMembers.organizationId = __join_0.organizationId where organizationMembers.profileId = outer.id and __join_0.userId = session.user)"
+        ]
+      },
+      "insert": "userId = session.user",
+      "update": "userId = session.user",
+      "delete": "false"
+    },
+    "restoreOperations": {
+      "read": {
+        "anyOf": [
+          { "allOf": ["ownerId = session.user", "status = 'incomplete'"] },
+          {
+            "allOf": [
+              "status = 'active'",
+              "exists organizationMembers(organizationId = this.workspaceId, userId = session.user, role in ['owner', 'admin'])"
+            ]
+          }
+        ]
+      },
+      "insert": {
+        "allOf": [
+          { "allOf": ["ownerId = session.user", "status = 'incomplete'"] },
+          "exists organizations(id = this.workspaceId, ownerId = session.user, restoreOperationId = this.id, name = this.workspaceName, kind = this.workspaceKind, defaultCurrency = this.workspaceCurrency)"
+        ]
+      },
+      "update": {
+        "old": { "allOf": ["ownerId = session.user", "status = 'incomplete'"] },
+        "new": {
+          "allOf": [
+            { "allOf": ["ownerId = session.user", "status = 'active'"] },
+            "exists restoreOperations(id = this.id, workspaceId = this.workspaceId, sourceFileId = this.sourceFileId, ownerId = this.ownerId, payloadSha256 = this.payloadSha256, graphSha256 = this.graphSha256, workspaceName = this.workspaceName, workspaceKind = this.workspaceKind, workspaceCurrency = this.workspaceCurrency, status = 'incomplete')"
+          ]
+        }
+      },
+      "delete": "false"
+    },
+    "simplefinAccountLinks": {
+      "read": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+            ]
+          },
+          "exists accounts(id = this.accountId, organizationId = this.organizationId, archivedAt = null)",
+          "exists simplefinConnections(id = this.connectionId, organizationId = this.organizationId, status = 'active')"
+        ]
+      },
+      "update": {
+        "old": {
+          "anyOf": [
+            "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+            "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "anyOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+              ]
+            },
+            "exists accounts(id = this.accountId, organizationId = this.organizationId, archivedAt = null)",
+            "exists simplefinConnections(id = this.connectionId, organizationId = this.organizationId, status = 'active')"
+          ]
+        }
+      },
+      "delete": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      }
+    },
+    "simplefinConnections": {
+      "read": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          {
+            "allOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              "ownerId = session.user"
+            ]
+          },
+          "accessUrl = ''"
+        ]
+      },
+      "update": {
+        "old": {
+          "allOf": [
+            {
+              "anyOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+              ]
+            },
+            "ownerId = session.user"
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "allOf": [
+                {
+                  "anyOf": [
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                  ]
+                },
+                "ownerId = session.user"
+              ]
+            },
+            "accessUrl = ''",
+            "exists simplefinConnections(id = this.id, organizationId = this.organizationId, ownerId = this.ownerId)"
+          ]
+        }
+      },
+      "delete": {
+        "allOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+            ]
+          },
+          "ownerId = session.user"
+        ]
+      }
+    },
+    "simplefinSyncAccountResults": {
+      "read": "allowedTo.read(attempt)",
+      "insert": {
+        "allOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+            ]
+          },
+          "allowedTo.update(attempt)",
+          "exists simplefinSyncAttempts(id = this.attemptId, organizationId = this.organizationId, initiatedBy = session.user, outcome = 'unfinished')",
+          "exists accounts(id = this.accountId, organizationId = this.organizationId)"
+        ]
+      },
+      "update": {
+        "old": {
+          "allOf": [
+            {
+              "anyOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+              ]
+            },
+            "allowedTo.update(attempt)",
+            "exists simplefinSyncAttempts(id = this.attemptId, organizationId = this.organizationId, initiatedBy = session.user, outcome = 'unfinished')",
+            "exists accounts(id = this.accountId, organizationId = this.organizationId)"
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "allOf": [
+                {
+                  "anyOf": [
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                  ]
+                },
+                "allowedTo.update(attempt)",
+                "exists simplefinSyncAttempts(id = this.attemptId, organizationId = this.organizationId, initiatedBy = session.user, outcome = 'unfinished')",
+                "exists accounts(id = this.accountId, organizationId = this.organizationId)"
+              ]
+            },
+            "exists simplefinSyncAccountResults(id = this.id, attemptId = this.attemptId, organizationId = this.organizationId, accountId = this.accountId, accountName = this.accountName)"
+          ]
+        }
+      },
+      "delete": "allowedTo.delete(attempt)"
+    },
+    "simplefinSyncAttempts": {
+      "read": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          {
+            "allOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              "initiatedBy = session.user",
+              "exists simplefinConnections(id = this.connectionId, organizationId = this.organizationId, ownerId = this.initiatedBy)"
+            ]
+          },
+          {
+            "allOf": [
+              "outcome = 'unfinished'",
+              "finishedAt = null",
+              "importSettlement = 'notStarted'"
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": {
+          "allOf": [
+            {
+              "allOf": [
+                {
+                  "anyOf": [
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                  ]
+                },
+                "initiatedBy = session.user",
+                "exists simplefinConnections(id = this.connectionId, organizationId = this.organizationId, ownerId = this.initiatedBy)"
+              ]
+            },
+            "outcome = 'unfinished'"
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "allOf": [
+                {
+                  "anyOf": [
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                  ]
+                },
+                "initiatedBy = session.user",
+                "exists simplefinConnections(id = this.connectionId, organizationId = this.organizationId, ownerId = this.initiatedBy)"
+              ]
+            },
+            "exists simplefinSyncAttempts(id = this.id, organizationId = this.organizationId, connectionId = this.connectionId, initiatedBy = this.initiatedBy, startedAt = this.startedAt)"
+          ]
+        }
+      },
+      "delete": {
+        "allOf": [
+          {
+            "allOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              "initiatedBy = session.user",
+              "exists simplefinConnections(id = this.connectionId, organizationId = this.organizationId, ownerId = this.initiatedBy)"
+            ]
+          },
+          { "allOf": ["outcome != 'unfinished'", "finishedAt != null"] }
+        ]
+      }
+    },
+    "tags": {
+      "read": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user)",
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                      "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                    ]
+                  },
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')"
+                ]
+              },
+              {
+                "allOf": [
+                  { "anyOf": ["kind = 'expense'", "kind = 'income'"] },
+                  {
+                    "anyOf": [
+                      "categoryId = null",
+                      "exists categories(id = this.categoryId, organizationId = this.organizationId, kind = this.kind)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "allOf": [
+              "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')",
+              {
+                "anyOf": [
+                  "categoryId = null",
+                  "exists categories(id = this.categoryId, organizationId = this.organizationId, kind = this.kind)"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": {
+          "anyOf": [
+            {
+              "anyOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+              ]
+            },
+            "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')"
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                    "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                  ]
+                },
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')"
+              ]
+            },
+            {
+              "allOf": [
+                { "anyOf": ["kind = 'expense'", "kind = 'income'"] },
+                {
+                  "anyOf": [
+                    "categoryId = null",
+                    "exists categories(id = this.categoryId, organizationId = this.organizationId, kind = this.kind)"
+                  ]
+                }
+              ]
+            },
+            "exists tags(id = this.id, organizationId = this.organizationId, kind = this.kind)"
+          ]
+        }
+      },
+      "delete": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      }
+    },
+    "transactionAttachments": {
+      "read": "allowedTo.read(transaction)",
+      "insert": {
+        "anyOf": [
+          "allowedTo.update(transaction)",
+          {
+            "allOf": [
+              "allowedTo.insert(file)",
+              "exists files(id = this.fileId, transactionId = this.transactionId)"
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": "allowedTo.update(transaction)",
+        "new": {
+          "allOf": [
+            "allowedTo.update(transaction)",
+            "exists files(id = this.fileId, transactionId = this.transactionId)"
+          ]
+        }
+      },
+      "delete": "allowedTo.update(transaction)"
+    },
+    "transactionBatches": {
+      "read": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user)",
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "anyOf": [
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+              "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+            ]
+          },
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "update": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+        ]
+      },
+      "delete": {
+        "anyOf": [
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+        ]
+      }
+    },
+    "transactionTags": {
+      "read": {
+        "allOf": [
+          "allowedTo.read(transaction)",
+          "exists transactions(id = this.transactionId, organizationId = this.organizationId)",
+          "exists tags(id = this.tagId, organizationId = this.organizationId)"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "allOf": [
+              "allowedTo.update(transaction)",
+              {
+                "anyOf": [
+                  {
+                    "allOf": [
+                      "exists transactions(id = this.transactionId, organizationId = this.organizationId, kind = 'expense')",
+                      "exists tags(id = this.tagId, organizationId = this.organizationId, kind = 'expense', archivedAt = null)"
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "exists transactions(id = this.transactionId, organizationId = this.organizationId, kind = 'income')",
+                      "exists tags(id = this.tagId, organizationId = this.organizationId, kind = 'income', archivedAt = null)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "allOf": [
+              "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')",
+              "exists transactions(id = this.transactionId, organizationId = this.organizationId)",
+              "exists tags(id = this.tagId, organizationId = this.organizationId)"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "allOf": [
+          "allowedTo.update(transaction)",
+          "exists transactions(id = this.transactionId, organizationId = this.organizationId)",
+          "exists tags(id = this.tagId, organizationId = this.organizationId)"
+        ]
+      }
+    },
+    "transactions": {
+      "read": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'viewer', accountAccessMode = 'all')"
+                ]
+              },
+              {
+                "allOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user)",
+                  "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user)"
+                ]
+              }
+            ]
+          },
+          "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          {
+            "allOf": [
+              {
+                "allOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+                          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+                        ]
+                      },
+                      {
+                        "allOf": [
+                          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+                          "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+                          "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user, access = 'write')"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      "exists categories(id = this.categoryId, organizationId = this.organizationId, kind = this.kind, archivedAt = null)",
+                      "exists accounts(id = this.accountId, organizationId = this.organizationId, currency = this.currency, archivedAt = null)"
+                    ]
+                  },
+                  "checkDetailsId = null",
+                  {
+                    "anyOf": [
+                      {
+                        "allOf": [
+                          "checkId = null",
+                          {
+                            "anyOf": [
+                              "paymentMethod = null",
+                              "paymentMethod = 'cash'",
+                              "paymentMethod = 'transfer'",
+                              "paymentMethod = 'electronic'"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "allOf": [
+                          { "allOf": ["paymentMethod = 'check'", "checkId != null"] },
+                          "exists checks(id = this.checkId, organizationId = this.organizationId, accountId = this.accountId)"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  "internalTransferId = null",
+                  "source = 'manual'",
+                  {
+                    "anyOf": [
+                      "exists internalTransfers(id = this.internalTransferId, organizationId = this.organizationId, expenseTransactionId = this.id, expenseAccountId = this.accountId)",
+                      "exists internalTransfers(id = this.internalTransferId, organizationId = this.organizationId, incomeTransactionId = this.id, incomeAccountId = this.accountId)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "allOf": [
+              "exists restoreOperations(workspaceId = this.organizationId, ownerId = session.user, status = 'incomplete')",
+              "checkDetailsId = null",
+              "exists accounts(id = this.accountId, organizationId = this.organizationId, currency = this.currency)",
+              "exists categories(id = this.categoryId, organizationId = this.organizationId, kind = this.kind)",
+              {
+                "anyOf": [
+                  {
+                    "allOf": [
+                      "checkId = null",
+                      {
+                        "anyOf": [
+                          "paymentMethod = null",
+                          "paymentMethod = 'cash'",
+                          "paymentMethod = 'transfer'",
+                          "paymentMethod = 'electronic'"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "allOf": [
+                      { "allOf": ["paymentMethod = 'check'", "checkId != null"] },
+                      "exists checks(id = this.checkId, organizationId = this.organizationId, accountId = this.accountId)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "update": {
+        "old": {
+          "anyOf": [
+            {
+              "anyOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+              ]
+            },
+            {
+              "allOf": [
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+                "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+                "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user, access = 'write')"
+              ]
+            }
+          ]
+        },
+        "new": {
+          "allOf": [
+            {
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                        "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')",
+                        "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member', accountAccessMode = 'all')"
+                      ]
+                    },
+                    {
+                      "allOf": [
+                        "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+                        "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+                        "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user, access = 'write')"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    "exists categories(id = this.categoryId, organizationId = this.organizationId, kind = this.kind, archivedAt = null)",
+                    "exists accounts(id = this.accountId, organizationId = this.organizationId, currency = this.currency, archivedAt = null)"
+                  ]
+                },
+                "checkDetailsId = null",
+                {
+                  "anyOf": [
+                    {
+                      "allOf": [
+                        "checkId = null",
+                        {
+                          "anyOf": [
+                            "paymentMethod = null",
+                            "paymentMethod = 'cash'",
+                            "paymentMethod = 'transfer'",
+                            "paymentMethod = 'electronic'"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "allOf": [
+                        { "allOf": ["paymentMethod = 'check'", "checkId != null"] },
+                        "exists checks(id = this.checkId, organizationId = this.organizationId, accountId = this.accountId)"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "allOf": [
+                    "internalTransferId = null",
+                    {
+                      "anyOf": [
+                        "exists transactions(id = this.id, internalTransferId = null)",
+                        {
+                          "allOf": [
+                            "exists transactions(id = this.id, internalTransferId != null)",
+                            "exists transactions(id = this.id, organizationId = this.organizationId, accountId = this.accountId, kind = this.kind, amountMinor = this.amountMinor, currency = this.currency)"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "anyOf": [
+                        "exists internalTransfers(id = this.internalTransferId, organizationId = this.organizationId, expenseTransactionId = this.id, expenseAccountId = this.accountId)",
+                        "exists internalTransfers(id = this.internalTransferId, organizationId = this.organizationId, incomeTransactionId = this.id, incomeAccountId = this.accountId)"
+                      ]
+                    },
+                    "exists transactions(id = this.id, organizationId = this.organizationId, accountId = this.accountId, kind = this.kind, amountMinor = this.amountMinor, currency = this.currency)"
+                  ]
+                }
+              ]
+            },
+            "exists transactions(id = this.id, organizationId = this.organizationId, kind = this.kind, source = this.source)",
+            {
+              "anyOf": [
+                {
+                  "allOf": [
+                    "externalId = null",
+                    "exists transactions(id = this.id, externalId = null)"
+                  ]
+                },
+                "exists transactions(id = this.id, externalId = this.externalId)"
+              ]
+            }
+          ]
+        }
+      },
+      "delete": {
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'owner')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
+                ]
+              },
+              {
+                "allOf": [
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'member')",
+                  "exists organizationMembers(organizationId = this.organizationId, userId = session.user, accountAccessMode = 'selected')",
+                  "exists accountMemberships(organizationId = this.organizationId, accountId = this.accountId, userId = session.user, canDelete = true)"
+                ]
+              }
+            ]
+          },
+          "internalTransferId = null"
+        ]
+      }
+    },
+    "uploads": { "read": "false", "insert": "false", "update": "false", "delete": "false" }
+  }
+}

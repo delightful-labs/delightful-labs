@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button, Checkbox } from 'delightful-ui'
-	import type { Account } from '../../schema.js'
+	import type { Account } from '../../queries.js'
 	import Icon from '../navigation/AppIcon.svelte'
 	import ExpensesIcon from 'tdesign-icons-svg/src/arrow-up.svg?component'
 	import IncomeIcon from 'tdesign-icons-svg/src/arrow-down.svg?component'

@@ -1,8 +1,8 @@
 import { TRANSACTION_SOURCE } from '#lib/domain/transaction-source.js'
 import { PAYMENT_METHOD } from '#lib/domain/payment-method.js'
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import { app, type Check } from '#lib/schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app, type Check } from '#lib/queries.js'
 import { normalizedName } from '#lib/domain/names.js'
 import { canWriteAccount } from '#lib/domain/organization-permissions.js'
 import {
@@ -31,7 +31,7 @@ import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { OutputFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
-export type TransactionSaveDb = Pick<ReturnType<typeof getDb>, 'beginTransaction' | 'all'>
+export type TransactionSaveDb = Pick<JazzDb, 'beginTransaction' | 'all'>
 type Input = FormOperationInput<
 	TransactionSaveValues,
 	TransactionEntryScope,

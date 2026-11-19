@@ -6,16 +6,10 @@ function fixture(status: JazzSessionSnapshot<object>['status'] = 'ready') {
 	const unused = vi.fn(async () => {})
 	const unsubscribe = vi.fn()
 	const session = {
-		getSnapshot: vi.fn(() => ({ status })),
+		getSnapshot: vi.fn(() => ({ status, user: null, localFirst: false })),
 		subscribe: vi.fn((_notify: () => void) => unsubscribe),
-		retry: vi.fn(async () => {}),
-		createLocalFirst: unused,
-		restoreLocalFirst: unused,
-		loginWithBackend: unused,
-		linkWithBackend: unused,
-		logout: unused,
-		close: unused
-	} satisfies JazzSession<object>
+		retry: vi.fn(async () => {})
+	} satisfies Pick<JazzSession<object>, 'getSnapshot' | 'subscribe' | 'retry'>
 	return { session, unused, unsubscribe }
 }
 describe('Jazz acquired session readiness boundary', () => {

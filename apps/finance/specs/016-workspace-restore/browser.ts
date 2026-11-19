@@ -4,7 +4,6 @@ import {
 	type JazzClientConfig,
 	type JazzClient
 } from 'jazz-tools/client'
-import { createDb, exportLocalFirstSecret, type DbConfig } from 'jazz-tools'
 const loadLocalFirst = () => import('jazz-tools/local-first')
 async function openLocalFirstSession({
 	appId,
@@ -13,7 +12,8 @@ async function openLocalFirstSession({
 	const session = await createSession({
 		...config,
 		...(appId ? { scope: appId } : {}),
-		client: loadLocalFirst
+		client: loadLocalFirst,
+		localFirst: 'now'
 	})
 	try {
 		await session.getSnapshot().client?.db.upgradeToLocalFirst(loadLocalFirst)
@@ -23,22 +23,26 @@ async function openLocalFirstSession({
 		throw error
 	}
 }
-async function openAccountClient(config: DbConfig): Promise<JazzClient> {
-	const db = await createDb(config)
-	return {
-		db,
-		get session() {
-			return db.getAuthState().session ?? null
-		},
-		shutdown: (options) => db.shutdown(options)
+async function openAccountClient({
+	key,
+	...config
+}: Omit<JazzClientConfig, 'appId'> & { appId?: string; key: string }) {
+	const session = await openLocalFirstSession({ ...config, initial: 'signed-out' })
+	try {
+		await session.restoreDeviceAccount(key)
+		const client = session.getSnapshot().client
+		if (!client) throw new Error('Fixture restoration client unavailable')
+		return { db: client.db, shutdown: () => session.close() }
+	} catch (error) {
+		await session.close()
+		throw error
 	}
 }
 
-import { app as isolationApp } from '../../src/lib/schema.js'
+import { app as isolationApp } from '../../src/lib/queries.js'
 
 // Test-only SDK bindings. The host test owns every operation and resource lifetime.
 const probe = {
-	exportLocalFirstSecret,
 	openLocalFirstSession,
 	openAccountClient,
 	app: isolationApp

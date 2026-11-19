@@ -1,11 +1,11 @@
+import { marginRecordValue } from '../../annotations/margin.js'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { createActor, createAsyncLogic, SimulatedClock, toPromise } from 'xstate'
 import type { Db } from 'jazz-tools'
 import { createPolicyTestApp } from 'jazz-tools/testing'
 import type { PolicyTestApp } from 'jazz-tools/testing'
-import { app } from '../../backend/jazz/schema.js'
-import permissions from '../../backend/jazz/permissions.js'
-import { policySchema } from '../../backend/jazz/schema-permissions.test-support.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
+import permissions from '../../backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { createDocumentNotePreview } from './preview.js'
 import type { PublicationSource } from '../../annotations/publication-link.js'
 import { createPublicationOwner, publicationOwnerFixture } from './owner.test-support.js'
@@ -14,7 +14,7 @@ let fixture: PolicyTestApp
 const publishingDid = 'did:plc:ewvi7nxzyoun6zhxrhs64oiz'
 const createdAt = new Date('2026-11-16T15:00:00Z')
 beforeAll(async () => {
-	fixture = await createPolicyTestApp(policySchema(), permissions, expect)
+	fixture = await createPolicyTestApp(app, permissions, expect)
 })
 afterAll(async () => fixture?.shutdown())
 
@@ -234,7 +234,7 @@ it('leaves an existing same-publisher association to the future reconciliation w
 	const uri = `at://${publishingDid}/at.margin.note/existing`
 	await a.backend
 		.update(app.publications, id, {
-			lifecycle: { state: 'issued', uri, record: candidate.record }
+			lifecycle: { state: 'issued', uri, record: marginRecordValue(candidate.record) }
 		})
 		.wait({ tier: 'global' })
 	expect(await preview(a)).toBeUndefined()

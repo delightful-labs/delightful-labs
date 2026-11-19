@@ -1,3 +1,4 @@
+import type { InsertOf } from 'jazz-tools'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import {
 	createPolicyTestApp,
@@ -5,8 +6,8 @@ import {
 	type PolicyTestSession,
 	type TestDb
 } from 'jazz-tools/testing'
-import { app } from './schema.js'
-import permissions from './permissions.js'
+import { app } from './queries.js'
+import permissions from './jazz.permissions.json' with { type: 'json' }
 import { createSyncLogRetentionMachine } from './machines/bank-sync/log-retention.js'
 import type { RetentionScope } from './machines/bank-sync/log-retention.js'
 import { createActor, toPromise } from 'xstate'
@@ -44,7 +45,7 @@ function values(connection = connectionId) {
 		importedCount: 0,
 		existingCount: 0,
 		omittedCount: 0
-	} satisfies import('jazz-tools').schema.InsertOf<typeof app.simplefinSyncAttempts>
+	} satisfies import('jazz-tools').InsertOf<typeof app.simplefinSyncAttempts>
 }
 function run(db = owner, identity = userId) {
 	return toPromise(

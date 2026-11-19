@@ -1,7 +1,7 @@
 import { publishBankSource } from './reports.fixture.js'
 import { afterEach, vi } from 'vitest'
-import type { schema } from 'jazz-tools'
-import { app, type TransactionRow } from '#lib/schema.js'
+import type { RowOf } from 'jazz-tools'
+import { app, type TransactionRow } from '#lib/queries.js'
 import { providerAccountIdentity } from '#lib/integrations/simplefin.js'
 import { createTransactionImportMachine } from './import-transaction.js'
 import { createAccountImportMachine } from './import-account.js'
@@ -27,7 +27,7 @@ type YieldLogic = CallbackActorLogic<{ type: 'CONTINUE' }>
 type PersistInput = import('./import-transaction.js').TransactionPersistInput
 type OutcomeInput = import('./operation.js').OperationOutcomeInput
 export const accounts = [account, { ...account, id: id(14), name: 'Savings' }]
-export const categories: schema.RowOf<typeof app.categories>[] = [
+export const categories: RowOf<typeof app.categories>[] = [
 	{
 		id: id(6),
 		organizationId: id(2),
@@ -84,7 +84,7 @@ afterEach(() => {
 export function importFixture(
 	options: { existingReadDeadline?: number; readDeadline?: number; yieldControl?: YieldLogic } = {}
 ) {
-	const links: schema.RowOf<typeof app.simplefinAccountLinks>[] = response.accounts.map(
+	const links: RowOf<typeof app.simplefinAccountLinks>[] = response.accounts.map(
 		(provider, index) => {
 			const destination = accounts[index]
 			if (!destination) throw new Error('Expected matching fixture account')

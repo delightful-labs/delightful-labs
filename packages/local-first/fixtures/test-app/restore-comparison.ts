@@ -1,6 +1,7 @@
+import type { RowOf } from 'jazz-tools'
 import type { EventPayload } from './restore-events.js'
 import { setup, createAsyncLogic, types } from 'xstate'
-import type { Db, Transaction, schema } from 'jazz-tools'
+import type { Db, Transaction } from 'jazz-tools'
 import {
 	restoreTransactionAccess,
 	type RestoreDestinationInput,
@@ -14,11 +15,11 @@ import { testAppRestoreData, type TestAppRestoreRequest } from './restore-reques
 import { createTestAppDestinationWriteMachine } from './restore-writer.js'
 
 type Input = RestoreDestinationInput<Transaction<'mergeable'>>
-type Control = schema.RowOf<typeof testAppRestoreApp.restoreDestinations>
+type Control = RowOf<typeof testAppRestoreApp.restoreDestinations>
 type Graph = Control & {
-	notebooks: schema.RowOf<typeof testAppRestoreApp.restoreNotebooks>[]
-	notes: schema.RowOf<typeof testAppRestoreApp.restoreNotes>[]
-	attachments: schema.RowOf<typeof testAppRestoreApp.restoreAttachments>[]
+	notebooks: RowOf<typeof testAppRestoreApp.restoreNotebooks>[]
+	notes: RowOf<typeof testAppRestoreApp.restoreNotes>[]
+	attachments: RowOf<typeof testAppRestoreApp.restoreAttachments>[]
 }
 export type TestAppComparison = 'incompleteMatch' | 'activeMatch' | 'conflict' | 'unavailable'
 export function testAppDestinationGraphQuery(destinationId: string) {

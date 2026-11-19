@@ -1,4 +1,4 @@
-import { exportLocalFirstSecret, type AccountHandle } from 'jazz-tools'
+import type { JazzSession, JazzSessionSnapshot } from 'jazz-tools/client'
 import { RecoveryPhrase } from 'jazz-tools/passphrase'
 import type {
 	AvailableRecoveryScope,
@@ -6,72 +6,86 @@ import type {
 	RecoveryScope
 } from '../../contracts/recovery-phrase.js'
 
+type RecoverySession = Pick<JazzSession<unknown>, 'getSnapshot' | 'exportDeviceKey'>
+
 export type JazzRecoveryAdapter = Readonly<{
-	/** Call from the host's existing account observation before publishing the returned scope. */
-	observeAccount: (account: AccountHandle | null | undefined) => RecoveryScope
-	/** Release this adapter's observed handle. Publish the result if its source remains active. */
+	/** Observe the host's existing session before publishing the returned scope. */
+	observeSession: () => RecoveryScope
 	invalidate: () => RecoveryScope
 	capability: RecoveryPhraseCapability
 }>
 
 /** No client, provider, subscription, or credential store is created here. */
 export function createJazzRecoveryAdapter(
-	getAccount: () => AccountHandle | null | undefined
+	getSession: () => RecoverySession | null | undefined
 ): JazzRecoveryAdapter {
 	const binding = Object.freeze({})
-	let observedAccount: AccountHandle | null = null
+	let observedSession: RecoverySession | null = null
+	let observedUser: JazzSessionSnapshot<unknown>['user'] = null
 	let generation = 0
 	let scope: RecoveryScope = { kind: 'unavailable' }
 
-	// Primitive binding validation used by both the machine guard and its adjacent export recheck.
-	function currentAccount(captured: AvailableRecoveryScope): AccountHandle | undefined {
+	function current() {
+		const session = getSession() ?? null
+		const snapshot = session?.getSnapshot()
+		return {
+			session,
+			user: snapshot?.status === 'ready' && snapshot.user?.kind === 'device' ? snapshot.user : null
+		}
+	}
+
+	// Check both the session and its public user binding, including before the
+	// host forwards a new observation. Account ID equality alone is insufficient.
+	function currentSession(captured: AvailableRecoveryScope) {
 		if (
 			scope.kind !== 'available' ||
-			!observedAccount ||
+			!observedSession ||
+			!observedUser ||
 			captured.binding !== binding ||
 			captured.generation !== generation ||
-			captured.identityId !== observedAccount.id
+			captured.identityId !== observedUser.accountId
 		)
 			return undefined
-
 		try {
-			return getAccount() === observedAccount ? observedAccount : undefined
+			const now = current()
+			return now.session === observedSession && now.user === observedUser
+				? observedSession
+				: undefined
 		} catch {
-			// A host snapshot getter failure cannot make an old binding current.
 			return undefined
 		}
 	}
 
 	return {
-		observeAccount(account) {
-			const next = account ?? null
-			if (next === observedAccount) return scope
-			observedAccount = next
+		observeSession() {
+			const next = current()
+			if (next.session === observedSession && next.user === observedUser) return scope
+			observedSession = next.session
+			observedUser = next.user
 			generation += 1
-			scope =
-				next?.identity.issuer === 'urn:jazz:local-first'
-					? Object.freeze<AvailableRecoveryScope>({
-							kind: 'available',
-							identityId: next.id,
-							binding,
-							generation
-						})
-					: { kind: 'unavailable' }
+			scope = next.user
+				? Object.freeze<AvailableRecoveryScope>({
+						kind: 'available',
+						identityId: next.user.accountId,
+						binding,
+						generation
+					})
+				: { kind: 'unavailable' }
 			return scope
 		},
 		invalidate() {
-			observedAccount = null
+			observedSession = null
+			observedUser = null
 			generation += 1
 			scope = { kind: 'unavailable' }
 			return scope
 		},
 		capability: {
-			isCurrentScope: (captured) => currentAccount(captured) !== undefined,
+			isCurrentScope: (captured) => currentSession(captured) !== undefined,
 			readPhrase: async (captured) => {
-				const account = currentAccount(captured)
-				if (!account) throw new Error('Recovery scope unavailable')
-				// Synchronous local export/encoding; no await, query, mutation, or acquired resource.
-				return RecoveryPhrase.fromSecret(exportLocalFirstSecret(account))
+				const session = currentSession(captured)
+				if (!session) throw new Error('Recovery scope unavailable')
+				return RecoveryPhrase.fromSecret(session.exportDeviceKey())
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 import { ACCOUNT_ACCESS } from '#lib/domain/account-access.js'
 import { ORGANIZATION_ROLE } from '#lib/domain/organization-role.js'
-import type { getDb } from 'jazz-tools/svelte'
-import { app, type Organization } from '../../schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app, type Organization } from '../../queries.js'
 import { workspaceCreationAttemptSchema } from '../../validation/identity.js'
 import type { WorkspaceCreationAttempt } from '../../domain/workspace-creation.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
@@ -18,7 +18,7 @@ export type WorkspacePersistenceResult =
 			settlement: 'notStarted' | 'locallyPersisted' | 'unresolved'
 	  }
 
-type Db = Pick<ReturnType<typeof getDb>, 'beginTransaction'>
+type Db = Pick<JazzDb, 'beginTransaction'>
 type Transaction = ReturnType<Db['beginTransaction']>
 type Input = { db: Db; attempt: WorkspaceCreationAttempt; purpose?: 'additional' | 'bootstrap' }
 type Event = WorkspacePersistenceEvent

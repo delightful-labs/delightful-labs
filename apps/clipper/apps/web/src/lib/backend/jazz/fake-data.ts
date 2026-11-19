@@ -7,7 +7,7 @@ import { createFakeDataMachine, canSeedLibrary } from '../../samples/machine.js'
 import type { SeedRows } from '../../samples/machine.js'
 import type { FakeDataPlan } from '../../samples/plan.js'
 import { insertPreparedContent } from './content.js'
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 export type FakeDataDb = Pick<Db, 'one' | 'all' | 'beginSerializableTransaction'>
 type Resource = { tx: ReturnType<FakeDataDb['beginSerializableTransaction']> }
 type Write = ReturnType<Resource['tx']['commit']>

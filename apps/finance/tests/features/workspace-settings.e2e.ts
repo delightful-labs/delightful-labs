@@ -1,3 +1,4 @@
+import { financeFixture } from '../helpers/worker-fixture.js'
 import { readFile } from 'node:fs/promises'
 import { performance } from 'node:perf_hooks'
 import { prepareArchiveOpen } from 'delightful-local-first/backup/envelope'
@@ -89,26 +90,12 @@ for (const role of ['admin', 'member', 'viewer']) {
 				const ownWorkspaceId = await subject
 					.getByLabel('Current Workspace', { exact: true })
 					.inputValue()
-				const subjectId = await subject.evaluate(() => window.workspaceSettingsTest.userId)
-				await page.evaluate(
-					async ({ organizationId, subjectId, role }) => {
-						const { app, db } = window.workspaceSettingsTest
-						if (role !== 'admin' && role !== 'member' && role !== 'viewer')
-							throw new Error('Invalid test role.')
-						await db
-							.update(app.organizations, organizationId, { name: 'Shared workspace' })
-							.wait({ tier: 'global' })
-						await db
-							.insert(app.organizationMembers, {
-								organizationId,
-								userId: subjectId,
-								role,
-								accountAccessMode: 'all'
-							})
-							.wait({ tier: 'global' })
-					},
-					{ organizationId, subjectId, role }
-				)
+				const subjectId = await financeFixture(subject, 'features/workspace-settings.e2e:92')
+				await financeFixture(page, 'features/workspace-settings.e2e:93', {
+					organizationId,
+					subjectId,
+					role
+				})
 				// Reopen to obtain the grant and recreate bindings for the new document.
 				await subject.reload()
 				await installWorkspaceSettingsTest(subject)
@@ -145,24 +132,17 @@ for (const role of ['admin', 'member', 'viewer']) {
 					await expect(
 						subject.getByText('You do not have permission to make this change.')
 					).toBeVisible()
-					const outcome = await subject.evaluate(async (organizationId) => {
-						const { app, db } = window.workspaceSettingsTest
-						try {
-							await db
-								.update(app.organizations, organizationId, { name: 'Forbidden rename' })
-								.wait({ tier: 'global' })
-							return 'accepted'
-						} catch (error) {
-							return error instanceof Error ? error.message : 'unknown-error'
-						}
-					}, organizationId)
+					const outcome = await financeFixture(
+						subject,
+						'features/workspace-settings.e2e:148',
+						organizationId
+					)
 					expect(outcome).toMatch(/AuthorizationDenied|permission_denied/)
-					const savedName = await page.evaluate(async (organizationId) => {
-						const { app, db } = window.workspaceSettingsTest
-						return (
-							await db.one(app.organizations.where({ id: organizationId }), { tier: 'remote' })
-						)?.name
-					}, organizationId)
+					const savedName = await financeFixture(
+						page,
+						'features/workspace-settings.e2e:160',
+						organizationId
+					)
 					expect(savedName).toBe('Shared workspace')
 				}
 				await selectWorkspace(selector, ownWorkspaceId)
@@ -184,24 +164,7 @@ test.describe('workspace backup downloads', () => {
 		{ tag: ['@workspaces', '@backup'] },
 		async ({ page }) => {
 			await start(page)
-			const identity = await page.evaluate(() => {
-				const { db, userId } = window.workspaceSettingsTest
-				const begin = db.beginSerializableTransaction.bind(db)
-				Object.defineProperty(db, 'beginSerializableTransaction', {
-					configurable: true,
-					writable: true,
-					value: () => {
-						const transaction = begin()
-						transaction.commit = () => {
-							sessionStorage.setItem('backup-test-commit-attempt', '1')
-							throw new Error('Injected export failure before native commit')
-						}
-						transaction.rollback = async () => false
-						return transaction
-					}
-				})
-				return userId
-			})
+			const identity = await financeFixture(page, 'features/workspace-settings.e2e:187')
 			await page.locator('#workspace-backup-protection').selectOption('none')
 			await page.getByRole('button', { name: 'Download Backup', exact: true }).click()
 			await expect(
@@ -223,7 +186,7 @@ test.describe('workspace backup downloads', () => {
 			])
 			await expect(page.getByLabel('Current Workspace', { exact: true })).not.toHaveValue('')
 			await installWorkspaceSettingsTest(page)
-			expect(await page.evaluate(() => window.workspaceSettingsTest.userId)).toBe(identity)
+			expect(await financeFixture(page, 'features/workspace-settings.e2e:226')).toBe(identity)
 			expect(await page.evaluate(() => sessionStorage.getItem('backup-test-commit-attempt'))).toBe(
 				'1'
 			)
@@ -237,77 +200,7 @@ test.describe('workspace backup downloads', () => {
 				// This flow seeds, exports, restores and independently verifies 521 transactions.
 				test.setTimeout(180_000)
 				await start(page)
-				const source = await page.evaluate(async () => {
-					const { db, app, userId } = window.workspaceSettingsTest
-					const root = (
-						await db.all(app.organizations.where({ ownerId: userId }), { tier: 'remote' })
-					)[0]
-					if (!root) throw new Error('Missing disposable workspace')
-					const organizationId = root.id,
-						accountId = crypto.randomUUID(),
-						categoryId = crypto.randomUUID(),
-						transactionId = crypto.randomUUID(),
-						fileId = crypto.randomUUID()
-					const tx = db.beginTransaction()
-					tx.insert(
-						app.accounts,
-						{ organizationId, name: 'Backup account', currency: 'USD', kind: 'cash' },
-						{ id: accountId }
-					)
-					tx.insert(
-						app.categories,
-						{ organizationId, name: 'Backup category', kind: 'expense', isSystem: false },
-						{ id: categoryId }
-					)
-					for (let index = 0; index < 521; index++)
-						tx.insert(
-							app.transactions,
-							{
-								organizationId,
-								accountId,
-								categoryId,
-								kind: 'expense',
-								currency: 'USD',
-								amountMinor: index + 1,
-								bookedOn: '2026-11-01',
-								description: 'Exact transaction ' + index,
-								source: 'manual'
-							},
-							{ id: index === 0 ? transactionId : crypto.randomUUID() }
-						)
-					await tx.commit().wait({ tier: 'global' })
-					const attachment = db.beginTransaction()
-					attachment.insert(
-						app.files,
-						{
-							transactionId,
-							fileName: 'exact-receipt.bin',
-							mimeType: 'application/octet-stream',
-							sizeBytes: 8
-						},
-						{ id: fileId }
-					)
-					attachment.insert(app.transactionAttachments, { transactionId, fileId })
-					attachment.insert(app.fileParts, {
-						fileId,
-						partIndex: 0,
-						sizeBytes: 8,
-						data: new Uint8Array([0, 1, 127, 255, 9, 8, 7, 6])
-					})
-					await attachment.commit().wait({ tier: 'global' })
-					const records = await db.all(
-						app.transactions
-							.where({ organizationId })
-							.select('*', '$createdAt', '$updatedAt', '$createdBy', '$updatedBy'),
-						{ tier: 'remote' }
-					)
-					return {
-						organizationId,
-						transactionId,
-						fileId,
-						records: JSON.stringify(records.toSorted((a, b) => a.id.localeCompare(b.id)))
-					}
-				})
+				const source = await financeFixture(page, 'features/workspace-settings.e2e:240')
 				await page.locator('#workspace-backup-protection').selectOption(protection)
 				if (protection === 'password')
 					await page.locator('#workspace-backup-password').fill('independent-browser-password')
@@ -349,16 +242,11 @@ test.describe('workspace backup downloads', () => {
 				expect(
 					payload.records.find((row) => row.id === source.transactionId)?.fields.description
 				).toEqual({ kind: 'text', value: 'Exact transaction 0' })
-				const after = await page.evaluate(async (organizationId) => {
-					const { db, app } = window.workspaceSettingsTest
-					const records = await db.all(
-						app.transactions
-							.where({ organizationId })
-							.select('*', '$createdAt', '$updatedAt', '$createdBy', '$updatedBy'),
-						{ tier: 'remote' }
-					)
-					return JSON.stringify(records.toSorted((a, b) => a.id.localeCompare(b.id)))
-				}, source.organizationId)
+				const after = await financeFixture(
+					page,
+					'features/workspace-settings.e2e:352',
+					source.organizationId
+				)
 				expect(after).toBe(source.records)
 				const measurement = {
 					protection,
@@ -381,14 +269,7 @@ test.describe('workspace backup downloads', () => {
 
 				// Restore from the actual downloaded file through the root-owned UI.
 				const restoreRegion = page.getByRole('region', { name: 'Restore Workspace', exact: true })
-				const beforeIds = await page.evaluate(async () =>
-					(
-						await window.workspaceSettingsTest.db.all(
-							window.workspaceSettingsTest.app.organizations,
-							{ tier: 'remote' }
-						)
-					).map((row) => row.id)
-				)
+				const beforeIds = await financeFixture(page, 'features/workspace-settings.e2e:384')
 				if (protection === 'none') {
 					await restoreRegion.getByLabel('Backup', { exact: true }).setInputFiles({
 						name: 'invalid.dlf',
@@ -411,16 +292,9 @@ test.describe('workspace backup downloads', () => {
 					await expect(restoreRegion.getByRole('alert')).toContainText(
 						'Couldn’t complete the request.'
 					)
-					expect(
-						await page.evaluate(async () =>
-							(
-								await window.workspaceSettingsTest.db.all(
-									window.workspaceSettingsTest.app.organizations,
-									{ tier: 'remote' }
-								)
-							).map((row) => row.id)
-						)
-					).toEqual(beforeIds)
+					expect(await financeFixture(page, 'features/workspace-settings.e2e:415')).toEqual(
+						beforeIds
+					)
 				}
 				await restoreRegion.getByLabel('Backup', { exact: true }).setInputFiles(path)
 				if (protection === 'password')
@@ -431,16 +305,7 @@ test.describe('workspace backup downloads', () => {
 				await expect(
 					restoreRegion.getByRole('button', { name: 'Create Workspace', exact: true })
 				).toBeVisible()
-				expect(
-					await page.evaluate(async () =>
-						(
-							await window.workspaceSettingsTest.db.all(
-								window.workspaceSettingsTest.app.organizations,
-								{ tier: 'remote' }
-							)
-						).map((row) => row.id)
-					)
-				).toEqual(beforeIds)
+				expect(await financeFixture(page, 'features/workspace-settings.e2e:435')).toEqual(beforeIds)
 				if (protection === 'none') {
 					await navigateSidebar(page, 'Overview')
 					await expect(
@@ -475,51 +340,11 @@ test.describe('workspace backup downloads', () => {
 					body: JSON.stringify(restoreMeasurement),
 					contentType: 'application/json'
 				})
-				const restored = await page.evaluate(async (beforeIds) => {
-					const { db, app } = window.workspaceSettingsTest
-					const roots = await db.all(app.organizations, { tier: 'remote' }),
-						root = roots.find((row) => !beforeIds.includes(row.id))
-					if (!root) throw new Error('Missing restored workspace')
-					const transactions = await db.all(app.transactions.where({ organizationId: root.id }), {
-							tier: 'remote'
-						}),
-						members = await db.all(app.organizationMembers.where({ organizationId: root.id }), {
-							tier: 'remote'
-						}),
-						operations = await db.all(app.restoreOperations.where({ workspaceId: root.id }), {
-							tier: 'remote'
-						})
-					const first = transactions.find((row) => row.description === 'Exact transaction 0')
-					if (!first) throw new Error('Missing restored attachment transaction')
-					const files = await db.all(app.files.where({ transactionId: first.id }), {
-						tier: 'remote'
-					})
-					const parts = await db.all(
-						app.fileParts
-							.where({ fileId: { in: files.map((row) => row.id) } })
-							.orderBy('partIndex'),
-						{ tier: 'remote' }
-					)
-					return {
-						id: root.id,
-						roots: roots.length,
-						transactions: transactions.length,
-						descriptions: transactions.map((row) => row.description).sort(),
-						facts: transactions
-							.map((row) => ({
-								description: row.description,
-								amountMinor: row.amountMinor,
-								currency: row.currency,
-								bookedOn: row.bookedOn,
-								kind: row.kind,
-								source: row.source
-							}))
-							.toSorted((a, b) => a.amountMinor - b.amountMinor),
-						attachment: parts.flatMap((part) => [...(part.data ?? [])]),
-						members: members.map((row) => ({ role: row.role, userId: row.userId })),
-						operationCount: operations.length
-					}
-				}, beforeIds)
+				const restored = await financeFixture(
+					page,
+					'features/workspace-settings.e2e:478',
+					beforeIds
+				)
 				expect(restored).toMatchObject({
 					roots: beforeIds.length + 1,
 					transactions: 521,
@@ -541,22 +366,9 @@ test.describe('workspace backup downloads', () => {
 				expect(restored.attachment).toEqual([0, 1, 127, 255, 9, 8, 7, 6])
 				expect(restored.members).toHaveLength(1)
 				expect(restored.members[0]?.role).toBe('owner')
-				expect(
-					await page.evaluate(
-						async (source) =>
-							JSON.stringify(
-								(
-									await window.workspaceSettingsTest.db.all(
-										window.workspaceSettingsTest.app.transactions
-											.where({ organizationId: source.organizationId })
-											.select('*', '$createdAt', '$updatedAt', '$createdBy', '$updatedBy'),
-										{ tier: 'remote' }
-									)
-								).toSorted((a, b) => a.id.localeCompare(b.id))
-							),
-						source
-					)
-				).toBe(source.records)
+				expect(await financeFixture(page, 'features/workspace-settings.e2e:545', source)).toBe(
+					source.records
+				)
 				await restoreRegion.getByRole('button', { name: 'Open Workspace', exact: true }).click()
 				await expect(page).toHaveURL((url) => url.searchParams.get('workspace') === restored.id)
 				await installWorkspaceSettingsTest(page)
@@ -569,17 +381,9 @@ test.describe('workspace backup downloads', () => {
 				await expect(restoreRegion.getByRole('status')).toHaveText('Done', {
 					timeout: info.timeout
 				})
-				expect(
-					await page.evaluate(
-						async () =>
-							(
-								await window.workspaceSettingsTest.db.all(
-									window.workspaceSettingsTest.app.organizations,
-									{ tier: 'remote' }
-								)
-							).length
-					)
-				).toBe(beforeIds.length + 1)
+				expect(await financeFixture(page, 'features/workspace-settings.e2e:573')).toBe(
+					beforeIds.length + 1
+				)
 
 				await responsiveness.dispose()
 				opened.archive.release()

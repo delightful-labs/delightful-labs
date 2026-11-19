@@ -8,7 +8,7 @@ import { createDomainTransaction } from '../../machines/storage/domain-transacti
 import type { TransactionDomainInput } from '../../machines/storage/domain-transaction.js'
 import { retainDetachedTransaction } from '../../backend/jazz/transaction.js'
 import type { SyncReceipt } from '../../contracts/storage.js'
-import { app } from '../../backend/jazz/schema.js'
+import { app } from '../../backend/jazz/jazz.generated.js'
 import { publicationSourceSchema } from '../../annotations/publication-link.js'
 import type { PublicationSource } from '../../annotations/publication-link.js'
 import {

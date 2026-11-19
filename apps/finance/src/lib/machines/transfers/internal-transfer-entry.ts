@@ -1,10 +1,8 @@
-import { m } from '#lib/paraglide/messages.js'
-import { formReasonText } from '#lib/forms/form-messages.js'
 import { canWriteAccount } from '#lib/domain/organization-permissions.js'
 import { EXPENSE, INCOME } from '#lib/domain/transaction-kind.js'
 import { parseAmountMinor } from '#lib/domain/money.js'
-import { type Account } from '#lib/schema.js'
-import type { getDb } from 'jazz-tools/svelte'
+import { type Account } from '#lib/queries.js'
+import type { Db as JazzDb } from 'jazz-tools'
 import { z } from 'zod'
 import type {
 	FormCapability,
@@ -44,8 +42,9 @@ type CreatedTransfer = {
 	incomeTransactionId: string
 }
 type Dependencies = {
-	db: Pick<ReturnType<typeof getDb>, 'beginTransaction'>
-	trackWrite: (write: TransferWriteTracking) => void
+	binding: object
+	db: Pick<JazzDb, 'beginTransaction'>
+	trackWrite?: (write: TransferWriteTracking) => void
 	observe: () => InternalTransferEntryObservation
 	mutationGateway: TransferMutationGateway
 }
@@ -580,7 +579,7 @@ export const internalTransferEntrySchema = z
 	})
 
 export function createInternalTransferEntryFormOptions(dependencies: Dependencies) {
-	const availability = createInternalTransferEntryAvailability(dependencies.db)
+	const availability = createInternalTransferEntryAvailability(dependencies.binding)
 	const persistence = createPersistence(dependencies)
 	return createSingleWriteFormOptions<
 		InternalTransferEntryValues,
@@ -603,10 +602,4 @@ export function createInternalTransferEntryFormOptions(dependencies: Dependencie
 	})
 }
 
-export const internalTransferEntryReasonLabels = {
-	...formReasonText,
-	insufficientAccounts: () => m['transfers.insufficient_accounts'](),
-	permissionChanged: () => m['forms.read_only'](),
-	incompatible: () => m['transfers.incompatible'](),
-	unavailable: () => m['errors.save_subject']({ subject: m['nouns.transfer']({ count: 1 }) })
-} satisfies Record<InternalTransferEntryReason, () => string>
+export { internalTransferEntryReasonLabels } from '../../forms/form-messages.js'

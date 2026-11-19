@@ -1,3 +1,11 @@
+import type { BankSource } from '../machines/bank-sync/types.js'
+import type { InternalTransferEntryObservation } from './transfer-create-contract.js'
+import type { WorkerTransferFacts } from './worker-transfers.js'
+import type { DeleteGrantObservation } from '../machines/accounts/account-delete-grants.js'
+import type { BackupObservation } from '../machines/workspaces/workspace-backup.js'
+import { appWorkspaceSchema } from '../validation/identity.js'
+import type { ProfileObservation } from './profile-contract.js'
+import type { WorkspaceRenameObservation } from './workspace-rename-contract.js'
 import type { WorkspaceNavigationFacts } from './workspace-orchestration-contract.js'
 import { z } from 'zod'
 import { createWorkerFormViewSchema } from 'delightful-local-first/forms/worker'
@@ -18,25 +26,17 @@ export const workerAccountCreationView = createWorkerFormViewSchema(
 	z.enum(ACCOUNT_CREATION_REASON)
 )
 export type WorkerAccountCreationView = z.output<typeof workerAccountCreationView>
-export const workerAccountCreationCommand = z.discriminatedUnion('type', [
+export const workerFormCommand = z.discriminatedUnion('type', [
 	z.strictObject({ type: z.enum(['OPEN', 'RESET', 'CANCEL', 'RETRY_READINESS']) }),
 	z.strictObject({ type: z.enum(['SUBMIT', 'CHANGE']), values: z.record(z.string(), z.unknown()) })
 ])
-export type WorkerAccountCreationCommand = z.output<typeof workerAccountCreationCommand>
+export type WorkerFormCommand = z.output<typeof workerFormCommand>
 
 export const workerTransactionEntryView = createWorkerFormViewSchema(
 	z.undefined(),
 	z.enum(TRANSACTION_ENTRY_REASON)
 )
 export type WorkerTransactionEntryView = z.output<typeof workerTransactionEntryView>
-export const workerTransactionEntryCommand = z.discriminatedUnion('type', [
-	z.strictObject({ type: z.enum(['OPEN', 'RESET', 'CANCEL', 'RETRY_READINESS']) }),
-	z.strictObject({
-		type: z.enum(['SUBMIT', 'CHANGE']),
-		values: z.record(z.string(), z.union([z.string(), z.array(z.string())]))
-	})
-])
-export type WorkerTransactionEntryCommand = z.output<typeof workerTransactionEntryCommand>
 export const workerAccountOrderCommand = z.discriminatedUnion('type', [
 	z.strictObject({ type: z.enum(['EDIT', 'DONE']) }),
 	z.strictObject({ type: z.literal('MOVE'), id: z.uuid(), direction: z.enum(['up', 'down']) })
@@ -49,6 +49,14 @@ export const workerAccountOrderView = z.strictObject({
 	moves: z.array(z.strictObject({ id: z.uuid(), up: z.boolean(), down: z.boolean() }))
 })
 export type FinanceFormsObservation = {
+	sampleSelectedAccounts: readonly string[] | null
+	bank: BankSource
+	transferCreate: InternalTransferEntryObservation
+	transfers: WorkerTransferFacts
+	accountAccess: DeleteGrantObservation
+	backup: BackupObservation
+	profile: ProfileObservation
+	workspace: WorkspaceRenameObservation
 	classification: ManagementObservation
 	order: AccountOrderObservation
 	navigation: WorkspaceNavigationFacts
@@ -93,3 +101,88 @@ export const workerClassificationForms = z.strictObject({
 	archiveTag: workerClassificationArchiveView
 })
 export type WorkerClassificationForms = z.output<typeof workerClassificationForms>
+
+export const workerProfileFormView = createWorkerFormViewSchema(
+	z.undefined(),
+	z.enum(['sessionUnavailable', 'loadFailed', 'loading', 'profileUnavailable'])
+)
+export const workerProfileForms = z.strictObject({
+	name: workerProfileFormView,
+	avatar: workerProfileFormView
+})
+export type WorkerProfileForms = z.output<typeof workerProfileForms>
+export const workerWorkspaceFormView = createWorkerFormViewSchema(
+	z.undefined(),
+	z.enum([
+		'sessionUnavailable',
+		'selectWorkspace',
+		'loadFailed',
+		'loading',
+		'workspaceUnavailable',
+		'readOnly'
+	])
+)
+export type WorkerWorkspaceFormView = z.output<typeof workerWorkspaceFormView>
+
+export const workerWorkspaceCreationView = z
+	.strictObject({
+		draftRevision: z.number().int().nonnegative(),
+		mode: z.enum([
+			'unavailable',
+			'working',
+			'editing',
+			'invalid',
+			'recovered',
+			'complete',
+			'conflict',
+			'failed',
+			'unresolved'
+		]),
+		name: z.string(),
+		// Native inserted rows also carry Jazz metadata and write methods.
+		// Project only the declared row fields into the worker reply.
+		workspace: appWorkspaceSchema.extend({ id: z.uuid() }).strip().optional(),
+		canSubmit: z.boolean(),
+		canRetry: z.boolean(),
+		canCreateAnother: z.boolean()
+	})
+	.transform((view) => ({ ...view, workspace: view.workspace }))
+export type WorkerWorkspaceCreationView = z.output<typeof workerWorkspaceCreationView>
+export const workerWorkspaceCreationCommand = z.discriminatedUnion('type', [
+	z.strictObject({ type: z.literal('SUBMIT'), name: z.string() }),
+	z.strictObject({ type: z.enum(['RETRY', 'NEW', 'CANCEL']) })
+])
+
+export type WorkerWorkspaceCreationCommand = z.output<typeof workerWorkspaceCreationCommand>
+
+export const workerTransferCreationView = createWorkerFormViewSchema(
+	z.strictObject({
+		transferId: z.uuid(),
+		expenseTransactionId: z.uuid(),
+		incomeTransactionId: z.uuid()
+	}),
+	z.enum([
+		'sessionUnavailable',
+		'selectWorkspace',
+		'loadFailed',
+		'loading',
+		'readOnly',
+		'noAccounts',
+		'insufficientAccounts',
+		'noCategories',
+		'permissionChanged',
+		'incompatible',
+		'unavailable'
+	])
+)
+export type WorkerTransferCreationView = z.output<typeof workerTransferCreationView>
+
+export const workerSampleView = z.strictObject({
+	busy: z.boolean(),
+	saved: z.number().int().nonnegative(),
+	failed: z.boolean()
+})
+export const workerSamplesView = z.strictObject({
+	income: workerSampleView,
+	expense: workerSampleView
+})

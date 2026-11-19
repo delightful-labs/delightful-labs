@@ -1,37 +1,10 @@
-import { schema as s, type Db } from 'jazz-tools'
+import type { Db } from 'jazz-tools'
+import { app } from './jazz/jazz.generated.js'
+export { app }
 export { createJazzClient as createBrowserSession } from 'jazz-tools/client'
 export const loadLocalFirst = () => import('jazz-tools/local-first')
-
-export const app = s.defineApp(
-	{
-		workspaces: s.table({ revision: s.int(), allowed: s.boolean(), visible: s.boolean() }, {}),
-		entries: s.table(
-			{ workspaceId: s.uuid(), fileId: s.uuid(), revision: s.int() },
-			{ workspace: s.rel('workspaces', 'workspaceId'), file: s.rel('files', 'fileId') }
-		),
-		files: s.table(
-			{ workspaceId: s.uuid(), revision: s.int(), sizeBytes: s.int() },
-			{ parts: s.reverse('parts', 'file') }
-		),
-		parts: s.table(
-			{ workspaceId: s.uuid(), fileId: s.uuid(), partIndex: s.int(), data: s.bytes() },
-			{ file: s.rel('files', 'fileId') }
-		)
-	},
-	{ migrations: 'none' }
-)
-export const permissions = s.definePermissions(app, ({ policy }) => {
-	policy.workspaces.allowRead.where({ visible: true })
-	policy.workspaces.allowInsert.where({ allowed: true })
-	policy.workspaces.allowUpdate.where({ allowed: true })
-	policy.workspaces.allowDelete.always()
-	for (const table of [policy.entries, policy.files, policy.parts]) {
-		table.allowRead.always()
-		table.allowInsert.always()
-		table.allowUpdate.always()
-		table.allowDelete.always()
-	}
-})
+import permissions from './jazz/jazz.permissions.json' with { type: 'json' }
+export { permissions }
 
 export type Graph = { workspace: string; entry: string; file: string; part: string }
 export const bytes = (revision: number) =>

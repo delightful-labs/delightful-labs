@@ -1,0 +1,61 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "9f5bee41c58bd12850849015dae4d63454bd0cb71ce474dc28debc96cca8b93d"
+  },
+  "tables": {
+    "restoreAttachments": {
+      "columns": {
+        "destinationId": "uuid",
+        "ownerId": "uuid",
+        "operationId": "string",
+        "mediaType": "string",
+        "fileName": "string",
+        "sizeBytes": "int",
+        "sha256": "string",
+        "contents": "bytes"
+      },
+      "relations": { "destination": { "rel": "restoreDestinations", "column": "destinationId" } }
+    },
+    "restoreDestinations": {
+      "columns": {
+        "ownerId": "uuid",
+        "operationId": "string",
+        "payloadSha256": "string",
+        "graphSha256": "string",
+        "status": { "enum": ["incomplete", "active"] }
+      },
+      "relations": {
+        "attachments": { "reverse": "restoreAttachments", "relation": "destination" },
+        "notebooks": { "reverse": "restoreNotebooks", "relation": "destination" },
+        "notes": { "reverse": "restoreNotes", "relation": "destination" }
+      }
+    },
+    "restoreNotebooks": {
+      "columns": {
+        "destinationId": "uuid",
+        "ownerId": "uuid",
+        "operationId": "string",
+        "title": "string"
+      },
+      "relations": { "destination": { "rel": "restoreDestinations", "column": "destinationId" } }
+    },
+    "restoreNotes": {
+      "columns": {
+        "destinationId": "uuid",
+        "ownerId": "uuid",
+        "operationId": "string",
+        "notebookId": "uuid",
+        "attachmentId": "uuid?",
+        "body": "string",
+        "archived": "boolean"
+      },
+      "relations": {
+        "attachment": { "rel": "restoreAttachments", "column": "attachmentId" },
+        "destination": { "rel": "restoreDestinations", "column": "destinationId" },
+        "notebook": { "rel": "restoreNotebooks", "column": "notebookId" }
+      }
+    }
+  }
+}

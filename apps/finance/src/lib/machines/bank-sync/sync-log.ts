@@ -1,4 +1,4 @@
-import { app } from '#lib/schema.js'
+import { app } from '#lib/queries.js'
 import { syncAttemptSchema, syncAccountCompletionSchema } from '#lib/validation/bank-sync-log.js'
 import { stableUuid } from '#lib/data.js'
 import type {

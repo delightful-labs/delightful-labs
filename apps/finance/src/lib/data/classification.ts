@@ -1,5 +1,5 @@
 import type { Db } from 'jazz-tools'
-import { app, type Category, type Tag } from '../schema.js'
+import { app, type Category, type Tag } from '../queries.js'
 import { appCategorySchema } from '../validation/categories.js'
 import { appTagSchema } from '../validation/tags.js'
 

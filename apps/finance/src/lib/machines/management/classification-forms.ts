@@ -1,7 +1,7 @@
 import { createManagementFormOptions } from './management.js'
 import { categoryFormSchema, categoryArchiveSchema } from '../../validation/categories.js'
 import { tagFormSchema, tagArchiveSchema } from '../../validation/tags.js'
-import type { Category, Tag } from '../../schema.js'
+import type { Category, Tag } from '../../queries.js'
 import type { ManagementObservation } from '../../contracts/management-contract.js'
 import type { z } from 'zod'
 type Dependencies<Result, Values> = {

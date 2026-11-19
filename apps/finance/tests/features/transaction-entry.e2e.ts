@@ -1,3 +1,4 @@
+import { financeFixture } from '../helpers/worker-fixture.js'
 import { expect } from '@playwright/test'
 import { test, start } from '../helpers/workspace.js'
 import { selectWorkspace } from '../helpers/ui.js'
@@ -35,89 +36,10 @@ for (const scenario of formScenarios) {
 			const firstWorkspaceId = await page
 				.getByLabel('Current Workspace', { exact: true })
 				.inputValue()
-			const secondWorkspaceId = await page.evaluate(
-				async ({ organizationId, kind }) => {
-					const { app, db, userId } = window.workspaceSettingsTest
-					const second = await db
-						.insert(app.organizations, {
-							name: 'Form workspace',
-							kind: 'business',
-							defaultCurrency: 'USD',
-							ownerId: userId
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.organizationMembers, {
-							organizationId: second.id,
-							userId,
-							role: 'owner',
-							accountAccessMode: 'all'
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.accounts, {
-							organizationId,
-							name: 'Personal checking',
-							kind: 'bank',
-							currency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.categories, {
-							organizationId,
-							name: 'Personal category',
-							kind,
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.accounts, {
-							organizationId: second.id,
-							name: 'Business checking',
-							kind: 'bank',
-							currency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					const archivedAccount = await db
-						.insert(app.accounts, {
-							organizationId: second.id,
-							name: 'Archived checking',
-							kind: 'bank',
-							currency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					await db
-						.update(app.accounts, archivedAccount.id, { archivedAt: new Date() })
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.categories, {
-							organizationId: second.id,
-							name: 'Business category',
-							kind,
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.categories, {
-							organizationId: second.id,
-							name: 'Wrong kind category',
-							kind: kind === 'expense' ? 'income' : 'expense',
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.categories, {
-							organizationId: second.id,
-							name: 'Archived category',
-							kind,
-							isSystem: false,
-							archivedAt: new Date()
-						})
-						.wait({ tier: 'global' })
-					return second.id
-				},
-				{ organizationId: firstWorkspaceId, kind: scenario.kind }
-			)
+			const secondWorkspaceId = await financeFixture(page, 'features/transaction-entry.e2e:38', {
+				organizationId: firstWorkspaceId,
+				kind: scenario.kind
+			})
 			await page
 				.getByRole('navigation')
 				.getByRole('link', { name: scenario.link, exact: true })
@@ -222,22 +144,10 @@ for (const scenario of formScenarios) {
 			await expect(page).toHaveURL(
 				`${scenario.kind === 'income' ? '/income' : '/expenses'}?workspace=${secondWorkspaceId}`
 			)
-			const saved = await page.evaluate(
-				async ({ organizationId, memo }) => {
-					const { app, db } = window.workspaceSettingsTest
-					const rows = await db.all(app.transactions.where({ organizationId, memo }), {
-						tier: 'remote'
-					})
-					const row = rows[0]
-					return {
-						rows,
-						check: row?.checkId
-							? await db.one(app.checks.where({ id: row.checkId }), { tier: 'remote' })
-							: null
-					}
-				},
-				{ organizationId: secondWorkspaceId, memo: scenario.memo }
-			)
+			const saved = await financeFixture(page, 'features/transaction-entry.e2e:225', {
+				organizationId: secondWorkspaceId,
+				memo: scenario.memo
+			})
 			expect(saved.rows).toHaveLength(1)
 			expect(saved.rows[0]).toMatchObject({
 				kind: scenario.kind,
@@ -275,73 +185,10 @@ for (const scenario of formScenarios) {
 			const firstWorkspaceId = await page
 				.getByLabel('Current Workspace', { exact: true })
 				.inputValue()
-			const fixture = await page.evaluate(
-				async ({ organizationId, kind }) => {
-					const { app, db, userId } = window.workspaceSettingsTest
-					const system = await db.one(
-						app.categories.where({ organizationId, kind, isSystem: true }),
-						{ tier: 'remote' }
-					)
-					if (!system) throw new Error('System category is missing.')
-					const account = await db
-						.insert(app.accounts, {
-							organizationId,
-							name: 'Default checking',
-							kind: 'bank',
-							currency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					const custom = await db
-						.insert(app.categories, {
-							organizationId,
-							name: 'Custom category',
-							kind,
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-					const second = await db
-						.insert(app.organizations, {
-							name: 'Defaults workspace',
-							kind: 'business',
-							ownerId: userId,
-							defaultCurrency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					await db
-						.insert(app.organizationMembers, {
-							organizationId: second.id,
-							userId,
-							role: 'owner',
-							accountAccessMode: 'all'
-						})
-						.wait({ tier: 'global' })
-					const secondAccount = await db
-						.insert(app.accounts, {
-							organizationId: second.id,
-							name: 'Second checking',
-							kind: 'bank',
-							currency: 'USD'
-						})
-						.wait({ tier: 'global' })
-					const secondSystem = await db
-						.insert(app.categories, {
-							organizationId: second.id,
-							name: 'Renamed default',
-							kind,
-							isSystem: true
-						})
-						.wait({ tier: 'global' })
-					return {
-						systemId: system.id,
-						accountId: account.id,
-						customId: custom.id,
-						secondWorkspaceId: second.id,
-						secondAccountId: secondAccount.id,
-						secondSystemId: secondSystem.id
-					}
-				},
-				{ organizationId: firstWorkspaceId, kind: scenario.kind }
-			)
+			const fixture = await financeFixture(page, 'features/transaction-entry.e2e:278', {
+				organizationId: firstWorkspaceId,
+				kind: scenario.kind
+			})
 			await page
 				.getByRole('navigation')
 				.getByRole('link', { name: scenario.link, exact: true })
@@ -367,16 +214,7 @@ for (const scenario of formScenarios) {
 				await page.getByRole('button', { name: 'Save Transaction', exact: true }).click()
 				await expect
 					.poll(() =>
-						page.evaluate(
-							async ({ organizationId, memo }) => {
-								const { app, db } = window.workspaceSettingsTest
-								const rows = await db.all(app.transactions.where({ organizationId, memo }), {
-									tier: 'remote'
-								})
-								return rows.map((row) => ({ categoryId: row.categoryId, kind: row.kind }))
-							},
-							{ organizationId, memo }
-						)
+						financeFixture(page, 'features/transaction-entry.e2e:370', { organizationId, memo })
 					)
 					.toEqual([{ categoryId, kind: scenario.kind }])
 				await page
@@ -390,20 +228,10 @@ for (const scenario of formScenarios) {
 			await save(fixture.accountId, 'Default transaction', firstWorkspaceId, fixture.systemId)
 			await expect(category).toHaveValue(fixture.systemId)
 			await category.selectOption(fixture.customId)
-			await page.evaluate(
-				async ({ organizationId, kind }) => {
-					const { app, db } = window.workspaceSettingsTest
-					await db
-						.insert(app.categories, {
-							organizationId,
-							name: 'Live category',
-							kind,
-							isSystem: false
-						})
-						.wait({ tier: 'global' })
-				},
-				{ organizationId: firstWorkspaceId, kind: scenario.kind }
-			)
+			await financeFixture(page, 'features/transaction-entry.e2e:393', {
+				organizationId: firstWorkspaceId,
+				kind: scenario.kind
+			})
 			await expect(category.getByRole('option', { name: 'Live category' })).toHaveCount(1)
 			await expect(category).toHaveValue(fixture.customId)
 			await save(fixture.accountId, 'Custom transaction', firstWorkspaceId, fixture.customId)

@@ -1,3 +1,19 @@
+import { acceptInspection } from '../../diagnostics/inspector.js'
+import {
+	financeBankConnectRequest,
+	type WorkerBankCommand,
+	type WorkerBankHistoryCommand
+} from '../../contracts/worker-banks.js'
+import { dispatchWindowWebAuthn } from '../../integrations/webauthn.js'
+import type { WorkerTransactionImageCommand } from '../../contracts/worker-images.js'
+import type { WorkerTransferEditCommand } from '../../contracts/worker-transfers.js'
+import {
+	financeBackupRequest,
+	financeWorkspaceRestoreRequest
+} from '../../contracts/worker-backup.js'
+import { dispatchWindowBackup } from './download.js'
+import type { WorkspaceRestoreCommand } from '../../machines/workspaces/workspace-restore.js'
+import type { WorkerWorkspaceCreationCommand } from '../../contracts/worker-forms.js'
 import { replyWithWindowNavigation } from './navigation.js'
 import type { WorkspaceNavigate } from '../../contracts/workspace-orchestration-contract.js'
 import type {
@@ -6,6 +22,11 @@ import type {
 	RecoveryPhraseCapability
 } from 'delightful-local-first/recovery/contracts'
 import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
+import {
+	transactionListLocation,
+	transactionListQuery
+} from '../../domain/transaction-list-routes.js'
+import { withQueryParams } from '../../domain/query-params.js'
 import { get, writable, type Readable } from 'svelte/store'
 import { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/worker-broker'
 import brokerUrl from '#jazz-broker-worker?sharedworker&url'
@@ -24,11 +45,15 @@ import {
 } from '../../contracts/worker-application.js'
 import { EXPENSE, type TransactionKind } from '../../domain/transaction-kind.js'
 import type {
-	WorkerTransactionEntryCommand,
+	WorkerFormCommand,
 	ClassificationForm,
-	WorkerAccountOrderCommand,
-	WorkerAccountCreationCommand
+	WorkerAccountOrderCommand
 } from '../../contracts/worker-forms.js'
+
+// Callers may pass a complete view. Transport only the command's scope fields.
+function commandScope({ sessionRevision, selection }: WorkerCommandScope): WorkerCommandScope {
+	return { sessionRevision, selection }
+}
 
 /** Window owns native transport and rendering only. Domain state stays in the Worker. */
 export function createFinanceWorkerClient(
@@ -54,6 +79,7 @@ export function createFinanceWorkerClient(
 		},
 		open: (url, name) => new SharedWorker(url, { type: 'module', name })
 	})
+	const imageEditor = writable<{ file: File; port: MessagePort } | null>(null)
 	const observedLocation = writable(new URL(location.href))
 	let revision = 0
 	const state = writable<FinanceWorkerView>({
@@ -81,10 +107,28 @@ export function createFinanceWorkerClient(
 		},
 		workspaceStartup: null,
 		accountCreation: null,
+		accountArchive: null,
+		accountAccess: null,
 		accountOrder: null,
 		classification: null,
+		backup: null,
+		workspaceRestore: null,
+		workspaceCreation: null,
+		profile: null,
+		workspace: null,
 		transactionEntry: null,
 		transactionEdit: null,
+		samples: null,
+		canRetrySession: false,
+		canRetryInitialization: false,
+		workspaceIntegrity: null,
+		mutationRejected: false,
+		bank: null,
+		transactionDetails: null,
+		transferEdit: null,
+		transferCreation: null,
+		transfers: null,
+		overview: null,
 		ledger: null
 	})
 	const fail = () => {
@@ -110,10 +154,28 @@ export function createFinanceWorkerClient(
 			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
+			accountArchive: null,
+			accountAccess: null,
 			accountOrder: null,
 			classification: null,
+			backup: null,
+			workspaceRestore: null,
+			workspaceCreation: null,
+			profile: null,
+			workspace: null,
 			transactionEntry: null,
 			transactionEdit: null,
+			samples: null,
+			canRetrySession: false,
+			canRetryInitialization: false,
+			workspaceIntegrity: null,
+			mutationRejected: false,
+			bank: null,
+			transactionDetails: null,
+			transferEdit: null,
+			transferCreation: null,
+			transfers: null,
+			overview: null,
 			ledger: null
 		}))
 	}
@@ -129,6 +191,40 @@ export function createFinanceWorkerClient(
 	const receiveControl = (event: MessageEvent<unknown>) => {
 		const decoded = financeWorkerReply.safeParse(event.data)
 		if (!decoded.success || decoded.data.type === 'VIEW') return
+		if (decoded.data.type === 'INSPECTION') {
+			acceptInspection(decoded.data.event)
+			return
+		}
+		if (decoded.data.type === 'WEBAUTHN') {
+			const port = event.ports[0]
+			if (port && event.ports.length === 1) void dispatchWindowWebAuthn(port, decoded.data)
+			else fail()
+			return
+		}
+		if (decoded.data.type === 'EDIT_IMAGE') {
+			const port = event.ports[0]
+			if (!port || event.ports.length !== 1) {
+				fail()
+				return
+			}
+			if (get(imageEditor)) {
+				port.postMessage({ kind: 'failed', reason: 'input' })
+				port.close()
+				return
+			}
+			imageEditor.set({ file: decoded.data.file, port })
+			return
+		}
+		if (decoded.data.type === 'DOWNLOAD_BACKUP') {
+			const port = event.ports[0]
+			if (port && event.ports.length === 1) dispatchWindowBackup(port, decoded.data.bytes)
+			else fail()
+			return
+		}
+		if (decoded.data.type === 'RELOAD_PAGE') {
+			window.location.reload()
+			return
+		}
 		if (decoded.data.type === 'NAVIGATE') {
 			const port = event.ports[0]
 			if (port && event.ports.length === 1)
@@ -146,6 +242,8 @@ export function createFinanceWorkerClient(
 		worker.removeEventListener('messageerror', fail)
 		window.removeEventListener('popstate', observeLocation)
 		window.removeEventListener('popstate', observeRoute)
+		window.removeEventListener('online', observeNetwork)
+		window.removeEventListener('offline', observeNetwork)
 		worker.terminate()
 		releaseBroker()
 		state.update((view) => ({
@@ -169,10 +267,28 @@ export function createFinanceWorkerClient(
 			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
+			accountArchive: null,
+			accountAccess: null,
 			accountOrder: null,
 			classification: null,
+			backup: null,
+			workspaceRestore: null,
+			workspaceCreation: null,
+			profile: null,
+			workspace: null,
 			transactionEntry: null,
 			transactionEdit: null,
+			samples: null,
+			canRetrySession: false,
+			canRetryInitialization: false,
+			workspaceIntegrity: null,
+			mutationRejected: false,
+			bank: null,
+			transactionDetails: null,
+			transferEdit: null,
+			transferCreation: null,
+			transfers: null,
+			overview: null,
 			ledger: null
 		}))
 	}
@@ -189,9 +305,17 @@ export function createFinanceWorkerClient(
 			financeWorkerCommand.parse({ type: 'OBSERVE_LOCATION', href: relativeHref() })
 		)
 	}
+	function observeNetwork() {
+		worker.postMessage(
+			financeWorkerCommand.parse({ type: 'OBSERVE_NETWORK', offline: !navigator.onLine })
+		)
+	}
 	worker.postMessage(open, [data.port2, control.port2])
 	observeLocation()
+	observeNetwork()
 	window.addEventListener('popstate', observeLocation)
+	window.addEventListener('online', observeNetwork)
+	window.addEventListener('offline', observeNetwork)
 	const view: Readable<FinanceWorkerView> = { subscribe: state.subscribe }
 	function selectContext(
 		workspaceId: string | null,
@@ -219,10 +343,28 @@ export function createFinanceWorkerClient(
 			recoveryAvailable: false,
 			workspaceStartup: null,
 			accountCreation: null,
+			accountArchive: null,
+			accountAccess: null,
 			accountOrder: null,
 			classification: null,
+			backup: null,
+			workspaceRestore: null,
+			workspaceCreation: null,
+			profile: null,
+			workspace: null,
 			transactionEntry: null,
 			transactionEdit: null,
+			samples: null,
+			canRetrySession: false,
+			canRetryInitialization: false,
+			workspaceIntegrity: null,
+			mutationRejected: false,
+			bank: null,
+			transactionDetails: null,
+			transferEdit: null,
+			transferCreation: null,
+			transfers: null,
+			overview: null,
 			ledger: null
 		}))
 		worker.postMessage(command)
@@ -283,9 +425,13 @@ export function createFinanceWorkerClient(
 			})
 		}
 	}
+	let observedRouteHref: string | undefined
 	function observeRoute() {
 		const current = get(state)
 		if (current.status === 'closed') return
+		const href = relativeHref()
+		if (observedRouteHref === href) return
+		observedRouteHref = href
 		observedLocation.set(new URL(location.href))
 		window.addEventListener('popstate', observeRoute)
 		const command = financeWorkerCommand.parse({
@@ -303,6 +449,8 @@ export function createFinanceWorkerClient(
 	}
 
 	return {
+		imageEditor: { subscribe: imageEditor.subscribe },
+		closeImageEditor: () => imageEditor.set(null),
 		location: { subscribe: observedLocation.subscribe },
 		view,
 		observeLocation,
@@ -367,6 +515,22 @@ export function createFinanceWorkerClient(
 			selectContext(get(state).selection.workspaceId, get(state).transactionKind, transactionId),
 		selectTransactionKind: (kind: TransactionKind) =>
 			selectContext(get(state).selection.workspaceId, kind),
+		setAccountDeleteGrant: (
+			accountId: string,
+			userId: string,
+			canDelete: boolean,
+			scope: WorkerCommandScope
+		) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'SET_ACCOUNT_DELETE_GRANT',
+					accountId,
+					userId,
+					canDelete,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
 		archiveAccount: (accountId: string, scope: WorkerCommandScope) => {
 			const current = get(state)
 			if (current.status !== 'ready') return
@@ -379,9 +543,85 @@ export function createFinanceWorkerClient(
 				})
 			)
 		},
+		startBackup: (protection: 'none' | 'password', password: string, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeBackupRequest.parse({
+					type: 'START_BACKUP',
+					protection,
+					password,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		startWorkspaceRestore: (file: File, password: string, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkspaceRestoreRequest.parse({
+					type: 'START_WORKSPACE_RESTORE',
+					file,
+					password,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		backupCommand: (command: 'CANCEL' | 'RELOAD', scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'BACKUP_COMMAND',
+					command,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		workspaceRestoreCommand: (
+			command: WorkspaceRestoreCommand['type'],
+			scope: WorkerCommandScope
+		) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'WORKSPACE_RESTORE_COMMAND',
+					command,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		workspaceCreationCommand: (
+			command: WorkerWorkspaceCreationCommand,
+			scope: WorkerCommandScope
+		) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'WORKSPACE_CREATION',
+					command,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		profileCommand: (
+			form: 'name' | 'avatar',
+			command: WorkerFormCommand,
+			scope: WorkerCommandScope
+		) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'PROFILE',
+					form,
+					command,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		workspaceSettingsCommand: (command: WorkerFormCommand, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'WORKSPACE_SETTINGS',
+					command,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
 		classificationCommand: (
 			form: ClassificationForm,
-			command: WorkerAccountCreationCommand,
+			command: WorkerFormCommand,
 			scope: WorkerCommandScope
 		) =>
 			worker.postMessage(
@@ -402,7 +642,7 @@ export function createFinanceWorkerClient(
 					selection: scope.selection
 				})
 			),
-		accountCreationCommand: (command: WorkerAccountCreationCommand, scope: WorkerCommandScope) => {
+		accountCreationCommand: (command: WorkerFormCommand, scope: WorkerCommandScope) => {
 			const current = get(state)
 			if (
 				current.status === 'closed' ||
@@ -419,7 +659,70 @@ export function createFinanceWorkerClient(
 				})
 			)
 		},
-		transactionEditCommand: (command: WorkerTransactionEntryCommand, scope: WorkerCommandScope) => {
+		addSamples: (kind: TransactionKind, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'ADD_SAMPLES',
+					kind,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		retrySession: () => worker.postMessage(financeWorkerCommand.parse({ type: 'RETRY_SESSION' })),
+		retryInitialization: (scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'RETRY_INITIALIZATION',
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		retryIntegrity: (scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'RETRY_INTEGRITY',
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		dismissMutationNotice: (scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'DISMISS_MUTATION_NOTICE',
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		bankCommand: (command: WorkerBankCommand, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({ type: 'BANK', command, ...commandScope(scope) })
+			),
+		bankHistoryCommand: (command: WorkerBankHistoryCommand, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({ type: 'BANK_HISTORY', command, ...commandScope(scope) })
+			),
+		connectBank: (token: string, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeBankConnectRequest.parse({
+					type: 'BANK_CONNECT',
+					token,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		transactionImageCommand: (command: WorkerTransactionImageCommand, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({ type: 'TRANSACTION_IMAGE', command, ...commandScope(scope) })
+			),
+		transferEditCommand: (command: WorkerTransferEditCommand, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({ type: 'TRANSFER_EDIT', command, ...commandScope(scope) })
+			),
+		transferEntryCommand: (command: WorkerFormCommand, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({ type: 'TRANSFER_ENTRY', command, ...commandScope(scope) })
+			),
+		transactionEditCommand: (command: WorkerFormCommand, scope: WorkerCommandScope) => {
 			const current = get(state)
 			if (
 				current.status === 'closed' ||
@@ -436,10 +739,7 @@ export function createFinanceWorkerClient(
 				})
 			)
 		},
-		transactionEntryCommand: (
-			command: WorkerTransactionEntryCommand,
-			scope: WorkerCommandScope
-		) => {
+		transactionEntryCommand: (command: WorkerFormCommand, scope: WorkerCommandScope) => {
 			const current = get(state)
 			if (
 				current.status === 'closed' ||
@@ -458,11 +758,20 @@ export function createFinanceWorkerClient(
 		},
 		selectAccount: (accountId: string, checked: boolean, scope: WorkerCommandScope) =>
 			worker.postMessage(
-				financeWorkerCommand.parse({ type: 'SET_ACCOUNT_SELECTED', accountId, checked, ...scope })
+				financeWorkerCommand.parse({
+					type: 'SET_ACCOUNT_SELECTED',
+					accountId,
+					checked,
+					...commandScope(scope)
+				})
 			),
 		selectAllAccounts: (checked: boolean, scope: WorkerCommandScope) =>
 			worker.postMessage(
-				financeWorkerCommand.parse({ type: 'SET_ALL_ACCOUNTS_SELECTED', checked, ...scope })
+				financeWorkerCommand.parse({
+					type: 'SET_ALL_ACCOUNTS_SELECTED',
+					checked,
+					...commandScope(scope)
+				})
 			),
 		selectLedgerPage: (page: number, scope: WorkerCommandScope) => {
 			worker.postMessage(
@@ -474,11 +783,42 @@ export function createFinanceWorkerClient(
 				})
 			)
 		},
-		setLedgerFilters: (filters: TransactionListFilters, scope: WorkerCommandScope) => {
+		setOverviewFilters: (filters: TransactionListFilters, scope: WorkerCommandScope) =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'SET_OVERVIEW_FILTERS',
+					filters,
+					sessionRevision: scope.sessionRevision,
+					selection: scope.selection
+				})
+			),
+		setLedgerFilters: (change: Partial<TransactionListFilters>, scope: WorkerCommandScope) => {
+			const current = get(state)
+			if (
+				current.status !== 'ready' ||
+				current.sessionRevision !== scope.sessionRevision ||
+				current.selection.revision !== scope.selection.revision ||
+				current.selection.workspaceId !== scope.selection.workspaceId
+			)
+				return
+			if (observedRouteHref !== undefined) {
+				// Query controls are native UI navigation. Read the current URL,
+				// rather than replacing other fields from an older worker DTO.
+				const origin = relativeHref()
+				const filters = { ...transactionListLocation(location.search).filters, ...change }
+				const destination = withQueryParams(origin, transactionListQuery(filters, 1))
+				void navigate(destination, new AbortController().signal, origin, true).then(
+					observeRoute,
+					fail
+				)
+				return
+			}
+			// Standalone hosts can select a context without owning a browser route.
+			if (!current.ledger) return
 			worker.postMessage(
 				financeWorkerCommand.parse({
 					type: 'SET_LEDGER_FILTERS',
-					filters,
+					filters: { ...current.ledger.filters, ...change },
 					sessionRevision: scope.sessionRevision,
 					selection: scope.selection
 				})

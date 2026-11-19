@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { openCreationModal } from './helpers/ui.js'
+import { failNextAccountStorageOpen } from './helpers/startup-failure.js'
 
 declare global {
 	interface Window {
@@ -218,25 +219,12 @@ test('startup failure diagnostics follow the debug flag and preserve retry', asy
 		if (message.type() === 'error' && /\[(?:state-machine|jazz-startup)\]/.test(message.text()))
 			diagnostics.push(message.text())
 	})
-	await page.addInitScript(() => {
-		const getItem = Storage.prototype.getItem
-		let failed = false
-		Storage.prototype.getItem = function (key) {
-			if (!failed && key.startsWith('jazz-account-selection-v1:')) {
-				failed = true
-				throw new DOMException(
-					'Synthetic account storage failure token=PRIVATE_STARTUP_TOKEN',
-					'SecurityError'
-				)
-			}
-			return getItem.call(this, key)
-		}
-	})
+	await failNextAccountStorageOpen(page)
 	await page.goto('/settings/banks')
 	await expect(page.getByText('Your finances could not be opened.', { exact: false })).toBeVisible()
 	if (info.config.metadata.debugEnabled === true) {
 		await expect.poll(() => diagnostics.join('\n')).toContain('Machine entered an error state')
-		expect(diagnostics.join('\n')).toContain('machine: application-readiness')
+		expect(diagnostics.join('\n')).toContain('machine: session-runtime')
 		expect(diagnostics.join('\n')).not.toContain('PRIVATE_STARTUP_TOKEN')
 	} else {
 		expect(diagnostics).toEqual([])

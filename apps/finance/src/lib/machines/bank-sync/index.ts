@@ -1,4 +1,3 @@
-import { m } from '#lib/paraglide/messages.js'
 import type { BankPresentation } from '#lib/contracts/bank-presentation-contract.js'
 import {
 	bankAvailabilityMachine,
@@ -23,7 +22,8 @@ import {
 	bankCredentialFingerprint,
 	bankObservation,
 	bankViewMetadata,
-	bankSetupSteps,
+	bankData,
+	type BankSource,
 	type BankSyncDependencies,
 	type BankAccess,
 	type BankCredential,
@@ -51,6 +51,7 @@ type Event =
 	| HistoryEvent
 	| ProgressEvent
 	| BankObservationEvent
+	| { type: 'SOURCE_OBSERVED'; source: BankSource }
 	| { type: 'SHUTDOWN' }
 	| { type: 'NETWORK_CHANGED'; offline: boolean }
 	| { type: 'RETENTION_STOPPED' }
@@ -148,6 +149,7 @@ export function createBankSyncMachine(
 		release: retainResourceRelease(context.release, params.result)
 	})
 	const events0 = {
+		SOURCE_OBSERVED: types<{ source: BankSource }>(),
 		DISCOVER: types<EventPayload<Event, 'DISCOVER'>>(),
 		SYNC: types<EventPayload<Event, 'SYNC'>>(),
 		MAP: types<EventPayload<Event, 'MAP'>>(),
@@ -347,6 +349,29 @@ export function createBankSyncMachine(
 			}
 		},
 		on: {
+			SOURCE_OBSERVED: ({ context, event, value }, enq) => {
+				if (matchesState('drainingRetention', value) || matchesState('closed', value)) return
+				const source = event.source
+				const observed = bankObservation(source)
+				const access: BankAccess =
+					observed.allowed && source.organizationId && source.userId
+						? { kind: 'allowed', organizationId: source.organizationId, userId: source.userId }
+						: {
+								kind:
+									source.sessionReady && source.membership !== undefined ? 'restricted' : 'waiting',
+								organizationId: source.organizationId,
+								userId: source.userId
+							}
+				const changed =
+					context.access.kind !== access.kind ||
+					context.access.organizationId !== access.organizationId ||
+					context.access.userId !== access.userId
+				const revision = context.revision + (changed ? 1 : 0)
+				if (changed) enq.raise({ type: 'WORKSPACE_ACCESS_CHANGED', revision, access })
+				enq.raise({ type: 'CONNECTIONS_CHANGED', revision, connections: source.connections })
+				enq.raise({ type: 'MAPPING_DATA_CHANGED', revision, data: bankData(source) })
+				enq.raise({ type: 'HISTORY_CHANGED', revision, records: source.connections })
+			},
 			// Mapping children are pure; active resource owners still settle via SHUTDOWN.
 			'xstate.error.actor': (args, enq) => {
 				if (!args.event.actorId.startsWith('mapping:')) return
@@ -787,17 +812,16 @@ export function createBankSyncMachine(
 							disconnected: {
 								meta: {
 									status: {
-										key: 'bank.idle_step',
-										label: () => m['bank.idle_step']({ step: bankSetupSteps[0].label() })
+										key: 'bank.idle_step'
 									}
 								}
 							},
-							locked: { meta: { status: { key: 'bank.locked', label: () => m['bank.locked']() } } },
+							locked: { meta: { status: { key: 'bank.locked' } } },
 							waiting: {
-								meta: { status: { key: 'bank.waiting', label: () => m['bank.waiting']() } }
+								meta: { status: { key: 'bank.waiting' } }
 							},
 							restricted: {
-								meta: { status: { key: 'bank.restricted', label: () => m['bank.restricted']() } }
+								meta: { status: { key: 'bank.restricted' } }
 							}
 						}
 					},
@@ -805,17 +829,17 @@ export function createBankSyncMachine(
 						initial: 'complete',
 						states: {
 							complete: {
-								meta: { status: { key: 'bank.success', label: () => m['bank.success']() } }
+								meta: { status: { key: 'bank.success' } }
 							},
 							partial: {
 								meta: {
-									status: { key: 'bank.partial_success', label: () => m['bank.partial_success']() }
+									status: { key: 'bank.partial_success' }
 								}
 							}
 						}
 					},
 					cancelled: {
-						meta: { status: { key: 'bank.cancelled', label: () => m['bank.cancelled']() } }
+						meta: { status: { key: 'bank.cancelled' } }
 					},
 					failure: {
 						initial: 'classifying',
@@ -861,38 +885,36 @@ export function createBankSyncMachine(
 							},
 							modeMismatch: {
 								meta: {
-									status: { key: 'bank.mode_mismatch', label: () => m['bank.mode_mismatch']() }
+									status: { key: 'bank.mode_mismatch' }
 								}
 							},
 							passkey: {
 								meta: {
-									status: { key: 'bank.passkey_failure', label: () => m['bank.passkey_failure']() }
+									status: { key: 'bank.passkey_failure' }
 								}
 							},
 							claim: {
 								meta: {
-									status: { key: 'bank.claim_failure', label: () => m['bank.claim_failure']() }
+									status: { key: 'bank.claim_failure' }
 								}
 							},
 							invalidToken: {
 								meta: {
 									status: {
-										key: 'bank.invalid_setup_token',
-										label: () => m['bank.invalid_setup_token']()
+										key: 'bank.invalid_setup_token'
 									}
 								}
 							},
 							accountConflict: {
 								meta: {
 									status: {
-										key: 'bank.account_already_linked',
-										label: () => m['bank.account_already_linked']()
+										key: 'bank.account_already_linked'
 									}
 								}
 							},
 							save: {
 								meta: {
-									status: { key: 'bank.save_failure', label: () => m['bank.save_failure']() }
+									status: { key: 'bank.save_failure' }
 								}
 							},
 							otherTab: {
@@ -901,8 +923,7 @@ export function createBankSyncMachine(
 							lockingUnavailable: {
 								meta: {
 									status: {
-										key: 'bank.locking_unavailable',
-										label: () => m['bank.locking_unavailable']()
+										key: 'bank.locking_unavailable'
 									}
 								}
 							},
@@ -922,7 +943,7 @@ export function createBankSyncMachine(
 								}
 							},
 							unexpected: {
-								meta: { status: { key: 'bank.failure', label: () => m['bank.failure']() } }
+								meta: { status: { key: 'bank.failure' } }
 							}
 						}
 					}
@@ -1085,7 +1106,7 @@ export function createBankSyncMachine(
 				},
 				tags: ['setup', 'busy'],
 				meta: {
-					status: { key: 'bank.working', label: () => m['bank.working']() },
+					status: { key: 'bank.working' },
 					setupView: 'creating',
 					setupStep: 1
 				},
@@ -1555,7 +1576,7 @@ export function createBankSyncMachine(
 					}
 				},
 				tags: ['operating', 'busy'],
-				meta: { status: { key: 'bank.working', label: () => m['bank.working']() } },
+				meta: { status: { key: 'bank.working' } },
 				entry: (args) => {
 					return {
 						context: ((args) => ({
@@ -2096,4 +2117,14 @@ export function selectBankView(
 			}
 		)
 	} satisfies BankPresentation
+}
+
+/** Public SDK-worker binding report. Raw credentials and operation errors stay private. */
+export function selectBankReport(snapshot: SnapshotFrom<ReturnType<typeof createBankSyncMachine>>) {
+	return {
+		access: snapshot.context.access,
+		view: selectBankView(snapshot),
+		canOperate: snapshot.context.availability?.canOperate ?? false,
+		continueOnNavigation: snapshot.context.command?.type === 'SYNC' && snapshot.matches('running')
+	}
 }

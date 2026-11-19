@@ -11,7 +11,7 @@ export type FinanceSession = JazzSession<JazzClient>
 /** Native SDK reads stay here; application charts consume identity facts and domain bindings. */
 export function financeSessionIdentityId(session: FinanceSession | undefined) {
 	const state = session?.getSnapshot()
-	return state?.status === 'ready' && state.account && state.client ? state.account.id : undefined
+	return state?.status === 'ready' && state.user && state.client ? state.user.accountId : undefined
 }
 export function workspaceRestoreSessionReady(session: FinanceSession | undefined) {
 	return financeSessionIdentityId(session) !== undefined
@@ -30,22 +30,19 @@ export function bindWorkspaceRestoreFile(
 	config: WorkspaceRestoreConfiguration
 ) {
 	const state = session.getSnapshot()
-	if (state.status !== 'ready' || !state.account || !state.client)
+	if (state.status !== 'ready' || !state.user || !state.client)
 		throw new Error('Restore session unavailable')
-	const account = state.account,
+	const user = state.user,
 		client = state.client,
 		db = client.db
 	const binding: WorkspaceRestoreBinding = {
-		identityId: account.id,
+		identityId: user.accountId,
 		db,
 		subscribe: (notify) => session.subscribe(notify),
 		isCurrent: () => {
 			const now = session.getSnapshot()
 			return (
-				now.status === 'ready' &&
-				now.account === account &&
-				now.client === client &&
-				now.client.db === db
+				now.status === 'ready' && now.user === user && now.client === client && now.client.db === db
 			)
 		}
 	}

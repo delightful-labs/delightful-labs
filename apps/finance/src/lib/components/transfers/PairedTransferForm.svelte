@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { Button, FieldFeedback, InputCurrency, InputDate, Select } from 'delightful-ui'
 	import { untrack } from 'svelte'
-	import type { Account } from '#lib/schema.js'
+	import type { Account } from '#lib/queries.js'
 	import type { InternalTransferEntryView } from '#lib/contracts/transfer-create-contract.js'
 	import { amountInputPattern } from '#lib/domain/money.js'
 	import { todayDateOnly } from '#lib/domain/date-only.js'
 	import { m } from '#lib/paraglide/messages.js'
-	import { internalTransferEntryReasonLabels } from '#lib/machines/transfers/internal-transfer-entry.js'
+	import { internalTransferEntryReasonLabels } from '#lib/forms/form-messages.js'
 	import FormFeedback from '../forms/FormFeedback.svelte'
 	import FormContent from '../forms/FormContent.svelte'
 
@@ -17,7 +17,7 @@
 		onreset,
 		oninput
 	}: {
-		accounts: readonly Account[]
+		accounts: readonly Pick<Account, 'id' | 'name' | 'currency'>[]
 		view: InternalTransferEntryView
 		onsubmit: (event: SubmitEvent) => void
 		onreset: (event: Event) => void

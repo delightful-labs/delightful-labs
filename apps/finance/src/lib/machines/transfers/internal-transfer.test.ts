@@ -5,7 +5,7 @@ import {
 	type InternalTransfer,
 	type OrganizationMember,
 	type TransactionRow
-} from '#lib/schema.js'
+} from '#lib/queries.js'
 import {
 	internalTransferDeleteMachine,
 	internalTransferLinkMachine,

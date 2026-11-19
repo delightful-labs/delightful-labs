@@ -4,7 +4,7 @@ import type { FinanceWorkerCapabilities } from '../../src/lib/contracts/worker-a
 import type { InspectionEvent } from 'xstate'
 import { diagnosticError } from '../../src/lib/diagnostics/error-details.js'
 import { createFinanceWorkerBinding as nativeBinding } from '../../src/lib/runtime/worker/binding.js'
-import { app } from '../../src/lib/schema.js'
+import { app } from '../../src/lib/queries.js'
 import { z } from 'zod'
 import { ReadTier } from 'jazz-tools'
 

@@ -1,4 +1,4 @@
-import { app } from '../schema.js'
+import { app } from '../queries.js'
 
 export function organizationMembershipQuery(
 	organizationId: string | null | undefined,

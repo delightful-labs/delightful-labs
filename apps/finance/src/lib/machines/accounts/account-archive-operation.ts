@@ -1,4 +1,4 @@
-import type { Account, OrganizationMember } from '#lib/schema.js'
+import type { Account, OrganizationMember } from '#lib/queries.js'
 import { canWriteAccount } from '#lib/domain/organization-permissions.js'
 import { accountArchiveSchema } from '#lib/validation/accounts.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'

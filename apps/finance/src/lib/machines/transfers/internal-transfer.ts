@@ -1,13 +1,13 @@
 import { EXPENSE, INCOME } from '#lib/domain/transaction-kind.js'
 import { canDeleteAccount, canWriteAccount } from '#lib/domain/organization-permissions.js'
 import { findInternalTransferCounterparts } from '#lib/domain/internal-transfer.js'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import {
 	app,
 	type InternalTransfer,
 	type OrganizationMember,
 	type TransactionRow
-} from '#lib/schema.js'
+} from '#lib/queries.js'
 import { createJazzTransactionActors } from '../persistence/jazz-transaction-actors.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { OutputFrom } from 'xstate'
@@ -17,13 +17,13 @@ type LocalWrite = {
 	txId: Promise<string>
 	wait(options: { tier: 'local' }): Promise<void>
 }
-type JazzTransaction = ReturnType<ReturnType<typeof getDb>['beginTransaction']>
+type JazzTransaction = ReturnType<JazzDb['beginTransaction']>
 type Tx = Pick<JazzTransaction, 'one' | 'all' | 'insert' | 'update' | 'delete' | 'rollback'> & {
 	commit(): LocalWrite
 }
 type Db = { beginTransaction(): Tx }
 type TransferWrite = LocalWrite & { txId: Promise<string> }
-type TransferReadDb = Pick<ReturnType<typeof getDb>, 'one' | 'all'>
+type TransferReadDb = Pick<JazzDb, 'one' | 'all'>
 type TransferEndpointRequest = {
 	db: TransferReadDb
 	organizationId: string
@@ -54,7 +54,7 @@ export type InternalTransferLinkInput = {
 	identityId: string
 	expenseTransactionId: string
 	incomeTransactionId: string
-	trackWrite: TrackTransferWrite
+	trackWrite?: TrackTransferWrite | undefined
 }
 export type InternalTransferLinkEvent = { type: 'CANCEL' } | { type: 'SHUTDOWN' }
 export type InternalTransferLinkResult =
@@ -243,13 +243,13 @@ const stage = createAsyncLogic({
 
 export type InternalTransferUnlinkInput = Omit<TransferEndpointRequest, 'db'> & {
 	db: UnlinkDb
-	trackWrite: TrackTransferWrite
+	trackWrite?: TrackTransferWrite | undefined
 }
 export type InternalTransferDeleteChoice =
 	{ kind: 'both' } | { kind: 'selected'; transactionId: string }
 export type InternalTransferDeleteInput = Omit<TransferEndpointRequest, 'db'> & {
 	db: DeleteDb
-	trackWrite: TrackTransferWrite
+	trackWrite?: TrackTransferWrite | undefined
 	choice: InternalTransferDeleteChoice
 }
 type UnlinkRecords = {
@@ -651,7 +651,7 @@ export const internalTransferUnlinkMachine = setup({
 								onDone: (args, enq) => {
 									const { context } = args
 									enq(() =>
-										context.request.trackWrite({
+										context.request.trackWrite?.({
 											transactionId: args.event.output,
 											operation: 'unlink',
 											transferId: eligibleUnlink(context.assessment).transfer.id
@@ -756,7 +756,7 @@ export const internalTransferUnlinkMachine = setup({
 								onDone: (args, enq) => {
 									const { context } = args
 									enq(() =>
-										context.request.trackWrite({
+										context.request.trackWrite?.({
 											transactionId: args.event.output,
 											operation: 'unlink',
 											transferId: eligibleUnlink(context.assessment).transfer.id
@@ -1251,7 +1251,7 @@ export const internalTransferDeleteMachine = setup({
 								onDone: (args, enq) => {
 									const { context } = args
 									enq(() =>
-										context.request.trackWrite({
+										context.request.trackWrite?.({
 											transactionId: args.event.output,
 											operation: 'delete',
 											transferId: eligibleDelete(context.assessment).transfer.id
@@ -1351,7 +1351,7 @@ export const internalTransferDeleteMachine = setup({
 								onDone: (args, enq) => {
 									const { context } = args
 									enq(() =>
-										context.request.trackWrite({
+										context.request.trackWrite?.({
 											transactionId: args.event.output,
 											operation: 'delete',
 											transferId: eligibleDelete(context.assessment).transfer.id
@@ -1767,7 +1767,7 @@ export const internalTransferLinkMachine = setup({
 								onDone: (args, enq) => {
 									const { context } = args
 									enq(() =>
-										context.request.trackWrite({
+										context.request.trackWrite?.({
 											transactionId: args.event.output,
 											operation: 'link',
 											transferId: required(context.transferId)

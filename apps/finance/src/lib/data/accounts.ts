@@ -1,5 +1,5 @@
 import type { Db } from 'jazz-tools'
-import { app, type Account } from '../schema.js'
+import { app, type Account } from '../queries.js'
 import { ACCOUNT_CURRENCY, type AccountCurrency } from '../domain/account-currency.js'
 import { appAccountSchema } from '../validation/accounts.js'
 

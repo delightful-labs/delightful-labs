@@ -4,7 +4,7 @@ import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'nod
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { copyCandidate } from './copy-candidate.mjs'
+import { copyHistoricalSource } from './history-source.mjs'
 
 export function portRuntimeImports(path, lib, runtimeEntry, clipper) {
 	for (const item of readdirSync(path, { withFileTypes: true })) {
@@ -42,7 +42,7 @@ export function portRuntimeImports(path, lib, runtimeEntry, clipper) {
 	}
 }
 
-/** Isolated native schema port, not an application migration or compatibility layer. */
+/** Native generated bindings compared with a frozen historical producer, in disposable stores. */
 export async function checkSchema(directory, source, proof, versions, scope, sdkVersion) {
 	const run = (args, cwd) => execFileSync('pnpm', args, { cwd, stdio: 'inherit' })
 	const json = (path, value) => writeFileSync(path, JSON.stringify(value, null, 2) + '\n')
@@ -56,7 +56,8 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 		[app, 'file:../candidate-sdk.tgz']
 	]) {
 		mkdirSync(path)
-		cpSync(join(source, 'src'), join(path, 'src'), { recursive: true })
+		if (path === legacy) copyHistoricalSource(source, path)
+		else cpSync(join(source, 'src'), join(path, 'src'), { recursive: true })
 		json(join(path, 'package.json'), {
 			name: `${scope}-schema-upgrade-proof`,
 			private: true,
@@ -83,38 +84,11 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 	// The legacy compiler supplies comparison metadata only; it is never a live rollout.
 	run(['add', '--ignore-scripts', 'jazz-tools@2.0.0-alpha.65'], legacy)
 	run(['exec', 'jazz-tools', 'validate', '--schema-dir', schemaPath], legacy)
-	execFileSync(
-		'git',
-		['apply', '--check', '--whitespace=error-all', join(proof, `${scope}-schema.patch`)],
-		{ cwd: app, stdio: 'inherit' }
-	)
-	execFileSync('git', ['apply', join(proof, `${scope}-schema.patch`)], {
-		cwd: app,
-		stdio: 'inherit'
-	})
-	copyCandidate(join(proof, 'candidate', scope), app)
+	cpSync(join(proof, 'fixtures', scope), app, { recursive: true })
 	// Only copied callers move from authoring schema.ts to native runtime queries.
 	const lib = join(app, schemaPath)
 	const runtimeEntry = clipper ? 'jazz.generated.js' : 'queries.js'
 
-	portRuntimeImports(join(app, 'src/lib'), lib, runtimeEntry, clipper)
-	if (!clipper)
-		for (const name of [
-			'permissions.test.ts',
-			'bank-sync-log-permissions.test.ts',
-			'bank-sync-log-retention-permissions.test.ts'
-		]) {
-			const file = join(lib, name)
-			writeFileSync(
-				file,
-				readFileSync(file, 'utf8')
-					.replace(
-						"import permissions from './permissions.js'",
-						"import permissions from './jazz.permissions.json' with { type: 'json' }"
-					)
-					.replaceAll("import('jazz-tools').schema.InsertOf", "import('jazz-tools').InsertOf")
-			)
-		}
 	for (const name of ['tsconfig.schema.json', 'vitest.schema.config.mjs'])
 		cpSync(join(proof, `${prefix}${name}`), join(app, name))
 	if (!clipper) {
@@ -124,10 +98,6 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 		for (const name of ['restore-probe.ts', 'silent-jazz-proxy.ts'])
 			cpSync(join(source, 'tests/helpers', name), join(app, 'tests/helpers', name))
 	}
-	run(
-		['exec', 'jazz-tools', 'migrations', 'create', '--name', 'initial', '--schema-dir', schemaPath],
-		app
-	)
 	run(['exec', 'jazz-tools', 'generate', '--schema-dir', schemaPath], app)
 	run(['exec', 'jazz-tools', 'generate', '--check', '--schema-dir', schemaPath], app)
 	run(['exec', 'tsc', '--project', 'tsconfig.schema.json'], app)

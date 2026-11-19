@@ -1,17 +1,28 @@
-import { m } from '#lib/paraglide/messages.js'
+import { transactionTransferObservation } from './transfer-observation.js'
+import type { WorkerTransferFacts } from '../../contracts/worker-transfers.js'
+import type {
+	TransactionEditTransferState,
+	TransferStatusLabel,
+	TransferDeleteFeedback
+} from '#lib/contracts/worker-transfers.js'
+export type {
+	TransactionEditTransferState,
+	TransferStatusLabel,
+	TransferDeleteFeedback
+} from '#lib/contracts/worker-transfers.js'
 import { canWriteAccount } from '#lib/domain/organization-permissions.js'
 import {
 	findInternalTransferCounterparts,
 	type InternalTransferCandidate
 } from '#lib/domain/internal-transfer.js'
-import type { InternalTransfer } from '#lib/schema.js'
+import type { InternalTransfer } from '#lib/queries.js'
 import type {
 	TransactionEntryObservation,
 	TransactionEntryScope,
 	TransactionEntryView
 } from '#lib/contracts/transaction-entry-contract.js'
 import type { FormObservation } from '#lib/contracts/form-contract.js'
-import type { getDb } from 'jazz-tools/svelte'
+import type { Db as JazzDb } from 'jazz-tools'
 import { createScopedFormMachine, selectScopedFormView } from '../forms/scoped-form.js'
 import {
 	createTransactionEditFormOptions,
@@ -39,13 +50,6 @@ import type { EventFrom, SnapshotFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 export type TransactionEditOptions = ReturnType<typeof createTransactionEditFormOptions>
-export type TransactionEditTransferState =
-	'unselected' | 'searching' | 'matches' | 'empty' | 'failed' | 'linked' | 'conflicted'
-export type TransferStatusLabel = () => string
-export type TransferDeleteFeedback = {
-	label: () => string
-	variant: 'loading' | 'success' | 'error'
-}
 
 type TransferObservation = {
 	rows: readonly InternalTransferCandidate[]
@@ -104,8 +108,8 @@ function deleteResult(result: TransferMutationResult): InternalTransferDeleteRes
 
 export function createTransactionEditMachine(
 	options: TransactionEditOptions,
-	db: ReturnType<typeof getDb>,
-	trackTransferWrite: (write: TransferWriteTracking) => void,
+	db: Pick<JazzDb, 'all' | 'one' | 'beginTransaction' | 'transaction' | 'delete'>,
+	trackTransferWrite: ((write: TransferWriteTracking) => void) | undefined,
 	mutationGateway: TransferMutationGateway
 ) {
 	const formMachine = createScopedFormMachine(options)
@@ -135,6 +139,7 @@ export function createTransactionEditMachine(
 		| { type: 'ENABLE_SEARCH' }
 		| { type: 'DISABLE_SEARCH' }
 		| { type: 'TRANSFER_OBSERVATION'; observation: TransferObservation }
+		| { type: 'TRANSFER_FACTS'; facts: WorkerTransferFacts }
 		| { type: 'SELECT_COUNTERPART'; candidateId: string }
 		| { type: 'LINK_COUNTERPART'; candidateId: string }
 		| { type: 'UNLINK_TRANSFER' }
@@ -156,6 +161,7 @@ export function createTransactionEditMachine(
 		ENABLE_SEARCH: types<EventPayload<Event, 'ENABLE_SEARCH'>>(),
 		DISABLE_SEARCH: types<EventPayload<Event, 'DISABLE_SEARCH'>>(),
 		TRANSFER_OBSERVATION: types<EventPayload<Event, 'TRANSFER_OBSERVATION'>>(),
+		TRANSFER_FACTS: types<EventPayload<Event, 'TRANSFER_FACTS'>>(),
 		SELECT_COUNTERPART: types<EventPayload<Event, 'SELECT_COUNTERPART'>>(),
 		LINK_COUNTERPART: types<EventPayload<Event, 'LINK_COUNTERPART'>>(),
 		UNLINK_TRANSFER: types<EventPayload<Event, 'UNLINK_TRANSFER'>>(),
@@ -311,6 +317,21 @@ export function createTransactionEditMachine(
 				type: 'parallel',
 				onDone: { target: '#transaction-edit-form.closed' },
 				on: {
+					TRANSFER_FACTS: ({ context, event, value }, enq) => {
+						if (!matchesState({ running: { lifecycle: 'active' } }, value)) return
+						const searchEnabled = ['searching', 'matches', 'empty', 'failed'].some((state) =>
+							matchesState({ running: { transfer: state } }, value)
+						)
+						enq.raise({
+							type: 'TRANSFER_OBSERVATION',
+							observation: transactionTransferObservation(
+								event.facts,
+								context.observation.facts,
+								context.scopeGeneration,
+								searchEnabled
+							)
+						})
+					},
 					OBSERVE: (args, enq) => {
 						let context = args.context
 						if (!args.guards.workflowActive(args)) return
@@ -795,8 +816,7 @@ export function createTransactionEditMachine(
 							conflicted: {},
 							searching: {
 								meta: {
-									transferStatus: () =>
-										m['status.loading_subject']({ subject: m['nouns.transaction']({ count: 2 }) }),
+									transferStatus: 'loadingTransactions',
 									priority: 3
 								},
 								on: {
@@ -824,8 +844,7 @@ export function createTransactionEditMachine(
 							},
 							failed: {
 								meta: {
-									transferStatus: () =>
-										m['errors.load_subject']({ subject: m['nouns.transaction']({ count: 2 }) }),
+									transferStatus: 'loadTransactionsFailed',
 									priority: 3
 								},
 								on: {
@@ -893,7 +912,7 @@ export function createTransactionEditMachine(
 								}
 							},
 							operating: {
-								meta: { transferStatus: () => m['forms.settling'](), priority: 1 },
+								meta: { transferStatus: 'settling', priority: 1 },
 								initial: 'active',
 								invoke: {
 									id: 'linkOperation',
@@ -996,8 +1015,7 @@ export function createTransactionEditMachine(
 							},
 							succeeded: {
 								meta: {
-									transferStatus: () =>
-										m['status.saved_subject']({ subject: m['nouns.transfer']({ count: 1 }) }),
+									transferStatus: 'transferSaved',
 									priority: 1
 								},
 								on: {
@@ -1066,12 +1084,11 @@ export function createTransactionEditMachine(
 										}
 									},
 									cancelled: {
-										meta: { transferStatus: () => m['status.cancelled'](), priority: 1 }
+										meta: { transferStatus: 'cancelled', priority: 1 }
 									},
 									failed: {
 										meta: {
-											transferStatus: () =>
-												m['errors.save_subject']({ subject: m['nouns.transfer']({ count: 1 }) }),
+											transferStatus: 'saveTransferFailed',
 											priority: 1
 										}
 									}
@@ -1178,7 +1195,7 @@ export function createTransactionEditMachine(
 								}
 							},
 							operating: {
-								meta: { transferStatus: () => m['forms.settling'](), priority: 2 },
+								meta: { transferStatus: 'settling', priority: 2 },
 								initial: 'active',
 								invoke: {
 									id: 'unlinkOperation',
@@ -1288,8 +1305,7 @@ export function createTransactionEditMachine(
 							},
 							succeeded: {
 								meta: {
-									transferStatus: () =>
-										m['status.saved_subject']({ subject: m['nouns.transfer']({ count: 1 }) }),
+									transferStatus: 'transferSaved',
 									priority: 2
 								},
 								on: {
@@ -1356,15 +1372,14 @@ export function createTransactionEditMachine(
 										}
 									},
 									cancelled: {
-										meta: { transferStatus: () => m['status.cancelled'](), priority: 2 }
+										meta: { transferStatus: 'cancelled', priority: 2 }
 									},
 									recoveryRequired: {
-										meta: { transferStatus: () => m['transfers.recovery_required'](), priority: 2 }
+										meta: { transferStatus: 'recoveryRequired', priority: 2 }
 									},
 									failed: {
 										meta: {
-											transferStatus: () =>
-												m['errors.save_subject']({ subject: m['nouns.transfer']({ count: 1 }) }),
+											transferStatus: 'saveTransferFailed',
 											priority: 2
 										}
 									}
@@ -1469,7 +1484,7 @@ export function createTransactionEditMachine(
 							},
 							operating: {
 								meta: {
-									deleteFeedback: { label: () => m['forms.settling'](), variant: 'loading' }
+									deleteFeedback: { message: 'settling', variant: 'loading' }
 								},
 								initial: 'active',
 								invoke: {
@@ -1601,7 +1616,7 @@ export function createTransactionEditMachine(
 									both: {
 										meta: {
 											deleteFeedback: {
-												label: () => m['transfers.delete_saved_both'](),
+												message: 'deletedBoth',
 												variant: 'success'
 											}
 										}
@@ -1609,7 +1624,7 @@ export function createTransactionEditMachine(
 									selected: {
 										meta: {
 											deleteFeedback: {
-												label: () => m['transfers.delete_saved_selected'](),
+												message: 'deletedSelected',
 												variant: 'success'
 											}
 										}
@@ -1684,7 +1699,7 @@ export function createTransactionEditMachine(
 									recoveryRequired: {
 										meta: {
 											deleteFeedback: {
-												label: () => m['transfers.recovery_required'](),
+												message: 'recoveryRequired',
 												variant: 'error'
 											}
 										}
@@ -1692,10 +1707,7 @@ export function createTransactionEditMachine(
 									failed: {
 										meta: {
 											deleteFeedback: {
-												label: () =>
-													m['errors.save_subject']({
-														subject: m['nouns.transaction']({ count: 2 })
-													}),
+												message: 'deleteFailed',
 												variant: 'error'
 											}
 										}
@@ -1785,6 +1797,36 @@ export function createTransactionEditMachine(
 	}
 	return {
 		logic,
+		selectReport: (snapshot: EditSnapshot) => ({
+			observation: snapshot.context.observation.facts,
+			form: selectFormView(snapshot),
+			state: selectTransferState(snapshot),
+			candidates: snapshot.context.candidates,
+			selectedCandidateId: snapshot.context.selectedCandidateId,
+			writableCandidateIds:
+				selectFormView(snapshot).fieldsEditable && snapshot.context.linkInput === undefined
+					? [...snapshot.context.writableCandidateIds]
+					: [],
+			linkPending: snapshot.context.linkInput !== undefined,
+			unlinkPending: snapshot.context.unlinkInput !== undefined,
+			deletePending: snapshot.context.deleteInput !== undefined,
+			status:
+				Object.values(snapshot.getMeta())
+					.filter((meta) => meta?.transferStatus)
+					.sort((a, b) => (b?.priority ?? 0) - (a?.priority ?? 0))[0]?.transferStatus ?? null,
+			deleteFeedback:
+				Object.values(snapshot.getMeta()).find((meta) => meta?.deleteFeedback)?.deleteFeedback ??
+				null,
+			linkedTransfer: snapshot.context.linkedTransfer,
+			unlinkWritable:
+				selectFormView(snapshot).fieldsEditable &&
+				snapshot.context.unlinkInput === undefined &&
+				snapshot.context.unlinkWritable,
+			deleteAvailable:
+				!!snapshot.context.linkedTransfer &&
+				selectFormView(snapshot).fieldsEditable &&
+				snapshot.context.deleteResult?.outcome !== 'succeeded'
+		}),
 		selectFormView,
 		selectTransferStatus: (snapshot: EditSnapshot): TransferStatusLabel | null => {
 			const metadata = Object.values(snapshot.getMeta()).filter((meta) => meta?.transferStatus)

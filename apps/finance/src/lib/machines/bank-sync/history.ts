@@ -1,8 +1,7 @@
 import { required } from './identity.js'
 import type { BankHistoryRecord, LastSync, Connection } from './types.js'
-import type { SyncAttempt, SyncAccountResult } from '#lib/schema.js'
+import type { SyncAttempt, SyncAccountResult } from '#lib/queries.js'
 import type { BankMessage, BankLogPresentation } from '#lib/contracts/bank-presentation-contract.js'
-import { m } from '#lib/paraglide/messages.js'
 import { bankFailureStatuses } from './status.js'
 import { types, setup } from 'xstate'
 import type { ActorRef, Snapshot } from 'xstate'
@@ -200,31 +199,31 @@ export const bankHistoryMachine = setup({
 })
 
 const outcomeMessages = {
-	unfinished: { label: m['labels.unspecified'] },
-	succeeded: { label: m['bank.succeeded'] },
-	partial: { label: m['bank.partial'] },
-	failed: { label: m['bank.failed'] },
-	cancelled: { label: m['status.cancelled'] }
+	unfinished: { key: 'labels.unspecified' },
+	succeeded: { key: 'bank.succeeded' },
+	partial: { key: 'bank.partial' },
+	failed: { key: 'bank.failed' },
+	cancelled: { key: 'status.cancelled' }
 } satisfies Record<SyncAttempt['outcome'], BankMessage>
 const connectionMessages = {
 	active: outcomeMessages.succeeded,
 	error: outcomeMessages.failed,
-	revoked: { label: () => m['status.unavailable_subject']({ subject: m['bank.title']() }) }
+	revoked: { key: 'unavailableBank' }
 } satisfies Record<Connection['status'], BankMessage>
-const savedMessage = { label: m['status.saved'] }
+const savedMessage: BankMessage = { key: 'status.saved' }
 const settlementMessages = {
-	notStarted: { label: m['bank.step_upcoming'] },
+	notStarted: { key: 'bank.step_upcoming' },
 	locallyPersisted: savedMessage,
 	confirmed: savedMessage,
-	unresolved: { label: m['bank.log_unresolved'] }
+	unresolved: { key: 'bank.log_unresolved' }
 } satisfies Record<SyncAttempt['importSettlement'], BankMessage>
 const failureMessages = {
 	...bankFailureStatuses,
-	authorization: { label: m['developer.unavailable'] },
+	authorization: { key: 'developer.unavailable' },
 	import: {
-		label: () => m['errors.save_subject']({ subject: m['nouns.transaction']({ count: 2 }) })
+		key: 'saveTransactionsFailed'
 	},
-	unexpected: { label: m['errors.unexpected_title'] }
+	unexpected: { key: 'errors.unexpected_title' }
 } satisfies Record<NonNullable<SyncAttempt['failureCode']>, BankMessage>
 
 export function selectBankLogPresentation(input: {

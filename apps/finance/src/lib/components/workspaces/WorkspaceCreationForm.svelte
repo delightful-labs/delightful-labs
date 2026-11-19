@@ -4,7 +4,7 @@
 	import {
 		workspaceCreationDialogPresentation,
 		type WorkspaceCreationView
-	} from '#lib/machines/workspaces/workspace-creation.js'
+	} from '#lib/contracts/workspace-creation-view.js'
 	import { m } from '#lib/paraglide/messages.js'
 	let {
 		scope,

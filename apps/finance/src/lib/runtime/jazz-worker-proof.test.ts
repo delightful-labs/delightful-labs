@@ -7,7 +7,14 @@ const appId = 'credential-recovery-regression'
 const seed = Buffer.alloc(32, 17).toString('base64url')
 const payloadSchema = z.object({ sub: z.string(), exp: z.number() })
 
-async function fixture(lifetimeSeconds = 60) {
+async function fixture(
+	lifetimeSeconds = 60,
+	change: (proof: { token: string; appId: string; claimedAuthor: string }) => {
+		token: string
+		appId: string
+		claimedAuthor: string
+	} = (proof) => proof
+) {
 	const wasm = await loadWasmModule()
 	const token = wasm.mintLocalFirstToken(
 		seed,
@@ -22,28 +29,30 @@ async function fixture(lifetimeSeconds = 60) {
 	const proof = { token, appId, claimedAuthor }
 	const author = new TextEncoder().encode(claimedAuthor)
 	const runtime = new NativeRuntimeAdapter(wasm.WasmDb, {}, new Uint8Array(16), author, 1, false, {
-		selfSignedClientProof: proof
+		selfSignedClientProof: change(proof)
 	})
-	return { runtime, wasm, proof, author, expires: payload.exp }
+	return { runtime, proof, author, expires: payload.exp }
 }
 
-describe('retained Jazz worker credential admission', () => {
-	it('accepts a fresh same-identity proof after the opening proof expires', async () => {
+describe('native Jazz credential admission', () => {
+	it('rejects an expired opening proof and admits the same identity after reopening with a fresh proof', async () => {
 		// JWT seconds are rounded down. A one-second token can expire during
 		// construction near a clock boundary, before this expiry scenario begins.
-		const { runtime, wasm, proof, author, expires } = await fixture(3)
+		const { runtime, proof, author, expires } = await fixture(3)
 		try {
 			await new Promise((resolve) =>
 				setTimeout(resolve, Math.max(0, expires * 1000 - Date.now()) + 100)
 			)
 			await expect(runtime.acceptPeer({}, undefined, author)).rejects.toThrow(/expired/)
-			const fresh = {
-				...proof,
-				token: wasm.mintLocalFirstToken(seed, appId, 60, BigInt(Math.floor(Date.now() / 1000)))
+			const fresh = await fixture()
+			try {
+				const peer = await fresh.runtime.acceptPeer({}, undefined, fresh.author)
+				expect(peer).toBeDefined()
+				expect(fresh.proof.claimedAuthor).toBe(proof.claimedAuthor)
+				peer.close()
+			} finally {
+				await fresh.runtime.close()
 			}
-			const peer = await runtime.acceptPeer({}, undefined, author, fresh)
-			expect(peer).toBeDefined()
-			peer.close()
 		} finally {
 			await runtime.close()
 		}
@@ -51,9 +60,8 @@ describe('retained Jazz worker credential admission', () => {
 	it.each(['application', 'author', 'signature'])(
 		'rejects a mismatched %s without bypassing native verification',
 		async (kind) => {
-			const { runtime, proof, author } = await fixture()
-			try {
-				const candidate = {
+			await expect(
+				fixture(60, (proof) => ({
 					...proof,
 					appId: kind === 'application' ? 'another-application' : proof.appId,
 					claimedAuthor:
@@ -61,11 +69,8 @@ describe('retained Jazz worker credential admission', () => {
 							? JSON.stringify(['urn:jazz:local-first', 'other'])
 							: proof.claimedAuthor,
 					token: kind === 'signature' ? `${proof.token.slice(0, -8)}AAAAAAAA` : proof.token
-				}
-				await expect(runtime.acceptPeer({}, undefined, author, candidate)).rejects.toBeDefined()
-			} finally {
-				await runtime.close()
-			}
+				}))
+			).rejects.toBeDefined()
 		}
 	)
 })

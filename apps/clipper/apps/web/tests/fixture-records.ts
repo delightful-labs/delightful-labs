@@ -1,5 +1,5 @@
 import { ReadTier } from 'jazz-tools'
-import { app } from '../src/lib/backend/jazz/schema.js'
+import { app } from '../src/lib/backend/jazz/jazz.generated.js'
 import { createJazzClient } from 'jazz-tools/client'
 import { browserAccountStore, fixtureServerUrl } from './browser-account-store.js'
 import { createLibraryRecords } from '../src/lib/backend/jazz/records.js'
@@ -13,26 +13,26 @@ const session = await createJazzClient({
 	store: browserAccountStore(serverUrl),
 	client: () => import('jazz-tools/local-first'),
 	env: 'clipper',
-	initial: 'local-first',
+	initial: 'device',
 	runtimeSources: { wasmUrl, wasmVersion: JAZZ_RUNTIME_VERSION }
 })
 await session.getSnapshot().client?.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
 /** Warm this independent test replica before taking its authority offline. */
 export async function ready() {
-	const { account, client } = session.getSnapshot()
-	if (!account || !client) throw new Error('Fixture account unavailable')
-	const library = await client.db.one(app.libraries.where({ id: account.id }), {
+	const { user, client } = session.getSnapshot()
+	if (!user || !client) throw new Error('Fixture account unavailable')
+	const library = await client.db.one(app.libraries.where({ id: user.accountId }), {
 		tier: ReadTier.LocalFirst
 	})
 	if (!library) throw new Error('Fixture library unavailable')
 }
 await ready()
 export function currentLibraryRecords() {
-	const { account, client } = session.getSnapshot()
-	if (!account || !client) throw new Error('Fixture account unavailable')
+	const { user, client } = session.getSnapshot()
+	if (!user || !client) throw new Error('Fixture account unavailable')
 	return createLibraryRecords(
 		client.db,
-		account.id,
+		user.accountId,
 		() => session.getSnapshot().client === client,
 		readConnection(client.db)
 	)

@@ -21,7 +21,7 @@ import { prepareArticle, uuid } from '../../capture/articles.js'
 import { captureDocumentRecord } from './document-record.js'
 import type { CaptureDocument, ArticleDraft, LibraryArticle } from '../../contracts/articles.js'
 
-import { app } from './schema.js'
+import { app } from './jazz.generated.js'
 import { documentsQuery } from './queries.js'
 /** Reads stay bound to this DB/library; owning actors gate admission and late-result consumption.
  * Native write admission and commit scope protection live in transactionLifecycle. */

@@ -1,7 +1,7 @@
 import { createWorkspaceInitialization } from 'delightful-local-first/workspace/initialization'
 import { ReadTier } from 'jazz-tools'
-import type { getDb } from 'jazz-tools/svelte'
-import { app } from '../../schema.js'
+import type { Db as JazzDb } from 'jazz-tools'
+import { app } from '../../queries.js'
 import { m } from '#lib/paraglide/messages.js'
 import { stableUuid } from '../../domain/stable-uuid.js'
 import {
@@ -13,7 +13,7 @@ import {
 	type WorkspacePersistenceResult
 } from './workspace-creation-transaction.js'
 
-type Db = Pick<ReturnType<typeof getDb>, 'all' | 'beginTransaction' | 'getConfig'>
+type Db = Pick<JazzDb, 'all' | 'beginTransaction' | 'getConfig'>
 type Input = { db: Db; userId: string }
 
 type ReadInput = Input & { tier: typeof ReadTier.LocalFirst | typeof ReadTier.Remote }
