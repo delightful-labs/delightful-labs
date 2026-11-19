@@ -602,12 +602,14 @@ test(
 				page.getByRole('alert').filter({ hasText: 'Your finances could not be opened.' })
 			).toHaveText('Your finances could not be opened.')
 			expect(blocked).toBeGreaterThan(0)
+			const previousFailures = blocked
 			await retry.click()
+			await expect.poll(() => blocked).toBeGreaterThan(previousFailures)
 			await expect(retry).toBeVisible()
 			failing = false
 			await retry.click()
 			await expect(
-				page.getByRole('button', { name: 'Toggle Main navigation', exact: true })
+				page.getByRole('cell', { name: 'Network retained checking', exact: true })
 			).toBeVisible()
 			await expect.poll(() => currentIdentity(page)).toBe(identity)
 			await page.goto('/accounts')

@@ -149,7 +149,9 @@ test(
 		await navigateSidebar(page, 'Expenses')
 		await expect(main.getByText('Retained archived history', { exact: true })).toBeVisible()
 		await main.getByRole('link', { name: 'Add Expenses', exact: true }).click()
-		await expect(main.getByText('Add an account before recording a transaction.')).toBeVisible()
+		await expect(
+			main.getByRole('status').filter({ hasText: 'Add an account before recording a transaction.' })
+		).toBeVisible()
 		await page.goto('/accounts')
 		await expect(main.getByText('Start with one place you keep money.')).toBeVisible()
 	}

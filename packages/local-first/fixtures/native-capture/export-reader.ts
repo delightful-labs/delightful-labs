@@ -36,20 +36,18 @@ export function createExportReader(
 			}
 		}),
 		read: createAsyncLogic<void, JazzArchiveReaderInput>({
-			run: ({ input }) =>
-				Promise.all([
-					input.all(app.workspaces.where({ id: graph.workspace })),
-					input.all(app.entries.where({ workspaceId: graph.workspace })),
-					input.all(app.files.where({ workspaceId: graph.workspace })),
-					input.all(app.parts.where({ workspaceId: graph.workspace }))
-				]).then(([roots, entries, files, parts]) => {
-					if (input.signal.aborted) return
-					const root = roots[0],
-						part = parts[0]
-					if (!root || !part || entries.length !== 1 || files.length !== 1 || parts.length !== 1)
-						throw new Error('Incomplete scope')
-					privateReads.set(input, { revision: root.revision, bytes: Uint8Array.from(part.data) })
-				})
+			run: async ({ input }) => {
+				const roots = await input.all(app.workspaces.where({ id: graph.workspace }))
+				const entries = await input.all(app.entries.where({ workspaceId: graph.workspace }))
+				const files = await input.all(app.files.where({ workspaceId: graph.workspace }))
+				const parts = await input.all(app.parts.where({ workspaceId: graph.workspace }))
+				if (input.signal.aborted) return
+				const root = roots[0],
+					part = parts[0]
+				if (!root || !part || entries.length !== 1 || files.length !== 1 || parts.length !== 1)
+					throw new Error('Incomplete scope')
+				privateReads.set(input, { revision: root.revision, bytes: Uint8Array.from(part.data) })
+			}
 		}),
 		pause: createAsyncLogic<void, JazzArchiveReaderInput>({ run: ({ input }) => pause(input) }),
 		digest: createAsyncLogic<void, JazzArchiveReaderInput>({

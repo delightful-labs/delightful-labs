@@ -809,7 +809,9 @@ application credential or call-owner layer. Their source is preserved at
 `51b8e878:patches/jazz-tools@2.0.0-alpha.60.patch`. They were not included in the
 initial alpha.67 bridge/backend/provider patch.
 
-Proposed disposition, pending user decision:
+Approved disposition — November 19: the user approved porting both retained
+fixes into the shared alpha.67 patch. Keep the scope below; no additional
+application credential or retry layer is authorized by this decision.
 
 1. Port the existing joining-proof path through broker bootstrap, the peer record
    and `acceptPeer`. Keep owner identity and audience fixed; let native
@@ -826,3 +828,18 @@ Proposed disposition, pending user decision:
 The alternative is to leave this upgrade unmerged until an upstream release
 passes these requirements. Do not remove the existing negative tests or treat a
 fresh-session worker fixture as long-lived broker qualification.
+
+Implementation and local qualification — November 19:
+
+- Both retained fixes are implemented in the shared patch, including the readable
+  broker/native adapter, its declaration and the published broker bundle.
+- Full Clipper worker qualification passes 32/32, including all five previously
+  failing proof/offline Retry cases.
+- Full Finance application-worker qualification passes 66/66 across three engines;
+  SDK/session binding qualification passes 42/42.
+- Finance units cover all 1,799 cases green; production PWA/offline passes 19/19.
+  Local First native capture/export passes 20/20. Browser fixture repairs retain
+  every original assertion’s purpose and introduce no app-level coordination.
+- Final code-head hosted CI remains the merge gate. Preserve all concurrent PR
+  commits and the normal worker integration; do not revert to the inactive
+  foundation checkpoint.

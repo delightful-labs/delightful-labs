@@ -11,7 +11,7 @@ patchedDependencies:
     hash: 3e2e5ee73129b769859c2f3a3e0b222c89a5c1470b9a8642b8ffa2be78eee381
     path: apps/clipper/patches/better-auth-bsky-0.3.2-better-auth-1.7.patch
   jazz-tools@2.0.0-alpha.67:
-    hash: 1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc
+    hash: 5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905
     path: patches/jazz-tools@2.0.0-alpha.67.patch
 
 importers:
@@ -55,7 +55,7 @@ importers:
         version: 0.6.0
       delightful-local-first:
         specifier: workspace:*
-        version: file:packages/local-first(d70f8c2d1c8a19b9518d036b816fd6d0)
+        version: file:packages/local-first(4db06dccee15eda9fe7a9dc9e765afa4)
       delightful-ui:
         specifier: workspace:*
         version: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
@@ -67,7 +67,7 @@ importers:
         version: 26.7.1(typescript@6.0.3)
       jazz-tools:
         specifier: 2.0.0-alpha.67
-        version: 2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
+        version: 2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       svelte:
         specifier: 5.57.2
         version: 5.57.2(@typescript-eslint/types@8.71.2)
@@ -133,7 +133,7 @@ importers:
         version: 1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))
       delightful-local-first:
         specifier: workspace:*
-        version: file:packages/local-first(073435cd9d3ee1c4d0259bb216e52d4a)
+        version: file:packages/local-first(5d4a218020c576ca4e403c4490122c66)
       delightful-ui:
         specifier: workspace:*
         version: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
@@ -151,7 +151,7 @@ importers:
         version: 2.0.0-alpha.67
       jazz-tools:
         specifier: 2.0.0-alpha.67
-        version: 2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
+        version: 2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.4.0)
@@ -238,13 +238,13 @@ importers:
         version: 6.0.0-beta.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(xstate@6.0.0-beta.1)
       delightful-local-first:
         specifier: workspace:*
-        version: file:packages/local-first(c1fbe5b2607f893670effdfd34176b0a)
+        version: file:packages/local-first(9cc7bfe5306f940a2a43bacdff3ca2d0)
       delightful-ui:
         specifier: workspace:*
         version: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
       jazz-tools:
         specifier: 2.0.0-alpha.67
-        version: 2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
+        version: 2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       layerchart:
         specifier: ^2.9.0
         version: 2.9.0(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(zod@4.1.11)
@@ -435,7 +435,7 @@ importers:
         version: 4.10.2
       jazz-tools:
         specifier: 2.0.0-alpha.67
-        version: 2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.3(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(ws@8.22.1)
+        version: 2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.3(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       oxfmt:
         specifier: 0.76.0
         version: 0.76.0(svelte@5.57.3(@typescript-eslint/types@8.71.2))
@@ -8370,31 +8370,31 @@ snapshots:
     dependencies:
       robust-predicates: 3.0.3
 
-  delightful-local-first@file:packages/local-first(073435cd9d3ee1c4d0259bb216e52d4a):
+  delightful-local-first@file:packages/local-first(4db06dccee15eda9fe7a9dc9e765afa4):
     dependencies:
       svelte: 5.57.2(@typescript-eslint/types@8.71.2)
       zod: 4.1.11
     optionalDependencies:
       delightful-ui: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
-      jazz-tools: 2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
+      jazz-tools: 2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       xstate: 6.0.0-beta.1
 
-  delightful-local-first@file:packages/local-first(c1fbe5b2607f893670effdfd34176b0a):
+  delightful-local-first@file:packages/local-first(5d4a218020c576ca4e403c4490122c66):
     dependencies:
       svelte: 5.57.2(@typescript-eslint/types@8.71.2)
       zod: 4.1.11
     optionalDependencies:
       delightful-ui: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
-      jazz-tools: 2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
+      jazz-tools: 2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       xstate: 6.0.0-beta.1
 
-  delightful-local-first@file:packages/local-first(d70f8c2d1c8a19b9518d036b816fd6d0):
+  delightful-local-first@file:packages/local-first(9cc7bfe5306f940a2a43bacdff3ca2d0):
     dependencies:
       svelte: 5.57.2(@typescript-eslint/types@8.71.2)
       zod: 4.1.11
     optionalDependencies:
       delightful-ui: file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2))
-      jazz-tools: 2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
+      jazz-tools: 2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1)
       xstate: 6.0.0-beta.1
 
   delightful-ui@file:packages/ui(svelte@5.57.2(@typescript-eslint/types@8.71.2)):
@@ -8824,7 +8824,7 @@ snapshots:
       '@garden-co/jazz-napi-linux-x64-gnu': 2.0.0-alpha.67
       '@garden-co/jazz-napi-win32-x64-msvc': 2.0.0-alpha.67
 
-  jazz-tools@2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1):
+  jazz-tools@2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1):
     dependencies:
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1
@@ -8854,7 +8854,7 @@ snapshots:
     transitivePeerDependencies:
       - bare-url
 
-  jazz-tools@2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1):
+  jazz-tools@2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.0.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1):
     dependencies:
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1
@@ -8884,7 +8884,7 @@ snapshots:
     transitivePeerDependencies:
       - bare-url
 
-  jazz-tools@2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1):
+  jazz-tools@2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.2(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.2(@typescript-eslint/types@8.71.2))(ws@8.22.1):
     dependencies:
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1
@@ -8914,7 +8914,7 @@ snapshots:
     transitivePeerDependencies:
       - bare-url
 
-  jazz-tools@2.0.0-alpha.67(patch_hash=1f662b8738eb18672b5c6ce8b354088b9c0232562f16925e043c16e7567cccbc)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.3(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(ws@8.22.1):
+  jazz-tools@2.0.0-alpha.67(patch_hash=5e90bfe9b46d2cc515eafd5843bc457b5be0dab82ba6706fb49270832f799905)(@vercel/functions@3.11.0(ws@8.22.1))(@vercel/sandbox@3.9.1)(better-auth@1.7.22(@opentelemetry/api@1.9.1)(@sveltejs/kit@3.1.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(svelte@5.57.3(@typescript-eslint/types@8.71.2))(typescript@6.0.3)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2))))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.71.2))(ws@8.22.1):
     dependencies:
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1

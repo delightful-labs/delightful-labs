@@ -21,12 +21,12 @@ scoped forms and feature charts, exposing bounded views and scoped commands rath
 universal SDK facade or a generic RPC service. Final checks cover actual routes, not only the
 isolated composite worker fixture.
 
-## Current source and verification status — November 18
+## Current source and verification status — November 19
 
 PR46 integrates alpha.67 and one application worker into the normal SvelteKit
-app. Preserve the other agents’ commits. Finance’s integration and collected
-functional repairs are implemented. The shared SDK broker qualification and
-final-head hosted CI remain merge requirements.
+app. Preserve the other agents’ commits. Finance’s integration, functional repairs and the user-approved retained broker
+fixes are implemented and locally qualified. Passing final code-head hosted CI
+remains a merge requirement.
 
 Current implementation decisions:
 
@@ -70,31 +70,45 @@ Current implementation decisions:
 Qualification evidence is cumulative across the broad runs and affected repairs,
 not a claim of one final all-green run:
 
-| Surface                    | Current evidence                                                                                                                                                                                                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Finance units              | Full 1,797-case run passed. Final worker-root suite: 72/72 passed, including two new native Retry cases. Static and browser-test types pass with zero Svelte errors/warnings.                                                                                       |
-| Actual Finance routes      | All 270 unique real-route scenarios covered green across the broad run and targeted repairs. Includes rapid filters, permissions, offline financial saves, files, transfers, bank sync, profiles and recovery.                                                      |
-| Standalone components      | 9/9 passed on the development fixture host. Coverage ownership checks assign all 44 browser test files without duplicate application scenarios.                                                                                                                     |
-| Finance native worker      | All 66 distinct Chromium/Firefox/WebKit cases covered green. Latest full run: 65/66; the standalone classification fixture then waits for the worker’s new route view before editing, asserts the selected category before saving, and passes in all three engines. |
-| Native backup/restoration  | 107/107 passed, including browser-process restarts, partial writes, rollback, permission repair and exact historical data. Actual production-route password/recovery-key exports and independent archive reopening pass.                                            |
-| Production/offline/bundles | Final 19/19 PWA cases passed. Audited Window bundle: 864 modules, no Jazz runtime or financial projection implementation. Application worker: 604 modules, no Svelte UI. Provider, image and SDK broker workers remain separate.                                    |
-| Production startup         | 7/7 passed in the final production run: cold local reads/writes offline and under silent connections, partial permission data, later server rejection and cold bank history.                                                                                        |
-| Clipper                    | 1,029/1,029 units and web/extension static checks pass. Native workers: 27/32; five long-lived broker proof cases await the shared SDK patch decision.                                                                                                              |
-| Local First                | 1,250 units, static/package checks and complete package-consumer types/runtime checks pass. No new library lifecycle or SDK facade is introduced by the Finance Retry repair.                                                                                       |
+| Surface                    | Current evidence                                                                                                                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Finance units              | All 1,799 cases covered green: 1,615 in the full run and all 184 native policy/backup cases rerun with local-server permission after sandbox listener denial. Static and browser-test types pass with zero Svelte errors/warnings.                                       |
+| Actual Finance routes      | All 270 unique real-route scenarios covered green across broad runs and targeted repairs. The six cases affected by hosted CI now pass: production developer controls/sample draining, repeated startup failures, and account-archive feedback.                          |
+| Standalone components      | 9/9 passed on the development fixture host. Coverage ownership checks assign all 44 browser test files without duplicate application scenarios.                                                                                                                          |
+| Finance native worker      | Fresh full 66/66 Chromium/Firefox/WebKit application-worker cases and 42/42 SDK/session binding cases pass with the updated shared patch.                                                                                                                                |
+| Native backup/restoration  | 107/107 passed at the integration checkpoint, including browser-process restarts, partial writes, rollback, permission repair and exact historical data. Actual production-route archive exports and independent reopening pass.                                         |
+| Production/offline/bundles | Fresh 19/19 PWA cases pass with the retained SDK fixes. Audited Window: 864 modules with no Jazz runtime/financial projections. Application worker: 604 modules with no Svelte UI. Provider, image and SDK broker workers remain separate.                               |
+| Production startup         | 7/7 passed at the integration checkpoint and in its hosted CI, including cold local work, silent connections, partial permission data, later server rejection and cold bank history. Final code-head CI repeats this gate.                                               |
+| Clipper                    | Fresh full 32/32 native worker cases pass, including all five fresh/expired/forged/wrong-audience/wrong-identity proof cases and offline edits across visible Retry. Previous 1,029 units and web/extension static/browser checks pass; final code-head CI repeats them. |
+| Local First                | Native snapshot capture/export: fresh 20/20 pass with ordered snapshot reads and native Vite resolution. Previous 1,250 units, static/package and complete consumer qualification pass; final code-head CI repeats all affected gates.                                   |
 
-The retained-broker failure and concrete proposal are recorded at the end of
-[the Jazz upgrade plan](worker-jazz-upgrade-plan.md). Alpha.67 admits subscribers
-with the owner’s original proof rather than the joining peer’s fresh proof.
-Offline Retry also requires failed-connection remote synchronization. These
-were existing alpha.60 patch responsibilities omitted from the initial alpha.67
-patch. The user decision on porting them is pending. Do not add an application
-credential framework, silently remove negative tests, or recommend merging while
-these five native cases remain unresolved.
+The user approved porting the two existing alpha.60 broker responsibilities on
+November 19. The shared alpha.67 patch now forwards the joining peer’s current
+proof while keeping owner identity/audience fixed and native signature/expiry
+verification intact. Explicit Retry drains locally with `waitForSync: false`;
+account replacement and sign-out retain synchronization requirements. Both the
+readable SDK implementation and its shipped broker bundle carry the same fix.
+No application credential cache, token-renewal policy or extra SDK owner exists.
 
-Remaining before merge: resolve the shared SDK decision and qualify its retained fixes in both apps; upload this repair batch to
-the same PR46 and inspect final-head hosted CI. Keep small cosmetic follow-ups
-separate. User servers, production data and storage namespaces remain unchanged.
-No Paraglide generation is authorized.
+Hosted CI at `e92c1bdf` identified fixture/configuration issues now repaired:
+the general production host explicitly enables the developer controls it tests;
+the no-account assertion targets form status instead of a second pane; the
+startup fault test proves another blocked fetch and waits for retained account
+content before querying identity. Local First follows Jazz’s recommended Vite
+exclusion for the SDK and performs native snapshot reads sequentially, matching
+Finance’s qualified capture path. No extra dependency patch addresses this
+snapshot concurrency limitation.
+
+The [upgrade plan](worker-jazz-upgrade-plan.md#november-18-qualification-retained-broker-patch-responsibilities)
+records approval, source evidence and qualification. The lock changes only the
+shared SDK patch fingerprint and its three corresponding injected peer contexts;
+a frozen offline install and monorepo package-identity checks pass.
+
+Remaining before merge: upload this completed repair batch to the same PR46 and
+verify its code-head hosted CI. No further Finance feature migration or shared
+broker decision remains. Keep small cosmetic follow-ups separate. User servers,
+production data and storage namespaces remain unchanged. No Paraglide generation
+is authorized.
 
 ## Earlier inactive implementation checkpoint — November 18
 
