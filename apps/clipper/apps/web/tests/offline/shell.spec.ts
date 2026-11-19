@@ -4,6 +4,7 @@ import { closeLibraryPopovers, openLibrarySearch, openLibraryFilters } from '../
 import { openAddLink } from '../add-link.js'
 import { readingControls, closeReadingControls, visibleReadingParagraph } from '../reader-ui.js'
 import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
+import { resumeObservationsSchema } from '../../src/lib/reader/schema.js'
 import { test, expect, chromium, firefox, webkit } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
@@ -468,11 +469,14 @@ test('production shell survives abrupt application worker termination and a full
 		await expect(restored.getByRole('article')).toContainText('Exact offline shell text café 🦊')
 		const documentId = readerPath!.split('/').pop()!
 		await expect
-			.poll(() =>
-				authority.backend.db.one(
+			.poll(async () => {
+				const document = await authority.backend.db.one(
 					app.libraryDocuments.where({ id: documentId }).include({ attachment: { site: true } })
 				)
-			)
+				return document
+					? { ...document, resumePosition: resumeObservationsSchema.parse(document.resumePosition) }
+					: document
+			})
 			.toMatchObject({
 				readingProgress: expect.any(Number),
 				resumePosition: { interactedAt: expect.any(Date) },

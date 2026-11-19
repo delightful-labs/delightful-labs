@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const fixture = '/__form-presentation'
+const fixtureURL = '/__form-presentation'
 
 // Supply the test-only document through Playwright. Vite transforms the entry
 // module and actual shared components; no application route is introduced.
@@ -23,7 +23,7 @@ test(
 	'scoped fields react to access; accepted reset rebuilds fields and busy reset preserves them',
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
-		await page.goto(fixture)
+		await page.goto(fixtureURL)
 		const name = page.getByRole('textbox', { name: 'Name', exact: true })
 		await expect(name).toBeEnabled()
 		await name.fill('Draft')
@@ -59,7 +59,7 @@ test(
 test('modal preserves drafts across Escape/backdrop; closes and reopens issued work without cancellation; renders void success', async ({
 	page
 }) => {
-	await page.goto(`${fixture}?modal`)
+	await page.goto(`${fixtureURL}?modal`)
 	const trigger = page.getByRole('button', { name: 'Save draft', exact: true }).first()
 	const dialog = page.getByRole('dialog', { name: 'Save draft', exact: true })
 	await trigger.click()
@@ -101,7 +101,7 @@ test(
 	'scope replacement closes the modal and resets its visible draft',
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
-		await page.goto(`${fixture}?modal`)
+		await page.goto(`${fixtureURL}?modal`)
 		const trigger = page.getByRole('button', { name: 'Save draft', exact: true }).first()
 		const dialog = page.getByRole('dialog')
 		await trigger.click()
@@ -120,7 +120,7 @@ test(
 test('submission reports render validation and operating activity through the shared controller', async ({
 	page
 }) => {
-	await page.goto(`${fixture}?validation`)
+	await page.goto(`${fixtureURL}?validation`)
 	const name = page.getByRole('textbox', { name: 'Name', exact: true })
 	await expect(name).toBeEnabled()
 	await name.fill('Reported progress')
@@ -143,7 +143,7 @@ test(
 	'scope replacement during reported validation waits for cleanup without starting a write',
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
-		await page.goto(`${fixture}?validation`)
+		await page.goto(`${fixtureURL}?validation`)
 		const name = page.getByRole('textbox', { name: 'Name', exact: true })
 		await expect(name).toBeEnabled()
 		await name.fill('Old scope')
@@ -164,7 +164,7 @@ test(
 test('readiness withdrawal disables submission until a current report arrives', async ({
 	page
 }) => {
-	await page.goto(fixture)
+	await page.goto(fixtureURL)
 	const name = page.getByRole('textbox', { name: 'Name', exact: true })
 	const save = page.getByRole('button', { name: 'Save draft', exact: true })
 	await expect(name).toBeEnabled()
@@ -187,7 +187,7 @@ test('readiness withdrawal disables submission until a current report arrives', 
 test('readiness failure drains pending work before a fresh watcher can recover', async ({
 	page
 }) => {
-	await page.goto(fixture)
+	await page.goto(fixtureURL)
 	const name = page.getByRole('textbox', { name: 'Name', exact: true })
 	const retry = page.getByRole('button', { name: 'Retry readiness', exact: true })
 	await expect(name).toBeEnabled()
@@ -213,10 +213,8 @@ test(
 	'workspace loading feedback is visible while page content waits',
 	{ tag: ['@workspaces'] },
 	async ({ page }) => {
-		await page.goto('/accounts')
-		await expect(
-			page.getByRole('main').getByRole('heading', { name: 'Accounts', exact: true })
-		).toBeVisible()
+		await page.goto(fixtureURL)
+		await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeEnabled()
 		await page.evaluate(async () => {
 			const sveltePath = '/node_modules/svelte/src/index-client.js'
 			const componentPath = '/src/lib/components/workspaces/WorkspaceScopeNotice.svelte'
@@ -244,10 +242,8 @@ test(
 test.describe('active application locale', () => {
 	test.use({ locale: 'de-DE', timezoneId: 'America/Los_Angeles' })
 	test('formats category counts, tag summaries and money with the app locale', async ({ page }) => {
-		await page.goto('/accounts')
-		await expect(
-			page.getByRole('main').getByRole('heading', { name: 'Accounts', exact: true })
-		).toBeVisible()
+		await page.goto(fixtureURL)
+		await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeEnabled()
 		await page.evaluate(async () => {
 			const sveltePath = '/node_modules/svelte/src/index-client.js'
 			const categoryPath = '/src/lib/components/classification/CategoryList.svelte'

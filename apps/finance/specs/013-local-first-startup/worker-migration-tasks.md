@@ -104,8 +104,37 @@ records approval, source evidence and qualification. The lock changes only the
 shared SDK patch fingerprint and its three corresponding injected peer contexts;
 a frozen offline install and monorepo package-identity checks pass.
 
-Remaining before merge: upload this completed repair batch to the same PR46 and
-verify its code-head hosted CI. No further Finance feature migration or shared
+Hosted CI at `6fa7c94b` passes every actual Finance application, native startup,
+offline, unit, static and build job. All Foundation jobs and Clipper's web,
+extension, tooling/build and 32 native worker cases pass. Three remaining
+fixture expectations are corrected without application or additional SDK changes:
+
+- Finance's two pure presentation cases mount through the existing standalone
+  component document instead of waiting for an unrelated account startup. All
+  nine component cases pass locally on that fixture host.
+- Clipper's backend reading-position assertion uses the existing
+  `resumeObservationsSchema` to decode its stored observation set before checking
+  the resolved date and unchanged article metadata.
+- Clipper's cold restart after deliberate provider/native sign-out asserts the
+  retained signed-out state and absence of the previous article. Its existing
+  explicit Create account action then opens a fresh library offline. This follows
+  Clipper's recorded sign-out contract; automatic account creation is first-use
+  behavior, not permission to undo an explicit sign-out on restart.
+
+The complete corrected Clipper production/offline suite passes 12/12 locally,
+including Chromium, Firefox and WebKit startup, full-process restarts, reconnect,
+reading-position/metadata synchronization, annotations and consented updates.
+Clipper static qualification reports zero Svelte errors and warnings.
+
+The previously skipped sample-data suite exposed the same overlapping native
+snapshot-read stall in Clipper's optional seed-presence check. Four direct awaits
+replace `Promise.all`; its existing serializable recheck/commit, authority guard,
+offline skip and shutdown settlement remain unchanged. Both sample-data browser
+cases and all 11 existing seeding/lifecycle tests pass on the final repair source.
+Temporary phase-only diagnostics are removed.
+
+Remaining before merge: upload this final fixture batch to the same
+PR46 and verify its code-head hosted CI. No further Finance feature migration or shared
 broker decision remains. Keep small cosmetic follow-ups separate. User servers,
 production data and storage namespaces remain unchanged. No Paraglide generation
 is authorized.
