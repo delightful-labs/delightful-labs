@@ -1,7 +1,7 @@
 # Native-library cleanup specification
 
-Status: C01–C07 complete, including explicit retained-owner dispositions for C06.
-C08–C10 remain open. Complete
+Status: C01–C08 complete, including explicit retained-owner dispositions for C06
+and C08. C09–C10 remain open. Complete
 focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
@@ -66,8 +66,8 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Task status and acceptance
 
-C01–C07 are complete. C06 includes the verified classification reduction and the
-retained-owner decisions below. C08–C10 remain open pending their acceptance evidence. The source evidence and constraints for each
+C01–C08 are complete. C06 and C08 include reviewed retained-owner decisions
+below. C09–C10 remain open pending their acceptance evidence. The source evidence and constraints for each
 task follow this checklist. Update this status and its evidence after each slice;
 do not mark an item complete merely because code moved to a smaller file.
 
@@ -85,7 +85,7 @@ do not mark an item complete merely because code moved to a smaller file.
       reports/close results, and preserve draft, interruption and settlement semantics.
 - [x] **C07:** Each receiving path decodes once; repeated view reset/subscription
       bookkeeping is reduced with no stale data or lost immediate pending feedback.
-- [ ] **C08:** Where native Svelte/XState bindings reduce code, adopt them without
+- [x] **C08:** Where native Svelte/XState bindings reduce code, adopt them without
       changing DOM resource ownership, error handling or graceful shutdown.
 - [ ] **C09:** Record a before/after decision for finite worker reuse. Adopt shared
       code only where it reduces total code/lifecycle variants; document justified skips.
@@ -404,7 +404,7 @@ the same fields repeatedly. Preserve no stale data after failure or replacement.
 
 ### C08 — Use native Svelte actor subscriptions where they remove boilerplate
 
-**Confirmed opportunity, lower priority.** Local First's
+**Evaluated; selective adoption and retained bindings recorded below.** Local First's
 [form controller](../../../../packages/local-first/src/lib/integrations/forms/controller.svelte.ts)
 and [avatar selection binding](../../../../packages/local-first/src/lib/integrations/profile/avatar-selection.svelte.ts),
 plus UI's [SwipeActions](../../../../packages/ui/src/lib/Components/SwipeActions.svelte),
@@ -840,3 +840,32 @@ Verification on November 19, Node 24.22.2 / pnpm 10.28.0:
   builds were not repeated for these bounded client-adapter changes.
 
 Remaining: C08–C10; no push, merge, deployment, migration or dependency change.
+
+
+## C08 native subscription evaluation and retained bindings
+
+The installed `@xstate/svelte@6.0.0-beta.0` implementation was inspected, not
+assumed equivalent to an actor owner. `useSelector` wraps a native Svelte readable
+store, refreshes from `getSnapshot()` at first subscription, subscribes only to
+next snapshots and releases that subscription at last unsubscription. It neither
+starts/drains the actor nor replaces its error observer.
+
+| Binding | Decision | Source-backed reason |
+| --- | --- | --- |
+| Clipper library render projection | Adopt native Svelte store lifecycle, completed in C07 (`ca82e8ab`). | Deletes the observer Set, explicit replay and first/last subscription bookkeeping while preserving synchronous pending feedback and the existing native client resource owner. |
+| Local First form controller | Retain explicit snapshot/error observation and `stopAfterShutdown`. | Its error observer refreshes the failed snapshot. `useSelector` only observes next snapshots, so retaining that error path would require another subscription/bridge rather than delete it. Financial shutdown must still drain. |
+| Local First avatar selection | Retain the current small `.svelte.ts` rune bridge and component owner. | Selection/crop cleanup still requires explicit SHUTDOWN and stop. A selector store in this helper would also need a reactive store-to-rune bridge; no reduction is demonstrated. |
+| UI SwipeActions | Retain the current three-line initial-snapshot/subscribe/unsubscribe bridge. | A native readable initializer/import does not materially reduce it. Pointer capture, ResizeObserver, chosen-event observation, DOM listeners, actor start/stop and focus/animation handling all retain their current owner. |
+
+Neither UI nor Local First currently declares `@xstate/svelte`; adding a package
+integration solely to replace these tiny bridges would increase upgrade surfaces.
+No dependency was added, no new actor hook was written and `useActorRef` was not
+substituted for a drain protocol. The C07 store change is the qualifying reduction
+and already passed its **8/8 render component**, **6/6 client unit** and **36/36
+Clipper native browser** cases. Those passing checks were not repeated for this
+read-only evaluation. Other component APIs and resource lifetimes are unchanged;
+no runtime files or generated/catalog output changed in C08.
+
+C08 is complete as a selective adoption/retain decision, not a claim that every
+manual snapshot binding should be replaced. Remaining: C09–C10; no push, merge,
+deployment, migration or dependency change.
