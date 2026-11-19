@@ -51,9 +51,13 @@ must not replace a root's outstanding resource-drain protocol.
 
 ## Required outcomes
 
-1. Reduce repeated code and the number of version-sensitive integration points
-   across Finance, Clipper, Local First and UI. Prefer deletion, existing public
-   APIs and existing package boundaries before creating another abstraction.
+1. Reduce drift and the number of version-sensitive integration points across
+   Finance, Clipper, Local First and UI by sharing common behavior, resource
+   lifecycles and adapters. Prefer existing public implementations and package
+   boundaries. Total line count is a cost to report, not the sole adoption gate:
+   a shared implementation can be worthwhile even with some consumer glue if it
+   eliminates independently maintained behavior. Do not create another generic
+   wrapper, supervisor or RPC framework to obtain reuse.
 2. Keep domain decisions, eligibility, issued operations and cleanup visible in
    the owning XState charts. Preserve native Svelte rendering/store behavior and
    Jazz session, query, transaction, authorization and synchronization ownership.
@@ -87,8 +91,9 @@ do not mark an item complete merely because code moved to a smaller file.
       bookkeeping is reduced with no stale data or lost immediate pending feedback.
 - [x] **C08:** Where native Svelte/XState bindings reduce code, adopt them without
       changing DOM resource ownership, error handling or graceful shutdown.
-- [ ] **C09:** Record a before/after decision for finite worker reuse. Adopt shared
-      code only where it reduces total code/lifecycle variants; document justified skips.
+- [ ] **C09:** Record the before/after ownership decision for finite worker reuse.
+      Share common lifecycle behavior to reduce app drift; report code costs and
+      document any justified boundary-specific exceptions.
 - [ ] **C10:** Production-bound fixtures use the actual adapter; identical builds
       are reused only across matching configurations with separate authorities and full coverage.
 
@@ -429,10 +434,11 @@ worker creation, message/error/abort handling and termination. This is the prior
 R4 reuse candidate, not a newly discovered need for a transport framework.
 
 Evaluate moving the existing finite-job primitive to Local First and adopting it
-where total code and lifecycle variants shrink. Preserve Finance's provider
-deadline, trace sanitization, consent and secret handling in Finance. A small
-native image leaf may remain simpler than an actor adapter; do not force it onto
-the abstraction. Do not mix finite CPU/HTTP jobs with persistent Jazz/application
+where the native resource lifetimes match. Reducing behavioral variants and app
+drift is the primary benefit; total code size is a secondary cost, not a veto. Preserve Finance's provider
+deadline, trace sanitization, consent and secret handling in Finance. Use the shared native job directly from an existing caller chart where possible;
+do not preserve a duplicate worker lifecycle merely because its local leaf is
+shorter. Keep only domain request/reply mapping in the app. Do not mix finite CPU/HTTP jobs with persistent Jazz/application
 workers or use `terminate()` as a financial drain receipt. Clipper domain code
 shared with its extension remains Clipper-owned, not Local First policy.
 
@@ -766,8 +772,11 @@ feature to acquire another chart.
 | Transfers | Keep the mutation owner, submission and edit workflow contracts. Issued transfer settlement and interactive form lifetimes must remain explicit. |
 | Backup/restore | Keep the current public reports and real drain rules, including restore's existing busy/drain boundary. Grouping does not establish equivalent resource lifetimes. |
 
-No generalization of the classification chart, generic supervisor or relocated
-copies of these blocks is authorized by this disposition. Future changes require
+These retained form/policy implementations already come from Local First; they
+are not two app-owned forks. The classification change reduces Finance's parent
+coordination without changing that common implementation. No generalization of
+the classification chart, generic supervisor or relocated copies of these blocks
+is authorized by this disposition. Future changes require
 a demonstrated reduction and a concrete ownership review. These retain decisions
 reuse the implementation and verification already recorded; unchanged owners were
 not retested solely to document that they remain unchanged.
@@ -857,6 +866,8 @@ starts/drains the actor nor replaces its error observer.
 | Local First avatar selection | Retain the current small `.svelte.ts` rune bridge and component owner. | Selection/crop cleanup still requires explicit SHUTDOWN and stop. A selector store in this helper would also need a reactive store-to-rune bridge; no reduction is demonstrated. |
 | UI SwipeActions | Retain the current three-line initial-snapshot/subscribe/unsubscribe bridge. | A native readable initializer/import does not materially reduce it. Pointer capture, ResizeObserver, chosen-event observation, DOM listeners, actor start/stop and focus/animation handling all retain their current owner. |
 
+The retained bindings themselves live in the shared UI/Local First packages;
+keeping them does not introduce divergent Finance and Clipper implementations.
 Neither UI nor Local First currently declares `@xstate/svelte`; adding a package
 integration solely to replace these tiny bridges would increase upgrade surfaces.
 No dependency was added, no new actor hook was written and `useActorRef` was not
@@ -871,44 +882,76 @@ manual snapshot binding should be replaced. Remaining: C09–C10; no push, merge
 deployment, migration or dependency change.
 
 
-## C09 source assessment and proposed skip (review pending)
+## C09 revised shared-worker design (not implemented)
 
-The current implementation was read together with its actual callers and tests.
-Before: Clipper's finite `browser-worker-job.ts` is **202 lines / 5,913 bytes**,
+The user clarified that reducing drift between the two apps and reusing common
+behavior take priority over net line savings. The proposed line-count-based skip
+is withdrawn. The objective is one finite native-worker lifecycle implementation,
+with app-specific payloads, consent, diagnostics and deadlines remaining in their
+owners. No new framework, supervisor or actor-to-promise bridge is proposed.
+
+Baseline: Clipper's finite `browser-worker-job.ts` is **202 lines / 5,913 bytes**,
 Finance's `simplefin-worker.ts` is **83 lines / 2,650 bytes**, and its
-`image-render.ts` is **42 lines / 1,465 bytes**: **327 lines / 10,028 bytes** total
-across the three implementations. Clipper already shares its chart between web
-images and extension extraction; the native job cases passed in C07.
+`image-render.ts` is **42 lines / 1,465 bytes**. These counts are a review baseline,
+not a reason to keep independent behavior. Clipper already shares its chart
+between web images and extension extraction; Finance currently maintains its own
+construction/message/error/abort/termination paths.
 
-Proposed after-decision: retain these implementations (**327 lines / 10,028
-bytes; zero source delta**), with no shared export or new adapter. This is an
-explicit skip proposal, not an implemented/tested extraction or a claim that an
-alternative has a measured source reduction.
+### First implementation batch: shared core and both apps' image consumers
 
-- Promoting Clipper's chart alone relocates 202 lines and adds a public package
-  contact point while deleting no lifecycle implementation.
-- Finance's image renderer is one native cancellable CPU leaf, already invoked
-  by the image editor's render actor. It validates ImageData and uses native
-  finally/abort cleanup. A chart adapter would need result/error mapping and an
-  integration change; the present small leaf is the simpler reviewed boundary.
-- Provider transport is called through `fetchAccounts`, with a promise contract,
-  a 75-second bootstrap/body deadline, explicit cancellation-vs-timeout trace,
-  worker-error prevention, bounded domain reply decoding and sanitized stage/
-  count diagnostics. The shared job is an invoked chart with different output
-  and error handling. Starting it inside this promise and awaiting it would be
-  the prohibited child-actor promise bridge; correct adoption requires a reviewed
-  change in the existing provider owner rather than a transport substitution.
-- Local First's existing `createWorkerRequest` is also not the same resource:
-  its channel owns routing/resources, request identities and unknown-effect
-  receipts. Adapting finite CPU/HTTP workers to it would add a channel protocol;
-  it would not delete their native resource owner. No RPC/worker framework is
-  proposed.
+1. Promote the existing Clipper `createBrowserWorkerJob` implementation and its
+   typed input/result contract into Local First, exposed through one supported
+   public entry such as `delightful-local-first/worker/browser-job`. Preserve
+   selected worker construction/posting, decoder failure, abort, transferred
+   buffers, elapsed timing, listener release and cleanup-failure blocking. The
+   default clock uses native performance time at the owned effect boundary;
+   no Clipper domain import moves into Local First.
+2. Point Clipper's web image job and extension extraction job at that canonical
+   export and remove their private production lifecycle implementation. Keep
+   domain request/reply schemas and their existing 20s/15s deadline choices in
+   Clipper. Shared lifecycle qualification belongs with the canonical core;
+   app-specific integration fixtures remain app-owned.
+3. Finance's existing `imageEditorMachine` directly invokes that same job chart
+   for preview/apply rendering. `image-render.ts` retains only the request/worker
+   URL and ImageData reply mapping, rather than another worker lifecycle. Do not
+   hide the job behind the old promise API. CANCEL/SHUTDOWN must request native
+   cancellation and wait for the job's release result before bitmap/canvas or
+   parent completion. Preserve pending apply, preview replacement, failures and
+   blocked cleanup; stopping an invocation is not a successful drain report.
+4. Qualify the public package export and consumer XState identity, the canonical
+   generated/unit lifecycle campaigns, both apps' image behavior, actual native
+   cancellation/cleanup, Clipper extension extraction and Finance held-render
+   interruption. Build/package without catalog generation; keep all output and
+   profiles isolated from user servers/data.
 
-The recommended skip preserves provider consent/secrets, trace sanitization,
-Finance deadline behavior and each existing cleanup contract. No runtime code or
-qualification was changed for this assessment. C09 remains unchecked until this
-before/after retain decision is accepted. Do not mistake finite native
-`terminate()` returning for a Jazz/application resource-drain receipt.
+### Provider integration: same lifecycle, separately reviewed caller change
+
+Finance's provider transport is also intended to consume the shared lifecycle.
+Its current `fetchAccounts` promise contract is called by the existing bank
+operation's `fetchProvider` actor. Starting a job actor inside that promise would
+be the prohibited child-actor promise bridge, so the invocation boundary must
+move into an owned chart instead.
+
+Review a concrete provider-fetch chart invoked by the existing operation's
+`fetching` state. Keep its existing authorization before the request and after
+its response. Finance continues owning demo-vs-real selection, URL validation,
+the 75-second bootstrap/body deadline, cancellation-vs-timeout outcome, sanitized
+provider stage/count traces and transient credentials. Its chart invokes the
+same shared worker job and waits for native release before reporting completion
+or interruption. Native worker-error prevention and invalid reply handling must
+retain their present behavior. No secret may enter diagnostics or survive its
+selected operation lifetime as part of this integration.
+
+Settle that caller/drain contract before modifying provider code. Additional
+consumer mapping is acceptable when it removes independently maintained worker
+behavior. Local First's existing channel-oriented `createWorkerRequest` remains
+separate: its identity/unknown-effect protocol and channel resource owner are not
+these finite jobs. Persistent Jazz/application workers and financial write custody
+also retain their existing real close protocols.
+
+C09 remains open pending the shared implementation and verification, followed by
+provider caller integration. C10 remains open. C01–C08 are complete; retained
+shared bindings may be revisited if an actual cross-app fork is found.
 
 ## C10 concrete work sequence (not implemented)
 
@@ -944,5 +987,5 @@ batch. For build reuse, verify actual compiled environment inputs before
 collapsing jobs. Clipper's per-spec authority/server restart remains intentional;
 reuse an immutable build only across truly matching inputs, never a mutable
 backend. Keep generated output separate from user servers/data and introduce no
-new generic fixture/RPC/cache framework. Remaining: C09 disposition and C10;
+new generic fixture/RPC/cache framework. Remaining: C09 shared implementation/provider integration and C10;
 C01–C08 are complete.
