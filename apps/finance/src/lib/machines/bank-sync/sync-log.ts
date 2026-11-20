@@ -103,15 +103,7 @@ export function createSyncLogMachine({ db }: Pick<Dependencies, 'db'>) {
 		CANCEL: types<EventPayload<SyncLogEvent, 'CANCEL'>>(),
 		FINISH: types<EventPayload<SyncLogEvent, 'FINISH'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['accountId']>
-				| import('xstate').OutputFrom<(typeof actors)['recordAccount']>
-				| import('xstate').OutputFrom<(typeof actors)['recordStart']>
-				| import('xstate').OutputFrom<(typeof actors)['recordResult']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

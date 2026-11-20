@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, closeSeedReplica } from './seed-fixture.js'
+import { expect } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
 import { app } from '../src/lib/backend/jazz/jazz.generated.js'
 import permissions from '../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
@@ -37,6 +38,7 @@ test('populated restart bounds rendering, starts search on demand and reads dire
 		const text = message.text()
 		if (text.includes('"machine":"root-bootstrap"')) rootStates.push(text)
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const ids = await page.evaluate(async () => {
@@ -44,6 +46,7 @@ test('populated restart bounds rendering, starts search on demand and reads dire
 		return (await import(/* @vite-ignore */ path)).seedStartupLibrary(120)
 	})
 	rootStates.length = 0
+	await closeSeedReplica(page)
 	await page.reload()
 	const rows = page.locator('[data-article-id]')
 	await expect(rows).toHaveCount(50)
@@ -77,6 +80,7 @@ test('populated restart bounds rendering, starts search on demand and reads dire
 	await expect(rows).toHaveCount(50)
 	await closeLibraryPopovers(page)
 	searchStarted = false
+	await closeSeedReplica(page)
 	await page.goto('/articles/' + ids[0])
 	await expect(page.getByRole('article')).toContainText('uniquestartupneedle')
 	expect(await hasSearchWorker()).toBe(false)

@@ -145,6 +145,97 @@ function retainOnFailure() {
 
 for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
 	describe(engine, () => {
+		it.each(['normal', 'http-failure', 'cancel', 'blocked-release'] satisfies Parameters<
+			Window['qualifyProviderJob']
+		>[0][])(
+			'qualifies the shared finite provider job through native %s and cleanup',
+			async (mode) => {
+				const browser = await browserType.launch({ headless: true })
+				try {
+					const page = await browser.newPage()
+					let requests = 0
+					await page.route('**/api/simplefin', async (route) => {
+						requests++
+						expect(route.request().postDataJSON()).toEqual({
+							operation: 'discover',
+							url: 'https://fixture:synthetic@bridge.simplefin.org/simplefin'
+						})
+						await route.fulfill({
+							status: mode === 'http-failure' ? 502 : 200,
+							contentType: 'application/json',
+							body: JSON.stringify({ accounts: [], errors: [] })
+						})
+					})
+					await page.goto(origin + '/tests/worker-bindings/index.html')
+					await page.waitForFunction(() => typeof window.qualifyProviderJob === 'function')
+					const result = await page.evaluate((mode) => window.qualifyProviderJob(mode), mode)
+					expect(result.windowPresent).toBe(false)
+					if (mode === 'blocked-release')
+						expect(result).toMatchObject({
+							kind: 'blocked',
+							status: 'active',
+							releases: 0,
+							posts: 1,
+							hasOutput: false
+						})
+					else
+						expect(result).toMatchObject({
+							kind: mode === 'normal' ? 'replied' : mode === 'cancel' ? 'cancelled' : 'failed',
+							status: 'done',
+							releases: 1,
+							posts: 1,
+							clearedInput: true,
+							handlersRemoved: true,
+							secretInDiagnostics: false
+						})
+					expect(requests).toBe(mode === 'normal' || mode === 'http-failure' ? 1 : 0)
+				} finally {
+					await browser.close()
+				}
+			}
+		)
+
+		it.each([
+			'normal',
+			'cancel-preview',
+			'cancel-apply',
+			'replace-preview',
+			'blocked-release'
+		] satisfies Parameters<Window['qualifyImageJob']>[0][])(
+			'qualifies the shared finite image job through native %s and cleanup',
+			async (mode) => {
+				const browser = await browserType.launch({ headless: true })
+				try {
+					const page = await browser.newPage()
+					await page.goto(origin + '/tests/worker-bindings/index.html')
+					await page.waitForFunction(() => typeof window.qualifyImageJob === 'function')
+					const result = await page.evaluate((mode) => window.qualifyImageJob(mode), mode)
+					if (mode === 'blocked-release')
+						expect(result).toMatchObject({
+							kind: 'blocked',
+							status: 'active',
+							hasOutput: false,
+							releases: 0,
+							resources: 1
+						})
+					else {
+						expect(result).toMatchObject({
+							kind: mode.startsWith('cancel') ? 'closed' : 'applied',
+							status: 'done',
+							handlersRemoved: true,
+							retainsPixels: false
+						})
+						expect(result.releases).toBe(result.resources)
+						expect(result.posts).toBe(mode.startsWith('cancel') ? 1 : 2)
+						if (mode === 'normal')
+							expect(result).toMatchObject({ dimensions: [4, 4], pixel: [64, 128, 192, 255] })
+					}
+				} finally {
+					await browser.close()
+				}
+			}
+		)
+
 		it.each([{ initial: 'device' }, { initial: 'signed-out' }] satisfies {
 			initial: 'device' | 'signed-out'
 		}[])(

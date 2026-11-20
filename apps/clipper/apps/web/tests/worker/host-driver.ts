@@ -1,9 +1,6 @@
 import { serveScopedAccountStorage } from '../../src/lib/runtime/worker/scoped-storage-channel.js'
 import { serveBrokerHost } from '../../src/lib/runtime/worker/broker-channel.js'
-import {
-	serveAccountStorage,
-	accountStorageKey
-} from '../../src/lib/runtime/worker/storage-channel.js'
+import { accountStorageKey } from '../../src/lib/runtime/worker/storage-channel.js'
 import { z } from 'zod'
 import { fixtureServerUrl } from '../browser-account-store.js'
 const { PUBLIC_JAZZ_APP_ID } = z.object({ PUBLIC_JAZZ_APP_ID: z.string() }).parse(import.meta.env)
@@ -20,15 +17,23 @@ export async function qualifyHost() {
 	const expected = currentLibraryRecords().articles.libraryId
 	const key = accountStorageKey(PUBLIC_JAZZ_SERVER_URL)
 	const worker = new Worker(new URL('./host.worker.ts', import.meta.url), { type: 'module' })
-	const channel = new MessageChannel()
+	const channel = new MessageChannel(),
+		storageControl = new MessageChannel()
+	const storageScope = crypto.randomUUID()
 	const broker = new MessageChannel(),
 		brokerControl = new MessageChannel()
 	const brokerScope = crypto.randomUUID()
 	const stopBroker = serveNativeBroker(broker.port1, brokerControl.port1, brokerScope)
-	const stop = serveAccountStorage(channel.port1, localStorage, key)
+	const stop = serveScopedAccountStorage(
+		channel.port1,
+		storageControl.port1,
+		storageScope,
+		localStorage,
+		key
+	)
 	try {
 		return await new Promise((resolve, reject) => {
-			let result: unknown
+			let result: Record<string, unknown> = {}
 			worker.onerror = () => reject(new Error('Worker host failed'))
 			worker.onmessage = ({ data }) => {
 				if (data.type === 'FAILED')
@@ -38,18 +43,20 @@ export async function qualifyHost() {
 						)
 					)
 				if (data.type === 'READY') result = { ...data, sameAccount: data.accountId === expected }
-				if (data.type === 'CLOSED') resolve(result)
+				if (data.type === 'CLOSED') resolve({ ...result, closed: true })
 			}
 			worker.postMessage(
 				{
 					port: channel.port2,
+					storageControl: storageControl.port2,
+					storageScope,
 					broker: broker.port2,
 					brokerControl: brokerControl.port2,
 					brokerScope,
 					appId: PUBLIC_JAZZ_APP_ID,
 					serverUrl: PUBLIC_JAZZ_SERVER_URL
 				},
-				[channel.port2, broker.port2, brokerControl.port2]
+				[channel.port2, storageControl.port2, broker.port2, brokerControl.port2]
 			)
 		})
 	} finally {

@@ -7,6 +7,11 @@ import { build } from 'vite'
 
 const consumers = [
 	{
+		name: 'browser-job',
+		source: 'browser-worker-job.ts',
+		subpath: 'delightful-local-first/worker/browser-job'
+	},
+	{
 		name: 'callback-custody',
 		source: 'worker-callback-custody.ts',
 		subpath: 'delightful-local-first/worker/callback-custody'
@@ -112,7 +117,7 @@ try {
 		})
 	}
 	console.log(
-		'Packed callback-custody/close/root-broker/owned-broker consumers: public types, native effects/receipts and self-contained ES-module workers passed.'
+		'Packed browser-job/callback-custody/close/root-broker/owned-broker consumers: public types, native effects/receipts and self-contained ES-module workers passed.'
 	)
 } finally {
 	await rm(directory, { recursive: true, force: true })

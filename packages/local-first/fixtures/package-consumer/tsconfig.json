@@ -40,7 +40,8 @@
 		"./worker-broker-owned.ts",
 		"./worker-host-close-packed.mjs",
 		"./worker-effect-drain.ts",
-		"./ordered-sign-out.ts"
+		"./ordered-sign-out.ts",
+		"./browser-worker-job.ts"
 	],
 	"exclude": []
 }

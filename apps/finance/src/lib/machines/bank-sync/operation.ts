@@ -1,11 +1,8 @@
 import { app } from '#lib/queries.js'
 import { createBankTrace } from '#lib/integrations/diagnostics.js'
 import { unlockCredential } from '#lib/integrations/passkey.js'
-import {
-	fetchAccounts,
-	providerAccountIdentity,
-	providerBalanceSnapshot
-} from '#lib/integrations/simplefin.js'
+import { providerAccountIdentity, providerBalanceSnapshot } from '#lib/integrations/simplefin.js'
+import { providerFetchMachine } from './provider-fetch.js'
 import { createAuthorizationMachine } from './authorization.js'
 import { createAccountMappingMachine } from './accounts.js'
 import { createImportMachine } from './import.js'
@@ -122,18 +119,6 @@ export function createBankOperationMachine(dependencies: Dependencies) {
 			)
 		}
 	})
-	const fetchProvider = createAsyncLogic<
-		ProviderResponse,
-		{ work: OperationWork; accessUrl: string }
-	>({
-		run: ({ input, signal }) =>
-			fetchAccounts(
-				input.accessUrl,
-				input.work.command.type === 'DISCOVER',
-				signal,
-				input.work.trace
-			)
-	})
 	const persistOutcome = createAsyncLogic<void, OperationOutcomeInput>({
 		run: async ({ input, signal }) => {
 			signal.throwIfAborted()
@@ -163,7 +148,7 @@ export function createBankOperationMachine(dependencies: Dependencies) {
 		authorize: createAuthorizationMachine(dependencies),
 		disconnect,
 		unlock,
-		fetchProvider,
+		fetchProvider: providerFetchMachine,
 		mapAccounts: createAccountMappingMachine(dependencies),
 		importTransactions: createImportMachine(dependencies),
 		persistOutcome
@@ -195,22 +180,7 @@ export function createBankOperationMachine(dependencies: Dependencies) {
 				EventPayload<LockEvent | ProgressEvent | ErrorActorEvent | { type: 'CANCEL' }, 'CANCEL'>
 			>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['lock']>
-				| import('xstate').OutputFrom<(typeof actors)['prepare']>
-				| import('xstate').OutputFrom<(typeof actors)['authorize']>
-				| import('xstate').OutputFrom<(typeof actors)['disconnect']>
-				| import('xstate').OutputFrom<(typeof actors)['unlock']>
-				| import('xstate').OutputFrom<(typeof actors)['fetchProvider']>
-				| import('xstate').OutputFrom<(typeof actors)['mapAccounts']>
-				| import('xstate').OutputFrom<(typeof actors)['importTransactions']>
-				| import('xstate').OutputFrom<(typeof actors)['persistOutcome']>
-				| import('xstate').OutputFrom<(typeof actors)['mapAccounts']>
-				| import('xstate').OutputFrom<(typeof actors)['importTransactions']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const workflow = setup({
 		schemas: {
 			context: types<Context>(),
@@ -247,7 +217,7 @@ export function createBankOperationMachine(dependencies: Dependencies) {
 			authorizingMapping: {},
 			unlocking: {},
 			authorizingFetch: {},
-			fetching: {},
+			fetching: { states: { working: {}, cancelling: {}, failing: {}, blocked: {} } },
 			authorizingResponse: {},
 			checkingDiscovery: {},
 			discovering: {},
@@ -312,6 +282,16 @@ export function createBankOperationMachine(dependencies: Dependencies) {
 			}),
 			onError: (args, enq) => {
 				const { context, event } = args
+				if (matchesState('fetching', args.value)) {
+					if (
+						matchesState({ fetching: 'cancelling' }, args.value) ||
+						matchesState({ fetching: 'blocked' }, args.value)
+					)
+						return {}
+					if (args.children.fetchProvider?.getSnapshot().status === 'active')
+						enq.sendTo(args.children.fetchProvider, { type: 'CANCEL' })
+					return { target: '.fetching.failing', context: failure(context, event.error, enq) }
+				}
 				return {
 					target: '.settlingFailure',
 					context: failure(context, 'error' in event ? event.error : new Error('failure'), enq)
@@ -612,30 +592,56 @@ export function createBankOperationMachine(dependencies: Dependencies) {
 			},
 			fetching: {
 				meta: { loadingProvider: true },
+				initial: 'working',
+				states: {
+					working: {},
+					blocked: { on: { CANCEL: {}, LOCK_FAILED: {} } },
+					cancelling: { on: { CANCEL: {}, LOCK_FAILED: {} } },
+					failing: { on: { LOCK_FAILED: {} } }
+				},
+				on: {
+					CANCEL: ({ children }, enq) => {
+						if (children.fetchProvider?.getSnapshot().status === 'active')
+							enq.sendTo(children.fetchProvider, { type: 'CANCEL' })
+						return { target: '.cancelling', context: { accessUrl: undefined } }
+					},
+					LOCK_FAILED: ({ context, event, children }, enq) => {
+						if (children.fetchProvider?.getSnapshot().status === 'active')
+							enq.sendTo(children.fetchProvider, { type: 'CANCEL' })
+						return { target: '.failing', context: failure(context, event.error, enq) }
+					}
+				},
 				invoke: {
+					id: 'fetchProvider',
 					src: 'fetchProvider',
 					input: ({ context }) => {
 						if (!context.accessUrl) throw new Error('invalid-credential')
 						return { work: workFor(context), accessUrl: context.accessUrl }
 					},
-					onDone: (args) => {
+					onDone: ({ context, event, value }, enq) => {
+						if (matchesState({ fetching: 'failing' }, value))
+							return { target: 'settlingFailure', context: { accessUrl: undefined } }
+						if (
+							matchesState({ fetching: 'cancelling' }, value) ||
+							event.output.kind === 'cancelled'
+						)
+							return { target: 'cancelled', context: { accessUrl: undefined } }
+						if (event.output.kind === 'failed') {
+							enq(() =>
+								context.work?.trace.failed('provider.fetch.failed', new Error('provider_failure'))
+							)
+							return {
+								target: 'preparingFailure',
+								context: failure(context, new Error('provider_failure'), enq)
+							}
+						}
 						return {
 							target: 'authorizingResponse',
-							context: { response: args.event.output, accessUrl: undefined }
+							context: { response: event.output.response, accessUrl: undefined }
 						}
 					},
-					onError: (args, enq) => {
-						const { context } = args
-						enq(
-							({ context, event }) =>
-								context.work?.trace.failed('provider.fetch.failed', event.error),
-							args
-						)
-						return {
-							target: 'preparingFailure',
-							context: failure(context, new Error('provider_failure'), enq)
-						}
-					}
+					// Unexpected chart failure cannot certify release of its native child.
+					onError: { target: '.blocked', context: { accessUrl: undefined } }
 				}
 			},
 			authorizingResponse: {

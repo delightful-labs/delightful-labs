@@ -47,6 +47,15 @@ type Context = {
 	recoveryChoices: Record<string, { text: string; writerId: string | undefined }>
 	adoptedWriters: Record<string, string>
 	observationGeneration: number
+	recoveryReport: ReturnType<typeof selectAnnotationRecovery> | undefined
+}
+function recoveryReport(context: Context | undefined) {
+	return (
+		context?.recoveryReport ?? {
+			...selectAnnotationRecovery(undefined),
+			ready: !context?.capability?.recovery
+		}
+	)
 }
 type Event =
 	| AnnotationCommand
@@ -182,7 +191,8 @@ export const annotationsMachine = model.createMachine({
 		invalidBases: {},
 		recoveryChoices: {},
 		adoptedWriters: {},
-		observationGeneration: 0
+		observationGeneration: 0,
+		recoveryReport: undefined
 	}),
 	states: {
 		active: {
@@ -213,9 +223,7 @@ export const annotationsMachine = model.createMachine({
 					)
 						return
 					const note = args.context.visibleRows.notes.find((note) => note.id === args.event.id)
-					const recovery = selectAnnotationRecovery(
-						args.self.getSnapshot().children.recovery?.getSnapshot()
-					)
+					const recovery = recoveryReport(args.context)
 					if (
 						!note ||
 						args.context.invalidNotes[note.id] !== undefined ||
@@ -237,9 +245,7 @@ export const annotationsMachine = model.createMachine({
 					const highlight = args.context.visibleRows.highlights.find(
 						(value) => value.id === args.event.id
 					)
-					const recovery = selectAnnotationRecovery(
-						args.self.getSnapshot().children.recovery?.getSnapshot()
-					)
+					const recovery = recoveryReport(args.context)
 					if (
 						!highlight ||
 						!recovery.ready ||
@@ -277,9 +283,7 @@ export const annotationsMachine = model.createMachine({
 				KEEP_DRAFT: (args, enq) => {
 					if (!args.guards.accepting(args) || !args.guards.currentDocument(args, args.event)) return
 					enq.sendTo('sharingPreview', { type: 'INVALIDATED', noteId: args.event.id })
-					const recovered = selectAnnotationRecovery(
-						args.self.getSnapshot().children.recovery?.getSnapshot()
-					).records.find(
+					const recovered = recoveryReport(args.context).records.find(
 						(record) =>
 							record.writerId === args.event.writerId && record.draft.noteId === args.event.id
 					)
@@ -411,15 +415,33 @@ export const annotationsMachine = model.createMachine({
 						id: 'recovery',
 						src: 'recovery',
 						input: ({ context }) => ({ capability: context.capability }),
-						onSnapshot: {},
+						onSnapshot: ({ context, event }) => {
+							const report = selectAnnotationRecovery(event.snapshot)
+							if (
+								report.documentId !== context.documentId ||
+								report.generation !== context.observationGeneration
+							)
+								return
+							return { context: { recoveryReport: report } }
+						},
 						onDone: { target: '.closed' },
-						onError: { target: '.failed' }
+						onError: ({ context }) => ({
+							target: '.failed',
+							context: {
+								recoveryReport: { ...recoveryReport(context), failed: true, ready: false }
+							}
+						})
 					},
 					states: {
 						active: {
 							on: {
-								OPEN: ({ event }, enq) => {
-									enq.sendTo('recovery', { type: 'OPEN', documentId: event.documentId })
+								OPEN: (args, enq) => {
+									if (!args.guards.accepting(args)) return
+									enq.sendTo('recovery', {
+										type: 'OPEN',
+										documentId: args.event.documentId,
+										generation: args.context.observationGeneration + 1
+									})
 								},
 								CLOSE: (_args, enq) => {
 									enq.sendTo('recovery', { type: 'CLOSE' })
@@ -454,6 +476,7 @@ export const annotationsMachine = model.createMachine({
 								context: {
 									documentId: args.event.documentId,
 									observationGeneration: args.context.observationGeneration + 1,
+									recoveryReport: undefined,
 									undoId: undefined,
 									text: args.event.text,
 									textHash: undefined,
@@ -466,6 +489,7 @@ export const annotationsMachine = model.createMachine({
 							target: '.idle',
 							context: {
 								documentId: '',
+								recoveryReport: undefined,
 								text: '',
 								rows: emptyAnnotationRows,
 								visibleRows: emptyAnnotationRows
@@ -732,7 +756,7 @@ export const annotationsMachine = model.createMachine({
 })
 export function selectAnnotations(snapshot: SnapshotFrom<typeof annotationsMachine> | undefined) {
 	const context = snapshot?.context
-	const recovery = selectAnnotationRecovery(snapshot?.children.recovery?.getSnapshot())
+	const recovery = recoveryReport(context)
 	const ready =
 		!!snapshot &&
 		snapshot.status === 'active' &&

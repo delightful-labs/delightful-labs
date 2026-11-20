@@ -554,26 +554,7 @@ const events0 = {
 			>
 		>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof actors)['readSource']>
-			| import('xstate').OutputFrom<(typeof actors)['decode']>
-			| import('xstate').OutputFrom<(typeof actors)['index']>
-			| import('xstate').OutputFrom<(typeof actors)['derive']>
-			| import('xstate').OutputFrom<(typeof actors)['project']>
-			| import('xstate').OutputFrom<(typeof actors)['hashGraph']>
-			| import('xstate').OutputFrom<(typeof actors)['hashWrites']>
-			| import('xstate').OutputFrom<(typeof actors)['hashPlan']>
-			| import('xstate').OutputFrom<(typeof actors)['finish']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
+
 const actors = {
 	readSource: createAsyncLogic<PrivateValue<Source>, PlanningInput>({
 		run: ({ input }) =>

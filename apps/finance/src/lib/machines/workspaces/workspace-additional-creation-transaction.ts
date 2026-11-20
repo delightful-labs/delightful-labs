@@ -121,10 +121,7 @@ export function createAdditionalWorkspaceTransaction(db: Db) {
 		CANCEL: types<EventPayload<WorkspacePersistenceEvent, 'CANCEL'>>(),
 		SHUTDOWN: types<EventPayload<WorkspacePersistenceEvent, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof transaction>>
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<{

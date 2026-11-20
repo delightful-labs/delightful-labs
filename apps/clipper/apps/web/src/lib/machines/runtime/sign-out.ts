@@ -3,24 +3,40 @@ import type {
 	OrderedSignOutInput,
 	SignOutStage
 } from 'delightful-local-first/session/sign-out/contracts'
-import type { AccountHost, AccountObservation } from '../../contracts/account.js'
+import type { AccountInput, AccountObservation } from '../../contracts/account.js'
 
 export type { SignOutStage }
 export const signOutMachine = createOrderedSignOutMachine()
 
-/** Select immutable native capabilities before starting the shared owner. */
+/** Captured binding survives provider settlement; the shared runtime rechecks mutation admission. */
 export function signOutInput(
-	host: AccountHost,
+	input: AccountInput,
 	observation: AccountObservation,
+	attempt: number,
 	onOverdue?: (stage: SignOutStage) => void
 ): OrderedSignOutInput {
-	const provider = host.signOut
-	const observeSession = observation.status === 'ready' ? observation.logoutStatus : undefined
 	return {
-		...(provider ? { provider } : {}),
-		...(observeSession ? { observeSession } : {}),
-		session:
-			observation.status === 'ready' && observation.logout ? observation.logout : host.logout,
+		...(input.signOut ? { provider: input.signOut } : {}),
+		observeSession: () => {
+			const current = input.session.view.get().observation
+			if (
+				current?.status === 'signed-out' ||
+				(current?.status === 'ready' && current.identityKind === 'device')
+			)
+				return 'signed-out'
+			if (current?.status !== 'ready') return 'unavailable'
+			return observation.status === 'ready' && current.binding === observation.binding
+				? 'current'
+				: 'replaced'
+		},
+		session: {
+			session: input.session,
+			scope: { binding: input.session.binding, attempt },
+			change: {
+				operation: 'signOut',
+				before: observation.status === 'ready' ? observation : undefined
+			}
+		},
 		...(onOverdue ? { onOverdue } : {})
 	}
 }

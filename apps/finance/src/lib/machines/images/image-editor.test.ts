@@ -13,8 +13,8 @@ afterEach(() => {
 	vi.unstubAllGlobals()
 })
 
-function fixture(mimeType = 'image/png') {
-	mockEditorRendering()
+function fixture(mimeType = 'image/png', held = false) {
+	const workers = mockEditorRendering(held)
 	const file = new File(['original'], 'receipt.png', { type: mimeType })
 	const source = new TestImageData(
 		4,
@@ -52,6 +52,7 @@ function fixture(mimeType = 'image/png') {
 	cleanups.push(() => actor.stop())
 	return {
 		actor,
+		workers,
 		file,
 		source,
 		bitmap,
@@ -324,6 +325,69 @@ describe('image editor actor', () => {
 			viewport: { kind: 'empty' },
 			controls: { apply: false, cancel: false }
 		})
+	})
+
+	it.each(['PREVIEW', 'APPLY'] satisfies ('PREVIEW' | 'APPLY')[])(
+		'drains an issued %s worker before cancellation or shutdown completes',
+		async (command) => {
+			for (const type of ['CANCEL', 'SHUTDOWN'] satisfies ('CANCEL' | 'SHUTDOWN')[]) {
+				const f = fixture('image/png', true)
+				await ready(f)
+				f.actor.send({ type: command })
+				const worker = f.workers[0]
+				if (!worker) throw new Error('Missing issued image worker')
+				const late = worker.onmessage
+				f.actor.send({ type })
+				expect(worker.terminate).toHaveBeenCalledOnce()
+				expect(worker.onmessage).toBeNull()
+				late?.(new MessageEvent('message', { data: f.source }))
+				await expect(toPromise(f.actor)).resolves.toEqual({
+					kind: type === 'SHUTDOWN' ? 'closed' : 'cancelled'
+				})
+				expect(f.allocate).not.toHaveBeenCalled()
+			}
+		}
+	)
+
+	it('discards an invalidated preview and waits for release before applying the latest selection', async () => {
+		const f = fixture('image/png', true)
+		await ready(f)
+		f.actor.send({ type: 'PREVIEW' })
+		const preview = f.workers[0]
+		if (!preview) throw new Error('Missing preview worker')
+		const late = preview.onmessage
+		f.actor.send({ type: 'SET_CONTRAST', value: 150 })
+		expect(preview.terminate).toHaveBeenCalledOnce()
+		expect(f.actor.getSnapshot().matches({ interactive: 'editing' })).toBe(true)
+		late?.(new MessageEvent('message', { data: f.source }))
+		expect(f.actor.getSnapshot().context.preview).toBeUndefined()
+		f.actor.send({ type: 'PREVIEW' })
+		const replaced = f.workers[1]
+		if (!replaced) throw new Error('Missing replacement preview')
+		f.actor.send({ type: 'APPLY' })
+		expect(replaced.terminate).toHaveBeenCalledOnce()
+		const apply = f.workers[2]
+		if (!apply) throw new Error('Missing apply worker')
+		expect(apply.postMessage.mock.lastCall?.[0].adjustments.contrast).toBe(150)
+		apply.onmessage?.(new MessageEvent('message', { data: f.source }))
+		await expect(toPromise(f.actor)).resolves.toMatchObject({ kind: 'applied' })
+		expect(apply.terminate).toHaveBeenCalledOnce()
+	})
+
+	it('keeps a refused native release owned rather than acknowledging editor shutdown', async () => {
+		const f = fixture('image/png', true)
+		await ready(f)
+		f.actor.send({ type: 'PREVIEW' })
+		const worker = f.workers[0]
+		if (!worker) throw new Error('Missing preview worker')
+		worker.terminate.mockImplementation(() => {
+			throw new Error('Native release refused')
+		})
+		f.actor.send({ type: 'SHUTDOWN' })
+		expect(f.actor.getSnapshot().status).toBe('active')
+		expect(f.actor.getSnapshot().output).toBeUndefined()
+		expect(f.allocate).not.toHaveBeenCalled()
+		expect(worker.terminate).toHaveBeenCalledOnce()
 	})
 
 	it('handles a native display failure without allocating export resources', async () => {

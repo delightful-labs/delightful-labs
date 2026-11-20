@@ -2,7 +2,7 @@ import {
 	createBrowserWorkerJob,
 	type BrowserWorkerJobInput,
 	type BrowserWorkerJobResult
-} from '../machines/browser-worker-job.js'
+} from 'delightful-local-first/worker/browser-job'
 import { imageWorkerReplySchema, type ImageWorkerReply, type ProcessedImage } from './schema.js'
 
 export type ImageJobRequest = { bytes: Uint8Array; mediaType: string }

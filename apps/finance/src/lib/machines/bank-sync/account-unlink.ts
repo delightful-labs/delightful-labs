@@ -41,14 +41,7 @@ export function createAccountUnlinkMachine(dependencies: Dependencies) {
 		CANCEL: types<EventPayload<{ type: 'UNLINK' } | MappingInterruption, 'CANCEL'>>(),
 		SHUTDOWN: types<EventPayload<{ type: 'UNLINK' } | MappingInterruption, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['links']>
-				| import('xstate').OutputFrom<(typeof actors)['authorize']>
-				| import('xstate').OutputFrom<(typeof actors)['remove']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

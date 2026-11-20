@@ -185,7 +185,7 @@ it('reports overdue SDK acquisition without losing the late session or acknowled
 	try {
 		f.actor.start()
 		f.actor.send({ type: 'SHUTDOWN' })
-		await waitFor(f.actor, (s) => s.matches('settlingAcquisition'), { timeout: 1000 })
+		await waitFor(f.actor, (s) => s.matches({ closingSession: 'acquisition' }), { timeout: 1000 })
 		clock.increment(5)
 		expect(f.actor.getSnapshot().context.closeIssue).toEqual({
 			stage: 'acquisition',
@@ -210,7 +210,7 @@ it('retains the original SDK close through overdue feedback and consumes its lat
 	try {
 		f.actor.start()
 		f.actor.send({ type: 'SHUTDOWN' })
-		await waitFor(f.actor, (s) => s.matches('closingSession'), { timeout: 1000 })
+		await waitFor(f.actor, (s) => s.matches({ closingSession: 'session' }), { timeout: 1000 })
 		clock.increment(5)
 		expect(f.actor.getSnapshot().context.closeIssue).toEqual({
 			stage: 'session',
@@ -247,7 +247,7 @@ it('an already queued deadline cannot override actual SDK closure when native ti
 	try {
 		f.actor.start()
 		f.actor.send({ type: 'SHUTDOWN' })
-		await waitFor(f.actor, (s) => s.matches('closingSession'), { timeout: 1000 })
+		await waitFor(f.actor, (s) => s.matches({ closingSession: 'session' }), { timeout: 1000 })
 		const delayed = [...scheduled.values()]
 		expect(delayed.length).toBeGreaterThan(0)
 		closing.resolve()

@@ -1,3 +1,4 @@
+import { test, closeSeedReplica } from './seed-fixture.js'
 import { openArticleActions } from './article-actions.js'
 import {
 	expectLibrarySynced,
@@ -8,7 +9,7 @@ import {
 } from './account-ui.js'
 import { readingControls } from './reader-ui.js'
 import { openAddLink } from './add-link.js'
-import { test, expect, chromium } from '@playwright/test'
+import { expect, chromium } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -48,6 +49,7 @@ test('starts locally without signup, reloads and restores the same account into 
 				devServerReloads++
 		})
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	// Cold module/WASM startup must reach the usable local library before the
 	// separate remote-acceptance assertion starts its timeout.
@@ -57,6 +59,7 @@ test('starts locally without signup, reloads and restores the same account into 
 	await expect(page.getByRole('button', { name: 'Create account', exact: true })).toHaveCount(0)
 	await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
 	await expectLibrarySynced(page)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await expect(page.getByText('Private library synced.', { exact: true })).toHaveCount(0)
@@ -64,6 +67,7 @@ test('starts locally without signup, reloads and restores the same account into 
 	const second = await browser.newContext()
 	try {
 		const restored = await second.newPage()
+		await closeSeedReplica(restored)
 		await restored.goto('http://127.0.0.1:5180')
 		await restoreAccount(restored, phrase)
 		await expect(
@@ -74,6 +78,7 @@ test('starts locally without signup, reloads and restores the same account into 
 		expect(recoveredPhrase === phrase).toBe(true)
 		// Stop the real authority: the SDK transport can live in a SharedWorker.
 		await authority.stop()
+		await closeSeedReplica(restored)
 		await restored.reload()
 		await openAccountSettings(restored)
 		await expect(
@@ -81,17 +86,20 @@ test('starts locally without signup, reloads and restores the same account into 
 		).toBeVisible()
 		await openAllArticles(restored)
 		authority = await startAuthority()
+		await closeSeedReplica(restored)
 		await restored.reload()
 		await expect(
 			restored.getByRole('region', { name: 'Saved articles', exact: true })
 		).toBeVisible()
 		expect(devServerReloads, 'Account navigation must not race a Vite full-page reload').toBe(0)
 	} finally {
+		await closeSeedReplica(second)
 		await second.close()
 	}
 })
 
 test('invalid restoration preserves the current local library', async ({ page }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await openAccountSettings(page)
 	await page.getByLabel('Recovery phrase', { exact: true }).fill('not a valid recovery phrase')
@@ -108,13 +116,16 @@ test('retains the account and library after closing every page and browser proce
 	let context = await chromium.launchPersistentContext(profile, { headless: true })
 	try {
 		const page = await context.newPage()
+		await closeSeedReplica(page)
 		await page.goto('http://127.0.0.1:5180')
 		await expectLibrarySynced(page)
 		await authority.stop()
+		await closeSeedReplica(context)
 		await context.close()
 		// Persistent-context close exits its browser process, including its workers.
 		context = await chromium.launchPersistentContext(profile, { headless: true })
 		const reopened = await context.newPage()
+		await closeSeedReplica(reopened)
 		await reopened.goto('http://127.0.0.1:5180')
 		await openAccountSettings(reopened)
 		await expect(
@@ -122,6 +133,7 @@ test('retains the account and library after closing every page and browser proce
 		).toBeVisible()
 		await openAllArticles(reopened)
 		authority = await startAuthority()
+		await closeSeedReplica(reopened)
 		await reopened.reload()
 		await openAccountSettings(reopened)
 		await expect(
@@ -129,6 +141,7 @@ test('retains the account and library after closing every page and browser proce
 		).toBeVisible()
 		await openAllArticles(reopened)
 	} finally {
+		await closeSeedReplica(context)
 		await context.close()
 		await rm(profile, { recursive: true, force: true })
 	}
@@ -150,10 +163,12 @@ test('saves new content offline, restarts the browser, and syncs to a restored p
 	}
 	try {
 		const page = await context.newPage()
+		await closeSeedReplica(page)
 		await page.goto('http://127.0.0.1:5180')
 		await expectLibrarySynced(page)
 		const phrase = await readRecoveryPhrase(page)
 		const restored = await independent.newPage()
+		await closeSeedReplica(restored)
 		await restored.goto('http://127.0.0.1:5180')
 		await restoreAccount(restored, phrase)
 		await expect(
@@ -170,9 +185,11 @@ test('saves new content offline, restarts the browser, and syncs to a restored p
 				return (await import(/* @vite-ignore */ path)).save(id)
 			}, operationId)
 		).toBe('saved')
+		await closeSeedReplica(context)
 		await context.close()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
 		const reopened = await context.newPage()
+		await closeSeedReplica(reopened)
 		await reopened.goto('http://127.0.0.1:5180')
 		await openAccountSettings(reopened)
 		await expect(
@@ -186,7 +203,9 @@ test('saves new content offline, restarts the browser, and syncs to a restored p
 			}, operationId)
 		).toEqual(expected)
 		authority = await startAuthority()
+		await closeSeedReplica(reopened)
 		await reopened.reload()
+		await closeSeedReplica(restored)
 		await restored.reload()
 		await expect(
 			restored.getByRole('region', { name: 'Saved articles', exact: true })
@@ -202,7 +221,9 @@ test('saves new content offline, restarts the browser, and syncs to a restored p
 			)
 			.toEqual(expected)
 	} finally {
+		await closeSeedReplica(independent)
 		await independent.close()
+		await closeSeedReplica(context)
 		await context.close()
 		await rm(profile, { recursive: true, force: true })
 	}
@@ -212,6 +233,7 @@ test('authenticates capture requests with the existing account and rejects missi
 	page,
 	request
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const missing = await request.post('/api/capture/resolve')
@@ -320,6 +342,7 @@ test('Add Link preserves distinct source URLs while sharing resolved Article con
 	page.on('request', (request) => {
 		if (request.url().includes('images.example')) remoteRequests.push(request.url())
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await openAddLink(page)
 	await page.getByLabel('Article URL', { exact: true }).fill('https://short.example/#intro')
@@ -412,10 +435,12 @@ test('UI Add Link saves automatically with the authority offline, survives a ful
 	try {
 		const page = await context.newPage()
 		await fixtureArticle(page, () => authority.stop())
+		await closeSeedReplica(page)
 		await page.goto('http://127.0.0.1:5180')
 		await expectLibrarySynced(page)
 		const phrase = await readRecoveryPhrase(page)
 		const restored = await independent.newPage()
+		await closeSeedReplica(restored)
 		await restored.goto('http://127.0.0.1:5180')
 		await restoreAccount(restored, phrase)
 		await expect(
@@ -437,9 +462,11 @@ test('UI Add Link saves automatically with the authority offline, survives a ful
 		).toBeVisible()
 		await page.getByRole('link', { name: 'UI saved article', exact: true }).click()
 		await expect(page.getByRole('article')).toContainText('Exact UI text café 🦊')
+		await closeSeedReplica(context)
 		await context.close()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
 		const reopened = await context.newPage()
+		await closeSeedReplica(reopened)
 		await reopened.goto('http://127.0.0.1:5180')
 		await reopened
 			.getByRole('region', { name: 'Saved articles' })
@@ -453,7 +480,9 @@ test('UI Add Link saves automatically with the authority offline, survives a ful
 		await expect(reopened.getByRole('article').locator('code')).toHaveText('const safe = true')
 
 		authority = await startAuthority()
+		await closeSeedReplica(reopened)
 		await reopened.reload()
+		await closeSeedReplica(restored)
 		await restored.reload()
 		await restored
 			.getByRole('region', { name: 'Saved articles' })
@@ -464,7 +493,9 @@ test('UI Add Link saves automatically with the authority offline, survives a ful
 			restored.getByRole('article').getByRole('heading', { name: 'Structured heading' })
 		).toBeVisible()
 	} finally {
+		await closeSeedReplica(independent)
 		await independent.close()
+		await closeSeedReplica(context)
 		await context.close()
 		await rm(profile, { recursive: true, force: true })
 	}
@@ -483,6 +514,7 @@ test('background extraction stays quiet and leaves the saved URL and form usable
 		await pending
 		await route.fulfill({ status: 503, json: { code: 'gatewayUnavailable' } }).catch(() => {})
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await openAddLink(page)
 	await page.getByLabel('Article URL', { exact: true }).fill('https://example.com/')
@@ -504,6 +536,7 @@ test('background extraction stays quiet and leaves the saved URL and form usable
 })
 
 test('reader displays the exact text of a plain text Article', async ({ page }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const result = await page.evaluate(async () => {
@@ -530,6 +563,7 @@ test('first use opens a stable local library with the authority unavailable and 
 }) => {
 	await authority.stop()
 	try {
+		await closeSeedReplica(page)
 		await page.goto('/')
 		await expect(page.getByRole('region', { name: 'Saved articles' })).toBeVisible()
 		await openAccountSettings(page)
@@ -540,6 +574,7 @@ test('first use opens a stable local library with the authority unavailable and 
 		await expect(page.getByRole('button', { name: 'Create account', exact: true })).toHaveCount(0)
 		await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
 		const phrase = await readRecoveryPhrase(page)
+		await closeSeedReplica(page)
 		await page.reload()
 		await expect(page.getByRole('region', { name: 'Saved articles' })).toBeVisible()
 		const reopenedPhrase = await readRecoveryPhrase(page)
@@ -554,6 +589,7 @@ test('reader links support new tabs, direct reload and owner-scoped missing cont
 	browser
 }) => {
 	await fixtureArticle(page)
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await openAddLink(page)
 	await page.getByLabel('Article URL', { exact: true }).fill('https://example.com/saved')
@@ -575,12 +611,14 @@ test('reader links support new tabs, direct reload and owner-scoped missing cont
 		await expect(tab.getByRole('article')).toContainText('Exact UI text café 🦊')
 		await expect(tab.getByRole('region', { name: 'Saved articles' })).toHaveCount(0)
 		await expect(page).toHaveURL('http://127.0.0.1:5180/')
+		await closeSeedReplica(tab)
 		await tab.reload()
 		await expect(tab).toHaveURL(new RegExp(href! + '$'))
 		await expect(tab.getByRole('article')).toContainText('Exact UI text café 🦊')
 		const stranger = await browser.newContext()
 		try {
 			const denied = await stranger.newPage()
+			await closeSeedReplica(denied)
 			await denied.goto('http://127.0.0.1:5180' + href)
 			await expect(
 				denied.getByText(
@@ -590,9 +628,11 @@ test('reader links support new tabs, direct reload and owner-scoped missing cont
 			).toBeVisible()
 			await expect(denied.getByRole('article')).toHaveCount(0)
 		} finally {
+			await closeSeedReplica(stranger)
 			await stranger.close()
 		}
 	} finally {
+		await closeSeedReplica(tab)
 		await tab.close()
 	}
 })
@@ -601,6 +641,7 @@ test('capture continues when the initiating library page is replaced by a reader
 	page
 }) => {
 	await fixtureArticle(page)
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await openAddLink(page)
 	await page.getByLabel('Article URL', { exact: true }).fill('https://example.com/first')
@@ -680,6 +721,7 @@ test('Add Link persists article objects before a worker processes their content 
 	const started = page.waitForEvent('worker', {
 		predicate: (w) => w.url().includes('article-worker.ts')
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	const worker = await started
 	expect(await worker.evaluate(() => typeof document)).toBe('undefined')
@@ -693,6 +735,7 @@ test('Add Link persists article objects before a worker processes their content 
 	await expect.poll(() => count).toBe(1)
 	await expect(page.getByRole('button', { name: 'Add link', exact: true })).toBeEnabled()
 	const other = await context.newPage()
+	await closeSeedReplica(other)
 	await other.goto('/')
 	await expect(other.getByRole('button', { name: 'Add link', exact: true })).toBeEnabled()
 	await openAddLink(other)
@@ -720,6 +763,7 @@ test('Add Link persists article objects before a worker processes their content 
 	await expect(page.getByRole('link', { name: 'Queued two', exact: true })).toBeVisible()
 	expect(max).toBe(1)
 	expect(count).toBe(2)
+	await closeSeedReplica(other)
 	await other.close()
 })
 
@@ -731,6 +775,7 @@ test('the article save operation accepts supplied content without fetching the U
 		requests.push(route.request().url())
 		await route.abort()
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const result = await page.evaluate(async () => {
@@ -739,6 +784,7 @@ test('the article save operation accepts supplied content without fetching the U
 	})
 	expect(result.ready).toBe(true)
 	expect(requests).toEqual([])
+	await closeSeedReplica(page)
 	await page.goto('/articles/' + result.id)
 	await expect(page.getByRole('article')).toContainText('Content supplied by a browser clip.')
 })
@@ -756,6 +802,7 @@ test('a worker resumes a URL-only article after complete browser restart', async
 			await gate.promise
 			await route.abort().catch(() => {})
 		})
+		await closeSeedReplica(page)
 		await page.goto('http://127.0.0.1:5180')
 		await expectLibrarySynced(page)
 		await openAddLink(page)
@@ -771,11 +818,13 @@ test('a worker resumes a URL-only article after complete browser restart', async
 			return (await import(/* @vite-ignore */ path)).inspect([url])
 		}, url)
 		expect(before[0]?.attachment).toBeNull()
+		await closeSeedReplica(context)
 		await context.close()
 		gate.resolve()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
 		const reopened = await context.newPage()
 		await fixtureArticle(reopened, undefined, url)
+		await closeSeedReplica(reopened)
 		await reopened.goto('http://127.0.0.1:5180')
 		await expect(
 			reopened.getByRole('link', { name: 'UI saved article', exact: true })
@@ -789,6 +838,7 @@ test('a worker resumes a URL-only article after complete browser restart', async
 		expect(after[0]?.attachment).toBeTruthy()
 	} finally {
 		gate.resolve()
+		await closeSeedReplica(context)
 		await context.close()
 		await rm(profile, { recursive: true, force: true })
 	}
@@ -822,6 +872,7 @@ test('Retry from a second tab reaches the worker holding the library lock', asyn
 			}
 		})
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await openAddLink(page)
 	await page.getByLabel('Article URL', { exact: true }).fill('https://example.com/cross-tab-retry')
@@ -836,6 +887,7 @@ test('Retry from a second tab reaches the worker holding the library lock', asyn
 		})
 	).toBeVisible()
 	const second = await context.newPage()
+	await closeSeedReplica(second)
 	await second.goto('/')
 	await expect(
 		(await openArticleActions(second.locator('[data-article-id]'))).getByRole('button', {
@@ -847,12 +899,14 @@ test('Retry from a second tab reaches the worker holding the library lock', asyn
 	await expect(second.getByRole('link', { name: 'Retried across tabs', exact: true })).toBeVisible()
 	await expect(page.getByRole('link', { name: 'Retried across tabs', exact: true })).toBeVisible()
 	expect(attempts).toBe(2)
+	await closeSeedReplica(second)
 	await second.close()
 })
 
 test('moves account controls to their own page with shared sidebar links and retains the account', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const drawer = page.locator('aside')
@@ -871,6 +925,7 @@ test('moves account controls to their own page with shared sidebar links and ret
 		'page'
 	)
 	await expect(page.getByRole('button', { name: 'Add link', exact: true })).toHaveCount(0)
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(page).toHaveURL(/\/account$/)
 	const reopened = await readRecoveryPhrase(page)
@@ -887,6 +942,7 @@ test('account navigation follows viewport changes without overriding manual desk
 	page
 }) => {
 	await page.setViewportSize({ width: 1280, height: 844 })
+	await closeSeedReplica(page)
 	await page.goto('/')
 	const library = page.getByRole('region', { name: 'Saved articles', includeHidden: true })
 	await expect(library).toBeVisible()
@@ -913,6 +969,7 @@ test('mobile account navigation closes the drawer and restores keyboard focus on
 	page
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 })
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles' })).toBeVisible()
 	const drawer = page.locator('aside')
@@ -940,6 +997,7 @@ test('mobile account navigation closes the drawer and restores keyboard focus on
 })
 
 test('Add link modal focuses its URL field and dismisses without saving', async ({ page }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles' })).toBeVisible()
 	const dialog = await openAddLink(page)
@@ -963,6 +1021,7 @@ test('Add link modal focuses its URL field and dismisses without saving', async 
 test('Add link is available only on the landing page, including after reader reload and return', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await expect(page.getByRole('button', { name: 'Add link', exact: true })).toBeVisible()
@@ -975,6 +1034,7 @@ test('Add link is available only on the landing page, including after reader rel
 		await page.getByRole('link', { name: 'Supplied clip', exact: true }).click()
 		await expect(page.getByRole('article')).toContainText('Content supplied by a browser clip.')
 		await expect(page.getByRole('button', { name: 'Add link', exact: true })).toHaveCount(0)
+		await closeSeedReplica(page)
 		await page.reload()
 		await expect(page.getByRole('article')).toContainText('Content supplied by a browser clip.')
 		await expect(page.getByRole('button', { name: 'Add link', exact: true })).toHaveCount(0)
@@ -989,6 +1049,7 @@ test('sidebar shows browser connectivity and follows offline and online events',
 	page,
 	context
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByText('online', { exact: true })).toBeVisible()
 	await expect(

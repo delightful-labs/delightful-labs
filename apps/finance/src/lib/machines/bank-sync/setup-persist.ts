@@ -66,13 +66,7 @@ export function createSetupPersistenceMachine({ db }: Dependencies) {
 		})
 	}
 	const events0 = { SAVE: types<EventPayload<{ type: 'SAVE' }, 'SAVE'>>() }
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['insert']>
-				| import('xstate').OutputFrom<(typeof actors)['update']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

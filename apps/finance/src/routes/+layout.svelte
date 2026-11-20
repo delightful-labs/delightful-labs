@@ -91,20 +91,10 @@
 		<WorkerAccounts
 			view={client.view}
 			location={client.location}
-			recovery={client.recovery}
-			onRestore={client.restoreIdentity}
-			onRetryRecoveryNavigation={client.retryRecoveryNavigation}
 			onRetryWorkspaceNavigation={client.retryWorkspaceNavigation}
 			onSelectWorkspace={client.navigateWorkspace}
-			onArchive={client.archiveAccount}
 			onAccountCreation={client.accountCreationCommand}
 			onAccountOrder={client.accountOrderCommand}
-			onClassification={client.classificationCommand}
-			onTransactionEntry={client.transactionEntryCommand}
-			onTransactionEdit={client.transactionEditCommand}
-			onSelectTransaction={client.navigateTransaction}
-			onLedgerPage={client.selectLedgerPage}
-			onLedgerFilters={client.setLedgerFilters}
 			onSelectAccount={client.selectAccount}
 			onSelectAllAccounts={client.selectAllAccounts}
 		>

@@ -1,5 +1,5 @@
 import { extractionJobMachine, EXTRACTION_TIMEOUT_MS } from './worker.js'
-import type { BrowserWorkerJobInput } from '../../web/src/lib/machines/browser-worker-job.js'
+import type { BrowserWorkerJobInput } from 'delightful-local-first/worker/browser-job'
 import type { ExtractionReply } from './protocol.js'
 import { withinResourceDeadline } from '../../web/src/lib/contracts/resource-waits.js'
 import type { EventPayload } from '../../web/src/lib/machines/events.js'

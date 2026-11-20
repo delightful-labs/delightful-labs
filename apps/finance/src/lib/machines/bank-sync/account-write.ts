@@ -65,17 +65,7 @@ export function createAccountWriteMachine(dependencies: Dependencies) {
 		CANCEL: types<EventPayload<{ type: 'WRITE' } | MappingInterruption, 'CANCEL'>>(),
 		SHUTDOWN: types<EventPayload<{ type: 'WRITE' } | MappingInterruption, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['providerLinks']>
-				| import('xstate').OutputFrom<(typeof actors)['account']>
-				| import('xstate').OutputFrom<(typeof actors)['destinationLinks']>
-				| import('xstate').OutputFrom<(typeof actors)['linkId']>
-				| import('xstate').OutputFrom<(typeof actors)['authorize']>
-				| import('xstate').OutputFrom<(typeof actors)['transaction']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

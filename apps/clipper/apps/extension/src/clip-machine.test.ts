@@ -194,7 +194,7 @@ it.each(['construction', 'post', 'worker', 'message', 'reply'] as const)(
 		try {
 			if (failure !== 'construction' && failure !== 'post') {
 				await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledOnce())
-				if (failure === 'worker') worker.onerror?.()
+				if (failure === 'worker') worker.onerror?.(new Event('error'))
 				if (failure === 'message') worker.onmessageerror?.()
 				if (failure === 'reply') worker.reply({ content: { title: 'unchecked' } })
 			}

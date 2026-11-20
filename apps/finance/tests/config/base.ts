@@ -3,6 +3,10 @@ import { fileURLToPath } from 'node:url'
 
 const port = process.env.FINANCE_E2E_PORT ?? '5180'
 const baseURL = `http://127.0.0.1:${port}`
+const build =
+	process.env.FINANCE_E2E_PREBUILT === 'true'
+		? ''
+		: 'FINANCE_PREVIEW=true pnpm exec vite build --config vite.e2e.config.ts && '
 
 // Reuse only a server explicitly identified as belonging to this agent session.
 export default defineConfig({
@@ -35,7 +39,7 @@ export default defineConfig({
 		env: { PUBLIC_DEBUG: 'true' },
 		// Offline worker creation needs the real production asset/service-worker cache.
 		// The dedicated E2E config retains static fixtures and disposable native data.
-		command: `FINANCE_PREVIEW=true pnpm exec vite build --config vite.e2e.config.ts && FINANCE_PREVIEW=true pnpm exec vite preview --config vite.e2e.config.ts --host 0.0.0.0 --port ${port} --strictPort`,
+		command: `${build}FINANCE_PREVIEW=true pnpm exec vite preview --config vite.e2e.config.ts --host 0.0.0.0 --port ${port} --strictPort`,
 		url: baseURL,
 		timeout: 180_000,
 		reuseExistingServer: process.env.FINANCE_E2E_REUSE_SERVER === 'true' && !process.env.CI

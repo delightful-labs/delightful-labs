@@ -971,15 +971,7 @@ export function createFinanceRestoreAdapter(
 		SHUTDOWN: types<EventPayload<RestoreEvent, 'SHUTDOWN'>>(),
 		INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>()
 	}
-	type NativeEvent2 =
-		| import('xstate').InferEvents<typeof events2>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['fingerprint']>
-				| import('xstate').OutputFrom<(typeof actors)['read']>
-				| import('xstate').OutputFrom<(typeof actors)['stage']>
-				| import('xstate').OutputFrom<(typeof actors)['hashSource']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),
@@ -1162,14 +1154,7 @@ export function createFinanceRestoreAdapter(
 		SHUTDOWN: types<EventPayload<RestoreEvent, 'SHUTDOWN'>>(),
 		INVALIDATE: types<EventPayload<RestoreEvent, 'INVALIDATE'>>()
 	}
-	type NativeEvent1 =
-		| import('xstate').InferEvents<typeof events1>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof comparisonActors)['destination']>
-				| import('xstate').OutputFrom<(typeof comparisonActors)['journal']>
-				| import('xstate').OutputFrom<(typeof comparisonActors)['destination']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const comparisonModel = setup({
 		schemas: {
 			context: types<
@@ -1657,24 +1642,7 @@ export function createWorkspaceRestoreController(
 		SUBMIT: types<EventPayload<RestoreControllerEvent, 'SUBMIT'>>(),
 		SCOPE_CHANGED: types<EventPayload<RestoreControllerEvent, 'SCOPE_CHANGED'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['observe']>
-				| import('xstate').OutputFrom<(typeof actors)['readFile']>
-				| import('xstate').OutputFrom<(typeof actors)['prepareEnvelope']>
-				| import('xstate').OutputFrom<(typeof actors)['open']>
-				| import('xstate').OutputFrom<(typeof actors)['validateFile']>
-				| import('xstate').OutputFrom<(typeof actors)['deriveBinding']>
-				| import('xstate').OutputFrom<(typeof actors)['journal']>
-				| import('xstate').OutputFrom<(typeof actors)['preparePlan']>
-				| import('xstate').OutputFrom<(typeof actors)['plan']>
-				| import('xstate').OutputFrom<(typeof actors)['prepareNative']>
-				| import('xstate').OutputFrom<(typeof actors)['cleanup']>
-				| import('xstate').OutputFrom<(typeof actors)['navigate']>
-				| import('xstate').OutputFrom<(typeof actors)['plan']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<RestoreControllerContext>(),

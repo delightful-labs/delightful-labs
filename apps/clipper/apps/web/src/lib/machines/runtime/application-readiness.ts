@@ -1,5 +1,4 @@
 import { signOutMachine, signOutInput, type SignOutStage } from './sign-out.js'
-import type { EventPayload } from '../events.js'
 import {
 	types,
 	type SnapshotFrom,
@@ -8,97 +7,58 @@ import {
 	createAsyncLogic,
 	matchesState
 } from 'xstate'
+import { createSessionChangeMachine } from 'delightful-local-first/session/runtime'
+import type {
+	SessionRuntimeView,
+	SessionRuntimeChangeInput
+} from 'delightful-local-first/session/runtime'
+import { restorationMachine } from 'delightful-local-first/restoration/workflow'
 import { t, recoveryMessages } from '../../localization/index.js'
 import { stateFeedback } from '../../contracts/feedback.js'
-import type { NamedState } from '../../contracts/feedback.js'
-import type { WorkflowMessage } from '../../contracts/feedback.js'
+import type { NamedState, WorkflowMessage } from '../../contracts/feedback.js'
 import { libraryMachine } from '../capture/library.js'
 import { rootBootstrapMachine } from './root-bootstrap.js'
-import {
-	createSessionStartupMachine,
-	createSessionReadinessMachine
-} from 'delightful-local-first/session/workflow'
-import type {
-	SessionStartupReport,
-	SessionReadinessReport,
-	SessionReadinessScope
-} from 'delightful-local-first/session/contracts'
-
-import { restorationMachine } from 'delightful-local-first/restoration/workflow'
-import type { RestorationReport } from 'delightful-local-first/restoration/contracts'
-import { sameAccountBinding, accountBindingIdentity } from '../../contracts/account.js'
+import { sameAccountBinding } from '../../contracts/account.js'
 import type {
 	AccountBinding,
-	AccountBindingIdentity,
+	AccountCapabilities,
 	ReadyAccountObservation,
-	AccountHost,
 	AccountInput,
 	AccountObservation,
-	RootAccess,
 	RootWrite
 } from '../../contracts/account.js'
 import type { ConnectionEvent, ConnectionObserver } from '../../contracts/connection.js'
 
-type Event<Session extends object> =
-	| ConnectionEvent
-	| SessionStartupReport<Session>
-	| SessionReadinessReport
-	| { type: 'OBSERVED'; observation: AccountObservation }
-	| { type: 'LIBRARY_BOUND'; binding: AccountBinding }
-	| { type: 'LIBRARY_ADOPTED' }
-	| { type: 'SIGN_OUT_OVERDUE'; stage: SignOutStage }
-	| {
-			type: 'HOST_BOUND'
-			scope: Context<Session>['scope']
-			host: AccountHost
-			observation: AccountObservation
-	  }
-	| { type: 'HOST_ADOPTED'; scope: Context<Session>['scope'] }
-	| { type: 'CREATE' | 'LOGOUT' | 'RETRY' | 'SHUTDOWN' }
-	| { type: 'RESTORE'; phrase: string }
-	| RestorationReport
-	| {
-			type:
-				| 'OBSERVATION_RESTARTED'
-				| 'STARTUP_CLOSED'
-				| 'FEEDBACK_CLEAR'
-				| 'IDENTITY_FAILED'
-				| 'RESTORE_INVALID'
-				| 'RESTORE_FAILED'
-	  }
-
-type Context<Session extends object> = {
-	clean: boolean
-	host: AccountHost | undefined
-	input: AccountInput<Session>
-	scope: AccountInput<Session>['startup']['scope']
-	readinessScope: SessionReadinessScope | undefined
-	retryAttempt: number
-	observationAttempt: number
-	observation: AccountObservation
-	failedBinding: AccountBindingIdentity | undefined
-	candidate: ReadyAccountObservation | undefined
-	adoption: AccountBinding | undefined
-	write: RootWrite | undefined
-	phrase: string
-	attempt: number
-}
 function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Account capability unavailable')
 	return value
 }
-function root<Session extends object>(context: Context<Session>): RootAccess {
-	if (context.observation.status !== 'ready') throw new Error('Library scope unavailable')
-	return context.observation.root
+/** Missing observations withdraw admission; native session owns status and retry. */
+function observation(view: SessionRuntimeView<AccountCapabilities>): AccountObservation {
+	return (
+		view.observation ?? {
+			status:
+				view.stage === 'acquiring'
+					? 'starting'
+					: view.stage === 'active'
+						? 'transitioning'
+						: view.stage === 'closed' || view.stage === 'closing'
+							? 'closed'
+							: 'error'
+		}
+	)
 }
-function observe(host: AccountHost): AccountObservation {
-	try {
-		return host.read()
-	} catch {
-		return { status: 'error' }
-	}
+type Context = {
+	input: AccountInput
+	observation: AccountObservation
+	adoption: AccountBinding | undefined
+	candidate: ReadyAccountObservation | undefined
+	failedBinding: object | undefined
+	write: RootWrite | undefined
+	phrase: string
+	attempt: number
+	clean: boolean
 }
-
 type AccountFeedback = 'identityFailed' | 'restoreFailed' | 'restoreInvalid'
 type AccountMeta = NamedState & {
 	name: string
@@ -112,17 +72,10 @@ function accountStatus(status: MachineStatus, name: string): AccountMeta {
 const configuration = accountStatus('working', t('account.status.configuration'))
 const starting = accountStatus('starting', t('account.status.starting'))
 const working = accountStatus('working', t('account.status.working'))
-function isRestored(result: { outcome: string }) {
-	return result.outcome === 'restored'
-}
-function isInvalidRestoration(result: { outcome: string }) {
-	return result.outcome === 'invalid'
-}
 
-export function createApplicationReadinessMachine<Session extends object>(
-	observeConnection?: ConnectionObserver
-) {
-	const accountActors = {
+export function createApplicationReadinessMachine(observeConnection?: ConnectionObserver) {
+	const actors = {
+		// The library lease survives observation replacement until its issued work drains.
 		bindingCustody: createCallbackLogic<
 			{ type: 'OWN' | 'RELEASE'; binding: AccountBinding },
 			{ owner: { subscribe(observer: { error: () => void }): { unsubscribe: () => void } } }
@@ -148,24 +101,20 @@ export function createApplicationReadinessMachine<Session extends object>(
 		libraryBinding: createCallbackLogic<
 			{ type: 'ADOPT' },
 			{
-				host: AccountHost
 				observation: ReadyAccountObservation
 				owner: { subscribe(observer: { error: () => void }): { unsubscribe: () => void } }
 			}
 		>(({ input, receive, sendBack }) => {
-			const native = required(input.host.adopt)(input.observation)
-			let released = false
+			let released = false,
+				adopted = false
 			const binding: AccountBinding = {
-				observation: native.observation,
+				observation: input.observation,
+				library: input.observation.capabilities.createLibrary(() => !released),
 				release: () => {
-					if (!released) {
-						released = true
-						native.release()
-					}
+					released = true
 				}
 			}
 			const subscription = input.owner.subscribe({ error: binding.release })
-			let adopted = false
 			receive(() => {
 				adopted = true
 				sendBack({ type: 'LIBRARY_ADOPTED' })
@@ -176,249 +125,94 @@ export function createApplicationReadinessMachine<Session extends object>(
 				if (!adopted) binding.release()
 			}
 		}),
-		binding: createCallbackLogic<
-			{ type: 'ADOPT' },
-			{ session: Session; account: AccountInput<Session>; scope: Context<Session>['scope'] }
-		>(({ input, receive, sendBack }) => {
-			// The native adapter retains custody until the chart acknowledges adoption.
-			const host = input.account.bind(input.session)
-			let adopted = false
-			receive(() => {
-				adopted = true
-				sendBack({ type: 'HOST_ADOPTED', scope: input.scope })
-			})
-			sendBack({ type: 'HOST_BOUND', scope: input.scope, host, observation: observe(host) })
-			return () => {
-				if (!adopted) host.release()
-			}
-		}),
-		observation: createCallbackLogic<{ type: 'READ' }, AccountHost>(
+		observation: createCallbackLogic<{ type: 'READ' }, AccountInput['session']>(
 			({ input, receive, sendBack }) => {
-				receive(() => sendBack({ type: 'OBSERVED', observation: observe(input) }))
+				const publish = (view: SessionRuntimeView<AccountCapabilities>) => {
+					if (view.stage === 'failed') sendBack({ type: 'NATIVE_FAILED' })
+					sendBack({ type: 'OBSERVED', observation: observation(view), stage: view.stage })
+				}
+				const read = () => {
+					try {
+						publish(input.view.get())
+					} catch {
+						sendBack({ type: 'NATIVE_FAILED' })
+					}
+				}
+				const subscription = input.view.subscribe({
+					next: publish,
+					error: () => sendBack({ type: 'NATIVE_FAILED' }),
+					complete: read
+				})
+				receive(read)
+				read()
+				return () => subscription.unsubscribe()
 			}
 		),
 		connection: createCallbackLogic<ConnectionEvent>(({ sendBack }) =>
 			observeConnection?.(sendBack)
 		),
-		library: libraryMachine,
-		startup: createSessionStartupMachine<Session>(),
-		readiness: createSessionReadinessMachine(),
-		prepare: createAsyncLogic({
-			run: ({ input }: { input: { host: AccountHost; observation: ReadyAccountObservation } }) =>
-				(input.observation.prepare ?? required(input.host.prepare))()
-		}),
-		create: createAsyncLogic({ run: ({ input }: { input: AccountHost }) => input.create() }),
+		change: createSessionChangeMachine((input: SessionRuntimeChangeInput) => input),
 		logout: signOutMachine,
+		restore: restorationMachine,
+		library: libraryMachine,
 		bootstrap: rootBootstrapMachine,
-		global: createAsyncLogic({ run: ({ input }: { input: RootWrite }) => input.global() }),
-		restore: restorationMachine
+		global: createAsyncLogic({ run: ({ input }: { input: RootWrite }) => input.global() })
 	}
-
 	const model = setup({
 		schemas: {
-			context: types<Context<Session>>(),
+			context: types<Context>(),
+			meta: types<AccountMeta>(),
+			input: types<AccountInput>(),
+			output: types<{ clean: boolean }>(),
 			events: {
-				HOST_BOUND: types<EventPayload<Event<Session>, 'HOST_BOUND'>>(),
-				HOST_ADOPTED: types<EventPayload<Event<Session>, 'HOST_ADOPTED'>>(),
-				ONLINE: types<EventPayload<Event<Session>, 'ONLINE'>>(),
-				OFFLINE: types<EventPayload<Event<Session>, 'OFFLINE'>>(),
-				SESSION_STARTING: types<EventPayload<Event<Session>, 'SESSION_STARTING'>>(),
-				SESSION_STARTUP_FAILED: types<EventPayload<Event<Session>, 'SESSION_STARTUP_FAILED'>>(),
-				SESSION_STATUS: types<EventPayload<Event<Session>, 'SESSION_STATUS'>>(),
-				SESSION_OBSERVATION_FAILED:
-					types<EventPayload<Event<Session>, 'SESSION_OBSERVATION_FAILED'>>(),
-				SESSION_OBSERVATION_CLEANUP_FAILED:
-					types<EventPayload<Event<Session>, 'SESSION_OBSERVATION_CLEANUP_FAILED'>>(),
-				SESSION_RETRY_STARTED: types<EventPayload<Event<Session>, 'SESSION_RETRY_STARTED'>>(),
-				SESSION_RETRY_SETTLED: types<EventPayload<Event<Session>, 'SESSION_RETRY_SETTLED'>>(),
-				OBSERVED: types<EventPayload<Event<Session>, 'OBSERVED'>>(),
-				LIBRARY_BOUND: types<EventPayload<Event<Session>, 'LIBRARY_BOUND'>>(),
+				ONLINE: types(),
+				OFFLINE: types(),
+				CREATE: types(),
+				LOGOUT: types(),
+				RETRY: types(),
+				SHUTDOWN: types(),
+				RESTORE: types<{ phrase: string }>(),
+				OBSERVED: types<{ observation: AccountObservation; stage: SessionRuntimeView['stage'] }>(),
+				NATIVE_FAILED: types(),
+				LIBRARY_BOUND: types<{ binding: AccountBinding }>(),
 				LIBRARY_ADOPTED: types(),
 				SIGN_OUT_OVERDUE: types<{ stage: SignOutStage }>(),
-				RETRY: types<EventPayload<Event<Session>, 'RETRY'>>(),
-				SHUTDOWN: types<EventPayload<Event<Session>, 'SHUTDOWN'>>(),
-				CREATE: types<EventPayload<Event<Session>, 'CREATE'>>(),
-				LOGOUT: types<EventPayload<Event<Session>, 'LOGOUT'>>(),
-				RESTORE: types<EventPayload<Event<Session>, 'RESTORE'>>(),
-				RESTORATION_VALIDATED: types<EventPayload<Event<Session>, 'RESTORATION_VALIDATED'>>(),
-				RESTORATION_PREPARE_REQUESTED:
-					types<EventPayload<Event<Session>, 'RESTORATION_PREPARE_REQUESTED'>>(),
-				SESSION_ACQUIRED: types<EventPayload<Event<Session>, 'SESSION_ACQUIRED'>>()
+				RESTORATION_VALIDATED: types<{ binding: object; attempt: number }>(),
+				RESTORATION_PREPARE_REQUESTED: types<{ binding: object; attempt: number }>()
 			},
 			internalEvents: {
-				OBSERVATION_RESTARTED: types<EventPayload<Event<Session>, 'OBSERVATION_RESTARTED'>>(),
-				STARTUP_CLOSED: types<EventPayload<Event<Session>, 'STARTUP_CLOSED'>>(),
-				FEEDBACK_CLEAR: types<EventPayload<Event<Session>, 'FEEDBACK_CLEAR'>>(),
-				IDENTITY_FAILED: types<EventPayload<Event<Session>, 'IDENTITY_FAILED'>>(),
-				RESTORE_INVALID: types<EventPayload<Event<Session>, 'RESTORE_INVALID'>>(),
-				RESTORE_FAILED: types<EventPayload<Event<Session>, 'RESTORE_FAILED'>>()
+				FEEDBACK_CLEAR: types(),
+				IDENTITY_FAILED: types(),
+				RESTORE_INVALID: types(),
+				RESTORE_FAILED: types()
 			},
-			input: types<AccountInput<Session>>(),
-			output: types<{ clean: boolean }>(),
-			meta: types<AccountMeta>(),
 			children: {
-				binding: types<import('xstate').ActorRefFrom<(typeof accountActors)['binding']>>(),
-				observation: types<import('xstate').ActorRefFrom<(typeof accountActors)['observation']>>(),
-				connection: types<import('xstate').ActorRefFrom<(typeof accountActors)['connection']>>(),
-				library: types<import('xstate').ActorRefFrom<(typeof accountActors)['library']>>(),
-				startup: types<import('xstate').ActorRefFrom<(typeof accountActors)['startup']>>(),
-				readiness: types<import('xstate').ActorRefFrom<(typeof accountActors)['readiness']>>(),
-				bindingCustody: types<import('xstate').ActorRefFrom<typeof accountActors.bindingCustody>>(),
-				libraryBinding: types<import('xstate').ActorRefFrom<typeof accountActors.libraryBinding>>(),
-				prepare: types<import('xstate').ActorRefFrom<(typeof accountActors)['prepare']>>(),
-				create: types<import('xstate').ActorRefFrom<(typeof accountActors)['create']>>(),
-				logout: types<import('xstate').ActorRefFrom<(typeof accountActors)['logout']>>(),
-				bootstrap: types<import('xstate').ActorRefFrom<(typeof accountActors)['bootstrap']>>(),
-				global: types<import('xstate').ActorRefFrom<(typeof accountActors)['global']>>(),
-				restore: types<import('xstate').ActorRefFrom<(typeof accountActors)['restore']>>()
+				bindingCustody: types<import('xstate').ActorRefFrom<typeof actors.bindingCustody>>(),
+				libraryBinding: types<import('xstate').ActorRefFrom<typeof actors.libraryBinding>>(),
+				observation: types<import('xstate').ActorRefFrom<typeof actors.observation>>(),
+				connection: types<import('xstate').ActorRefFrom<typeof actors.connection>>(),
+				change: types<import('xstate').ActorRefFrom<typeof actors.change>>(),
+				logout: types<import('xstate').ActorRefFrom<typeof actors.logout>>(),
+				restore: types<import('xstate').ActorRefFrom<typeof actors.restore>>(),
+				library: types<import('xstate').ActorRefFrom<typeof libraryMachine>>(),
+				bootstrap: types<import('xstate').ActorRefFrom<typeof rootBootstrapMachine>>(),
+				global: types<import('xstate').ActorRefFrom<typeof actors.global>>()
 			}
 		},
-		states: {
-			active: {
-				type: 'parallel',
-				states: {
-					connection: {
-						states: {
-							observing: {
-								states: {
-									checking: {},
-									online: {},
-									offline: {}
-								}
-							},
-							closed: {}
-						}
-					},
-					feedback: {
-						states: {
-							none: {},
-							identityFailed: {},
-							restoreInvalid: {},
-							restoreFailed: {}
-						}
-					},
-					flow: {
-						id: 'application-flow',
-						states: {
-							opening: {},
-							openFailed: {},
-							binding: {
-								schemas: { input: types<{ session: Session }>() },
-								states: {
-									waiting: {},
-									adopting: {
-										schemas: {
-											context: types<{ host: AccountHost; readinessScope: SessionReadinessScope }>()
-										}
-									},
-									stopping: {}
-								}
-							},
-							running: {
-								id: 'application-active-flow-running',
-								schemas: {
-									context: types<{ host: AccountHost; readinessScope: SessionReadinessScope }>()
-								},
-								states: {
-									draining: { id: 'application-active-flow-running-draining' },
-									refreshing: {},
-									route: { id: 'application-active-flow-running-route' },
-									adoptingLibrary: {
-										schemas: {
-											input: types<{ candidate: ReadyAccountObservation }>(),
-											context: types<{ candidate: ReadyAccountObservation }>()
-										},
-										states: { waiting: {}, accepting: {}, stopping: {} }
-									},
-									preparing: {
-										schemas: {
-											context: types<{ preparing: AccountBindingIdentity }>()
-										},
-										states: {
-											active: {},
-											stopping: {}
-										}
-									},
-									signedOut: {},
-									waiting: {},
-									unavailable: {},
-									retrying: { id: 'application-active-flow-running-retrying' },
-									reobserving: {},
-									creating: {
-										states: {
-											active: {},
-											stopping: {}
-										}
-									},
-									restoring: {
-										id: 'application-active-flow-running-restoring',
-										states: {
-											active: {},
-											stopping: {}
-										}
-									},
-									loggingOut: {
-										id: 'application-active-flow-running-loggingOut',
-										states: { active: {}, overdue: {}, stopping: {} }
-									},
-									library: {
-										id: 'application-active-flow-running-library',
-										states: {
-											bootstrapping: {},
-											stopping: {},
-											replacing: {},
-											conflict: {},
-											failed: {},
-											ready: {
-												states: {
-													existing: {},
-													stopping: {
-														states: {
-															shutdown: {},
-															restore: {},
-															logout: {},
-															replace: {}
-														}
-													},
-													syncPending: {},
-													synced: {},
-													syncFailed: {}
-												}
-											}
-										}
-									}
-								}
-							},
-							closing: { id: 'application-active-flow-closing' },
-							finished: { type: 'choice' }
-						}
-					},
-					ownerHealth: {
-						states: {
-							healthy: {},
-							failed: {}
-						}
-					},
-					cleanupHealth: {
-						states: {
-							healthy: {},
-							failed: {}
-						}
-					},
-					observationHealth: {
-						states: {
-							healthy: {},
-							failed: {}
-						}
-					}
-				}
-			},
-			cleanupFailed: { id: 'application-cleanupFailed', type: 'final' },
-			ownerFailed: { id: 'application-ownerFailed', type: 'final' },
-			closed: { id: 'application-closed', type: 'final' }
-		},
-		actors: accountActors,
+		actors,
 		guards: {
+			sameBinding: ({
+				context,
+				event
+			}: {
+				context: Context
+				event: { type: string; observation?: AccountObservation }
+			}) =>
+				!!event.observation &&
+				sameAccountBinding(context.observation, event.observation) &&
+				context.observation.status === 'ready' &&
+				event.observation.status === 'ready' &&
+				context.observation.localFirst === event.observation.localFirst,
 			libraryStoppingFor: (
 				{ value }: { value: import('xstate').StateValue },
 				reason: 'restore' | 'logout' | 'replace'
@@ -427,161 +221,63 @@ export function createApplicationReadinessMachine<Session extends object>(
 					{ active: { flow: { running: { library: { ready: { stopping: reason } } } } } },
 					value
 				),
-			existingRoot: (
-				_args: { context: Context<Session> },
-				result: { outcome: string; write?: RootWrite }
-			) => result.outcome === 'ready' && result.write === undefined,
-			observationBroken: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ active: { observationHealth: 'failed' } }, value),
-			ownerBroken: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ active: { ownerHealth: 'failed' } }, value),
-			cleanupBroken: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ active: { cleanupHealth: 'failed' } }, value),
-			failedOwner: ({ context, event }: { context: Context<Session>; event: Event<Session> }) =>
-				event.type === 'SESSION_STARTUP_FAILED' &&
-				event.reason === 'ownerFailed' &&
-				event.scope.binding === context.scope.binding &&
-				event.scope.attachment === context.scope.attachment &&
-				event.scope.generation === context.scope.generation,
-			currentReadinessScope: ({
-				context,
-				event
-			}: {
-				context: Context<Session>
-				event: Event<Session>
-			}) =>
-				'scope' in event &&
-				event.scope.binding === context.readinessScope?.binding &&
-				event.scope.attachment === context.readinessScope?.attachment,
-
-			currentStartup: ({ context, event }: { context: Context<Session>; event: Event<Session> }) =>
-				'scope' in event &&
-				'generation' in event.scope &&
-				event.scope.binding === context.scope.binding &&
-				event.scope.attachment === context.scope.attachment &&
-				event.scope.generation === context.scope.generation,
-			currentReadiness: ({
-				context,
-				event
-			}: {
-				context: Context<Session>
-				event: Event<Session>
-			}) =>
-				'scope' in event &&
-				event.scope.binding === context.readinessScope?.binding &&
-				event.scope.attachment === context.readinessScope?.attachment &&
-				'observation' in event &&
-				event.observation === context.observationAttempt,
-
-			stoppingPreparation: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ active: { flow: { running: { preparing: 'stopping' } } } }, value),
-			preparationReplaced: (
-				{ context }: { context: Context<Session> },
-				preparing: AccountBindingIdentity
-			) =>
-				context.observation.status === 'ready' &&
-				!sameAccountBinding(context.observation, preparing) &&
-				(context.observation.localFirst !== false ||
-					context.observation.accountId !== preparing.accountId ||
-					context.observation.clientBinding !== preparing.clientBinding ||
-					context.observation.databaseBinding !== preparing.databaseBinding),
-			needsLocalFirst: ({ context }) =>
-				context.observation.status === 'ready' &&
-				context.observation.localFirst === false &&
-				!!(context.observation.prepare ?? context.host?.prepare),
-			stoppingCreate: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ active: { flow: { running: { creating: 'stopping' } } } }, value),
-			stoppingRestore: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ active: { flow: { running: { restoring: 'stopping' } } } }, value),
-			stoppingLogout: ({ value }: { value: import('xstate').StateValue }) =>
-				matchesState({ active: { flow: { running: { loggingOut: 'stopping' } } } }, value),
 			stoppingBootstrap: ({ value }: { value: import('xstate').StateValue }) =>
 				matchesState({ active: { flow: { running: { library: 'stopping' } } } }, value),
 			replacingBootstrap: ({ value }: { value: import('xstate').StateValue }) =>
 				matchesState({ active: { flow: { running: { library: 'replacing' } } } }, value),
-			sameBinding: ({ context, event }: { context: Context<Session>; event: Event<Session> }) =>
-				event.type === 'OBSERVED' &&
-				event.observation.status === 'ready' &&
-				context.observation.status === 'ready' &&
-				sameAccountBinding(event.observation, context.observation) &&
-				event.observation.localFirst === context.observation.localFirst
+			existingRoot: (_args: { context: Context }, result: { outcome: string; write?: RootWrite }) =>
+				result.outcome === 'ready' && result.write === undefined,
+			stoppingChange: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ active: { flow: { running: { changing: 'stopping' } } } }, value),
+			stoppingRestore: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ active: { flow: { running: { restoring: 'stopping' } } } }, value),
+			stoppingLogout: ({ value }: { value: import('xstate').StateValue }) =>
+				matchesState({ active: { flow: { running: { loggingOut: 'stopping' } } } }, value)
 		},
 		actions: {
-			refreshBinding: ({ context, event }: { context: Context<Session>; event: Event<Session> }) =>
-				event.type === 'OBSERVED' &&
-				event.observation.status === 'ready' &&
-				context.observation.status === 'ready'
-					? {
-							context: {
-								observation: {
-									...event.observation,
-									...context.observation,
-									...(event.observation.signedIn === undefined
-										? {}
-										: { signedIn: event.observation.signedIn })
-								}
-							}
-						}
-					: { context: {} },
-			clearPhrase: () => ({ context: { phrase: '' } }),
-			clearResources: (): {
-				context: Pick<
-					Context<Session>,
-					'host' | 'write' | 'observation' | 'phrase' | 'adoption' | 'candidate' | 'failedBinding'
-				>
-			} => ({
-				context: {
-					host: undefined,
-					write: undefined,
-					observation: { status: 'closed' },
-					adoption: undefined,
-					candidate: undefined,
-					failedBinding: undefined,
-					phrase: ''
-				}
-			}),
-			rememberObservation: ({ event }: { event: Event<Session> }) => ({
-				context: event.type === 'OBSERVED' ? { observation: event.observation } : {}
-			})
+			rememberObservation: ({
+				event
+			}: {
+				event: { type: string; observation?: AccountObservation }
+			}) => ({ context: event.observation ? { observation: event.observation } : {} }),
+			refreshBinding: ({
+				event
+			}: {
+				event: { type: string; observation?: AccountObservation }
+			}) => ({ context: event.observation ? { observation: event.observation } : {} }),
+			clearPhrase: () => ({ context: { phrase: '' } })
 		}
 	})
-
 	return model.createMachine({
 		id: 'application-readiness',
-		options: { maxIterations: 1000 },
 		initial: 'active',
-		output: ({ context }) => ({ clean: context.clean }),
 		context: ({ input }) => ({
-			clean: false,
 			input,
-			scope: input.startup.scope,
-			readinessScope: undefined,
-			retryAttempt: 0,
-			observationAttempt: 0,
-			host: undefined,
-			observation: { status: 'signed-out' },
+			observation: { status: 'starting' },
 			adoption: undefined,
 			candidate: undefined,
 			failedBinding: undefined,
 			write: undefined,
 			phrase: '',
-			attempt: 0
+			attempt: 0,
+			clean: true
 		}),
-
-		entry: (args, enq) => {
-			enq.sendTo('startup', { type: 'START', ...args.context.input.startup })
-		},
+		output: ({ context }) => ({ clean: context.clean }),
 		invoke: [
 			{ id: 'bindingCustody', src: 'bindingCustody', input: ({ self }) => ({ owner: self }) },
 			{
-				id: 'startup',
-				src: 'startup',
-				input: ({ self }) => ({ reportTo: self }),
-				onDone: (args, enq) => {
-					enq.raise({ type: 'STARTUP_CLOSED' })
-				}
+				id: 'observation',
+				src: 'observation',
+				input: ({ context }) => context.input.session,
+				onError: (_args, enq) => enq.raise({ type: 'NATIVE_FAILED' })
 			}
 		],
+		on: {
+			NATIVE_FAILED: (_args, enq) => {
+				enq.raise({ type: 'SHUTDOWN' })
+				return { context: { clean: false } }
+			}
+		},
 		states: {
 			active: {
 				type: 'parallel',
@@ -591,7 +287,7 @@ export function createApplicationReadinessMachine<Session extends object>(
 						states: {
 							observing: {
 								initial: 'checking',
-								invoke: { id: 'connection', src: 'connection' },
+								invoke: { id: 'connection', src: 'connection', onError: { target: 'closed' } },
 								on: {
 									ONLINE: { target: '.online' },
 									OFFLINE: { target: '.offline' },
@@ -600,18 +296,10 @@ export function createApplicationReadinessMachine<Session extends object>(
 								states: {
 									checking: {},
 									online: {
-										meta: {
-											name: t('connection.online'),
-											variant: 'info',
-											channel: 'connection'
-										}
+										meta: { name: t('connection.online'), variant: 'info', channel: 'connection' }
 									},
 									offline: {
-										meta: {
-											name: t('connection.offline'),
-											variant: 'info',
-											channel: 'connection'
-										}
+										meta: { name: t('connection.offline'), variant: 'info', channel: 'connection' }
 									}
 								}
 							},
@@ -655,161 +343,50 @@ export function createApplicationReadinessMachine<Session extends object>(
 						}
 					},
 					flow: {
-						id: 'application-flow',
-						initial: 'opening',
-						on: {
-							STARTUP_CLOSED: { target: '.finished' },
-							SESSION_STARTING: (args) => {
-								const { context, event } = args
-								return {
-									context:
-										event.scope.binding === context.scope.binding &&
-										event.scope.attachment === context.scope.attachment
-											? { scope: event.scope }
-											: {}
-								}
-							},
-							SESSION_ACQUIRED: (args) => {
-								if (!args.guards.currentStartup(args)) return
-								return {
-									target: '.binding',
-									input: { session: args.event.session }
-								}
-							},
-							SESSION_STARTUP_FAILED: (args, enq) => {
-								if (args.guards.failedOwner(args)) {
-									enq.raise({ type: 'SHUTDOWN' })
-									return {}
-								}
-								if (args.guards.currentStartup(args)) {
-									return { target: '.openFailed' }
-								}
-							},
-							SESSION_OBSERVATION_CLEANUP_FAILED: (args, enq) => {
-								if (!args.guards.currentReadinessScope(args)) return
-								enq.raise({ type: 'SHUTDOWN' })
-							},
-							SHUTDOWN: { target: '.closing' }
-						},
+						initial: 'running',
+						on: { SHUTDOWN: { target: '.closing' } },
 						states: {
-							opening: { meta: accountStatus('starting', t('account.status.starting')) },
-							openFailed: {
-								meta: accountStatus('unavailable', t('account.status.unavailable')),
-								on: {
-									RETRY: (args, enq) => {
-										enq.sendTo('startup', { type: 'RETRY' })
-										return { target: 'opening' }
-									}
-								}
-							},
-							binding: {
-								meta: starting,
-								initial: 'waiting',
-								invoke: {
-									id: 'binding',
-									src: 'binding',
-									input: ({ context, input }) => ({
-										session: input.session,
-										account: context.input,
-										scope: context.scope
-									}),
-									onError: { target: 'openFailed' }
-								},
-								on: { SHUTDOWN: { target: '.stopping' } },
-								states: {
-									waiting: {
-										on: {
-											HOST_BOUND: (args) => {
-												if (!args.guards.currentStartup(args)) return
-												const { host, observation } = args.event
-												return {
-													target: 'adopting',
-													context: {
-														host,
-														observation,
-														readinessScope: { binding: host.readiness.binding, attachment: {} }
-													}
-												}
-											}
-										}
-									},
-									adopting: {
-										entry: (_args, enq) => {
-											enq.sendTo('binding', { type: 'ADOPT' })
-										},
-										on: { HOST_ADOPTED: { target: '#application-active-flow-running' } }
-									},
-									stopping: {
-										on: {
-											HOST_BOUND: {
-												target: '#application-active-flow-closing'
-											},
-											HOST_ADOPTED: { target: '#application-active-flow-closing' }
-										}
-									}
-								}
-							},
 							running: {
-								id: 'application-active-flow-running',
 								initial: 'route',
-
-								entry: (args, enq) => {
-									const { context } = args
-									enq.sendTo('readiness', {
-										type: 'BIND',
-										scope: context.readinessScope,
-										capability: context.host.readiness.capability
-									})
-								},
-								invoke: [
-									{
-										id: 'readiness',
-										src: 'readiness',
-										input: ({ self }) => ({ reportTo: self }),
-										onDone: { target: '#application-active-flow-closing' }
-									},
-									{
-										id: 'observation',
-										src: 'observation',
-										input: ({ context }) => context.host
-									}
-								],
 								on: {
-									SHUTDOWN: { target: '.draining' },
-									OBSERVED: (args) => {
-										return { context: args.actions.rememberObservation(args).context }
-									},
-									SESSION_STATUS: (args, enq) => {
-										if (!args.guards.currentReadiness(args)) return
-										enq.sendTo('observation', { type: 'READ' })
-									},
-									SESSION_OBSERVATION_FAILED: (args, enq) => {
-										if (!args.guards.currentReadiness(args)) return
-										enq.raise({
-											type: 'OBSERVED',
-											observation: { status: 'error' }
-										})
-									}
+									OBSERVED: (args) => ({ context: args.actions.rememberObservation(args).context }),
+									SHUTDOWN: { target: 'closing' }
 								},
 								states: {
-									draining: {
-										id: 'application-active-flow-running-draining',
-										meta: accountStatus('closing', t('account.status.closing')),
-										entry: (args, enq) => {
-											enq.sendTo('readiness', { type: 'SHUTDOWN' })
-										},
-										on: {
-											OBSERVED: {},
-											SHUTDOWN: {},
-											SESSION_STATUS: {},
-											SESSION_OBSERVATION_FAILED: {}
+									route: {
+										id: 'application-active-flow-running-route',
+										entry: () => ({ context: { write: undefined } }),
+										always: ({ context }, enq) => {
+											if (
+												context.observation.status === 'ready' &&
+												context.observation.localFirst
+											) {
+												if (
+													!context.adoption ||
+													!sameAccountBinding(context.observation, context.adoption.observation)
+												)
+													return {
+														target: 'adoptingLibrary',
+														context: { candidate: context.observation }
+													}
+												return { target: 'library' }
+											}
+											if (context.adoption)
+												enq.sendTo('bindingCustody', { type: 'RELEASE', binding: context.adoption })
+											if (context.observation.status === 'signed-out')
+												return { target: 'signedOut', context: { adoption: undefined } }
+											if (context.observation.status === 'starting')
+												return { target: 'opening', context: { adoption: undefined } }
+											if (
+												context.observation.status === 'transitioning' ||
+												context.observation.status === 'ready'
+											)
+												return { target: 'waiting', context: { adoption: undefined } }
+											return { target: 'unavailable', context: { adoption: undefined } }
 										}
 									},
-									refreshing: {
-										meta: working,
-										entry: (_args, enq) => {
-											enq.sendTo('observation', { type: 'READ' })
-										},
+									opening: {
+										meta: starting,
 										on: {
 											OBSERVED: (args) => ({
 												target: 'route',
@@ -817,94 +394,78 @@ export function createApplicationReadinessMachine<Session extends object>(
 											})
 										}
 									},
-									route: {
-										id: 'application-active-flow-running-route',
-										entry: () => {
-											return { context: { write: undefined } }
-										},
-										always: (args, enq) => {
-											const { context } = args
-											if (matchesState({ active: { observationHealth: 'failed' } }, args.value)) {
-												return {
-													target: 'unavailable',
-													context: { observation: { status: 'error' } }
-												}
+									waiting: {
+										meta: starting,
+										on: {
+											OBSERVED: (args) => ({
+												target: 'route',
+												context: args.actions.rememberObservation(args).context
+											})
+										}
+									},
+									unavailable: {
+										meta: accountStatus('unavailable', t('account.status.unavailable')),
+										on: {
+											OBSERVED: (args) =>
+												args.context.failedBinding &&
+												args.event.observation.status === 'ready' &&
+												args.context.failedBinding === args.event.observation.binding
+													? undefined
+													: {
+															target: 'route',
+															context: args.actions.rememberObservation(args).context
+														},
+											RETRY: ({ context }, enq) => {
+												enq.sendTo(context.input.session.owner, { type: 'RETRY' })
+												return { target: 'refreshing', context: { failedBinding: undefined } }
 											}
-											if (args.guards.needsLocalFirst(args)) {
-												if (context.observation.status !== 'ready')
-													throw new Error('Preparation scope unavailable')
-												return {
-													target: 'preparing',
-													context: {
-														preparing: accountBindingIdentity(context.observation)
-													}
-												}
-											}
-											if (context.observation.status === 'ready') {
-												if (
-													context.host.adopt &&
-													(!context.adoption ||
-														!sameAccountBinding(context.observation, context.adoption.observation))
-												)
-													return {
-														target: 'adoptingLibrary',
-														context: { candidate: context.observation },
-														input: { candidate: context.observation }
-													}
-												return {
-													target: 'library',
-													context: {
-														observation: context.adoption
-															? {
-																	...context.adoption.observation,
-																	...(context.observation.localFirst === undefined
-																		? {}
-																		: { localFirst: context.observation.localFirst }),
-																	...(context.observation.signedIn === undefined
-																		? {}
-																		: { signedIn: context.observation.signedIn })
-																}
-															: context.observation
-													}
-												}
-											}
-											if (context.adoption)
-												enq.sendTo('bindingCustody', { type: 'RELEASE', binding: context.adoption })
-											if (context.observation.status === 'signed-out') {
-												return { target: 'signedOut', context: { adoption: undefined } }
-											}
-											if (context.observation.status === 'transitioning') {
-												return { target: 'waiting', context: { adoption: undefined } }
-											}
-											return { target: 'unavailable', context: { adoption: undefined } }
+										}
+									},
+									refreshing: {
+										meta: working,
+										entry: (_args, enq) => enq.sendTo('observation', { type: 'READ' }),
+										on: {
+											OBSERVED: (args) => ({
+												target: 'route',
+												context: args.actions.rememberObservation(args).context
+											})
+										}
+									},
+									signedOut: {
+										meta: accountStatus('signedOut', t('account.status.signedOut')),
+										on: {
+											OBSERVED: (args) => ({
+												target: 'route',
+												context: args.actions.rememberObservation(args).context
+											}),
+											CREATE: ({ context }, enq) => {
+												enq.raise({ type: 'FEEDBACK_CLEAR' })
+												return { target: 'changing', context: { attempt: context.attempt + 1 } }
+											},
+											RESTORE: ({ context, event }) => ({
+												target: 'restoring',
+												context: { phrase: event.phrase, attempt: context.attempt + 1 }
+											})
 										}
 									},
 									adoptingLibrary: {
 										initial: 'waiting',
-										entry: ({ context, input }, enq) => {
+										entry: ({ context }, enq) => {
 											if (context.adoption)
 												enq.sendTo('bindingCustody', { type: 'RELEASE', binding: context.adoption })
-											return { context: { adoption: undefined, candidate: input.candidate } }
+											return { context: { adoption: undefined } }
 										},
 										invoke: {
 											id: 'libraryBinding',
 											src: 'libraryBinding',
-											input: ({ context, input, self }) => ({
-												owner: self,
-												host: context.host,
-												observation: input.candidate
+											input: ({ context, self }) => ({
+												observation: required(context.candidate),
+												owner: self
 											}),
-											onError: ({ context }) =>
-												sameAccountBinding(context.observation, context.candidate)
-													? {
-															target: 'unavailable',
-															context: {
-																observation: { status: 'error' },
-																failedBinding: accountBindingIdentity(context.candidate),
-																candidate: undefined
-															}
-														}
-													: { target: 'route' }
+											onError: ({ context }) => ({
+												target: 'unavailable',
+												context: { failedBinding: context.candidate?.binding, candidate: undefined }
+											})
 										},
 										on: { SHUTDOWN: { target: '.stopping' } },
 										states: {
@@ -919,7 +480,7 @@ export function createApplicationReadinessMachine<Session extends object>(
 												}
 											},
 											accepting: {
-												entry: (_, enq) => enq.sendTo('libraryBinding', { type: 'ADOPT' }),
+												entry: (_args, enq) => enq.sendTo('libraryBinding', { type: 'ADOPT' }),
 												on: {
 													LIBRARY_ADOPTED: ({ context }) =>
 														sameAccountBinding(
@@ -928,10 +489,7 @@ export function createApplicationReadinessMachine<Session extends object>(
 														)
 															? {
 																	target: '#application-active-flow-running-library',
-																	context: {
-																		observation: required(context.adoption).observation,
-																		candidate: undefined
-																	}
+																	context: { candidate: undefined }
 																}
 															: { target: '#application-active-flow-running-route' }
 												}
@@ -944,148 +502,8 @@ export function createApplicationReadinessMachine<Session extends object>(
 											}
 										}
 									},
-									preparing: {
-										meta: starting,
-										initial: 'active',
-										states: { active: {}, stopping: {} },
-										on: { SHUTDOWN: { target: '.stopping' } },
-										invoke: {
-											id: 'prepare',
-											src: 'prepare',
-											input: ({ context }) => {
-												if (context.observation.status !== 'ready')
-													throw new Error('Account scope unavailable')
-												return { host: context.host, observation: context.observation }
-											},
-											onDone: (args, _enq) => {
-												if (args.guards.stoppingPreparation(args)) {
-													return { target: 'draining' }
-												}
-
-												return { target: 'refreshing' }
-											},
-											onError: (args) => {
-												if (args.guards.stoppingPreparation(args)) {
-													return { target: 'draining' }
-												}
-												if (args.guards.preparationReplaced(args, args.context.preparing))
-													return { target: 'refreshing' }
-												return {
-													target: 'unavailable',
-													context: {
-														observation: { status: 'error' },
-														failedBinding: args.context.preparing
-													}
-												}
-											}
-										}
-									},
-									signedOut: {
-										meta: accountStatus('signedOut', t('account.status.signedOut')),
-										on: {
-											OBSERVED: (args) => {
-												return {
-													target: 'route',
-													context: args.actions.rememberObservation(args).context
-												}
-											},
-											CREATE: (args, enq) => {
-												enq.raise({ type: 'FEEDBACK_CLEAR' })
-												return { target: 'creating' }
-											},
-											RESTORE: (args) => {
-												return {
-													target: 'restoring',
-													context: { phrase: args.event.phrase, attempt: args.context.attempt + 1 }
-												}
-											}
-										}
-									},
-									waiting: {
-										on: {
-											OBSERVED: (args) => {
-												return {
-													target: 'route',
-													context: args.actions.rememberObservation(args).context
-												}
-											}
-										}
-									},
-									unavailable: {
-										meta: accountStatus('unavailable', t('account.status.unavailable')),
-										on: {
-											RETRY: (args) => {
-												if (matchesState({ active: { observationHealth: 'failed' } }, args.value)) {
-													return { target: 'reobserving', context: { failedBinding: undefined } }
-												}
-												return { target: 'retrying', context: { failedBinding: undefined } }
-											},
-											OBSERVED: (args) => {
-												if (
-													args.context.failedBinding &&
-													sameAccountBinding(args.context.failedBinding, args.event.observation)
-												)
-													return
-												return {
-													target: 'route',
-													context: args.actions.rememberObservation(args).context
-												}
-											}
-										}
-									},
-
 									retrying: {
 										id: 'application-active-flow-running-retrying',
-										entry: (args, enq) => {
-											const { context } = args
-											const retryAttempt = context.retryAttempt + 1
-											enq.sendTo('readiness', {
-												type: 'RETRY',
-												scope: context.readinessScope,
-												attempt: retryAttempt
-											})
-											return { context: { retryAttempt } }
-										},
-										on: {
-											SESSION_RETRY_SETTLED: (args) => {
-												const { context, event } = args
-												if (
-													!(
-														event.scope.binding === context.readinessScope?.binding &&
-														event.scope.attachment === context.readinessScope?.attachment &&
-														event.attempt === context.retryAttempt
-													)
-												)
-													return
-												return { target: 'refreshing' }
-											}
-										}
-									},
-									reobserving: {
-										entry: (args, enq) => {
-											const { context } = args
-											const observationAttempt = context.observationAttempt + 1
-											enq.raise({ type: 'OBSERVATION_RESTARTED' })
-											enq.sendTo('readiness', {
-												type: 'REOBSERVE',
-												scope: context.readinessScope,
-												observation: observationAttempt
-											})
-											return { context: { observationAttempt } }
-										},
-										on: {
-											OBSERVED: (args) => {
-												return {
-													target: 'route',
-													context: args.actions.rememberObservation(args).context
-												}
-											}
-										}
-									},
-									creating: {
-										entry: (args, enq) => {
-											enq.raise({ type: 'FEEDBACK_CLEAR' })
-										},
 										initial: 'active',
 										states: {
 											active: {},
@@ -1093,36 +511,74 @@ export function createApplicationReadinessMachine<Session extends object>(
 										},
 										on: { SHUTDOWN: { target: '.stopping' } },
 										invoke: {
-											id: 'create',
-											src: 'create',
-											input: ({ context }) => context.host,
-											onDone: (args, _enq) => {
-												if (args.guards.stoppingCreate(args)) {
-													return {
-														target: '#application-active-flow-running-draining'
-													}
+											id: 'change',
+											src: 'change',
+											input: ({ context }) => ({
+												session: context.input.session,
+												scope: { binding: context.input.session.binding, attempt: context.attempt },
+												change: { operation: 'retry' }
+											}),
+											onDone: ({ value }) => ({
+												target: matchesState(
+													{ active: { flow: { running: { retrying: 'stopping' } } } },
+													value
+												)
+													? 'draining'
+													: 'refreshing'
+											}),
+											onError: ({ value }, enq) => {
+												enq.raise({ type: 'IDENTITY_FAILED' })
+												return {
+													target: matchesState(
+														{ active: { flow: { running: { retrying: 'stopping' } } } },
+														value
+													)
+														? 'draining'
+														: 'refreshing'
 												}
-
-												return { target: 'refreshing' }
+											}
+										}
+									},
+									changing: {
+										initial: 'active',
+										states: {
+											active: {},
+											stopping: { meta: accountStatus('closing', t('account.status.closing')) }
+										},
+										on: { SHUTDOWN: { target: '.stopping' } },
+										invoke: {
+											id: 'change',
+											src: 'change',
+											input: ({ context }) => ({
+												session: context.input.session,
+												scope: { binding: context.input.session.binding, attempt: context.attempt },
+												change: {
+													operation: 'create',
+													before:
+														context.observation.status === 'signed-out'
+															? context.observation
+															: undefined
+												}
+											}),
+											onDone: (args, enq) => {
+												if (args.event.output.outcome !== 'completed')
+													enq.raise({ type: 'IDENTITY_FAILED' })
+												return {
+													target: args.guards.stoppingChange(args) ? 'draining' : 'refreshing'
+												}
 											},
 											onError: (args, enq) => {
-												if (args.guards.stoppingCreate(args)) {
-													return {
-														target: '#application-active-flow-running-draining'
-													}
-												}
 												enq.raise({ type: 'IDENTITY_FAILED' })
-
-												return { target: 'refreshing' }
+												return {
+													target: args.guards.stoppingChange(args) ? 'draining' : 'refreshing'
+												}
 											}
 										}
 									},
 									restoring: {
 										id: 'application-active-flow-running-restoring',
-										entry: (args, enq) => {
-											enq.raise({ type: 'FEEDBACK_CLEAR' })
-										},
 										initial: 'active',
+										entry: (_args, enq) => enq.raise({ type: 'FEEDBACK_CLEAR' }),
 										states: {
 											active: {},
 											stopping: { meta: accountStatus('closing', t('account.status.closing')) }
@@ -1132,52 +588,58 @@ export function createApplicationReadinessMachine<Session extends object>(
 												enq.sendTo('restore', { type: 'SHUTDOWN' })
 												return { target: '.stopping', context: args.actions.clearPhrase().context }
 											},
-											RESTORATION_VALIDATED: (args) => {
-												return { context: args.actions.clearPhrase().context }
-											},
-											RESTORATION_PREPARE_REQUESTED: (args, enq) => {
-												const { event } = args
-												enq.sendTo('restore', {
-													type: 'PREPARED',
-													binding: event.binding,
-													attempt: event.attempt
-												})
+											RESTORATION_VALIDATED: ({ context, event }) =>
+												event.binding === context.input.session.binding &&
+												event.attempt === context.attempt
+													? { context: { phrase: '' } }
+													: undefined,
+											RESTORATION_PREPARE_REQUESTED: ({ context, event }, enq) => {
+												if (
+													event.binding === context.input.session.binding &&
+													event.attempt === context.attempt
+												)
+													enq.sendTo('restore', {
+														type: 'PREPARED',
+														binding: event.binding,
+														attempt: event.attempt
+													})
 											}
 										},
 										invoke: {
 											id: 'restore',
 											src: 'restore',
 											input: ({ context, self }) => ({
-												capability: context.host.restoration.capability,
-												scope: {
-													binding: context.host.restoration.binding,
-													attempt: context.attempt
-												},
 												phrase: context.phrase,
-												reportTo: self
+												scope: { binding: context.input.session.binding, attempt: context.attempt },
+												reportTo: self,
+												capability: {
+													runtime: context.input.session,
+													parsePhrase: context.input.parsePhrase,
+													isCurrentBinding: (binding) => binding === context.input.session.binding,
+													readIdentity: async () => {
+														const current = context.input.session.view.get().observation
+														return current?.status === 'ready'
+															? { kind: 'ready', identityId: current.identityId }
+															: { kind: 'unavailable' }
+													}
+												}
 											}),
 											onDone: (args, enq) => {
-												const patch = args.actions.clearPhrase().context
-												if (args.guards.stoppingRestore(args))
-													return {
-														target: '#application-active-flow-running-draining',
-														context: patch
-													}
-												if (isRestored(args.event.output)) enq.raise({ type: 'FEEDBACK_CLEAR' })
-												else if (isInvalidRestoration(args.event.output))
+												if (args.event.output.outcome === 'invalid')
 													enq.raise({ type: 'RESTORE_INVALID' })
-												else enq.raise({ type: 'RESTORE_FAILED' })
-												return { target: 'refreshing', context: patch }
+												else if (args.event.output.outcome !== 'restored')
+													enq.raise({ type: 'RESTORE_FAILED' })
+												return {
+													target: args.guards.stoppingRestore(args) ? 'draining' : 'refreshing',
+													context: { phrase: '' }
+												}
 											},
 											onError: (args, enq) => {
-												const patch = args.actions.clearPhrase().context
-												if (args.guards.stoppingRestore(args))
-													return {
-														target: '#application-active-flow-running-draining',
-														context: patch
-													}
 												enq.raise({ type: 'RESTORE_FAILED' })
-												return { target: 'refreshing', context: patch }
+												return {
+													target: args.guards.stoppingRestore(args) ? 'draining' : 'refreshing',
+													context: { phrase: '' }
+												}
 											}
 										}
 									},
@@ -1203,40 +665,38 @@ export function createApplicationReadinessMachine<Session extends object>(
 										},
 										on: {
 											SHUTDOWN: { target: '.stopping' },
-											SIGN_OUT_OVERDUE: (_args, enq) => {
-												enq.raise({ type: 'IDENTITY_FAILED' })
-											}
+											SIGN_OUT_OVERDUE: (_args, enq) => enq.raise({ type: 'IDENTITY_FAILED' })
 										},
 										invoke: {
 											id: 'logout',
 											src: 'logout',
 											input: ({ context, self }) =>
-												signOutInput(context.host, context.observation, (stage) =>
+												signOutInput(context.input, context.observation, context.attempt, (stage) =>
 													self.send({ type: 'SIGN_OUT_OVERDUE', stage })
 												),
 											onDone: (args, enq) => {
 												if (args.event.output.outcome === 'failed')
 													enq.raise({ type: 'IDENTITY_FAILED' })
-												return args.guards.stoppingLogout(args)
-													? { target: '#application-active-flow-running-draining' }
-													: { target: 'refreshing' }
+												return {
+													target: args.guards.stoppingLogout(args) ? 'draining' : 'refreshing'
+												}
 											},
 											onError: (args, enq) => {
 												enq.raise({ type: 'IDENTITY_FAILED' })
-												return args.guards.stoppingLogout(args)
-													? { target: '#application-active-flow-running-draining' }
-													: { target: 'refreshing' }
+												return {
+													target: args.guards.stoppingLogout(args) ? 'draining' : 'refreshing'
+												}
 											}
 										}
 									},
-
 									library: {
 										id: 'application-active-flow-running-library',
 										initial: 'bootstrapping',
 										invoke: {
 											id: 'bootstrap',
 											src: 'bootstrap',
-											input: ({ context }) => root(context),
+											input: ({ context }) =>
+												required(context.adoption).observation.capabilities.root,
 											onDone: (args) => {
 												const { event } = args
 												if (args.guards.stoppingBootstrap(args)) {
@@ -1315,20 +775,23 @@ export function createApplicationReadinessMachine<Session extends object>(
 											conflict: {
 												meta: accountStatus('conflict', t('account.status.conflict')),
 												on: {
-													LOGOUT: {
-														target: '#application-active-flow-running-loggingOut'
-													}
+													LOGOUT: (args) => ({
+														target: '#application-active-flow-running-loggingOut',
+														context: { attempt: args.context.attempt + 1 }
+													})
 												}
 											},
 											failed: {
 												meta: accountStatus('rootFailed', t('account.status.rootFailed')),
 												on: {
-													RETRY: {
-														target: '#application-active-flow-running-retrying'
-													},
-													LOGOUT: {
-														target: '#application-active-flow-running-loggingOut'
-													}
+													RETRY: ({ context }) => ({
+														target: '#application-active-flow-running-retrying',
+														context: { attempt: context.attempt + 1 }
+													}),
+													LOGOUT: (args) => ({
+														target: '#application-active-flow-running-loggingOut',
+														context: { attempt: args.context.attempt + 1 }
+													})
 												}
 											},
 											ready: {
@@ -1336,15 +799,15 @@ export function createApplicationReadinessMachine<Session extends object>(
 												invoke: {
 													id: 'library',
 													src: 'library',
-													input: ({ context }) =>
-														context.observation.status === 'ready'
-															? context.observation.library
-															: undefined,
+													input: ({ context }) => context.adoption?.library,
 													onDone: (args) => {
 														if (args.guards.libraryStoppingFor(args, 'restore'))
 															return { target: '#application-active-flow-running-restoring' }
 														if (args.guards.libraryStoppingFor(args, 'logout'))
-															return { target: '#application-active-flow-running-loggingOut' }
+															return {
+																target: '#application-active-flow-running-loggingOut',
+																context: { attempt: args.context.attempt + 1 }
+															}
 														if (args.guards.libraryStoppingFor(args, 'replace'))
 															return { target: '#application-active-flow-running-route' }
 														return { target: '#application-active-flow-running-draining' }
@@ -1417,127 +880,47 @@ export function createApplicationReadinessMachine<Session extends object>(
 												}
 											}
 										}
+									},
+									draining: {
+										id: 'application-active-flow-running-draining',
+										always: { target: '#application-active-flow-closing' }
 									}
 								}
 							},
 							closing: {
 								id: 'application-active-flow-closing',
 								meta: accountStatus('closing', t('account.status.closing')),
-								entry: (args, enq) => {
-									const { context } = args
+								entry: ({ context }, enq) => {
 									if (context.adoption)
 										enq.sendTo('bindingCustody', { type: 'RELEASE', binding: context.adoption })
-									enq(() => context.host?.release())
-									enq.sendTo('startup', { type: 'SHUTDOWN' })
 									return {
 										context: {
-											...args.actions.clearPhrase().context,
 											adoption: undefined,
 											candidate: undefined,
-											failedBinding: undefined
+											phrase: '',
+											write: undefined
 										}
 									}
 								},
-								on: {
-									SESSION_ACQUIRED: {},
-									SESSION_STARTUP_FAILED: {},
-									SESSION_STARTING: {},
-									SHUTDOWN: {}
-								}
-							},
-							finished: {
-								type: 'choice',
-								choice: (args) => {
-									if (matchesState({ active: { cleanupHealth: 'failed' } }, args.value)) {
-										return { target: '#application-cleanupFailed' }
-									}
-									if (matchesState({ active: { ownerHealth: 'failed' } }, args.value)) {
-										return { target: '#application-ownerFailed' }
-									}
-									return { target: '#application-closed' }
-								}
+								always: ({ context }) => ({
+									target: context.clean ? '#application-closed' : '#application-ownerFailed'
+								})
 							}
-						}
-					},
-					ownerHealth: {
-						initial: 'healthy',
-						states: {
-							healthy: {
-								on: {
-									SESSION_STARTUP_FAILED: (args) => {
-										if (!args.guards.failedOwner(args)) return
-										return { target: 'failed' }
-									}
-								}
-							},
-							failed: {}
-						}
-					},
-					cleanupHealth: {
-						initial: 'healthy',
-						states: {
-							healthy: {
-								on: {
-									SESSION_OBSERVATION_CLEANUP_FAILED: (args) => {
-										if (!args.guards.currentReadinessScope(args)) return
-										return { target: 'failed' }
-									}
-								}
-							},
-							failed: {}
-						}
-					},
-					observationHealth: {
-						initial: 'healthy',
-						on: { OBSERVATION_RESTARTED: { target: '.healthy' } },
-						states: {
-							healthy: {
-								on: {
-									SESSION_OBSERVATION_FAILED: (args) => {
-										if (!args.guards.currentReadiness(args)) return
-										return { target: 'failed' }
-									}
-								}
-							},
-							failed: {}
 						}
 					}
 				}
 			},
-			cleanupFailed: {
-				id: 'application-cleanupFailed',
-				meta: accountStatus('cleanupFailed', t('account.status.cleanupFailed')),
-				type: 'final',
-				entry: (args) => {
-					return { context: args.actions.clearResources().context }
-				}
-			},
 			ownerFailed: {
 				id: 'application-ownerFailed',
-				meta: accountStatus('ownerFailed', t('account.status.ownerFailed')),
 				type: 'final',
-				entry: (args) => {
-					return { context: args.actions.clearResources().context }
-				}
+				meta: accountStatus('ownerFailed', t('account.status.ownerFailed')),
+				entry: () => ({ context: { observation: { status: 'closed' } } })
 			},
 			closed: {
 				id: 'application-closed',
 				meta: accountStatus('closed', t('account.status.closed')),
 				type: 'final',
-				entry: () => {
-					return {
-						context: {
-							host: undefined,
-							write: undefined,
-							clean: true,
-							adoption: undefined,
-							candidate: undefined,
-							failedBinding: undefined,
-							observation: { status: 'closed' },
-							phrase: ''
-						}
-					}
-				}
+				entry: () => ({ context: { observation: { status: 'closed' } } })
 			}
 		}
 	})
@@ -1560,58 +943,48 @@ export type ApplicationStatus =
 	| 'working'
 	| 'ownerFailed'
 	| 'cleanupFailed'
-export type ApplicationSnapshot<Session extends object> = SnapshotFrom<
-	ReturnType<typeof createApplicationReadinessMachine<Session>>
->
+export type ApplicationSnapshot = SnapshotFrom<ReturnType<typeof createApplicationReadinessMachine>>
 type MachineStatus = Exclude<ApplicationStatus, 'configuration'>
-export function selectApplicationView<Session extends object>(
-	snapshot: ApplicationSnapshot<Session> | undefined,
+export function selectApplicationView(
+	snapshot: ApplicationSnapshot | undefined,
 	configured: boolean
 ) {
 	const metadata = snapshot ? Object.values(snapshot.getMeta()) : [starting]
 	const meta = configured
 		? (metadata.find((state) => state?.channel === 'account') ?? working)
 		: configuration
-	const feedback = metadata.find((state) => state?.channel === 'feedback')?.feedback
 	const status: ApplicationStatus = configured ? (meta.status ?? 'working') : 'configuration'
 	return {
 		status,
 		message: { text: meta.name, variant: meta.variant },
 		feedbackMessage: stateFeedback(metadata, 'feedback'),
 		connectionMessage: stateFeedback(metadata, 'connection'),
-		feedback,
+		feedback: metadata.find((state) => state?.channel === 'feedback')?.feedback,
 		showIdentityForm: snapshot?.can({ type: 'CREATE' }) ?? false,
 		canLogout:
 			snapshot?.context.observation.status === 'ready' &&
-			snapshot.context.observation.signedIn === true &&
+			snapshot.context.observation.identityKind === 'backend' &&
 			snapshot.can({ type: 'LOGOUT' }),
 		canRestore: snapshot?.can({ type: 'RESTORE', phrase: '' }) ?? false,
 		canRetry: snapshot?.can({ type: 'RETRY' }) ?? false,
 		requiresReload:
-			snapshot?.matches('ownerFailed') ||
-			snapshot?.matches('cleanupFailed') ||
+			snapshot?.context.clean === false ||
 			snapshot?.matches({ active: { flow: { running: { loggingOut: 'overdue' } } } }) ||
 			false
 	}
 }
-export function selectRecoveryBinding<Session extends object>(
-	snapshot: ApplicationSnapshot<Session> | undefined
-) {
-	return snapshot &&
-		selectLibraryActor(snapshot) &&
-		!snapshot.matches({ active: { ownerHealth: 'failed' } }) &&
-		!snapshot.matches({ active: { cleanupHealth: 'failed' } }) &&
-		snapshot.context.observation.status === 'ready'
-		? { ...snapshot.context.observation.recovery, messages: recoveryMessages() }
+export function selectRecoveryBinding(snapshot: ApplicationSnapshot | undefined) {
+	return snapshot && selectLibraryActor(snapshot) && snapshot.context.observation.status === 'ready'
+		? { ...snapshot.context.observation.capabilities.recovery, messages: recoveryMessages() }
 		: undefined
 }
-
-/** The invocation ID is owned by ready; never expose actors from a draining binding. */
-export function selectLibraryActor<Session extends object>(
-	snapshot: ApplicationSnapshot<Session> | undefined
-) {
-	return snapshot?.matches({ active: { flow: { running: { library: 'ready' } } } }) &&
-		!snapshot.matches({ active: { flow: { running: { library: { ready: 'stopping' } } } } })
+export function selectLibraryActor(snapshot: ApplicationSnapshot | undefined) {
+	return snapshot &&
+		matchesState({ active: { flow: { running: { library: 'ready' } } } }, snapshot.value) &&
+		!matchesState(
+			{ active: { flow: { running: { library: { ready: 'stopping' } } } } },
+			snapshot.value
+		)
 		? snapshot.children.library
 		: undefined
 }

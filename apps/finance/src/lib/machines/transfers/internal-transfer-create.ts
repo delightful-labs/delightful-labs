@@ -17,7 +17,7 @@ import type { Db as JazzDb } from 'jazz-tools'
 import { z } from 'zod'
 import { createJazzTransactionActors } from '../persistence/jazz-transaction-actors.js'
 import { setup, types, createAsyncLogic, matchesState } from 'xstate'
-import type { OutputFrom } from 'xstate'
+
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 type JazzTransaction = ReturnType<JazzDb['beginTransaction']>
@@ -318,20 +318,7 @@ export function createInternalTransferCreateMachine() {
 		INVALIDATE: types<EventPayload<InternalTransferCreateEvent, 'INVALIDATE'>>(),
 		SHUTDOWN: types<EventPayload<InternalTransferCreateEvent, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['validate']>
-				| import('xstate').OutputFrom<(typeof actors)['allocate']>
-				| import('xstate').OutputFrom<(typeof actors)['open']>
-				| import('xstate').OutputFrom<(typeof actors)['read']>
-				| import('xstate').OutputFrom<(typeof actors)['stage']>
-				| import('xstate').OutputFrom<(typeof actors)['commit']>
-				| import('xstate').OutputFrom<(typeof actors)['identifyWrite']>
-				| import('xstate').OutputFrom<(typeof actors)['settle']>
-				| import('xstate').OutputFrom<(typeof actors)['rollback']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

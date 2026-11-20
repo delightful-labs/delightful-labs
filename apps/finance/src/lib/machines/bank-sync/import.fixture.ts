@@ -7,6 +7,7 @@ import { createTransactionImportMachine } from './import-transaction.js'
 import { createAccountImportMachine } from './import-account.js'
 import { createImportMachine } from './import.js'
 import { createAuthorizationMachine } from './authorization.js'
+import { providerFetchMachine } from './provider-fetch.js'
 import { createBankOperationMachine } from './operation.js'
 import { createBankSyncMachine } from './index.js'
 import { bankObservation } from './availability.js'
@@ -207,9 +208,22 @@ export function importFixture(
 			authorize,
 			importTransactions: imports,
 			unlock: createAsyncLogic<string, OperationWork>({ run: unlock }),
-			fetchProvider: createAsyncLogic<ProviderResponse, { work: OperationWork; accessUrl: string }>(
-				{ run: fetch }
-			),
+			fetchProvider: providerFetchMachine.provide({
+				actors: {
+					prepare: createAsyncLogic<
+						Awaited<
+							ReturnType<typeof import('#lib/integrations/simplefin.js').prepareProviderFetch>
+						>,
+						import('xstate').InputFrom<typeof providerFetchMachine>
+					>({
+						run: async () =>
+							({ kind: 'demo', response: await fetch() }) satisfies {
+								kind: 'demo'
+								response: ProviderResponse
+							}
+					})
+				}
+			}),
 			persistOutcome: createAsyncLogic({
 				run: ({ input, signal }: { input: Parameters<typeof outcome>[0]; signal: AbortSignal }) =>
 					outcome(input, signal)

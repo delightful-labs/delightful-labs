@@ -210,3 +210,22 @@ The [worker effect drain](worker-effect-drain.md) observes the original effect's
 quiescence receipt and the exact host-close receipt. Import its factory and types
 from `worker/effect-drain/workflow` and `worker/effect-drain/contracts`. The parent
 retains its lock and original unknown outcome until this chart returns proof.
+
+## Finite native browser jobs
+
+Import `createBrowserWorkerJob`, `BrowserWorkerJobInput` and
+`BrowserWorkerJobResult` from `delightful-local-first/worker/browser-job`. Invoke
+this chart from the existing operation owner. Supply the selected Worker factory,
+request, reply decoder, optional transfer list and optional abort signal/clock.
+Domain validation, permissions, deadlines and result mapping stay with the caller.
+Clipper's image/extraction jobs and Finance's image editor/provider fetch use this
+same lifecycle. Completed job snapshots clear their admitted input after release;
+callers must likewise clear transient credentials from their own context.
+
+The job completes only after removing its handlers and abort listener and returning
+from native `Worker.terminate()`. CANCEL uses that same cleanup path. Failed native
+cleanup blocks completion; actor stop is not a successful release acknowledgement.
+Browsers supply no asynchronous process-exit receipt for these finite workers.
+Persistent Jazz/application workers and financial write custody retain their own
+real drain/close protocols. Do not start a job actor inside a promise leaf and
+await it as an adapter for an old promise API.

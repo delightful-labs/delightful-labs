@@ -1,4 +1,4 @@
-import * as imageWorker from '../../runtime/worker/image-render.js'
+import type { ImageRenderInput } from '../../runtime/worker/image-render.js'
 import { renderEditorPixels } from '../../domain/image-editor-pixels.js'
 /** Minimal native pixel-buffer stand-in for Node; tests exercise the real pixel math. */
 export class TestImageData implements ImageData {
@@ -46,10 +46,43 @@ export function mockEditorPlatform() {
 	return { source, bitmap, canvas, canvasResource, decode, read, paint, encode, release }
 }
 
-/** Replace only the browser transport; keep the actual image pixel implementation. */
-export function mockEditorRendering() {
-	return vi.spyOn(imageWorker, 'renderImageInWorker').mockImplementation(async (input, signal) => {
-		signal.throwIfAborted()
-		return renderEditorPixels(input.source, input.selection, input.adjustments)
+/** Replace only the native Worker; all tests still invoke the shared lifecycle. */
+export function mockEditorRendering(held = false) {
+	type Resource = {
+		onmessage: ((event: MessageEvent<unknown>) => void) | null
+		onerror: ((event?: Event) => void) | null
+		onmessageerror: ((event?: Event) => void) | null
+		postMessage: ReturnType<typeof vi.fn<(input: ImageRenderInput) => void>>
+		terminate: ReturnType<typeof vi.fn<() => void>>
+	}
+	const workers: Resource[] = []
+	vi.stubGlobal('Worker', function () {
+		let released = false
+		const worker: Resource = {
+			onmessage: null,
+			onerror: null,
+			onmessageerror: null,
+			postMessage: vi.fn((input: ImageRenderInput) => {
+				if (held) return
+				queueMicrotask(() => {
+					if (released) return
+					try {
+						worker.onmessage?.(
+							new MessageEvent('message', {
+								data: renderEditorPixels(input.source, input.selection, input.adjustments)
+							})
+						)
+					} catch {
+						worker.onerror?.(new Event('error'))
+					}
+				})
+			}),
+			terminate: vi.fn(() => {
+				released = true
+			})
+		}
+		workers.push(worker)
+		return worker
 	})
+	return workers
 }

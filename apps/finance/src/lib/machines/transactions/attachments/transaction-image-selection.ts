@@ -37,16 +37,6 @@ const events0 = {
 	CLOSE: types<EventPayload<Event, 'CLOSE'>>(),
 	SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof imageEditorMachine>>
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Draft selection owns one invoked editor, retained while cancellation drains its resources. */
 export const transactionImageSelectionMachine = setup({

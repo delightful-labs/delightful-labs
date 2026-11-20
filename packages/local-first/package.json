@@ -441,6 +441,10 @@
 		"./backend/jazz/session-runtime": {
 			"types": "./dist/backend/jazz/session-runtime.d.ts",
 			"default": "./dist/backend/jazz/session-runtime.js"
+		},
+		"./worker/browser-job": {
+			"types": "./dist/machines/lifecycle/browser-worker-job.d.ts",
+			"default": "./dist/machines/lifecycle/browser-worker-job.js"
 		}
 	},
 	"svelte": "./dist/index.js",

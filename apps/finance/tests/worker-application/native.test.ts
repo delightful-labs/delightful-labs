@@ -25,6 +25,16 @@ beforeAll(async () => {
 	await build({
 		...workerRuntimeBuildConfig(),
 		configFile: false,
+		resolve: {
+			...workerRuntimeBuildConfig().resolve,
+			alias: [
+				{
+					find: '$app/state',
+					replacement: resolve('tests/worker-application/route-state.svelte.ts')
+				},
+				...workerRuntimeBuildConfig().resolve.alias
+			]
+		},
 		logLevel: 'silent',
 		plugins: [
 			svelte({ configFile: false }),
@@ -182,9 +192,29 @@ async function close(page: Page) {
 		.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
 		.toBe('closed')
 }
+async function route(page: Page, path: string) {
+	await page.evaluate((path) => window.financeWorkerReadFixture.route(path + location.search), path)
+}
+async function selectWorkspaceUI(page: Page, id: string) {
+	const select = page.getByLabel('Current Workspace', { exact: true })
+	await browserExpect(select.locator('option[value="' + id + '"]')).toHaveCount(1)
+	if ((await select.inputValue()) !== id) await select.selectOption(id)
+}
+async function archiveAccountUI(page: Page, name: string) {
+	await route(page, '/accounts')
+	await page.getByRole('button', { name: 'Manage ' + name, exact: true }).click()
+	await page
+		.getByRole('dialog', { name, exact: true })
+		.getByRole('button', { name: 'Archive', exact: true })
+		.click()
+}
 async function createAccountUI(page: Page, name: string) {
+	await route(page, '/accounts')
 	await openDrawerSection(page, 'Accounts')
-	await page.getByRole('button', { name: /add account/i, exact: true }).click()
+	await page
+		.locator('aside')
+		.getByRole('button', { name: /add account/i, exact: true })
+		.click()
 	const dialog = page.getByRole('dialog', { name: /add account/i })
 	await browserExpect(dialog).toBeVisible()
 	await dialog.getByLabel(/account name/i).fill(name)
@@ -195,15 +225,14 @@ async function createAccountUI(page: Page, name: string) {
 	await browserExpect(page.getByRole('cell', { name, exact: true })).toBeVisible()
 }
 async function enterExpenseUI(page: Page, accountId: string, description: string) {
+	await route(page, '/expenses/new')
 	await page.getByLabel('Account', { exact: true }).selectOption(accountId)
 	await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Worker expense' })
 	await page.getByLabel('Amount', { exact: true }).fill('12.34')
 	await page.getByLabel('Date', { exact: true }).fill('2026-11-18')
 	await page.getByLabel('Description', { exact: true }).fill(description)
 	await page.getByRole('button', { name: /save transaction/i }).click()
-	await browserExpect(
-		page.getByRole('status').filter({ hasText: /transaction saved/i })
-	).toBeVisible()
+	await browserExpect.poll(() => new URL(page.url()).pathname).toMatch(/^\/(income|expenses)$/)
 }
 for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 	describe(name, () => {
@@ -228,7 +257,6 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				).toEqual({ ok: true })
 				await page.evaluate((id) => {
 					window.financeWorkerReadFixture.route('/settings/categories?workspace=' + id)
-					window.financeWorkerReadFixture.followRoutes()
 				}, workspaceId)
 				await page.getByRole('button', { name: 'Add Category', exact: true }).click()
 				let dialog = page.getByRole('dialog', { name: 'Add Category', exact: true })
@@ -249,6 +277,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				).toHaveCount(0)
 				const aside = page.locator('aside')
 				await aside.getByRole('link', { name: 'Expenses', exact: true }).click()
+				await route(page, '/expenses/new')
 				// This standalone host has no SvelteKit route boundary. Wait for the
 				// worker's new route view before editing its replacement form.
 				await browserExpect
@@ -264,9 +293,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.getByLabel('Description', { exact: true }).fill('Classification history')
 				await browserExpect(page.getByLabel('Category', { exact: true })).toHaveValue(categoryId)
 				await page.getByRole('button', { name: /save transaction/i }).click()
-				await browserExpect(
-					page.getByRole('status').filter({ hasText: /transaction saved/i })
-				).toBeVisible()
+				await browserExpect
+					.poll(() => new URL(page.url()).pathname)
+					.toMatch(/^\/(income|expenses)$/)
 				await aside.getByRole('link', { name: 'Tags', exact: true }).click()
 				await page.getByRole('button', { name: 'Add Tag', exact: true }).click()
 				dialog = page.getByRole('dialog', { name: 'Add Tag', exact: true })
@@ -295,7 +324,6 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await open(page, scope)
 				await page.evaluate((id) => {
 					window.financeWorkerReadFixture.route('/settings/tags?workspace=' + id)
-					window.financeWorkerReadFixture.followRoutes()
 				}, workspaceId)
 				await page.getByRole('radio', { name: 'All', exact: true }).check()
 				await browserExpect(
@@ -336,7 +364,6 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				).toEqual({ ok: true })
 				await page.evaluate((id) => {
 					window.financeWorkerReadFixture.route('/expenses?workspace=' + id)
-					window.financeWorkerReadFixture.followRoutes()
 				}, workspaceId)
 				const aside = page.locator('aside'),
 					income = aside.getByRole('link', { name: 'Income', exact: true }),
@@ -400,13 +427,14 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				const toggle = page.getByRole('button', { name: 'Toggle Main navigation', exact: true }),
 					dismiss = page.getByRole('button', { name: 'Close Main navigation', exact: true })
 				await browserExpect(toggle).toHaveAttribute('aria-expanded', 'true')
 				await dismiss.click()
 				await browserExpect(toggle).toBeFocused()
 				await browserExpect(toggle).toHaveAttribute('aria-expanded', 'false')
+				await route(page, '/expenses/new')
 				const description = page.getByLabel('Description', { exact: true })
 				await description.fill('Keep mobile draft')
 				await toggle.click()
@@ -476,11 +504,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					.toEqual(['Edited B'])
 				await page.evaluate(() => window.financeWorkerReadFixture.attach())
 				await browserExpect(page.getByRole('cell', { name: 'Edited B', exact: true })).toBeVisible()
-				await page
-					.getByRole('row')
-					.filter({ has: page.getByRole('cell', { name: 'Edited B', exact: true }) })
-					.getByRole('button', { name: 'Archive', exact: true })
-					.click()
+				await archiveAccountUI(page, 'Edited B')
 				await browserExpect(page.getByRole('cell', { name: 'Edited B', exact: true })).toHaveCount(
 					0
 				)
@@ -506,7 +530,6 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await open(page, crypto.randomUUID())
 				await page.evaluate(() => {
 					window.financeWorkerReadFixture.route('/accounts?query=rent&page=2#row')
-					window.financeWorkerReadFixture.followRoutes()
 				})
 				await browserExpect.poll(() => new URL(page.url()).pathname).toBe('/settings/workspace')
 				await browserExpect
@@ -533,6 +556,13 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					await page.evaluate((id) => window.financeWorkerReadFixture.transactions(id), a)
 				).transactions?.[0]
 				if (!transaction) throw new Error('Missing routed transaction')
+				await page.evaluate(
+					(id) =>
+						window.financeWorkerReadFixture.route(
+							'/accounts?query=rent&page=2&workspace=' + id + '#row'
+						),
+					a
+				)
 				expect(
 					await page.evaluate(
 						({ b, accountB }) => window.financeWorkerReadFixture.seed(b, accountB, 'Route B'),
@@ -564,7 +594,10 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect
 					.poll(() => page.url().slice(origin.length))
 					.toBe('/expenses/' + transaction.id + '?page=2&workspace=' + a + '#detail')
-				await browserExpect(page.getByRole('cell', { name: 'Route A', exact: true })).toBeVisible()
+				await browserExpect(
+					page.getByRole('checkbox', { name: 'Route A', exact: true })
+				).toBeVisible()
+				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('12.34')
 				const before = await page.evaluate(() => window.financeWorkerReadFixture.navigationCalls())
 				await page.evaluate(() => window.financeWorkerReadFixture.holdNavigation())
 				await select.selectOption(b)
@@ -600,9 +633,12 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				await browserExpect(page.getByRole('cell', { name: 'Seed', exact: true })).toBeVisible()
-				await page.getByRole('button', { name: /add account/i, exact: true }).click()
+				await page
+					.locator('aside')
+					.getByRole('button', { name: /add account/i, exact: true })
+					.click()
 				const dialog = page.getByRole('dialog', { name: /add account/i })
 				await browserExpect(dialog.getByLabel('Currency', { exact: true })).toHaveValue('TZS')
 				await dialog.getByLabel(/account name/i).fill('Local cash')
@@ -631,6 +667,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					ok: true,
 					recoveryReads: 0
 				})
+				await route(page, '/account')
 				const show = page.getByRole('button', { name: /show recovery phrase/i })
 				await show.click()
 				const phrase = page.getByRole('textbox', { name: /recovery phrase/i })
@@ -688,13 +725,14 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				await browserExpect(
 					page.getByRole('cell', { name: 'Before restore', exact: true })
 				).toBeVisible()
 				const identity = await page.evaluate(
 					() => window.financeWorkerReadFixture.state().identityId
 				)
+				await route(page, '/account')
 				await page.getByRole('button', { name: /show recovery phrase/i }).click()
 				const phrase = await page
 					.getByRole('dialog')
@@ -704,8 +742,8 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.holdArchive())).toEqual({
 					ok: true
 				})
-				await page.getByRole('button', { name: 'Archive', exact: true }).click()
-				await page.locator('summary').filter({ hasText: 'Login' }).click()
+				await archiveAccountUI(page, 'Before restore')
+				await route(page, '/login')
 				await page.getByRole('textbox', { name: /recovery phrase/i }).fill(phrase)
 				await page.getByRole('button', { name: 'Login', exact: true }).click()
 				await browserExpect
@@ -718,7 +756,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					.toBe('loading')
 				await page.evaluate(() => window.financeWorkerReadFixture.detach())
 				await page.evaluate(() => window.financeWorkerReadFixture.attach())
-				await page.locator('summary').filter({ hasText: 'Login' }).click()
+				await route(page, '/login')
 				await browserExpect(page.getByRole('textbox', { name: /recovery phrase/i })).toHaveValue('')
 				await browserExpect(page.getByRole('textbox', { name: /recovery phrase/i })).toBeDisabled()
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.releaseArchive())).toEqual(
@@ -731,7 +769,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					identity
 				)
 				await openDrawerSection(page, 'Settings')
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
 					.toBe('ready')
@@ -779,8 +817,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				const original = await page.evaluate(() => window.financeWorkerReadFixture.state())
 				const workspace = original.workspaces?.[0]
 				if (!workspace) throw new Error('Missing source workspace')
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await selectWorkspaceUI(page, workspace.id)
 				await createAccountUI(page, 'Recovered wallet')
+				await route(page, '/expenses/new')
 				await page
 					.getByLabel('Account', { exact: true })
 					.selectOption({ label: 'Recovered wallet · USD' })
@@ -789,9 +828,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.getByLabel('Date', { exact: true }).fill('2026-11-18')
 				await page.getByLabel('Description', { exact: true }).fill('Existing recovered expense')
 				await page.getByRole('button', { name: /save transaction/i }).click()
-				await browserExpect(
-					page.getByRole('status').filter({ hasText: /transaction saved/i })
-				).toBeVisible()
+				await browserExpect
+					.poll(() => new URL(page.url()).pathname)
+					.toMatch(/^\/(income|expenses)$/)
 				await browserExpect
 					.poll(async () => {
 						const result = await page.evaluate(
@@ -801,6 +840,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						return result.transactions?.map((row) => row.description)
 					})
 					.toEqual(['Existing recovered expense'])
+				await route(page, '/account')
 				await page.getByRole('button', { name: /show recovery phrase/i }).click()
 				const phrase = await page
 					.getByRole('dialog')
@@ -818,7 +858,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					() => window.financeWorkerReadFixture.state().identityId
 				)
 				expect(temporary).not.toBe(original.identityId)
-				await page.locator('summary').filter({ hasText: 'Login' }).click()
+				await route(page, '/login')
 				const input = page.getByRole('textbox', { name: /recovery phrase/i })
 				await input.fill('not a recovery phrase')
 				await page.getByRole('button', { name: 'Login', exact: true }).click()
@@ -829,6 +869,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					temporary
 				)
 				await browserExpect(input).toHaveValue('not a recovery phrase')
+				const beforeRestoreNavigation = await page.evaluate(() =>
+					window.financeWorkerReadFixture.navigationCalls()
+				)
 				await page.evaluate(() => {
 					window.financeWorkerReadFixture.route('/login')
 					window.financeWorkerReadFixture.failNextNavigation()
@@ -847,12 +890,14 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						.getByRole('alert')
 						.filter({ hasText: /account was restored.*destination could not be opened/i })
 				).toBeVisible()
-				expect(await page.evaluate(() => window.financeWorkerReadFixture.navigationCalls())).toBe(1)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.navigationCalls())).toBe(
+					beforeRestoreNavigation + 1
+				)
 				await page.evaluate(() => window.financeWorkerReadFixture.holdNavigation())
 				await page.getByRole('button', { name: 'Try again', exact: true }).click()
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.navigationCalls()))
-					.toBe(2)
+					.toBe(beforeRestoreNavigation + 2)
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore))
 					.toMatchObject({ busy: true, navigationOnly: true })
@@ -871,13 +916,18 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						)
 					)
 					.toEqual([workspace.id])
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await selectWorkspaceUI(page, workspace.id)
+				await route(page, '/accounts')
 				await browserExpect(
 					page.getByRole('cell', { name: 'Recovered wallet', exact: true })
 				).toBeVisible()
+				await route(page, '/expenses')
 				await browserExpect(
 					page.getByRole('link', { name: /transaction details.*Existing recovered expense/i })
 				).toBeVisible()
+				const beforeHeldRestoreNavigation = await page.evaluate(() =>
+					window.financeWorkerReadFixture.navigationCalls()
+				)
 				await page.evaluate(() => {
 					window.financeWorkerReadFixture.route('/login')
 					window.financeWorkerReadFixture.holdNavigation()
@@ -886,7 +936,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.getByRole('button', { name: 'Login', exact: true }).click()
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.navigationCalls()))
-					.toBe(3)
+					.toBe(beforeHeldRestoreNavigation + 1)
 				await page.evaluate(() => window.financeWorkerReadFixture.close())
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
@@ -906,7 +956,8 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
 					original.identityId
 				)
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await selectWorkspaceUI(page, workspace.id)
+				await route(page, '/expenses')
 				await browserExpect(
 					page.getByRole('link', { name: /transaction details.*Existing recovered expense/i })
 				).toBeVisible()
@@ -954,7 +1005,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(workspaces).toHaveLength(1)
 				const workspace = workspaces?.[0]
 				if (!workspace) throw new Error('Native initialization did not create a workspace')
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await selectWorkspaceUI(page, workspace.id)
 				await createAccountUI(page, 'Initialized wallet')
 				await browserExpect(
 					page.getByRole('cell', { name: 'Initialized wallet', exact: true })
@@ -975,7 +1026,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(
 					await page.evaluate(() => window.financeWorkerReadFixture.state().workspaces)
 				).toEqual(workspaces)
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspace.id)
+				await selectWorkspaceUI(page, workspace.id)
 				await browserExpect(
 					page.getByRole('cell', { name: 'Initialized wallet', exact: true })
 				).toBeVisible()
@@ -1006,7 +1057,10 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.evaluate((id) => window.financeWorkerReadFixture.select(id), workspaceId)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					workspaceId
+				)
 				const row = page
 					.getByRole('row')
 					.filter({ has: page.getByRole('cell', { name: 'Pending archive', exact: true }) })
@@ -1014,7 +1068,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.holdArchive())).toEqual({
 					ok: true
 				})
-				await row.getByRole('button', { name: 'Archive', exact: true }).click()
+				await archiveAccountUI(page, 'Pending archive')
 				await browserExpect(row).toHaveCount(0)
 				await page.evaluate(() => window.financeWorkerReadFixture.close())
 				await browserExpect
@@ -1047,8 +1101,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				await browserExpect(page.getByRole('cell', { name: 'Ledger', exact: true })).toBeVisible()
+				await route(page, '/expenses/new')
 				await browserExpect(page.getByLabel('Account', { exact: true })).toHaveValue(accountId)
 
 				await enterExpenseUI(page, accountId, 'Worker expense record')
@@ -1067,7 +1122,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						}
 					]
 				})
-				await page.evaluate(() => window.financeWorkerReadFixture.selectKind('income'))
+				await page.evaluate(() =>
+					window.financeWorkerReadFixture.route('/income/new' + location.search)
+				)
 				await browserExpect(
 					page
 						.getByLabel('Category', { exact: true })
@@ -1078,9 +1135,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.getByLabel('Date', { exact: true }).fill('2026-11-19')
 				await page.getByLabel('Payment method', { exact: true }).selectOption('cash')
 				await page.getByRole('button', { name: /save transaction/i }).click()
-				await browserExpect(
-					page.getByRole('status').filter({ hasText: /transaction saved/i })
-				).toBeVisible()
+				await browserExpect
+					.poll(() => new URL(page.url()).pathname)
+					.toMatch(/^\/(income|expenses)$/)
 				expect(
 					await page.evaluate((id) => window.financeWorkerReadFixture.transactions(id), workspaceId)
 				).toMatchObject({
@@ -1116,9 +1173,11 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				await createAccountUI(page, 'Check destination')
-				await page.evaluate(() => window.financeWorkerReadFixture.selectKind('income'))
+				await page.evaluate(() =>
+					window.financeWorkerReadFixture.route('/income/new' + location.search)
+				)
 				await browserExpect(
 					page
 						.getByLabel('Category', { exact: true })
@@ -1133,9 +1192,9 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.locator('[name="checkDate"]').fill('2026-11-19')
 				const save = page.getByRole('button', { name: /save transaction/i })
 				await save.click()
-				await browserExpect(
-					page.getByRole('status').filter({ hasText: /transaction saved/i })
-				).toBeVisible()
+				await browserExpect
+					.poll(() => new URL(page.url()).pathname)
+					.toMatch(/^\/(income|expenses)$/)
 				await page.getByRole('link', { name: /transaction details/i }).click()
 				await browserExpect(page.locator('[name="checkNumber"]')).toHaveValue('100')
 				await page.locator('[name="checkNumber"]').fill('101')
@@ -1186,7 +1245,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				await enterExpenseUI(page, accountId, 'Worker editable expense')
 				await page
 					.getByRole('link', { name: /transaction details.*Worker editable expense/i })
@@ -1224,8 +1283,13 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				const id = await page.evaluate(() => window.financeWorkerReadFixture.state().transactionId)
 				expect(id).not.toBeNull()
 				await amount.fill('99.00')
-				await page.evaluate(() => window.financeWorkerReadFixture.selectTransaction(null))
-				await page.evaluate((id) => window.financeWorkerReadFixture.selectTransaction(id), id)
+				await page.evaluate(() =>
+					window.financeWorkerReadFixture.route('/expenses' + location.search)
+				)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/expenses/' + id + location.search),
+					id
+				)
 				await browserExpect(amount).toHaveValue('25.00')
 				await browserExpect(
 					page.getByLabel('Memo (additional notes)', { exact: true })
@@ -1253,7 +1317,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				expect(
 					await page.evaluate(
 						({ workspaceId, accountId }) =>
@@ -1266,13 +1330,15 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						page.evaluate(() => window.financeWorkerReadFixture.state().accounts[0]?.balanceMinor)
 					)
 					.toBe(-4000n)
+				await route(page, '/expenses')
 				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(25)
 				await browserExpect(page.getByText('$40.00', { exact: true })).toBeVisible()
-				const originalUrl = page.url()
+				const originalUrl = new URL(page.url())
 				await page.getByRole('link', { name: /next page/i }).click()
 				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
 				await browserExpect(page.getByText('$40.00', { exact: true })).toBeVisible()
-				expect(page.url()).toBe(originalUrl)
+				expect(new URL(page.url()).pathname).toBe(originalUrl.pathname)
+				expect(new URL(page.url()).searchParams.get('page')).toBe('2')
 				await page
 					.getByRole('link', { name: /transaction details/i })
 					.first()
@@ -1281,7 +1347,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(
 					await page.evaluate(() => window.financeWorkerReadFixture.state().ledger?.page)
 				).toBe(2)
-				await page.getByRole('button', { name: 'Back to List', exact: true }).click()
+				await route(page, '/expenses')
 				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
 				expect(
 					await page.evaluate(
@@ -1344,7 +1410,6 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					window.financeWorkerReadFixture.route(
 						'/expenses?workspace=' + id + '&page=2&q=ledger&keep=yes#row'
 					)
-					window.financeWorkerReadFixture.followRoutes()
 				}, workspaceId)
 				await browserExpect(page.getByText(/^Ledger record \d+$/)).toHaveCount(15)
 				await page.getByRole('link', { name: /previous page/i }).click()
@@ -1405,7 +1470,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(workspaceId)
+				await selectWorkspaceUI(page, workspaceId)
 				await createAccountUI(page, 'Mask B')
 				const accountB = await page.evaluate(
 					() =>
@@ -1424,7 +1489,6 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await enterExpenseUI(page, accountB, 'Only selected B')
 				await page.evaluate((id) => {
 					window.financeWorkerReadFixture.route('/expenses?workspace=' + id + '&page=2#accounts')
-					window.financeWorkerReadFixture.followRoutes()
 				}, workspaceId)
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().ledger?.page))
@@ -1470,7 +1534,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ other, otherAccount }
 					)
 				).toEqual({ ok: true })
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(other)
+				await selectWorkspaceUI(page, other)
 				await browserExpect(
 					page.getByRole('cell', { name: 'Other workspace', exact: true })
 				).toBeVisible()
@@ -1513,7 +1577,6 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				).toEqual({ ok: true })
 				await page.evaluate((id) => {
 					window.financeWorkerReadFixture.route('/expenses?workspace=' + id + '&q=ledger&page=99')
-					window.financeWorkerReadFixture.followRoutes()
 				}, workspaceId)
 				await browserExpect(page.getByRole('link', { name: /transaction details/i })).toHaveCount(
 					15
@@ -1532,7 +1595,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browserExpect.poll(() => page.url()).toBe(destination.href)
 				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('1.00')
 				await browserExpect(
-					page.getByRole('button', { name: 'Back to List', exact: true })
+					page.getByRole('heading', { name: /transaction details/i, exact: true })
 				).toBeVisible()
 				await page.goBack()
 				await browserExpect.poll(() => new URL(page.url()).pathname).toBe('/expenses')
@@ -1545,7 +1608,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await page.goForward()
 				await browserExpect.poll(() => page.url()).toBe(destination.href)
 				await browserExpect(page.getByLabel('Amount', { exact: true })).toHaveValue('1.00')
-				await page.getByRole('button', { name: 'Back to List', exact: true }).click()
+				await route(page, '/expenses')
 				await browserExpect.poll(() => new URL(page.url()).pathname).toBe('/expenses')
 				await browserExpect
 					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().transactionId))
@@ -1568,6 +1631,23 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				page = await browser.newPage()
 			try {
 				await open(page, crypto.randomUUID())
+				const beforeWorkspace = crypto.randomUUID(),
+					beforeAccount = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Before fault'),
+						{ workspaceId: beforeWorkspace, accountId: beforeAccount }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					beforeWorkspace
+				)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Before fault', exact: true })
+				).toBeVisible()
+				const before = await page.evaluate(() => window.financeWorkerReadFixture.state())
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.badView())).toEqual({
 					ok: true
 				})
@@ -1577,6 +1657,18 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(
 					await page.evaluate(() => window.financeWorkerReadFixture.state().identityRestore)
 				).toMatchObject({ canSubmit: false, canRetryNavigation: false, busy: false })
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state())).toMatchObject({
+					sessionRevision: before.sessionRevision,
+					selection: before.selection,
+					accounts: [],
+					classification: null,
+					workspaceNavigation: null,
+					ledger: null,
+					recoveryAvailable: false
+				})
+				await browserExpect(
+					page.getByRole('cell', { name: 'Before fault', exact: true })
+				).toHaveCount(0)
 				const workspaceId = crypto.randomUUID(),
 					accountId = crypto.randomUUID()
 				expect(
@@ -1586,7 +1678,10 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.evaluate((id) => window.financeWorkerReadFixture.select(id), workspaceId)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					workspaceId
+				)
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().status)).toBe(
 					'failed'
 				)
@@ -1594,6 +1689,14 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					page.getByRole('cell', { name: 'After fault', exact: true }).count()
 				).resolves.toBe(0)
 				await close(page)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state())).toMatchObject({
+					identityId: null,
+					accounts: [],
+					classification: null,
+					ledger: null,
+					recoveryAvailable: false,
+					canRetrySession: false
+				})
 			} finally {
 				await browser.close()
 			}
@@ -1670,7 +1773,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						)
 					).toEqual({ ok: true })
 				}
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(a)
+				await selectWorkspaceUI(page, a)
 				await createAccountUI(page, 'Order B')
 				await browserExpect(
 					page.getByRole('button', { name: 'Edit Order', exact: true })
@@ -1708,7 +1811,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					page.getByRole('checkbox', { name: 'Order B', exact: true })
 				).toBeChecked()
 				await page.getByRole('button', { name: 'Done', exact: true }).click()
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(b)
+				await selectWorkspaceUI(page, b)
 				await createAccountUI(page, 'Other B')
 				await browserExpect
 					.poll(() =>
@@ -1722,7 +1825,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						)
 					)
 					.toEqual(['Other A', 'Other B'])
-				await page.getByLabel('Current Workspace', { exact: true }).selectOption(a)
+				await selectWorkspaceUI(page, a)
 				await browserExpect
 					.poll(() =>
 						page.evaluate(() =>
@@ -1730,6 +1833,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						)
 					)
 					.toEqual(['Order B', 'Order A'])
+				await route(page, '/expenses/new')
 				await browserExpect(page.getByLabel('Account', { exact: true })).toHaveValue(idB)
 				await close(page)
 			} finally {
@@ -1758,7 +1862,10 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 						{ workspaceId, accountId }
 					)
 				).toEqual({ ok: true })
-				await page.evaluate((id) => window.financeWorkerReadFixture.select(id), workspaceId)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					workspaceId
+				)
 				await browserExpect(
 					page.getByRole('cell', { name: 'Retained wallet', exact: true })
 				).toBeVisible()
@@ -1797,7 +1904,10 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
 					identity
 				)
-				await page.evaluate((id) => window.financeWorkerReadFixture.select(id), workspaceId)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					workspaceId
+				)
 				await browserExpect(
 					page.getByRole('cell', { name: 'Retained wallet', exact: true })
 				).toBeVisible()
@@ -1822,7 +1932,10 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				context = await engine.launchPersistentContext(profile, { headless: true })
 				page = await context.newPage()
 				await open(page, scope)
-				await page.evaluate((id) => window.financeWorkerReadFixture.select(id), workspaceId)
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					workspaceId
+				)
 				await browserExpect(
 					page.getByRole('cell', { name: 'Retained edit', exact: true })
 				).toBeVisible()

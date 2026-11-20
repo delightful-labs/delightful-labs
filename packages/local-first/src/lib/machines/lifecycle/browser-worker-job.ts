@@ -1,5 +1,4 @@
 import { createCallbackLogic, setup, types } from 'xstate'
-import { monotonicNow } from '../contracts/resource-waits.js'
 
 export type BrowserJobWorker = Pick<
 	Worker,
@@ -25,10 +24,10 @@ export type BrowserWorkerJobResult<Reply> = (
 export function createBrowserWorkerJob<Request, Reply>() {
 	type Input = BrowserWorkerJobInput<Request, Reply>
 	type Result = BrowserWorkerJobResult<Reply>
-	type Context = { input: Input; result: Result }
+	type Context = { input: Input | undefined; result: Result }
 	const native = createCallbackLogic<{ type: 'OPEN' | 'POST' | 'RELEASE' }, Input>(
 		({ input, receive, sendBack }) => {
-			const now = input.now ?? monotonicNow,
+			const now = input.now ?? (() => performance.now()),
 				startedAt = now()
 			let worker: BrowserJobWorker | undefined
 			let released = false
@@ -59,7 +58,8 @@ export function createBrowserWorkerJob<Request, Reply>() {
 					try {
 						worker = input.open()
 						worker.onmessage = ({ data }: MessageEvent<unknown>) => report(data)
-						worker.onerror = () => {
+						worker.onerror = (event) => {
+							event.preventDefault()
 							if (!released) sendBack({ type: 'FAILED', reason: 'worker' })
 						}
 						worker.onmessageerror = () => {
@@ -71,7 +71,8 @@ export function createBrowserWorkerJob<Request, Reply>() {
 					}
 				} else if (event.type === 'POST') {
 					try {
-						worker!.postMessage(input.message, input.transfer ?? [])
+						if (!worker) throw new Error('Missing browser job worker')
+						worker.postMessage(input.message, input.transfer ?? [])
 						sendBack({ type: 'POSTED' })
 					} catch {
 						sendBack({ type: 'FAILED', reason: 'post' })
@@ -123,7 +124,10 @@ export function createBrowserWorkerJob<Request, Reply>() {
 		invoke: {
 			id: 'native',
 			src: 'native',
-			input: ({ context }) => context.input,
+			input: ({ context }) => {
+				if (!context.input) throw new Error('Missing browser job input')
+				return context.input
+			},
 			onError: { target: '.blocked' }
 		},
 		on: {
@@ -188,7 +192,7 @@ export function createBrowserWorkerJob<Request, Reply>() {
 					ADMITTED: {},
 					RELEASED: ({ context, event }) => ({
 						target: 'settled',
-						context: { result: { ...context.result, elapsedMs: event.elapsedMs } }
+						context: { input: undefined, result: { ...context.result, elapsedMs: event.elapsedMs } }
 					}),
 					RELEASE_FAILED: { target: 'blocked' }
 				}

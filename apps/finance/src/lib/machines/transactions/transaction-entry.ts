@@ -88,10 +88,7 @@ export function createTransactionEntryAvailability(binding: object) {
 		SHUTDOWN: types<EventPayload<FormChildEvent<TransactionEntryObservation>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<TransactionEntryObservation>, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<never>
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<{ observation: FormObservation<TransactionEntryObservation> }>(),

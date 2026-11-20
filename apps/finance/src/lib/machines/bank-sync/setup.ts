@@ -121,22 +121,7 @@ export function createBankSetupMachine(dependencies: Dependencies) {
 		LOCK_FAILED: types<EventPayload<Event, 'LOCK_FAILED'>>(),
 		CREDENTIAL_CHANGED: types<EventPayload<Event, 'CREDENTIAL_CHANGED'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['lock']>
-				| import('xstate').OutputFrom<(typeof actors)['prepare']>
-				| import('xstate').OutputFrom<(typeof actors)['authorize']>
-				| import('xstate').OutputFrom<(typeof actors)['checkBaseline']>
-				| import('xstate').OutputFrom<(typeof actors)['validateToken']>
-				| import('xstate').OutputFrom<(typeof actors)['create']>
-				| import('xstate').OutputFrom<(typeof actors)['encrypt']>
-				| import('xstate').OutputFrom<(typeof actors)['verify']>
-				| import('xstate').OutputFrom<(typeof actors)['claim']>
-				| import('xstate').OutputFrom<(typeof actors)['seal']>
-				| import('xstate').OutputFrom<(typeof actors)['persist']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const workflow = setup({
 		schemas: {
 			context: types<Context>(),

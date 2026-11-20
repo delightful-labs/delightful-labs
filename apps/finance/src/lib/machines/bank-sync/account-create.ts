@@ -39,14 +39,7 @@ export function createAccountCreationMachine(dependencies: Dependencies) {
 		CANCEL: types<EventPayload<{ type: 'CREATE' } | MappingInterruption, 'CANCEL'>>(),
 		SHUTDOWN: types<EventPayload<{ type: 'CREATE' } | MappingInterruption, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['validate']>
-				| import('xstate').OutputFrom<(typeof actors)['accountId']>
-				| import('xstate').OutputFrom<(typeof actors)['write']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

@@ -38,16 +38,6 @@ function requiredPlan(plan: IntegrityPlan | undefined): IntegrityPlan {
 	return plan
 }
 const events0 = { ASSESS: types<EventPayload<{ type: 'ASSESS' }, 'ASSESS'>>() }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<never>
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Current-policy adapter: never uses workspace creator/kind as authority. */
 export const workspaceIntegrityAssessment = setup({

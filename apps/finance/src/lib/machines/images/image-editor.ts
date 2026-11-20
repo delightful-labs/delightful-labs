@@ -9,9 +9,9 @@ import {
 	type ImageSelectionMode
 } from '#lib/domain/image-editor-geometry.js'
 import type { ImageAdjustments } from '#lib/domain/image-editor-pixels.js'
-import { renderImageInWorker } from '#lib/runtime/worker/image-render.js'
+import { imageRenderMachine, imageRenderJob } from '#lib/runtime/worker/image-render.js'
 import * as platform from '#lib/domain/image-editor-platform.js'
-import { setup, types, createAsyncLogic } from 'xstate'
+import { setup, types, createAsyncLogic, matchesState } from 'xstate'
 import type { SnapshotFrom } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
@@ -40,6 +40,7 @@ type Context = {
 	adjustments: ImageAdjustments
 	drag: DragOrigin | undefined
 	preview: ImageData | undefined
+	afterPreview: 'edit' | 'apply' | undefined
 	rendered: ImageData | undefined
 	canvas: HTMLCanvasElement | undefined
 	result: ImageEditorOutput | undefined
@@ -80,10 +81,7 @@ const decode = createAsyncLogic({
 const read = createAsyncLogic({
 	run: async ({ input }: { input: ImageBitmap }) => platform.readEditorSource(input)
 })
-const render = createAsyncLogic({
-	run: ({ input, signal }: { input: ReturnType<typeof renderInput>; signal: AbortSignal }) =>
-		renderImageInWorker(input, signal)
-})
+const render = imageRenderMachine
 const allocate = createAsyncLogic({ run: async () => platform.createEditorCanvas() })
 const paint = createAsyncLogic({
 	run: async ({ input }: { input: { canvas: HTMLCanvasElement; pixels: ImageData } }) =>
@@ -119,25 +117,6 @@ const events0 = {
 	SHUTDOWN: types<EventPayload<ImageEditorEvent, 'SHUTDOWN'>>(),
 	DISPLAY_FAILED: types<EventPayload<ImageEditorEvent, 'DISPLAY_FAILED'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<typeof decode>
-			| import('xstate').OutputFrom<typeof read>
-			| import('xstate').OutputFrom<typeof render>
-			| import('xstate').OutputFrom<typeof allocate>
-			| import('xstate').OutputFrom<typeof paint>
-			| import('xstate').OutputFrom<typeof encode>
-			| import('xstate').OutputFrom<typeof closeBitmap>
-			| import('xstate').OutputFrom<typeof closeCanvas>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Owns editing and export resources; callers drain SHUTDOWN before stopping the actor. */
 export const imageEditorMachine = setup({
@@ -147,122 +126,20 @@ export const imageEditorMachine = setup({
 		input: types<ImageEditorInput>(),
 		output: types<ImageEditorOutput>(),
 		children: {
-			decode: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['decode']
-				>
-			>(),
-			read: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['read']
-				>
-			>(),
-			render: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['render']
-				>
-			>(),
-			allocate: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['allocate']
-				>
-			>(),
-			paint: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['paint']
-				>
-			>(),
-			encode: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['encode']
-				>
-			>(),
-			closeBitmap: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['closeBitmap']
-				>
-			>(),
-			closeCanvas: types<
-				import('xstate').ActorRefFrom<
-					{
-						decode: typeof decode
-						read: typeof read
-						render: typeof render
-						allocate: typeof allocate
-						paint: typeof paint
-						encode: typeof encode
-						closeBitmap: typeof closeBitmap
-						closeCanvas: typeof closeCanvas
-					}['closeCanvas']
-				>
-			>()
+			decode: types<import('xstate').ActorRefFrom<typeof decode>>(),
+			read: types<import('xstate').ActorRefFrom<typeof read>>(),
+			render: types<import('xstate').ActorRefFrom<typeof render>>(),
+			allocate: types<import('xstate').ActorRefFrom<typeof allocate>>(),
+			paint: types<import('xstate').ActorRefFrom<typeof paint>>(),
+			encode: types<import('xstate').ActorRefFrom<typeof encode>>(),
+			closeBitmap: types<import('xstate').ActorRefFrom<typeof closeBitmap>>(),
+			closeCanvas: types<import('xstate').ActorRefFrom<typeof closeCanvas>>()
 		}
 	},
 	actors: { decode, read, render, allocate, paint, encode, closeBitmap, closeCanvas },
-	actions: {}
+	guards: {
+		renderingPreview: ({ value }) => matchesState({ interactive: 'renderingPreview' }, value)
+	}
 }).createMachine({
 	id: 'image-editor',
 	initial: 'validating',
@@ -275,6 +152,7 @@ export const imageEditorMachine = setup({
 		adjustments: { blackWhite: false, contrast: 100 },
 		drag: undefined,
 		preview: undefined,
+		afterPreview: undefined,
 		rendered: undefined,
 		canvas: undefined,
 		result: undefined
@@ -365,72 +243,98 @@ export const imageEditorMachine = setup({
 		interactive: {
 			initial: 'editing',
 			on: {
-				DISPLAY_FAILED: (args) => {
-					const { context } = args
-					return { target: 'cleanup', context: { result: failed(context, 'render') } }
-				},
-				CANCEL: (args) => {
-					return { target: 'cleanup', context: patchCancel(args) }
-				},
-				SHUTDOWN: (args) => {
-					return { target: 'cleanup', context: patchShutdown() }
-				},
-				SET_MODE: (args) => {
-					const { event } = args
-					return {
-						target: '.editing.idle',
-						context: {
-							mode: event.mode,
-							selection: initialImageSelection(event.mode, required(args.context.source)),
-							drag: undefined,
-							preview: undefined
-						}
+				DISPLAY_FAILED: (args, enq) => {
+					const context = { result: failed(args.context, 'render') }
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context }
 					}
+					return { target: 'cleanup', context }
 				},
-				SET_CONTRAST: (args) => {
+				CANCEL: (args, enq) => {
+					const context = patchCancel(args)
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context }
+					}
+					return { target: 'cleanup', context }
+				},
+				SHUTDOWN: (args, enq) => {
+					const context = patchShutdown()
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context }
+					}
+					return { target: 'cleanup', context }
+				},
+				SET_MODE: (args, enq) => {
+					const { event } = args
+					const patch = {
+						mode: event.mode,
+						selection: initialImageSelection(event.mode, required(args.context.source)),
+						drag: undefined,
+						preview: undefined
+					}
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context: { ...patch, afterPreview: 'edit' } }
+					}
+					return { target: '.editing.idle', context: patch }
+				},
+				SET_CONTRAST: (args, enq) => {
 					const { event } = args
 					if (!Number.isFinite(event.value)) return
-					return {
-						target: '.editing.idle',
-						context: {
-							adjustments: {
-								...args.context.adjustments,
-								contrast: Math.max(0, Math.min(200, event.value))
-							},
-							drag: undefined,
-							preview: undefined
-						}
+					const patch = {
+						adjustments: {
+							...args.context.adjustments,
+							contrast: Math.max(0, Math.min(200, event.value))
+						},
+						drag: undefined,
+						preview: undefined
 					}
-				},
-				SET_BLACK_WHITE: (args) => {
-					return {
-						target: '.editing.idle',
-						context: {
-							adjustments: {
-								...args.context.adjustments,
-								blackWhite: args.event.value
-							},
-							drag: undefined,
-							preview: undefined
-						}
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context: { ...patch, afterPreview: 'edit' } }
 					}
+					return { target: '.editing.idle', context: patch }
 				},
-				RESET: (args) => {
+				SET_BLACK_WHITE: (args, enq) => {
+					const patch = {
+						adjustments: {
+							...args.context.adjustments,
+							blackWhite: args.event.value
+						},
+						drag: undefined,
+						preview: undefined
+					}
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context: { ...patch, afterPreview: 'edit' } }
+					}
+					return { target: '.editing.idle', context: patch }
+				},
+				RESET: (args, enq) => {
 					const { context } = args
-					return {
-						target: '.editing.idle',
-						context: {
-							selection: initialImageSelection(context.mode, required(context.source)),
-							adjustments: { blackWhite: false, contrast: 100 },
-							drag: undefined,
-							preview: undefined
-						}
+					const patch = {
+						selection: initialImageSelection(context.mode, required(context.source)),
+						adjustments: { blackWhite: false, contrast: 100 },
+						drag: undefined,
+						preview: undefined
 					}
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context: { ...patch, afterPreview: 'edit' } }
+					}
+					return { target: '.editing.idle', context: patch }
 				},
-				APPLY: (args) => {
+				APPLY: (args, enq) => {
 					const { context } = args
 					if (!validImageQuad(selectionQuad(required(context.selection)), required(context.source)))
 						return
+					if (args.guards.renderingPreview(args)) {
+						enq.sendTo('render', { type: 'CANCEL' })
+						return { context: { afterPreview: 'apply', drag: undefined, preview: undefined } }
+					}
 					return { target: 'renderingApply', context: { drag: undefined, preview: undefined } }
 				}
 			},
@@ -502,10 +406,24 @@ export const imageEditorMachine = setup({
 				},
 				renderingPreview: {
 					invoke: {
+						id: 'render',
 						src: 'render',
-						input: ({ context }) => renderInput(context),
-						onDone: (args) => {
-							return { target: 'previewReady', context: { preview: args.event.output } }
+						input: ({ context }) => imageRenderJob(renderInput(context)),
+						onDone: ({ context, event }) => {
+							if (context.result) return { target: '#image-editor.cleanup' }
+							if (context.afterPreview === 'apply')
+								return {
+									target: '#image-editor.renderingApply',
+									context: { afterPreview: undefined }
+								}
+							if (context.afterPreview === 'edit')
+								return { target: 'editing', context: { afterPreview: undefined } }
+							if (event.output.kind !== 'replied')
+								return {
+									target: '#image-editor.cleanup',
+									context: { result: failed(context, 'render') }
+								}
+							return { target: 'previewReady', context: { preview: event.output.reply } }
 						},
 						onError: (args) => {
 							const { context } = args
@@ -526,14 +444,27 @@ export const imageEditorMachine = setup({
 			}
 		},
 		renderingApply: {
+			on: {
+				CANCEL: (args, enq) => {
+					enq.sendTo('render', { type: 'CANCEL' })
+					return { context: patchCancel(args) }
+				},
+				SHUTDOWN: (_args, enq) => {
+					enq.sendTo('render', { type: 'CANCEL' })
+					return { context: patchShutdown() }
+				}
+			},
 			invoke: {
+				id: 'render',
 				src: 'render',
-				input: ({ context }) => renderInput(context),
+				input: ({ context }) => imageRenderJob(renderInput(context)),
 				onDone: (args) => {
 					if (args.context.result !== undefined) {
 						return { target: 'cleanup' }
 					}
-					return { target: 'creatingCanvas', context: { rendered: args.event.output } }
+					if (args.event.output.kind !== 'replied')
+						return { target: 'cleanup', context: { result: failed(args.context, 'render') } }
+					return { target: 'creatingCanvas', context: { rendered: args.event.output.reply } }
 				},
 				onError: (args) => {
 					const { context } = args
@@ -668,7 +599,13 @@ export const imageEditorMachine = setup({
 		settling: {
 			entry: () => {
 				return {
-					context: { source: undefined, preview: undefined, rendered: undefined, drag: undefined }
+					context: {
+						source: undefined,
+						preview: undefined,
+						afterPreview: undefined,
+						rendered: undefined,
+						drag: undefined
+					}
 				}
 			},
 			always: (args) => {

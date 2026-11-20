@@ -87,23 +87,6 @@ const ownedActors3 = {
 const events0 = {
 	SHUTDOWN: types<{}>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof ownedActors3)['registerFile']>
-			| import('xstate').OutputFrom<(typeof ownedActors3)['writePart']>
-			| import('xstate').OutputFrom<(typeof ownedActors3)['linkAttachment']>
-			| import('xstate').OutputFrom<(typeof ownedActors3)['deletePart']>
-			| import('xstate').OutputFrom<(typeof ownedActors3)['deleteFile']>
-			| import('xstate').OutputFrom<(typeof ownedActors3)['readParts']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 export const transactionAttachmentUploadMachine = setup({
 	schemas: {

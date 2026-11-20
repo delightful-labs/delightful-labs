@@ -16,7 +16,7 @@ and claimed account must match the runtime owner's original scope; native
 signature and expiry verification remain enforced. Do not extend token lifetimes,
 bypass native admission, change namespaces or clear IndexedDB to fix this.
 
-Root-bootstrap Retry now uses the existing session-readiness retry owner before
+Root-bootstrap Retry uses the shared native session-runtime retry owner before
 opening the library again. A native same-account retry drains local persistence
 and leases without requiring the failed connection to reach remote sync; ordinary
 account switching and sign-out retain their previous synchronization behavior.
@@ -40,9 +40,23 @@ The alpha.60 migration adds a local-first preparation state before library boots
 
 Unexpectedly stopped transaction owners transfer their native acquisition, pending call, and commit receipts into private worker-realm custody. These receipts are never projected into UI messages, automatically replayed, or assumed safe to roll back. Retained custody blocks the worker host's clean-close acknowledgment; ordinary graceful shutdown still drains through the existing transaction owners.
 
-The web layout mounts `Application.svelte`, whose native port client opens `application.worker.ts`. That worker owns the existing DLF account acquisition/readiness/restoration, root bootstrap, domain library, save/organization transactions, recovery workflow, tag validation, data subscriptions and projections. Capture network/database calls execute there; search, article coordination and image processing retain their nested workers. The main thread renders DUI components, forwards intent, and owns DOM, focus, selection, layout, scrolling and fullscreen effects.
+The web layout mounts `Application.svelte`, whose native port client opens `application.worker.ts`. That worker owns DLF's native session runtime (also used by Finance), identity-change/restoration invocations, root bootstrap, domain library, save/organization transactions, recovery workflow, tag validation, data subscriptions and projections. Capture network/database calls execute there; search, article coordination and image processing retain their nested workers. The main thread renders DUI components, forwards intent, and owns DOM, focus, selection, layout, scrolling and fullscreen effects.
 
 The web UI no longer opens a Jazz session or constructs the application/library actors. Browser test fixtures which require direct SDK access explicitly import `tests/fixture-records.ts`; that Window client is test-only and is not imported by the production UI. Extension settings and sign-in also use dedicated workers through the same host, with the extension's existing library capability. Chrome connection confirmation stays behind a Window-only native adapter; its sign-in chart runs in the worker. The hidden offscreen capture runtime retains its existing ownership, so this is not a claim that every extension workflow has migrated.
+
+C04 native-session cleanup (2026-11-19): native Jazz owns preparation, retry,
+identity/client/database replacement and recovery. The app consumes one public
+binding generation; it no longer binds a second startup/readiness/restoration
+facade or prepares thin clients itself. Library capability allocation remains a
+domain lease and waits for native local readiness; replaced leases stay owned
+until their issued work drains. The worker host waits for domain and reader
+surface drains and checks detached transaction custody before invoking DLF's
+`sessionCloseMachine`; account-store and broker receipts follow successful native
+session close. Direct/forced stop and unclean domain output never authorize that
+close protocol. The extension offscreen owner also uses the shared runtime and
+waits for clean domain and session completion before reload. Storage keys and
+backends are unchanged. Current evidence lives in Finance's
+[native-library cleanup record](../../../finance/specs/013-local-first-startup/native-library-cleanup-review.md).
 
 ## Native compatibility adapters
 

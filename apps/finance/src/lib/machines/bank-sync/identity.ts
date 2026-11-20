@@ -8,10 +8,7 @@ export { required } from '../../domain/required.js'
 
 export function createIdentityMachine({ observe }: Dependencies) {
 	const events0 = { CHECK: types<EventPayload<{ type: 'CHECK' }, 'CHECK'>>() }
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<never>
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

@@ -26,13 +26,7 @@ export function createPreparationMachine(dependencies: Dependencies) {
 		})
 	}
 	const events0 = { PREPARE: types<EventPayload<{ type: 'PREPARE' }, 'PREPARE'>>() }
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['identity']>
-				| import('xstate').OutputFrom<(typeof actors)['connectionId']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

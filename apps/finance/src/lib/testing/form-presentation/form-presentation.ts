@@ -26,10 +26,7 @@ export function harnessOptions(controls: {
 		SHUTDOWN: types<EventPayload<FormChildEvent<Facts>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<Facts>, 'OBSERVE'>>()
 	}
-	type NativeEvent1 =
-		| import('xstate').InferEvents<typeof events1>
-		| import('xstate').DoneActorEvent<never>
-		| import('xstate').ErrorActorEvent
+
 	const availability = setup({
 		schemas: {
 			context: types<{ observation: FormObservation<Facts> }>(),
@@ -51,10 +48,7 @@ export function harnessOptions(controls: {
 		SHUTDOWN: types<EventPayload<FormChildEvent<Facts>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<Facts>, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof settle>>
-		| import('xstate').ErrorActorEvent
+
 	const operation = setup({
 		schemas: {
 			context: types<{ result: Result }>(),

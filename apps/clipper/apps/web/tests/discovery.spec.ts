@@ -1,8 +1,9 @@
+import { test, closeSeedReplica } from './seed-fixture.js'
 import { openArticleActions } from './article-actions.js'
 import { expectLibrarySynced, readRecoveryPhrase, restoreAccount } from './account-ui.js'
 import { readingControls } from './reader-ui.js'
 import { closeLibraryPopovers, openLibrarySearch, openLibraryFilters } from './library-popovers.js'
-import { test, expect, chromium } from '@playwright/test'
+import { expect, chromium } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -47,6 +48,7 @@ async function tags(page: Page, row: ReturnType<Page['locator']>) {
 test('creates Unicode-equivalent tags once, changes membership and combines tag/status/favorite filters', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/tag-first'),
@@ -93,6 +95,7 @@ test('creates Unicode-equivalent tags once, changes membership and combines tag/
 	await openLibraryFilters(page)
 	await page.getByRole('button', { name: 'Favorites', exact: true }).click()
 	await expect(first.row).toBeVisible()
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(first.row).toBeVisible()
 	dialog = await tags(page, first.row)
@@ -101,6 +104,7 @@ test('creates Unicode-equivalent tags once, changes membership and combines tag/
 test('Trash controls preserve content/organization and duplicate Add Link offers explicit Restore', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const url = 'https://example.com/trash-duplicate',
@@ -158,6 +162,7 @@ test('Trash controls preserve content/organization and duplicate Add Link offers
 test('real browser worker searches saved body and URL offline, scopes Trash, and rebuilds a missing cache', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/search-needle'),
@@ -221,6 +226,7 @@ test('merges offline independent tag changes across restored clients and preserv
 	page,
 	browser
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const url = 'https://example.com/tags-two-clients',
@@ -242,6 +248,7 @@ test('merges offline independent tag changes across restored clients and preserv
 	let stopped = false
 	try {
 		const other = await otherContext.newPage()
+		await closeSeedReplica(other)
 		await other.goto('http://127.0.0.1:5180')
 		await restoreAccount(other, recovery)
 		const remote = other.locator(`[data-article-id="${item.id}"]`)
@@ -289,6 +296,7 @@ test('merges offline independent tag changes across restored clients and preserv
 			tagDialog.getByRole('button', { name: 'Remove Second', exact: true })
 		).toBeVisible()
 	} finally {
+		await closeSeedReplica(otherContext)
 		await otherContext.close()
 		if (stopped) authority = await startLocalJazzServer(options())
 	}
@@ -302,6 +310,7 @@ test('persists tags and Trash across a complete offline browser restart and rest
 	let stopped = false
 	try {
 		let page = await context.newPage()
+		await closeSeedReplica(page)
 		await page.goto('/')
 		await expectLibrarySynced(page)
 		const url = 'https://example.com/tags-offline-restart',
@@ -318,12 +327,14 @@ test('persists tags and Trash across a complete offline browser restart and rest
 			)
 		}, url)
 		await expect(item.row).toHaveCount(0)
+		await closeSeedReplica(context)
 		await context.close()
 		context = await chromium.launchPersistentContext(profile, {
 			headless: true,
 			baseURL: 'http://127.0.0.1:5180'
 		})
 		page = await context.newPage()
+		await closeSeedReplica(page)
 		await page.goto(`/articles/${item.id}`)
 		await expect(page.getByRole('article')).toContainText('Content supplied by a browser clip.')
 		await page.getByRole('button', { name: 'Restore article', exact: true }).click()
@@ -341,6 +352,7 @@ test('persists tags and Trash across a complete offline browser restart and rest
 		})
 		expect(result.map((row: { id: string }) => row.id)).toEqual([item.id])
 	} finally {
+		await closeSeedReplica(context)
 		await context.close()
 		if (stopped) authority = await startLocalJazzServer(options())
 		await rm(profile, { recursive: true, force: true })
@@ -351,6 +363,7 @@ test('reindexes a snapshot arriving from another restored client without restart
 	page,
 	browser
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const recovery = await phrase(page)
@@ -364,6 +377,7 @@ test('reindexes a snapshot arriving from another restored client without restart
 	const otherContext = await browser.newContext()
 	try {
 		const other = await otherContext.newPage()
+		await closeSeedReplica(other)
 		await other.goto('http://127.0.0.1:5180')
 		await restoreAccount(other, recovery)
 		await expectLibrarySynced(other)
@@ -385,6 +399,7 @@ test('reindexes a snapshot arriving from another restored client without restart
 		).toHaveCount(0)
 		await expect(page.locator(`[data-article-id="${saved.id}"]`)).toHaveCount(0)
 	} finally {
+		await closeSeedReplica(otherContext)
 		await otherContext.close()
 	}
 })
@@ -392,6 +407,7 @@ test('reindexes a snapshot arriving from another restored client without restart
 test('search input combines title, URL and body keywords with status, favorites, tags and Trash', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/ui-needle')
@@ -478,6 +494,7 @@ test('search input combines title, URL and body keywords with status, favorites,
 test('search failure is localized, leaves the library usable and retries with a fresh worker', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const application = page.workers().find((worker) => worker.url().includes('application.worker'))
@@ -519,6 +536,7 @@ test('tag validation uses the shared generic field error and clears it on edit a
 		if (message.type() === 'warning' && message.text().includes('Custom actions should not call'))
 			warnings.push(message.text())
 	})
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const item = await supplied(page, 'https://example.com/tag-validation')
@@ -549,6 +567,7 @@ test('tag validation uses the shared generic field error and clears it on edit a
 test('DUI TagInput selects suggestions with the keyboard, rejects duplicates and removes chips persistently', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/dui-first')
@@ -573,6 +592,7 @@ test('DUI TagInput selects suggestions with the keyboard, rejects duplicates and
 	await expect(dialog.getByRole('button', { name: 'Remove Reading', exact: true })).toHaveCount(0)
 	await expect(input).toBeFocused()
 	await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect(second.row).toBeVisible()
 	await tags(page, second.row)
@@ -584,6 +604,7 @@ test('DUI TagInput selects suggestions with the keyboard, rejects duplicates and
 test('removing articles focuses the next or previous native link, then the library heading', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	await supplied(page, 'https://example.com/component-first')
@@ -620,6 +641,7 @@ test('removing articles focuses the next or previous native link, then the libra
 test('Add Link exposes invalid-source feedback without showing processing or success', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const dialog = await openAddLink(page)
@@ -643,6 +665,7 @@ test('Add Link exposes invalid-source feedback without showing processing or suc
 test('DUI shares Unicode comparison for duplicate feedback and suggestion filtering', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	const first = await supplied(page, 'https://example.com/canonical-first')
@@ -672,6 +695,7 @@ test('DUI shares Unicode comparison for duplicate feedback and suggestion filter
 test('native pagination focuses the first newly revealed article and retains search state', async ({
 	page
 }) => {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expectLibrarySynced(page)
 	await page.evaluate(async () => {

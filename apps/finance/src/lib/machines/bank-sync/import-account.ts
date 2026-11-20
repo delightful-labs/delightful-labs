@@ -118,16 +118,7 @@ export function createAccountImportMachine(dependencies: Dependencies) {
 		CONTINUE:
 			types<EventPayload<ProgressEvent | { type: 'CANCEL' } | { type: 'CONTINUE' }, 'CONTINUE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['existing']>
-				| import('xstate').OutputFrom<(typeof actors)['yieldControl']>
-				| import('xstate').OutputFrom<(typeof actors)['account']>
-				| import('xstate').OutputFrom<(typeof actors)['saveBalanceSnapshot']>
-				| import('xstate').OutputFrom<(typeof actors)['transaction']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

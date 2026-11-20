@@ -1,10 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { SimulatedClock, waitFor } from 'xstate'
-import type {
-	AccountHost,
-	AccountObservation,
-	ReadyAccountObservation
-} from '../../contracts/account.js'
+import type { AccountObservation } from '../../contracts/account.js'
+import { nativeSessionFixture, readyAccount } from '../../machines/runtime/session.test-support.js'
 import {
 	testLibraryCapability,
 	controlledSave
@@ -25,13 +22,17 @@ it.each(['provider', 'session'] as const)(
 		const provider = vi.fn(() => (stage === 'provider' ? pending.promise : Promise.resolve()))
 		const session = vi.fn(async () => {
 			if (stage === 'session') await pending.promise
-			native.emit({ status: 'signed-out' })
+			native.emit({ status: 'signed-out', binding: {} })
 		})
 		const observation = native.current()
 		if (observation.status !== 'ready') throw new Error('Missing native identity')
-		native.emit({ ...observation, signedIn: true, logout: session })
+		native.account.change.mockImplementation(async () => {
+			await session()
+			return 'completed'
+		})
 		const f = createWorkerHostFixture(undefined, undefined, undefined, {
-			account: { ...native.account, signOut: provider },
+			account: native.account,
+			signOut: provider,
 			clock,
 			closePolicy: { drainMs: 5 }
 		})
@@ -74,90 +75,56 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 function fixture() {
-	const listeners = new Set<() => void>(),
-		releaseRecovery = vi.fn(),
+	const releaseRecovery = vi.fn(),
 		observeRecovery = vi.fn()
-	const native = (accountId: string): ReadyAccountObservation => ({
-		status: 'ready',
-		binding: {},
-		clientBinding: {},
-		databaseBinding: {},
-		accountId,
-		localFirst: true,
-		root: { read: async () => 'compatible', ensure: vi.fn() },
-		recovery: {
-			capability: { isCurrentScope: () => false, readPhrase: async () => '' },
-			source: {
-				subscribe: (notify) => {
-					observeRecovery(accountId)
-					notify({ kind: 'unavailable' })
-					return () => releaseRecovery(accountId)
-				}
+	const libraries = new Map<string, LibraryCapability>(),
+		live: (() => boolean)[] = []
+	const adopt = vi.fn(
+		(value: Extract<AccountObservation, { status: 'ready' }>, isLive: () => boolean) => {
+			live.push(isLive)
+			return (
+				libraries.get(value.identityId) ??
+				testLibraryCapability({
+					id: crypto.randomUUID(),
+					title: value.identityId,
+					text: 'local',
+					html: '<p>local</p>',
+					submittedUrl: 'https://example.com/',
+					finalUrl: 'https://example.com/',
+					provenance: '{}',
+					imagesMissing: false
+				})
+			)
+		}
+	)
+	const native = (identityId: string) => {
+		const base = readyAccount(identityId)
+		const value: Extract<AccountObservation, { status: 'ready' }> = {
+			...base,
+			capabilities: {
+				...base.capabilities,
+				recovery: {
+					...base.capabilities.recovery,
+					source: {
+						subscribe: (notify) => {
+							observeRecovery(identityId)
+							notify({ kind: 'unavailable' })
+							return () => releaseRecovery(identityId)
+						}
+					}
+				},
+				createLibrary: (isLive) => adopt(value, isLive)
 			}
 		}
-	})
-	let current: AccountObservation = native('A')
-	const releases: ReturnType<typeof vi.fn>[] = [],
-		libraries = new Map<string, LibraryCapability>()
-	const adopt = vi.fn((observation: ReadyAccountObservation) => {
-		const release = vi.fn()
-		releases.push(release)
-		const id = crypto.randomUUID()
-		const library =
-			libraries.get(observation.accountId) ??
-			testLibraryCapability({
-				id,
-				title: observation.accountId,
-				text: 'local',
-				html: '<p>local</p>',
-				submittedUrl: 'https://example.com/',
-				finalUrl: 'https://example.com/',
-				provenance: '{}',
-				imagesMissing: false
-			})
-		return { observation: { ...observation, library }, release }
-	})
-	const unused = vi.fn(async () => {})
-	const account: AccountHost = {
-		read: () => current,
-		adopt,
-		readiness: {
-			binding: {},
-			capability: {
-				readStatus: () => current.status,
-				subscribe: (notify) => {
-					listeners.add(notify)
-					return () => listeners.delete(notify)
-				},
-				retry: unused
-			}
-		},
-		create: unused,
-		logout: unused,
-		release: vi.fn(),
-		restoration: {
-			binding: {},
-			capability: {
-				isCurrentBinding: () => false,
-				parsePhrase: async () => {
-					throw new Error('Unused restoration')
-				},
-				readIdentity: async () => ({ kind: 'unavailable' }),
-				restoreIdentity: unused
-			}
-		}
+		return value
 	}
-	const emit = (observation: AccountObservation) => {
-		current = observation
-		for (const notify of listeners) notify()
-	}
+	const source = nativeSessionFixture(native('A'))
 	return {
-		account,
+		...source,
+		account: source,
 		native,
-		emit,
-		current: () => current,
 		adopt,
-		releases,
+		live,
 		libraries,
 		observeRecovery,
 		releaseRecovery
@@ -183,7 +150,7 @@ it('owns one recovery/tag/subscription set for duplicate native binding observat
 	f.actor.send({ type: 'SHUTDOWN' })
 	await waitFor(f.actor, (s) => s.status === 'done', { timeout: 1000 })
 	expect(native.releaseRecovery).toHaveBeenCalledExactlyOnceWith('A')
-	expect(native.releases[0]).toHaveBeenCalledOnce()
+	expect(native.live[0]?.()).toBe(false)
 })
 it('A → B → C retires Window resources before publishing the latest binding and refuses stale scope/facts', async () => {
 	const native = fixture(),
@@ -214,9 +181,7 @@ it('A → B → C retires Window resources before publishing the latest binding 
 	await waitFor(f.actor, (s) => s.matches({ running: { accepting: 'retiring' } }), {
 		timeout: 1000
 	})
-	await vi.waitFor(() =>
-		expect(native.adopt).toHaveBeenLastCalledWith(expect.objectContaining({ accountId: 'C' }))
-	)
+	await vi.waitFor(() => expect(native.adopt.mock.calls.at(-1)?.[0].identityId).toBe('C'))
 	expect(f.actor.getSnapshot().context.library).toBeUndefined()
 	f.actor.send({ type: 'MORE', scope: a.scope })
 	expect(f.actor.getSnapshot().context.limit).toBe(50)

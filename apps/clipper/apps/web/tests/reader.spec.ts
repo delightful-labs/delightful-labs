@@ -1,3 +1,4 @@
+import { test, closeSeedReplica } from './seed-fixture.js'
 import {
 	openAccountSettings,
 	openAllArticles,
@@ -9,7 +10,7 @@ import {
 	closeReadingControls,
 	visibleReadingParagraph as visibleParagraph
 } from './reader-ui.js'
-import { test, expect, chromium } from '@playwright/test'
+import { expect, chromium } from '@playwright/test'
 import type { projectReaderState } from '../src/lib/reader/schema.js'
 import type { Page } from '@playwright/test'
 import { startLocalJazzServer } from './browser-core.js'
@@ -36,6 +37,7 @@ test.afterAll(async () => {
 	await rm(directory, { recursive: true, force: true })
 })
 async function seed(page: Page, url = 'https://example.com/reader-experience') {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const id = await page.evaluate(async (url) => {
@@ -71,6 +73,7 @@ async function phrase(page: Page) {
 }
 
 async function codeReader(page: Page) {
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	await page.evaluate(async () => {
@@ -234,6 +237,7 @@ test('keeps a text anchor through typography, viewport resizing, navigation and 
 		.poll(async () => (await state(page)).preferences)
 		.toMatchObject({ theme: 'dark', font: 'sans', size: 32, spacing: 2, width: 40 })
 	const furthest = Math.max(...Object.values((await state(page)).progress))
+	await closeSeedReplica(page)
 	await page.reload()
 	await expect.poll(() => visibleParagraph(page)).toBe(paragraph)
 	await page.getByRole('main').hover({ position: { x: 2, y: 100 } })
@@ -259,6 +263,7 @@ test('synchronizes independent settings and latest positions without scrolling a
 	const context = await browser.newContext()
 	try {
 		const other = await context.newPage()
+		await closeSeedReplica(other)
 		await other.goto('/')
 		await restoreAccount(other, recovery)
 		await other.locator(`[data-article-id="${id}"]`).getByRole('link').click()
@@ -274,9 +279,11 @@ test('synchronizes independent settings and latest positions without scrolling a
 		await second.getByLabel('Font family', { exact: true }).selectOption('sans')
 		await closeReadingControls(other)
 		await expect.poll(async () => (await state(page)).preferences.font).toBe('sans')
+		await closeSeedReplica(other)
 		await other.reload()
 		await expect.poll(async () => Number(await visibleParagraph(other))).toBeGreaterThan(1)
 	} finally {
+		await closeSeedReplica(context)
 		await context.close()
 	}
 })
@@ -300,9 +307,11 @@ test('retains offline reading settings and location through a complete browser r
 		)
 		await page.getByRole('link', { name: 'Open library', exact: true }).click()
 		await expect(page.locator(`[data-article-id="${id}"]`).getByText(/^\d+% read$/)).toBeVisible()
+		await closeSeedReplica(context)
 		await context.close()
 		context = await chromium.launchPersistentContext(directory, { headless: true })
 		const reopened = await context.newPage()
+		await closeSeedReplica(reopened)
 		await reopened.goto('http://127.0.0.1:5180/articles/' + id)
 		await expect(reopened.getByRole('article')).toBeVisible()
 		console.info(
@@ -323,6 +332,7 @@ test('retains offline reading settings and location through a complete browser r
 		).toBeVisible()
 		await openAllArticles(reopened)
 	} finally {
+		await closeSeedReplica(context)
 		await context.close()
 		if (stopped) authority = await startLocalJazzServer(options())
 		await rm(directory, { recursive: true, force: true })
@@ -366,12 +376,14 @@ test('updates progress for a short article when a reading gesture cannot scroll 
 	page
 }) => {
 	await page.setViewportSize({ width: 1600, height: 1400 })
+	await closeSeedReplica(page)
 	await page.goto('/')
 	await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 	const id = await page.evaluate(async () => {
 		const path = '/tests/reader-driver.ts'
 		return (await import(/* @vite-ignore */ path)).seedReader('https://example.com/short-reader', 1)
 	})
+	await closeSeedReplica(page)
 	await page.goto('/articles/' + id)
 	await expect(page.getByRole('article')).toBeVisible()
 	const main = page.getByRole('main')

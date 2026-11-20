@@ -61,10 +61,7 @@ export function createWorkspaceNamingPersistence<Write>(
 		SHUTDOWN: types<EventPayload<FormChildEvent<WorkspaceRenameObservation>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<WorkspaceRenameObservation>, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<typeof naming>>
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<{ input: Input; result: Result | undefined }>(),

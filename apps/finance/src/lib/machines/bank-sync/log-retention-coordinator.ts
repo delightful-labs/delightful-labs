@@ -43,10 +43,7 @@ export function createSyncLogRetentionCoordinator(
 		CHECK: types<EventPayload<Event, 'CHECK'>>(),
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<import('xstate').OutputFrom<(typeof actors)['retention']>>
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

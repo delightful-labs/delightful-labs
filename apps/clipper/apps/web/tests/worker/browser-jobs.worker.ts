@@ -8,7 +8,7 @@ import { extractionJob, extractionJobMachine } from '../../../extension/src/work
 import type {
 	BrowserWorkerJobInput,
 	BrowserJobWorker
-} from '../../src/lib/machines/browser-worker-job.js'
+} from 'delightful-local-first/worker/browser-job'
 
 const request = z.object({
 	mode: z.enum(['image', 'extract']),

@@ -414,22 +414,6 @@ const events2 = {
 	CANCEL: types<EventPayload<InternalTransferLinkEvent, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<InternalTransferLinkEvent, 'SHUTDOWN'>>()
 }
-type NativeEvent2 =
-	| import('xstate').InferEvents<typeof events2>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<typeof readUnlink>
-			| import('xstate').OutputFrom<typeof clearUnlinkMarkers>
-			| import('xstate').OutputFrom<typeof deleteUnlinkRelationship>
-			| import('xstate').OutputFrom<typeof identifyTransferWrite>
-			| import('xstate').OutputFrom<typeof settleUnlinkWrite>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Owns ordered local-first unlink writes and exposes partial completion for recovery. */
 export const internalTransferUnlinkMachine = setup({
@@ -876,22 +860,7 @@ const events1 = {
 	CANCEL: types<EventPayload<InternalTransferLinkEvent, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<InternalTransferLinkEvent, 'SHUTDOWN'>>()
 }
-type NativeEvent1 =
-	| import('xstate').InferEvents<typeof events1>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof deleteActors)['read']>
-			| import('xstate').OutputFrom<(typeof deleteActors)['clearMarkers']>
-			| import('xstate').OutputFrom<(typeof deleteActors)['identifyTransferWrite']>
-			| import('xstate').OutputFrom<(typeof deleteActors)['settleWrite']>
-			| import('xstate').OutputFrom<(typeof deleteActors)['deleteBundle']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
+
 export const internalTransferDeleteMachine = setup({
 	schemas: {
 		context: types<DeleteContext>(),
@@ -1433,24 +1402,6 @@ const events0 = {
 	CANCEL: types<EventPayload<InternalTransferLinkEvent, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<InternalTransferLinkEvent, 'SHUTDOWN'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<typeof open>
-			| import('xstate').OutputFrom<typeof read>
-			| import('xstate').OutputFrom<typeof stage>
-			| import('xstate').OutputFrom<typeof commit>
-			| import('xstate').OutputFrom<typeof settle>
-			| import('xstate').OutputFrom<typeof rollback>
-			| import('xstate').OutputFrom<typeof identifyTransferWrite>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Owns one mergeable Jazz transaction from endpoint read through local persistence. */
 export const internalTransferLinkMachine = setup({

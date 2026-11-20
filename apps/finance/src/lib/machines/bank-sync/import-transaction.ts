@@ -111,15 +111,7 @@ export function createTransactionImportMachine(dependencies: Dependencies) {
 		PROCESS: types<EventPayload<{ type: 'PROCESS' } | { type: 'CANCEL' }, 'PROCESS'>>(),
 		CANCEL: types<EventPayload<{ type: 'PROCESS' } | { type: 'CANCEL' }, 'CANCEL'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['identity']>
-				| import('xstate').OutputFrom<(typeof actors)['authorize']>
-				| import('xstate').OutputFrom<(typeof actors)['existing']>
-				| import('xstate').OutputFrom<(typeof actors)['persist']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<Context>(),

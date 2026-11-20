@@ -72,8 +72,45 @@ jobs:
           PUBLIC_JAZZ_APP_ID: ci-build
           PUBLIC_JAZZ_SERVER_URL: http://127.0.0.1:9
 
-  browser:
+  browser_build:
     needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
+    name: Matching browser build
+    outputs:
+      artifact_id: ${{ steps.browser_artifact.outputs.artifact-id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Require successful check selection
+        if: ${{ needs.plan.result != 'success' }}
+        run: exit 1
+        working-directory: .
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.2'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --workspace-root monorepo:check-links
+      - name: Build the application/auth/permissions/workspace fixture once
+        run: pnpm exec vite build --config vite.e2e.config.ts
+        env:
+          FINANCE_PREVIEW: 'true'
+          PUBLIC_DEBUG: 'true'
+      - uses: actions/upload-artifact@v7
+        id: browser_artifact
+        with:
+          name: finance-e2e-${{ github.sha }}-${{ github.run_attempt }}
+          path: apps/finance/.svelte-kit/output/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  browser:
+    needs: [plan, browser_build]
     if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.finance == 'true') }}
     name: Browser (${{ matrix.suite }})
     runs-on: ubuntu-24.04
@@ -87,24 +124,31 @@ jobs:
       matrix:
         include:
           - suite: application-1
+            reuse_build: true
             config: playwright.config.ts
             selection: --project=application --shard=1/2
           - suite: application-2
+            reuse_build: true
             config: playwright.config.ts
             selection: --project=application --shard=2/2
           - suite: authentication
+            reuse_build: true
             config: playwright.config.ts
             selection: --project=authentication
           - suite: permissions
+            reuse_build: true
             config: playwright.config.ts
             selection: --project=permissions
           - suite: workspace
+            reuse_build: true
             config: playwright.config.ts
             selection: --project=workspace
           - suite: presentation
+            reuse_build: false
             config: tests/config/playwright.form-presentation.config.ts
             selection: ''
           - suite: startup
+            reuse_build: false
             config: tests/config/playwright.startup.config.ts
             selection: ''
     steps:
@@ -126,8 +170,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
+      - name: Require the matching browser artifact
+        if: ${{ matrix.reuse_build && needs.browser_build.result != 'success' }}
+        run: exit 1
+      - uses: actions/download-artifact@v7
+        if: ${{ matrix.reuse_build }}
+        with:
+          artifact-ids: ${{ needs.browser_build.outputs.artifact_id }}
+          path: apps/finance/.svelte-kit/output/
       - name: Run against a disposable in-memory Jazz server
         run: pnpm exec playwright test --config=${{ matrix.config }} ${{ matrix.selection }} --forbid-only
+        env:
+          FINANCE_E2E_PREBUILT: ${{ matrix.reuse_build && 'true' || 'false' }}
       - name: Retain browser diagnostics and durations
         if: always()
         uses: actions/upload-artifact@v7

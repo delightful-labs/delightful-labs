@@ -53,21 +53,6 @@ const events0 = {
 	CANCEL: types<EventPayload<IntegrityEvent, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<IntegrityEvent, 'SHUTDOWN'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<typeof prepare>
-			| import('xstate').OutputFrom<typeof discover>
-			| import('xstate').OutputFrom<typeof workspaceIntegrityAssessment>
-			| import('xstate').OutputFrom<typeof workspaceIntegrityTransaction>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Fixed to one identity/workspace/database binding. Its owner must drain it before replacement. */
 export const workspaceIntegrity = setup({

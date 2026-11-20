@@ -178,3 +178,11 @@ Failure screenshots and a machine-readable duration report are written to `test-
 CI also retains failure traces. For local traces, pass `--trace retain-on-failure`; local
 development runs leave tracing off by default. Override concurrency with `--workers`. Use `pnpm test:pwa`, `pnpm test:startup`, and the CI feature-flag
 matrix for the separate production and flag-dependent environments.
+
+
+The general browser CI projects share one immutable `vite.e2e.config.ts` build
+per commit. `FINANCE_E2E_PREBUILT=true` selects preview-only startup after that
+matching `.svelte-kit/output` artifact has been restored; it does not reuse a
+server or database. Local runs build and preview by default. Presentation,
+startup, PWA and other flag-specific builds retain their own configurations and
+are excluded from this artifact. Do not substitute the general check job's build.

@@ -243,3 +243,46 @@ it('hands pending annotations from scoped transport receipts to worker durabilit
 	expect(f.client.getView().view.annotations.pending).toBe(false)
 	expect(f.client.getView().view.annotations.message?.text).toBe('Previously synced')
 })
+
+it('replays pending admission and receipt changes that occurred with no rendered subscribers', () => {
+	const f = fixture()
+	const before = f.client.subscribe(() => {})
+	before.unsubscribe()
+	f.client.send({
+		type: 'ORGANIZE',
+		request: { id: crypto.randomUUID(), field: 'trashed', value: false }
+	})
+	const received = commandSchema.parse(f.worker.postMessage.mock.lastCall?.[0])
+	if (received.type !== 'LIBRARY') throw new Error('Missing library command')
+	const pending = vi.fn<(value: LibraryRender) => void>()
+	const waiting = f.client.subscribe(pending)
+	expect(pending).toHaveBeenCalledOnce()
+	expect(pending.mock.lastCall?.[0].view.canOrganize).toBe(false)
+	waiting.unsubscribe()
+	f.worker.onmessage?.({
+		data: { type: 'RECEIVED', scope: f.initial.scope, requestId: received.requestId }
+	})
+	const settled = vi.fn<(value: LibraryRender) => void>()
+	const resumed = f.client.subscribe(settled)
+	expect(settled).toHaveBeenCalledOnce()
+	expect(settled.mock.lastCall?.[0].view.canOrganize).toBe(true)
+	resumed.unsubscribe()
+	expect(f.worker.terminate).not.toHaveBeenCalled()
+})
+
+it('keeps subscriptions independent when the same renderer is subscribed twice', () => {
+	const f = fixture()
+	const changed = vi.fn<(value: LibraryRender) => void>()
+	const first = f.client.subscribe(changed),
+		second = f.client.subscribe(changed)
+	expect(changed).toHaveBeenCalledTimes(2)
+	first.unsubscribe()
+	f.binding.update({ ...f.initial, canAdd: false })
+	expect(changed).toHaveBeenCalledTimes(3)
+	expect(changed.mock.lastCall?.[0].canAdd).toBe(false)
+	second.unsubscribe()
+	f.binding.update(f.initial)
+	expect(changed).toHaveBeenCalledTimes(3)
+	expect(f.client.getView().canAdd).toBe(true)
+	expect(f.worker.terminate).not.toHaveBeenCalled()
+})

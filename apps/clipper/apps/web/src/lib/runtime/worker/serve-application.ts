@@ -1,9 +1,14 @@
+import type { AccountCapabilities } from '../../contracts/account.js'
 import { imageUrlSchema } from '../../images/schema.js'
 import { bindWorkerConnectivity } from '../../offline/connectivity.js'
 /// <reference lib="webworker" />
 import { createActor } from 'xstate'
 
 import { z } from 'zod'
+import {
+	createSessionRuntimeMachine,
+	createSessionRuntimeConnection
+} from 'delightful-local-first/session/runtime'
 import { accountInput } from '../../backend/jazz/account.js'
 import { projectRuntime } from './views.js'
 import { commandSchema } from './protocol.js'
@@ -119,9 +124,15 @@ export function serveApplicationWorker(options: {
 			store: accountStore,
 			runtimeSources: { browserWorkerHost: broker }
 		})
+		const runtime = createActor(createSessionRuntimeMachine<AccountCapabilities>(), {
+			input: input.native,
+			...machineDiagnostics
+		})
 		const actor = createActor(workerHostMachine, {
 			input: {
-				...input,
+				session: createSessionRuntimeConnection(runtime, input.native.binding),
+				parsePhrase: input.parsePhrase,
+				signOut: input.signOut,
 				scope: crypto.randomUUID(),
 				closeAccountStore: accountStore.close,
 				closeBroker: broker.close,
@@ -168,5 +179,6 @@ export function serveApplicationWorker(options: {
 			error: () => self.postMessage({ type: 'FAILED' })
 		})
 		actor.start()
+		runtime.start()
 	}
 }

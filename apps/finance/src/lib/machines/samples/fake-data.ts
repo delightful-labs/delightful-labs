@@ -108,26 +108,6 @@ const events0 = {
 	CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
 	SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof actors)['readLocal']>
-			| import('xstate').OutputFrom<(typeof actors)['readAuthority']>
-			| import('xstate').OutputFrom<(typeof actors)['prepare']>
-			| import('xstate').OutputFrom<(typeof actors)['recheck']>
-			| import('xstate').OutputFrom<(typeof actors)['stage']>
-			| import('xstate').OutputFrom<(typeof actors)['open']>
-			| import('xstate').OutputFrom<(typeof actors)['commit']>
-			| import('xstate').OutputFrom<(typeof actors)['settle']>
-			| import('xstate').OutputFrom<(typeof actors)['rollback']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 /** Seed only authoritative emptiness; own the serializable transaction until confirmed or rolled back. */
 export const fakeDataSetup = setup({

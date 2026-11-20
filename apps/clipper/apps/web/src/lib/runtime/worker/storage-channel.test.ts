@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest'
-import { accountStorageClient, serveAccountStorage } from './storage-channel.js'
+import {
+	accountStorageClient,
+	serveAccountStorage
+} from '../../../../tests/legacy-storage-channel.js'
 
 it('keeps concurrent private storage replies correlated and only accesses the bound key', async () => {
 	const channel = new MessageChannel()

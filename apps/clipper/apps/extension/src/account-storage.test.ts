@@ -5,7 +5,7 @@ import { startTestJazz } from 'jazz-tools/testing'
 import { app } from '../../web/src/lib/backend/jazz/jazz.generated.js'
 import permissions from '../../web/src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { extensionAccountStorageKey } from './account-storage.js'
-import { createWorkerAccountStore } from '../../web/src/lib/runtime/worker/account-store.js'
+import { createWorkerAccountStore } from '../../web/tests/legacy-account-store.js'
 
 afterEach(() => vi.unstubAllGlobals())
 

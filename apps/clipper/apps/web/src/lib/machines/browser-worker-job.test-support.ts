@@ -1,9 +1,12 @@
 import { vi } from 'vitest'
-import type { BrowserJobWorker, BrowserWorkerJobInput } from './browser-worker-job.js'
+import type {
+	BrowserJobWorker,
+	BrowserWorkerJobInput
+} from 'delightful-local-first/worker/browser-job'
 
 export class TestJobWorker implements BrowserJobWorker {
 	onmessage: ((event: MessageEvent<unknown>) => void) | null = null
-	onerror: ((event?: Event) => void) | null = null
+	onerror: ((event: Event) => void) | null = null
 	onmessageerror: ((event?: Event) => void) | null = null
 	postMessage = vi.fn(
 		(_message: unknown, _transfer?: Transferable[] | StructuredSerializeOptions) => {}

@@ -18,16 +18,6 @@ type Context = Input & {
 }
 export type { ProviderAccountView } from '#lib/contracts/bank-presentation-contract.js'
 const events0 = { CHECK: types<EventPayload<{ type: 'CHECK' }, 'CHECK'>>() }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<never>
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 export const accountOptionsMachine = setup({
 	schemas: { context: types<Context>(), events: events0, input: types<Input>() }

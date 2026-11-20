@@ -61,16 +61,6 @@ const events0 = {
 	SETUP_STARTED: types<EventPayload<Event, 'SETUP_STARTED'>>(),
 	SETUP_ENDED: types<EventPayload<Event, 'SETUP_ENDED'>>()
 }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<never>
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
 
 export const bankAvailabilityMachine = setup({
 	schemas: { context: types<Context>(), events: events0, input: types<Input>() },

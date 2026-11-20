@@ -21,20 +21,7 @@ type Context = ProviderRequest & {
 
 // A disposable worker owns this root. No Jazz client or passkey is opened here.
 const events0 = { REQUEST: types<EventPayload<{ type: 'REQUEST' }, 'REQUEST'>>() }
-type NativeEvent0 =
-	| import('xstate').InferEvents<typeof events0>
-	| import('xstate').DoneActorEvent<
-			| import('xstate').OutputFrom<(typeof actors)['request']>
-			| import('xstate').OutputFrom<(typeof actors)['decode']>
-			| import('xstate').OutputFrom<(typeof actors)['validate']>
-	  >
-	| import('xstate').ErrorActorEvent
-	| import('xstate').AfterEvent
-	| import('xstate').DoneStateEvent
-	| import('xstate').SnapshotEvent
-	| import('xstate').TimeoutEvent
-	| import('xstate').ActorTimeoutEvent
-	| import('xstate').ErrorPlatformEvent
+
 const actors = {
 	request: createAsyncLogic<Response, ProviderRequest>({
 		run: ({ input, signal }) =>

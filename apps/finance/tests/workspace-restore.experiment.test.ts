@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { chromium, firefox, webkit, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
-import { jazzWasmEntry } from '../tooling/jazz-wasm.js'
+import { resolveJazzWorkerAssets } from 'delightful-local-first/backend/jazz/worker-build'
 import type { Plugin } from 'vite'
 import type { RecoverySample } from '../specs/016-workspace-restore/browser.js'
 import {
@@ -58,16 +58,18 @@ import permissions from '../src/lib/jazz.permissions.json' with { type: 'json' }
 const isolationPermissions = permissions
 import { createActor, toPromise, createAsyncLogic } from 'xstate'
 
+const assets = resolveJazzWorkerAssets(import.meta.url)
+
 function jazzRuntimeAssets(): Plugin {
 	return {
 		name: 'finance-restore-jazz-assets',
 		config: () => ({
 			resolve: {
 				alias: [
-					{ find: /^jazz-wasm$/, replacement: jazzWasmEntry },
+					{ find: /^jazz-wasm$/, replacement: assets.wasmEntry },
 					{
 						find: /^#jazz-wasm-binary/,
-						replacement: resolve(dirname(jazzWasmEntry), 'jazz_wasm_bg.wasm')
+						replacement: assets.wasmBinary
 					}
 				]
 			},
@@ -1088,7 +1090,7 @@ describe('browser replica separation', () => {
 	let web: ViteDevServer, serving: LocalJazzServerHandle, url: string
 	beforeAll(async () => {
 		const require = createRequire(import.meta.url),
-			wasm = jazzWasmEntry
+			wasm = assets.wasmEntry
 		web = await createServer({
 			configFile: false,
 			root: process.cwd(),

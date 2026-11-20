@@ -94,13 +94,7 @@ export function createTransactionSubmissionMachine(
 		SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<Event, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['save']>
-				| import('xstate').OutputFrom<(typeof actors)['attachments']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

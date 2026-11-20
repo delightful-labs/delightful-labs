@@ -1,6 +1,6 @@
 import { locks } from 'node:worker_threads'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createWorkerAccountStore } from './account-store.js'
+import { createWorkerAccountStore } from '../../../../tests/legacy-account-store.js'
 
 afterEach(() => vi.unstubAllGlobals())
 

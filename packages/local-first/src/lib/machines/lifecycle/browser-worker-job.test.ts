@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest'
 import { createActor, toPromise } from 'xstate'
 import { z } from 'zod'
 import { createBrowserWorkerJob } from './browser-worker-job.js'
-import { TestJobWorker } from './browser-worker-job.test-support.js'
+import { TestJobWorker } from '../../../../tests/fixtures/browser-worker-job.js'
 
 const reply = z.object({ value: z.number().int() })
 const machine = createBrowserWorkerJob<string, z.infer<typeof reply>>()
@@ -43,23 +43,31 @@ it('delivers validated replies only after synchronous native cleanup, once', asy
 	f.actor.send({ type: 'CANCEL' })
 	expect(await toPromise(f.actor)).toMatchObject({ kind: 'replied', reply: { value: 7 } })
 	expect(outcomes).toHaveLength(1)
+	expect(f.actor.getSnapshot().context.input).toBeUndefined()
 	expect(f.worker.onmessage).toBeNull()
 	expect(f.worker.onerror).toBeNull()
 	expect(f.worker.onmessageerror).toBeNull()
 	expect(f.worker.postMessage).toHaveBeenCalledExactlyOnceWith('selected', [])
 })
-it.each(['construction', 'post', 'worker', 'message', 'reply'] as const)(
-	'contains %s failure and releases each acquired worker',
-	async (reason) => {
-		const f = fixture({ failOpen: reason === 'construction', failPost: reason === 'post' })
-		f.actor.start()
-		if (reason === 'worker') f.worker.onerror?.(new Event('error'))
-		if (reason === 'message') f.worker.onmessageerror?.(new Event('messageerror'))
-		if (reason === 'reply') f.worker.reply({ value: 'invalid' })
-		expect(await toPromise(f.actor)).toMatchObject({ kind: 'failed', reason })
-		expect(f.worker.terminate).toHaveBeenCalledTimes(reason === 'construction' ? 0 : 1)
+it.each(['construction', 'post', 'worker', 'message', 'reply'] satisfies (
+	| 'construction'
+	| 'post'
+	| 'worker'
+	| 'message'
+	| 'reply'
+)[])('contains %s failure and releases each acquired worker', async (reason) => {
+	const f = fixture({ failOpen: reason === 'construction', failPost: reason === 'post' })
+	f.actor.start()
+	if (reason === 'worker') {
+		const event = new Event('error', { cancelable: true })
+		f.worker.onerror?.(event)
+		expect(event.defaultPrevented).toBe(true)
 	}
-)
+	if (reason === 'message') f.worker.onmessageerror?.(new Event('messageerror'))
+	if (reason === 'reply') f.worker.reply({ value: 'invalid' })
+	expect(await toPromise(f.actor)).toMatchObject({ kind: 'failed', reason })
+	expect(f.worker.terminate).toHaveBeenCalledTimes(reason === 'construction' ? 0 : 1)
+})
 it('refuses pre-aborted admission before construction/posting and removes its listener', async () => {
 	const abort = new AbortController()
 	abort.abort()
@@ -72,7 +80,7 @@ it('refuses pre-aborted admission before construction/posting and removes its li
 	expect(f.worker.terminate).not.toHaveBeenCalled()
 	expect(remove).toHaveBeenCalledOnce()
 })
-it.each(['signal', 'command', 'stop'] as const)(
+it.each(['signal', 'command', 'stop'] satisfies ('signal' | 'command' | 'stop')[])(
 	'cleans up on %s without accepting a late reply',
 	async (mode) => {
 		const abort = new AbortController(),
@@ -126,7 +134,7 @@ it('retains the first reentrant reply/error/abort outcome through cleanup', asyn
 		f = fixture({ signal: abort.signal })
 	f.worker.postMessage.mockImplementation(() => {
 		f.worker.reply({ value: 7 })
-		f.worker.onerror?.()
+		f.worker.onerror?.(new Event('error'))
 		abort.abort()
 	})
 	f.actor.start()

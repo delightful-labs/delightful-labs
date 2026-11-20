@@ -81,7 +81,11 @@ test('all existing check jobs retain fail-closed routing; title workflow has no 
 		assert.ok(jobs.length > 1)
 		for (const [, job, body] of jobs) {
 			if (job === 'plan') continue
-			assert.match(body, /needs: (?:plan|\[plan, web-browser, worker-offline, extension\])/u)
+			assert.match(body, /^    needs: (?:plan|\[plan(?:, [\w-]+)*\])$/mu)
+			if (name === 'finance' && job === 'browser') {
+				assert.match(body, /needs: \[plan, browser_build\]/u)
+				assert.match(body, /if: \$\{\{ matrix.reuse_build && needs.browser_build.result != 'success' \}\}\n        run: exit 1/u)
+			}
 			assert.match(body, /always\(\) && \(needs.plan.result != 'success' \|\| needs.plan.outputs.\w+ == 'true'\)/u)
 			assert.match(body, /steps:\n      - name: Require successful check selection\n        if: \$\{\{ needs.plan.result != 'success' \}\}\n        run: exit 1/u)
 		}

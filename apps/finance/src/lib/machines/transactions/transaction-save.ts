@@ -224,18 +224,7 @@ export function createTransactionSaveMachine(
 		SHUTDOWN: types<EventPayload<FormChildEvent<TransactionEntryObservation>, 'SHUTDOWN'>>(),
 		OBSERVE: types<EventPayload<FormChildEvent<TransactionEntryObservation>, 'OBSERVE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['validate']>
-				| import('xstate').OutputFrom<(typeof actors)['allocate']>
-				| import('xstate').OutputFrom<(typeof actors)['observe']>
-				| import('xstate').OutputFrom<(typeof actors)['readLedger']>
-				| import('xstate').OutputFrom<(typeof actors)['readCheck']>
-				| import('xstate').OutputFrom<(typeof actors)['checkWrite']>
-				| import('xstate').OutputFrom<(typeof actors)['ledgerWrite']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

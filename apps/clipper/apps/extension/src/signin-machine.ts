@@ -13,9 +13,7 @@ export type ConnectionObservation =
 	| { kind: 'ready'; accountId: string }
 	| { kind: 'failed' }
 /** Projection of the existing account owner; it carries no credentials or account objects. */
-export function connectionObservation<Session extends object>(
-	snapshot: ApplicationSnapshot<Session>
-): ConnectionObservation {
+export function connectionObservation(snapshot: ApplicationSnapshot): ConnectionObservation {
 	if (snapshot.matches({ active: { flow: { running: 'restoring' } } })) return { kind: 'restoring' }
 	if (
 		snapshot.matches({ active: { feedback: 'restoreFailed' } }) ||
@@ -201,8 +199,8 @@ export function createSignInMachine(cap: {
 		}
 	})
 }
-export function signInView<Session extends object>(
-	account: ApplicationSnapshot<Session> | undefined,
+export function signInView(
+	account: ApplicationSnapshot | undefined,
 	confirmation: { context: Context; hasTag: (tag: 'confirming') => boolean }
 ) {
 	const view = selectApplicationView(account, true)

@@ -44,6 +44,7 @@ export function createRecoveryOwner(binding: RecoveryBinding) {
 			id: 'phrase',
 			src: 'phrase',
 			input: { kind: 'unavailable' },
+			onSnapshot: {},
 			onDone: { target: '.closed' }
 		},
 		states: {

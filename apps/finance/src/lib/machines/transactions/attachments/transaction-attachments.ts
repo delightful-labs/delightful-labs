@@ -73,14 +73,7 @@ export function createTransactionAttachmentsMachine() {
 		CANCEL: types<EventPayload<Event, 'CANCEL'>>(),
 		INVALIDATE: types<EventPayload<Event, 'INVALIDATE'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<typeof imageProcessingMachine>
-				| import('xstate').OutputFrom<typeof transactionAttachmentUploadMachine>
-				| import('xstate').OutputFrom<typeof readExisting>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	const model = setup({
 		schemas: {
 			context: types<Context>(),

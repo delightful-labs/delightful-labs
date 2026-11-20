@@ -1,4 +1,5 @@
-import type { EventPayload } from '../../machines/events.js'
+// Historical unscoped owner: retained only for independent upgrade/lock tests.
+import type { EventPayload } from '../src/lib/machines/events.js'
 import { types, createActor, createCallbackLogic, setup, toPromise, createAsyncLogic } from 'xstate'
 
 import type { AccountStore } from 'jazz-tools'

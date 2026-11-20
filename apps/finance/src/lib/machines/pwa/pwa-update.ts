@@ -41,15 +41,7 @@ export function createPwaUpdateMachine(platform: {
 		SHUTDOWN: types<EventPayload<UpdateEvent, 'SHUTDOWN'>>(),
 		OBSERVER_FAILED: types<EventPayload<UpdateEvent, 'OBSERVER_FAILED'>>()
 	}
-	type NativeEvent0 =
-		| import('xstate').InferEvents<typeof events0>
-		| import('xstate').DoneActorEvent<
-				| import('xstate').OutputFrom<(typeof actors)['registration']>
-				| import('xstate').OutputFrom<(typeof actors)['observe']>
-				| import('xstate').OutputFrom<(typeof actors)['activate']>
-				| import('xstate').OutputFrom<(typeof actors)['reload']>
-		  >
-		| import('xstate').ErrorActorEvent
+
 	return setup({
 		schemas: {
 			context: types<{

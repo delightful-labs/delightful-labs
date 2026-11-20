@@ -18,7 +18,7 @@ const image: ArticleImage = {
 class TestWorker {
 	static workers: TestWorker[] = []
 	onmessage: ((event: { data: unknown }) => void) | null = null
-	onerror: (() => void) | null = null
+	onerror: ((event: Event) => void) | null = null
 	onmessageerror: (() => void) | null = null
 	terminate = vi.fn()
 	postMessage = vi.fn()
@@ -271,7 +271,7 @@ it.each(['worker', 'message', 'reply'] as const)(
 		const f = fixture()
 		await waitFor(f.actor, (s) => s.matches({ running: { queue: { processing: 'waiting' } } }))
 		const worker = TestWorker.workers[0]!
-		if (failure === 'worker') worker.onerror?.()
+		if (failure === 'worker') worker.onerror?.(new Event('error'))
 		if (failure === 'message') worker.onmessageerror?.()
 		if (failure === 'reply') worker.onmessage?.({ data: { kind: 'ready', result: {} } })
 		await waitFor(f.actor, (s) => s.context.rows[0]?.status === 'failed')

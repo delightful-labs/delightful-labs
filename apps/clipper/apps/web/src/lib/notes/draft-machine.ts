@@ -169,6 +169,15 @@ export function selectNoteDraftState(
 	snapshot: import('xstate').SnapshotFrom<typeof noteDraftMachine> | undefined
 ) {
 	return {
+		// The recovery owner uses monotonically increasing edit sequences to reject
+		// an idle report queued before its latest command was admitted.
+		sequence: snapshot
+			? [
+					...snapshot.context.queue,
+					...snapshot.context.durable,
+					...(snapshot.context.issued ? [snapshot.context.issued] : [])
+				].reduce((sequence, record) => Math.max(sequence, record.draft.sequence), 0)
+			: 0,
 		pending: !!snapshot && (snapshot.context.queue.length > 0 || !!snapshot.context.issued),
 		failed: snapshot?.matches({ running: { storage: 'failed' } }) === true
 	}

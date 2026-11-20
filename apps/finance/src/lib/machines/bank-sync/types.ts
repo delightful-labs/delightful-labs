@@ -4,7 +4,8 @@ import type { Db as JazzDb } from 'jazz-tools'
 import type { Account, OrganizationMember, app } from '#lib/queries.js'
 import type { BankTrace } from '#lib/integrations/diagnostics.js'
 import type { CredentialScope } from '#lib/validation/integrations.js'
-import type { fetchAccounts } from '#lib/integrations/simplefin.js'
+import type { providerResponseSchema } from '#lib/validation/integrations.js'
+import type { z } from 'zod'
 
 export type Connection = RowOf<typeof app.simplefinConnections>
 export type ProviderSummary = {
@@ -32,7 +33,7 @@ export type ImportOutcome =
 	  }
 
 export type ImportResult = ImportOutcome & { accountResults: readonly AccountImportReport[] }
-export type ProviderResponse = Awaited<ReturnType<typeof fetchAccounts>>
+export type ProviderResponse = z.infer<typeof providerResponseSchema>
 export type BankCommand =
 	| { type: 'DISCOVER' }
 	| { type: 'SYNC' }
