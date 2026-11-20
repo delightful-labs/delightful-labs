@@ -557,7 +557,6 @@ sign-out ordering rather than recreating its old session facade around the new
 runtime. No storage move, new supervisor, actor wrapper or generic transport is
 proposed. This proposal still requires user review before runtime work.
 
-
 ### C04 design approved after the consumer audit (implemented)
 
 The three Clipper tokens are compared in `sameAccountBinding`; the additional
@@ -586,7 +585,6 @@ single-generation report contract; its checks qualify replacement during
 preparation, held-write/restore/sign-out interruption, provider refusal, expired
 backend identity and extension existing-account admission. Preserve the current
 storage key/backend and all independent native shutdown/identity/offline tests.
-
 
 ## C05 reviewed design and completed implementation
 
@@ -703,7 +701,6 @@ held mutation interrupted by workspace/session change or shutdown; native resour
 drain. Bank/provider, transfers, backup and restore remain in their existing owners
 until separate source-backed designs settle their different lifetimes.
 
-
 ### C06 classification implementation and evidence
 
 - `classification-forms.ts` now composes four static invocations of the existing
@@ -767,13 +764,13 @@ The follow-up discussion selected keeping existing owners and moving to C07's
 concrete deletions. This completes C06's reviewed scope without requiring every
 feature to acquire another chart.
 
-| Feature | Decision and source-backed reason |
-| --- | --- |
+| Feature             | Decision and source-backed reason                                                                                                                                     |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Profile name/avatar | Keep the existing two shared scoped forms and their profile observation. A new two-form group has no demonstrated total-code reduction from the four-form experiment. |
-| Workspace rename | Keep its single existing shared scoped form and workspace observation. It already has one resource/policy owner; another owner would add a forwarding layer. |
-| Bank/history | Keep separate existing invoked reports and shutdown results. Provider consent, unlocked credentials, sync settlement and history observation are distinct lifetimes. |
-| Transfers | Keep the mutation owner, submission and edit workflow contracts. Issued transfer settlement and interactive form lifetimes must remain explicit. |
-| Backup/restore | Keep the current public reports and real drain rules, including restore's existing busy/drain boundary. Grouping does not establish equivalent resource lifetimes. |
+| Workspace rename    | Keep its single existing shared scoped form and workspace observation. It already has one resource/policy owner; another owner would add a forwarding layer.          |
+| Bank/history        | Keep separate existing invoked reports and shutdown results. Provider consent, unlocked credentials, sync settlement and history observation are distinct lifetimes.  |
+| Transfers           | Keep the mutation owner, submission and edit workflow contracts. Issued transfer settlement and interactive form lifetimes must remain explicit.                      |
+| Backup/restore      | Keep the current public reports and real drain rules, including restore's existing busy/drain boundary. Grouping does not establish equivalent resource lifetimes.    |
 
 These retained form/policy implementations already come from Local First; they
 are not two app-owned forks. The classification change reduces Finance's parent
@@ -853,7 +850,6 @@ Verification on November 19, Node 24.22.2 / pnpm 10.28.0:
 
 Remaining: C08–C10; no push, merge, deployment, migration or dependency change.
 
-
 ## C08 native subscription evaluation and retained bindings
 
 The installed `@xstate/svelte@6.0.0-beta.0` implementation was inspected, not
@@ -862,12 +858,12 @@ store, refreshes from `getSnapshot()` at first subscription, subscribes only to
 next snapshots and releases that subscription at last unsubscription. It neither
 starts/drains the actor nor replaces its error observer.
 
-| Binding | Decision | Source-backed reason |
-| --- | --- | --- |
-| Clipper library render projection | Adopt native Svelte store lifecycle, completed in C07 (`ca82e8ab`). | Deletes the observer Set, explicit replay and first/last subscription bookkeeping while preserving synchronous pending feedback and the existing native client resource owner. |
-| Local First form controller | Retain explicit snapshot/error observation and `stopAfterShutdown`. | Its error observer refreshes the failed snapshot. `useSelector` only observes next snapshots, so retaining that error path would require another subscription/bridge rather than delete it. Financial shutdown must still drain. |
-| Local First avatar selection | Retain the current small `.svelte.ts` rune bridge and component owner. | Selection/crop cleanup still requires explicit SHUTDOWN and stop. A selector store in this helper would also need a reactive store-to-rune bridge; no reduction is demonstrated. |
-| UI SwipeActions | Retain the current three-line initial-snapshot/subscribe/unsubscribe bridge. | A native readable initializer/import does not materially reduce it. Pointer capture, ResizeObserver, chosen-event observation, DOM listeners, actor start/stop and focus/animation handling all retain their current owner. |
+| Binding                           | Decision                                                                     | Source-backed reason                                                                                                                                                                                                             |
+| --------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clipper library render projection | Adopt native Svelte store lifecycle, completed in C07 (`ca82e8ab`).          | Deletes the observer Set, explicit replay and first/last subscription bookkeeping while preserving synchronous pending feedback and the existing native client resource owner.                                                   |
+| Local First form controller       | Retain explicit snapshot/error observation and `stopAfterShutdown`.          | Its error observer refreshes the failed snapshot. `useSelector` only observes next snapshots, so retaining that error path would require another subscription/bridge rather than delete it. Financial shutdown must still drain. |
+| Local First avatar selection      | Retain the current small `.svelte.ts` rune bridge and component owner.       | Selection/crop cleanup still requires explicit SHUTDOWN and stop. A selector store in this helper would also need a reactive store-to-rune bridge; no reduction is demonstrated.                                                 |
+| UI SwipeActions                   | Retain the current three-line initial-snapshot/subscribe/unsubscribe bridge. | A native readable initializer/import does not materially reduce it. Pointer capture, ResizeObserver, chosen-event observation, DOM listeners, actor start/stop and focus/animation handling all retain their current owner.      |
 
 The retained bindings themselves live in the shared UI/Local First packages;
 keeping them does not introduce divergent Finance and Clipper implementations.
@@ -883,7 +879,6 @@ no runtime files or generated/catalog output changed in C08.
 C08 is complete as a selective adoption/retain decision, not a claim that every
 manual snapshot binding should be replaced. Remaining: C09–C10; no push, merge,
 deployment, migration or dependency change.
-
 
 ## C09 shared-worker design and completed integration
 
@@ -1096,7 +1091,6 @@ backend. Keep generated output separate from user servers/data and introduce no
 new generic fixture/RPC/cache framework. Remaining: C10;
 C01–C09 are complete.
 
-
 ### C10 normal-close ownership design (approved and implemented)
 
 The Window seed replica is imported by article, reader, image, storage and startup
@@ -1119,7 +1113,6 @@ runtime wrapper or unload supervisor.
 The user approved this owner before implementation. The dedicated worker fixture
 and Window adapter are qualified below; matching immutable CI build reuse is the
 second C10 batch.
-
 
 ## C10 fixture ownership and actual-adapter batch completed
 
@@ -1165,7 +1158,6 @@ lint correction to its failure reporting, not to weaken closure assertions.
 
 Remaining: C10 matching Finance CI build reuse batch. No dependency, storage
 migration, catalog generation, push, merge or deployment.
-
 
 ## C10 matching Finance build batch completed
 
@@ -1217,7 +1209,6 @@ push, merge, deployment, SDK patch, package dependency or storage migration was 
 The pre-publication fetch confirmed `origin/main` was still `b69e6ad6`; no
 merge or rebase was needed before opening the cleanup PR.
 
-
 ## Publication, hosted qualification and merge closeout
 
 [PR52](https://github.com/delightful-labs/delightful-labs/pull/52) merged on
@@ -1254,7 +1245,6 @@ reviewed retained owners remain intentional. Do not revive superseded historical
 worker-migration checkboxes as new work without checking the current handoff and
 agreeing a new concrete objective with the user.
 
-
 ### Post-merge shared-profile fixture follow-up
 
 The merge commit's Finance workspace job reported **54 passed / 1 failed** in
@@ -1277,3 +1267,26 @@ isolation and membership removal. Finance test TypeScript, unchanged E2E scope
 selection (**270 unique scenarios / 44 assigned files**), changed-file formatting
 and `git diff --check` passed. The original PR52 qualification remains successful;
 this test-only follow-up has its own hosted checks before review/merge.
+
+### Startup warm-setup follow-up
+
+PR53's [Finance run 44674381208](https://github.com/delightful-labs/delightful-labs/actions/runs/44674381208)
+passed every selected job except startup (**6 passed / 1 failed**). The bank-history
+case failed before seeding history or stalling the authority: the shared warm
+setup reloaded after service-worker readiness while initial workspace routing was
+still settling, then observed scoped workspace settings instead of Accounts.
+The trace and error context were inspected before retrying.
+
+The helper now waits for the scoped Accounts URL and enabled Add Account control
+before its warm reload, then asserts that the exact same scoped URL survives.
+No runtime routing, timeout, retry, authority behavior or cold-start assertion
+changed. This establishes the existing scenario's warm-data precondition; it does
+not claim a production routing defect was diagnosed or repaired.
+
+The isolated production startup build used the real startup endpoint/app ID and
+disabled debug/fake data, with catalog generation omitted and disposable storage.
+All **7/7 startup browser scenarios** passed, including full browser restart with
+an unanswered authority, offline reads/writes, real permission rejection and bank
+history across unanswered/offline restarts. Finance test TypeScript, changed-file
+formatting and `git diff --check` passed. Hosted qualification of this follow-up
+remains required before merge; C01–C10 remain complete.
