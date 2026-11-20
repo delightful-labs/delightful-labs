@@ -331,3 +331,17 @@ it('renews native backend sessions without mutating admission and rejects revoke
 		await backend.close()
 	}
 })
+
+it('serves identity-only Finance metadata through the application auth boundary', async () => {
+	const origin = 'https://finance-preview.example.invalid'
+	vi.stubEnv('AUTH_BASE_URL', origin)
+	vi.stubEnv('AUTH_SECRET', 'disposable-metadata-fixture-secret-longer-than-thirty-two')
+	const response = await handleAuth(new Request(origin + '/api/auth/oauth-client-metadata.json'))
+	expect(response.status).toBe(200)
+	expect(await response.json()).toMatchObject({
+		client_id: origin + '/api/auth/oauth-client-metadata.json',
+		client_name: 'Delightful Finance',
+		scope: 'atproto',
+		redirect_uris: [origin + '/api/auth/atproto/callback']
+	})
+})
