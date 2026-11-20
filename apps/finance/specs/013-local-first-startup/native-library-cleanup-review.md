@@ -1214,3 +1214,16 @@ push, merge, deployment, SDK patch, package dependency or storage migration was 
 
 Final fresh `git fetch origin main` confirmed `origin/main` remains `b69e6ad6`;
 no newer main commit, merge or rebase was required.
+
+
+## Publication and hosted qualification follow-up
+
+Published the approved feature branch and opened
+[PR 52](https://github.com/delightful-labs/delightful-labs/pull/52). The first hosted
+run built and uploaded the matching Finance artifact successfully, and both app
+preview builds passed. Foundation selection exposed a stale routing-test allowlist
+that accepted only the previous dependency-list spellings. Updated that assertion
+to require `plan` while allowing additional job dependencies, and explicitly
+retained checks that Finance's browser job requires `browser_build` and refuses a
+failed matching build. All original fail-closed selection checks remain. The affected CI/guidance suite
+passes **23/23** locally. Hosted qualification is still in progress; no merge or production deployment is authorized.
