@@ -622,3 +622,14 @@ A temporary exception for only the branch-preview alias has been requested but
 has not been granted. No protection exception or real-provider login has been
 performed. The Vercel connector created temporary authenticated share access for
 agent verification; that does not make metadata publicly fetchable by a provider.
+
+
+Hosted fix verification: deployment `dpl_516639M21ptFgMonfq7DuEhSTdwZ` of
+commit `6b9976dd` is READY in Preview (SvelteKit, Node 24, iad1; build 71.3 seconds).
+Through authenticated access to the branch alias, the metadata endpoint returns
+200 with the exact Finance client name, branch-origin client/callback URLs and
+`scope: atproto`. A fresh disposable Chromium context successfully opened the
+hosted login page, displayed both the AT Protocol handle input and sign-in button,
+and observed no failed HTTP responses. The context was closed after this check.
+No provider authorization or sign-in was issued. Real-provider qualification
+remains pending the requested preview-alias protection exception and owner login.
