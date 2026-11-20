@@ -55,7 +55,10 @@ This Node/build-only export has no Vite runtime/type dependency and introduces
 no runtime owner.
 
 ```ts
-import { jazzWorkerOptions, resolveJazzWorkerAssets } from 'delightful-local-first/backend/jazz/worker-build'
+import {
+	jazzWorkerOptions,
+	resolveJazzWorkerAssets
+} from 'delightful-local-first/backend/jazz/worker-build'
 
 const assets = resolveJazzWorkerAssets(import.meta.url)
 // Use assets.brokerEntry, assets.wasmEntry and assets.wasmBinary in app-owned aliases.

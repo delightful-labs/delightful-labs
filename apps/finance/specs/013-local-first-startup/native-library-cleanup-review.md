@@ -1227,3 +1227,12 @@ to require `plan` while allowing additional job dependencies, and explicitly
 retained checks that Finance's browser job requires `browser_build` and refuses a
 failed matching build. All original fail-closed selection checks remain. The affected CI/guidance suite
 passes **23/23** locally. Hosted qualification is still in progress; no merge or production deployment is authorized.
+
+
+Hosted Foundation selection now passes. Its package-wide formatter then caught
+Markdown formatting in `docs/jazz-worker-broker.md` and `docs/next-app.md` that the
+changed-TypeScript check had missed. Formatted those two documents without
+changing their contracts; full Local First formatting passes on **450 files** and
+Clipper formatting passes on **621 files**. Website qualification passed on the
+routing-fix head. Remaining hosted application/library checks are monitored on
+PR 52 rather than inferred from the successful local qualification.

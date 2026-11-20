@@ -211,7 +211,6 @@ quiescence receipt and the exact host-close receipt. Import its factory and type
 from `worker/effect-drain/workflow` and `worker/effect-drain/contracts`. The parent
 retains its lock and original unknown outcome until this chart returns proof.
 
-
 ## Finite native browser jobs
 
 Import `createBrowserWorkerJob`, `BrowserWorkerJobInput` and
