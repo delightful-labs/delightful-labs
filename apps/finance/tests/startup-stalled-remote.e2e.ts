@@ -260,11 +260,16 @@ test(
 
 async function prepareSavedExpense(page: Page) {
 	await page.goto('/accounts')
+	await expect(page).toHaveURL(/\/accounts\?workspace=[a-f0-9-]+$/)
+	await expect(
+		page.getByRole('main').getByRole('button', { name: 'Add Account', exact: true })
+	).toBeEnabled()
+	const accountsUrl = page.url()
 	await page.evaluate(async () => {
 		await navigator.serviceWorker.ready
 	})
 	await page.reload()
-	await expect(page).toHaveURL(/\/accounts\?workspace=[a-f0-9-]+$/)
+	await expect(page).toHaveURL(accountsUrl)
 	await openCreationModal(page, 'Add Account')
 	const dialog = creationDialog(page, 'Add Account')
 	await dialog.getByLabel('Account name').fill('Silent remote ledger')
