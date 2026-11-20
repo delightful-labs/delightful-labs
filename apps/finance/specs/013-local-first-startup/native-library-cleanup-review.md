@@ -1,8 +1,10 @@
 # Native-library cleanup specification
 
-Status: C01–C10 complete, including explicit retained-owner dispositions for C06
-and C08. Complete
-focused deletion batches before redesigning shared runtime contracts. The user requested
+Status: C01–C10 complete and merged in PR52 at `884cb464`, including explicit
+retained-owner dispositions for C06 and C08. All 33 reported PR checks/statuses
+passed. This is the current baseline; the earlier checkpoints below are historical.
+
+Complete focused deletion batches before redesigning shared runtime contracts. The user requested
 this specification and an agent handoff on November 19. This does not authorize
 an unreviewed rewrite, dependency patch or production release.
 
@@ -1212,27 +1214,42 @@ Verification:
 completion does not imply removing those existing shared implementations. No
 push, merge, deployment, SDK patch, package dependency or storage migration was performed.
 
-Final fresh `git fetch origin main` confirmed `origin/main` remains `b69e6ad6`;
-no newer main commit, merge or rebase was required.
+The pre-publication fetch confirmed `origin/main` was still `b69e6ad6`; no
+merge or rebase was needed before opening the cleanup PR.
 
 
-## Publication and hosted qualification follow-up
+## Publication, hosted qualification and merge closeout
 
-Published the approved feature branch and opened
-[PR 52](https://github.com/delightful-labs/delightful-labs/pull/52). The first hosted
-run built and uploaded the matching Finance artifact successfully, and both app
-preview builds passed. Foundation selection exposed a stale routing-test allowlist
-that accepted only the previous dependency-list spellings. Updated that assertion
-to require `plan` while allowing additional job dependencies, and explicitly
-retained checks that Finance's browser job requires `browser_build` and refuses a
-failed matching build. All original fail-closed selection checks remain. The affected CI/guidance suite
-passes **23/23** locally. Hosted qualification is still in progress; no merge or production deployment is authorized.
+[PR52](https://github.com/delightful-labs/delightful-labs/pull/52) merged on
+November 20, 2026 (UTC), as `884cb4641140e96b925a19a6da0622fa77dcc7c8`.
+The final PR head was `dfcc13e4f1dbbffcd47667d857f1fd3e57cec075`.
+All **33 reported checks/statuses passed** before merge, including:
 
+- [Foundation](https://github.com/delightful-labs/delightful-labs/actions/runs/44662459930):
+  selection/guidance, website, UI and Local First checks, public consumers and
+  native browser qualification.
+- [Finance](https://github.com/delightful-labs/delightful-labs/actions/runs/44662459944):
+  types/units/build, the matching immutable browser artifact, both application
+  shards, authentication, permissions, workspace, presentation, startup, restore,
+  feature flags and production-preview PWA qualification.
+- [Clipper](https://github.com/delightful-labs/delightful-labs/actions/runs/44662459825):
+  tooling/types/build, ordinary browser scenarios, workers/offline/sample data,
+  packaged extension and the required aggregate browser check.
+- Conventional PR title and the reported Vercel preview statuses.
 
-Hosted Foundation selection now passes. Its package-wide formatter then caught
-Markdown formatting in `docs/jazz-worker-broker.md` and `docs/next-app.md` that the
-changed-TypeScript check had missed. Formatted those two documents without
-changing their contracts; full Local First formatting passes on **450 files** and
-Clipper formatting passes on **621 files**. Website qualification passed on the
-routing-fix head. Remaining hosted application/library checks are monitored on
-PR 52 rather than inferred from the successful local qualification.
+Hosted checks exposed two verification gaps, both corrected before the passing
+head: the routing test's old dependency-list allowlist did not include the shared
+browser-build dependency, and package-wide Markdown formatting had been missed
+by the changed-TypeScript formatting check. Fail-closed routing remains asserted;
+the affected CI/guidance suite passed **23/23** locally. Full Local First and
+Clipper formatting passed on **450** and **621** files respectively. Those fixes
+changed tests/document formatting, not runtime policy or storage identities.
+
+Fresh post-merge fetch confirmed `origin/main` at the merge commit above. The
+user merged the PR; this agent did not perform the merge or manually deploy any
+service. Local user servers/data and other agents' work remain untouched.
+
+**C01–C10 have no remaining implementation or qualification tasks.** C06/C08's
+reviewed retained owners remain intentional. Do not revive superseded historical
+worker-migration checkboxes as new work without checking the current handoff and
+agreeing a new concrete objective with the user.
