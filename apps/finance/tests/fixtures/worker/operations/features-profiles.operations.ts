@@ -65,20 +65,28 @@ export const operation114 = async () => {
 	return { profileId: profile.id, userId }
 }
 
-export const operation127 = () => window.workspaceSettingsTest.userId
+export const operation127 = async () => {
+	const { app, db, userId } = window.workspaceSettingsTest
+	const profile = await db.one(app.profiles.where({ userId }), { tier: 'remote' })
+	if (!profile) throw new Error('Missing member profile')
+	return { userId, profileId: profile.id }
+}
 
 export const operation128 = async ({
 	organizationId,
-	subjectId
+	subjectId,
+	profileId
 }: {
 	organizationId: string
 	subjectId: string
+	profileId: string
 }) => {
 	const { app, db } = window.workspaceSettingsTest
 	await db
 		.insert(app.organizationMembers, {
 			organizationId,
 			userId: subjectId,
+			profileId,
 			role: 'member',
 			accountAccessMode: 'all'
 		})

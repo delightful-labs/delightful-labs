@@ -67,8 +67,13 @@ test(
 		try {
 			const subject = await context.newPage()
 			await start(subject)
-			const subjectId = await financeFixture(subject, 'features/profiles.e2e:127')
-			await financeFixture(page, 'features/profiles.e2e:128', { organizationId, subjectId })
+			const member = await financeFixture(subject, 'features/profiles.e2e:127')
+			const subjectId = member.userId
+			await financeFixture(page, 'features/profiles.e2e:128', {
+				organizationId,
+				subjectId,
+				profileId: member.profileId
+			})
 			const selector = subject.getByLabel('Current Workspace', { exact: true })
 			await expect(selector.locator(`option[value="${organizationId}"]`)).toHaveCount(1)
 			await selectWorkspace(selector, organizationId)

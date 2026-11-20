@@ -1253,3 +1253,27 @@ service. Local user servers/data and other agents' work remain untouched.
 reviewed retained owners remain intentional. Do not revive superseded historical
 worker-migration checkboxes as new work without checking the current handoff and
 agreeing a new concrete objective with the user.
+
+
+### Post-merge shared-profile fixture follow-up
+
+The merge commit's Finance workspace job reported **54 passed / 1 failed** in
+[run 44671485384](https://github.com/delightful-labs/delightful-labs/actions/runs/44671485384).
+The saved trace showed the member's entered name and a disabled Save button,
+with profile-attribution repair active. The unmodified focused case passed
+locally, so this evidence does not establish a runtime or command-scope defect.
+
+Source inspection found that the owner-only edit scenario inserted a shared
+membership without `profileId`. Corrected that setup to read the member's existing
+profile through its own SDK and link it when creating the membership, matching
+the other shared-profile fixtures. The ownership scenario now has a fully
+attributed membership; explicit missing-profile-reference visibility coverage is
+retained. No permission, runtime, form-admission or worker-protocol code changed.
+
+After rebuilding the isolated fixture once without catalog generation, all
+**5/5 profile browser cases** passed with two workers. Includes offline naming and
+transaction attribution, owner-only writes, and admin/member/viewer visibility,
+isolation and membership removal. Finance test TypeScript, unchanged E2E scope
+selection (**270 unique scenarios / 44 assigned files**), changed-file formatting
+and `git diff --check` passed. The original PR52 qualification remains successful;
+this test-only follow-up has its own hosted checks before review/merge.
