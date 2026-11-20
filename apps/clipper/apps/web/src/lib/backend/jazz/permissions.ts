@@ -1,3 +1,4 @@
+import { authPermissions } from 'delightful-local-first/backend/jazz/auth-schema'
 import type { schema as s } from 'jazz-tools'
 import { schema } from './schema.js'
 
@@ -58,6 +59,7 @@ const validSite = (libraryId: s.Uuid, faviconId: s.Uuid) =>
 	allOf(isMyLibrary(libraryId), anyOf({ faviconId: null }, assetMatches(faviconId, libraryId)))
 
 export const permissions = definePermissions({
+	...authPermissions,
 	articleImages: {
 		read: (articleImage) => isMyLibrary(articleImage.libraryId),
 		insert: (articleImage) =>
@@ -99,42 +101,6 @@ export const permissions = definePermissions({
 				isMyLibrary(asset.libraryId),
 				storageOperationMatches(asset.operationId, asset.libraryId)
 			),
-		update: false,
-		delete: false
-	},
-	better_auth_account: {
-		read: false,
-		insert: false,
-		update: false,
-		delete: false
-	},
-	better_auth_atprotoSession: {
-		read: false,
-		insert: false,
-		update: false,
-		delete: false
-	},
-	better_auth_atprotoState: {
-		read: false,
-		insert: false,
-		update: false,
-		delete: false
-	},
-	better_auth_session: {
-		read: false,
-		insert: false,
-		update: false,
-		delete: false
-	},
-	better_auth_user: {
-		read: false,
-		insert: false,
-		update: false,
-		delete: false
-	},
-	better_auth_verification: {
-		read: false,
-		insert: false,
 		update: false,
 		delete: false
 	},

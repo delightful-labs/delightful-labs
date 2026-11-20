@@ -9,7 +9,7 @@ function unavailable(error: string, fields: string[] = [], status = 503): Respon
 	return Response.json({ error, fields }, { status, headers: { 'Cache-Control': 'no-store' } })
 }
 
-export function configuredAuth() {
+export function configuredAuth(): ReturnType<typeof createAuthServer> | undefined {
 	const parsed = authConfiguration.safeParse({
 		origin: process.env.AUTH_BASE_URL,
 		secret: process.env.AUTH_SECRET

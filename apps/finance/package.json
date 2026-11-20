@@ -59,6 +59,8 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
+		"better-auth": "1.7.22",
+		"@kingironman2011/better-auth-bsky": "0.3.2",
 		"@faker-js/faker": "^10.6.0",
 		"@opentelemetry/api": "^1.9.1",
 		"@vercel/functions": "3.11.0",

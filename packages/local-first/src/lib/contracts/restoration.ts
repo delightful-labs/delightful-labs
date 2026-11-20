@@ -8,6 +8,8 @@ export type RestorationIdentity =
 /** Fixed leaf dependencies. Credentials and raw SDK errors must never enter diagnostics. */
 export type RestorationCapability = Readonly<{
 	parsePhrase: (phrase: string) => Promise<string>
+	/** Optional provider cookie/session clearance after validation and host drain. */
+	clearProviderSession?: () => Promise<void>
 	/** Total, synchronous predicate; checks session/environment, not the changing account. */
 	isCurrentBinding: (binding: object) => boolean
 	/** One issued operation. Settlement/rejection does not promise rollback or cancellation. */
@@ -44,6 +46,7 @@ export type RestorationResult = RestorationScope &
 	(
 		| Readonly<{ outcome: 'invalid'; mutation: 'notStarted' }>
 		| Readonly<{ outcome: 'cancelled'; mutation: 'notStarted' | 'settled' }>
-		| Readonly<{ outcome: 'failed' | 'identityUnavailable'; mutation: 'settled' }>
+		| Readonly<{ outcome: 'failed'; mutation: 'notStarted' | 'settled' }>
+		| Readonly<{ outcome: 'identityUnavailable'; mutation: 'settled' }>
 		| Readonly<{ outcome: 'restored'; mutation: 'settled'; identityId: string }>
 	)

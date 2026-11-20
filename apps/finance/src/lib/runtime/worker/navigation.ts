@@ -50,3 +50,22 @@ export async function replyWithWindowNavigation(
 		port.close()
 	}
 }
+
+/** Selected browser-only redirect, requested after Finance's close receipts settle. */
+export function requestProviderNavigation(url: string) {
+	const channel = new MessageChannel()
+	return new Promise<void>((resolve, reject) => {
+		channel.port1.onmessageerror = () => reject(new Error('Provider navigation reply unavailable'))
+		channel.port1.onmessage = (event) => {
+			const reply = financeNavigationReply.safeParse(event.data)
+			if (reply.success && reply.data.outcome === 'completed') resolve()
+			else reject(new Error('Provider navigation failed'))
+		}
+		try {
+			globalThis.postMessage({ type: 'PROVIDER_NAVIGATE', url }, { transfer: [channel.port2] })
+		} catch (error) {
+			channel.port2.close()
+			reject(error)
+		}
+	}).finally(() => channel.port1.close())
+}

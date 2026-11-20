@@ -1,3 +1,4 @@
+import { workerAuthView } from './worker-auth.js'
 import { projectedInspection } from '../diagnostics/inspection-projection.js'
 import { workerSamplesView } from './worker-forms.js'
 import { workerBankView, workerBankCommand, workerBankHistoryCommand } from './worker-banks.js'
@@ -144,6 +145,15 @@ export type WorkerOverviewView = z.output<typeof workerOverviewView>
 export type WorkerLedgerRecord = z.output<typeof transactionLedgerRecordSchema>
 export type WorkerLedgerView = z.output<typeof workerLedgerView>
 export const financeWorkerCommand = z.discriminatedUnion('type', [
+	z.strictObject({
+		type: z.literal('BEGIN_AUTH'),
+		sessionRevision,
+		handle: z.string().trim().min(1).max(2048)
+	}),
+	z.strictObject({
+		type: z.enum(['CONFIRM_AUTH', 'CANCEL_AUTH', 'RETRY_AUTH', 'SIGN_OUT']),
+		sessionRevision
+	}),
 	z.strictObject({
 		type: z.literal('ADD_SAMPLES'),
 		kind: workerTransactionKind,
@@ -332,6 +342,7 @@ export const financeRecoveryReply = z.discriminatedUnion('outcome', [
 ])
 export const financeWorkerOpen = z.strictObject({
 	type: z.literal('OPEN'),
+	callbackAttempt: z.string().nullable().optional(),
 	hostId: z.uuid(),
 	serverUrl: z.url().max(8192),
 	scope: z.string().trim().min(1).max(8192),
@@ -408,6 +419,7 @@ export const workerClassificationView = z.strictObject({
 	archivableTagIds: z.array(z.uuid())
 })
 export const financeWorkerView = z.strictObject({
+	auth: workerAuthView.optional(),
 	type: z.literal('VIEW'),
 	sessionRevision,
 	transactionKind: workerTransactionKind,
@@ -499,6 +511,11 @@ export const financeWorkerReply = z.discriminatedUnion('type', [
 	financeWebAuthnRequest,
 	financeDownloadRequest,
 	z.strictObject({ type: z.literal('RELOAD_PAGE') }),
+	z.strictObject({ type: z.literal('AUTH_RETURNED') }),
+	z.strictObject({
+		type: z.literal('PROVIDER_NAVIGATE'),
+		url: z.url().refine((value) => new URL(value).protocol === 'https:')
+	}),
 	z.strictObject({ type: z.literal('CLOSED') }),
 	z.strictObject({ type: z.literal('FAILED') })
 ])

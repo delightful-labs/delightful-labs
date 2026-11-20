@@ -12,6 +12,7 @@ import { app } from '../../backend/jazz/jazz.generated.js'
 import permissions from '../../backend/jazz/jazz.permissions.json' with { type: 'json' }
 import { createAuthServer } from './server.js'
 import { identityAuthorizationScope, publicationAuthorizationScope } from './authorization.js'
+import { createAtprotoAuthServer } from 'delightful-local-first/backend/jazz/auth'
 
 const origin = 'https://clipper.example.invalid'
 const issuer = 'https://issuer.example.invalid'
@@ -110,8 +111,36 @@ function signInRequest(scope: unknown, selectedOrigin = origin) {
 	})
 }
 
+it('defaults the shared server to identity-only metadata and actual authorization grants', async () => {
+	const remote = provider()
+	const auth = createAtprotoAuthServer(
+		{ db: () => db, schema: app },
+		{ origin, secret },
+		{ clientName: 'Identity-only consumer', cookiePrefix: 'finance.auth' }
+	)
+	const metadata = await auth.handler(new Request(origin + '/api/auth/oauth-client-metadata.json'))
+	expect(await metadata.json()).toMatchObject({ scope: 'atproto' })
+	expect((await auth.handler(signInRequest(undefined))).status).toBe(200)
+	expect(remote.pushed.map((body) => body.get('scope'))).toEqual(['atproto'])
+	const before = await db.all(app.better_auth_atprotoState)
+	expect((await auth.handler(signInRequest(publicationAuthorizationScope))).status).toBe(400)
+	expect(remote.pushed).toHaveLength(1)
+	expect(await db.all(app.better_auth_atprotoState)).toEqual(before)
+})
+
+it('refuses a default grant outside the configured allowed grants', () => {
+	expect(() =>
+		createAtprotoAuthServer(
+			{ db: () => db, schema: app },
+			{ origin, secret },
+			{ clientName: 'Invalid consumer', defaultAuthorizationScope: publicationAuthorizationScope }
+		)
+	).toThrow('Invalid auth authorization policy')
+})
+
 it('requests Margin access by default and honors explicit scopes through the real client, plugin and OAuth PAR implementation', async () => {
 	const remote = provider()
+	const before = await db.all(app.better_auth_atprotoState)
 	const auth = createAuthServer({ db: () => db, schema: app }, { origin, secret })
 	const client = createAuthClient({
 		baseURL: origin,
@@ -141,7 +170,7 @@ it('requests Margin access by default and honors explicit scopes through the rea
 		'atproto',
 		'atproto repo:at.margin.note'
 	])
-	expect(await db.all(app.better_auth_atprotoState)).toHaveLength(3)
+	expect(await db.all(app.better_auth_atprotoState)).toHaveLength(before.length + 3)
 	expect(await db.all(app.publications)).toEqual([])
 })
 

@@ -61,7 +61,11 @@ const row = (name: string): WorkerAccount => ({
 	kind: 'cash',
 	currency: 'USD'
 })
-function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db']) {
+function fixture(
+	initialization?: InputFrom<typeof workspaceInitialization>['db'],
+	navigateProvider?: (url: string) => Promise<void>,
+	clearAppSession?: () => Promise<void>
+) {
 	const order: string[] = []
 	let observed = (_: SessionRuntimeObservation<FinanceWorkerCapabilities>) => {}
 	const directory: {
@@ -280,7 +284,9 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 		readRecoveryPhrase: recoveryRead,
 		archiveAccount: archiveWrite
 	}
-	const ready = (binding: object): SessionRuntimeObservation<FinanceWorkerCapabilities> => ({
+	const ready = (
+		binding: object
+	): Extract<SessionRuntimeObservation<FinanceWorkerCapabilities>, { status: 'ready' }> => ({
 		status: 'ready',
 		binding,
 		identityId: userId,
@@ -386,7 +392,9 @@ function fixture(initialization?: InputFrom<typeof workspaceInitialization>['db'
 			closeAccountStore,
 			closeBroker,
 			brokerIdentity,
-			navigate
+			navigate,
+			...(navigateProvider ? { navigateProvider } : {}),
+			...(clearAppSession ? { clearAppSession } : {})
 		}
 	})
 	owner = actor
@@ -2626,4 +2634,203 @@ describe('worker recovery native navigation ownership', () => {
 			f.stop()
 		}
 	})
+})
+
+describe('provider login admission and shutdown', () => {
+	async function start(f: ReturnType<typeof fixture>) {
+		await f.start()
+		f.actor.send({ type: 'OBSERVE_ROUTE', pathname: '/login', search: '', hash: '', revision: 1 })
+		return f.view().sessionRevision
+	}
+	it('confirms before provider work and waits for all close receipts before navigation', async () => {
+		const navigated = vi.fn(async (_url: string) => {})
+		const fetch = vi.fn(async () => Response.json({ url: 'https://provider.invalid/authorize' }))
+		vi.stubGlobal('fetch', fetch)
+		const f = fixture(undefined, navigated)
+		const closed = Promise.withResolvers<void>()
+		f.closeBroker.mockImplementation(async () => {
+			await closed.promise
+			return { scope: 'host', requestId: 'close-receipt' }
+		})
+		try {
+			const sessionRevision = await start(f)
+			f.actor.send({ type: 'BEGIN_AUTH', handle: 'person.example', sessionRevision })
+			expect(f.view().auth?.confirmationRequired).toBe(true)
+			expect(fetch).not.toHaveBeenCalled()
+			f.actor.send({ type: 'CONFIRM_AUTH', sessionRevision })
+			await vi.waitFor(() => expect(f.closeBroker).toHaveBeenCalledOnce())
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.closeAccountStore).toHaveBeenCalledOnce()
+			expect(navigated).not.toHaveBeenCalled()
+			closed.resolve()
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(navigated).toHaveBeenCalledExactlyOnceWith('https://provider.invalid/authorize')
+		} finally {
+			closed.resolve()
+			f.stop()
+		}
+	})
+	it.each(['route', 'identity'])(
+		'invalidates confirmation when the %s changes',
+		async (changed) => {
+			const navigated = vi.fn(async (_url: string) => {})
+			const fetch = vi.fn()
+			vi.stubGlobal('fetch', fetch)
+			const f = fixture(undefined, navigated)
+			try {
+				const sessionRevision = await start(f)
+				f.actor.send({ type: 'BEGIN_AUTH', handle: 'person.example', sessionRevision })
+				if (changed === 'route')
+					f.actor.send({
+						type: 'OBSERVE_ROUTE',
+						pathname: '/account',
+						search: '',
+						hash: '',
+						revision: 2
+					})
+				else f.publishSession(f.ready({}))
+				f.actor.send({ type: 'CONFIRM_AUTH', sessionRevision })
+				expect(f.view().auth?.confirmationRequired).toBe(false)
+				expect(fetch).not.toHaveBeenCalled()
+				expect(navigated).not.toHaveBeenCalled()
+			} finally {
+				f.stop()
+			}
+		}
+	)
+	it('does not navigate after a native close failure', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => Response.json({ url: 'https://provider.invalid/authorize' }))
+		)
+		const navigated = vi.fn(async (_url: string) => {})
+		const f = fixture(undefined, navigated)
+		f.nativeClose.mockRejectedValueOnce(new Error('Synthetic native close failure'))
+		try {
+			const sessionRevision = await start(f)
+			f.actor.send({ type: 'BEGIN_AUTH', handle: 'person.example', sessionRevision })
+			f.actor.send({ type: 'CONFIRM_AUTH', sessionRevision })
+			await waitFor(f.actor, (snapshot) => snapshot.matches('closeFailed'))
+			expect(navigated).not.toHaveBeenCalled()
+			expect(f.view().auth?.message?.key).toBe('login.atproto_failed')
+		} finally {
+			f.stop()
+		}
+	})
+})
+
+describe('ordered provider sign-out', () => {
+	it('updates authentication facts without restarting a stable native binding', async () => {
+		const f = fixture(
+			undefined,
+			async () => {},
+			async () => {}
+		)
+		try {
+			await f.start()
+			const ready = f.actor.getSnapshot().context.ready
+			if (!ready) throw new Error('Missing native ready observation')
+			const revision = f.view().sessionRevision
+			f.publishSession({ ...ready, identityKind: 'backend' })
+			expect(f.view().auth?.canSignOut).toBe(true)
+			expect(f.view().sessionRevision).toBe(revision)
+			expect(f.open).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+
+	async function startBackend(f: ReturnType<typeof fixture>) {
+		await f.start()
+		f.publishSession({ ...f.ready({}), identityKind: 'backend' })
+		await waitFor(f.actor, () => f.view().auth?.canSignOut === true)
+		return f.view().sessionRevision
+	}
+	it('never offers provider sign-out for a silently initialized guest', async () => {
+		const provider = vi.fn(async () => {})
+		const f = fixture(undefined, async () => {}, provider)
+		try {
+			await f.start()
+			f.actor.send({ type: 'SIGN_OUT', sessionRevision: f.view().sessionRevision })
+			expect(f.view().auth?.canSignOut).toBe(false)
+			expect(provider).not.toHaveBeenCalled()
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+	it('refuses native logout after provider failure and leaves the current identity usable', async () => {
+		const provider = vi.fn(async () => {
+			throw new Error('Synthetic provider failure')
+		})
+		const f = fixture(undefined, async () => {}, provider)
+		try {
+			const sessionRevision = await startBackend(f)
+			f.actor.send({ type: 'SIGN_OUT', sessionRevision })
+			await vi.waitFor(() =>
+				expect(f.view().auth?.signOutMessage?.key).toBe('login.sign_out_failed')
+			)
+			expect(f.changeIdentity).not.toHaveBeenCalled()
+			expect(f.view().identityId).toBe(userId)
+			expect(f.view().auth?.canSignOut).toBe(true)
+		} finally {
+			f.stop()
+		}
+	})
+	it('clears the app session before native logout and allows signed-out login without provisioning a guest', async () => {
+		const order: string[] = []
+		const f = fixture(
+			undefined,
+			async () => {},
+			async () => {
+				order.push('provider')
+			}
+		)
+		f.changeIdentity.mockImplementation(async (change) => {
+			order.push(change.operation)
+			f.publishSession({ status: 'signed-out', binding: {} })
+			return 'completed'
+		})
+		try {
+			const sessionRevision = await startBackend(f)
+			f.actor.send({ type: 'SIGN_OUT', sessionRevision })
+			await waitFor(f.actor, () => f.view().status === 'signed-out')
+			expect(order).toEqual(['provider', 'signOut'])
+			expect(f.view().auth?.canBegin).toBe(true)
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			expect(f.view().auth?.canSignOut).toBe(false)
+		} finally {
+			f.stop()
+		}
+	})
+	it.each(['close', 'replacement'])(
+		'retains a held provider effect during %s',
+		async (interruption) => {
+			const held = Promise.withResolvers<void>()
+			const provider = vi.fn(() => held.promise)
+			const f = fixture(undefined, async () => {}, provider)
+			try {
+				const sessionRevision = await startBackend(f)
+				f.actor.send({ type: 'SIGN_OUT', sessionRevision })
+				await vi.waitFor(() => expect(provider).toHaveBeenCalledOnce())
+				if (interruption === 'close') f.actor.send({ type: 'CLOSE' })
+				else f.publishSession({ ...f.ready({}), identityKind: 'backend' })
+				expect(f.changeIdentity).not.toHaveBeenCalled()
+				expect(f.nativeClose).not.toHaveBeenCalled()
+				held.resolve()
+				if (interruption === 'close') {
+					await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+					expect(f.changeIdentity).toHaveBeenCalledOnce()
+					expect(f.nativeClose).toHaveBeenCalledOnce()
+				} else {
+					await vi.waitFor(() => expect(f.view().auth?.signOutBusy).toBe(false))
+					expect(f.changeIdentity).not.toHaveBeenCalled()
+					expect(f.view().identityId).toBe(userId)
+				}
+			} finally {
+				held.resolve()
+				f.stop()
+			}
+		}
+	)
 })

@@ -33,6 +33,8 @@
 		"test:account-store": "pnpm package && tsc --project fixtures/indexeddb-account-store/tsconfig.json && vitest run --config fixtures/indexeddb-account-store/vitest.config.ts"
 	},
 	"devDependencies": {
+		"better-auth": "1.7.22",
+		"@kingironman2011/better-auth-bsky": "0.3.2",
 		"@inlang/paraglide-js": "3.1.0",
 		"@opentelemetry/api": "1.9.1",
 		"@playwright/test": "1.60.0",
@@ -61,6 +63,22 @@
 	"version": "0.0.0",
 	"description": "Reusable local-first identity and workspace foundations for Delightful apps.",
 	"exports": {
+		"./backend/jazz/auth": {
+			"types": "./dist/backend/jazz/atproto-auth.d.ts",
+			"default": "./dist/backend/jazz/atproto-auth.js"
+		},
+		"./backend/jazz/auth-schema": {
+			"types": "./dist/backend/jazz/auth-schema.d.ts",
+			"default": "./dist/backend/jazz/auth-schema.js"
+		},
+		"./auth/atproto/workflow": {
+			"types": "./dist/auth/atproto/workflow.d.ts",
+			"default": "./dist/auth/atproto/workflow.js"
+		},
+		"./auth/atproto/server": {
+			"types": "./dist/auth/atproto/server.d.ts",
+			"default": "./dist/auth/atproto/server.js"
+		},
 		"./backend/jazz/backup": {
 			"types": "./dist/backend/jazz/backup-api.d.ts",
 			"default": "./dist/backend/jazz/backup-api.js"
@@ -455,12 +473,20 @@
 		"!dist/**/*.spec.*"
 	],
 	"peerDependencies": {
+		"better-auth": "1.7.22",
+		"@kingironman2011/better-auth-bsky": "0.3.2",
 		"delightful-ui": "0.0.25",
 		"jazz-tools": "2.0.0-alpha.67",
 		"svelte": "^5.57.2",
 		"xstate": "6.0.0-beta.1"
 	},
 	"peerDependenciesMeta": {
+		"better-auth": {
+			"optional": true
+		},
+		"@kingironman2011/better-auth-bsky": {
+			"optional": true
+		},
 		"xstate": {
 			"optional": true
 		},

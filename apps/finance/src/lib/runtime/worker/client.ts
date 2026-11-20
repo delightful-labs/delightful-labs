@@ -117,6 +117,7 @@ export function createFinanceWorkerClient(
 ) {
 	const open = financeWorkerOpen.parse({
 		type: 'OPEN',
+		callbackAttempt: new URL(location.href).searchParams.get('atproto_attempt'),
 		...configuration,
 		hostId: crypto.randomUUID()
 	})
@@ -194,6 +195,30 @@ export function createFinanceWorkerClient(
 			const port = event.ports[0]
 			if (port && event.ports.length === 1) dispatchWindowBackup(port, decoded.data.bytes)
 			else fail()
+			return
+		}
+		if (decoded.data.type === 'AUTH_RETURNED') {
+			const url = new URL(location.href)
+			url.searchParams.delete('atproto_attempt')
+			history.replaceState(history.state, '', url)
+			observeLocation()
+			observeRoute()
+			return
+		}
+		if (decoded.data.type === 'PROVIDER_NAVIGATE') {
+			const port = event.ports[0]
+			if (!port || event.ports.length !== 1) {
+				fail()
+				return
+			}
+			try {
+				window.location.assign(decoded.data.url)
+				port.postMessage({ outcome: 'completed' })
+			} catch {
+				port.postMessage({ outcome: 'failed' })
+			} finally {
+				port.close()
+			}
 			return
 		}
 		if (decoded.data.type === 'RELOAD_PAGE') {
@@ -350,6 +375,27 @@ export function createFinanceWorkerClient(
 		closeImageEditor: () => imageEditor.set(null),
 		location: { subscribe: observedLocation.subscribe },
 		view,
+		signOut: () =>
+			worker.postMessage(
+				financeWorkerCommand.parse({
+					type: 'SIGN_OUT',
+					sessionRevision: get(state).sessionRevision
+				})
+			),
+		beginAuth: (handle: string) => {
+			const command = financeWorkerCommand.safeParse({
+				type: 'BEGIN_AUTH',
+				handle,
+				sessionRevision: get(state).sessionRevision
+			})
+			if (command.success) worker.postMessage(command.data)
+		},
+		retryAuth: () =>
+			worker.postMessage({ type: 'RETRY_AUTH', sessionRevision: get(state).sessionRevision }),
+		confirmAuth: () =>
+			worker.postMessage({ type: 'CONFIRM_AUTH', sessionRevision: get(state).sessionRevision }),
+		cancelAuth: () =>
+			worker.postMessage({ type: 'CANCEL_AUTH', sessionRevision: get(state).sessionRevision }),
 		observeLocation,
 		observeRoute,
 		navigateWorkspace: (workspaceId: string) => {
