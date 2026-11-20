@@ -336,7 +336,11 @@ it('serves identity-only Finance metadata through the application auth boundary'
 	const origin = 'https://finance-preview.example.invalid'
 	vi.stubEnv('AUTH_BASE_URL', origin)
 	vi.stubEnv('AUTH_SECRET', 'disposable-metadata-fixture-secret-longer-than-thirty-two')
-	const response = await handleAuth(new Request(origin + '/api/auth/oauth-client-metadata.json'))
+	const response = await handleAuth(
+		new Request(origin + '/api/auth/oauth-client-metadata.json', {
+			headers: { 'x-forwarded-for': '192.0.2.1' }
+		})
+	)
 	expect(response.status).toBe(200)
 	expect(await response.json()).toMatchObject({
 		client_id: origin + '/api/auth/oauth-client-metadata.json',

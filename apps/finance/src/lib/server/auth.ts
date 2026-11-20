@@ -4,9 +4,6 @@ import {
 } from 'delightful-local-first/backend/jazz/auth'
 import { createAuthRequestHandler } from 'delightful-local-first/auth/atproto/server'
 import { app } from '../jazz.generated.js'
-import { createLogger } from '../diagnostics/logger.js'
-
-const logger = createLogger('auth')
 
 const handleConfiguredAuth = createAuthRequestHandler({
 	cookieName: 'finance.oauth-completion',
@@ -43,35 +40,7 @@ export async function handleAuth(request: Request): Promise<Response> {
 	}
 	if (!configured) return unavailable('invalid_auth_configuration')
 	try {
-		return await handleConfiguredAuth(
-			{
-				api: configured.api,
-				handler: async (providerRequest) => {
-					try {
-						return await configured.handler(providerRequest)
-					} catch (error) {
-						const kind =
-							error instanceof Error &&
-							['Error', 'TypeError', 'ReferenceError', 'RangeError', 'SyntaxError'].includes(
-								error.name
-							)
-								? error.name
-								: 'unknown'
-						const frame =
-							error instanceof Error
-								? error.stack?.match(/\/var\/task\/([A-Za-z0-9_./-]+):(\d+):(\d+)/)
-								: undefined
-						logger.error('provider_request_failed', {
-							kind,
-							location: frame ? frame.slice(1).join(':') : 'unavailable'
-						})
-						throw error
-					}
-				}
-			},
-			request,
-			parsed.data
-		)
+		return await handleConfiguredAuth(configured, request, parsed.data)
 	} catch {
 		if (request.signal.aborted)
 			throw new DOMException('Authentication request disconnected', 'AbortError')

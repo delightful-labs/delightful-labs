@@ -30,6 +30,7 @@
 		"test:permissions": "playwright test --config tests/config/playwright.permissions.config.ts",
 		"test:workspace": "playwright test --config tests/config/playwright.workspace.config.ts",
 		"check:tests": "tsc --project tests/tsconfig.json --noEmit",
+		"check:auth-build": "node --test tests/auth-metadata-build.test.mjs",
 		"test:attachments": "playwright test --config tests/config/playwright.transaction-attachments.config.ts",
 		"test:description": "playwright test --config tests/config/playwright.transaction-description.config.ts",
 		"test:startup": "playwright test --config tests/config/playwright.startup.config.ts",

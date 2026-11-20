@@ -583,3 +583,42 @@ The preceding 72-case browser result remains applicable: this follow-up changes
 only documentation and native test coverage, with no runtime code changes.
 A hosted real-provider round trip remains open; no commit, push, deployment,
 production configuration or live-provider session was changed.
+
+
+## Hosted preview checkpoint — 2026-11-20
+
+The user explicitly approved committing, pushing and creating an isolated Finance
+preview for provider qualification. The implementation was rebased onto freshly
+fetched main `614d8d40` without conflicts, then committed and pushed as
+`e7d4c785` on `docs/finance-atproto-login`. The incoming main changes were
+unrelated documentation and Finance test-fixture fixes.
+
+Vercel project `delightful-finances` built the branch successfully. Preview-only,
+branch-scoped `AUTH_BASE_URL` and an independently generated sensitive
+`AUTH_SECRET` were configured. The branch alias is
+`delightful-finances-git-docs-fi-b29966-mjamesderochers-projects.vercel.app`.
+Production settings and storage were not changed. A request using the API target
+`staging` was rejected by automatic approval review; the documented safer preview
+operation (omitted target, reusing the verified preview source) was accepted and
+returned `target: null`.
+
+Authenticated metadata checks exposed an actual production-only failure:
+Better Auth's IP validator called `z.validate`, but Finance's built server had
+externalized Zod imports to Finance's older Zod 4.1.11. Better Auth's own pinned
+Zod 4.6.7 supplies that API. Native source tests preserved the proper dependency
+resolution, and requests without forwarded IPs did not reach the failing branch.
+Temporary sanitized diagnostics identified the TypeError and bundle source
+location; they have now been removed and branch debugging has been disabled.
+
+Finance SSR now bundles Zod so each importer keeps its compatible installed
+version. There is no dependency upgrade, override, SDK patch or disabled rate
+limiting. A new `check:auth-build` check runs the actual emitted route in production
+mode with a forwarded IP: it reproduced `500 !== 200` before the rebuild and
+passes after the fix. Finance CI runs this check after its existing production
+build. Five native auth cases, the production build and Svelte/type checks pass.
+
+Anonymous provider metadata discovery still redirects to Vercel Authentication.
+A temporary exception for only the branch-preview alias has been requested but
+has not been granted. No protection exception or real-provider login has been
+performed. The Vercel connector created temporary authenticated share access for
+agent verification; that does not make metadata publicly fetchable by a provider.

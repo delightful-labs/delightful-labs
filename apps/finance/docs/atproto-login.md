@@ -104,3 +104,10 @@ Local native/browser tests already cover these app boundaries with a synthetic
 provider redirect and real Jazz, cookies and completion receipts. They do not
 establish real-provider consent or OAuth interoperability. The current evidence
 is recorded in the [feature spec](../../../specs/004-finance-atproto-login/spec.md).
+
+After a production build, `pnpm --filter delightful-finances check:auth-build`
+checks the emitted auth endpoint in production mode with a forwarded client IP.
+This protects the dependency boundary between Finance's Zod and Better Auth's
+newer Zod: SSR bundles each version with its importer instead of making bundled
+Better Auth resolve Finance's older external package. Native source tests alone
+do not exercise that production bundling boundary.

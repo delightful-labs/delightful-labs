@@ -71,6 +71,8 @@ jobs:
           FINANCE_PREVIEW: 'true'
           PUBLIC_JAZZ_APP_ID: ci-build
           PUBLIC_JAZZ_SERVER_URL: http://127.0.0.1:9
+      - name: Verify built auth behind a forwarding proxy
+        run: pnpm check:auth-build
 
   browser_build:
     needs: plan
