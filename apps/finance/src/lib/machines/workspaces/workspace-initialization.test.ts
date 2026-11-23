@@ -85,7 +85,8 @@ describe('workspace initialization decisions', () => {
 		expect(done.output).toEqual({
 			outcome: 'ready',
 			identityId: expectedProfileId,
-			workspaceId: expectedWorkspaceId
+			workspaceId: expectedWorkspaceId,
+			persistence: { outcome: 'succeeded', settlement: 'locallyPersisted', workspace }
 		})
 		expect(f.insert).toHaveBeenNthCalledWith(
 			1,

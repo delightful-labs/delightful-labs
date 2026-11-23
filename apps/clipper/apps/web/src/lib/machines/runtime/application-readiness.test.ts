@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createActor, waitFor, SimulatedClock } from 'xstate'
+import { createActor, waitFor, SimulatedClock, type InspectionEvent } from 'xstate'
 import {
 	createApplicationReadinessMachine,
 	selectApplicationView,
@@ -25,12 +25,14 @@ function fixture(
 		clock?: SimulatedClock
 		acquisition?: Promise<void>
 		signOut?: () => Promise<void>
+		inspect?: (event: InspectionEvent) => void
 	}
 ) {
 	const native = nativeSessionFixture(initial, options)
 	const actor = createActor(createApplicationReadinessMachine(options?.observeConnection), {
 		input: { ...native.input, ...(options?.signOut ? { signOut: options.signOut } : {}) },
-		...(options?.clock ? { clock: options.clock } : {})
+		...(options?.clock ? { clock: options.clock } : {}),
+		...(options?.inspect ? { inspect: options.inspect } : {})
 	})
 	actor.start()
 	native.owner.start()
@@ -146,6 +148,26 @@ it('does not overwrite an incompatible library root', async () => {
 	expect(selectLibraryActor(f.actor.getSnapshot())).toBeUndefined()
 	await close(f)
 })
+it.each([false, true])(
+	'refuses a clean drain for an unknown root write with early shutdown=%s',
+	async (early) => {
+		const local = Promise.withResolvers<void>()
+		const write = { local: () => local.promise, global: async () => {} }
+		const access = {
+			read: vi.fn<RootAccess['read']>(async () => 'missing'),
+			ensure: vi.fn(() => write)
+		}
+		const f = fixture(readyAccount('A', access))
+		await vi.waitFor(() => expect(access.ensure).toHaveBeenCalledOnce())
+		if (early) f.actor.send({ type: 'SHUTDOWN' })
+		local.reject(new Error('Local settlement unavailable'))
+		await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+		expect(f.actor.getSnapshot().output).toEqual({ clean: false })
+		expect(f.actor.getSnapshot().context.write).toBe(write)
+		expect(selectApplicationView(f.actor.getSnapshot(), true).status).toBe('ownerFailed')
+		expect(f.close).not.toHaveBeenCalled()
+	}
+)
 it('exposes recovery only for the ready library and withdraws it before shutdown completes', async () => {
 	const f = fixture(readyAccount())
 	await ready(f)
@@ -423,3 +445,95 @@ it('tracks connectivity independently and releases observation immediately while
 	local.resolve()
 	await waitFor(f.actor, (s) => s.status === 'done')
 })
+
+it('ignores an unrelated startup report while initialization is still reading', async () => {
+	const pending = Promise.withResolvers<'compatible'>()
+	const read = vi.fn(() => pending.promise)
+	const ensure = vi.fn()
+	const f = fixture(readyAccount('A', { read, ensure }))
+	await vi.waitFor(() => expect(read).toHaveBeenCalledOnce())
+	f.actor.send({
+		type: 'WORKSPACE_INITIALIZATION_RESULT',
+		binding: {},
+		initialization: { outcome: 'ready', identityId: 'A', workspaceId: 'A' },
+		provenance: { identityId: 'A', initialWorkspaceId: 'A' }
+	})
+	expect(selectLibraryActor(f.actor.getSnapshot())).toBeUndefined()
+	expect(selectApplicationView(f.actor.getSnapshot(), true).status).toBe('openingLibrary')
+	pending.resolve('compatible')
+	await ready(f)
+	expect(ensure).not.toHaveBeenCalled()
+	await close(f)
+})
+
+it('rejects an earlier adoption report when the same native account returns after replacement', async () => {
+	const first = Promise.withResolvers<'compatible'>()
+	const second = Promise.withResolvers<'compatible'>()
+	const read = vi.fn<RootAccess['read']>()
+	read.mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise)
+	const ensure = vi.fn()
+	const a = readyAccount('A', { read, ensure })
+	const f = fixture(a)
+	await vi.waitFor(() => expect(read).toHaveBeenCalledOnce())
+	const oldAdoption = f.actor.getSnapshot().context.adoption
+	if (!oldAdoption) throw new Error('Missing first adoption')
+	f.emit(readyAccount('B'))
+	await ready(f)
+	f.emit(a)
+	await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2))
+	expect(f.actor.getSnapshot().context.adoption).not.toBe(oldAdoption)
+	f.actor.send({
+		type: 'WORKSPACE_INITIALIZATION_RESULT',
+		binding: oldAdoption,
+		initialization: { outcome: 'ready', identityId: 'A', workspaceId: 'A' },
+		provenance: { identityId: 'A', initialWorkspaceId: 'A' }
+	})
+	expect(selectLibraryActor(f.actor.getSnapshot())).toBeUndefined()
+	second.resolve('compatible')
+	await ready(f)
+	first.resolve('compatible')
+	expect(f.actor.getSnapshot().context.observation).toBe(a)
+	expect(ensure).not.toHaveBeenCalled()
+	await close(f)
+})
+
+it.each(['shutdown', 'replace'] satisfies ('shutdown' | 'replace')[])(
+	'preserves %s between startup report acknowledgment and the terminal receipt',
+	async (interruption) => {
+		const pending = Promise.withResolvers<'compatible'>()
+		const a = readyAccount('A', { read: () => pending.promise, ensure: vi.fn() })
+		const b = readyAccount('B')
+		let interrupt = () => {}
+		let handoffs = 0
+		let startup: InspectionEvent['actorRef'] | undefined
+		const f = fixture(a, {
+			inspect: (event) => {
+				if (event.type === '@xstate.actor' && event.id === 'bootstrap') startup = event.actorRef
+				if (
+					event.type === '@xstate.transition' &&
+					event.actorRef === startup &&
+					event.sent.some((sent) => sent.event.type === 'WORKSPACE_INITIALIZATION_RESULT')
+				) {
+					handoffs++
+					if (handoffs === 1) interrupt()
+				}
+			}
+		})
+		interrupt = () => {
+			if (interruption === 'shutdown') f.actor.send({ type: 'SHUTDOWN' })
+			else f.emit(b)
+		}
+		pending.resolve('compatible')
+		if (interruption === 'shutdown') {
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(f.actor.getSnapshot().output).toEqual({ clean: true })
+			expect(handoffs).toBe(1)
+		} else {
+			await ready(f)
+			expect(f.actor.getSnapshot().context.observation).toBe(b)
+			expect(handoffs).toBe(2)
+			await close(f)
+		}
+		expect(f.close).not.toHaveBeenCalled()
+	}
+)

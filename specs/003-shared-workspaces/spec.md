@@ -1,18 +1,50 @@
 # Shared workspaces across Delightful apps
 
-**Created**: 2026-11-14  
-**Branch**: `spec/shared-workspaces`  
-**Status**: Research and draft specification; implementation design pending
+**Created**: 2026-11-14
+
+**Branch**: `feat/shared-workspace-initialization`
+
+**Status**: Shared initializer/startup adopted in both apps; selection/leases pending
 
 Every Delightful app should have a workspace concept backed by reusable Local
 First lifecycle behavior. Finance already exposes workspaces. Clipper will begin
 with one private workspace created and selected automatically, without workspace
 controls in the product UI.
 
-The [research and contract proposal](research.md) records current APIs, missing
+## Architecture direction (2026-11-23)
+
+The majority of workspace logic must be the same implementation in both apps.
+Use Finance's existing workflow as the starting point: reuse what it already
+consumes from Local First and move its remaining reusable orchestration into
+Local First. Finance must consume each extraction too, so Clipper adopts the
+same implementation rather than a parallel workflow with similar contracts.
+
+App integrations should be thin bindings for schemas, storage permissions,
+domain operations/resources and presentation. Hidden workspace controls in
+Clipper are a presentation choice, not a reason for a separate lifecycle.
+Initialization, selection, attachment replacement, invalidation and lifecycle
+coordination belong in Local First. Domain resource cleanup stays app-owned,
+with sequencing and settlement coordinated through the shared lifecycle.
+
+Before implementation, inventory each Finance workspace responsibility as
+already shared, to be extracted, or app-owned with a concrete domain reason.
+Map Clipper's current equivalent to that inventory and identify the code to
+delete. Every proposed app-specific workflow must explain why the shared
+implementation cannot serve it through a small supported integration boundary.
+Resolve common gaps, including offline bootstrap, in Local First for both apps.
+Do not preserve Clipper's separate bootstrap merely to minimize its initial diff.
+
+The [current implementation inventory](implementation-inventory.md) maps the
+production owners on `origin/main` at `e7b8f5e7`, the shared ownership design and
+the code to replace. It supersedes stale integration paths in the original
+research, including the older Finance startup/selection attachment wrappers.
+
+The [research and contract proposal](research.md) records baseline APIs, missing
 contracts, ownership boundaries, risks and a proposed implementation sequence.
-Proposed API details remain design choices pending review. This feature does not
-authorize implementation, publication or changes to production data.
+Remaining API details are design choices pending review. The user authorized
+the seed/startup ownership extractions, canonical initializer adoption and their qualification in the current
+session, as recorded in the implementation inventory. This specification alone
+does not authorize publication or changes to production data.
 
 ## Required behavior
 
@@ -28,6 +60,9 @@ authorize implementation, publication or changes to production data.
 - Local First owns reusable initialization, selection, scoped leases,
   invalidation and lifecycle coordination. Both Finance and Clipper consume
   shared behavior rather than maintaining duplicate workflows.
+- Finance's existing workspace workflow is the extraction baseline. Both apps
+  consume the resulting Local First implementation; replaced app orchestration
+  is removed as each extraction is adopted.
 - Apps retain domain schemas, storage authorization, operations, routes and
   domain resource drains. Finance retains its financial and membership policies.
 - Workspace isolation is enforced at storage boundaries. Hidden controls do not
@@ -53,15 +88,23 @@ authorize implementation, publication or changes to production data.
    adopting shared contract changes.
 8. Backend checks reject unauthorized workspace access and cross-workspace child
    references, independently of UI state.
+9. A responsibility inventory identifies the shared implementation used by both
+   apps, the replaced code removed, and a domain reason for each remaining
+   app-specific workspace behavior. Matching interfaces alone do not satisfy
+   convergence while duplicate lifecycle implementations remain.
 
 ## Design work remaining
 
-- Select safe offline bootstrap admission using supported installed SDK APIs.
-  Current session readiness does not provide durable fresh-identity provenance.
-- Generalize startup's Finance-shaped fields and expose initialized workspace
-  provenance separately from selection/access readiness.
-- Determine the smallest shared extraction beyond existing selection,
-  transaction and creation APIs; evaluate Finance's selection attachment owner.
+- Extend canonical-root qualification to independent concurrent native replicas,
+  unanswered connections, partial replicas and later permission rejection.
+  Same-Db concurrent initialization, restoration and full offline restart are
+  qualified in the implementation inventory. Device identity kind alone still
+  does not prove that an identity was freshly created.
+- Complete workspace selection/access lease adoption in Clipper.
+- Extract reusable ownership from Finance's current production worker into
+  Local First, including selection attachment where required.
+  Keep integrations thin and review remaining differences against the shared
+  implementation requirement above.
 - Confirm the effect of Clipper's accepted disposable development-data policy on
   the final schema plan. No data reset is authorized by this specification.
 - Resolve whether cross-app workspace linking is desired. Shared lifecycle does

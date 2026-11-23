@@ -1607,7 +1607,13 @@ export function createFinanceWorkerMachine({
 								}
 							: undefined,
 					NATIVE_FAILED: {},
-					FORMS_VIEW: {}
+					FORMS_VIEW: ({ context, event }) =>
+						event.binding === context.forms?.binding && event.view.status === 'failed'
+							? {
+									target: '#finance-worker.drainFailed',
+									context: { formsView: undefined, ready: undefined, ...withdrawn }
+								}
+							: undefined
 				},
 				onDone: ({ context }) => ({
 					target: context.signOutRequest ? 'signingOut' : 'closingSession'

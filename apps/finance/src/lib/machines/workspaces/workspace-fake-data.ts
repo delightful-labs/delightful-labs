@@ -1,6 +1,7 @@
 import { fakeDataSetup, type FakeDataDb, type FakeDataResult } from '../samples/fake-data.js'
 import type { WorkspacePersistenceEvent } from './workspace-creation-transaction.js'
-import { setup, types } from 'xstate'
+import { setup, types, type SnapshotFrom } from 'xstate'
+import { createWorkspaceSeedOwner } from 'delightful-local-first/workspace/startup'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
 type Input = {
@@ -104,57 +105,13 @@ export const workspaceFakeData = setup({
 	}
 })
 
-/** One worker attachment; the existing seed chart owns every database effect. */
-export const workerWorkspaceSeed = setup({
-	schemas: {
-		input: types<{ db: FakeDataDb; userId: string }>(),
-		context: types<{
-			db: FakeDataDb
-			userId: string
-			organizationId: string | undefined
-			outcome: 'closed' | 'unresolved'
-		}>(),
-		output: types<{ outcome: 'closed' | 'unresolved' }>(),
-		events: { INITIALIZED: types<{ workspaceId: string }>(), SHUTDOWN: types() },
-		children: { seed: types<import('xstate').ActorRefFrom<typeof workspaceFakeData>>() }
-	},
-	actors: { seed: workspaceFakeData }
-}).createMachine({
-	id: 'finance-worker-optional-seed',
-	context: ({ input }) => ({ ...input, organizationId: undefined, outcome: 'closed' }),
-	initial: 'waiting',
-	output: ({ context }) => ({ outcome: context.outcome }),
-	states: {
-		waiting: {
-			on: {
-				INITIALIZED: ({ event }) => ({
-					target: 'running',
-					context: { organizationId: event.workspaceId }
-				}),
-				SHUTDOWN: { target: 'closed' }
-			}
-		},
-		running: {
-			initial: 'seeding',
-			invoke: {
-				id: 'seed',
-				src: 'seed',
-				input: ({ context }) => ({ ...context, organizationId: context.organizationId ?? '' }),
-				onDone: ({ event }) =>
-					event.output.settlement === 'unresolved'
-						? { target: 'closed', context: { outcome: 'unresolved' } }
-						: { target: 'closed' },
-				onError: { target: 'closed', context: { outcome: 'unresolved' } }
-			},
-			on: {
-				INITIALIZED: {},
-				SHUTDOWN: (_, enq) => {
-					enq.sendTo('seed', { type: 'SHUTDOWN' })
-					return { target: '.closing' }
-				}
-			},
-			states: { seeding: {}, closing: { on: { SHUTDOWN: {} } } }
-		},
-		closed: { type: 'final' }
-	}
+/** Finance supplies seed policy and storage; Local First owns initialization/close coordination. */
+export const workerWorkspaceSeed = createWorkspaceSeedOwner<
+	{ db: FakeDataDb; userId: string },
+	Input,
+	WorkspaceFakeDataResult,
+	SnapshotFrom<typeof workspaceFakeData>
+>({
+	seed: workspaceFakeData,
+	input: (input, workspaceId) => ({ ...input, organizationId: workspaceId })
 })

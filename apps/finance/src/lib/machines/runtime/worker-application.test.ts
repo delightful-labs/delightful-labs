@@ -1140,11 +1140,41 @@ describe('Finance worker ownership and selected accounts', () => {
 		try {
 			await f.start()
 			await vi.waitFor(() => expect(initial.wait).toHaveBeenCalledOnce())
+			await vi.waitFor(() => expect(f.actor.getSnapshot().context.formsView).toBeDefined())
+			const formsView = f.actor.getSnapshot().context.formsView
+			if (!formsView) throw new Error('Missing current forms report')
 			f.actor.send({ type: 'CLOSE' })
+			f.actor.send({
+				type: 'FORMS_VIEW',
+				binding: {},
+				view: { ...formsView, status: 'failed', creation: null, transaction: null, edit: null }
+			})
+			expect(f.actor.getSnapshot().matches('draining')).toBe(true)
 			expect(f.nativeClose).not.toHaveBeenCalled()
 			pending.resolve()
 			await waitFor(f.actor, (s) => s.status === 'done')
 			expect(f.nativeClose).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('refuses native release when initialization reported unknown settlement before shutdown', async () => {
+		const initial = workspaceCreationFixture()
+		initial.one.mockReset().mockResolvedValue(null)
+		initial.wait.mockRejectedValue(new Error('Local settlement unavailable'))
+		const f = fixture({
+			...initial.db,
+			all: vi.fn().mockResolvedValue([]),
+			getConfig: () => ({ serverUrl: 'https://authority.invalid' })
+		})
+		try {
+			await f.start()
+			await vi.waitFor(() => expect(f.view().workspaceStartup).toBe('failed'))
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (snapshot) => snapshot.matches('drainFailed'))
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.actor.getSnapshot().output).toBeUndefined()
 		} finally {
 			f.stop()
 		}

@@ -1,15 +1,6 @@
 import type { Organization } from '../queries.js'
 import type { ActorRef, Snapshot } from 'xstate'
 
-export { sameInitializationRequest } from 'delightful-local-first/workspace/startup-contracts'
-export type {
-	WorkspaceSessionFacts,
-	InitializationRequest,
-	InitializationStatus,
-	InitializationReport,
-	InitializationStatusEvent,
-	InitializationRecipient
-} from 'delightful-local-first/workspace/startup-contracts'
 export type WorkspaceRoute = { pathname: string; search: string; hash: string }
 export type NavigationAccess = 'waiting' | 'ready' | 'denied' | 'failed'
 export type WorkspaceNavigationFacts = WorkspaceRoute & {

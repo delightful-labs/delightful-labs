@@ -115,10 +115,42 @@ actor must own acquisition, checks, staging, commit, settlement and rollback. Lo
 finishes immediately. An empty cache alone cannot authorize bootstrap. Explicit authority discovery
 remains necessary only for the existing provenance/bootstrap decision.
 
-`workspace/startup` coordinates that initialization actor and an optional app seed actor. Supply
-`ready(result)` and error constructors. Foreground readiness is reported before optional seeding;
-identity replacement and shutdown drain children. A no-op seed actor is appropriate when the app
-has no sample-data policy.
+For a schema-enforced private root whose ID is the native identity, discovery may instead
+return `canonicalRoot: { id, status }` without identity/workspace directory facts. Status
+is `compatible`, `missing` or `incompatible`, based on the app's native root checks. The
+initializer rejects empty/mismatched IDs, mixed directory evidence, incompatible roots and
+prepared targets outside that same canonical ID. A missing canonical root may ensure only
+that root locally; this mode does not authorize creating an arbitrary replacement workspace.
+Apps using directory/provenance discovery retain the conservative authority behavior.
+Qualify actual storage convergence before claiming the canonical mode is safe for an app.
+
+A ready result includes `persistence` only when bootstrap issued a successful write. Keep
+its native receipt for app-specific remote-status observation; an existing-root result has
+no new receipt. Shutdown/cancellation during bootstrap retains the invocation until settlement
+and cannot publish ready afterward, even if a noncancelable write leaf finishes successfully.
+When the initializer maps that successful completion to closed/cancelled, it retains the
+persistence receipt; a child's own interruption result is preserved verbatim. A concrete
+bootstrap actor with a larger event protocol can supply its full event type as the factory's
+last generic parameter; do not narrow its actor logic through a cast or an app supervisor.
+
+`createWorkspaceStartupOwner` from `workspace/startup` owns initialization for one native
+session binding. Supply the existing initializer and a pure provenance projection; actor input
+captures the binding, initializer input and recipient. It publishes one
+`WORKSPACE_INITIALIZATION_RESULT` with the original result and neutral `identityId` /
+`initialWorkspaceId` provenance. The report can contain an unavailable or failed result;
+receiving it is not workspace access or readiness. Provenance does not select a workspace.
+Send `SHUTDOWN` and await its terminal `closed` or `unresolved` receipt before releasing the
+binding. Pending initialization is drained without publishing an ordinary completion report
+after shutdown. An earlier reported result does not acknowledge shutdown, and unresolved
+settlement remains unresolved even when the result arrived before shutdown.
+
+For worker integrations that coordinate initialization separately, use `createWorkspaceSeedOwner`
+from that same subpath. Supply the app seed actor and a pure `input(scope, workspaceId)` mapper.
+Send `INITIALIZED` once provenance resolves; the owner invokes at most one seed and ignores
+duplicate initialization. `SHUTDOWN` waits for the child's settlement and returns `closed` or
+`unresolved`; it does not create a seed if shutdown precedes initialization. Keep schema writes,
+feature flags and seed policy in the app actor. This owner is independent of foreground readiness.
+Omit it when an app has no seed work; new integrations do not need a dummy seed actor.
 
 For explicit additional creation, compose:
 

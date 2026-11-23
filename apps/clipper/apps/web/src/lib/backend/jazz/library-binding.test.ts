@@ -5,6 +5,8 @@ import { createLibraryBinding, createLibraryCapture } from './library-binding.js
 import { createLibraryCapability } from './library.js'
 import permissions from './jazz.permissions.json' with { type: 'json' }
 import { app } from './jazz.generated.js'
+import { createActor, toPromise } from 'xstate'
+import { rootBootstrapMachine } from '../../machines/runtime/root-bootstrap.js'
 
 let fixture: PolicyTestApp
 beforeAll(async () => {
@@ -67,4 +69,55 @@ it('refuses capture before dispatch and retires a response after binding replace
 	pending.resolve(response)
 	await expect(result).rejects.toThrow('Account scope expired')
 	expect(cancel).toHaveBeenCalledOnce()
+})
+
+it('converges concurrent shared initialization on one native canonical root and reopens it without a write', async () => {
+	const session = {
+		user_id: 'concurrent-canonical-root',
+		authMode: 'local-first',
+		claims: {}
+	} satisfies PolicyTestSession
+	const db = fixture.as(session)
+	const identityId = fixture.accountFor(session)
+	const makeBinding = () =>
+		createLibraryBinding({
+			db,
+			identityId,
+			isCurrent: () => true,
+			libraryFactory: createLibraryCapability,
+			cacheNamespace: 'concurrent-canonical-root'
+		})
+	const owners = Array.from({ length: 4 }, () =>
+		createActor(rootBootstrapMachine, {
+			input: { db: makeBinding().root, userId: identityId }
+		})
+	)
+	try {
+		const results = await Promise.all(owners.map((owner) => toPromise(owner.start())))
+		for (const result of results) {
+			expect(result.outcome).toBe('ready')
+			if (result.outcome === 'ready') {
+				expect(result.workspaceId).toBe(identityId)
+				if (result.persistence?.outcome === 'succeeded') await result.persistence.write.global()
+			}
+		}
+		expect(await db.all(app.libraries.where({ ownerId: identityId }))).toHaveLength(1)
+		const root = makeBinding().root
+		const ensure = vi.fn(() => root.ensure())
+		const reopened = createActor(rootBootstrapMachine, {
+			input: { db: { read: root.read, ensure }, userId: identityId }
+		})
+		try {
+			expect(await toPromise(reopened.start())).toEqual({
+				outcome: 'ready',
+				identityId,
+				workspaceId: identityId
+			})
+			expect(ensure).not.toHaveBeenCalled()
+		} finally {
+			reopened.stop()
+		}
+	} finally {
+		for (const owner of owners) owner.stop()
+	}
 })

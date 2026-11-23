@@ -1,150 +1,61 @@
-import type { EventPayload } from '../events.js'
-import { types, setup, createAsyncLogic, matchesState } from 'xstate'
-
+import {
+	createAsyncLogic,
+	type EventFromLogic,
+	type InputFrom,
+	type OutputFrom,
+	type SnapshotFrom
+} from 'xstate'
+import { createWorkspaceInitialization } from 'delightful-local-first/workspace/initialization'
+import { createWorkspaceStartupOwner } from 'delightful-local-first/workspace/startup'
 import type { RootAccess, RootWrite } from '../../contracts/account.js'
 
-type Result =
-	| { outcome: 'ready'; write?: RootWrite }
-	| { outcome: 'failed' | 'conflict' | 'closed' }
-type Context = { root: RootAccess; write: RootWrite | undefined; result: Result }
-function receipt(context: Context) {
-	if (!context.write) throw new Error('Missing library write receipt')
-	return context.write
-}
-const actors = {
-	read: createAsyncLogic({ run: ({ input }: { input: RootAccess }) => input.read() }),
-	issue: createAsyncLogic({ run: async ({ input }: { input: RootAccess }) => input.ensure() }),
-	persist: createAsyncLogic({ run: ({ input }: { input: RootWrite }) => input.local() })
-}
-// The write region retains both issue and local settlement when shutdown is requested.
-export const rootBootstrapMachine = setup({
-	schemas: {
-		context: types<Context>(),
-		events: { SHUTDOWN: types<EventPayload<{ type: 'SHUTDOWN' }, 'SHUTDOWN'>>() },
-		input: types<RootAccess>(),
-		output: types<Result>(),
-		tags: types<string>(),
-		children: {
-			read: types<import('xstate').ActorRefFrom<(typeof actors)['read']>>(),
-			issue: types<import('xstate').ActorRefFrom<(typeof actors)['issue']>>(),
-			persist: types<import('xstate').ActorRefFrom<(typeof actors)['persist']>>()
+type Attempt = { id: string }
+type Persistence =
+	| { outcome: 'succeeded'; write: RootWrite }
+	| { outcome: 'failed'; settlement: 'unresolved'; write: RootWrite; error: unknown }
+
+// One canonical upsert and its local durability receipt. Shared initialization owns interruption.
+const persistRoot = createAsyncLogic({
+	run: async ({ input }: { input: { db: RootAccess; attempt: Attempt } }): Promise<Persistence> => {
+		const write = input.db.ensure()
+		try {
+			await write.local()
+			return { outcome: 'succeeded', write }
+		} catch (error) {
+			return { outcome: 'failed', settlement: 'unresolved', write, error }
 		}
-	},
-	actors,
-	guards: {
-		stopping: ({ value }: { value: import('xstate').StateValue }) =>
-			matchesState({ writing: { lifetime: 'stopping' } }, value),
-		existingRoot: (_args: { context: Context }, { result }: { result: string }) =>
-			result === 'compatible',
-		incompatibleRoot: (_args: { context: Context }, { result }: { result: string }) =>
-			result === 'incompatible'
 	}
-}).createMachine({
-	id: 'root-bootstrap',
-	initial: 'reading',
-	context: ({ input }) => ({
-		root: input,
-		write: undefined,
-		result: { outcome: 'failed' }
+})
+
+/** Clipper supplies schema-bound storage leaves; Finance uses this same initializer factory. */
+export const rootBootstrapMachine = createWorkspaceInitialization<
+	RootAccess,
+	undefined,
+	Attempt,
+	Persistence,
+	SnapshotFrom<typeof persistRoot>,
+	EventFromLogic<typeof persistRoot>
+>({
+	tiers: { local: undefined, authority: undefined },
+	discover: async ({ db, userId }) => ({
+		canonicalRoot: { id: userId, status: await db.read() }
 	}),
-	output: ({ context }) => context.result,
-	states: {
-		reading: {
-			on: { SHUTDOWN: { target: 'closed' } },
-			invoke: {
-				id: 'read',
-				src: 'read',
-				input: ({ context }: { context: Context }) => context.root,
-				onDone: (args) => {
-					const { event } = args
-					if (args.guards.incompatibleRoot(args, { result: event.output })) {
-						return { target: 'conflict' }
-					}
-					if (args.guards.existingRoot(args, { result: event.output })) {
-						return { target: 'existing' }
-					}
-					return { target: 'writing' }
-				},
-				onError: { target: 'failed' }
-			}
-		},
-		writing: {
-			type: 'parallel',
-			states: {
-				lifetime: {
-					initial: 'active',
-					states: {
-						active: { on: { SHUTDOWN: { target: 'stopping' } } },
-						stopping: { on: { SHUTDOWN: {} } }
-					}
-				},
-				operation: {
-					initial: 'issuing',
-					states: {
-						issuing: {
-							invoke: {
-								id: 'issue',
-								src: 'issue',
-								input: ({ context }: { context: Context }) => context.root,
-								onDone: (args) => {
-									return { target: 'persisting', context: { write: args.event.output } }
-								},
-								onError: (args) => {
-									if (matchesState({ writing: { lifetime: 'stopping' } }, args.value)) {
-										return { target: '#root-bootstrap.closed' }
-									}
-									return { target: '#root-bootstrap.failed' }
-								}
-							}
-						},
-						persisting: {
-							invoke: {
-								id: 'persist',
-								src: 'persist',
-								input: ({ context }: { context: Context }) => receipt(context),
-								onDone: (args) => {
-									if (matchesState({ writing: { lifetime: 'stopping' } }, args.value)) {
-										return { target: '#root-bootstrap.closed' }
-									}
-									return { target: '#root-bootstrap.ready' }
-								},
-								onError: (args) => {
-									if (matchesState({ writing: { lifetime: 'stopping' } }, args.value)) {
-										return { target: '#root-bootstrap.closed' }
-									}
-									return { target: '#root-bootstrap.failed' }
-								}
-							}
-						}
-					}
-				}
-			}
-		},
-		ready: {
-			type: 'final',
-			entry: (args) => {
-				const { context } = args
-				return { context: { result: { outcome: 'ready', write: receipt(context) } } }
-			}
-		},
-		existing: {
-			type: 'final',
-			entry: () => {
-				return { context: { result: { outcome: 'ready' } } }
-			}
-		},
-		failed: { type: 'final' },
-		conflict: {
-			type: 'final',
-			entry: () => {
-				return { context: { result: { outcome: 'conflict' } } }
-			}
-		},
-		closed: {
-			type: 'final',
-			entry: () => {
-				return { context: { result: { outcome: 'closed' } } }
-			}
-		}
-	}
+	prepareInitial: async ({ userId }) => ({ id: userId }),
+	selectReady: (attempt) => ({ identityId: attempt.id, workspaceId: attempt.id }),
+	transaction: persistRoot
+})
+
+export type RootInitializationResult = OutputFrom<typeof rootBootstrapMachine>
+
+/** Startup reports and terminal drain receipts use the same owner as Finance. */
+export const rootStartupMachine = createWorkspaceStartupOwner<
+	InputFrom<typeof rootBootstrapMachine>,
+	RootInitializationResult,
+	SnapshotFrom<typeof rootBootstrapMachine>
+>({
+	initialize: rootBootstrapMachine,
+	provenance: (result) =>
+		result.outcome === 'ready'
+			? { identityId: result.identityId, initialWorkspaceId: result.workspaceId }
+			: undefined
 })

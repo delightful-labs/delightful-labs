@@ -36,7 +36,7 @@ test('populated restart bounds rendering, starts search on demand and reads dire
 	const rootStates: string[] = []
 	page.on('console', (message) => {
 		const text = message.text()
-		if (text.includes('"machine":"root-bootstrap"')) rootStates.push(text)
+		if (text.includes('"machine":"workspace-initialization"')) rootStates.push(text)
 	})
 	await closeSeedReplica(page)
 	await page.goto('/')
@@ -54,8 +54,10 @@ test('populated restart bounds rendering, starts search on demand and reads dire
 	const hasSearchWorker = () => Promise.resolve(searchStarted)
 	expect(await hasSearchWorker()).toBe(false)
 	await expect(page.getByText('Private library synced.', { exact: true })).toHaveCount(0)
-	await expect.poll(() => rootStates.some((state) => state.includes('existing'))).toBe(true)
-	expect(rootStates.some((state) => state.includes('writing.'))).toBe(false)
+	await expect
+		.poll(() => rootStates.some((state) => state.includes('"outcome":"ready"')))
+		.toBe(true)
+	expect(rootStates.some((state) => state.includes('bootstrapping'))).toBe(false)
 	await page.getByRole('button', { name: 'Show articles', exact: true }).click()
 	await expect(rows).toHaveCount(100)
 	await expect(rows.nth(50).getByRole('link')).toBeFocused()

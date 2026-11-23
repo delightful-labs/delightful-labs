@@ -7,6 +7,21 @@ import { build } from 'vite'
 
 const consumers = [
 	{
+		name: 'workspace-initialization',
+		source: 'workspace-initialization.ts',
+		subpath: 'delightful-local-first/workspace/initialization'
+	},
+	{
+		name: 'workspace-startup',
+		source: 'workspace-startup.ts',
+		subpath: 'delightful-local-first/workspace/startup'
+	},
+	{
+		name: 'workspace-seed',
+		source: 'workspace-seed.ts',
+		subpath: 'delightful-local-first/workspace/startup'
+	},
+	{
 		name: 'browser-job',
 		source: 'browser-worker-job.ts',
 		subpath: 'delightful-local-first/worker/browser-job'
@@ -117,7 +132,7 @@ try {
 		})
 	}
 	console.log(
-		'Packed browser-job/callback-custody/close/root-broker/owned-broker consumers: public types, native effects/receipts and self-contained ES-module workers passed.'
+		'Packed workspace-initialization/workspace-startup/workspace-seed/browser-job/callback-custody/close/root-broker/owned-broker consumers: public types, effects/receipts and self-contained ES-module workers passed.'
 	)
 } finally {
 	await rm(directory, { recursive: true, force: true })

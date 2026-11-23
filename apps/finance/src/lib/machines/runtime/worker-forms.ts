@@ -127,6 +127,8 @@ import {
 	type OutputFrom
 } from 'xstate'
 import { workspaceInitialization } from '../workspaces/workspace-initialization.js'
+import { createWorkspaceStartupOwner } from 'delightful-local-first/workspace/startup'
+import type { WorkspaceInitializationReport } from 'delightful-local-first/workspace/startup-contracts'
 import { createAccountCreationFormOptions } from '../accounts/account-creation-access.js'
 import {
 	createScopedFormMachine,
@@ -154,7 +156,20 @@ import {
 	type FinanceFormsObservation
 } from '../../contracts/worker-forms.js'
 
-/** One SDK-bound workflow owner. Existing charts retain initialization, form policy and settlement. */
+type InitializationResult = OutputFrom<typeof workspaceInitialization>
+const workspaceStartup = createWorkspaceStartupOwner<
+	InputFrom<typeof workspaceInitialization>,
+	InitializationResult,
+	SnapshotFrom<typeof workspaceInitialization>
+>({
+	initialize: workspaceInitialization,
+	provenance: (result) =>
+		result.outcome === 'ready'
+			? { identityId: result.identityId, initialWorkspaceId: result.workspaceId }
+			: undefined
+})
+
+/** One SDK-bound workflow owner. Local First owns startup; Finance retains domain policy. */
 export function createFinanceFormsMachine(
 	dependencies: Omit<Parameters<typeof createAccountCreationFormOptions>[0], 'observe'> & {
 		accountOrderStorage: AccountOrderStorage
@@ -330,7 +345,7 @@ export function createFinanceFormsMachine(
 		navigation: NavigationReport | undefined
 		archive: ReturnType<typeof selectAccountArchiveReport> | undefined
 		seedClosed: boolean
-		initialization: OutputFrom<typeof workspaceInitialization> | undefined
+		initialization: InitializationResult | undefined
 		edit: TransactionEntryView | undefined
 		editObservation: TransactionEntryObservation | undefined
 		creation: AccountCreationView | undefined
@@ -449,6 +464,8 @@ export function createFinanceFormsMachine(
 				ORDER_CLOSED: types()
 			},
 			events: {
+				WORKSPACE_INITIALIZATION_RESULT:
+					types<Omit<WorkspaceInitializationReport<InitializationResult>, 'type'>>(),
 				ADD_SAMPLES: types<{ kind: TransactionEntryObservation['kind'] }>(),
 				INTEGRITY_STATUS: types<{ report: IntegrityReport }>(),
 				RETRY_INTEGRITY: types(),
@@ -519,7 +536,7 @@ export function createFinanceFormsMachine(
 						import('xstate').ActorRefFrom<ReturnType<typeof createWorkspaceNavigationMachine>>
 					>(),
 				archive: types<import('xstate').ActorRefFrom<typeof archive>>(),
-				initialization: types<import('xstate').ActorRefFrom<typeof workspaceInitialization>>(),
+				initialization: types<import('xstate').ActorRefFrom<typeof workspaceStartup>>(),
 				edit: types<import('xstate').ActorRefFrom<typeof editTransaction>>(),
 				creation: types<import('xstate').ActorRefFrom<typeof createAccount>>(),
 				transaction: types<import('xstate').ActorRefFrom<typeof enterTransaction>>()
@@ -552,7 +569,7 @@ export function createFinanceFormsMachine(
 			createAccount,
 			enterTransaction,
 			editTransaction,
-			workspaceInitialization,
+			workspaceStartup,
 			archive,
 			navigation: dependencies.navigation
 		}
@@ -985,29 +1002,17 @@ export function createFinanceFormsMachine(
 			},
 			{
 				id: 'initialization',
-				src: 'workspaceInitialization',
-				input: () => dependencies.initialization,
-				onDone: ({ context, value, event }, enq) => {
-					if (matchesState('closing', value)) {
-						if ('settlement' in event.output && event.output.settlement === 'unresolved')
-							return { target: '.failed' }
-						enq.raise({ type: 'INITIALIZATION_CLOSED' })
-						return { context: { initialization: event.output } }
-					}
-					if (event.output.outcome === 'ready')
-						enq.sendTo('seed', { type: 'INITIALIZED', workspaceId: event.output.workspaceId })
-					const request = {
-						generation: context.integrityRequest.generation + 1,
-						binding: integrityBinding(context.observation, event.output)
-					}
-					enq.sendTo('integrity', { type: 'OBSERVED', request })
-					return {
-						context: {
-							initialization: event.output,
-							integrityRequest: request,
-							integrityReport: undefined
-						}
-					}
+				src: 'workspaceStartup',
+				input: ({ self }) => ({
+					binding: dependencies.binding,
+					initialization: dependencies.initialization,
+					recipient: self
+				}),
+				onDone: ({ value, event }, enq) => {
+					if (!matchesState('closing', value) || event.output.outcome !== 'closed')
+						return { target: '.failed' }
+					enq.raise({ type: 'INITIALIZATION_CLOSED' })
+					return { context: { initialization: event.output.initialization } }
 				},
 				onError: { target: '.failed' }
 			},
@@ -1129,6 +1134,26 @@ export function createFinanceFormsMachine(
 					enq.sendTo('bank', { type: 'SOURCE_OBSERVED', source: bankSource(context) })
 				},
 				on: {
+					WORKSPACE_INITIALIZATION_RESULT: ({ context, event }, enq) => {
+						if (event.binding !== dependencies.binding) return
+						if (event.provenance)
+							enq.sendTo('seed', {
+								type: 'INITIALIZED',
+								workspaceId: event.provenance.initialWorkspaceId
+							})
+						const request = {
+							generation: context.integrityRequest.generation + 1,
+							binding: integrityBinding(context.observation, event.initialization)
+						}
+						enq.sendTo('integrity', { type: 'OBSERVED', request })
+						return {
+							context: {
+								initialization: event.initialization,
+								integrityRequest: request,
+								integrityReport: undefined
+							}
+						}
+					},
 					TRANSFER_MUTATION_REQUEST: ({ context, event }, enq) => {
 						const current = transferScope(context.observation)
 						const request = event.request
@@ -1378,9 +1403,7 @@ export function createFinanceFormsMachine(
 					SHUTDOWN: ({ self, context }, enq) => {
 						const seed = self.getSnapshot().children.seed
 						if (seed?.getSnapshot().status === 'active') enq.sendTo(seed, { type: 'SHUTDOWN' })
-						const initialization = self.getSnapshot().children.initialization
-						if (initialization?.getSnapshot().status === 'active')
-							enq.sendTo(initialization, { type: 'SHUTDOWN' })
+						enq.sendTo('initialization', { type: 'SHUTDOWN' })
 						enq.sendTo('navigation', { type: 'SHUTDOWN' })
 						enq.sendTo('archive', { type: 'SHUTDOWN' })
 						enq.sendTo('order', { type: 'SHUTDOWN' })
@@ -1577,12 +1600,8 @@ export function createFinanceFormsMachine(
 						}
 					},
 					initialization: {
-						initial: 'assessing',
+						initial: 'waiting',
 						states: {
-							assessing: {
-								type: 'choice',
-								choice: ({ context }) => ({ target: context.initialization ? 'closed' : 'waiting' })
-							},
 							waiting: { on: { INITIALIZATION_CLOSED: { target: 'closed' } } },
 							closed: { type: 'final' }
 						}

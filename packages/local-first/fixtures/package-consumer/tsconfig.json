@@ -41,7 +41,10 @@
 		"./worker-host-close-packed.mjs",
 		"./worker-effect-drain.ts",
 		"./ordered-sign-out.ts",
-		"./browser-worker-job.ts"
+		"./browser-worker-job.ts",
+		"./workspace-seed.ts",
+		"./workspace-startup.ts",
+		"./workspace-initialization.ts"
 	],
 	"exclude": []
 }

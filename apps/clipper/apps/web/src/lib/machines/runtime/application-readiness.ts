@@ -17,7 +17,8 @@ import { t, recoveryMessages } from '../../localization/index.js'
 import { stateFeedback } from '../../contracts/feedback.js'
 import type { NamedState, WorkflowMessage } from '../../contracts/feedback.js'
 import { libraryMachine } from '../capture/library.js'
-import { rootBootstrapMachine } from './root-bootstrap.js'
+import { rootStartupMachine, type RootInitializationResult } from './root-bootstrap.js'
+import type { WorkspaceInitializationReport } from 'delightful-local-first/workspace/startup-contracts'
 import { sameAccountBinding } from '../../contracts/account.js'
 import type {
 	AccountBinding,
@@ -155,7 +156,7 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 		logout: signOutMachine,
 		restore: restorationMachine,
 		library: libraryMachine,
-		bootstrap: rootBootstrapMachine,
+		bootstrap: rootStartupMachine,
 		global: createAsyncLogic({ run: ({ input }: { input: RootWrite }) => input.global() })
 	}
 	const model = setup({
@@ -176,6 +177,8 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 				NATIVE_FAILED: types(),
 				LIBRARY_BOUND: types<{ binding: AccountBinding }>(),
 				LIBRARY_ADOPTED: types(),
+				WORKSPACE_INITIALIZATION_RESULT:
+					types<Omit<WorkspaceInitializationReport<RootInitializationResult>, 'type'>>(),
 				SIGN_OUT_OVERDUE: types<{ stage: SignOutStage }>(),
 				RESTORATION_VALIDATED: types<{ binding: object; attempt: number }>(),
 				RESTORATION_PREPARE_REQUESTED: types<{ binding: object; attempt: number }>()
@@ -195,7 +198,7 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 				logout: types<import('xstate').ActorRefFrom<typeof actors.logout>>(),
 				restore: types<import('xstate').ActorRefFrom<typeof actors.restore>>(),
 				library: types<import('xstate').ActorRefFrom<typeof libraryMachine>>(),
-				bootstrap: types<import('xstate').ActorRefFrom<typeof rootBootstrapMachine>>(),
+				bootstrap: types<import('xstate').ActorRefFrom<typeof rootStartupMachine>>(),
 				global: types<import('xstate').ActorRefFrom<typeof actors.global>>()
 			}
 		},
@@ -225,8 +228,6 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 				matchesState({ active: { flow: { running: { library: 'stopping' } } } }, value),
 			replacingBootstrap: ({ value }: { value: import('xstate').StateValue }) =>
 				matchesState({ active: { flow: { running: { library: 'replacing' } } } }, value),
-			existingRoot: (_args: { context: Context }, result: { outcome: string; write?: RootWrite }) =>
-				result.outcome === 'ready' && result.write === undefined,
 			stoppingChange: ({ value }: { value: import('xstate').StateValue }) =>
 				matchesState({ active: { flow: { running: { changing: 'stopping' } } } }, value),
 			stoppingRestore: ({ value }: { value: import('xstate').StateValue }) =>
@@ -695,32 +696,55 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 										invoke: {
 											id: 'bootstrap',
 											src: 'bootstrap',
-											input: ({ context }) =>
-												required(context.adoption).observation.capabilities.root,
+											input: ({ context, self }) => ({
+												binding: required(context.adoption),
+												recipient: self,
+												initialization: {
+													db: required(context.adoption).observation.capabilities.root,
+													userId: required(context.adoption).observation.identityId
+												}
+											}),
 											onDone: (args) => {
-												const { event } = args
+												const result = args.event.output.initialization
+												if (args.event.output.outcome === 'unresolved' || result === undefined)
+													return {
+														target: '#application-active-flow-running-draining',
+														context: {
+															clean: false,
+															write: result && 'write' in result ? result.write : undefined
+														}
+													}
 												if (args.guards.stoppingBootstrap(args)) {
 													return { target: '#application-active-flow-running-draining' }
 												}
 												if (args.guards.replacingBootstrap(args)) {
 													return { target: '#application-active-flow-running-route' }
 												}
-												if (args.guards.existingRoot(args, event.output)) {
+												if (result.outcome === 'ready' && result.persistence === undefined) {
 													return { target: '.ready.existing', context: { write: undefined } }
 												}
-												if (event.output.outcome === 'ready') {
+												if (result.outcome === 'ready') {
 													return {
 														target: '.ready.syncPending',
 														context: {
 															write:
-																event.output.outcome === 'ready' ? event.output.write : undefined
+																result.persistence?.outcome === 'succeeded'
+																	? result.persistence.write
+																	: undefined
 														}
 													}
 												}
-												if (event.output.outcome === 'conflict') {
+												if (
+													result.outcome === 'unavailable' &&
+													result.reason === 'canonicalRootConflict'
+												) {
 													return { target: '.conflict' }
 												}
 												return { target: '.failed' }
+											},
+											onError: {
+												target: '#application-active-flow-running-draining',
+												context: { clean: false }
 											}
 										},
 										on: {
@@ -738,6 +762,11 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 											bootstrapping: {
 												meta: accountStatus('openingLibrary', t('account.status.openingLibrary')),
 												on: {
+													WORKSPACE_INITIALIZATION_RESULT: ({ context, event }, enq) => {
+														if (event.binding !== context.adoption) return
+														enq.sendTo('bootstrap', { type: 'SHUTDOWN' })
+														return { target: 'settling' }
+													},
 													SHUTDOWN: (args, enq) => {
 														enq.sendTo('bootstrap', { type: 'SHUTDOWN' })
 														return { target: 'stopping' }
@@ -747,6 +776,21 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 															return args.actions.refreshBinding(args)
 														}
 														enq.sendTo('bootstrap', { type: 'SHUTDOWN' })
+														return {
+															target: 'replacing',
+															context: args.actions.rememberObservation(args).context
+														}
+													}
+												}
+											},
+											// The report was acknowledged; only the terminal startup receipt may admit work.
+											settling: {
+												meta: accountStatus('openingLibrary', t('account.status.openingLibrary')),
+												on: {
+													SHUTDOWN: { target: 'stopping' },
+													OBSERVED: (args) => {
+														if (args.guards.sameBinding(args))
+															return args.actions.refreshBinding(args)
 														return {
 															target: 'replacing',
 															context: args.actions.rememberObservation(args).context
@@ -898,7 +942,7 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 											adoption: undefined,
 											candidate: undefined,
 											phrase: '',
-											write: undefined
+											write: context.clean ? undefined : context.write
 										}
 									}
 								},
