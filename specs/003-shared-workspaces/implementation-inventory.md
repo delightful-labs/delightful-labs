@@ -476,3 +476,54 @@ These checks use disposable profiles/authorities and isolated generated output.
 No production data, schema permissions or dependencies changed. Shared selection,
 access leases and the independent-replica/connection/permission scenarios remain
 open as recorded in the feature specification.
+
+## Selection integration continuation
+
+The qualified initializer/startup implementation was committed as `090e33b5`
+after the user's explicit `Commit and continue` instruction. The subsequent
+[selection integration design](selection-integration.md) traces Finance's active
+`SELECT_CONTEXT`, retained read/form bindings and full domain-drain protocol.
+It identifies the prerequisite identity/access/resource split, the existing DLF
+selector to reuse, and the shared receipt boundary both apps must consume.
+The first small source extraction below prepares that boundary. It does not
+introduce an unused selector, silently reinterpret route revisions as leases or
+claim that changed observations acknowledge native resource drain.
+
+### Shared observation lifetime (implementation review pending)
+
+Finance's production `worker-queries.ts` contains the callback lifetime used for
+all 15 query subscriptions, including identity, directory and target-access facts.
+The new DLF `data/observation-workflow` export extracts its active-callback guard,
+subscription ownership and disposal-failure boundary. Finance now supplies typed
+value/failure reports and its existing `reportDisposalFailure` callback. Clipper's
+library collection consumes the same factory in place of its separate subscription
+callback. Native schemas, subscription construction, fact decoding and report
+correlation remain app-owned.
+
+The resource model is one invoked callback actor per native subscription. It
+admits source values/failures while active, marks callback admission withdrawn
+before calling disposal, and releases the returned subscription. Synchronous
+subscription-construction errors report failure through the same typed path as
+native read failures. Disposal errors use Finance's existing host failure signal;
+Clipper retains its existing thrown-disposal-error behavior. Late source callbacks
+after disposal cannot publish into the parent. There is no new selection policy,
+session owner, operation supervisor, retry, polling or available-empty fallback.
+
+Source files for this batch are the shared factory/public export and the two
+production consumer bindings. The selection integration design and app integration
+guide record the boundaries. The identity/access/content-owner split and actual
+selection-lease adoption remain subsequent work.
+
+Review this extraction before adding/running behavior tests. Required checks
+include synchronous/asynchronous publication, absent subscription, startup/read
+failure, late callbacks during/after disposal, exactly-once disposal and disposal
+failure propagation, plus actual Finance query and Clipper collection behavior.
+Packed export and native browser qualification are required after review;
+previous initializer/startup results do not qualify this extraction.
+
+Review-stage checks passed: both shared libraries packaged with strict publint,
+DLF library checks, full Finance and Clipper web/extension checks (zero errors and
+warnings), both app production builds, workspace peer links, scoped formatting/
+lint and whitespace checks. No behavior tests were added or run for this new
+extraction pending implementation review. These changes remain uncommitted after
+the qualified startup commit.

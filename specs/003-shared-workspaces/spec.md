@@ -95,6 +95,10 @@ does not authorize publication or changes to production data.
 
 ## Design work remaining
 
+The [production selection integration design](selection-integration.md) records
+the identity/access/resource boundary required by Finance's active worker before
+both apps can consume the same selection and drain implementation.
+
 - Extend canonical-root qualification to independent concurrent native replicas,
   unanswered connections, partial replicas and later permission rejection.
   Same-Db concurrent initialization, restoration and full offline restart are

@@ -1,7 +1,8 @@
 import type { BankSource } from '../bank-sync/types.js'
 import type { WorkerTransferRecord } from '../../contracts/worker-transfers.js'
 import type { workerWorkspaceMember, workerAccountGrant } from '../../contracts/worker-accounts.js'
-import { createCallbackLogic, setup, types, type SnapshotFrom } from 'xstate'
+import { setup, types, type SnapshotFrom } from 'xstate'
+import { createBoundObservationLogic } from 'delightful-local-first/data/observation-workflow'
 import type { SessionRuntimeObservation } from 'delightful-local-first/session/runtime'
 import type {
 	FinanceWorkerCapabilities,
@@ -84,31 +85,19 @@ function observeQuery<Result>(
 		| 'TRANSACTIONS'
 		| 'TRANSACTION'
 ) {
-	return createCallbackLogic<
-		never,
+	return createBoundObservationLogic<
+		Result,
 		{
 			binding: object
 			observe: ((publish: (result: Result) => void, failed: () => void) => () => void) | undefined
 			reportDisposalFailure: () => void
-		}
-	>(({ input, sendBack }) => {
-		let active = true
-		const release = input.observe?.(
-			(rows) => {
-				if (active) sendBack({ type: event, binding: input.binding, rows })
-			},
-			() => {
-				if (active) sendBack({ type: 'READ_FAILED', binding: input.binding })
-			}
-		)
-		return () => {
-			active = false
-			try {
-				release?.()
-			} catch {
-				input.reportDisposalFailure()
-			}
-		}
+		},
+		{ type: typeof event; binding: object; rows: Result } | { type: 'READ_FAILED'; binding: object }
+	>({
+		observe: (input, publish, failed) => input.observe?.(publish, failed),
+		observed: (input, rows) => ({ type: event, binding: input.binding, rows }),
+		failed: (input) => ({ type: 'READ_FAILED', binding: input.binding }),
+		disposalFailed: (input) => input.reportDisposalFailure()
 	})
 }
 const bankConnections = observeQuery<Rows['bankConnections']>('BANK_CONNECTIONS')

@@ -1,3 +1,4 @@
+import { createBoundObservationLogic } from 'delightful-local-first/data/observation-workflow'
 import { publicationCleanupMachine } from '../../annotations/publication-cleanup.js'
 import { annotationsMachine, selectAnnotations } from '../../annotations/machine.js'
 import { documentReadingProgress } from '../../reader/schema.js'
@@ -120,19 +121,15 @@ const actors = {
 	readerExperience: readerExperienceMachine,
 	images: imageQueueMachine,
 	search: createSearchMachine(),
-	collection: createCallbackLogic<LibraryEvent, LibraryCapability | undefined>(
-		({ input, sendBack }) => {
-			try {
-				return input?.subscribe(
-					(rows) => sendBack({ type: 'ROWS', rows }),
-					() => sendBack({ type: 'LIST_FAILED' })
-				)
-			} catch {
-				sendBack({ type: 'LIST_FAILED' })
-				return
-			}
-		}
-	),
+	collection: createBoundObservationLogic<
+		LibraryArticle[],
+		LibraryCapability | undefined,
+		Extract<LibraryEvent, { type: 'ROWS' | 'LIST_FAILED' }>
+	>({
+		observe: (input, publish, failed) => input?.subscribe(publish, failed),
+		observed: (_input, rows) => ({ type: 'ROWS', rows }),
+		failed: () => ({ type: 'LIST_FAILED' })
+	}),
 	worker: createCallbackLogic<QueueControl, LibraryCapability | undefined>(
 		({ input, receive, sendBack }) => {
 			if (!input) {

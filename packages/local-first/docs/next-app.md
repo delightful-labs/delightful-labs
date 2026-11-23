@@ -99,6 +99,18 @@ Keep loading, error and available-empty distinct. `DataObservation<Row>` is the 
 revisioned snapshot contract. Copy changing row fields while building facts, preserving opaque
 binding identities. A shallow row snapshot deliberately does not clone resource handles.
 
+Worker-owned subscriptions can use `createBoundObservationLogic` from
+`data/observation-workflow`. This is Finance's production observation lifetime,
+also used by Clipper's library collection. Supply the native subscription leaf
+and pure typed value/failure report projections. The actor admits callbacks while
+invoked, withdraws callback admission before disposal, and releases the returned
+subscription once. Startup subscription errors become the supplied failure report;
+they never become available-empty data. An optional `disposalFailed` callback
+preserves the host's existing cleanup-failure boundary; without it, disposal errors
+are rethrown. Keep binding/generation in the reports and reject stale reports in
+their owning chart. This adapter does not grant workspace access or acknowledge
+domain-operation drain.
+
 Use `issueLocalWrite` and `persistLocal` from the named Jazz boundary where a statechart separates
 issuing a write from observing local durability. A single-write leaf may use its native receipt
 with a local wait. Never claim remote acceptance from that wait. Multi-step read/check/write or

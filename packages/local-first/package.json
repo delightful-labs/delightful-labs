@@ -307,6 +307,10 @@
 			"types": "./dist/contracts/observation.d.ts",
 			"default": "./dist/contracts/observation.js"
 		},
+		"./data/observation-workflow": {
+			"types": "./dist/machines/data/observation.d.ts",
+			"default": "./dist/machines/data/observation.js"
+		},
 		"./backend/jazz/data": {
 			"types": "./dist/backend/jazz/data.svelte.d.ts",
 			"default": "./dist/backend/jazz/data.svelte.js"
