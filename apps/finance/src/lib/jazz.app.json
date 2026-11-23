@@ -2,7 +2,7 @@
   "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
   "$generated": {
     "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
-    "sha256": "93bd6a074bf283218679edaa76d76ec7f96971eb36ff8f16111247968c88e349"
+    "sha256": "d5d73598201427c7e6c77115fb5c6d2a646ebf829c3ee45efba7fb8e9c35ce7d"
   },
   "tables": {
     "accountMemberships": {
@@ -35,6 +35,70 @@
     "batchTemplates": {
       "columns": { "organizationId": "uuid", "name": "string" },
       "relations": { "organization": { "rel": "organizations", "column": "organizationId" } }
+    },
+    "better_auth_account": {
+      "columns": {
+        "accountId": "string",
+        "providerId": "string",
+        "userId": "uuid",
+        "accessToken": "string?",
+        "refreshToken": "string?",
+        "idToken": "string?",
+        "accessTokenExpiresAt": "timestamp?",
+        "refreshTokenExpiresAt": "timestamp?",
+        "scope": "string?",
+        "password": "string?",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      },
+      "relations": { "userIdRelation": { "rel": "better_auth_user", "column": "userId" } }
+    },
+    "better_auth_atprotoSession": {
+      "columns": {
+        "did": "string",
+        "sessionData": "string",
+        "userId": "uuid?",
+        "handle": "string",
+        "pdsUrl": "string",
+        "updatedAt": "timestamp"
+      },
+      "relations": { "userIdRelation": { "rel": "better_auth_user", "column": "userId" } }
+    },
+    "better_auth_atprotoState": {
+      "columns": { "stateKey": "string", "stateData": "string", "expiresAt": "timestamp" }
+    },
+    "better_auth_session": {
+      "columns": {
+        "expiresAt": "timestamp",
+        "token": "string",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp",
+        "ipAddress": "string?",
+        "userAgent": "string?",
+        "userId": "uuid"
+      },
+      "relations": { "userIdRelation": { "rel": "better_auth_user", "column": "userId" } }
+    },
+    "better_auth_user": {
+      "columns": {
+        "name": "string",
+        "email": "string",
+        "emailVerified": "boolean",
+        "image": "string?",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp",
+        "atprotoDid": "string?",
+        "atprotoHandle": "string?"
+      }
+    },
+    "better_auth_verification": {
+      "columns": {
+        "identifier": "string",
+        "value": "string",
+        "expiresAt": "timestamp",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
     },
     "categories": {
       "columns": {
@@ -350,6 +414,306 @@
       "columns": { "fileId": "uuid", "status": { "enum": ["pending", "complete", "failed"] } }
     }
   },
+  "history": {
+    "b33f0ec2011b": {
+      "tables": {
+        "accountMemberships": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "userId": "uuid",
+            "accountId": { "type": "uuid", "references": "accounts" },
+            "access": { "enum": ["read", "write"] },
+            "canDelete": "boolean"
+          }
+        },
+        "accounts": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "name": "string",
+            "kind": { "enum": ["cash", "bank", "card"] },
+            "currency": "string",
+            "archivedAt": "timestamp?"
+          }
+        },
+        "batchTemplates": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "name": "string"
+          }
+        },
+        "categories": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "name": "string",
+            "kind": { "enum": ["expense", "income"] },
+            "isSystem": "boolean",
+            "archivedAt": "timestamp?"
+          }
+        },
+        "checkDetails": {
+          "columns": {
+            "transactionId": { "type": "uuid", "references": "transactions" },
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "accountId": { "type": "uuid", "references": "accounts" },
+            "checkNumber": "string",
+            "checkDate": "string",
+            "payerName": "string?",
+            "bankName": "string?",
+            "memoOnCheck": "string?"
+          }
+        },
+        "checks": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "accountId": { "type": "uuid", "references": "accounts" },
+            "checkNumber": "string",
+            "checkDate": "string",
+            "payerName": "string?",
+            "bankName": "string?",
+            "memoOnCheck": "string?"
+          }
+        },
+        "fileParts": {
+          "columns": {
+            "fileId": { "type": "uuid", "references": "files" },
+            "partIndex": "int",
+            "sizeBytes": "int",
+            "data": "bytes?"
+          }
+        },
+        "files": {
+          "columns": {
+            "transactionId": { "type": "uuid", "optional": true, "references": "transactions" },
+            "accountId": "uuid?",
+            "organizationId": "uuid?",
+            "fileName": "string",
+            "mimeType": "string",
+            "sizeBytes": "int"
+          }
+        },
+        "internalTransfers": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "expenseTransactionId": { "type": "uuid", "references": "transactions" },
+            "incomeTransactionId": { "type": "uuid", "references": "transactions" },
+            "expenseAccountId": { "type": "uuid", "optional": true, "references": "accounts" },
+            "incomeAccountId": { "type": "uuid", "optional": true, "references": "accounts" },
+            "expenseAmountMinor": "bigint?",
+            "expenseCurrency": "string?",
+            "incomeAmountMinor": "bigint?",
+            "incomeCurrency": "string?",
+            "amountMinor": "bigint?",
+            "currency": "string?"
+          }
+        },
+        "organizationMembers": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "userId": "uuid",
+            "profileId": { "type": "uuid", "optional": true, "references": "profiles" },
+            "role": { "enum": ["owner", "admin", "member", "viewer"] },
+            "accountAccessMode": { "enum": ["all", "selected"] }
+          }
+        },
+        "organizations": {
+          "columns": {
+            "name": "string",
+            "kind": { "enum": ["personal", "business"] },
+            "defaultCurrency": "string",
+            "ownerId": "uuid",
+            "restoreOperationId": {
+              "type": "uuid",
+              "optional": true,
+              "references": "restoreOperations"
+            }
+          }
+        },
+        "profiles": {
+          "columns": {
+            "userId": "uuid",
+            "initialWorkspaceId": "uuid?",
+            "displayName": "string?",
+            "avatarData": "bytes?",
+            "avatarMimeType": {
+              "enum": ["image/png", "image/jpeg", "image/webp"],
+              "optional": true
+            }
+          }
+        },
+        "restoreOperations": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "organizations" },
+            "sourceFileId": { "type": "uuid", "references": "files" },
+            "ownerId": "uuid",
+            "status": { "enum": ["incomplete", "active"] },
+            "payloadSha256": "string",
+            "graphSha256": "string",
+            "workspaceName": "string",
+            "workspaceKind": { "enum": ["personal", "business"] },
+            "workspaceCurrency": "string"
+          }
+        },
+        "simplefinAccountLinks": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "accountId": { "type": "uuid", "references": "accounts" },
+            "connectionId": {
+              "type": "uuid",
+              "optional": true,
+              "references": "simplefinConnections"
+            },
+            "simplefinAccountId": "string",
+            "simplefinOrgId": "string?",
+            "availableBalance": "string?",
+            "balanceDate": "timestamp?"
+          }
+        },
+        "simplefinConnections": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "accessUrl": "string",
+            "ownerId": "uuid?",
+            "credentialVersion": "int?",
+            "credentialId": "string?",
+            "prfSalt": "string?",
+            "iv": "string?",
+            "ciphertext": "string?",
+            "lastOutcome": { "enum": ["succeeded", "partial", "failed"], "optional": true },
+            "importedCount": "int?",
+            "existingCount": "int?",
+            "omittedCount": "int?",
+            "status": { "enum": ["active", "error", "revoked"] },
+            "lastSyncAt": "timestamp?",
+            "lastError": "string?",
+            "claimedAt": "timestamp"
+          }
+        },
+        "simplefinSyncAccountResults": {
+          "columns": {
+            "attemptId": { "type": "uuid", "references": "simplefinSyncAttempts" },
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "accountId": { "type": "uuid", "references": "accounts" },
+            "accountName": "string",
+            "outcome": { "enum": ["unfinished", "succeeded", "partial", "failed", "cancelled"] },
+            "failureCode": {
+              "enum": [
+                "authorization",
+                "passkey",
+                "provider",
+                "mapping",
+                "import",
+                "interrupted",
+                "unexpected"
+              ],
+              "optional": true
+            },
+            "importedCount": "int?",
+            "existingCount": "int?",
+            "omittedCount": "int?"
+          }
+        },
+        "simplefinSyncAttempts": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "connectionId": { "type": "uuid", "references": "simplefinConnections" },
+            "initiatedBy": "uuid",
+            "startedAt": "timestamp",
+            "finishedAt": "timestamp?",
+            "outcome": { "enum": ["unfinished", "succeeded", "partial", "failed", "cancelled"] },
+            "importSettlement": {
+              "enum": ["notStarted", "locallyPersisted", "confirmed", "unresolved"]
+            },
+            "failureCode": {
+              "enum": [
+                "authorization",
+                "passkey",
+                "provider",
+                "mapping",
+                "import",
+                "interrupted",
+                "unexpected"
+              ],
+              "optional": true
+            },
+            "importedCount": "int?",
+            "existingCount": "int?",
+            "omittedCount": "int?"
+          }
+        },
+        "tags": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "name": "string",
+            "kind": { "enum": ["expense", "income"] },
+            "categoryId": { "type": "uuid", "optional": true, "references": "categories" },
+            "archivedAt": "timestamp?"
+          }
+        },
+        "transactionAttachments": {
+          "columns": {
+            "transactionId": { "type": "uuid", "references": "transactions" },
+            "fileId": { "type": "uuid", "references": "files" }
+          }
+        },
+        "transactionBatches": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "name": "string?"
+          }
+        },
+        "transactionTags": {
+          "columns": {
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "transactionId": { "type": "uuid", "references": "transactions" },
+            "tagId": { "type": "uuid", "references": "tags" }
+          }
+        },
+        "transactions": {
+          "columns": {
+            "amountMinor": "bigint",
+            "kind": { "enum": ["expense", "income"] },
+            "currency": "string",
+            "categoryId": { "type": "uuid", "references": "categories" },
+            "accountId": { "type": "uuid", "references": "accounts" },
+            "organizationId": { "type": "uuid", "references": "organizations" },
+            "bookedOn": "string",
+            "description": "string?",
+            "memo": "string?",
+            "paymentMethod": {
+              "enum": ["cash", "check", "transfer", "electronic"],
+              "optional": true
+            },
+            "checkDetailsId": { "type": "uuid", "optional": true, "references": "checkDetails" },
+            "checkId": { "type": "uuid", "optional": true, "references": "checks" },
+            "internalTransferId": {
+              "type": "uuid",
+              "optional": true,
+              "references": "internalTransfers"
+            },
+            "source": { "enum": ["manual", "simplefin"] },
+            "externalId": "string?",
+            "batchId": { "type": "uuid", "optional": true, "references": "transactionBatches" }
+          }
+        },
+        "uploads": {
+          "columns": { "fileId": "uuid", "status": { "enum": ["pending", "complete", "failed"] } }
+        }
+      }
+    }
+  },
+  "migrations": [
+    {
+      "from": "b33f0ec2011b",
+      "createTables": [
+        "better_auth_account",
+        "better_auth_atprotoSession",
+        "better_auth_atprotoState",
+        "better_auth_session",
+        "better_auth_user",
+        "better_auth_verification"
+      ]
+    }
+  ],
   "transforms": {
     "accountCurrency": { "stored": "string", "view": "string" },
     "accountName": { "stored": "string", "view": "string" },

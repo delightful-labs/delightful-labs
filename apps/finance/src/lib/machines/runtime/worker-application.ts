@@ -1,3 +1,9 @@
+import { createOrderedSignOutMachine } from 'delightful-local-first/session/sign-out/workflow'
+import {
+	financeAtprotoMachine,
+	selectFinanceAtprotoView,
+	type FinanceAuthMessage
+} from '../identity/atproto.js'
 import { workerAccount } from '../../contracts/worker-application.js'
 import { debugEnabled } from '../../diagnostics/logger.js'
 import type { WorkerBankCommand, WorkerBankHistoryCommand } from '../../contracts/worker-banks.js'
@@ -103,10 +109,25 @@ type Input = {
 	closeBroker: () => Promise<WorkerHostClosed>
 	brokerIdentity: WorkerHostClosed
 	navigate: WorkspaceNavigate
+	callbackAttempt?: string | null | undefined
+	navigateProvider?: (url: string) => Promise<void>
+	clearAppSession?: () => Promise<void>
+	authReturned?: () => void
 }
 type RestorationFinished = Omit<FinanceRecoveryFinished, 'type'>
 type RestorationOwner = ActorRef<Snapshot<unknown>, { type: 'SHUTDOWN' | 'WORKSPACE_DRAINED' }>
+type SignOutRequest = {
+	scope: RestorationScope
+	before: { status: 'ready'; binding: object }
+	continuation: 'resume' | 'close'
+}
+const financeSignOutMachine = createOrderedSignOutMachine()
 type Context = Input & {
+	signedOutBinding: object | undefined
+	signOutRequest: SignOutRequest | undefined
+	signOutFeedback: FinanceAuthMessage | undefined
+	authAdmission: { revision: number; binding: object; pathname: string } | undefined
+	providerDestination: string | undefined
 	offline: boolean
 	restoration:
 		| { scope: RestorationScope; owner: RestorationOwner; operation: 'restore' | 'navigate' }
@@ -114,6 +135,7 @@ type Context = Input & {
 	recoveryNavigation: RecoveryNavigation | undefined
 	href: string | undefined
 	route: WorkspaceRoute | undefined
+	routeRevision: number
 	restorationOutcome: RecoveryResult['outcome'] | undefined
 	restorationAttempt: number
 	validatedRestorationAttempt: number
@@ -369,6 +391,12 @@ const closeStore = createAsyncLogic({
 const closeBroker = createAsyncLogic({
 	run: ({ input }: { input: Input['closeBroker'] }) => input()
 })
+const navigateProvider = createAsyncLogic({
+	run: ({ input }: { input: { navigate: Input['navigateProvider']; url: string } }) => {
+		if (!input.navigate) throw new Error('Provider navigation unavailable')
+		return input.navigate(input.url)
+	}
+})
 export function createFinanceWorkerMachine({
 	observeForms
 }: {
@@ -379,8 +407,16 @@ export function createFinanceWorkerMachine({
 		schemas: {
 			input: types<Input>(),
 			context: types<Context>(),
+			meta: types<{ authMessage?: FinanceAuthMessage }>(),
 			output: types<{ outcome: 'closed' }>(),
 			events: {
+				BEGIN_AUTH: types<{ handle: string; sessionRevision: number }>(),
+				CONFIRM_AUTH: types<{ sessionRevision: number }>(),
+				CANCEL_AUTH: types<{ sessionRevision: number }>(),
+				RETRY_AUTH: types<{ sessionRevision: number }>(),
+				SIGN_OUT: types<{ sessionRevision: number }>(),
+				OAUTH_REDIRECT: types<{ url: string }>(),
+				OAUTH_RETURNED: types(),
 				REGISTER_RESTORATION: types<{
 					scope: RestorationScope
 					owner: RestorationOwner
@@ -466,12 +502,16 @@ export function createFinanceWorkerMachine({
 				READ_DISPOSAL_FAILED: types()
 			},
 			children: {
+				oauth: types<ActorRefFrom<typeof financeAtprotoMachine>>(),
 				sessionObservation: types<ActorRefFrom<typeof observeSession>>(),
 				queries: types<ActorRefFrom<typeof financeQueriesMachine>>(),
 				forms: types<ActorRefFrom<ReturnType<typeof createFinanceFormsMachine>>>()
 			}
 		},
 		actors: {
+			oauth: financeAtprotoMachine,
+			navigateProvider,
+			signOut: financeSignOutMachine,
 			observeSession,
 			queries: financeQueriesMachine,
 			closeSession: sessionCloseMachine,
@@ -484,10 +524,16 @@ export function createFinanceWorkerMachine({
 		initial: 'running',
 		context: ({ input }) => ({
 			...input,
+			authAdmission: undefined,
+			signedOutBinding: undefined,
+			signOutRequest: undefined,
+			signOutFeedback: undefined,
+			providerDestination: undefined,
 			offline: true,
 			recoveryNavigation: undefined,
 			href: undefined,
 			route: undefined,
+			routeRevision: 0,
 			restoration: undefined,
 			restorationOutcome: undefined,
 			restorationAttempt: 0,
@@ -511,6 +557,15 @@ export function createFinanceWorkerMachine({
 		output: () => ({ outcome: 'closed' }),
 		invoke: [
 			{
+				id: 'oauth',
+				src: 'oauth',
+				input: ({ context }) => ({ callbackAttempt: context.callbackAttempt }),
+				onSnapshot: () => ({}),
+				onError: (_args, enq) => {
+					enq.raise({ type: 'NATIVE_FAILED' })
+				}
+			},
+			{
 				id: 'sessionObservation',
 				src: 'observeSession',
 				input: ({ context }) => context.session,
@@ -521,6 +576,93 @@ export function createFinanceWorkerMachine({
 			}
 		],
 		on: {
+			SIGN_OUT: ({ context, event, value, children }, enq) => {
+				const ready = context.ready
+				const auth = selectFinanceAtprotoView(children.oauth?.getSnapshot())
+				if (
+					!matchesState('running', value) ||
+					!ready ||
+					ready.identityKind !== 'backend' ||
+					!context.clearAppSession ||
+					context.restoration ||
+					auth.busy ||
+					auth.confirmationRequired ||
+					event.sessionRevision !== context.sessionRevision
+				)
+					return
+				enq.raise({ type: 'CLOSE' })
+				return {
+					context: {
+						signOutRequest: {
+							scope: { binding: context.session.binding, attempt: context.restorationAttempt + 1 },
+							before: { status: 'ready', binding: ready.binding },
+							continuation: 'resume'
+						},
+						restorationAttempt: context.restorationAttempt + 1,
+						signOutFeedback: { key: 'actions.sign_out', variant: 'loading' },
+						authAdmission: undefined,
+						providerDestination: undefined
+					}
+				}
+			},
+			BEGIN_AUTH: ({ context, event, children, value }, enq) => {
+				const ready = context.ready
+				const identityBinding = ready?.binding ?? context.signedOutBinding
+				if (
+					!matchesState('running', value) ||
+					!identityBinding ||
+					!context.route ||
+					!context.navigateProvider ||
+					context.restoration ||
+					context.sessionRevision !== event.sessionRevision
+				)
+					return
+				const command = {
+					type: 'BEGIN',
+					handle: event.handle,
+					requiresConfirmation: ready?.identityKind === 'device'
+				} satisfies Parameters<NonNullable<typeof children.oauth>['send']>[0]
+				if (!children.oauth?.getSnapshot().can(command)) return
+				enq.sendTo('oauth', command)
+				return {
+					context: {
+						authAdmission: {
+							revision: context.sessionRevision,
+							binding: identityBinding,
+							pathname: context.route.pathname
+						}
+					}
+				}
+			},
+			CONFIRM_AUTH: ({ context, event }, enq) => {
+				if (
+					event.sessionRevision !== context.sessionRevision ||
+					context.authAdmission?.binding !== (context.ready?.binding ?? context.signedOutBinding) ||
+					context.authAdmission?.revision !== context.sessionRevision
+				)
+					return
+				enq.sendTo('oauth', { type: 'CONFIRM' })
+			},
+			CANCEL_AUTH: ({ context, event }, enq) => {
+				if (event.sessionRevision !== context.sessionRevision) return
+				enq.sendTo('oauth', { type: 'CANCEL' })
+				return { context: { authAdmission: undefined } }
+			},
+			OAUTH_RETURNED: ({ context }, enq) => {
+				enq(() => context.authReturned?.())
+				return { context: { callbackAttempt: undefined } }
+			},
+			OAUTH_REDIRECT: ({ context, event, value }, enq) => {
+				if (
+					!matchesState('running', value) ||
+					!context.authAdmission ||
+					context.authAdmission.revision !== context.sessionRevision ||
+					context.authAdmission.binding !== (context.ready?.binding ?? context.signedOutBinding)
+				)
+					return
+				enq.raise({ type: 'CLOSE' })
+				return { context: { providerDestination: event.url } }
+			},
 			START_BACKUP: ({ event }, enq) => enq(() => event.submission.release()),
 			START_WORKSPACE_RESTORE: ({ event }, enq) => enq(() => event.request.release()),
 			TRANSFER_MUTATION_REQUEST: ({ context, event }, enq) => {
@@ -546,7 +688,10 @@ export function createFinanceWorkerMachine({
 				return { context: { offline: event.offline } }
 			},
 			OBSERVE_ROUTE: ({ context, event }, enq) => {
-				if (event.revision <= context.selection.revision) return
+				if (event.revision <= Math.max(context.selection.revision, context.routeRevision)) return
+				const leaveAuth =
+					context.authAdmission !== undefined && context.authAdmission.pathname !== event.pathname
+				if (leaveAuth) enq.sendTo('oauth', { type: 'CANCEL' })
 				const route = { pathname: event.pathname, search: event.search, hash: event.hash }
 				enq.raise({
 					type: 'SELECT_CONTEXT',
@@ -557,7 +702,14 @@ export function createFinanceWorkerMachine({
 					kind: transactionKindForPath(event.pathname),
 					transactionId: transactionIdForPath(event.pathname)
 				})
-				return { context: { route, href: `${route.pathname}${route.search}${route.hash}` } }
+				return {
+					context: {
+						route,
+						routeRevision: event.revision,
+						href: `${route.pathname}${route.search}${route.hash}`,
+						...(leaveAuth ? { authAdmission: undefined } : {})
+					}
+				}
 			},
 			RESTORATION_FAILED: ({ context, event }) =>
 				sameRestoration(context, event)
@@ -579,6 +731,7 @@ export function createFinanceWorkerMachine({
 					: { context: completed }
 			},
 			CLOSE: ({ context }, enq) => {
+				enq.sendTo('oauth', { type: 'CANCEL' })
 				if (context.restoration) enq.sendTo(context.restoration.owner, { type: 'SHUTDOWN' })
 				if (context.forms) enq.sendTo(context.forms.owner, { type: 'SHUTDOWN' })
 				return {
@@ -690,6 +843,13 @@ export function createFinanceWorkerMachine({
 						const view = event.view,
 							ready = view.observation
 						if (
+							context.authAdmission &&
+							(view.stage !== 'active' ||
+								(ready?.status !== 'ready' && ready?.status !== 'signed-out') ||
+								ready.binding !== context.authAdmission.binding)
+						)
+							enq.sendTo('oauth', { type: 'CANCEL' })
+						if (
 							context.restoration &&
 							(context.ready
 								? ready?.status !== 'ready' || ready.binding !== context.ready.binding
@@ -705,6 +865,8 @@ export function createFinanceWorkerMachine({
 						) {
 							const next = {
 								...context,
+								signedOutBinding: ready?.status === 'signed-out' ? ready.binding : undefined,
+								authAdmission: undefined,
 								ready: undefined,
 								...withdrawn,
 								sessionStatus: view.status
@@ -715,9 +877,21 @@ export function createFinanceWorkerMachine({
 								context: { ...next, sessionStatus: 'error' }
 							}
 						}
+						if (
+							view.stage === 'active' &&
+							ready?.status === 'signed-out' &&
+							context.signedOutBinding === ready.binding
+						)
+							return { context: { sessionStatus: view.status } }
 						if (ready?.status !== 'ready') {
 							const next = {
 								...context,
+								sessionRevision:
+									ready?.status === 'signed-out' && context.signedOutBinding !== ready.binding
+										? context.sessionRevision + 1
+										: context.sessionRevision,
+								signedOutBinding: ready?.status === 'signed-out' ? ready.binding : undefined,
+								authAdmission: undefined,
 								ready: undefined,
 								...withdrawn,
 								sessionStatus: view.status
@@ -729,9 +903,11 @@ export function createFinanceWorkerMachine({
 							return { target: '.waiting', context: next }
 						}
 						if (context.ready?.binding === ready.binding)
-							return { context: { sessionStatus: view.status } }
+							return { context: { ready, sessionStatus: view.status } }
 						const next = {
 							...context,
+							signedOutBinding: undefined,
+							authAdmission: undefined,
 							ready,
 							...withdrawn,
 							readBinding: {},
@@ -1341,6 +1517,10 @@ export function createFinanceWorkerMachine({
 								context: {
 									ready,
 									sessionStatus: view.status,
+									signedOutBinding:
+										view.observation?.status === 'signed-out'
+											? view.observation.binding
+											: undefined,
 									readBinding: {},
 									restoration: undefined,
 									settledRestoration: undefined,
@@ -1372,6 +1552,10 @@ export function createFinanceWorkerMachine({
 						return {
 							context: {
 								ready,
+								signedOutBinding:
+									event.view.stage === 'active' && observation?.status === 'signed-out'
+										? observation.binding
+										: undefined,
 								selectedAccountIds:
 									ready && ready.binding !== context.ready?.binding
 										? null
@@ -1413,9 +1597,21 @@ export function createFinanceWorkerMachine({
 				}
 			},
 			draining: {
+				meta: { authMessage: { key: 'login.atproto_working', variant: 'info' } },
 				type: 'parallel',
-				on: { CLOSE: {}, NATIVE_FAILED: {}, FORMS_VIEW: {} },
-				onDone: { target: 'closingSession' },
+				on: {
+					CLOSE: ({ context }) =>
+						context.signOutRequest
+							? {
+									context: { signOutRequest: { ...context.signOutRequest, continuation: 'close' } }
+								}
+							: undefined,
+					NATIVE_FAILED: {},
+					FORMS_VIEW: {}
+				},
+				onDone: ({ context }) => ({
+					target: context.signOutRequest ? 'signingOut' : 'closingSession'
+				}),
 				states: {
 					financial: {
 						initial: 'assessing',
@@ -1460,9 +1656,108 @@ export function createFinanceWorkerMachine({
 					}
 				}
 			},
-			drainFailed: { on: { CLOSE: {} } },
-			closeFailed: { on: { CLOSE: { target: 'closingSession' } } },
+			signingOut: {
+				on: {
+					SESSION: {},
+					NATIVE_FAILED: {},
+					READ_DISPOSAL_FAILED: {},
+					FORMS_VIEW: {},
+					CLOSE: ({ context }) => ({
+						context: {
+							signOutRequest: { ...required(context.signOutRequest), continuation: 'close' }
+						}
+					})
+				},
+				invoke: {
+					src: 'signOut',
+					input: ({ context }) => {
+						const request = required(context.signOutRequest)
+						return {
+							provider: required(context.clearAppSession),
+							observeSession: () => {
+								const view = context.session.view.get(),
+									observation = view.observation
+								return view.stage !== 'active'
+									? 'unavailable'
+									: observation?.status === 'signed-out'
+										? 'signed-out'
+										: observation?.status === 'ready'
+											? observation.binding === request.before.binding
+												? 'current'
+												: 'replaced'
+											: 'unavailable'
+							},
+							session: {
+								session: context.session,
+								scope: request.scope,
+								change: { operation: 'signOut', before: request.before }
+							}
+						}
+					},
+					onDone: ({ event }) => ({
+						target: 'resumingIdentity',
+						context: {
+							...(event.output.outcome === 'completed' ? { callbackAttempt: undefined } : {}),
+							signOutFeedback:
+								event.output.outcome === 'failed'
+									? { key: 'login.sign_out_failed', variant: 'error' }
+									: undefined
+						}
+					}),
+					onError: {
+						target: 'resumingIdentity',
+						context: { signOutFeedback: { key: 'login.sign_out_failed', variant: 'error' } }
+					}
+				}
+			},
+			resumingIdentity: {
+				type: 'choice',
+				choice: ({ context }) => {
+					if (required(context.signOutRequest).continuation === 'close')
+						return { target: 'closingSession', context: { signOutRequest: undefined } }
+					const view = context.session.view.get(),
+						observation = view.observation
+					const ready =
+						view.stage === 'active' && observation?.status === 'ready' ? observation : undefined
+					return {
+						target:
+							view.stage === 'active' ? (ready ? 'running.ready' : 'running.waiting') : 'failed',
+						context: {
+							ready,
+							signedOutBinding:
+								observation?.status === 'signed-out' ? observation.binding : undefined,
+							sessionStatus: view.status,
+							sessionRevision: context.sessionRevision + 1,
+							signOutRequest: undefined,
+							readBinding: {},
+							facts: undefined,
+							formsView: undefined,
+							selectedAccountIds: null,
+							selection: {
+								workspaceId: workspaceRoute(context.route?.search ?? '').workspaceId,
+								revision: Math.max(context.selection.revision, context.routeRevision)
+							},
+							...transactionContextForRoute(context.route)
+						}
+					}
+				}
+			},
+			drainFailed: {
+				meta: { authMessage: { key: 'login.atproto_failed', variant: 'error' } },
+				on: { CLOSE: {} }
+			},
+			closeFailed: {
+				meta: { authMessage: { key: 'login.atproto_failed', variant: 'error' } },
+				on: {
+					CLOSE: { target: 'closingSession' },
+					RETRY_AUTH: ({ context, event }) =>
+						context.providerDestination && event.sessionRevision === context.sessionRevision
+							? { target: 'closingSession' }
+							: undefined
+				}
+			},
 			closingSession: {
+				meta: { authMessage: { key: 'login.atproto_working', variant: 'info' } },
 				on: { CLOSE: {}, NATIVE_FAILED: { target: 'closeFailed' } },
 				invoke: {
 					src: 'closeSession',
@@ -1474,6 +1769,7 @@ export function createFinanceWorkerMachine({
 				}
 			},
 			closingAccountStore: {
+				meta: { authMessage: { key: 'login.atproto_working', variant: 'info' } },
 				on: { CLOSE: {}, NATIVE_FAILED: { target: 'closeFailed' } },
 				invoke: {
 					src: 'closeStore',
@@ -1483,6 +1779,7 @@ export function createFinanceWorkerMachine({
 				}
 			},
 			closingBroker: {
+				meta: { authMessage: { key: 'login.atproto_working', variant: 'info' } },
 				on: { CLOSE: {}, NATIVE_FAILED: { target: 'closeFailed' } },
 				invoke: {
 					src: 'closeBroker',
@@ -1493,11 +1790,36 @@ export function createFinanceWorkerMachine({
 							target:
 								receipt.scope === context.brokerIdentity.scope &&
 								receipt.requestId === context.brokerIdentity.requestId
-									? 'closed'
+									? context.providerDestination
+										? 'navigatingProvider'
+										: 'closed'
 									: 'closeFailed'
 						}
 					},
 					onError: { target: 'closeFailed' }
+				}
+			},
+			navigatingProvider: {
+				meta: { authMessage: { key: 'login.atproto_working', variant: 'info' } },
+				on: { CLOSE: {} },
+				invoke: {
+					src: 'navigateProvider',
+					input: ({ context }) => ({
+						navigate: context.navigateProvider,
+						url: required(context.providerDestination)
+					}),
+					onDone: { target: 'closed' },
+					onError: { target: 'providerNavigationFailed' }
+				}
+			},
+			providerNavigationFailed: {
+				meta: { authMessage: { key: 'login.atproto_failed', variant: 'error' } },
+				on: {
+					CLOSE: {},
+					RETRY_AUTH: ({ context, event }) =>
+						event.sessionRevision === context.sessionRevision
+							? { target: 'navigatingProvider' }
+							: undefined
 				}
 			},
 			cleanupFailed: { on: { CLOSE: {}, NATIVE_FAILED: {} } },
@@ -1550,12 +1872,15 @@ export function selectFinanceWorkerView(
 			  snapshot.matches('cleanupFailed') ||
 			  snapshot.matches('drainFailed') ||
 			  snapshot.matches('closeFailed') ||
+			  snapshot.matches('providerNavigationFailed') ||
 			  snapshot.matches({ running: 'readFailed' })
 			? 'failed'
 			: snapshot.matches('draining') ||
 				  snapshot.matches('closingSession') ||
+				  snapshot.matches('signingOut') ||
 				  snapshot.matches('closingAccountStore') ||
-				  snapshot.matches('closingBroker')
+				  snapshot.matches('closingBroker') ||
+				  snapshot.matches('navigatingProvider')
 				? 'closing'
 				: snapshot.matches('restoring')
 					? 'loading'
@@ -1595,8 +1920,39 @@ export function selectFinanceWorkerView(
 	const archive = forms?.archive
 	const archiveRows = new Map(archive?.view.rows.map((row) => [row.account.id, row]) ?? [])
 
+	const authView = selectFinanceAtprotoView(snapshot.children.oauth?.getSnapshot())
+	const authMessage = Object.values(snapshot.getMeta()).find(
+		(meta) => meta?.authMessage
+	)?.authMessage
+
 	return {
 		type: 'VIEW',
+		auth: {
+			canBegin:
+				snapshot.matches('running') &&
+				(context.ready !== undefined || context.signedOutBinding !== undefined) &&
+				context.navigateProvider !== undefined &&
+				!context.restoration &&
+				!authView.busy &&
+				!authView.confirmationRequired,
+			busy: authView.busy || (context.providerDestination !== undefined && status === 'closing'),
+			confirmationRequired: authView.confirmationRequired,
+			canSignOut:
+				snapshot.matches('running') &&
+				context.ready?.identityKind === 'backend' &&
+				context.clearAppSession !== undefined &&
+				!context.restoration &&
+				!authView.busy &&
+				!authView.confirmationRequired,
+			signOutBusy:
+				context.signOutRequest !== undefined &&
+				(snapshot.matches('draining') || snapshot.matches('signingOut')),
+			...(context.signOutFeedback ? { signOutMessage: context.signOutFeedback } : {}),
+			canRetryNavigation:
+				context.providerDestination !== undefined &&
+				(snapshot.matches('closeFailed') || snapshot.matches('providerNavigationFailed')),
+			...((authMessage ?? authView.message) ? { message: authMessage ?? authView.message } : {})
+		},
 		sessionRevision: context.sessionRevision,
 		transactionKind: context.transactionKind,
 		transactionId: context.transactionId,
@@ -1934,11 +2290,16 @@ export function selectFinanceRestorationAdmission(
 ) {
 	return snapshot?.status === 'active' &&
 		snapshot.matches('running') &&
+		!selectFinanceAtprotoView(snapshot.children.oauth?.getSnapshot()).busy &&
+		!selectFinanceAtprotoView(snapshot.children.oauth?.getSnapshot()).confirmationRequired &&
 		!snapshot.context.restoration &&
 		snapshot.context.sessionRevision === revision &&
 		(snapshot.context.ready !== undefined || snapshot.context.sessionStatus === 'signed-out')
 		? {
 				session: snapshot.context.session,
+				needsProviderClearance:
+					snapshot.context.ready?.identityKind === 'backend' ||
+					snapshot.context.callbackAttempt != null,
 				scope: {
 					binding: snapshot.context.session.binding,
 					attempt: snapshot.context.restorationAttempt + 1

@@ -70,7 +70,8 @@ const fixture = {
 	},
 	open(configuration: FinanceWorkerConfiguration) {
 		scope = configuration.scope
-		if (location.pathname === '/') history.replaceState(null, '', '/accounts')
+		if (location.pathname === '/')
+			history.replaceState(null, '', '/accounts' + location.search + location.hash)
 		client = createFinanceWorkerClient(
 			configuration,
 			async (destination, signal, expectedHref, replace) => {

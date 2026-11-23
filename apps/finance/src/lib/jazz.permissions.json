@@ -2,7 +2,7 @@
   "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
   "$generated": {
     "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
-    "sha256": "d08434f1846a58709838aedd788f7ae95b90f741f27311d831a9a70663151741"
+    "sha256": "b3f5bb8308e1ca1c8949f8aa3f5a853fe61272b27201b8946e638d2218eac654"
   },
   "tables": {
     "accountMemberships": {
@@ -132,6 +132,37 @@
           "exists organizationMembers(organizationId = this.organizationId, userId = session.user, role = 'admin')"
         ]
       }
+    },
+    "better_auth_account": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_atprotoSession": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_atprotoState": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_session": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "better_auth_user": { "read": "false", "insert": "false", "update": "false", "delete": "false" },
+    "better_auth_verification": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
     },
     "categories": {
       "read": {

@@ -77,7 +77,7 @@ test('global keyboard developer menu saves both sample kinds and retains progres
 		page.getByRole('main').getByRole('link', { name: /^Transaction details:/ })
 	).toHaveCount(25)
 	await page.locator('aside').getByRole('link', { name: 'Login', exact: true }).click()
-	await expect(page.getByRole('heading', { name: 'Restore Account', exact: true })).toBeVisible()
+	await expect(page.getByRole('heading', { name: 'Login', exact: true })).toBeVisible()
 	await openMenu(page)
 	await expect(income).toBeVisible()
 	await expect(expense).toBeVisible()

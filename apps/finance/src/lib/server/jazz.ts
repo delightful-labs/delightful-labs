@@ -1,12 +1,8 @@
+import { createJazzAuthHandlers } from 'delightful-local-first/backend/jazz/auth'
+import { configuredAuth } from './auth.js'
+import type { CreateJazzOptions, Jazz } from 'jazz-tools/backend'
 import { developmentJazz } from './jazz-development.js'
-import {
-	acceptDeviceAccounts,
-	createJazz,
-	memory,
-	sqlite,
-	vercel,
-	perBranch
-} from 'jazz-tools/backend'
+import { createJazz, memory, sqlite, vercel, perBranch } from 'jazz-tools/backend'
 import { app } from '../queries.js'
 import permissions from '../jazz.permissions.json' with { type: 'json' }
 
@@ -38,10 +34,10 @@ const options = {
 	app,
 	permissions,
 	store,
-	authenticate: acceptDeviceAccounts,
+	...createJazzAuthHandlers(configuredAuth),
 	...(publicUrl ? { publicUrl } : {})
-}
-export const jazz =
+} satisfies CreateJazzOptions
+export const jazz: Jazz =
 	process.env.FINANCE_EPHEMERAL_JAZZ === 'true'
 		? developmentJazz(() => createJazz(options))
 		: createJazz(options)

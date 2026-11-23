@@ -335,3 +335,49 @@ describe.each(['fixed', 'supplied'] satisfies ('fixed' | 'supplied')[])(
 		)
 	}
 )
+
+describe('provider-session clearance before native restoration', () => {
+	it('validates and waits for the host drain before clearing the provider', async () => {
+		const held = deferred<void>()
+		const clear = vi.fn(() => held.promise)
+		const f = startFixture({ clearProviderSession: clear }, 'supplied')
+		await waitFor(f.actor, (snapshot) => snapshot.matches('awaitingPreparation'))
+		expect(clear).not.toHaveBeenCalled()
+		f.prepare()
+		await vi.waitFor(() => expect(clear).toHaveBeenCalledOnce())
+		expect(f.restore).not.toHaveBeenCalled()
+		held.resolve()
+		expect(await completed(f)).toMatchObject({ outcome: 'restored' })
+		expect(f.restore).toHaveBeenCalledOnce()
+	})
+	it('does not mutate the native identity after provider refusal', async () => {
+		const f = startFixture(
+			{
+				clearProviderSession: async () => {
+					throw new Error('Provider unavailable')
+				}
+			},
+			'supplied'
+		)
+		await waitFor(f.actor, (snapshot) => snapshot.matches('awaitingPreparation'))
+		f.prepare()
+		expect(await completed(f)).toEqual({ ...f.scope, outcome: 'failed', mutation: 'notStarted' })
+		expect(f.restore).not.toHaveBeenCalled()
+		secretsCleared(f)
+	})
+	it.each(interruptions)(
+		'retains provider clearance through %s without then restoring',
+		async (type) => {
+			const held = deferred<void>()
+			const f = startFixture({ clearProviderSession: () => held.promise }, 'supplied')
+			await waitFor(f.actor, (snapshot) => snapshot.matches('awaitingPreparation'))
+			f.prepare()
+			f.actor.send({ type })
+			expect(f.actor.getSnapshot().status).toBe('active')
+			held.resolve()
+			expect(await completed(f)).toMatchObject({ outcome: 'cancelled' })
+			expect(f.restore).not.toHaveBeenCalled()
+			secretsCleared(f)
+		}
+	)
+})

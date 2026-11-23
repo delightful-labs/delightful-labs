@@ -1,14 +1,7 @@
+import { createJazzAuthHandlers } from 'delightful-local-first/backend/jazz/auth'
 import { configuredAuth } from './auth/handler.js'
 import { extensionOrigin } from '../../../../../tooling/extension-identity.js'
-import {
-	acceptDeviceAccounts,
-	createJazz,
-	memory,
-	perBranch,
-	remote,
-	sqlite,
-	vercel
-} from 'jazz-tools/backend'
+import { createJazz, memory, perBranch, remote, sqlite, vercel } from 'jazz-tools/backend'
 import { app } from '../backend/jazz/jazz.generated.js'
 import permissions from '../backend/jazz/jazz.permissions.json' with { type: 'json' }
 
@@ -51,34 +44,7 @@ export const jazz = createJazz({
 	app,
 	permissions,
 	store,
-	authenticate: async (request) => {
-		const auth = configuredAuth()
-		const session = auth
-			? await auth.api.getSession({
-					headers: request.headers,
-					query: { disableCookieCache: true, disableRefresh: true }
-				})
-			: null
-		return session
-			? {
-					userId: session.user.id,
-					expiresAt: Math.floor(session.session.expiresAt.getTime() / 1000)
-				}
-			: acceptDeviceAccounts(request)
-	},
-	refresh: async (request, next) => {
-		const auth = configuredAuth()
-		if (!auth) return next(request)
-		const refreshed = await auth.api.getSession({
-			headers: request.headers,
-			query: { disableCookieCache: true },
-			returnHeaders: true
-		})
-		const response = await next(request)
-		for (const cookie of refreshed.headers.getSetCookie())
-			response.headers.append('Set-Cookie', cookie)
-		return response
-	},
+	...createJazzAuthHandlers(configuredAuth),
 	allowedOrigins: [extensionOrigin],
 	...(publicUrl ? { publicUrl } : {})
 })

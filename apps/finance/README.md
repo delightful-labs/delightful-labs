@@ -29,6 +29,14 @@ Development and Vercel builds use the same-origin Jazz endpoint automatically. F
 preview, build with `PUBLIC_JAZZ_SERVER_URL=same-origin`; start the preview with
 `FINANCE_EPHEMERAL_JAZZ=true` only when disposable test data is intended.
 
+## AT Protocol login
+
+Optional AT Protocol login uses the shared Local First authentication package and
+Finance's existing Jazz backend. Configure the server-only `AUTH_BASE_URL` and
+`AUTH_SECRET` settings to enable it. Finance requests identity access only.
+See [login setup and verification](docs/atproto-login.md) for origins, storage,
+account switching, recovery and real-provider verification.
+
 ## Vercel deployment
 
 Vercel installs with `pnpm --filter 'delightful-finances...' install --frozen-lockfile`.

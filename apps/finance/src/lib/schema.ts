@@ -1,3 +1,4 @@
+import { tables as authTables } from 'delightful-local-first/backend/jazz/auth-schema'
 import { schema as s } from 'jazz-tools'
 
 import { accountsSchema } from './schema/accounts.js'
@@ -12,6 +13,7 @@ import { tagsSchema } from './schema/tags.js'
 import { transactionsSchema } from './schema/transactions.js'
 
 const baseDefinition = {
+	...authTables,
 	...identitySchema,
 	...accountsSchema,
 	...categoriesSchema,

@@ -1,3 +1,4 @@
+import { authPermissions } from 'delightful-local-first/backend/jazz/auth-schema'
 import type { schema as s } from 'jazz-tools'
 import { schema } from './schema.js'
 
@@ -403,6 +404,7 @@ const transferReferencesTransaction = (
 	)
 
 export const permissions = definePermissions({
+	...authPermissions,
 	accountMemberships: {
 		read: (accountMembership) => canReadMembership(accountMembership.organizationId),
 		insert: (accountMembership) => isAdmin(accountMembership.organizationId),

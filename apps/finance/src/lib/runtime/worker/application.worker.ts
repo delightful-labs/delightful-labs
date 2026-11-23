@@ -1,3 +1,4 @@
+import { clearAtprotoAppSession } from 'delightful-local-first/auth/atproto/workflow'
 import { debugEnabled } from '../../diagnostics/logger.js'
 import { projectInspection } from '../../diagnostics/inspection-projection.js'
 import { logMachineFailure } from '../../diagnostics/machine-diagnostics.js'
@@ -16,7 +17,7 @@ import {
 } from '../../contracts/worker-backup.js'
 import { prepareBackupSubmission } from '../../backup/submission.js'
 import { sessionRecoveryMachine } from 'delightful-local-first/recovery/coordination'
-import { requestWindowNavigation } from './navigation.js'
+import { requestWindowNavigation, requestProviderNavigation } from './navigation.js'
 import type { RecoveryRequest } from 'delightful-local-first/recovery/coordination'
 import { parseJazzRecoveryPhrase } from 'delightful-local-first/backend/jazz/restoration'
 import { replyWithRecoveryPhrase } from './recovery.js'
@@ -149,6 +150,9 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 					invalidate: () => {},
 					capability: {
 						runtime: session,
+						...(admitted.needsProviderClearance
+							? { clearProviderSession: clearAtprotoAppSession }
+							: {}),
 						parsePhrase: parseJazzRecoveryPhrase,
 						isCurrentBinding: current,
 						readIdentity: async () => {
@@ -247,6 +251,10 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 				inspect,
 				input: {
 					session: createSessionRuntimeConnection(runtime, native.binding),
+					callbackAttempt: open.data.callbackAttempt,
+					navigateProvider: requestProviderNavigation,
+					clearAppSession: clearAtprotoAppSession,
+					authReturned: () => self.postMessage({ type: 'AUTH_RETURNED' }),
 					accountOrderStorage: createFinanceAccountOrderStorage(
 						financeAccountStoreBinding({ serverUrl, scope, environment }).key
 					),

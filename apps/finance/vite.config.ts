@@ -14,7 +14,9 @@ export default defineConfig({
 	// A different page origin has different browser storage. Never silently change ports.
 	server: { host: '0.0.0.0', port: 5173, strictPort: true },
 	ssr: {
-		noExternal: ['jazz-tools'],
+		// Keep each dependency's Zod version. A bare external import makes bundled
+		// Better Auth resolve Finance's older Zod instead of its own compatible one.
+		noExternal: ['jazz-tools', 'zod'],
 		external: ['jazz-tools/backend', 'jazz-napi', '@vercel/functions', '@vercel/sandbox', 'ws']
 	},
 	// Vendored DUI updates must be loaded from the current package, not a cached bundle.

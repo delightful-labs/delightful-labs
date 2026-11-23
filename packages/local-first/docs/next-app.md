@@ -4,6 +4,47 @@ The Finance extraction exposes workflows rather than Finance's models. Use nativ
 permission rules in one app integration layer. The root package stays empty; import the relevant
 subpaths. Use the pinned Jazz, XState, Svelte and DUI versions listed in package.json.
 
+## Optional AT Protocol authentication
+
+Keep browser/worker and server imports separate:
+
+- `auth/atproto/workflow`: `createAtprotoWorkflow` owns authorization attempts,
+  optional pre-authorization confirmation, cancellation and callback confirmation.
+  Supply localized messages or typed descriptors. The host owns identity-scoped
+  admission and must drain/close native resources before executing a redirect.
+  `clearAtprotoAppSession` is one HTTP leaf for an owning identity workflow; it
+  does not itself drain or mutate the Jazz session.
+- `auth/atproto/server`: `createAuthRequestHandler` owns each HTTP request actor
+  and completion receipt lifecycle. Configure an app-specific receipt cookie name
+  and callback route. This is a Node/server entry and imports cryptography.
+- `backend/jazz/auth`: `createAtprotoAuthServer` composes the pinned Better Auth,
+  AT Protocol plugin and native Jazz adapter over the app's existing backend.
+  `createJazzAuthHandlers` supplies native authentication/refresh hooks with
+  device-account fallback. Apps supply lazy auth/backend acquisition and retain
+  hosting, storage, audiences and environment ownership.
+- `backend/jazz/auth-schema`: compose `tables` and `authPermissions` with native
+  app definitions. All six authentication tables deny client CRUD. Generate and
+  review native migrations; do not reset an existing store to adopt auth.
+
+The server factory requires `{ origin, secret }` and a policy with `clientName`.
+Use `cookiePrefix` to isolate app auth cookies on shared development hosts. Receipt
+cookie names are configured separately. The default allowed and requested grant
+is exactly `atproto`; publication permissions require explicit server policy.
+Browser-requested scopes cannot expand the server's allowed grants. AT Protocol
+identity reuse does not establish cross-app sessions or data access.
+
+Better Auth and the provider plugin are optional peers. Declare the pinned versions
+in consumers using the server entry; consumers of other DLF entries need not
+install server auth. Do not import server entries from browser/worker graphs.
+
+For recovery while an external app session is active, the restoration capability
+accepts optional `clearProviderSession`. This must be a single I/O leaf. The
+restoration chart validates the phrase and waits for host preparation before
+invoking clearance, waits for its settlement through cancellation/shutdown, and
+only then invokes native restoration. A clearance failure reports a failed restore
+with native `mutation: 'notStarted'`. Apps decide from admitted identity facts when
+clearance is required; normal guest recovery need not acquire a network dependency.
+
 ## Identity and application lifetime
 
 Create one `createJazzStartupRegistry()` from `backend/jazz/startup` per browser application lifetime.

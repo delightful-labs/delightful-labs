@@ -18,6 +18,7 @@
 		}
 	},
 	"actions": {
+		"sign_out": "Sign out",
 		"download_subject": "Download {subject}",
 		"imported": "Imported",
 		"existing": "Already present",
@@ -253,6 +254,13 @@
 		"unspecified": "Unspecified"
 	},
 	"login": {
+		"atproto_handle": "AT Protocol handle",
+		"atproto_sign_in": "Sign in with AT Protocol",
+		"atproto_working": "Signing in…",
+		"atproto_failed": "Sign-in could not be completed. Please try again.",
+		"switch_notice": "Signing in may open another Finance account. Your current account will be kept, and the accounts won’t be merged.",
+		"continue_sign_in": "Continue to sign in",
+		"sign_out_failed": "Sign-out could not be completed. Please try again.",
 		"description": "Enter the recovery phrase for an existing local-first account.",
 		"navigation_error": "Your account was restored, but the destination could not be opened. Try again or use the navigation links.",
 		"opening_destination": "Opening your account…",

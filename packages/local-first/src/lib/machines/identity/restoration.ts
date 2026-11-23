@@ -40,6 +40,9 @@ function defineRestorationMachine<Input extends RestorationInput>(
 	readCapability: (input: Input) => RestorationCapability
 ) {
 	const actors = {
+		clearProvider: createAsyncLogic({
+			run: ({ input }: { input: () => Promise<void> }) => input()
+		}),
 		parse: createAsyncLogic<
 			string,
 			{
@@ -132,18 +135,13 @@ function defineRestorationMachine<Input extends RestorationInput>(
 			context = { ...args.context, ...patch }
 			return { context: patch satisfies Partial<Context> }
 		},
-		failed: (args) => {
-			let context = args.context
-			let patch = {}
-			patch = { ...patch, phrase: undefined, credential: undefined }
-			context = { ...args.context, ...patch }
-			patch = {
-				...patch,
-				result: { ...context.scope, outcome: 'failed', mutation: 'settled' }
-			}
-			context = { ...args.context, ...patch }
-			return { context: patch satisfies Partial<Context> }
-		},
+		failed: ({ context }) => ({
+			context: {
+				phrase: undefined,
+				credential: undefined,
+				result: { ...context.scope, outcome: 'failed', mutation: context.mutation }
+			} satisfies Partial<Context>
+		}),
 		identityUnavailable: (args) => {
 			let context = args.context
 			let patch = {}
@@ -261,8 +259,44 @@ function defineRestorationMachine<Input extends RestorationInput>(
 				on: {
 					PREPARED: (args) => {
 						if (!args.guards.matchingPermit(args)) return
-						return { target: 'restoring' }
+						return { target: 'preparingIdentity' }
 					}
+				}
+			},
+			preparingIdentity: {
+				type: 'choice',
+				choice: ({ context }) => ({
+					target: context.capability.clearProviderSession ? 'clearingProvider' : 'restoring'
+				})
+			},
+			clearingProvider: {
+				initial: 'active',
+				invoke: {
+					src: actors.clearProvider,
+					input: ({ context }) => required(context.capability.clearProviderSession),
+					onDone: (args) => ({
+						target:
+							matchesState({ clearingProvider: 'settlingCancellation' }, args.value) ||
+							!args.guards.currentBinding(args)
+								? 'cancelled'
+								: 'restoring'
+					}),
+					onError: (args) => ({
+						target:
+							matchesState({ clearingProvider: 'settlingCancellation' }, args.value) ||
+							!args.guards.currentBinding(args)
+								? 'cancelled'
+								: 'failed'
+					})
+				},
+				on: {
+					CANCEL: { target: '.settlingCancellation' },
+					SHUTDOWN: { target: '.settlingCancellation' },
+					BINDING_INVALIDATED: { target: '.settlingCancellation' }
+				},
+				states: {
+					active: {},
+					settlingCancellation: { on: { CANCEL: {}, SHUTDOWN: {}, BINDING_INVALIDATED: {} } }
 				}
 			},
 			restoring: {

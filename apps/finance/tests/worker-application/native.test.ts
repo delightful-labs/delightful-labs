@@ -1,3 +1,15 @@
+import type { Socket } from 'node:net'
+import {
+	createAtprotoAuthServer,
+	createJazzAuthHandlers
+} from 'delightful-local-first/backend/jazz/auth'
+import {
+	createAuthRequestHandler,
+	createCompletionProtocol
+} from 'delightful-local-first/auth/atproto/server'
+import { makeSignature } from 'better-auth/crypto'
+import { z } from 'zod'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createJazz, memory, acceptDeviceAccounts } from 'jazz-tools/backend'
 import { app } from '../../src/lib/queries.js'
 import permissions from '../../src/lib/jazz.permissions.json' with { type: 'json' }
@@ -18,6 +30,43 @@ let directory = '',
 	origin = '',
 	retained = true
 let server: ReturnType<typeof createServer> | undefined
+const fixtureSockets = new Set<Socket>()
+let fixtureJazz: ReturnType<typeof createJazz> | undefined
+let fixtureAuth: ((request: Request) => Promise<Response>) | undefined
+async function relayAuth(
+	request: IncomingMessage,
+	response: ServerResponse,
+	handler: (request: Request) => Promise<Response>
+) {
+	try {
+		const chunks: Uint8Array[] = []
+		for await (const chunk of request) {
+			if (!Buffer.isBuffer(chunk)) throw new Error('Unexpected fixture request body')
+			chunks.push(chunk)
+		}
+		const headers = new Headers()
+		for (const [key, value] of Object.entries(request.headers)) {
+			if (Array.isArray(value)) for (const part of value) headers.append(key, part)
+			else if (value !== undefined) headers.set(key, value)
+		}
+		const reply = await handler(
+			new Request(new URL(request.url ?? '/', origin), {
+				method: request.method ?? 'GET',
+				headers,
+				...(chunks.length ? { body: Buffer.concat(chunks).toString('utf8') } : {})
+			})
+		)
+		response.writeHead(reply.status, {
+			...Object.fromEntries(reply.headers),
+			'set-cookie': reply.headers.getSetCookie()
+		})
+		response.end(Buffer.from(await reply.arrayBuffer()))
+	} catch {
+		response.writeHead(500)
+		response.end('Fixture auth request failed')
+	}
+}
+
 beforeAll(async () => {
 	await mkdir('.svelte-kit', { recursive: true })
 	directory = await mkdtemp(resolve('.svelte-kit/finance-worker-read-'))
@@ -129,16 +178,72 @@ beforeAll(async () => {
 							: 'application/octet-stream'
 		})
 	}
+	// Compile the real Finance service worker with this standalone host's asset manifest.
+	await build({
+		configFile: false,
+		logLevel: 'silent',
+		plugins: [
+			{
+				name: 'finance-auth-shell-manifest',
+				resolveId(id) {
+					if (['$app/service-worker', '$app/env', '$app/manifest'].includes(id)) return '\0' + id
+				},
+				load(id) {
+					if (id === '\0$app/service-worker') return 'export const self = globalThis'
+					if (id === '\0$app/env') return 'export const version = "finance-auth-fixture"'
+					if (id === '\0$app/manifest')
+						return (
+							'export const assets = []; export const immutable = ' +
+							JSON.stringify([...assets.keys(), '/'].map((path) => ({ path }))) +
+							'; export const prerendered = []'
+						)
+				},
+				generateBundle(_options, bundle) {
+					for (const output of Object.values(bundle))
+						if (output.type === 'chunk')
+							assets.set('/auth-fixture-worker.js', {
+								bytes: Buffer.from(output.code),
+								type: 'application/javascript'
+							})
+				}
+			}
+		],
+		build: {
+			write: false,
+			minify: false,
+			lib: { entry: resolve('src/service-worker/index.ts'), formats: ['es'] }
+		}
+	})
 	const brokers = [...assets.keys()].filter((p) => /jazz-broker-worker.*\.js$/.test(p))
 	if (brokers.length !== 1) throw new Error('Expected one broker asset: ' + brokers.join(', '))
 	server = createServer((request, response) => {
 		const path = new URL(request.url ?? '/', origin || 'http://test.invalid').pathname
+		if (fixtureJazz && path.startsWith(fixtureJazz.basePath)) {
+			fixtureJazz.nodeHandler(request, response)
+			return
+		}
+		if (fixtureAuth && (path.startsWith('/api/auth/') || path === '/test-oauth-return')) {
+			void relayAuth(request, response, fixtureAuth)
+			return
+		}
 		const asset = assets.get(path === '/' ? '/tests/worker-application/index.html' : path)
 		response.writeHead(asset ? 200 : 404, {
 			'Content-Type': asset?.type ?? 'text/plain',
 			'Cache-Control': 'no-store'
 		})
 		response.end(asset?.bytes ?? 'No app/auth/Jazz endpoint is available')
+	})
+	server.on('upgrade', (request, socket) => {
+		// The native backend handles its own path. Other fixture paths have no sync server.
+		if (
+			!fixtureJazz ||
+			!new URL(request.url ?? '/', origin).pathname.startsWith(fixtureJazz.basePath)
+		)
+			socket.destroy()
+	})
+	server.on('connection', (socket) => {
+		fixtureSockets.add(socket)
+		socket.once('close', () => fixtureSockets.delete(socket))
 	})
 	const listener = server
 	await new Promise<void>((resolve, reject) => {
@@ -153,6 +258,8 @@ beforeAll(async () => {
 afterAll(async () => {
 	if (server) {
 		const listener = server
+		for (const socket of fixtureSockets) socket.destroy()
+		fixtureSockets.clear()
 		listener.closeAllConnections()
 		await new Promise<void>((resolve, reject) => listener.close((e) => (e ? reject(e) : resolve())))
 	}
@@ -236,6 +343,372 @@ async function enterExpenseUI(page: Page, accountId: string, description: string
 }
 for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 	describe(name, () => {
+		it('switches to an existing provider account, signs out, recovers local work and reopens offline', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const secret = 'synthetic-finance-provider-secret-at-least-thirty-two'
+			let auth: ReturnType<typeof createAtprotoAuthServer>
+			const authority = createJazz({
+				app,
+				permissions,
+				store: memory(),
+				basePath: '/provider-' + name + '-jazz',
+				allowedOrigins: [origin],
+				...createJazzAuthHandlers(() => auth)
+			})
+			auth = createAtprotoAuthServer(
+				{ db: () => authority.db, schema: app },
+				{ origin, secret },
+				{ clientName: 'Delightful Finance', cookiePrefix: 'finance.auth' }
+			)
+			if (!server) throw new Error('Missing fixture server')
+			fixtureJazz = authority
+			await authority.attach(server)
+			await authority.ready()
+			const serverUrl = origin + authority.basePath,
+				scope = serverUrl
+			const native = await auth.$context
+			const user = await native.internalAdapter.createUser(
+				{ name: 'Synthetic provider user', email: 'provider@example.invalid', emailVerified: true },
+				{
+					method: 'oauth',
+					oauth: { providerId: 'atproto', profile: { did: 'did:plc:syntheticfinance' } }
+				}
+			)
+			const cookie = async () => {
+				const session = await native.internalAdapter.createSession(user.id)
+				return encodeURIComponent(
+					session.token + '.' + (await makeSignature(session.token, secret))
+				)
+			}
+			const completion = createCompletionProtocol({
+				cookieName: 'finance.oauth-completion',
+				callbackRoute: '/'
+			})
+			const handler = createAuthRequestHandler({
+				cookieName: 'finance.oauth-completion',
+				callbackRoute: '/'
+			})
+			let callbackURL = '/',
+				authorizations = 0
+			fixtureAuth = async (request) => {
+				const url = new URL(request.url)
+				if (url.pathname === '/api/auth/sign-in/atproto') {
+					const body = z
+						.object({ scope: z.literal('atproto'), callbackURL: z.string() })
+						.parse(await request.json())
+					callbackURL = body.callbackURL
+					authorizations += 1
+					return Response.json({ url: 'https://provider.invalid/authorize' })
+				}
+				if (url.pathname === '/test-oauth-return') {
+					const attempt = z
+						.uuid()
+						.parse(new URL(callbackURL, origin).searchParams.get('atproto_attempt'))
+					const headers = new Headers({ location: callbackURL })
+					headers.append(
+						'Set-Cookie',
+						native.authCookies.sessionToken.name +
+							'=' +
+							(await cookie()) +
+							'; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600'
+					)
+					headers.append('Set-Cookie', completion.completionCookie(attempt, user.id, secret, false))
+					return new Response(null, { status: 302, headers })
+				}
+				return handler(auth, request, { origin, secret })
+			}
+			const knownProfile = await mkdtemp(join(directory, 'provider-known-'))
+			const localProfile = await mkdtemp(join(directory, 'provider-local-'))
+			let context = await engine.launchPersistentContext(knownProfile, { headless: true })
+			const attach = async (page: Page) => {
+				await page.waitForFunction(() => !!window.financeWorkerReadFixture)
+				await page.evaluate(
+					({ scope, serverUrl }) =>
+						window.financeWorkerReadFixture.open({
+							scope,
+							serverUrl,
+							environment: 'worker-read-proof'
+						}),
+					{ scope, serverUrl }
+				)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().auth?.canSignOut))
+					.toBe(true)
+				await browserExpect
+					.poll(() => new URL(page.url()).searchParams.has('atproto_attempt'))
+					.toBe(false)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().workspaceStartup))
+					.toBe('ready')
+				await openDrawerSection(page, 'Settings')
+				await openDrawerSection(page, 'Accounts')
+			}
+			try {
+				await context.addCookies([
+					{
+						name: native.authCookies.sessionToken.name,
+						value: await cookie(),
+						url: origin,
+						httpOnly: true,
+						sameSite: 'Lax'
+					}
+				])
+				let page = await context.newPage()
+				await open(page, scope, serverUrl)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().auth?.canSignOut))
+					.toBe(true)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().workspaceStartup))
+					.toBe('ready')
+				const returningIdentity = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().identityId
+				)
+				const providerWorkspace = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().workspaces?.[0]
+				)
+				if (!providerWorkspace) throw new Error('Missing provider workspace')
+				await selectWorkspaceUI(page, providerWorkspace.id)
+				await createAccountUI(page, 'Provider-only wallet')
+				await close(page)
+				await context.close()
+				context = await engine.launchPersistentContext(localProfile, { headless: true })
+				await context.route('https://provider.invalid/authorize', (route) =>
+					route.fulfill({
+						status: 200,
+						contentType: 'text/html',
+						body:
+							'<script>location.replace(' +
+							JSON.stringify(origin + '/test-oauth-return') +
+							')</script>'
+					})
+				)
+				page = await context.newPage()
+				await open(page, scope, serverUrl)
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().workspaceStartup))
+					.toBe('ready')
+				const original = await page.evaluate(() => window.financeWorkerReadFixture.state())
+				const workspace = original.workspaces?.[0]
+				if (!workspace) throw new Error('Missing local workspace')
+				expect(original.identityId).not.toBe(returningIdentity)
+				await selectWorkspaceUI(page, workspace.id)
+				await createAccountUI(page, 'Before provider login')
+				await route(page, '/account')
+				await page.getByRole('button', { name: /show recovery phrase/i }).click()
+				const recovery = page.getByRole('dialog')
+				const phrase = await recovery
+					.getByRole('textbox', { name: /recovery phrase/i })
+					.inputValue()
+				await recovery.getByRole('button', { name: 'Close', exact: true }).click()
+				await route(page, '/login')
+				await page
+					.getByRole('textbox', { name: 'AT Protocol handle', exact: true })
+					.fill('person.example')
+				await page.getByRole('button', { name: 'Sign in with AT Protocol', exact: true }).click()
+				await page
+					.getByRole('dialog', { name: 'Sign in with AT Protocol', exact: true })
+					.getByRole('button', { name: 'Continue to sign in', exact: true })
+					.click()
+				await page.waitForURL(
+					(url) => url.origin === origin && url.searchParams.has('atproto_attempt')
+				)
+				await attach(page)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
+					returningIdentity
+				)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Before provider login', exact: true })
+				).toHaveCount(0)
+				await selectWorkspaceUI(page, providerWorkspace.id)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Provider-only wallet', exact: true })
+				).toBeVisible()
+				await page.evaluate(async () => {
+					await navigator.serviceWorker.register('/auth-fixture-worker.js')
+					await navigator.serviceWorker.ready
+				})
+				await context.setOffline(true)
+				await context.clearCookies({ name: native.authCookies.sessionToken.name })
+				await close(page)
+				await context.close()
+				context = await engine.launchPersistentContext(localProfile, { headless: true })
+				await context.setOffline(true)
+				page = await context.newPage()
+				await open(page, scope, serverUrl)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
+					returningIdentity
+				)
+				await selectWorkspaceUI(page, providerWorkspace.id)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Provider-only wallet', exact: true })
+				).toBeVisible()
+				expect(
+					(await context.cookies()).filter(
+						(cookie) => cookie.name === native.authCookies.sessionToken.name
+					)
+				).toHaveLength(0)
+				await context.addCookies([
+					{
+						name: native.authCookies.sessionToken.name,
+						value: await cookie(),
+						url: origin,
+						httpOnly: true,
+						sameSite: 'Lax'
+					}
+				])
+				await context.setOffline(false)
+				await context.route('https://provider.invalid/authorize', (route) =>
+					route.fulfill({
+						status: 200,
+						contentType: 'text/html',
+						body:
+							'<script>location.replace(' +
+							JSON.stringify(origin + '/test-oauth-return') +
+							')</script>'
+					})
+				)
+				await route(page, '/account')
+				await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
+					.toBe('signed-out')
+				await route(page, '/login')
+				await page
+					.getByRole('textbox', { name: 'AT Protocol handle', exact: true })
+					.fill('person.example')
+				await page.getByRole('button', { name: 'Sign in with AT Protocol', exact: true }).click()
+				await page.waitForURL(
+					(url) => url.origin === origin && url.searchParams.has('atproto_attempt')
+				)
+				await attach(page)
+				expect(authorizations).toBe(2)
+				await route(page, '/login')
+				await page.getByRole('textbox', { name: 'Recovery phrase', exact: true }).fill(phrase)
+				await page.getByRole('button', { name: 'Login', exact: true }).click()
+				await browserExpect
+					.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().identityId))
+					.toBe(original.identityId)
+				expect(
+					(await context.cookies()).filter(
+						(cookie) => cookie.name === native.authCookies.sessionToken.name
+					)
+				).toHaveLength(0)
+				await selectWorkspaceUI(page, workspace.id)
+				await route(page, '/accounts')
+				await browserExpect(
+					page.getByRole('cell', { name: 'Before provider login', exact: true })
+				).toBeVisible()
+				await page.evaluate(async () => {
+					await navigator.serviceWorker.register('/auth-fixture-worker.js')
+					await navigator.serviceWorker.ready
+				})
+				await close(page)
+				await context.close()
+				for (let restart = 0; restart < 2; restart++) {
+					context = await engine.launchPersistentContext(localProfile, { headless: true })
+					await context.setOffline(true)
+					page = await context.newPage()
+					await open(page, scope, serverUrl)
+					expect(
+						await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)
+					).toBe(original.identityId)
+					await selectWorkspaceUI(page, workspace.id)
+					await browserExpect(
+						page.getByRole('cell', { name: 'Before provider login', exact: true })
+					).toBeVisible()
+					if (restart === 0) await createAccountUI(page, 'Created offline after login')
+					else
+						await browserExpect(
+							page.getByRole('cell', { name: 'Created offline after login', exact: true })
+						).toBeVisible()
+					await close(page)
+					await context.close()
+				}
+				context = await engine.launchPersistentContext(localProfile, { headless: true })
+				page = await context.newPage()
+				await open(page, scope, serverUrl)
+				await browserExpect
+					.poll(async () =>
+						(await authority.db.all(app.accounts.where({ organizationId: workspace.id }))).map(
+							(account) => account.name
+						)
+					)
+					.toContain('Created offline after login')
+				await close(page)
+			} finally {
+				fixtureAuth = undefined
+				fixtureJazz = undefined
+				await context.close()
+				await authority.close()
+			}
+		}, 120_000)
+
+		it('confirms provider login accessibly and preserves local finance when authorization fails', async () => {
+			const browser = await engine.launch({ headless: true })
+			const context = await browser.newContext()
+			let requests = 0
+			await context.route('**/api/auth/sign-in/atproto', async (request) => {
+				requests += 1
+				expect(request.request().postDataJSON()).toMatchObject({
+					scope: 'atproto',
+					handle: 'person.example'
+				})
+				await request.fulfill({ status: 503, contentType: 'application/json', body: '{}' })
+			})
+			try {
+				const page = await context.newPage()
+				await open(page, crypto.randomUUID())
+				const identity = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().identityId
+				)
+				await route(page, '/login')
+				const handle = page.getByRole('textbox', { name: 'AT Protocol handle', exact: true })
+				const begin = page.getByRole('button', { name: 'Sign in with AT Protocol', exact: true })
+				await handle.fill('person.example')
+				// Establish keyboard focus explicitly: WebKit pointer clicks do not focus buttons.
+				await begin.focus()
+				await begin.press('Enter')
+				const dialog = page.getByRole('dialog', { name: 'Sign in with AT Protocol', exact: true })
+				await browserExpect(dialog).toBeVisible()
+				await browserExpect(
+					dialog.getByRole('button', { name: 'Continue to sign in', exact: true })
+				).toBeFocused()
+				expect(requests).toBe(0)
+				if (name === 'chromium')
+					await page.screenshot({
+						path: '.svelte-kit/finance-atproto-confirmation.png',
+						fullPage: true
+					})
+				await page.keyboard.press('Escape')
+				await browserExpect(dialog).not.toBeVisible()
+				await browserExpect(begin).toBeEnabled()
+				await browserExpect(begin).toBeFocused()
+				expect(requests).toBe(0)
+				await begin.click()
+				await dialog.getByRole('button', { name: 'Continue to sign in', exact: true }).click()
+				await browserExpect(
+					page
+						.getByRole('alert')
+						.filter({ hasText: 'Sign-in could not be completed. Please try again.' })
+				).toBeVisible()
+				expect(requests).toBe(1)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.state().identityId)).toBe(
+					identity
+				)
+				await route(page, '/account')
+				await browserExpect(
+					page.getByRole('button', { name: 'Sign out', exact: true })
+				).toHaveCount(0)
+				await close(page)
+			} finally {
+				await context.close()
+				await browser.close()
+			}
+		})
+
 		it('creates and archives classifications through the shared UI and retains complete history offline', async () => {
 			onTestFailed(() => {
 				retained = true

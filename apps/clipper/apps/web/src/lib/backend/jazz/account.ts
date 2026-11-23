@@ -1,3 +1,4 @@
+import { clearAtprotoAppSession } from 'delightful-local-first/auth/atproto/workflow'
 import { jazzRuntimeSources } from './runtime-sources.js'
 import { createLibraryCapability } from './library.js'
 import { createLibraryBinding } from './library-binding.js'
@@ -28,17 +29,7 @@ function nativeAccount(config: JazzClientConfig, libraryFactory: LibraryFactory)
 			}
 		),
 		parsePhrase: parseJazzRecoveryPhrase,
-		signOut: async () => {
-			const response = await fetch('/api/auth/sign-out', {
-				method: 'POST',
-				credentials: 'same-origin',
-				redirect: 'error',
-				cache: 'no-store',
-				headers: { 'Content-Type': 'application/json' },
-				body: '{}'
-			})
-			if (!response.ok) throw new Error('Provider sign-out failed')
-		}
+		signOut: clearAtprotoAppSession
 	}
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button, StatusMessage } from 'delightful-ui'
 	import { fromStore } from 'svelte/store'
 	import { getFinanceWorker } from '#lib/runtime/worker/context.js'
 	import { getPageNavigation } from '#lib/components/navigation/page-navigation.js'
@@ -29,6 +30,20 @@
 <svelte:head><title>{m['nouns.account']({ count: 1 })} · {m['app.name']()}</title></svelte:head>
 <PageLayout {navigation}>
 	{#snippet pageHeading()}<PageHeader title={m['nouns.account']({ count: 1 })} />{/snippet}
+	{#if state.current.auth?.canSignOut || state.current.auth?.signOutBusy}
+		<Button
+			type="button"
+			disabled={state.current.auth?.signOutBusy}
+			aria-busy={state.current.auth?.signOutBusy}
+			onclick={client.signOut}>{m['actions.sign_out']()}</Button
+		>
+	{/if}
+	{#if state.current.auth?.signOutMessage}
+		<StatusMessage
+			text={m[state.current.auth.signOutMessage.key]()}
+			variant={state.current.auth.signOutMessage.variant}
+		/>
+	{/if}
 	<WorkerRecovery binding={client.recovery} />
 	{#if state.current.profile}
 		<ProfileNameForm
