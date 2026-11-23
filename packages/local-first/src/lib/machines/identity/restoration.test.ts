@@ -347,7 +347,7 @@ describe('provider-session clearance before native restoration', () => {
 		await vi.waitFor(() => expect(clear).toHaveBeenCalledOnce())
 		expect(f.restore).not.toHaveBeenCalled()
 		held.resolve()
-		expect((await completed(f)).outcome).toBe('restored')
+		expect(await completed(f)).toMatchObject({ outcome: 'restored' })
 		expect(f.restore).toHaveBeenCalledOnce()
 	})
 	it('does not mutate the native identity after provider refusal', async () => {
@@ -375,7 +375,7 @@ describe('provider-session clearance before native restoration', () => {
 			f.actor.send({ type })
 			expect(f.actor.getSnapshot().status).toBe('active')
 			held.resolve()
-			expect((await completed(f)).outcome).toBe('cancelled')
+			expect(await completed(f)).toMatchObject({ outcome: 'cancelled' })
 			expect(f.restore).not.toHaveBeenCalled()
 			secretsCleared(f)
 		}

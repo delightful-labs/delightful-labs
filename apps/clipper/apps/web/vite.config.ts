@@ -39,6 +39,7 @@ export default defineConfig(({ command, mode }) => {
 				'jazz-tools',
 				'jazz-tools/client',
 				'jazz-tools/local-first',
+				'delightful-local-first/auth/atproto/workflow',
 				'delightful-local-first/recovery/view',
 				'delightful-local-first/forms/lifecycle',
 				'delightful-local-first/diagnostics/logger',
