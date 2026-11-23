@@ -35,7 +35,7 @@ Optional AT Protocol login uses the shared Local First authentication package an
 Finance's existing Jazz backend. Configure the server-only `AUTH_BASE_URL` and
 `AUTH_SECRET` settings to enable it. Finance requests identity access only.
 See [login setup and verification](docs/atproto-login.md) for origins, storage,
-account switching, recovery and the remaining real-provider check.
+account switching, recovery and real-provider verification.
 
 ## Vercel deployment
 

@@ -1,6 +1,6 @@
 # Shared AT Protocol login and Finance adoption
 
-Status: implementation complete and locally verified; live-provider qualification remains open.
+Status: implementation verified locally and with a real provider; ready for code review.
 Deployment remains outside the current authorization.
 Date: 2026-11-20.
 Baseline: freshly fetched `origin/main`, `884cb464` (PR #52).
@@ -633,3 +633,42 @@ hosted login page, displayed both the AT Protocol handle input and sign-in butto
 and observed no failed HTTP responses. The context was closed after this check.
 No provider authorization or sign-in was issued. Real-provider qualification
 remains pending the requested preview-alias protection exception and owner login.
+
+
+## Real-provider verification — 2026-11-23
+
+The user authorized continuing the real-provider test, including the temporary
+preview-alias access exception previously explained, and supplied their full
+AT Protocol handle. Only the known Finance branch alias received the exception;
+project-wide protection and production were unchanged. Anonymous metadata returned
+200, advertised Delightful Finance with exactly `atproto`, and pointed to the
+same preview origin for its callback.
+
+The owner completed provider authentication directly in Chrome; no password,
+recovery phrase, cookie, provider token or financial content was collected or
+saved as evidence. An initial attempt using an assumed handle suffix failed
+before provider authentication; using the owner's full custom-domain handle
+resolved the account and completed the real Bluesky authorization flow.
+
+Observed results in the deployed browser:
+
+- The device-account switch confirmation appeared before authorization.
+- The provider returned successfully to Finance, the callback parameter was
+  removed from the address bar, and the account page exposed Sign out.
+- Reloading retained the signed-in account and Sign out control.
+- Sign out removed authenticated account controls; the login form remained usable.
+- Signing in again reached Bluesky's password page. After the owner completed it,
+  Finance reopened the same personal workspace and exposed Sign out again.
+
+The owner completed the provider pages; a separate consent-screen screenshot was
+not captured. Scope evidence is the served metadata plus the earlier native
+provider-request tests. This real-provider check supplements, rather than
+replaces, the 72-case browser regression and offline/cross-account qualification.
+No financial transactions or profile changes were made during the live check.
+
+Afterward, the alias-only protection exception was revoked. An anonymous metadata
+request again returned 302 to Vercel Authentication, confirming cleanup. The owner
+was left signed in to the test Finance account. The tested app deployment remains
+`dpl_516639M21ptFgMonfq7DuEhSTdwZ`, runtime commit `6b9976dd`.
+Real-provider sign-in/reload/sign-out/returning-login qualification is complete.
+Nothing was merged or deployed to production; the branch is ready for code review.

@@ -30,7 +30,7 @@ Open `http://127.0.0.1:5182` in a disposable browser profile. Use that same host
 throughout the round trip: the provider plugin uses `127.0.0.1` for loopback
 redirects, and `localhost` has different cookies and browser storage. Agent backend
 storage is in memory and will disappear when the server stops. A hosted HTTPS
-preview is the preferred environment for the outstanding real-provider check.
+preview is the preferred environment for real-provider checks.
 
 For a preview, configure its stable branch origin and a separate secret in the
 preview environment. Retain its isolated Jazz store. The provider must be able to
@@ -77,7 +77,7 @@ clearance is unavailable, recovery refuses to switch identities. Guest recovery
 without provider-session evidence keeps its existing offline behavior. Remembered
 local identities and local edits remain usable offline without a provider cookie.
 
-## Real-provider verification still required
+## Real-provider verification
 
 Use an isolated preview, disposable Finance data and an account selected by the
 owner. Record only pass/fail results and non-sensitive configuration facts.
@@ -111,3 +111,8 @@ This protects the dependency boundary between Finance's Zod and Better Auth's
 newer Zod: SSR bundles each version with its importer instead of making bundled
 Better Auth resolve Finance's older external package. Native source tests alone
 do not exercise that production bundling boundary.
+
+The owner completed real-provider sign-in, reload, sign-out and returning sign-in
+on the isolated preview on 2026-11-23. The temporary preview-only access exception
+was removed after the test. See the feature spec for the observed results and
+scope of that verification; a new deployment still needs its own hosted checks.
