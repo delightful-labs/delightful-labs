@@ -422,6 +422,11 @@ function sameCommandScope(context: Context, scope: WorkerCommandScope) {
 	)
 }
 
+/** Profiles belong to the native identity; workspace navigation does not retire it. */
+function sameIdentityCommandScope(context: Context, scope: WorkerCommandScope) {
+	return scope.sessionRevision === context.sessionRevision
+}
+
 /** The fixed worker transport owns attachment revisions; DLF owns each lease epoch. */
 function currentWorkspaceActivation(context: Context) {
 	const lease = context.forms
@@ -1302,7 +1307,7 @@ export function createFinanceWorkerMachine({
 					},
 					PROFILE: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameIdentityCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)

@@ -501,3 +501,20 @@ The extension still requires its existing confirmed account connection. Its
 captured current predicate includes the original lease, while the web continues
 to create its local identity automatically. No schema, UI workspace controls,
 cross-app membership or data reset is introduced.
+
+## Identity command origin remains independent of workspace origin
+
+The native identity controls already outlive selected content. Their transport
+admission must use that same lifetime. Finance profile commands now match the
+originating native session revision plus the existing native forms binding;
+workspace selection/revision and financial activation do not retire a profile
+intent. The existing shared profile scope still checks identity, profile ID and
+native binding at readiness/operation boundaries. A different native session is
+rejected before dispatch. Financial commands retain all workspace/lease checks.
+
+A controlled parent regression first reproduced refusal of an otherwise valid
+profile submission after only workspace revision changed. The corrected parent
+accepts that identity intent and refuses another session's packet. All 1,856
+Finance unit tests, source/Svelte/test types and the five native profile/permission
+browser cases pass. The earlier hosted profile timeout remains tracked until
+new-head hosted qualification verifies it; no timeout or assertion is weakened.

@@ -1417,6 +1417,43 @@ describe('Finance worker ownership and selected accounts', () => {
 		}
 	})
 
+	it('keeps an identity profile intent admissible across workspace revision changes while rejecting another native session', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			last(f.queries).publish([])
+			const origin = f.view()
+			f.select(b, 2)
+			expect(f.view().selection.revision).not.toBe(origin.selection.revision)
+			const intent = {
+				type: 'PROFILE',
+				form: 'name',
+				command: {
+					type: 'SUBMIT',
+					values: { displayName: 'Identity across workspace navigation' }
+				},
+				selection: origin.selection,
+				sessionRevision: origin.sessionRevision
+			} satisfies Parameters<typeof f.actor.send>[0]
+			f.actor.send({ ...intent, sessionRevision: origin.sessionRevision + 1 })
+			expect(f.saveProfileName).not.toHaveBeenCalled()
+			f.actor.send(intent)
+			await vi.waitFor(() => expect(f.saveProfileName).toHaveBeenCalledOnce())
+			expect(f.saveProfileName).toHaveBeenCalledExactlyOnceWith(
+				'22222222-2222-4222-8222-222222222222',
+				userId,
+				'Identity across workspace navigation'
+			)
+		} finally {
+			f.stop()
+		}
+	})
+
 	it('waits independently for both identity and financial receipts before native closure', async () => {
 		const f = fixture(),
 			profile = Promise.withResolvers<void>(),
