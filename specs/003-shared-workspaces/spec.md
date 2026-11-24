@@ -4,7 +4,7 @@
 
 **Branch**: `feat/shared-workspace-initialization`
 
-**Status**: Shared initialization/startup and production selection/leases adopted in both apps; local qualification complete, latest-head hosted qualification pending
+**Status**: Shared initialization/startup and production selection/leases adopted in both apps; local qualification complete. Current hosted qualification is tracked in [PR #55](https://github.com/delightful-labs/delightful-labs/pull/55).
 
 Every Delightful app should have a workspace concept backed by reusable Local
 First lifecycle behavior. Finance already exposes workspaces. Clipper will begin

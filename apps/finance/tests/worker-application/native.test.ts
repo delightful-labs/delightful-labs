@@ -827,6 +827,87 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await context.close()
 			}
 		})
+		it('retains an open account draft while the same workspace lease receives a route revision', async () => {
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const workspaceId = crypto.randomUUID(),
+					accountId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Route wallet'),
+						{ workspaceId, accountId }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					workspaceId
+				)
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().workspaceNavigation?.status)
+					)
+					.toBe('scoped')
+				await page
+					.locator('aside')
+					.getByRole('button', { name: /add account/i, exact: true })
+					.click()
+				const dialog = page.getByRole('dialog', { name: /add account/i })
+				await browserExpect(dialog).toBeVisible()
+				await dialog.getByLabel(/account name/i).fill('Retained route draft')
+				const original = await page.evaluate(
+					() => window.financeWorkerReadFixture.state().selection
+				)
+				await route(page, '/income')
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => window.financeWorkerReadFixture.state().selection.revision)
+					)
+					.toBeGreaterThan(original.revision)
+				expect(
+					(await page.evaluate(() => window.financeWorkerReadFixture.state().selection)).activation
+				).toEqual(original.activation)
+				await browserExpect(dialog).toBeVisible()
+				await browserExpect(dialog.getByLabel(/account name/i)).toHaveValue('Retained route draft')
+				const replacementId = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ workspaceId, accountId }) =>
+							window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Replacement wallet'),
+						{ workspaceId: replacementId, accountId: crypto.randomUUID() }
+					)
+				).toEqual({ ok: true })
+				await page.evaluate(
+					(id) => window.financeWorkerReadFixture.route('/accounts?workspace=' + id),
+					replacementId
+				)
+				await browserExpect
+					.poll(() =>
+						page.evaluate(() => {
+							const view = window.financeWorkerReadFixture.state()
+							return view.workspaceNavigation?.status === 'scoped'
+								? view.selection.workspaceId
+								: null
+						})
+					)
+					.toBe(replacementId)
+				await browserExpect(dialog).toBeHidden()
+				expect(
+					(await page.evaluate(() => window.financeWorkerReadFixture.state().selection)).activation
+				).not.toEqual(original.activation)
+				await page
+					.locator('aside')
+					.getByRole('button', { name: /add account/i, exact: true })
+					.click()
+				await browserExpect(dialog).toBeVisible()
+				await browserExpect(dialog.getByLabel(/account name/i)).toHaveValue('')
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
 		it('binds the shared drawer to worker navigation, scoped links and retained native history', async () => {
 			onTestFailed(() => {
 				retained = true

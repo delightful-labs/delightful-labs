@@ -1165,7 +1165,8 @@ browser cases across Chromium, Firefox and
 WebKit plus five production profile/permission cases with the matching build.
 The account-creation fixture waits for actual scoped worker navigation before
 clicking; Window route changes alone do not acknowledge financial admission.
-New-head hosted qualification remains separately tracked until complete.
+Current hosted qualification is recorded in [PR #55](https://github.com/delightful-labs/delightful-labs/pull/55),
+separately from these local results.
 
 ## Storage compatibility audit
 
@@ -1185,3 +1186,43 @@ operations, private-root policy and explicit extension connection requirement.
 These are domain bindings rather than competing workspace lifecycle charts.
 Cross-app workspace linking remains a separate future feature, explicitly outside
 initial adoption; shared behavior does not imply a common database or membership.
+
+
+## Hosted debug qualification oracle
+
+Hosted qualification exposed an inspector HMR assertion that treated an arbitrary
+last sanitized snapshot as globally unique. Repeated snapshots can have identical
+transport fields and millisecond timestamps. The browser fixture now creates a
+separate named actor before HMR and checks exactly one old registration before
+and after replacement, exactly one new registration, one disconnect/new popup,
+and refusal of the retired module's later actor. This directly detects old
+buffer replay without assuming ordinary snapshot uniqueness. The inspector
+runtime is unchanged. The debug-enabled browser suite passes all three cases;
+source/test types and E2E scope checks qualify the fixture separately.
+
+
+## Account dialog activation qualification
+
+A native regression first reproduced a lost account draft after only a route
+revision changed, with the actual workspace activation unchanged. The component
+now gives the existing shared FormModal its native session/workspace/attachment/
+lease-epoch scope. A route revision retains that admitted draft; workspace
+replacement closes the dialog and reopening starts with an empty field. The
+worker's command admission and original packet origins remain unchanged.
+
+All 78 application browser cases pass across Chromium, Firefox and WebKit,
+including the three new retention/replacement cases. All seven production
+cold-start cases pass: cached reads/edits after full restart, offline and accepted
+unanswered connections, local account/workspace creation, held permission changes,
+archive, later native server rejection and retained bank history. This fixes the
+hosted cold unanswered-connection dialog failure without retrying clicks or
+increasing timeouts. Current hosted results remain in PR #55.
+
+
+Final local follow-up checks pass: all 1,846 Finance unit/native-SDK cases,
+source/Svelte/service-worker/test types, E2E scope checks, five production
+profile/permission cases and all three debug-enabled browser cases. The matching
+production builds pass. Hosted Foundation and Clipper qualifications passed on
+`948fa0e2`; Finance's two hosted failures were the dialog scope and arbitrary
+snapshot replay assertions addressed above. Final-head hosted results are tracked
+in PR #55, without treating older green jobs as proof of the changed head.

@@ -578,3 +578,17 @@ and ignores late answers. The 556-line Finance transaction statechart is removed
 Finance retains graph assessment/staging and the native serializable capability.
 Existing local markers still open without authority, and serializable bootstrap
 does not claim local-only acceptance while offline.
+
+
+## Account modal presentation follows the admitted workspace activation
+
+A native regression reproduced an open account draft disappearing after only a
+route revision changed. It verifies that the worker's actual activation remains
+identical before checking the dialog and its field value. The account modal's
+existing shared FormModal scope now uses session, workspace and native
+attachment/lease epoch rather than the route revision. No new lifecycle owner is
+introduced. A replacement activation closes the dialog and clears its DOM draft;
+commands still carry their original session/selection/activation envelope through
+unchanged admission guards. This also addresses the cold unanswered-connection
+startup failure where a just-opened account dialog was retired by a delayed
+same-workspace route acknowledgement.
