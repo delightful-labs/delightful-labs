@@ -784,3 +784,33 @@ This shared owner is not yet adopted by production apps. Finance must bind its
 financial/resource group first and remove the corresponding manual decisions;
 Clipper must then consume the same implementation. Native app qualification and
 remaining independent-replica canonical startup proof remain required.
+
+
+## Native observation release receipts
+
+DLF's existing `createBoundObservationLogic` now has an opt-in explicit `RELEASE`
+command and `released(input, outcome)` projection. The native callback withdraws
+admission before disposal, calls the disposer once, and publishes a receipt only
+after actual return. Acquisition/disposal failure reports unresolved custody;
+forced stop never publishes clean release. Existing stop-only consumers retain
+their prior behavior. The packed consumer executes both clean and failed receipts.
+
+Finance's eleven content observers use this same implementation. Their query
+owner retains invocations while consuming each unique binding/source receipt,
+withdraws rows during release, preserves close priority over read-failure drain,
+and distinguishes failed reads with released resources from unresolved cleanup.
+Its input now requires only the eleven content capabilities. Identity/access
+observers remain independent. The production application still owns this query
+group directly pending its move into the shared leased resource.
+
+Qualification: 113 Finance worker/query tests pass (107 existing worker cases and
+six query release cases). They cover all eleven native disposer calls before
+completion, read failure, acquisition/disposal faults, missing/foreign/duplicate
+receipts and a real parent failure/close burst. Source and test types pass with
+zero Svelte diagnostics. All 62 native Finance browser cases pass: 49 workspace,
+permission and form cases; nine worker cases across Chromium/Firefox/WebKit; and
+four cold/offline/unanswered-authority/later-rejection cases. No retries or timeout
+changes were needed. DLF adds six observation cases, including 100 generated
+release/stop schedules (seed 20261126). All 1,346 DLF tests across 66 files pass.
+Final complete source/Svelte/test types, package/publint, complete public and
+packed-consumer execution, scoped lint/formatting and workspace links pass.

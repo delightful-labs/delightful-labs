@@ -100,8 +100,11 @@ revisioned snapshot contract. Copy changing row fields while building facts, pre
 binding identities. A shallow row snapshot deliberately does not clone resource handles.
 
 Worker-owned subscriptions can use `createBoundObservationLogic` from
-`data/observation-workflow`. This is Finance's production observation lifetime,
-also used by Clipper's library collection. Supply the native subscription leaf
+`data/observation-workflow`. Consumers that need a native drain receipt can opt
+into `released(input, outcome)` and send `RELEASE`. The callback withdraws reads
+before disposal and reports `released` or `unresolved` afterward. Stop remains
+fallback cleanup and never publishes a receipt. This is Finance's production
+observation lifetime, also used by Clipper's library collection. Supply the native subscription leaf
 and pure typed value/failure report projections. The actor admits callbacks while
 invoked, withdraws callback admission before disposal, and releases the returned
 subscription once. Startup subscription errors become the supplied failure report;

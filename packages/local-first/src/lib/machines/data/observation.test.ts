@@ -7,6 +7,7 @@ type Input = { binding: object }
 type Report =
 	| { type: 'VALUE'; binding: object; value: number }
 	| { type: 'FAILED'; binding: object }
+	| { type: 'RELEASED'; binding: object; outcome: 'released' | 'unresolved' }
 const actors = new Set<{ stop(): void }>()
 afterEach(() => {
 	for (const actor of actors) actor.stop()
@@ -18,6 +19,7 @@ function fixture(options?: {
 	disposalError?: Error
 	callbackDuringDisposal?: boolean
 	absent?: boolean
+	explicit?: boolean
 }) {
 	let publish = (_value: number) => {}
 	let failed = () => {}
@@ -41,7 +43,10 @@ function fixture(options?: {
 		observe,
 		observed: (input, value) => ({ type: 'VALUE', binding: input.binding, value }),
 		failed: (input) => ({ type: 'FAILED', binding: input.binding }),
-		disposalFailed
+		disposalFailed,
+		released: options?.explicit
+			? (input, outcome) => ({ type: 'RELEASED', binding: input.binding, outcome })
+			: undefined
 	})
 	const machine = setup({
 		schemas: {
@@ -50,7 +55,9 @@ function fixture(options?: {
 			events: {
 				VALUE: types<{ binding: object; value: number }>(),
 				FAILED: types<{ binding: object }>(),
-				END: types()
+				END: types(),
+				RELEASE: types(),
+				RELEASED: types<{ binding: object; outcome: 'released' | 'unresolved' }>()
 			}
 		},
 		actors: { observation }
@@ -59,12 +66,16 @@ function fixture(options?: {
 		initial: 'observing',
 		on: {
 			VALUE: ({ context, event }) => ({ context: { reports: [...context.reports, event] } }),
-			FAILED: ({ context, event }) => ({ context: { reports: [...context.reports, event] } })
+			FAILED: ({ context, event }) => ({ context: { reports: [...context.reports, event] } }),
+			RELEASED: ({ context, event }) => ({ context: { reports: [...context.reports, event] } })
 		},
 		states: {
 			observing: {
-				invoke: { src: 'observation', input: ({ context }) => context.input },
-				on: { END: { target: 'idle' } }
+				invoke: { id: 'observation', src: 'observation', input: ({ context }) => context.input },
+				on: {
+					END: { target: 'idle' },
+					RELEASE: (_, enq) => enq.sendTo('observation', { type: 'RELEASE' })
+				}
 			},
 			idle: { on: { END: {} } }
 		}
@@ -172,5 +183,111 @@ it('obeys callback admission and exactly-once release across generated schedules
 			}
 		),
 		{ seed: 20261125, numRuns: 100 }
+	)
+})
+
+it('acknowledges explicit release after native disposal and ignores repeated release and late callbacks', () => {
+	const f = fixture({ explicit: true, initial: 1, callbackDuringDisposal: true })
+	f.actor.send({ type: 'RELEASE' })
+	expect(f.dispose).toHaveBeenCalledOnce()
+	expect(f.reports()).toEqual([
+		{ type: 'VALUE', binding: f.binding, value: 1 },
+		{ type: 'RELEASED', binding: f.binding, outcome: 'released' }
+	])
+	f.actor.send({ type: 'RELEASE' })
+	f.publish(2)
+	f.failed()
+	f.actor.send({ type: 'END' })
+	expect(f.dispose).toHaveBeenCalledOnce()
+	expect(f.reports()).toHaveLength(2)
+})
+
+it('reports unresolved explicit release when disposal or construction failed', () => {
+	for (const options of [
+		{ disposalError: new Error('Disposal failed') },
+		{ constructionError: new Error('Acquisition failed') }
+	]) {
+		const f = fixture({ ...options, explicit: true })
+		f.actor.send({ type: 'RELEASE' })
+		expect(f.reports().at(-1)).toEqual({
+			type: 'RELEASED',
+			binding: f.binding,
+			outcome: 'unresolved'
+		})
+		f.actor.send({ type: 'RELEASE' })
+		f.actor.send({ type: 'END' })
+		expect(f.reports().filter((report) => report.type === 'RELEASED')).toHaveLength(1)
+	}
+})
+
+it('releases an absent optional source without fabricating data', () => {
+	const f = fixture({ explicit: true, absent: true })
+	f.actor.send({ type: 'RELEASE' })
+	expect(f.reports()).toEqual([{ type: 'RELEASED', binding: f.binding, outcome: 'released' }])
+	expect(f.dispose).not.toHaveBeenCalled()
+})
+
+it('keeps stop-only consumers silent when they have not opted into explicit receipts', () => {
+	const f = fixture()
+	f.actor.send({ type: 'RELEASE' })
+	expect(f.dispose).not.toHaveBeenCalled()
+	expect(f.reports()).toEqual([])
+	f.actor.send({ type: 'END' })
+	expect(f.dispose).toHaveBeenCalledOnce()
+	expect(f.reports()).toEqual([])
+})
+
+it('does not turn stop into an explicit release receipt for an opted-in consumer', () => {
+	const f = fixture({ explicit: true })
+	f.actor.stop()
+	expect(f.dispose).toHaveBeenCalledOnce()
+	expect(f.reports()).toEqual([])
+})
+
+it('preserves explicit receipt and callback ordering across generated release/stop schedules', () => {
+	fc.assert(
+		fc.property(
+			fc.array(
+				fc.oneof(
+					fc.integer({ min: 0, max: 20 }),
+					fc.constant('failed'),
+					fc.constant('release'),
+					fc.constant('end')
+				),
+				{ maxLength: 30 }
+			),
+			(commands) => {
+				const f = fixture({ explicit: true, callbackDuringDisposal: true })
+				const expected: Report[] = []
+				let closed = false
+				try {
+					for (const command of commands) {
+						if (command === 'release') {
+							if (!closed)
+								expected.push({ type: 'RELEASED', binding: f.binding, outcome: 'released' })
+							closed = true
+							f.actor.send({ type: 'RELEASE' })
+						} else if (command === 'end') {
+							closed = true
+							f.actor.send({ type: 'END' })
+						} else if (command === 'failed') {
+							if (!closed) expected.push({ type: 'FAILED', binding: f.binding })
+							f.failed()
+						} else {
+							if (!closed) expected.push({ type: 'VALUE', binding: f.binding, value: command })
+							f.publish(command)
+						}
+						expect(f.reports()).toEqual(expected)
+						expect(f.dispose).toHaveBeenCalledTimes(closed ? 1 : 0)
+					}
+				} finally {
+					f.actor.stop()
+					actors.delete(f.actor)
+				}
+				expect(f.dispose).toHaveBeenCalledOnce()
+				expect(f.reports()).toEqual(expected)
+			}
+		),
+		{ seed: 20261126, numRuns: 100 }
 	)
 })

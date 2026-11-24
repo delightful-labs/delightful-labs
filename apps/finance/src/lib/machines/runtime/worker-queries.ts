@@ -1,7 +1,8 @@
+import type { ObservationReleaseOutcome } from 'delightful-local-first/data/observation-workflow'
 import type { BankSource } from '../bank-sync/types.js'
 import type { WorkerTransferRecord } from '../../contracts/worker-transfers.js'
 import type { workerWorkspaceMember, workerAccountGrant } from '../../contracts/worker-accounts.js'
-import { setup, types, type SnapshotFrom } from 'xstate'
+import { setup, types, matchesState, type SnapshotFrom } from 'xstate'
 import type {
 	WorkerSelection,
 	WorkerAccountRecord,
@@ -14,12 +15,26 @@ import type { ArchiveObservation } from '../accounts/account-archive-operation.j
 
 import {
 	observeFinanceQuery as observeQuery,
-	type FinanceWorkerReady
+	type FinanceContentSource
 } from './worker-query-observation.js'
 import type { WorkspaceAccessRows, WorkspaceAccessFacts } from './worker-workspace-access.js'
 export type { FinanceWorkerReady } from './worker-query-observation.js'
+export type FinanceContentCapabilities = Pick<
+	import('../../contracts/worker-application.js').FinanceWorkerCapabilities,
+	| 'observeBankConnections'
+	| 'observeBankLinks'
+	| 'observeTransfers'
+	| 'observeWorkspaceMembers'
+	| 'observeAccountGrants'
+	| 'observeAccounts'
+	| 'observeGrants'
+	| 'observeCategories'
+	| 'observeTags'
+	| 'observeTransaction'
+	| 'observeTransactions'
+>
 type Input = {
-	ready: FinanceWorkerReady
+	ready: { capabilities: FinanceContentCapabilities }
 	transactionId: string | null
 	selection: WorkerSelection
 	binding: object
@@ -54,22 +69,48 @@ type Rows = {
 export type FinanceContentFacts = Rows & { binding: object; status: 'loading' | 'ready' | 'failed' }
 export type FinanceQueryFacts = FinanceContentFacts & WorkspaceAccessRows
 
-const bankConnections = observeQuery<Rows['bankConnections']>('BANK_CONNECTIONS')
-const bankLinks = observeQuery<Rows['bankLinks']>('BANK_LINKS')
-const transfers = observeQuery<Rows['transfers']>('TRANSFERS')
-const workspaceMembers = observeQuery<Rows['workspaceMembers']>('WORKSPACE_MEMBERS')
-const accountGrants = observeQuery<Rows['accountGrants']>('ACCOUNT_GRANTS')
-const accounts = observeQuery<WorkerAccountRecord[]>('ACCOUNTS')
-const grants = observeQuery<ArchiveObservation['grants']>('GRANTS')
-const categories = observeQuery<Category[]>('CATEGORIES')
-const tags = observeQuery<Tag[]>('TAGS')
-const transaction = observeQuery<TransactionEntryObservation['transaction']>('TRANSACTION')
-const transactions = observeQuery<WorkerLedgerRecord[]>('TRANSACTIONS')
+const bankConnections = observeQuery<Rows['bankConnections']>('BANK_CONNECTIONS', 'bankConnections')
+const bankLinks = observeQuery<Rows['bankLinks']>('BANK_LINKS', 'bankLinks')
+const transfers = observeQuery<Rows['transfers']>('TRANSFERS', 'transfers')
+const workspaceMembers = observeQuery<Rows['workspaceMembers']>(
+	'WORKSPACE_MEMBERS',
+	'workspaceMembers'
+)
+const accountGrants = observeQuery<Rows['accountGrants']>('ACCOUNT_GRANTS', 'accountGrants')
+const accounts = observeQuery<WorkerAccountRecord[]>('ACCOUNTS', 'accounts')
+const grants = observeQuery<ArchiveObservation['grants']>('GRANTS', 'grants')
+const categories = observeQuery<Category[]>('CATEGORIES', 'categories')
+const tags = observeQuery<Tag[]>('TAGS', 'tags')
+const transaction = observeQuery<TransactionEntryObservation['transaction']>(
+	'TRANSACTION',
+	'transaction'
+)
+const transactions = observeQuery<WorkerLedgerRecord[]>('TRANSACTIONS', 'transactions')
+
+const contentSources: readonly FinanceContentSource[] = [
+	'bankConnections',
+	'bankLinks',
+	'transfers',
+	'workspaceMembers',
+	'accountGrants',
+	'accounts',
+	'grants',
+	'categories',
+	'tags',
+	'transaction',
+	'transactions'
+]
 
 export const financeQueriesMachine = setup({
 	schemas: {
 		input: types<Input>(),
-		context: types<Input & Rows>(),
+		context: types<
+			Input &
+				Rows & {
+					receipts: readonly { source: FinanceContentSource; outcome: ObservationReleaseOutcome }[]
+				}
+		>(),
+		output: types<{ outcome: 'released' }>(),
 		events: {
 			BANK_CONNECTIONS: types<{ binding: object; rows: Rows['bankConnections'] }>(),
 			BANK_LINKS: types<{ binding: object; rows: Rows['bankLinks'] }>(),
@@ -82,7 +123,13 @@ export const financeQueriesMachine = setup({
 			TAGS: types<{ binding: object; rows: Tag[] }>(),
 			TRANSACTION: types<{ binding: object; rows: TransactionEntryObservation['transaction'] }>(),
 			TRANSACTIONS: types<{ binding: object; rows: WorkerLedgerRecord[] }>(),
-			READ_FAILED: types<{ binding: object }>()
+			READ_FAILED: types<{ binding: object }>(),
+			SHUTDOWN: types(),
+			OBSERVATION_RELEASED: types<{
+				binding: object
+				source: FinanceContentSource
+				outcome: ObservationReleaseOutcome
+			}>()
 		}
 	},
 	actors: {
@@ -101,149 +148,167 @@ export const financeQueriesMachine = setup({
 }).createMachine({
 	id: 'finance-queries',
 	initial: 'running',
-	context: ({ input }) => ({ ...input, ...empty }),
+	context: ({ input }) => ({ ...input, ...empty, receipts: [] }),
+	output: () => ({ outcome: 'released' }),
+	on: {
+		SHUTDOWN: { target: '.releasingClose', context: empty },
+		OBSERVATION_RELEASED: ({ context, event, value }) => {
+			if (
+				(!matchesState('releasingFailure', value) && !matchesState('releasingClose', value)) ||
+				event.binding !== context.binding ||
+				!contentSources.includes(event.source) ||
+				context.receipts.some((receipt) => receipt.source === event.source)
+			)
+				return
+			return {
+				context: {
+					receipts: [...context.receipts, { source: event.source, outcome: event.outcome }]
+				}
+			}
+		}
+	},
+
+	invoke: [
+		{
+			id: 'bankConnections',
+			src: 'bankConnections',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeBankConnections.bind(
+							null,
+							context.selection.workspaceId
+						)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'bankLinks',
+			src: 'bankLinks',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeBankLinks.bind(null, context.selection.workspaceId)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'transfers',
+			src: 'transfers',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeTransfers.bind(null, context.selection.workspaceId)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'workspaceMembers',
+			src: 'workspaceMembers',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeWorkspaceMembers.bind(
+							null,
+							context.selection.workspaceId
+						)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'accountGrants',
+			src: 'accountGrants',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeAccountGrants.bind(
+							null,
+							context.selection.workspaceId
+						)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+
+		{
+			id: 'accounts',
+			src: 'accounts',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeAccounts.bind(null, context.selection.workspaceId)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+
+		{
+			id: 'grants',
+			src: 'grants',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeGrants.bind(null, context.selection.workspaceId)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'categories',
+			src: 'categories',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeCategories.bind(null, context.selection.workspaceId)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'tags',
+			src: 'tags',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeTags.bind(null, context.selection.workspaceId)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'transaction',
+			src: 'transaction',
+			input: ({ context }) => ({
+				...context,
+				observe:
+					context.selection.workspaceId && context.transactionId
+						? context.ready.capabilities.observeTransaction.bind(
+								null,
+								context.selection.workspaceId,
+								context.transactionId
+							)
+						: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		},
+		{
+			id: 'transactions',
+			src: 'transactions',
+			input: ({ context }) => ({
+				...context,
+				observe: context.selection.workspaceId
+					? context.ready.capabilities.observeTransactions.bind(null, context.selection.workspaceId)
+					: undefined
+			}),
+			onError: { target: '.unresolved', context: empty }
+		}
+	],
 	states: {
 		running: {
-			invoke: [
-				{
-					src: 'bankConnections',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeBankConnections.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'bankLinks',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeBankLinks.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'transfers',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeTransfers.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'workspaceMembers',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeWorkspaceMembers.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'accountGrants',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeAccountGrants.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-
-				{
-					src: 'accounts',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeAccounts.bind(null, context.selection.workspaceId)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-
-				{
-					src: 'grants',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeGrants.bind(null, context.selection.workspaceId)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'categories',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeCategories.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'tags',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeTags.bind(null, context.selection.workspaceId)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'transaction',
-					input: ({ context }) => ({
-						...context,
-						observe:
-							context.selection.workspaceId && context.transactionId
-								? context.ready.capabilities.observeTransaction.bind(
-										null,
-										context.selection.workspaceId,
-										context.transactionId
-									)
-								: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'transactions',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeTransactions.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				}
-			],
 			on: {
 				BANK_CONNECTIONS: ({ context, event }) =>
 					event.binding === context.binding
@@ -276,25 +341,53 @@ export const financeQueriesMachine = setup({
 				TRANSACTIONS: ({ context, event }) =>
 					event.binding === context.binding ? { context: { transactions: event.rows } } : undefined,
 				READ_FAILED: ({ context, event }) =>
-					event.binding === context.binding ? { target: 'failed', context: empty } : undefined
+					event.binding === context.binding
+						? { target: 'releasingFailure', context: empty }
+						: undefined
 			}
 		},
-		failed: {}
+		releasingFailure: {
+			entry: (_, enq) => {
+				for (const source of contentSources) enq.sendTo(source, { type: 'RELEASE' })
+			},
+			always: ({ context }) => {
+				if (context.receipts.some((receipt) => receipt.outcome === 'unresolved'))
+					return { target: 'unresolved' }
+				if (context.receipts.length === contentSources.length) return { target: 'failed' }
+			},
+			on: { SHUTDOWN: { target: 'releasingClose' } }
+		},
+		releasingClose: {
+			entry: (_, enq) => {
+				for (const source of contentSources) enq.sendTo(source, { type: 'RELEASE' })
+			},
+			always: ({ context }) => {
+				if (context.receipts.some((receipt) => receipt.outcome === 'unresolved'))
+					return { target: 'unresolved' }
+				if (context.receipts.length === contentSources.length) return { target: 'closed' }
+			},
+			on: { SHUTDOWN: {} }
+		},
+		failed: { on: { SHUTDOWN: { target: 'closed' } } },
+		unresolved: { on: { SHUTDOWN: {} } },
+		closed: { type: 'final' }
 	}
 })
 export function selectFinanceQueryFacts(
 	snapshot: SnapshotFrom<typeof financeQueriesMachine>
 ): FinanceContentFacts {
 	const { context } = snapshot
-	const rows = snapshot.status !== 'active' || snapshot.matches('failed') ? empty : context
+	const rows = snapshot.status !== 'active' || !snapshot.matches('running') ? empty : context
 	return {
 		binding: context.binding,
 		status:
-			snapshot.status !== 'active' || snapshot.matches('failed')
-				? 'failed'
-				: !!context.selection.workspaceId && context.accounts === null
-					? 'loading'
-					: 'ready',
+			snapshot.matches('releasingFailure') || snapshot.matches('releasingClose')
+				? 'loading'
+				: snapshot.status !== 'active' || !snapshot.matches('running')
+					? 'failed'
+					: !!context.selection.workspaceId && context.accounts === null
+						? 'loading'
+						: 'ready',
 		bankConnections: rows.bankConnections,
 		bankLinks: rows.bankLinks,
 		transfers: rows.transfers,
@@ -333,4 +426,12 @@ export function emptyFinanceContentFacts(
 	status: FinanceContentFacts['status'] = 'loading'
 ): FinanceContentFacts {
 	return { ...empty, binding, status }
+}
+
+export function financeQueriesReleaseUnresolved(
+	snapshot: SnapshotFrom<typeof financeQueriesMachine>
+) {
+	return (
+		snapshot.status === 'error' || snapshot.status === 'stopped' || snapshot.matches('unresolved')
+	)
 }

@@ -1,3 +1,4 @@
+import type { ObservationReleaseOutcome } from 'delightful-local-first/data/observation-workflow'
 import { createBoundObservationLogic } from 'delightful-local-first/data/observation-workflow'
 import type { SessionRuntimeObservation } from 'delightful-local-first/session/runtime'
 import type { FinanceWorkerCapabilities } from '../../contracts/worker-application.js'
@@ -6,6 +7,19 @@ export type FinanceWorkerReady = Extract<
 	SessionRuntimeObservation<FinanceWorkerCapabilities>,
 	{ status: 'ready' }
 >
+
+export type FinanceContentSource =
+	| 'bankConnections'
+	| 'bankLinks'
+	| 'transfers'
+	| 'workspaceMembers'
+	| 'accountGrants'
+	| 'accounts'
+	| 'grants'
+	| 'categories'
+	| 'tags'
+	| 'transactions'
+	| 'transaction'
 
 /** Finance's typed report binding; DLF owns the native observation lifetime. */
 export function observeFinanceQuery<Result>(
@@ -24,7 +38,8 @@ export function observeFinanceQuery<Result>(
 		| 'CATEGORIES'
 		| 'TAGS'
 		| 'TRANSACTIONS'
-		| 'TRANSACTION'
+		| 'TRANSACTION',
+	releaseSource?: FinanceContentSource
 ) {
 	return createBoundObservationLogic<
 		Result,
@@ -33,11 +48,26 @@ export function observeFinanceQuery<Result>(
 			observe: ((publish: (result: Result) => void, failed: () => void) => () => void) | undefined
 			reportDisposalFailure: () => void
 		},
-		{ type: typeof event; binding: object; rows: Result } | { type: 'READ_FAILED'; binding: object }
+		| { type: typeof event; binding: object; rows: Result }
+		| { type: 'READ_FAILED'; binding: object }
+		| {
+				type: 'OBSERVATION_RELEASED'
+				binding: object
+				source: FinanceContentSource
+				outcome: ObservationReleaseOutcome
+		  }
 	>({
 		observe: (input, publish, failed) => input.observe?.(publish, failed),
 		observed: (input, rows) => ({ type: event, binding: input.binding, rows }),
 		failed: (input) => ({ type: 'READ_FAILED', binding: input.binding }),
-		disposalFailed: (input) => input.reportDisposalFailure()
+		disposalFailed: (input) => input.reportDisposalFailure(),
+		released: releaseSource
+			? (input, outcome) => ({
+					type: 'OBSERVATION_RELEASED',
+					binding: input.binding,
+					source: releaseSource,
+					outcome
+				})
+			: undefined
 	})
 }

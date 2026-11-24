@@ -66,3 +66,67 @@ try {
 	actor.stop()
 }
 assert.equal(disposals, 1)
+
+// Native receipt qualification through the actual packed public API.
+for (const fail of [false, true]) {
+	let released = 0
+	let failures = 0
+	const owned = createBoundObservationLogic<
+		never,
+		Input,
+		{
+			type: 'RELEASED'
+			binding: object
+			outcome: 'released' | 'unresolved'
+		}
+	>({
+		observe: () => () => {
+			released++
+			if (fail) throw new Error('Native disposal failed')
+		},
+		observed: () => {
+			throw new Error('No data source')
+		},
+		failed: () => {
+			throw new Error('No read failure')
+		},
+		disposalFailed: () => {
+			failures++
+		},
+		released: (input, outcome) => ({ type: 'RELEASED', binding: input.binding, outcome })
+	})
+	const parent = setup({
+		schemas: {
+			input: types<Input>(),
+			context: types<Input>(),
+			events: { RELEASED: types<{ binding: object; outcome: 'released' | 'unresolved' }>() }
+		},
+		actors: { owned }
+	}).createMachine({
+		context: ({ input }) => input,
+		initial: 'releasing',
+		states: {
+			releasing: {
+				invoke: { id: 'owned', src: 'owned', input: ({ context }) => context },
+				entry: (_, enq) => enq.sendTo('owned', { type: 'RELEASE' }),
+				on: {
+					RELEASED: ({ context, event }) => {
+						assert.equal(event.binding, context.binding)
+						assert.equal(released, 1)
+						return event.outcome === 'released' ? { target: 'closed' } : { target: 'unresolved' }
+					}
+				}
+			},
+			closed: { type: 'final' },
+			unresolved: {}
+		}
+	})
+	const owner = createActor(parent, { input: { binding: {} } }).start()
+	try {
+		assert.equal(owner.getSnapshot().matches(fail ? 'unresolved' : 'closed'), true)
+		assert.equal(failures, fail ? 1 : 0)
+	} finally {
+		owner.stop()
+	}
+	assert.equal(released, 1)
+}

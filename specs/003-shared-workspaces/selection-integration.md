@@ -284,3 +284,22 @@ The shared owner must publish unresolved ownership and retain that invocation;
 it must not wait for a dead actor, fabricate a terminal receipt or acquire a
 replacement. A real terminal unresolved receipt is likewise retained and reported.
 Only demonstrated release can acknowledge the selector's exact drain token.
+
+## Explicit observation receipts
+
+The next source slice extends DLF's existing native observation callback with an
+opt-in `RELEASE` command and a typed released/unresolved receipt. Ordinary stop-only
+consumers keep their current behavior. The native leaf withdraws callbacks before
+calling the disposer, calls it once, and reports only after it returns. A thrown
+acquisition/disposal cannot establish clean release. Actor stop remains fallback
+cleanup and never publishes a successful receipt.
+
+Finance's content query group supplies the eleven concrete source identities,
+requests each release, and retains the invocation while collecting their actual
+receipts. Its states distinguish reading, release after read failure, release for
+shutdown, failed reads with demonstrated release, unresolved disposal and closed.
+Shutdown overrides a read-failure drain. Foreign/duplicate receipts cannot satisfy
+another source; missing receipts cannot establish closure. Existing access sources
+remain independent and preserve their stop-only host-cleanup boundary. This is a
+prerequisite to moving these queries inside the leased domain resource, not proof
+of production lease adoption by itself.
