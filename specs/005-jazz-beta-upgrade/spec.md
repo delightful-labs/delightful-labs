@@ -845,6 +845,37 @@ The subsequent native mixed-version fixture head `119df554` also completed all
 three workflows successfully: Finance (18 jobs), Clipper (six jobs), and
 Foundation (four jobs), plus PR-title checks.
 
+### CI correction: wait for saved-row observation after library binding
+
+Head `b40fe5c7` completed Finance and Foundation successfully but failed Clipper's
+worker/offline job. All 33 worker cases and five of six native handover cases
+passed. The Chromium new-document handover failed at the immediate saved-row
+assertion in `tests/worker-handover/native.test.ts:220`. The second red check,
+Account/library/offline browser tests, is the aggregate reporting that same job
+failure; it is not a separate failing scenario. Later offline/sample-data steps
+were not executed after the handover command failed.
+
+The fixture's `ready()` waits for a bound library. The native library machine
+initializes `rows: []` and applies the collection's asynchronous `ROWS` observation
+later; the worker projection can therefore publish the binding before those rows.
+The handover test immediately sampled that intermediate projection. Both the
+reopened document and the already-open descendant document now observe the exact
+original saved article ID using the existing 15-second observation deadline.
+The test retains its one-reload assertion, old-build refusal, both worker-release
+acknowledgements, all six engine/build scenarios and data-identity requirement.
+No application behavior, SDK patch, retry, timeout or CI selection changed.
+
+All six native cases pass with Node 24.22.2 and Clipper's pinned Vitest 4.1.8.
+A native negative control requests a deliberately nonexistent saved-row ID and
+fails at the unchanged 15-second predicate deadline; the original assertion source
+is restored byte-for-byte afterward. Initial local verification encountered an
+undeclared stale web Vitest executable from an earlier fixture environment.
+Frozen installation and removal of that stale shim restore the lockfile-pinned
+Clipper runner; the final six-case pass uses that runner. Workspace links,
+changed-source formatting and lint checks pass. The hosted correction remains
+separate evidence in the [PR checks](https://github.com/delightful-labs/delightful-labs/pull/56/checks),
+and must complete before the latest head is described as green.
+
 ### Native mixed-version wire and account-store qualification
 
 The mixed-version investigation uses the existing prepared

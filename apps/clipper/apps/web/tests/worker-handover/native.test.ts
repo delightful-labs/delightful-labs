@@ -150,6 +150,7 @@ async function configure(page: Page, appId: string) {
 	await page.evaluate((id) => window.clipperHandoverFixture.open(id), appId)
 }
 async function ready(page: Page) {
+	// Library binding precedes the collection's asynchronous ROWS observation.
 	await observe
 		.poll(() => page.evaluate(() => Boolean(window.clipperHandoverFixture.state().view?.library)))
 		.toBe(true)
@@ -209,15 +210,17 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 					await configure(old, appId)
 					if (version === 'new') {
 						await ready(old)
-						expect(
-							await old.evaluate(
-								(id) =>
-									window.clipperHandoverFixture
-										.state()
-										.view?.library?.rows.some((row) => row.id === id),
-								id
+						await observe
+							.poll(() =>
+								old.evaluate(
+									(id) =>
+										window.clipperHandoverFixture
+											.state()
+											.view?.library?.rows.some((row) => row.id === id),
+									id
+								)
 							)
-						).toBe(true)
+							.toBe(true)
 						await old.evaluate(() => window.clipperHandoverFixture.close())
 						await observe
 							.poll(() => old.evaluate(() => window.clipperHandoverFixture.state().released))
@@ -227,15 +230,17 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 							.poll(() => old.evaluate(() => window.clipperHandoverFixture.state().failed))
 							.toBe(true)
 					expect(reloads).toBe(1)
-					expect(
-						await future.evaluate(
-							(id) =>
-								window.clipperHandoverFixture
-									.state()
-									.view?.library?.rows.some((row) => row.id === id),
-							id
+					await observe
+						.poll(() =>
+							future.evaluate(
+								(id) =>
+									window.clipperHandoverFixture
+										.state()
+										.view?.library?.rows.some((row) => row.id === id),
+								id
+							)
 						)
-					).toBe(true)
+						.toBe(true)
 					await future.evaluate(() => window.clipperHandoverFixture.close())
 					await observe
 						.poll(() => future.evaluate(() => window.clipperHandoverFixture.state().released))
