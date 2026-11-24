@@ -16,14 +16,14 @@ let initializer: ReturnType<typeof createActor<typeof rootBootstrapMachine>> | u
 let completion: Promise<OutputFrom<typeof rootBootstrapMachine>> | undefined
 let discovery: Awaited<ReturnType<RootAccess['read']>> | undefined
 let barrier = Promise.withResolvers<void>()
-const writes: RootWrite[] = []
+const writes: Pick<RootWrite, 'global'>[] = []
 
 function current() {
 	const snapshot = session?.getSnapshot()
 	if (!snapshot?.client || !snapshot.user) throw new Error('Native fixture identity unavailable')
 	return { client: snapshot.client, identityId: snapshot.user.accountId }
 }
-export async function open(key?: string) {
+export async function open(key?: string, inspectRoot = true) {
 	if (session || account) throw new Error('Native fixture already open')
 	const serverUrl = fixtureServerUrl()
 	account = browserAccountStore(serverUrl)
@@ -38,7 +38,7 @@ export async function open(key?: string) {
 		})
 		if (key) await session.restoreDeviceAccount(key)
 		await current().client.db.upgradeToLocalFirst(() => import('jazz-tools/local-first'))
-		return { identityId: current().identityId, roots: await localRoots() }
+		return { identityId: current().identityId, roots: inspectRoot ? await localRoots() : undefined }
 	} catch (error) {
 		await close()
 		throw error
@@ -63,10 +63,9 @@ export async function remoteRoots() {
 		await client.db.all(app.libraries.where({ ownerId: identityId }), { tier: ReadTier.Remote })
 	).map((row) => ({ id: row.id, ownerId: row.ownerId, bootstrapVersion: row.bootstrapVersion }))
 }
-export function start() {
-	if (initializer) throw new Error('Native initialization already started')
+function nativeBinding() {
 	const { client, identityId } = current()
-	const native = createLibraryBinding({
+	return createLibraryBinding({
 		db: client.db,
 		identityId,
 		workspaceId: identityId,
@@ -76,6 +75,11 @@ export function start() {
 		},
 		cacheNamespace: 'independent-native-startup'
 	})
+}
+export function start() {
+	if (initializer) throw new Error('Native initialization already started')
+	const { identityId } = current()
+	const native = nativeBinding()
 	const root: RootAccess = {
 		read: async () => {
 			const observed = await native.root.read()
@@ -111,6 +115,34 @@ export async function result() {
 export async function accepted() {
 	await Promise.all(writes.map((write) => write.global()))
 	return remoteRoots()
+}
+export async function save(url: string) {
+	const records = nativeBinding().createRecords()
+	const result = await toPromise(
+		createActor(records.articles.saveMachine, {
+			input: {
+				url,
+				content: {
+					title: 'Partial replica clip',
+					text: 'Content retained across partial workspace startup.',
+					html: '<p>Content retained across partial workspace startup.</p>',
+					finalUrl: url,
+					provenance: '{}'
+				}
+			}
+		}).start()
+	)
+	if (result.kind === 'saved' || result.kind === 'duplicate') writes.push(...result.receipts)
+	return result.kind
+}
+export async function documents(remote = false) {
+	const { client, identityId } = current()
+	return (
+		await client.db.all(
+			app.libraryDocuments.where({ libraryId: identityId }),
+			remote ? { tier: ReadTier.Remote } : { tier: ReadTier.LocalFirst, firstLoadRemoteWaitMs: 0 }
+		)
+	).map((row) => ({ libraryId: row.libraryId, sourceUrl: row.sourceUrl }))
 }
 export async function close() {
 	barrier.resolve()

@@ -1054,3 +1054,17 @@ the final six host-binding regressions pass. All 125 native browser cases pass:
 offline production builds and the packaged extension build pass. The UI component
 tests use jsdom; they are not included in the native-browser count. Hosted runs
 remain separately tracked; passing local cases do not close hosted qualification.
+
+## Native partial-replica startup
+
+A second Clipper startup case first persists a canonical workspace and clip to
+the real authority, then restores its identity into an independent empty store
+without issuing a root/content query. With the actual authority stopped, explicit
+local-tier queries confirm both are missing. The production initializer reports
+local readiness at the same canonical ID, and the existing domain save actor
+persists another clip locally. Restarting the authority with the same database
+settles the exact write receipts. Remote-tier queries return exactly one original
+root and both the preexisting and offline clips. No data reset or replacement ID
+is used. This case and independent concurrent startup pass together; full Clipper
+types and scoped formatting/lint pass. Unanswered connections and later rejection
+remain separate scenarios.
