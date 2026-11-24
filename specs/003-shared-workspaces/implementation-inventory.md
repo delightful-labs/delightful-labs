@@ -1068,3 +1068,15 @@ root and both the preexisting and offline clips. No data reset or replacement ID
 is used. This case and independent concurrent startup pass together; full Clipper
 types and scoped formatting/lint pass. Unanswered connections and later rejection
 remain separate scenarios.
+
+The partial-replica case now also runs with an actual unanswered connection.
+Finance's unchanged native silent proxy lives in shared `scripts/testing` tooling;
+Finance retains its existing import path and isolated upgrade fixtures copy the
+shared implementation. The Clipper case records an accepted WebSocket handshake
+and incoming client bytes while withholding every Jazz reply. The production
+initializer and existing domain save still complete locally, then exact global
+receipts and remote rows reconcile when the real authority returns. All three
+Clipper startup cases and Finance's existing fully negotiated stalled-connection
+save case pass with this shared fixture. Both consumer test types and monorepo
+tooling tests pass. The helper is explicitly verification-only for deployment
+selection; CI selection remains conservative.

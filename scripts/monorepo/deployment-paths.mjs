@@ -17,6 +17,7 @@ export function verificationOnlyPath(path, project) {
 	if (!path || path.startsWith('/') || path.includes('\\') || path.split('/').some((part) => part === '..' || part === '.')) return false
 	if (/\.md$/iu.test(path)) return true
 	if (deploymentControlPaths.has(path)) return true
+	if (path === 'scripts/testing/silent-jazz-proxy.ts') return true
 	if (path.startsWith('.github/workflows/') || path.startsWith('.vscode/')) return true
 	const root = roots.find((prefix) => path.startsWith(prefix))
 	const local = root ? path.slice(root.length) : path

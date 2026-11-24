@@ -305,7 +305,7 @@ test('deployment-only exclusions keep CI active and reject ambiguous paths', () 
 	for (const path of ['', '/apps/finance/tests/app.ts', 'apps/finance/../tests/a.ts', 'apps/finance/./tests/a.ts', 'apps/finance/tests/a\\b.ts', 'unknown/tests/app.ts', 'apps/finance/src/lib/custom.config.ts', 'apps/finance/src/lib/tests-helper.ts', 'apps/finance/tsconfig.json']) {
 		assert.equal(verificationOnlyPath(path, 'finance'), false, path)
 	}
-	for (const path of ['scripts/monorepo/ci.mjs', 'scripts/monorepo/vercel-ignore.mjs', 'scripts/monorepo/deployment-paths.mjs']) {
+	for (const path of ['scripts/monorepo/ci.mjs', 'scripts/monorepo/vercel-ignore.mjs', 'scripts/monorepo/deployment-paths.mjs', 'scripts/testing/silent-jazz-proxy.ts']) {
 		assert.equal(verificationOnlyPath(path, 'website'), true)
 		assert.deepEqual(Object.values(selectChecks([path])), projects.map(() => true), 'deployment controls retain all CI verification')
 	}

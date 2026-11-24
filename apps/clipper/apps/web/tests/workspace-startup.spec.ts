@@ -3,6 +3,7 @@ import { startLocalJazzServer } from './browser-core.js'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createSilentJazzProxy } from '../../../../../scripts/testing/silent-jazz-proxy.js'
 
 let authority: Awaited<ReturnType<typeof startLocalJazzServer>>
 let dataDir: string
@@ -19,81 +20,94 @@ test.beforeAll(async () => {
 	await startAuthority()
 })
 
-test('a partial native replica starts offline on the canonical workspace and reconciles without resetting existing content', async ({
-	browser
-}) => {
-	const seed = await browser.newContext()
-	const partial = await browser.newContext()
-	const pages: Page[] = []
-	const existingUrl = 'https://example.com/partial-replica-existing'
-	const offlineUrl = 'https://example.com/partial-replica-offline'
-	try {
-		const source = await blank(seed)
-		pages.push(source)
-		const identity = await open(source)
-		const key = await source.evaluate(async (url) => {
-			const path = '/tests/workspace-startup/replica.ts'
-			const replica = await import(/* @vite-ignore */ path)
-			replica.start()
-			replica.releaseDiscovery()
-			await replica.result()
-			if ((await replica.save(url)) !== 'saved') throw new Error('Seed content was not saved')
-			await replica.accepted()
-			return replica.credential()
-		}, existingUrl)
-		await close(source)
-		const page = await blank(partial)
-		pages.push(page)
-		// Restore identity without issuing any application root/content query.
-		await page.evaluate(async (key) => {
-			const path = '/tests/workspace-startup/replica.ts'
-			await (await import(/* @vite-ignore */ path)).open(key, false)
-		}, key)
-		await authority.stop()
-		expect(
-			await page.evaluate(async () => {
+for (const connection of ['offline', 'unanswered']) {
+	test(`a partial native replica starts with ${connection} authority and reconciles without resetting existing content`, async ({
+		browser
+	}) => {
+		const seed = await browser.newContext()
+		const partial = await browser.newContext()
+		const pages: Page[] = []
+		const existingUrl = 'https://example.com/partial-replica-existing'
+		const offlineUrl = 'https://example.com/partial-replica-offline'
+		let silent: ReturnType<typeof createSilentJazzProxy> | undefined
+		try {
+			const source = await blank(seed)
+			pages.push(source)
+			const identity = await open(source)
+			const key = await source.evaluate(async (url) => {
 				const path = '/tests/workspace-startup/replica.ts'
 				const replica = await import(/* @vite-ignore */ path)
-				return { roots: await replica.localRoots(), documents: await replica.documents() }
+				replica.start()
+				replica.releaseDiscovery()
+				await replica.result()
+				if ((await replica.save(url)) !== 'saved') throw new Error('Seed content was not saved')
+				await replica.accepted()
+				return replica.credential()
+			}, existingUrl)
+			await close(source)
+			const page = await blank(partial)
+			pages.push(page)
+			// Restore identity without issuing any application root/content query.
+			await page.evaluate(async (key) => {
+				const path = '/tests/workspace-startup/replica.ts'
+				await (await import(/* @vite-ignore */ path)).open(key, false)
+			}, key)
+			await authority.stop()
+			if (connection === 'unanswered') {
+				silent = createSilentJazzProxy('http://127.0.0.1:5181')
+				silent.silence()
+				await silent.listen(5181)
+				await expect.poll(() => silent?.observed.opened ?? 0).toBeGreaterThan(0)
+				await expect.poll(() => silent?.observed.clientBytes ?? 0).toBeGreaterThan(0)
+			}
+			expect(
+				await page.evaluate(async () => {
+					const path = '/tests/workspace-startup/replica.ts'
+					const replica = await import(/* @vite-ignore */ path)
+					return { roots: await replica.localRoots(), documents: await replica.documents() }
+				})
+			).toEqual({ roots: [], documents: [] })
+			const result = await page.evaluate(async (url) => {
+				const path = '/tests/workspace-startup/replica.ts'
+				const replica = await import(/* @vite-ignore */ path)
+				replica.start()
+				replica.releaseDiscovery()
+				return { startup: await replica.result(), save: await replica.save(url) }
+			}, offlineUrl)
+			expect(result).toEqual({
+				startup: {
+					outcome: 'ready',
+					identityId: identity.identityId,
+					workspaceId: identity.identityId,
+					wrote: true
+				},
+				save: 'saved'
 			})
-		).toEqual({ roots: [], documents: [] })
-		const result = await page.evaluate(async (url) => {
-			const path = '/tests/workspace-startup/replica.ts'
-			const replica = await import(/* @vite-ignore */ path)
-			replica.start()
-			replica.releaseDiscovery()
-			return { startup: await replica.result(), save: await replica.save(url) }
-		}, offlineUrl)
-		expect(result).toEqual({
-			startup: {
-				outcome: 'ready',
-				identityId: identity.identityId,
-				workspaceId: identity.identityId,
-				wrote: true
-			},
-			save: 'saved'
-		})
-		await startAuthority()
-		const reconciled = await page.evaluate(async () => {
-			const path = '/tests/workspace-startup/replica.ts'
-			const replica = await import(/* @vite-ignore */ path)
-			return { roots: await replica.accepted(), documents: await replica.documents(true) }
-		})
-		expect(reconciled.roots).toEqual([
-			{ id: identity.identityId, ownerId: identity.identityId, bootstrapVersion: '1' }
-		])
-		expect(reconciled.documents).toHaveLength(2)
-		expect(reconciled.documents).toEqual(
-			expect.arrayContaining([
-				{ libraryId: identity.identityId, sourceUrl: existingUrl },
-				{ libraryId: identity.identityId, sourceUrl: offlineUrl }
+			await silent?.close()
+			silent = undefined
+			await startAuthority()
+			const reconciled = await page.evaluate(async () => {
+				const path = '/tests/workspace-startup/replica.ts'
+				const replica = await import(/* @vite-ignore */ path)
+				return { roots: await replica.accepted(), documents: await replica.documents(true) }
+			})
+			expect(reconciled.roots).toEqual([
+				{ id: identity.identityId, ownerId: identity.identityId, bootstrapVersion: '1' }
 			])
-		)
-	} finally {
-		await Promise.all(pages.filter((page) => !page.isClosed()).map(close))
-		await Promise.all([seed.close(), partial.close()])
-	}
-})
+			expect(reconciled.documents).toHaveLength(2)
+			expect(reconciled.documents).toEqual(
+				expect.arrayContaining([
+					{ libraryId: identity.identityId, sourceUrl: existingUrl },
+					{ libraryId: identity.identityId, sourceUrl: offlineUrl }
+				])
+			)
+		} finally {
+			await silent?.close()
+			await Promise.all(pages.filter((page) => !page.isClosed()).map(close))
+			await Promise.all([seed.close(), partial.close()])
+		}
+	})
+}
 test.afterAll(async () => {
 	await authority?.stop()
 	if (dataDir) await rm(dataDir, { recursive: true, force: true })
