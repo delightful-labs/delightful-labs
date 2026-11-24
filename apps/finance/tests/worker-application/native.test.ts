@@ -1557,6 +1557,102 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 				await browser.close()
 			}
 		})
+		it('refuses a retired activation through the real client even when packet route metadata matches the current workspace', async () => {
+			onTestFailed(() => {
+				retained = true
+			})
+			const browser = await engine.launch({ headless: true }),
+				page = await browser.newPage()
+			try {
+				await open(page, crypto.randomUUID())
+				const a = crypto.randomUUID(),
+					b = crypto.randomUUID(),
+					accountA = crypto.randomUUID(),
+					accountB = crypto.randomUUID()
+				expect(
+					await page.evaluate(
+						({ a, accountA }) =>
+							window.financeWorkerReadFixture.seed(a, accountA, 'Activation wallet'),
+						{ a, accountA }
+					)
+				).toEqual({ ok: true })
+				expect(
+					await page.evaluate(
+						({ b, accountB }) =>
+							window.financeWorkerReadFixture.seed(b, accountB, 'Other activation wallet'),
+						{ b, accountB }
+					)
+				).toEqual({ ok: true })
+				await selectWorkspaceUI(page, a)
+				const wallet = page.getByRole('cell', { name: 'Activation wallet', exact: true })
+				await browserExpect(wallet).toBeVisible()
+				const original = await page.evaluate(() => {
+					const view = window.financeWorkerReadFixture.state()
+					return { sessionRevision: view.sessionRevision, selection: view.selection }
+				})
+				await selectWorkspaceUI(page, b)
+				await browserExpect(
+					page.getByRole('cell', { name: 'Other activation wallet', exact: true })
+				).toBeVisible()
+				await selectWorkspaceUI(page, a)
+				await browserExpect(wallet).toBeVisible()
+				await browserExpect
+					.poll(() =>
+						page.evaluate(
+							(accountA) =>
+								window.financeWorkerReadFixture
+									.state()
+									.accounts.find((account) => account.id === accountA)?.archiveAction,
+							accountA
+						)
+					)
+					.toBe('available')
+				const fresh = await page.evaluate(() => {
+					const view = window.financeWorkerReadFixture.state()
+					return { sessionRevision: view.sessionRevision, selection: view.selection }
+				})
+				if (!original.selection.activation || !fresh.selection.activation)
+					throw new Error('Missing native activation envelope')
+				expect(fresh.selection.activation.epoch).toBeGreaterThan(
+					original.selection.activation.epoch
+				)
+				const delayed = {
+					sessionRevision: fresh.sessionRevision,
+					selection: { ...fresh.selection, activation: original.selection.activation }
+				}
+				const originalUrl = page.url()
+				await page.evaluate(
+					(delayed) => window.financeWorkerReadFixture.filtersWithScope(delayed),
+					delayed
+				)
+				expect(page.url()).toBe(originalUrl)
+
+				await page.evaluate(
+					({ accountA, delayed }) =>
+						window.financeWorkerReadFixture.archiveWithScope(accountA, delayed),
+					{ accountA, delayed }
+				)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.archiveCalls())).toEqual({
+					ok: true,
+					archiveCalls: 0
+				})
+				await browserExpect(wallet).toBeVisible()
+				await page.evaluate(
+					({ accountA, fresh }) =>
+						window.financeWorkerReadFixture.archiveWithScope(accountA, fresh),
+					{ accountA, fresh }
+				)
+				await browserExpect(wallet).toHaveCount(0)
+				expect(await page.evaluate(() => window.financeWorkerReadFixture.archiveCalls())).toEqual({
+					ok: true,
+					archiveCalls: 1
+				})
+				await close(page)
+			} finally {
+				await browser.close()
+			}
+		})
+
 		it('saves expense and income through the real transaction form in the application Worker', async () => {
 			onTestFailed(() => {
 				retained = true

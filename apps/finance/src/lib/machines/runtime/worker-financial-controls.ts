@@ -1,3 +1,4 @@
+import { sameTransferMutationScope } from '../../contracts/transfer-scope-drain.js'
 import { createWorkerSamples } from '../samples/worker-samples.js'
 import { selectSampleTransactionsView } from '../samples/sample-transactions.js'
 import { workerSamplesView } from '../../contracts/worker-forms.js'
@@ -180,7 +181,10 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 		...dependencies,
 		observe: () => dependencies.observe().edit
 	})
-	function transferScope(observation: FinanceFormsObservation) {
+	function transferScope(
+		observation: FinanceFormsObservation,
+		lease: import('delightful-local-first/workspace/contracts').WorkspaceLease | undefined
+	) {
 		const source = observation.transferCreate
 		return source.sessionReady &&
 			source.binding === dependencies.binding &&
@@ -189,7 +193,8 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 			? {
 					binding: dependencies.binding,
 					workspaceId: source.organizationId,
-					generation: observation.navigation.generation
+					generation: observation.navigation.generation,
+					lease
 				}
 			: undefined
 	}
@@ -199,7 +204,7 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 			return request.input.db === dependencies.db &&
 				request.input.identityId === observation.transferCreate.identityId &&
 				request.workspaceId === observation.transferCreate.organizationId
-				? transferScope(observation)
+				? transferScope(observation, observation.workspaceLease)
 				: undefined
 		},
 		send: dependencies.transferDispatch
@@ -222,6 +227,7 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 	const enterTransaction = createScopedFormMachine(transactionOptions)
 	const createAccount = createScopedFormMachine(options)
 	type Input = {
+		lease?: import('delightful-local-first/workspace/contracts').WorkspaceLease | undefined
 		observation: FinanceFormsObservation
 		selectionRevision: number
 		offline: boolean
@@ -391,7 +397,7 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 					form: ClassificationForm
 					command: WorkerFormCommand
 				}>(),
-				OBSERVE: types<Omit<Input, 'offline' | 'initialization'>>(),
+				OBSERVE: types<Omit<Input, 'offline' | 'initialization' | 'lease'>>(),
 				INITIALIZATION_OBSERVED: types<{ initialization: InitializationResult | undefined }>(),
 
 				ARCHIVE_ACCOUNT: types<{ accountId: string }>(),
@@ -633,7 +639,7 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 			{
 				id: 'transferOwner',
 				src: 'transferOwner',
-				input: ({ context }) => ({ scope: transferScope(context.observation) }),
+				input: ({ context }) => ({ scope: transferScope(context.observation, context.lease) }),
 				onDone: ({ value, event }, enq) => {
 					if (!matchesState('closing', value) || event.output.outcome !== 'closed')
 						return { target: '.failed' }
@@ -908,13 +914,11 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 				},
 				on: {
 					TRANSFER_MUTATION_REQUEST: ({ context, event }, enq) => {
-						const current = transferScope(context.observation)
+						const current = transferScope(context.observation, context.lease)
 						const request = event.request
 						if (
 							current &&
-							request.scope?.binding === current.binding &&
-							request.scope.workspaceId === current.workspaceId &&
-							request.scope.generation === current.generation &&
+							sameTransferMutationScope(request.scope, current) &&
 							request.input.db === dependencies.db &&
 							request.input.identityId === context.observation.transferCreate.identityId
 						)
@@ -1064,7 +1068,7 @@ export function createFinanceFinancialControlsMachine(dependencies: FinanceFinan
 							})
 						enq.sendTo('transferOwner', {
 							type: 'OBSERVE',
-							scope: transferScope(event.observation)
+							scope: transferScope(event.observation, context.lease)
 						})
 						enq.sendTo('transferCreation', {
 							type: 'OBSERVE',

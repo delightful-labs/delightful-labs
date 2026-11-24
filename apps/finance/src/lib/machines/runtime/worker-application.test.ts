@@ -1,6 +1,15 @@
 import type { Db } from 'jazz-tools'
 import { createAccountDeleteGrantMachine } from '../accounts/account-delete-grants.js'
 import { createWorkspaceBackupMachine } from '../workspaces/workspace-backup.js'
+import { prepareBackupSubmission, takeBackupProtection } from '../../backup/submission.js'
+import {
+	prepareWorkspaceRestoreFile,
+	workspaceRestoreFileAvailable
+} from '../workspaces/workspace-restore.js'
+import type {
+	TransferMutationRequest,
+	TransferMutationResponse
+} from '../transfers/internal-transfer-mutation-owner.js'
 import { createWorkspaceRestoreController } from '../workspaces/workspace-restore.js'
 import { createProfileFormOptions } from '../identity/profile.js'
 import { createWorkspaceRenameFormOptions } from '../workspaces/workspace-rename.js'
@@ -27,6 +36,8 @@ import {
 	selectFinanceRestorationAdmission,
 	selectFinanceNavigationRetry,
 	selectFinanceRecoveryReader,
+	selectFinanceBackupAdmission,
+	selectFinanceBankAdmission,
 	selectFinanceFormObservations
 } from './worker-application.js'
 import type {
@@ -468,6 +479,7 @@ function fixture(
 		saveProfileName,
 		createWrite,
 		transactionDb,
+		formDatabase: formDb,
 		enter: (command: WorkerFormCommand, scope = selectFinanceWorkerView(actor.getSnapshot())) =>
 			actor.send({
 				type: 'TRANSACTION_ENTRY',
@@ -2433,13 +2445,13 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
 			expect(f.view().accounts[0]?.archiveAction).toBe('archiving')
@@ -2473,7 +2485,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Original A').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			f.select(b, 2)
 			expect(f.queries).toHaveLength(1)
@@ -2482,7 +2494,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('B').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			f.select(a, 3)
 			expect(f.queries).toHaveLength(1)
@@ -2515,7 +2527,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
 			f.publishSession(f.ready({}))
@@ -2557,7 +2569,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.view().accounts[0]?.archiveAction).toBe('unavailable')
 			expect(f.archiveWrite).not.toHaveBeenCalled()
@@ -2569,7 +2581,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.archiveWrite).not.toHaveBeenCalled()
 			last(f.grants).publish([
@@ -2587,7 +2599,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			await vi.waitFor(() => expect(f.view().archiveFeedback?.outcome).toBe('succeeded'))
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
@@ -2607,7 +2619,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			await vi.waitFor(() =>
 				expect(f.view().archiveFeedback).toEqual({
@@ -3692,6 +3704,186 @@ describe('production shared workspace leases', () => {
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
 		} finally {
 			held.resolve()
+			f.stop()
+		}
+	})
+
+	it('refuses delayed same-route commands and private payloads after revocation/regrant while accepting fresh scopes', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			r.publish(r.membership(a))
+			last(f.queries).publish([row('Before')])
+			const old = f.view(),
+				oldLease = r.lease()
+			if (!oldLease) throw new Error('Missing original lease')
+			r.publish(null)
+			r.publish(r.membership(a))
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.queries).publish([row('After')])
+			const fresh = f.view()
+			expect(fresh.selection.revision).toBe(old.selection.revision)
+			expect(fresh.sessionRevision).toBe(old.sessionRevision)
+			expect(fresh.selection.activation?.epoch).toBeGreaterThan(
+				old.selection.activation?.epoch ?? 0
+			)
+			expect(selectFinanceBackupAdmission(f.actor.getSnapshot(), old)).toBeUndefined()
+			expect(selectFinanceBankAdmission(f.actor.getSnapshot(), old)).toBeUndefined()
+			expect(selectFinanceBackupAdmission(f.actor.getSnapshot(), fresh)).toBeDefined()
+			expect(selectFinanceBankAdmission(f.actor.getSnapshot(), fresh)).toBeDefined()
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				accountId: row('After').id
+			})
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: fresh.sessionRevision,
+				selection: { workspaceId: a, revision: fresh.selection.revision },
+				accountId: row('After').id
+			})
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			const secret = prepareBackupSubmission('password', 'discarded-fixture-secret')
+			const backupRelease = vi.fn(secret.release)
+			const file = prepareWorkspaceRestoreFile(new File(['discarded'], 'retired-backup'), '')
+			const fileRelease = vi.fn(() => file.release())
+			f.actor.send({
+				type: 'START_BACKUP',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				submission: { ...secret, release: backupRelease }
+			})
+			f.actor.send({
+				type: 'START_WORKSPACE_RESTORE',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				request: { ...file, release: fileRelease }
+			})
+			expect(backupRelease).toHaveBeenCalledOnce()
+			expect(fileRelease).toHaveBeenCalledOnce()
+			expect(() => takeBackupProtection(secret)).toThrow('Backup submission unavailable')
+			expect(workspaceRestoreFileAvailable(file)).toBe(false)
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: fresh.sessionRevision,
+				selection: fresh.selection,
+				accountId: row('After').id
+			})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('distinguishes forms reattachment when native binding, route revision and lease epoch repeat', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('Before')])
+			await vi.waitFor(() => expect(f.view().canRetryInitialization).toBe(true))
+			const old = f.view(),
+				binding = f.actor.getSnapshot().context.ready?.binding
+			f.actor.send({
+				type: 'RETRY_INITIALIZATION',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection
+			})
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.queries).publish([row('Reattached')])
+			const fresh = f.view()
+			expect(f.actor.getSnapshot().context.ready?.binding).toBe(binding)
+			expect(fresh.sessionRevision).toBe(old.sessionRevision)
+			expect(fresh.selection.revision).toBe(old.selection.revision)
+			expect(fresh.selection.activation?.epoch).toBe(old.selection.activation?.epoch)
+			expect(fresh.selection.activation?.attachment).toBeGreaterThan(
+				old.selection.activation?.attachment ?? 0
+			)
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				accountId: row('Reattached').id
+			})
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			expect(selectFinanceBankAdmission(f.actor.getSnapshot(), old)).toBeUndefined()
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: fresh.sessionRevision,
+				selection: fresh.selection,
+				accountId: row('Reattached').id
+			})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			expect(f.nativeClose).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('keeps identity commands usable without a financial activation', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			expect(f.view().selection.activation).toBeUndefined()
+			f.actor.send({
+				type: 'PROFILE',
+				form: 'name',
+				command: { type: 'SUBMIT', values: { displayName: 'Independent identity' } },
+				sessionRevision: f.view().sessionRevision,
+				selection: { workspaceId: a, revision: f.view().selection.revision }
+			})
+			await vi.waitFor(() => expect(f.saveProfileName).toHaveBeenCalledOnce())
+			expect(f.queries).toHaveLength(0)
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('rejects an internal transfer captured before regrant even when binding and route generation are unchanged', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			r.publish(r.membership(a))
+			last(f.queries).publish([])
+			const old = r.lease(),
+				generation = f.view().selection.revision
+			if (!old) throw new Error('Missing old lease')
+			const responses: TransferMutationResponse[] = []
+			const request: TransferMutationRequest = {
+				operation: 'link',
+				workspaceId: a,
+				requestId: 'retired-request',
+				scope: { binding: old.scope.binding, workspaceId: a, generation, lease: old },
+				input: {
+					db: f.formDatabase,
+					organizationId: a,
+					identityId: userId,
+					expenseTransactionId: crypto.randomUUID(),
+					incomeTransactionId: crypto.randomUUID(),
+					trackWrite: () => {}
+				},
+				recipient: { send: (event) => responses.push(event) }
+			}
+			r.publish(null)
+			r.publish(r.membership(a))
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.queries).publish([])
+			const fresh = r.lease()
+			if (!fresh) throw new Error('Missing fresh lease')
+			f.actor.send({ type: 'TRANSFER_MUTATION_REQUEST', request })
+			expect(responses).toHaveLength(1)
+			expect(f.transactionDb.beginTransaction).not.toHaveBeenCalled()
+			f.actor.send({
+				type: 'TRANSFER_MUTATION_REQUEST',
+				request: {
+					...request,
+					requestId: 'fresh-request',
+					scope: { binding: fresh.scope.binding, workspaceId: a, generation, lease: fresh }
+				}
+			})
+			await vi.waitFor(() => expect(f.transactionDb.beginTransaction).toHaveBeenCalledOnce())
+		} finally {
 			f.stop()
 		}
 	})

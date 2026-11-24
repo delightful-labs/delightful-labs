@@ -3,7 +3,10 @@ import { get } from 'svelte/store'
 import Application from './Application.svelte'
 import { observePage } from './route-state.svelte.js'
 import { createFinanceWorkerClient } from '../../src/lib/runtime/worker/client.js'
-import type { FinanceWorkerConfiguration } from '../../src/lib/contracts/worker-application.js'
+import type {
+	FinanceWorkerConfiguration,
+	WorkerCommandScope
+} from '../../src/lib/contracts/worker-application.js'
 
 let worker: Worker | undefined, client: ReturnType<typeof createFinanceWorkerClient> | undefined
 let component: ReturnType<typeof mount> | undefined
@@ -29,6 +32,7 @@ function request(message: unknown) {
 		ids?: readonly string[]
 		ok: boolean
 		recoveryReads?: number
+		archiveCalls?: number
 		error?: string
 		transactions?: {
 			id: string
@@ -112,6 +116,11 @@ const fixture = {
 	transactions: (workspaceId: string, authority = false) =>
 		request({ type: 'TEST_TRANSACTIONS', workspaceId, authority }),
 	archive: (accountId: string) => current().archiveAccount(accountId, get(current().view)),
+	filtersWithScope: (scope: WorkerCommandScope) =>
+		current().setLedgerFilters({ query: 'retired filter' }, scope),
+	archiveWithScope: (accountId: string, scope: WorkerCommandScope) =>
+		current().archiveAccount(accountId, scope),
+	archiveCalls: () => request({ type: 'TEST_ARCHIVE_CALLS' }),
 	holdArchive: () => request({ type: 'TEST_HOLD_ARCHIVE' }),
 	releaseArchive: () => request({ type: 'TEST_RELEASE_ARCHIVE' }),
 	async detach() {

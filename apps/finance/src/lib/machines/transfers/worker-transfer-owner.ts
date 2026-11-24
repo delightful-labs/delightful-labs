@@ -1,3 +1,4 @@
+import { sameTransferMutationScope } from '../../contracts/transfer-scope-drain.js'
 import { setup, types } from 'xstate'
 import {
 	createInternalTransferMutationOwner,
@@ -20,11 +21,7 @@ function sameScope(
 	left: TransferMutationScope | undefined,
 	right: TransferMutationScope | undefined
 ) {
-	return (
-		left?.binding === right?.binding &&
-		left?.workspaceId === right?.workspaceId &&
-		left?.generation === right?.generation
-	)
+	return (left === undefined && right === undefined) || sameTransferMutationScope(left, right)
 }
 function requiredScope(scope: TransferMutationScope | undefined) {
 	if (!scope) throw new Error('Missing admitted transfer scope')

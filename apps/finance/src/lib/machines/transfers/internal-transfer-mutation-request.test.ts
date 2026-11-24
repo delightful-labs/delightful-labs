@@ -133,4 +133,38 @@ describe('transfer request scope capture', () => {
 		expect(requests[0]?.scope?.generation).toBe(2)
 		expect(captureScope).not.toHaveBeenCalled()
 	})
+	it('uses distinct native actor-session identities for repeated child names and refuses retired replies', () => {
+		const requests: TransferMutationRequest[] = [],
+			cancelled: string[] = []
+		const logic = createTransferMutationRequestMachine({
+			send: (event) => {
+				if (event.type === 'TRANSFER_MUTATION_REQUEST') requests.push(event.request)
+				else cancelled.push(event.requestId)
+			}
+		})
+		const first = createActor(logic, { id: 'same-child-name', input: input() }).start()
+		actors.add(first)
+		const old = requests[0]
+		if (!old) throw new Error('Missing first request')
+		first.send({ type: 'CANCEL' })
+		first.stop()
+		const next = createActor(logic, { id: 'same-child-name', input: input() }).start()
+		actors.add(next)
+		const current = requests[1]
+		if (!current) throw new Error('Missing replacement request')
+		expect(current.requestId).not.toBe(old.requestId)
+		expect(cancelled).toEqual([old.requestId])
+		current.recipient.send({
+			type: 'TRANSFER_MUTATION_RESULT',
+			requestId: old.requestId,
+			result: { operation: 'link', result: { outcome: 'cancelled', settlement: 'notStarted' } }
+		})
+		expect(next.getSnapshot().status).toBe('active')
+		current.recipient.send({
+			type: 'TRANSFER_MUTATION_RESULT',
+			requestId: current.requestId,
+			result: { operation: 'link', result: { outcome: 'cancelled', settlement: 'notStarted' } }
+		})
+		expect(next.getSnapshot().status).toBe('done')
+	})
 })

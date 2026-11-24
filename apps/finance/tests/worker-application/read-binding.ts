@@ -23,6 +23,7 @@ export function inspectWorkerFailure(event: InspectionEvent) {
 		)
 }
 let recoveryReads = 0
+let archiveCalls = 0
 let captured: Parameters<typeof nativeBinding>[0] | undefined
 let archiveReceipt: ReturnType<typeof Promise.withResolvers<void>> | undefined
 export function createFinanceWorkerBinding(input: Parameters<typeof nativeBinding>[0]) {
@@ -35,6 +36,7 @@ export function createFinanceWorkerBinding(input: Parameters<typeof nativeBindin
 			return native.readRecoveryPhrase()
 		},
 		archiveAccount: async (accountId: string) => {
+			archiveCalls++
 			const receipt = archiveReceipt
 			await native.archiveAccount(accountId)
 			await receipt?.promise
@@ -68,6 +70,7 @@ const command = z.discriminatedUnion('type', [
 	}),
 	edit,
 	z.strictObject({ type: z.literal('TEST_RECOVERY_READS') }),
+	z.strictObject({ type: z.literal('TEST_ARCHIVE_CALLS') }),
 	z.strictObject({
 		type: z.literal('TEST_TRANSACTIONS'),
 		workspaceId: z.uuid(),
@@ -98,6 +101,10 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 			if (!native?.isCurrent()) throw new Error('Fixture binding unavailable')
 			const { db } = native,
 				c = decoded.data
+			if (c.type === 'TEST_ARCHIVE_CALLS') {
+				reply.postMessage({ ok: true, archiveCalls })
+				return
+			}
 			if (c.type === 'TEST_RECOVERY_READS') {
 				reply.postMessage({ ok: true, recoveryReads })
 				return

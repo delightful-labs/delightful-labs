@@ -135,7 +135,10 @@ export function createFinanceWorkspaceResources(options: {
 				invoke: {
 					id: 'financial',
 					src: 'financial',
-					input: ({ context }) => required(context.observation).forms,
+					input: ({ context }) => ({
+						...required(context.observation).forms,
+						lease: context.lease
+					}),
 					onSnapshot: ({ event }, enq) => {
 						if (event.snapshot.status === 'done') return
 						const financial = selectFinanceFinancialReport(event.snapshot)

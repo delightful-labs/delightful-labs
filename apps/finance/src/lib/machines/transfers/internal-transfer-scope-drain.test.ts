@@ -374,6 +374,35 @@ describe('scoped transfer drain ownership', () => {
 		f.actor.send({ type: 'BIND_TRANSFER_SCOPE', scope: { ...f.scope, binding: {} } })
 		expect(f.actor.getSnapshot().matches({ running: { control: 'released' } })).toBe(true)
 	})
+	it('rejects retired lease requests and drain tokens with unchanged native binding and route generation', async () => {
+		const f = fixture(false)
+		const lease = {
+			scope: { binding: f.scope.binding, attachment: {} },
+			request: { workspaceId, attempt: 1 },
+			epoch: 2
+		}
+		const current = { ...f.scope, lease }
+		const retired = { ...f.scope, lease: { ...lease, epoch: 1 } }
+		f.actor.send({ type: 'BIND_TRANSFER_SCOPE', scope: current })
+		f.actor.send({
+			type: 'REQUEST_TRANSFER_MUTATION',
+			request: f.request('link', 'old-lease', retired)
+		})
+		f.actor.send({ type: 'DRAIN_TRANSFER_SCOPE', drain: f.drain(retired) })
+		expect(f.mutations).toHaveLength(1)
+		expect(f.reports).toMatchObject([{ outcome: 'rejected', reason: 'scopeMismatch' }])
+		expect(f.gates.link.invoked).not.toHaveBeenCalled()
+		f.actor.send({
+			type: 'REQUEST_TRANSFER_MUTATION',
+			request: f.request('link', 'current-lease', current)
+		})
+		await vi.waitFor(() => expect(f.gates.link.invoked).toHaveBeenCalledOnce())
+		f.gates.link.pending.resolve({ outcome: 'closed', settlement: 'notStarted' })
+		await idle(f)
+		f.actor.send({ type: 'DRAIN_TRANSFER_SCOPE', drain: f.drain(current) })
+		await vi.waitFor(() => expect(f.reports.at(-1)?.outcome).toBe('released'))
+	})
+
 	it('rejects old A requests and retired tokens after A → B → A', () => {
 		const f = fixture()
 		const oldRequest = f.request()

@@ -894,3 +894,32 @@ types and workspace dependency links. The targeted 161 cases and native 62-case
 run above retain their separate scope. Shared library runtime source is unchanged
 in this adoption slice; its full formatting check passes with the documentation
 example correction.
+
+## Finance command activation origin
+
+Financial transport commands now carry the originating native forms attachment
+revision and DLF lease epoch. Route/session revisions remain separate. Missing or
+retired activation facts cannot authorize a command after same-route revocation,
+regrant or same-binding forms reattachment. Window-owned ledger navigation and
+private backup/bank admission use the same correlation. Identity commands remain
+available without a financial lease. Native transfer requests retain the actual
+lease object, and request/cancel replies use the actor's unique native session ID
+instead of its reusable child name.
+
+The access owner retains already-known, matching local membership on same-binding
+forms retry; fresh native bindings and targets inherit no access. Real null/failure
+observations still withdraw admission. Parent tests cover repeated lease epochs
+across distinct attachments, refusal cleanup of owned file/secret capabilities,
+and retired native requests against the actual bound database.
+
+All 1,855 Finance unit tests across 139 files pass. Native qualification passes
+85 cases: 69 application/permission cases including pagination and transfers,
+12 worker cases across Chromium/Firefox/WebKit, and four cold/offline/unanswered-
+connection/later-rejection cases. The real-client activation regression compares
+old and fresh commands with the same current route metadata and verifies actual
+native archive calls and persisted rows. The sample-batch handoff test now checks
+that B stays blocked until A's held write settles and never displays A's progress;
+native row counts still prove the write was not retargeted. This corrects the sole
+Finance hosted failure on `209a2905`; Foundation and Clipper passed on that head.
+Source/Svelte/test types and scoped formatting pass. Clipper lease adoption and
+independent-replica qualification remain open.

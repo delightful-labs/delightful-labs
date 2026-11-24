@@ -20,6 +20,7 @@ type Input = {
 	binding: object
 	initialWorkspaces: WorkspaceAccessRows['workspaces']
 	initialProfile?: WorkspaceAccessRows['profile']
+	initialMembership?: WorkspaceAccessRows['membership']
 	reportDisposalFailure: () => void
 }
 const empty: WorkspaceAccessRows = {
@@ -54,6 +55,7 @@ export const financeWorkspaceAccessMachine = setup({
 		...input,
 		...empty,
 		profile: input.initialProfile,
+		membership: input.initialMembership,
 		workspaces: input.initialWorkspaces
 	}),
 	states: {

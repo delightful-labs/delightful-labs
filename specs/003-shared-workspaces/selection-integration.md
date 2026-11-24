@@ -377,3 +377,44 @@ route revocation/regrant can retain those revisions while changing the lease.
 Do not claim end-to-end retired-command protection until those delayed request
 origins are correlated with the current attachment and epoch. Keep identity-only
 commands independent of financial admission and preserve owned-payload refusal.
+
+## Delayed command activation identity
+
+Finance's worker selection envelope will optionally carry a bounded activation
+identity: a native forms-attachment revision and the shared selector's lease epoch.
+The native root owns the monotonically increasing attachment revision, advancing
+it only when it constructs a forms owner. This distinguishes reattachment even
+when native binding, route revision and the new selector's initial epoch repeat.
+The worker publishes these values from its actual admitted lease; incoming route
+selection cannot choose the native activation. No SDK handles cross the transport.
+
+Financial intent, private bank/backup/file admission and selected-content commands
+must match that originating activation as well as existing session/route scope.
+Missing or retired activation is refused before effects or secret/file preparation;
+already-owned payloads retain their existing release paths. Identity/profile,
+workspace creation, target selection and initialization retry keep their independent
+identity-bound protocol. Same-workspace read changes retain the lease epoch;
+revocation/regrant and native reattachment do not revive old packets.
+
+The UI keeps the activation embedded in the view's immutable selection envelope
+when constructing commands. It must not substitute the latest activation for an
+old callback's supplied scope. Native transfer requests likewise retain their
+originating lease, not merely the UI route generation, through request and drain
+correlation. Tests must prove refusal after same-route revocation/regrant and
+same-binding forms reattachment, accepted fresh commands, independent identity
+controls, malformed packet refusal and exactly-once owned-payload release.
+
+
+The public activation comparison is also used before Window-only URL filter
+navigation, preserving the caller's supplied scope rather than reading a new one.
+Transfer request identities use the framework's actor-session identity, so repeated
+child names cannot reuse request/cancellation identifiers across invocations.
+Native transfer scopes carry the exact lease supplied as immutable financial-owner
+input. Root admission, the financial controller, request owner and drain matching
+all retain that original lease; scope comparison has one app-owned pure helper.
+
+A same-binding initialization retry retains its already observed local membership
+while restarting the access source. The source's initial loading snapshot is not
+new denial evidence. Actual absence or failure still withdraws that knowledge;
+new native bindings and targets do not inherit it. This avoids constructing and
+immediately draining an unnecessary first lease during controller reattachment.

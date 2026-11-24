@@ -1,3 +1,4 @@
+import { sameWorkerWorkspaceActivation } from '../../contracts/worker-scope.js'
 import type { WorkspaceLease } from 'delightful-local-first/workspace/contracts'
 import { createOrderedSignOutMachine } from 'delightful-local-first/session/sign-out/workflow'
 import {
@@ -173,6 +174,7 @@ type Context = Input & {
 				observer: ActorRef<Snapshot<unknown>, never>
 		  }
 		| undefined
+	formsAttachmentRevision: number
 	formsView: ReturnType<typeof selectFinanceFormsView> | undefined
 	readBinding: object | undefined
 	sessionStatus: SessionRuntimeView['status']
@@ -274,6 +276,9 @@ function formsObservation(context: Context): FinanceFormsObservation {
 		tags: context.facts?.tags ?? []
 	}
 	return {
+		workspaceLease: context.forms
+			? selectFinanceFormsLease(context.forms.owner.getSnapshot())
+			: undefined,
 		sampleSelectedAccounts: context.selectedAccountIds,
 		bank: {
 			organizationId: creation.organizationId,
@@ -414,6 +419,26 @@ function sameCommandScope(context: Context, scope: WorkerCommandScope) {
 		scope.sessionRevision === context.sessionRevision &&
 		scope.selection.revision === context.selection.revision &&
 		scope.selection.workspaceId === context.selection.workspaceId
+	)
+}
+
+/** The fixed worker transport owns attachment revisions; DLF owns each lease epoch. */
+function currentWorkspaceActivation(context: Context) {
+	const lease = context.forms
+		? selectFinanceFormsLease(context.forms.owner.getSnapshot())
+		: undefined
+	return lease &&
+		context.ready?.binding === lease.scope.binding &&
+		context.selection.workspaceId === lease.request.workspaceId
+		? { attachment: context.formsAttachmentRevision, epoch: lease.epoch }
+		: undefined
+}
+function sameFinancialCommandScope(context: Context, scope: WorkerCommandScope) {
+	const current = currentWorkspaceActivation(context)
+	return (
+		sameCommandScope(context, scope) &&
+		current !== undefined &&
+		sameWorkerWorkspaceActivation({ ...context.selection, activation: current }, scope.selection)
 	)
 }
 
@@ -595,6 +620,7 @@ export function createFinanceWorkerMachine({
 			accessBinding: {},
 			forms: undefined,
 			formsView: undefined,
+			formsAttachmentRevision: 0,
 			readBinding: undefined,
 			sessionStatus: 'starting'
 		}),
@@ -710,7 +736,15 @@ export function createFinanceWorkerMachine({
 			START_BACKUP: ({ event }, enq) => enq(() => event.submission.release()),
 			START_WORKSPACE_RESTORE: ({ event }, enq) => enq(() => event.request.release()),
 			TRANSFER_MUTATION_REQUEST: ({ context, event }, enq) => {
-				if (context.forms && context.forms.binding === context.ready?.binding) {
+				const lease = context.forms
+					? selectFinanceFormsLease(context.forms.owner.getSnapshot())
+					: undefined
+				if (
+					lease &&
+					context.forms &&
+					context.forms.binding === context.ready?.binding &&
+					event.request.scope?.lease === lease
+				) {
 					enq.sendTo(context.forms.owner, event)
 				} else
 					enq(() =>
@@ -989,7 +1023,10 @@ export function createFinanceWorkerMachine({
 							: undefined
 						const next = {
 							...context,
-							selection: event.selection,
+							selection: {
+								workspaceId: event.selection.workspaceId,
+								revision: event.selection.revision
+							},
 							overviewFilters:
 								event.selection.workspaceId === context.selection.workspaceId
 									? context.overviewFilters
@@ -1074,7 +1111,7 @@ export function createFinanceWorkerMachine({
 					},
 					OPEN_TRANSACTION: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.route ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding ||
@@ -1106,7 +1143,7 @@ export function createFinanceWorkerMachine({
 					},
 					SET_ACCOUNT_SELECTED: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.facts?.accounts?.some(
 								(account) => account.id === event.accountId && !account.archivedAt
 							)
@@ -1138,7 +1175,7 @@ export function createFinanceWorkerMachine({
 						}
 					},
 					SET_ALL_ACCOUNTS_SELECTED: ({ context, event }, enq) => {
-						if (!sameCommandScope(context, event) || !context.facts?.accounts) return
+						if (!sameFinancialCommandScope(context, event) || !context.facts?.accounts) return
 						if (
 							context.route &&
 							context.forms &&
@@ -1155,7 +1192,7 @@ export function createFinanceWorkerMachine({
 						return { context: { selectedAccountIds: event.checked ? null : [], ledgerPage: 1 } }
 					},
 					SET_LEDGER_PAGE: ({ context, event }, enq) => {
-						if (!sameCommandScope(context, event)) return
+						if (!sameFinancialCommandScope(context, event)) return
 						if (context.route && context.forms) {
 							enq.sendTo(context.forms.owner, {
 								type: 'NAVIGATE',
@@ -1170,12 +1207,12 @@ export function createFinanceWorkerMachine({
 						return { context: { ledgerPage: event.page } }
 					},
 					SET_LEDGER_FILTERS: ({ context, event }) => {
-						if (!sameCommandScope(context, event)) return
+						if (!sameFinancialCommandScope(context, event)) return
 						if (context.route) return
 						return { context: { ledgerFilters: event.filters, ledgerPage: 1 } }
 					},
 					SET_OVERVIEW_FILTERS: ({ context, event }, enq) => {
-						if (!sameCommandScope(context, event)) return
+						if (!sameFinancialCommandScope(context, event)) return
 						if (
 							context.overviewFilters &&
 							Object.entries(event.filters).every(
@@ -1196,7 +1233,7 @@ export function createFinanceWorkerMachine({
 					},
 					SET_ACCOUNT_DELETE_GRANT: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1210,7 +1247,7 @@ export function createFinanceWorkerMachine({
 					},
 					START_BACKUP: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						) {
@@ -1221,7 +1258,7 @@ export function createFinanceWorkerMachine({
 					},
 					START_WORKSPACE_RESTORE: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						) {
@@ -1235,7 +1272,7 @@ export function createFinanceWorkerMachine({
 					},
 					BACKUP_COMMAND: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1244,7 +1281,7 @@ export function createFinanceWorkerMachine({
 					},
 					WORKSPACE_RESTORE_COMMAND: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1278,7 +1315,7 @@ export function createFinanceWorkerMachine({
 					},
 					WORKSPACE_SETTINGS: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1287,7 +1324,7 @@ export function createFinanceWorkerMachine({
 					},
 					CLASSIFICATION: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1300,7 +1337,7 @@ export function createFinanceWorkerMachine({
 					},
 					ACCOUNT_ORDER: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1309,7 +1346,7 @@ export function createFinanceWorkerMachine({
 					},
 					ACCOUNT_CREATION: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1317,7 +1354,7 @@ export function createFinanceWorkerMachine({
 						enq.sendTo(context.forms.owner, { type: 'ACCOUNT_CREATION', command: event.command })
 					},
 					ADD_SAMPLES: ({ context, event }, enq) => {
-						if (debugEnabled && sameCommandScope(context, event) && context.forms)
+						if (debugEnabled && sameFinancialCommandScope(context, event) && context.forms)
 							enq.sendTo(context.forms.owner, { type: 'ADD_SAMPLES', kind: event.kind })
 					},
 					RETRY_INITIALIZATION: ({ context, event }, enq) => {
@@ -1331,16 +1368,16 @@ export function createFinanceWorkerMachine({
 						return { target: '#finance-worker.retiringForms', context: { formsView: undefined } }
 					},
 					RETRY_INTEGRITY: ({ context, event }, enq) => {
-						if (sameCommandScope(context, event) && context.forms)
+						if (sameFinancialCommandScope(context, event) && context.forms)
 							enq.sendTo(context.forms.owner, { type: 'RETRY_INTEGRITY' })
 					},
 					DISMISS_MUTATION_NOTICE: ({ context, event }, enq) => {
-						if (sameCommandScope(context, event) && context.forms)
+						if (sameFinancialCommandScope(context, event) && context.forms)
 							enq.sendTo(context.forms.owner, { type: 'DISMISS_MUTATION_NOTICE' })
 					},
 					BANK_HISTORY: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1349,7 +1386,7 @@ export function createFinanceWorkerMachine({
 					},
 					BANK: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1358,7 +1395,7 @@ export function createFinanceWorkerMachine({
 					},
 					TRANSACTION_IMAGE: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1367,7 +1404,7 @@ export function createFinanceWorkerMachine({
 					},
 					TRANSFER_EDIT: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1376,7 +1413,7 @@ export function createFinanceWorkerMachine({
 					},
 					TRANSFER_ENTRY: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1385,7 +1422,7 @@ export function createFinanceWorkerMachine({
 					},
 					TRANSACTION_EDIT: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1394,7 +1431,7 @@ export function createFinanceWorkerMachine({
 					},
 					TRANSACTION_ENTRY: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1403,7 +1440,7 @@ export function createFinanceWorkerMachine({
 					},
 					ARCHIVE_ACCOUNT: ({ context, event }, enq) => {
 						if (
-							!sameCommandScope(context, event) ||
+							!sameFinancialCommandScope(context, event) ||
 							!context.forms ||
 							context.forms.binding !== context.ready?.binding
 						)
@@ -1416,6 +1453,10 @@ export function createFinanceWorkerMachine({
 					ready: {
 						entry: ({ context, self }, enq) => {
 							if (!context.ready || context.forms) return
+							if (context.formsAttachmentRevision >= Number.MAX_SAFE_INTEGER) {
+								enq.raise({ type: 'NATIVE_FAILED' })
+								return
+							}
 							const binding = context.ready.binding
 							const owner = enq.spawn(
 								context.ready.capabilities.createForms(
@@ -1445,7 +1486,13 @@ export function createFinanceWorkerMachine({
 								done: (): FormsReport => ({ type: 'FORMS_CLOSED', binding }),
 								error: (): FormsReport => ({ type: 'FORMS_FAILED', binding })
 							})
-							return { context: { forms: { binding, owner, observer }, formsView: undefined } }
+							return {
+								context: {
+									forms: { binding, owner, observer },
+									formsView: undefined,
+									formsAttachmentRevision: context.formsAttachmentRevision + 1
+								}
+							}
 						},
 						initial: 'reading',
 						on: {
@@ -1485,6 +1532,12 @@ export function createFinanceWorkerMachine({
 								binding: context.accessBinding,
 								initialWorkspaces: context.facts?.workspaces ?? null,
 								initialProfile: context.facts?.profile,
+								initialMembership:
+									context.accessFacts?.status === 'observing' &&
+									context.accessFacts.binding === context.accessBinding &&
+									context.accessFacts.membership?.organizationId === context.selection.workspaceId
+										? context.accessFacts.membership
+										: undefined,
 								reportDisposalFailure: () => self.send({ type: 'READ_DISPOSAL_FAILED' })
 							}),
 							onSnapshot: ({ context, event }, enq) => {
@@ -2086,7 +2139,7 @@ export function selectFinanceWorkerView(
 		sessionRevision: context.sessionRevision,
 		transactionKind: context.transactionKind,
 		transactionId: context.transactionId,
-		selection: context.selection,
+		selection: { ...context.selection, activation: currentWorkspaceActivation(context) },
 		status,
 		identityRestore: {
 			canSubmit: selectFinanceRestorationAdmission(snapshot, context.sessionRevision) !== undefined,
@@ -2459,7 +2512,7 @@ export function selectFinanceBackupAdmission(
 ) {
 	if (
 		!snapshot?.matches('running') ||
-		!sameCommandScope(snapshot.context, scope) ||
+		!sameFinancialCommandScope(snapshot.context, scope) ||
 		!snapshot.context.ready ||
 		snapshot.context.forms?.binding !== snapshot.context.ready.binding
 	)
@@ -2474,7 +2527,7 @@ export function selectFinanceBankAdmission(
 ) {
 	return snapshot?.status === 'active' &&
 		snapshot.matches('running') &&
-		sameCommandScope(snapshot.context, scope) &&
+		sameFinancialCommandScope(snapshot.context, scope) &&
 		snapshot.context.forms?.binding === snapshot.context.ready?.binding
 		? snapshot.context.forms?.owner
 		: undefined

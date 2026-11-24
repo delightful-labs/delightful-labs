@@ -63,14 +63,14 @@ export function createTransferMutationRequestMachine(gateway: TransferMutationGa
 				self
 			}: {
 				context: Context
-				self: { id: string; send: (event: TransferMutationResponse) => void }
+				self: { send: (event: TransferMutationResponse) => void }
 			}) => {
 				const recipient: TransferMutationRecipient = {
 					send: (event) => self.send(event)
 				}
 				gateway.send({
 					type: 'TRANSFER_MUTATION_REQUEST',
-					request: { ...context.request, requestId: self.id, recipient }
+					request: { ...context.request, requestId: context.requestId, recipient }
 				})
 			},
 			cancel: ({ context }: { context: Context }) =>
@@ -86,7 +86,7 @@ export function createTransferMutationRequestMachine(gateway: TransferMutationGa
 			const scope = input.scope ?? gateway.captureScope?.(input)
 			return {
 				request: scope ? { ...input, scope: Object.freeze({ ...scope }) } : { ...input },
-				requestId: self.id,
+				requestId: required(self.sessionId),
 				result: undefined
 			}
 		},
