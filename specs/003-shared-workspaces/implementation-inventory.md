@@ -648,3 +648,39 @@ No retries, longer timeouts or weakened assertions were required. The shared DLF
 implementation is unchanged in this slice. Its previously qualified observation
 factory remains the subscription/disposal owner for both app consumers. New-head
 hosted checks remain separate from these local results.
+
+## Finance access/content observation lifetimes
+
+The user's instruction to continue through the night, including tests, authorizes
+implementation and qualification for the remaining PR work. It supersedes the
+per-slice test-review pause for this task; commit/PR tracking authorization remains
+in force. This does not authorize merging or production deployment.
+
+The application ready state now invokes access observations outside its nested
+financial reading/read-failed states. The financial query owner contains only
+its eleven content subscriptions. A pure projection combines their facts with
+the access owner's public facts; subscription and disposal behavior still comes
+from the existing shared DLF implementation.
+
+Same-workspace route changes restart only financial reads through a private
+self-coordination event. Workspace/native replacement establishes a new access
+binding as well as a new read binding. Explicit retry, restoration settlement,
+cancelled restoration and sign-out continuation also establish fresh access
+attachments, including when the SDK returns the same identity binding. Financial
+read failure releases financial subscriptions and retains live access observations.
+Read/construction/crash failures withdraw affected command admission; teardown
+failure still prevents clean native release.
+
+The existing worker suite now has 104 passing cases, adding real ownership checks
+for retained access through content changes and live access after financial read
+failure. The same-binding failed-restoration test also rejects an old access token
+against the reopened observer. The 49 workspace/permission/form browser cases
+passed. Four cold/native startup cases also passed: offline restart, cold open
+but unanswered connection, an established connection becoming unanswered and
+real later authority rejection after local persistence. The final source and
+test-fixture type checks passed with zero Svelte errors/warnings; formatting and
+whitespace checks passed. Hosted qualification must be checked for the new head.
+
+The session-bound forms owner is unchanged. Financial operation drain/identity
+controller separation and actual DLF workspace lease adoption remain required;
+this observation-lifetime prerequisite does not claim those are complete.

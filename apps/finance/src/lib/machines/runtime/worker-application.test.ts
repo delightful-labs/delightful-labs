@@ -2097,6 +2097,59 @@ describe('Finance worker ownership and selected accounts', () => {
 			}
 		}
 	)
+
+	it('retains access observations when same-workspace content reads change', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			const directory = last(f.directory),
+				membership = last(f.memberships),
+				query = last(f.queries)
+			const count = f.directory.length
+			const accessBinding = f.actor.getSnapshot().context.accessBinding
+			f.selectKind('income', 2)
+			expect(f.directory).toHaveLength(count)
+			expect(last(f.memberships)).toBe(membership)
+			expect(directory.release).not.toHaveBeenCalled()
+			expect(query.release).toHaveBeenCalledOnce()
+			expect(f.actor.getSnapshot().context.accessBinding).toBe(accessBinding)
+			directory.publish([{ id: a, name: 'Current A' }])
+			membership.publish(null)
+			expect(f.actor.getSnapshot().context.facts).toMatchObject({
+				workspaces: [{ name: 'Current A' }],
+				membership: null
+			})
+			f.select(b, 3)
+			expect(directory.release).toHaveBeenCalledOnce()
+			expect(f.actor.getSnapshot().context.accessBinding).not.toBe(accessBinding)
+		} finally {
+			f.stop()
+		}
+	})
+	it('keeps access observations live after financial read failure while content remains withdrawn', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			const directory = last(f.directory),
+				membership = last(f.memberships),
+				query = last(f.queries)
+			query.publish([row('Visible')])
+			query.failed()
+			expect(f.view().status).toBe('failed')
+			expect(directory.release).not.toHaveBeenCalled()
+			directory.publish([{ id: b, name: 'New directory evidence' }])
+			membership.publish(null)
+			query.publish([row('Retired')])
+			expect(f.view()).toMatchObject({ status: 'failed', accounts: [], workspaces: [{ id: b }] })
+			expect(f.actor.getSnapshot().context.facts?.membership).toBeNull()
+			expect(query.release).toHaveBeenCalledOnce()
+			expect(f.createWrite).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
 	it('withdraws a failed read and supports a new selected query without replaying any write', async () => {
 		const f = fixture()
 		try {
@@ -2664,10 +2717,16 @@ describe('worker restoration and financial drain', () => {
 		try {
 			await f.start()
 			const previous = f.actor.getSnapshot().context.forms?.owner
+			const accessBinding = f.actor.getSnapshot().context.accessBinding
 			const r = restoreFixture(f)
 			await waitFor(r.actor, (s) => s.status === 'done')
 			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
 			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
+			expect(f.actor.getSnapshot().context.accessBinding).not.toBe(accessBinding)
+			f.actor
+				.getSnapshot()
+				.children.workspaceAccess?.send({ type: 'READ_FAILED', binding: accessBinding })
+			expect(f.actor.getSnapshot().context.accessFacts?.status).toBe('observing')
 			expect(f.view().identityRestore).toMatchObject({ busy: false, feedback: 'sessionFailed' })
 			expect(f.changeIdentity).toHaveBeenCalledOnce()
 			f.actor.send({

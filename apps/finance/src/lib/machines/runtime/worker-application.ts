@@ -94,8 +94,16 @@ import { defaultTransactionCategory } from '../../validation/transactions.js'
 import {
 	financeQueriesMachine,
 	selectFinanceQueryFacts,
+	combineFinanceQueryFacts,
+	emptyFinanceContentFacts,
+	type FinanceContentFacts,
 	type FinanceQueryFacts
 } from './worker-queries.js'
+import {
+	financeWorkspaceAccessMachine,
+	selectFinanceWorkspaceAccessFacts,
+	type WorkspaceAccessFacts
+} from './worker-workspace-access.js'
 
 type Ready = Extract<SessionRuntimeObservation<FinanceWorkerCapabilities>, { status: 'ready' }>
 type FormsReport =
@@ -150,6 +158,9 @@ type Context = Input & {
 	ledgerFilters: TransactionListFilters
 	sessionRevision: number
 	facts: FinanceQueryFacts | undefined
+	contentFacts: FinanceContentFacts | undefined
+	accessFacts: WorkspaceAccessFacts | undefined
+	accessBinding: object
 	forms:
 		| {
 				binding: object
@@ -402,7 +413,7 @@ export function createFinanceWorkerMachine({
 }: {
 	observeForms: () => FinanceFormsObservation
 }) {
-	const withdrawn = { facts: undefined }
+	const withdrawn = { facts: undefined, contentFacts: undefined, accessFacts: undefined }
 	return setup({
 		schemas: {
 			input: types<Input>(),
@@ -501,10 +512,12 @@ export function createFinanceWorkerMachine({
 				NATIVE_FAILED: types(),
 				READ_DISPOSAL_FAILED: types()
 			},
+			internalEvents: { RESTART_FINANCIAL_READS: types() },
 			children: {
 				oauth: types<ActorRefFrom<typeof financeAtprotoMachine>>(),
 				sessionObservation: types<ActorRefFrom<typeof observeSession>>(),
 				queries: types<ActorRefFrom<typeof financeQueriesMachine>>(),
+				workspaceAccess: types<ActorRefFrom<typeof financeWorkspaceAccessMachine>>(),
 				forms: types<ActorRefFrom<ReturnType<typeof createFinanceFormsMachine>>>()
 			}
 		},
@@ -514,6 +527,7 @@ export function createFinanceWorkerMachine({
 			signOut: financeSignOutMachine,
 			observeSession,
 			queries: financeQueriesMachine,
+			workspaceAccess: financeWorkspaceAccessMachine,
 			closeSession: sessionCloseMachine,
 			retrySession: createSessionChangeMachine<SessionRuntimeChangeInput>((input) => input),
 			closeStore,
@@ -549,6 +563,9 @@ export function createFinanceWorkerMachine({
 			ledgerFilters: emptyLedgerFilters,
 			sessionRevision: 0,
 			facts: undefined,
+			contentFacts: undefined,
+			accessFacts: undefined,
+			accessBinding: {},
 			forms: undefined,
 			formsView: undefined,
 			readBinding: undefined,
@@ -911,6 +928,7 @@ export function createFinanceWorkerMachine({
 							ready,
 							...withdrawn,
 							readBinding: {},
+							accessBinding: {},
 							sessionRevision: context.sessionRevision + 1,
 							overviewFilters: undefined,
 							...transactionContextForRoute(context.route),
@@ -923,7 +941,7 @@ export function createFinanceWorkerMachine({
 						}
 						return { target: '.ready', reenter: true, context: next }
 					},
-					SELECT_CONTEXT: ({ context, event }, enq) => {
+					SELECT_CONTEXT: ({ context, event, value }, enq) => {
 						if (event.selection.revision <= context.selection.revision) return
 						const retainReads =
 							context.route !== undefined &&
@@ -932,6 +950,10 @@ export function createFinanceWorkerMachine({
 							event.selection.workspaceId === context.selection.workspaceId &&
 							event.kind === context.transactionKind &&
 							(event.transactionId ?? null) === context.transactionId
+						const retainAccess =
+							matchesState({ running: 'ready' }, value) &&
+							event.selection.workspaceId === context.selection.workspaceId &&
+							context.accessFacts?.status !== 'failed'
 						const readBinding = retainReads ? required(context.readBinding) : {}
 						const location = context.route
 							? transactionListLocation(context.route.search)
@@ -957,6 +979,9 @@ export function createFinanceWorkerMachine({
 									? context.ledgerPage
 									: 1),
 							readBinding,
+							accessBinding: retainAccess ? context.accessBinding : {},
+							accessFacts: retainAccess ? context.accessFacts : undefined,
+							contentFacts: retainReads ? context.contentFacts : undefined,
 							facts: retainReads
 								? context.facts
 								: context.facts
@@ -969,9 +994,9 @@ export function createFinanceWorkerMachine({
 											transfers: null,
 											workspaceMembers: null,
 											accountGrants: null,
-											workspace: undefined,
+											workspace: retainAccess ? context.accessFacts?.workspace : undefined,
 											accounts: null,
-											membership: undefined,
+											membership: retainAccess ? context.accessFacts?.membership : undefined,
 											grants: null,
 											categories: null,
 											tags: null,
@@ -987,6 +1012,10 @@ export function createFinanceWorkerMachine({
 								selectionRevision: next.selection.revision
 							})
 						if (retainReads) return { context: next }
+						if (retainAccess) {
+							enq.raise({ type: 'RESTART_FINANCIAL_READS' })
+							return { context: { ...next, formsView: undefined } }
+						}
 						return {
 							target: context.ready ? '.ready' : '.waiting',
 							reenter: true,
@@ -1390,45 +1419,123 @@ export function createFinanceWorkerMachine({
 							})
 							return { context: { forms: { binding, owner, observer }, formsView: undefined } }
 						},
+						initial: 'reading',
+						on: { RESTART_FINANCIAL_READS: { target: '.reading' } },
 						invoke: {
-							id: 'queries',
-							src: 'queries',
+							id: 'workspaceAccess',
+							src: 'workspaceAccess',
 							input: ({ context, self }) => ({
 								ready: required(context.ready),
+								workspaceId: context.selection.workspaceId,
+								binding: context.accessBinding,
 								initialWorkspaces: context.facts?.workspaces ?? null,
-								// Route reads share the identity. Retain its profile while subscriptions restart.
 								initialProfile: context.facts?.profile,
-								selection: context.selection,
-								transactionId: context.transactionId,
-								binding: required(context.readBinding),
 								reportDisposalFailure: () => self.send({ type: 'READ_DISPOSAL_FAILED' })
 							}),
 							onSnapshot: ({ context, event }, enq) => {
-								const facts = selectFinanceQueryFacts(event.snapshot)
-								if (facts.binding !== context.readBinding) return
-								const next = { ...context, facts }
+								const accessFacts = selectFinanceWorkspaceAccessFacts(event.snapshot)
+								if (accessFacts.binding !== context.accessBinding) return
+								const contentFacts =
+									accessFacts.status === 'failed'
+										? emptyFinanceContentFacts(required(context.readBinding), 'failed')
+										: (context.contentFacts ??
+											emptyFinanceContentFacts(required(context.readBinding)))
+								const facts = combineFinanceQueryFacts(contentFacts, accessFacts)
 								if (context.forms)
 									enq.sendTo(context.forms.owner, {
 										type: 'OBSERVE',
-										observation: formsObservation(next),
+										observation: formsObservation({ ...context, facts, accessFacts }),
 										selectionRevision: context.selection.revision
 									})
-								return facts.status === 'failed'
-									? { target: 'readFailed', context: { facts } }
-									: { context: { facts } }
+								return accessFacts.status === 'failed'
+									? { target: '.readFailed', context: { accessFacts, contentFacts, facts } }
+									: { context: { accessFacts, facts } }
 							},
-							onError: { target: 'readFailed', context: withdrawn }
-						}
-					},
-					readFailed: {
-						on: {
-							RETRY_WORKSPACE_NAVIGATION: ({ context, event }) =>
-								sameCommandScope(context, event) && context.route && context.ready
-									? {
-											target: 'ready',
-											context: { facts: undefined, readBinding: {}, formsView: undefined }
-										}
-									: undefined
+							onError: ({ context }, enq) => {
+								const accessFacts: WorkspaceAccessFacts = {
+									binding: context.accessBinding,
+									status: 'failed',
+									profile: undefined,
+									workspace: undefined,
+									workspaces: null,
+									membership: undefined
+								}
+								const contentFacts = emptyFinanceContentFacts(
+									required(context.readBinding),
+									'failed'
+								)
+								const facts = combineFinanceQueryFacts(contentFacts, accessFacts)
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										observation: formsObservation({ ...context, facts, accessFacts }),
+										selectionRevision: context.selection.revision
+									})
+								return { target: '.readFailed', context: { facts, contentFacts, accessFacts } }
+							}
+						},
+						states: {
+							reading: {
+								invoke: {
+									id: 'queries',
+									src: 'queries',
+									input: ({ context, self }) => ({
+										ready: required(context.ready),
+										selection: context.selection,
+										transactionId: context.transactionId,
+										binding: required(context.readBinding),
+										reportDisposalFailure: () => self.send({ type: 'READ_DISPOSAL_FAILED' })
+									}),
+									onSnapshot: ({ context, event }, enq) => {
+										const contentFacts = selectFinanceQueryFacts(event.snapshot)
+										const facts = combineFinanceQueryFacts(contentFacts, context.accessFacts)
+										if (facts.binding !== context.readBinding) return
+										const next = { ...context, facts }
+										if (context.forms)
+											enq.sendTo(context.forms.owner, {
+												type: 'OBSERVE',
+												observation: formsObservation(next),
+												selectionRevision: context.selection.revision
+											})
+										return facts.status === 'failed'
+											? { target: 'readFailed', context: { facts, contentFacts } }
+											: { context: { facts, contentFacts } }
+									},
+									onError: ({ context }, enq) => {
+										const contentFacts = emptyFinanceContentFacts(
+											required(context.readBinding),
+											'failed'
+										)
+										const facts = combineFinanceQueryFacts(contentFacts, context.accessFacts)
+										if (context.forms)
+											enq.sendTo(context.forms.owner, {
+												type: 'OBSERVE',
+												observation: formsObservation({ ...context, facts }),
+												selectionRevision: context.selection.revision
+											})
+										return { target: 'readFailed', context: { contentFacts, facts } }
+									}
+								}
+							},
+							readFailed: {
+								on: {
+									RETRY_WORKSPACE_NAVIGATION: ({ context, event }) =>
+										sameCommandScope(context, event) && context.route && context.ready
+											? {
+													target: '#finance-worker.running.ready',
+													reenter: true,
+													context: {
+														facts: undefined,
+														contentFacts: undefined,
+														accessFacts: undefined,
+														accessBinding: {},
+														readBinding: {},
+														formsView: undefined
+													}
+												}
+											: undefined
+								}
+							}
 						}
 					}
 				}
@@ -1522,6 +1629,9 @@ export function createFinanceWorkerMachine({
 											? view.observation.binding
 											: undefined,
 									readBinding: {},
+									accessBinding: {},
+									accessFacts: undefined,
+									contentFacts: undefined,
 									restoration: undefined,
 									settledRestoration: undefined,
 									restorationOutcome: settled.result.outcome,
@@ -1566,6 +1676,9 @@ export function createFinanceWorkerMachine({
 								...withdrawn,
 								formsView: undefined,
 								readBinding: {},
+								accessBinding: {},
+								accessFacts: undefined,
+								contentFacts: undefined,
 								sessionRevision:
 									ready && ready.binding !== context.ready?.binding
 										? context.sessionRevision + 1
@@ -1736,6 +1849,9 @@ export function createFinanceWorkerMachine({
 							sessionRevision: context.sessionRevision + 1,
 							signOutRequest: undefined,
 							readBinding: {},
+							accessBinding: {},
+							accessFacts: undefined,
+							contentFacts: undefined,
 							facts: undefined,
 							formsView: undefined,
 							selectedAccountIds: null,
@@ -1879,7 +1995,7 @@ export function selectFinanceWorkerView(
 			  snapshot.matches('drainFailed') ||
 			  snapshot.matches('closeFailed') ||
 			  snapshot.matches('providerNavigationFailed') ||
-			  snapshot.matches({ running: 'readFailed' })
+			  snapshot.matches({ running: { ready: 'readFailed' } })
 			? 'failed'
 			: snapshot.matches('draining') ||
 				  snapshot.matches('closingSession') ||

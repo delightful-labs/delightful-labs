@@ -155,3 +155,48 @@ replicas, same-workspace navigation, repeated/reordered selections, A → B → 
 access revocation, unanswered connections, later permission rejection, pending
 local writes, native binding replacement and failed/unknown drain. Shared helper
 tests alone cannot establish native resource or authorization correctness.
+
+## Access/content lifetime split
+
+The user's overnight instruction explicitly authorizes continued implementation
+and tests for this PR. Keep scoped commits and native qualification; no new
+review pause is needed between these already-authorized implementation/test slices.
+
+The next batch changes `worker-queries.ts`, `worker-application.ts` and their
+existing worker tests. The application ready state owns the access observer for
+one native binding/target. Its nested reading state owns financial content
+subscriptions. Same-workspace route changes reenter only reading; target or native
+replacement reenters the access owner too. An independent access binding rejects
+retired access reports while content read bindings continue to track route reads.
+
+Financial read failure enters the nested read-failed state and releases content
+subscriptions while retaining access observations. Access construction/read
+failure withdraws financial content and remains observable as failed until an
+explicit retry or replacement. Access and financial facts compose through a pure
+app projection; no second subscription lifecycle or permission algorithm is added.
+The existing forms owner remains identity-bound during this prerequisite. Its
+actual financial drain split follows; this batch does not claim lease adoption.
+
+## Identity controller extraction
+
+After the observation lifetime split is qualified, extract the existing
+startup/seed, profile-name/avatar, workspace-creation and navigation children into
+`worker-identity-controls.ts`. `worker-forms.ts` retains the financial children
+and composes the identity owner's public facts, forwarding existing typed
+commands. Its existing combined public view remains the compatibility boundary
+until the production application owns both groups independently.
+
+The identity owner keeps one admitted native binding, current profile/navigation
+facts and existing child reports. Its states are active, closing, failed and
+closed. It forwards profile/directory/navigation observations while active;
+startup provenance alone triggers optional seed admission. Shutdown sends each
+existing child its supported drain command and waits for that child's actual
+terminal result. Unresolved startup/seed settlement, unexpected completion or a
+child crash fails the owner instead of reporting clean closure. Initialization
+results reach the financial integrity owner through a public observation boundary.
+
+Keep existing form schema validation, profile observation identity checks,
+workspace-creation binding and navigation generations. This extraction does not
+create new authorization policy, rewrite domain operations, or add a second SDK
+owner. It prepares the same financial group for the existing DLF selector's lease
+and drain contract while identity controls remain available independently.

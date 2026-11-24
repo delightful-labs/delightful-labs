@@ -4,7 +4,6 @@ import type { workerWorkspaceMember, workerAccountGrant } from '../../contracts/
 import { setup, types, type SnapshotFrom } from 'xstate'
 import type {
 	WorkerSelection,
-	WorkerWorkspace,
 	WorkerAccountRecord,
 	WorkerLedgerRecord
 } from '../../contracts/worker-application.js'
@@ -17,16 +16,10 @@ import {
 	observeFinanceQuery as observeQuery,
 	type FinanceWorkerReady
 } from './worker-query-observation.js'
-import {
-	financeWorkspaceAccessMachine,
-	selectFinanceWorkspaceAccessFacts,
-	type WorkspaceAccessRows
-} from './worker-workspace-access.js'
+import type { WorkspaceAccessRows, WorkspaceAccessFacts } from './worker-workspace-access.js'
 export type { FinanceWorkerReady } from './worker-query-observation.js'
 type Input = {
 	ready: FinanceWorkerReady
-	initialWorkspaces: WorkerWorkspace[] | null
-	initialProfile?: WorkspaceAccessRows['profile']
 	transactionId: string | null
 	selection: WorkerSelection
 	binding: object
@@ -38,18 +31,14 @@ const empty = {
 	transfers: null,
 	workspaceMembers: null,
 	accountGrants: null,
-	profile: undefined,
-	workspace: undefined,
-	workspaces: null,
 	accounts: null,
-	membership: undefined,
 	grants: null,
 	categories: null,
 	tags: null,
 	transaction: undefined,
 	transactions: null
 }
-type Rows = WorkspaceAccessRows & {
+type Rows = {
 	bankConnections: BankSource['connections'] | null
 	bankLinks: BankSource['links'] | null
 	transfers: WorkerTransferRecord[] | null
@@ -62,7 +51,8 @@ type Rows = WorkspaceAccessRows & {
 	transaction: TransactionEntryObservation['transaction']
 	transactions: WorkerLedgerRecord[] | null
 }
-export type FinanceQueryFacts = Rows & { binding: object; status: 'loading' | 'ready' | 'failed' }
+export type FinanceContentFacts = Rows & { binding: object; status: 'loading' | 'ready' | 'failed' }
+export type FinanceQueryFacts = FinanceContentFacts & WorkspaceAccessRows
 
 const bankConnections = observeQuery<Rows['bankConnections']>('BANK_CONNECTIONS')
 const bankLinks = observeQuery<Rows['bankLinks']>('BANK_LINKS')
@@ -96,7 +86,6 @@ export const financeQueriesMachine = setup({
 		}
 	},
 	actors: {
-		workspaceAccess: financeWorkspaceAccessMachine,
 		bankConnections,
 		bankLinks,
 		transfers,
@@ -112,41 +101,10 @@ export const financeQueriesMachine = setup({
 }).createMachine({
 	id: 'finance-queries',
 	initial: 'running',
-	context: ({ input }) => ({
-		...input,
-		...empty,
-		workspaces: input.initialWorkspaces,
-		profile: input.initialProfile
-	}),
+	context: ({ input }) => ({ ...input, ...empty }),
 	states: {
 		running: {
 			invoke: [
-				{
-					id: 'workspaceAccess',
-					src: 'workspaceAccess',
-					input: ({ context }) => ({
-						ready: context.ready,
-						workspaceId: context.selection.workspaceId,
-						binding: context.binding,
-						initialWorkspaces: context.initialWorkspaces,
-						initialProfile: context.initialProfile,
-						reportDisposalFailure: context.reportDisposalFailure
-					}),
-					onSnapshot: ({ context, event }) => {
-						const facts = selectFinanceWorkspaceAccessFacts(event.snapshot)
-						if (facts.binding !== context.binding) return
-						if (facts.status === 'failed') return { target: 'failed', context: empty }
-						return {
-							context: {
-								profile: facts.profile,
-								workspace: facts.workspace,
-								workspaces: facts.workspaces,
-								membership: facts.membership
-							}
-						}
-					},
-					onError: { target: 'failed', context: empty }
-				},
 				{
 					src: 'bankConnections',
 					input: ({ context }) => ({
@@ -326,7 +284,7 @@ export const financeQueriesMachine = setup({
 })
 export function selectFinanceQueryFacts(
 	snapshot: SnapshotFrom<typeof financeQueriesMachine>
-): FinanceQueryFacts {
+): FinanceContentFacts {
 	const { context } = snapshot
 	const rows = snapshot.status !== 'active' || snapshot.matches('failed') ? empty : context
 	return {
@@ -334,8 +292,7 @@ export function selectFinanceQueryFacts(
 		status:
 			snapshot.status !== 'active' || snapshot.matches('failed')
 				? 'failed'
-				: context.workspaces === null ||
-					  (!!context.selection.workspaceId && context.accounts === null)
+				: !!context.selection.workspaceId && context.accounts === null
 					? 'loading'
 					: 'ready',
 		bankConnections: rows.bankConnections,
@@ -343,15 +300,37 @@ export function selectFinanceQueryFacts(
 		transfers: rows.transfers,
 		workspaceMembers: rows.workspaceMembers,
 		accountGrants: rows.accountGrants,
-		profile: rows.profile,
-		workspace: rows.workspace,
-		workspaces: rows.workspaces,
 		accounts: rows.accounts,
-		membership: rows.membership,
 		grants: rows.grants,
 		categories: rows.categories,
 		tags: rows.tags,
 		transaction: rows.transaction,
 		transactions: rows.transactions
 	}
+}
+
+/** Merge app-owned access evidence with the independent financial read scope. */
+export function combineFinanceQueryFacts(
+	content: FinanceContentFacts,
+	access: WorkspaceAccessFacts | undefined
+): FinanceQueryFacts {
+	return {
+		...content,
+		status:
+			content.status === 'failed' || access?.status === 'failed'
+				? 'failed'
+				: !access || access.workspaces === null || content.status === 'loading'
+					? 'loading'
+					: 'ready',
+		profile: access?.profile,
+		workspace: access?.workspace,
+		workspaces: access?.workspaces ?? null,
+		membership: access?.membership
+	}
+}
+export function emptyFinanceContentFacts(
+	binding: object,
+	status: FinanceContentFacts['status'] = 'loading'
+): FinanceContentFacts {
+	return { ...empty, binding, status }
 }
