@@ -570,3 +570,22 @@ the web test-result artifacts, using the existing pinned artifact action. This
 adds diagnostics without changing tests, retries, timeouts or pass criteria.
 The PR stays draft while that hosted qualification and the selection/lease work
 remain open. Hosted results and local qualification must be distinguished.
+
+### Hosted failure follow-up
+
+On `6ecbf452`, Foundation checks passed; Clipper worker/offline/extension jobs
+passed, but the web job still failed. Its retained trace identifies a Vite full
+reload in the first account case and several changing dependency hashes. The
+new `workspace/initialization`, `workspace/startup` and `data/observation-workflow`
+imports were absent from the existing explicit prebundle list. They are now
+included. The full 22-case account spec passed from a cleared dependency cache in
+this isolated checkout, including its unchanged zero-full-reload assertion.
+
+Finance's workspace, startup, authentication, permission and application-1 browser
+jobs passed. The application-2 artifact showed a single transfer-total assertion
+with no expenses in the current period. Its fixture is dated October 25, while
+the overview defaults to the latest 30 days: the row fell outside that range on
+November 24 UTC while still appearing in the local November 23 range. That test
+now selects an explicit October period through the existing UI before asserting
+the same $1.00 total. The targeted native browser case passed. These are narrow
+configuration/fixture corrections; hosted requalification remains required.

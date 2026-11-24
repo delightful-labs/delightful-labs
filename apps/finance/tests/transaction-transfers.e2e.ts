@@ -155,6 +155,12 @@ test(
 			.poll(() => persisted(page, seed.id))
 			.toMatchObject({ internalTransferId: null, amountMinor: 100, source: 'simplefin' })
 		await page.goto('/')
+		// The fixture is booked on October 25; it eventually falls outside the rolling default range.
+		await page.getByRole('button', { name: 'Filter Transactions', exact: true }).click()
+		await page.getByRole('radio', { name: 'Custom', exact: true }).check()
+		await page.getByLabel('Start Date', { exact: true }).fill('2026-10-01')
+		await page.getByLabel('End Date', { exact: true }).fill('2026-10-31')
+		await page.keyboard.press('Escape')
 		await expect(page.getByText('Total Expenses: $1.00', { exact: true })).toBeVisible()
 	}
 )
