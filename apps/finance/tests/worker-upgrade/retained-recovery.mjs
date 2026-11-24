@@ -5,18 +5,26 @@ import { cp, copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from '
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 
 // Disposable-copy recovery rehearsal. Never open or overwrite the captured store.
-const [readersArgument, snapshotsArgument, scope, kind] = process.argv.slice(2)
+const [readersArgument, snapshotsArgument, scope, kind, baseline = 'alpha67', ...extra] =
+	process.argv.slice(2)
 if (!readersArgument || !snapshotsArgument || !scope || !/^[a-zA-Z0-9_-]+$/.test(scope))
 	throw new Error('Pass prepared readers, snapshot root, destination name and app kind')
 if (kind !== 'finance' && kind !== 'clipper') throw new Error('Unknown recovery app kind')
+if ((baseline !== 'alpha67' && baseline !== 'beta1') || extra.length)
+	throw new Error('Recovery baseline must be alpha67 or beta1')
 const readers = resolve(readersArgument)
 const snapshots = resolve(snapshotsArgument)
 const source = join(snapshots, scope)
 const candidate = join(readers, 'beta1')
 const sdk = createRequire(join(candidate, 'package.json'))
 assert.equal(sdk('jazz-tools/package.json').version, '2.0.0-beta.1')
+assert.equal(
+	createRequire(join(readers, baseline, 'package.json'))('jazz-tools/package.json').version,
+	baseline === 'alpha67' ? '2.0.0-alpha.67' : '2.0.0-beta.1'
+)
 const { createJazz, sqlite } = await import(pathToFileURL(sdk.resolve('jazz-tools/backend')))
 const { app, permissions } = await import(pathToFileURL(join(candidate, 'retained-schema.mjs')))
 async function fingerprint(path) {
@@ -55,7 +63,13 @@ function read(version, snapshot, name) {
 try {
 	process.chdir(candidate)
 	process.env.JAZZ_APP_DIR = candidate
-	const before = await read('alpha67', source, 'baseline')
+	const before = await read(baseline, source, 'baseline')
+	const candidateBefore = await read('beta1', source, 'candidate-before-write')
+	assert.equal(before.identityPreserved, true)
+	assert.equal(candidateBefore.identityPreserved, true)
+	assert.equal(typeof before.appIdProof, 'string')
+	assert.ok(candidateBefore.appIdProof === before.appIdProof, 'Candidate identity differs')
+	assert.ok(isDeepStrictEqual(candidateBefore.tables, before.tables), 'Candidate data differs')
 	const upgraded = join(work, 'upgraded-source')
 	await mkdir(upgraded)
 	await cp(join(source, 'store'), join(upgraded, 'store'), { recursive: true })
@@ -96,16 +110,17 @@ try {
 	)
 	// Restore a fresh copy of the untouched snapshot, rather than trying an older
 	// core against the upgraded directory or treating deployment promotion as undo.
-	const restored = await read('alpha67', source, 'restored-from-snapshot')
-	assert.equal(before.identityPreserved, true)
+	const restored = await read(baseline, source, 'restored-from-snapshot')
 	assert.equal(restored.identityPreserved, true)
-	assert.equal(typeof before.appIdProof, 'string')
-	assert.equal(restored.appIdProof, before.appIdProof)
-	assert.deepEqual(restored.tables, before.tables)
-	assert.deepEqual(await fingerprint(source), original)
+	assert.ok(restored.appIdProof === before.appIdProof, 'Restored identity differs')
+	assert.ok(isDeepStrictEqual(restored.tables, before.tables), 'Restored data differs')
+	assert.ok(isDeepStrictEqual(await fingerprint(source), original), 'Snapshot bytes changed')
 	console.log(
 		JSON.stringify({
 			scope,
+			baselineVersion: before.version,
+			candidateVersion: candidateBefore.version,
+			candidateIdentityAndAllRowsAuditBytesMatch: true,
 			candidateWriteSurvivedReopen: true,
 			restoredIdentityAndAllRowsAuditBytesMatch: true,
 			snapshotBytesUnchanged: true

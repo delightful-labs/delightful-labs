@@ -835,6 +835,9 @@ Head `1af09e3b` subsequently completed all three hosted workflows successfully:
 Finance (18 jobs), Clipper (six jobs), and Foundation (four jobs), plus PR-title
 checks. This is exact-head hosted evidence, separate from the earlier superseded
 workflow. Main was fetched again and remains `9344dff2`.
+The subsequent native mixed-version fixture head `119df554` also completed all
+three workflows successfully: Finance (18 jobs), Clipper (six jobs), and
+Foundation (four jobs), plus PR-title checks.
 
 ### Native mixed-version wire and account-store qualification
 
@@ -889,6 +892,8 @@ node tests/worker-upgrade/mixed-version.mjs /path/to/prepared-finance-readers
 node /path/to/prepared-readers/retained-compare.mjs /path/to/snapshots finance
 node tests/worker-upgrade/retained-recovery.mjs /path/to/finance-readers /path/to/snapshots finance finance
 node tests/worker-upgrade/retained-recovery.mjs /path/to/clipper-readers /path/to/snapshots clipper-main clipper
+node tests/worker-upgrade/inspect-retained-drive.mjs /path/to/read-only-mounts preview
+node tests/worker-upgrade/retained-recovery.mjs /path/to/finance-readers /path/to/copied-preview-snapshots preview finance beta1
 ```
 
 The prepared `retained-compare.mjs` uses separate scratch copies for alpha.67 and
@@ -898,6 +903,68 @@ copies/key on completion. It requires complete local default-file/SQLite blob
 snapshots; unsupported external/custom layouts are refused. Historical
 alpha.60 compatibility is covered by the independent schema/archive fixtures.
 Preparing readers does not authorize production access or snapshot acquisition.
+
+### Hosted snapshot preparation and explicit recovery baseline
+
+Read-only Vercel inventory identifies separate production and preview Drives for
+both verified projects, all in `iad1`. The shared preview environment is
+`preview-feat-jazz-beta-upgrade-ed86022e`; each project's native Drive name is
+truncated and hashed independently. The reported 1 GiB is maximum capacity, not
+measured data usage. No production core was resumed, stopped, mounted or opened.
+
+The concrete proposed preview rehearsal uses one disposable Sandbox per app in
+its existing project and region, one vCPU, a five-minute timeout,
+`persistent: false`, no exposed ports and `networkPolicy: 'deny-all'`. The
+installed Sandbox SDK's `Drive.snapshot()` produces a read-only snapshot mount;
+it is distinct from snapshotting/stopping an existing Sandbox. Vercel also
+documents [read-only Drive snapshots](https://vercel.com/changelog/drives-for-vercel-sandbox-are-now-in-public-beta)
+and the subsequent [general-availability release](https://vercel.com/changelog/vercel-drives-is-now-generally-available).
+The new reader would mount only the existing app's preview Drive at
+`/retained/preview`, inspect fixed layout/version metadata, and copy the complete
+capture into disposable scratch space before opening any store with Jazz.
+Cloud credentials stay in the caller, never inside the reader VM. Cleanup must
+stop and discard each reader even after a refusal. The prepared readers include
+matching Linux x64 native addons, so the VM needs no outbound package download.
+
+Automatic approval review rejected the attempted Finance reader creation: it
+would expose potentially sensitive hosted preview data to new cloud compute,
+whereas the user's earlier snapshot authorization covered local stores. No
+Sandbox was created. The user has been asked to approve this exact preview-only
+procedure for both apps. Production snapshot acquisition remains separately
+unauthorized; there is no attempt to route around the rejection through the SDK
+or a Drive fork. The retained-user-browser rehearsal is also waiting for the
+user to identify the browser and profile; no original profile has been opened
+or copied.
+
+The preview stores already run beta, so alpha.67 cannot silently stand in for
+their pre-rehearsal baseline. `retained-recovery.mjs` now accepts an explicit
+`alpha67` or `beta1` final argument (default `alpha67` preserves the approved local
+procedure). It validates the installed SDK version and compares every row,
+audit field, byte value and application identity under the candidate before
+making its synthetic write. It then verifies that write after reopen and restores
+a fresh copy of the original snapshot with the selected baseline. Success reports
+both SDK versions. It never treats an older deployment or a downgrade of the
+modified store as recovery.
+
+On Node 24.22.2, the strengthened alpha.67-to-beta.1 procedure passes again on
+both approved main-store snapshots with exact pre-write comparisons, committed
+probe reopen, exact restored comparisons and unchanged snapshot bytes. A separate
+disposable Finance fixture containing binary attachment data was opened and
+written by beta, then passed beta-to-beta recovery. The inspector accepts an
+explicit `preview` destination and refuses external/custom blob layouts and
+paths outside the snapshot root; an unknown recovery baseline is also refused.
+These refusal controls pass. A native negative control deliberately attempted to
+restore the modified probe store instead of the untouched snapshot; exact restored
+data comparison refused it. The source was restored byte-for-byte afterward.
+Mismatch errors report fixed failure descriptions without dumping private HMAC
+comparison values or file fingerprints. The temporary qualifier initially parsed
+native store logging as JSON; selecting the final summary line corrected that harness
+error. All final checks used the pinned Node version. Scratch stores and keys
+were removed. These are local tooling checks, not hosted recovery evidence.
+
+The proposed cloud capture must still establish its actual blob descriptor and
+complete chunk coverage. Current app configuration and a successful fresh-profile
+save do not establish the contents or recoverability of an existing Drive.
 
 ### Approved and completed local retained-data rehearsal
 
