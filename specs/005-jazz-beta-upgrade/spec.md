@@ -15,8 +15,8 @@ excluded the older alpha.60 annotations store from migration; its original and
 complete snapshot are preserved. The first hosted qualification found Finance
 startup, transfer-feedback and workspace-browser failures; their investigation
 and corrective qualification are recorded below. Hosted production, retained
-browser profiles and
-external chunk recovery remain release gates. No production deployment has been made.
+browser profiles and external chunk recovery remain release gates. No production
+deployment has been made.
 
 **Input**: Upgrade the Delightful Labs monorepo to Jazz beta, using Jazz as
 intended. Behavior changes are acceptable. Earlier implementation choices and
@@ -658,8 +658,8 @@ declarations. Its standalone SvelteKit page adapter now has the correct shallow
 URL type, and its test shell derives the route store reactively. These changes
 correct fixture packaging/types; no product diagnostic or assertion was disabled.
 
-The following remain unqualified: hosted Vercel production stores and preview
-destinations, retained user browser profiles, complete external chunk-store
+The following remain unqualified: hosted Vercel production stores, retained user
+browser profiles and complete external chunk-store
 recovery. The known intermittent Finance unknown-save failures remain unresolved,
 although their four original workflows pass unchanged on beta. The real local-store
 comparisons/recovery and disposable browser fixtures qualify their recorded scope;
@@ -686,8 +686,7 @@ current-main local-store comparisons and snapshot recovery are complete with
 explicit snapshot authorization. Preview project/namespace/region, private worker
 transport and fresh-profile save/reload checks pass. Production destinations,
 retained browser profiles and external chunks remain open. The user explicitly
-excluded
-the older annotations store's migration. B6 has not started; production deployment
+excluded the older annotations store's migration. B6 has not started; production deployment
 is not authorized.
 
 The implemented update-handover path uses these existing owners:
@@ -749,8 +748,8 @@ preference for implicit browser reads; explicit `local-first` reads default to
 zero initial remote wait. The ordinary save's transaction-local edit/tag/check
 reads now select this supported option explicitly. See the
 [pinned SDK read-option lowering](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/packages/jazz-tools/src/runtime/client.ts).
-Transaction ownership, eligibility checks, atomic writes, local durability and later rejection tracking
-are unchanged. The original stalled-connection scenario then passed, as did its
+Transaction ownership, eligibility checks, atomic writes, local durability and
+later rejection tracking are unchanged. The original stalled-connection scenario then passed, as did its
 17 persistence unit cases. The complete seven-case production-startup suite also
 passes, including full browser restart, silent established/new connections,
 offline saves, later authority rejection and retained bank history. No SDK patch
@@ -804,6 +803,17 @@ exceptions or foreign-origin requests were observed. These preview checks used
 new disposable identities; the profiles were removed. No user browser or
 production store was used. This is hosted startup/transport and fresh-profile
 write/reload evidence, not complete production or retained-profile qualification.
+
+The corrective source commit is `995f80c798fa6794b6efa48a5bb773328cc73b1f`.
+Its Finance preview `dpl_71Uc64c7A4DNjy8j4Jp2uhY9zJgv` is READY in `iad1` for
+`prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa`; its new disposable identity also passed account
+save and hard reload with three authenticated 101 connections and no page errors.
+Clipper source was unchanged by that commit; its qualified preview remains
+`dpl_F489SGH4T4d3Yw1bNNjr44BfzViy`. Unaffected Clipper/website rebuilds were
+canceled by the existing deployment selector. Current hosted evidence is linked
+from the [PR checks](https://github.com/delightful-labs/delightful-labs/pull/56/checks).
+Only this spec was reconciled after the corrective source commit; its code,
+dependencies, schemas and tests are unchanged by that documentation update.
 
 The maintained fixture commands run from `apps/finance`:
 
