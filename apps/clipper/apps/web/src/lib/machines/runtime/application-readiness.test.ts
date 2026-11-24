@@ -78,6 +78,42 @@ it('withholds library/root access until the native local-first observation is re
 	await ready(f)
 	expect(read).toHaveBeenCalledOnce()
 })
+
+it('keeps recovery available without allocating content while ongoing root access is unknown', async () => {
+	const account = readyAccount()
+	const subscribe = vi.fn(() => () => {})
+	const f = fixture({
+		...account,
+		capabilities: {
+			...account.capabilities,
+			access: { workspaceId: account.identityId, subscribe }
+		}
+	})
+	await vi.waitFor(() => expect(subscribe).toHaveBeenCalledOnce())
+	expect(account.capabilities.createLibrary).not.toHaveBeenCalled()
+	expect(selectLibraryActor(f.actor.getSnapshot())).toBeUndefined()
+	expect(selectRecoveryBinding(f.actor.getSnapshot())?.capability).toBe(
+		account.capabilities.recovery.capability
+	)
+	expect(f.actor.getSnapshot().can({ type: 'RESTORE', phrase: 'valid synthetic phrase' })).toBe(
+		true
+	)
+	await close(f)
+})
+
+it('drains an identity replacement even when the native client binding object is reused', async () => {
+	const a = readyAccount('A')
+	const b = { ...readyAccount('B'), binding: a.binding }
+	const f = fixture(a)
+	await ready(f)
+	const first = selectLibraryActor(f.actor.getSnapshot())
+	f.emit(b)
+	await vi.waitFor(() => expect(b.capabilities.createLibrary).toHaveBeenCalledOnce())
+	await ready(f)
+	expect(selectLibraryActor(f.actor.getSnapshot())).not.toBe(first)
+	expect(first?.getSnapshot().output).toEqual({ outcome: 'released' })
+	await close(f)
+})
 it('withdraws native preparation observations on shutdown without allocating a library', async () => {
 	const value = readyAccount(),
 		f = fixture({ ...value, localFirst: false })
@@ -113,29 +149,18 @@ it('does not publish local-saved or synced while a root write is locally pending
 		expect(selectApplicationView(f.actor.getSnapshot(), true).status).toBe('synced')
 	)
 })
-it('retains an issued root receipt through shutdown and releases the library lease after local settlement', async () => {
+it('retains an issued root receipt through shutdown without constructing selected content', async () => {
 	const local = Promise.withResolvers<void>(),
 		access = root(local.promise, Promise.resolve())
 	const value = readyAccount('A', access),
-		live: (() => boolean)[] = []
-	const create = value.capabilities.createLibrary
-	const f = fixture({
-		...value,
-		capabilities: {
-			...value.capabilities,
-			createLibrary: (current) => {
-				live.push(current)
-				return create(current)
-			}
-		}
-	})
+		f = fixture(value)
 	await vi.waitFor(() => expect(access.ensure).toHaveBeenCalledOnce())
 	f.actor.send({ type: 'SHUTDOWN' })
 	expect(f.actor.getSnapshot().status).toBe('active')
-	expect(live[0]?.()).toBe(true)
+	expect(value.capabilities.createLibrary).not.toHaveBeenCalled()
 	local.resolve()
 	await waitFor(f.actor, (s) => s.status === 'done')
-	expect(live[0]?.()).toBe(false)
+	expect(value.capabilities.createLibrary).not.toHaveBeenCalled()
 	expect(f.close).not.toHaveBeenCalled()
 })
 it('does not overwrite an incompatible library root', async () => {
@@ -375,7 +400,7 @@ it('adopts only C after A → B → C while an issued A write drains, retaining 
 	expect(b.capabilities.createLibrary).not.toHaveBeenCalled()
 	expect(c.capabilities.createLibrary).toHaveBeenCalledOnce()
 })
-it('latches failed domain construction until explicit retry and never loops on duplicate native facts', async () => {
+it('retains failed domain construction without looping or inventing a release receipt', async () => {
 	const value = readyAccount(),
 		create = vi.fn(value.capabilities.createLibrary)
 	create.mockImplementationOnce(() => {
@@ -383,13 +408,16 @@ it('latches failed domain construction until explicit retry and never loops on d
 	})
 	const f = fixture({ ...value, capabilities: { ...value.capabilities, createLibrary: create } })
 	await vi.waitFor(() =>
-		expect(selectApplicationView(f.actor.getSnapshot(), true).status).toBe('unavailable')
+		expect(selectApplicationView(f.actor.getSnapshot(), true).status).toBe('cleanupFailed')
 	)
 	for (let index = 0; index < 4; index++) f.emit(f.current())
-	expect(create).toHaveBeenCalledOnce()
 	f.actor.send({ type: 'RETRY' })
-	await ready(f)
-	expect(create).toHaveBeenCalledTimes(2)
+	f.actor.send({ type: 'SHUTDOWN' })
+	expect(create).toHaveBeenCalledOnce()
+	expect(selectLibraryActor(f.actor.getSnapshot())).toBeUndefined()
+	expect(f.actor.getSnapshot().status).toBe('active')
+	expect(f.actor.getSnapshot().context.clean).toBe(false)
+	expect(f.close).not.toHaveBeenCalled()
 })
 it('retries a failed native acquisition through the same shared owner', async () => {
 	const acquisition = Promise.withResolvers<void>(),
@@ -562,9 +590,14 @@ it.each(['shutdown', 'restore', 'replace'] satisfies ('shutdown' | 'restore' | '
 		else if (reason === 'restore')
 			f.actor.send({ type: 'RESTORE', phrase: 'valid synthetic phrase' })
 		else f.emit(b)
-		await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
-		expect(f.actor.getSnapshot().output).toEqual({ clean: false })
-		expect(selectApplicationView(f.actor.getSnapshot(), true).status).toBe('ownerFailed')
+		await waitFor(
+			f.actor,
+			(snapshot) => selectApplicationView(snapshot, true).status === 'cleanupFailed',
+			{ timeout: 1000 }
+		)
+		expect(f.actor.getSnapshot().status).toBe('active')
+		expect(f.actor.getSnapshot().output).toBeUndefined()
+		expect(f.actor.getSnapshot().context.clean).toBe(false)
 		expect(dispose).toHaveBeenCalledOnce()
 		expect(f.close).not.toHaveBeenCalled()
 		expect(f.change).not.toHaveBeenCalled()

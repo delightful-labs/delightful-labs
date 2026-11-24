@@ -58,6 +58,7 @@ function fixture(
 			account: () => () => {},
 			clip: (library) => ({
 				library,
+				commands: library,
 				accountId: id,
 				current,
 				read: async (requested) => ({

@@ -26,7 +26,12 @@ function nativeAccount(config: JazzClientConfig, libraryFactory: LibraryFactory)
 					libraryFactory,
 					cacheNamespace
 				})
-				return { root: domain.root, recovery, createLibrary: domain.createLibrary }
+				return {
+					root: domain.root,
+					access: domain.access,
+					recovery,
+					createLibrary: domain.createLibrary
+				}
 			}
 		),
 		parsePhrase: parseJazzRecoveryPhrase,

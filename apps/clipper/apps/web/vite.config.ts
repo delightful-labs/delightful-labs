@@ -53,6 +53,7 @@ export default defineConfig(({ command, mode }) => {
 				'delightful-local-first/workspace/creation/workflow',
 				'delightful-local-first/workspace/initialization',
 				'delightful-local-first/workspace/startup',
+				'delightful-local-first/workspace/resource',
 				'delightful-local-first/transactions/workflow',
 				'delightful-local-first/lifecycle/operation/workflow',
 				'delightful-local-first/worker/request/workflow',

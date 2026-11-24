@@ -10,8 +10,10 @@ import { stopAfterShutdown } from 'delightful-local-first/forms/lifecycle'
 import {
 	createApplicationReadinessMachine,
 	selectLibraryActor,
+	selectLibraryCommandBinding,
 	selectApplicationView
 } from '../../web/src/lib/machines/runtime/application-readiness.js'
+import { workspaceLibraryCommands } from '../../web/src/lib/machines/runtime/workspace-library.js'
 import { existingAccountInput } from '../../web/src/lib/backend/jazz/account.js'
 import { extensionLibrary } from './library.js'
 import { createRuntimeMachine } from './runtime-machine.js'
@@ -71,10 +73,16 @@ const runtime = createActor(
 		},
 		clip: (library) => {
 			const bound = library.getSnapshot().context.capability!
+			const binding = selectLibraryCommandBinding(owner.getSnapshot())
+			if (!binding || selectLibraryActor(owner.getSnapshot()) !== library)
+				throw new Error('Workspace library unavailable')
 			return {
 				library,
+				commands: workspaceLibraryCommands(binding),
 				accountId: bound.libraryId,
-				current: bound.isCurrent,
+				current: () =>
+					selectLibraryCommandBinding(owner.getSnapshot())?.lease === binding.lease &&
+					bound.isCurrent(),
 				read: (id) => chrome.runtime.sendMessage({ type: 'CAPTURE', id }),
 				extraction: extractionJob,
 				issue: (capture, accountId) => command({ type: 'ISSUE', id: capture.id, accountId }),

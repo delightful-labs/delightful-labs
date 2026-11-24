@@ -8,7 +8,7 @@ import { t, noun } from '../../localization/index.js'
 export type TagFormEvent =
 	| { type: 'SELECT'; id: string; names: string[]; previous: Tag[]; enabled: boolean }
 	| { type: 'RESET' }
-type Library = ActorRef<Snapshot<unknown>, LibraryEvent>
+type Library = Pick<ActorRef<Snapshot<unknown>, LibraryEvent>, 'send'>
 type Context = { library: Library; id: string; change: TagSelectionChange; revision: number }
 function membership(change: TagSelectionChange) {
 	if (change.kind !== 'changed') throw new Error('Expected one tag membership change')
@@ -68,7 +68,7 @@ export const tagFormMachine = tagFormModel.createMachine({
 					return { target: 'invalid' }
 				}
 				if (context.change.kind === 'changed') {
-					enq.sendTo(context.library, {
+					enq(context.library.send, {
 						type: 'ORGANIZE',
 						request: {
 							id: context.id,

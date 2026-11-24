@@ -16,14 +16,13 @@ import { restorationMachine } from 'delightful-local-first/restoration/workflow'
 import { t, recoveryMessages } from '../../localization/index.js'
 import { stateFeedback } from '../../contracts/feedback.js'
 import type { NamedState, WorkflowMessage } from '../../contracts/feedback.js'
-import { libraryMachine } from '../capture/library.js'
+import { workspaceLibraryMachine, selectWorkspaceLibrary } from './workspace-library.js'
 import { rootStartupMachine, type RootInitializationResult } from './root-bootstrap.js'
 import type { WorkspaceInitializationReport } from 'delightful-local-first/workspace/startup-contracts'
 import { sameAccountBinding } from '../../contracts/account.js'
 import type {
 	AccountBinding,
 	AccountCapabilities,
-	ReadyAccountObservation,
 	AccountInput,
 	AccountObservation,
 	RootWrite
@@ -53,8 +52,6 @@ type Context = {
 	input: AccountInput
 	observation: AccountObservation
 	adoption: AccountBinding | undefined
-	candidate: ReadyAccountObservation | undefined
-	failedBinding: object | undefined
 	write: RootWrite | undefined
 	phrase: string
 	attempt: number
@@ -76,56 +73,6 @@ const working = accountStatus('working', t('account.status.working'))
 
 export function createApplicationReadinessMachine(observeConnection?: ConnectionObserver) {
 	const actors = {
-		// The library lease survives observation replacement until its issued work drains.
-		bindingCustody: createCallbackLogic<
-			{ type: 'OWN' | 'RELEASE'; binding: AccountBinding },
-			{ owner: { subscribe(observer: { error: () => void }): { unsubscribe: () => void } } }
-		>(({ input, receive }) => {
-			const bindings = new Set<AccountBinding>()
-			const dispose = () => {
-				for (const binding of bindings) binding.release()
-				bindings.clear()
-			}
-			const subscription = input.owner.subscribe({ error: dispose })
-			receive((event) => {
-				if (event.type === 'OWN') bindings.add(event.binding)
-				else {
-					bindings.delete(event.binding)
-					event.binding.release()
-				}
-			})
-			return () => {
-				subscription.unsubscribe()
-				dispose()
-			}
-		}),
-		libraryBinding: createCallbackLogic<
-			{ type: 'ADOPT' },
-			{
-				observation: ReadyAccountObservation
-				owner: { subscribe(observer: { error: () => void }): { unsubscribe: () => void } }
-			}
-		>(({ input, receive, sendBack }) => {
-			let released = false,
-				adopted = false
-			const binding: AccountBinding = {
-				observation: input.observation,
-				library: input.observation.capabilities.createLibrary(() => !released),
-				release: () => {
-					released = true
-				}
-			}
-			const subscription = input.owner.subscribe({ error: binding.release })
-			receive(() => {
-				adopted = true
-				sendBack({ type: 'LIBRARY_ADOPTED' })
-			})
-			sendBack({ type: 'LIBRARY_BOUND', binding })
-			return () => {
-				subscription.unsubscribe()
-				if (!adopted) binding.release()
-			}
-		}),
 		observation: createCallbackLogic<{ type: 'READ' }, AccountInput['session']>(
 			({ input, receive, sendBack }) => {
 				const publish = (view: SessionRuntimeView<AccountCapabilities>) => {
@@ -155,7 +102,7 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 		change: createSessionChangeMachine((input: SessionRuntimeChangeInput) => input),
 		logout: signOutMachine,
 		restore: restorationMachine,
-		library: libraryMachine,
+		library: workspaceLibraryMachine,
 		bootstrap: rootStartupMachine,
 		global: createAsyncLogic({ run: ({ input }: { input: RootWrite }) => input.global() })
 	}
@@ -176,8 +123,6 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 				OBSERVED: types<{ observation: AccountObservation; stage: SessionRuntimeView['stage'] }>(),
 				NATIVE_FAILED: types(),
 				LIBRARY_DISPOSAL_FAILED: types(),
-				LIBRARY_BOUND: types<{ binding: AccountBinding }>(),
-				LIBRARY_ADOPTED: types(),
 				WORKSPACE_INITIALIZATION_RESULT:
 					types<Omit<WorkspaceInitializationReport<RootInitializationResult>, 'type'>>(),
 				SIGN_OUT_OVERDUE: types<{ stage: SignOutStage }>(),
@@ -191,14 +136,12 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 				RESTORE_FAILED: types()
 			},
 			children: {
-				bindingCustody: types<import('xstate').ActorRefFrom<typeof actors.bindingCustody>>(),
-				libraryBinding: types<import('xstate').ActorRefFrom<typeof actors.libraryBinding>>(),
 				observation: types<import('xstate').ActorRefFrom<typeof actors.observation>>(),
 				connection: types<import('xstate').ActorRefFrom<typeof actors.connection>>(),
 				change: types<import('xstate').ActorRefFrom<typeof actors.change>>(),
 				logout: types<import('xstate').ActorRefFrom<typeof actors.logout>>(),
 				restore: types<import('xstate').ActorRefFrom<typeof actors.restore>>(),
-				library: types<import('xstate').ActorRefFrom<typeof libraryMachine>>(),
+				library: types<import('xstate').ActorRefFrom<typeof workspaceLibraryMachine>>(),
 				bootstrap: types<import('xstate').ActorRefFrom<typeof rootStartupMachine>>(),
 				global: types<import('xstate').ActorRefFrom<typeof actors.global>>()
 			}
@@ -257,8 +200,6 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 			input,
 			observation: { status: 'starting' },
 			adoption: undefined,
-			candidate: undefined,
-			failedBinding: undefined,
 			write: undefined,
 			phrase: '',
 			attempt: 0,
@@ -266,7 +207,6 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 		}),
 		output: ({ context }) => ({ clean: context.clean }),
 		invoke: [
-			{ id: 'bindingCustody', src: 'bindingCustody', input: ({ self }) => ({ owner: self }) },
 			{
 				id: 'observation',
 				src: 'observation',
@@ -359,23 +299,21 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 									route: {
 										id: 'application-active-flow-running-route',
 										entry: () => ({ context: { write: undefined } }),
-										always: ({ context }, enq) => {
+										always: ({ context }) => {
 											if (
 												context.observation.status === 'ready' &&
 												context.observation.localFirst
 											) {
-												if (
-													!context.adoption ||
-													!sameAccountBinding(context.observation, context.adoption.observation)
-												)
-													return {
-														target: 'adoptingLibrary',
-														context: { candidate: context.observation }
+												return {
+													target: 'library',
+													context: {
+														adoption: {
+															observation: context.observation,
+															scope: { binding: context.observation.binding, attachment: {} }
+														}
 													}
-												return { target: 'library' }
+												}
 											}
-											if (context.adoption)
-												enq.sendTo('bindingCustody', { type: 'RELEASE', binding: context.adoption })
 											if (context.observation.status === 'signed-out')
 												return { target: 'signedOut', context: { adoption: undefined } }
 											if (context.observation.status === 'starting')
@@ -409,18 +347,13 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 									unavailable: {
 										meta: accountStatus('unavailable', t('account.status.unavailable')),
 										on: {
-											OBSERVED: (args) =>
-												args.context.failedBinding &&
-												args.event.observation.status === 'ready' &&
-												args.context.failedBinding === args.event.observation.binding
-													? undefined
-													: {
-															target: 'route',
-															context: args.actions.rememberObservation(args).context
-														},
+											OBSERVED: (args) => ({
+												target: 'route',
+												context: args.actions.rememberObservation(args).context
+											}),
 											RETRY: ({ context }, enq) => {
 												enq.sendTo(context.input.session.owner, { type: 'RETRY' })
-												return { target: 'refreshing', context: { failedBinding: undefined } }
+												return { target: 'refreshing' }
 											}
 										}
 									},
@@ -449,60 +382,6 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 												target: 'restoring',
 												context: { phrase: event.phrase, attempt: context.attempt + 1 }
 											})
-										}
-									},
-									adoptingLibrary: {
-										initial: 'waiting',
-										entry: ({ context }, enq) => {
-											if (context.adoption)
-												enq.sendTo('bindingCustody', { type: 'RELEASE', binding: context.adoption })
-											return { context: { adoption: undefined } }
-										},
-										invoke: {
-											id: 'libraryBinding',
-											src: 'libraryBinding',
-											input: ({ context, self }) => ({
-												observation: required(context.candidate),
-												owner: self
-											}),
-											onError: ({ context }) => ({
-												target: 'unavailable',
-												context: { failedBinding: context.candidate?.binding, candidate: undefined }
-											})
-										},
-										on: { SHUTDOWN: { target: '.stopping' } },
-										states: {
-											waiting: {
-												on: {
-													LIBRARY_BOUND: ({ context, event }, enq) => {
-														if (!sameAccountBinding(context.observation, event.binding.observation))
-															return { target: '#application-active-flow-running-route' }
-														enq.sendTo('bindingCustody', { type: 'OWN', binding: event.binding })
-														return { target: 'accepting', context: { adoption: event.binding } }
-													}
-												}
-											},
-											accepting: {
-												entry: (_args, enq) => enq.sendTo('libraryBinding', { type: 'ADOPT' }),
-												on: {
-													LIBRARY_ADOPTED: ({ context }) =>
-														sameAccountBinding(
-															context.observation,
-															required(context.adoption).observation
-														)
-															? {
-																	target: '#application-active-flow-running-library',
-																	context: { candidate: undefined }
-																}
-															: { target: '#application-active-flow-running-route' }
-												}
-											},
-											stopping: {
-												on: {
-													LIBRARY_BOUND: { target: '#application-active-flow-running-draining' },
-													LIBRARY_ADOPTED: { target: '#application-active-flow-running-draining' }
-												}
-											}
 										}
 									},
 									retrying: {
@@ -846,10 +725,19 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 													id: 'library',
 													src: 'library',
 													input: ({ context, self }) => ({
-														...required(context.adoption).library,
+														account: required(context.adoption).observation,
+														scope: required(context.adoption).scope,
 														reportDisposalFailure: () =>
 															self.send({ type: 'LIBRARY_DISPOSAL_FAILED' })
 													}),
+													onSnapshot: ({ event }) =>
+														selectWorkspaceLibrary(event.snapshot).failed
+															? { target: '.unresolved', context: { clean: false } }
+															: { context: {} },
+													onError: {
+														target: '#application-ownerFailed',
+														context: { clean: false }
+													},
 													onDone: (args) => {
 														if (!args.context.clean || args.event.output.outcome !== 'released')
 															return {
@@ -900,6 +788,15 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 													}
 												},
 												states: {
+													unresolved: {
+														meta: accountStatus('cleanupFailed', t('account.status.ownerFailed')),
+														on: {
+															SHUTDOWN: {},
+															RESTORE: {},
+															LOGOUT: {},
+															OBSERVED: (args) => args.actions.rememberObservation(args)
+														}
+													},
 													// Existing local data is ready without claiming a new save or remote receipt.
 													existing: { meta: accountStatus('ready', '') },
 													stopping: {
@@ -945,13 +842,10 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 							closing: {
 								id: 'application-active-flow-closing',
 								meta: accountStatus('closing', t('account.status.closing')),
-								entry: ({ context }, enq) => {
-									if (context.adoption)
-										enq.sendTo('bindingCustody', { type: 'RELEASE', binding: context.adoption })
+								entry: ({ context }) => {
 									return {
 										context: {
 											adoption: undefined,
-											candidate: undefined,
 											phrase: '',
 											write: context.clean ? undefined : context.write
 										}
@@ -1029,7 +923,9 @@ export function selectApplicationView(
 	}
 }
 export function selectRecoveryBinding(snapshot: ApplicationSnapshot | undefined) {
-	return snapshot && selectLibraryActor(snapshot) && snapshot.context.observation.status === 'ready'
+	return snapshot &&
+		snapshot.context.observation.status === 'ready' &&
+		snapshot.context.observation.localFirst
 		? { ...snapshot.context.observation.capabilities.recovery, messages: recoveryMessages() }
 		: undefined
 }
@@ -1040,6 +936,14 @@ export function selectLibraryActor(snapshot: ApplicationSnapshot | undefined) {
 			{ active: { flow: { running: { library: { ready: 'stopping' } } } } },
 			snapshot.value
 		)
-		? snapshot.children.library
+		? snapshot.children.library &&
+				selectWorkspaceLibrary(snapshot.children.library.getSnapshot()).library
 		: undefined
+}
+
+export function selectLibraryCommandBinding(snapshot: ApplicationSnapshot | undefined) {
+	const owner = snapshot?.children.library
+	if (!owner || !selectLibraryActor(snapshot)) return undefined
+	const lease = selectWorkspaceLibrary(owner.getSnapshot()).lease
+	return lease ? { owner, lease } : undefined
 }

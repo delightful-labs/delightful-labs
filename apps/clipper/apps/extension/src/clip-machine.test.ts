@@ -62,6 +62,7 @@ function fixture(
 			id,
 			capability: {
 				library: owner,
+				commands: owner,
 				accountId: id,
 				current: () => true,
 				read: async () =>

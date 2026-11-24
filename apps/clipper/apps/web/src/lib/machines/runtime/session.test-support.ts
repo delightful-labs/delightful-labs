@@ -96,6 +96,13 @@ export function readyAccount(
 		localFirst: true,
 		capabilities: {
 			root,
+			access: {
+				workspaceId: identityId,
+				subscribe: (publish) => {
+					publish('allowed')
+					return () => {}
+				}
+			},
 			recovery: {
 				source: {
 					subscribe: (notify) => {

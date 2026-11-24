@@ -460,3 +460,44 @@ the optional account diagnostic callback is absent. This reuses the same shared
 observation implementation and receipt outcome as Finance queries. The native
 resource owner integration remains the next step; the current readiness host
 still supplies account-level cleanup reporting and owns native client closure.
+
+## Production Clipper shared owner composition
+
+`workspace-library.ts` composes the same `createWorkspaceResourceOwner` used by
+Finance. The immutable input fixes one actual native account binding and a fresh
+attachment. The canonical target comes from the separately supplied native
+workspace-access capability. Ongoing allowed evidence admits the library;
+unknown/denied/failed evidence withdraws it through the shared selector. Repeated
+allowed observations retain the actual lease and library. Regrant after a drain
+gets a new lease epoch. There is no Clipper implementation of lease issuance,
+selection replacement, drain tokens, retained shared custody or command matching.
+
+The app-owned resource chart acquires one native library capability, invokes the
+existing domain library, forwards admitted commands and consumes that library's
+real terminal receipt. Its acquisition guard remains alive through issued domain
+work and withdraws on actual completion or forced stop. Shutdown during acquisition
+waits for the acquired result before draining. Capability construction failure
+produces unresolved custody instead of an invented release/retry.
+
+A controller keeps the ongoing access observer alongside the shared owner. Its
+close joins actual shared-owner completion with the observer's explicit disposal
+receipt. Unknown access allocates no selected capability. An unresolved resource,
+failed native observer or failed disposal remains owned; it cannot authorize
+replacement or clean native closure. The readiness host retains the controller
+and presents its existing cleanup-failure feedback. Identity/bootstrap and native
+session close remain outside the selected library. Recovery observation likewise
+survives library changes while its native identity capability stays unchanged.
+
+The old mutable binding set and LIBRARY_BOUND/ADOPT/LIBRARY_ADOPTED handshake are
+removed. Readiness retains only an immutable startup attachment. Native identity
+or explicit workspace changes invalidate it even if a client binding object is
+reused. Web commands, tag editing, reader-surface offers and extension saves use
+native send capabilities capturing their originating controller and exact lease.
+They never replace that lease with a newer selection. The shared owner rejects
+retired commands; refused surface offers acknowledge release to their existing
+Window resource owner. Dead controller recipients also refuse owned offers.
+
+The extension still requires its existing confirmed account connection. Its
+captured current predicate includes the original lease, while the web continues
+to create its local identity automatically. No schema, UI workspace controls,
+cross-app membership or data reset is introduced.

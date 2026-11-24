@@ -966,3 +966,51 @@ Removing only this worktree's generated cache produced the passing cold 22-case
 run; no receipt gate, assertion or timeout was weakened. Production bundles use
 the current implementation and pass separately. Shared lease adoption remains
 open and follows this qualified terminal-receipt boundary.
+
+## Clipper production lease adoption
+
+Clipper now consumes the same DLF resource-owner factory as Finance. Its native
+library resource acquires one app-owned capability and invokes the existing
+capture/reader/search/image/write library. DLF owns selection, exact lease
+admission, invalidation, replacement sequencing, drain tokens and unresolved
+resource custody. The app controller keeps native root-access observation outside
+that lease and joins its actual disposal receipt with shared-owner completion.
+The immutable input binds a native account and fresh attachment; the explicit
+canonical target is supplied separately by the native access capability.
+
+Readiness no longer maintains a mutable set of adopted bindings or the
+LIBRARY_BOUND/ADOPT/LIBRARY_ADOPTED handshake. Bootstrap retains only its immutable
+attachment, and selected library construction waits for ongoing allowed evidence.
+Identity or workspace changes invalidate even a reused native binding object.
+Recovery remains identity-bound and is retained across library changes when its
+native capability/source are unchanged. Existing native session closure remains
+outside library selection.
+
+Web intents, tag editing, reader-surface offers and extension saves capture their
+original exact lease in a native command capability. They use the shared owner's
+command envelope and never upgrade old commands to the latest selection. Refused
+reader offers acknowledge their existing Window resource owner, including when
+the original controller is already closed. Missing/failed access and issued writes
+do not authorize a replacement. Unresolved release retains the live controller,
+blocks restore/replacement/clean SDK closure and uses existing cleanup-failure
+feedback. The extension's confirmed-account requirement is preserved.
+
+Qualification: all 1,023 Clipper unit tests across 155 files pass, plus 75 focused
+integration cases. The subsequent native-refusal/diagnostic edge changes pass 43
+owner/readiness cases. All 38 native browser cases pass on the new production
+composition: 22 account, all 12 production offline, one populated startup and
+three extension offline/restoration/teardown cases. Both offline production builds
+and the extension build pass. The new resource subpath is prebundled for cold
+development startup. Source/type and scoped formatting qualification follow below.
+
+This closes production adoption, not the remaining independent-replica,
+unanswered-authority, partial-replica and later-rejection acceptance work. The
+full feature and draft PR remain open. Hosted Foundation and Clipper passed on
+`9d474314`; Finance passed its application shards but its workspace shard timed
+out in the shared-workspace profile-edit case, which is retained for reproduction.
+
+Final Clipper production-adoption qualification: full coordinator/web/service-
+worker/extension type checks pass with zero Svelte errors or warnings; scoped
+formatting, lint and diff checks pass. The final held-write/refused-surface and
+native diagnostic changes pass the 43 owner/readiness cases. No timeout, retry or
+weaker native assertion was introduced.

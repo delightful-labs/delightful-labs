@@ -17,6 +17,7 @@ import { z } from 'zod'
 import { captureSchema, sourceSchema, matchingContent } from './protocol.js'
 import type { Capture, Source } from './protocol.js'
 import type { ArticleContent } from '../../web/src/lib/contracts/articles.js'
+import type { LibraryEvent } from '../../web/src/lib/contracts/library.js'
 import { libraryMachine, selectLibraryView } from '../../web/src/lib/machines/capture/library.js'
 import { t } from '../../web/src/lib/localization/index.js'
 import type { WorkflowMessage } from '../../web/src/lib/contracts/feedback.js'
@@ -37,6 +38,7 @@ type Context = {
 const replySchema = z.object({ capture: captureSchema, source: sourceSchema.optional() })
 export type ClipCapability = {
 	library: Library
+	commands: { send: (event: LibraryEvent) => void }
 	accountId: string
 	current: () => boolean
 	read: (id: string) => Promise<unknown>
@@ -68,7 +70,7 @@ export function createClipMachine() {
 				input.capability.remove(input.id)
 		}),
 		save: createCallbackLogic<{ type: 'CANCEL' }, Context>(({ input, sendBack, receive }) => {
-			input.capability.library.send({
+			input.capability.commands.send({
 				type: 'ADD',
 				url: input.capture!.url,
 				...(input.content ? { content: input.content } : {})
@@ -77,7 +79,7 @@ export function createClipMachine() {
 				sendBack({ type: 'LIBRARY', snapshot })
 			)
 			sendBack({ type: 'LIBRARY', snapshot: input.capability.library.getSnapshot() })
-			receive(() => input.capability.library.send({ type: 'CANCEL' }))
+			receive(() => input.capability.commands.send({ type: 'CANCEL' }))
 			return () => subscription.unsubscribe()
 		})
 	}

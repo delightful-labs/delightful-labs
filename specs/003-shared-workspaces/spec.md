@@ -4,7 +4,7 @@
 
 **Branch**: `feat/shared-workspace-initialization`
 
-**Status**: Shared initializer/startup adopted in both apps; selection/leases pending
+**Status**: Shared initialization/startup and production selection/leases adopted in both apps; remaining native acceptance and hosted qualification pending
 
 Every Delightful app should have a workspace concept backed by reusable Local
 First lifecycle behavior. Finance already exposes workspaces. Clipper will begin
@@ -104,11 +104,9 @@ both apps can consume the same selection and drain implementation.
   Same-Db concurrent initialization, restoration and full offline restart are
   qualified in the implementation inventory. Device identity kind alone still
   does not prove that an identity was freshly created.
-- Complete workspace selection/access lease adoption in Clipper.
-- Extract reusable ownership from Finance's current production worker into
-  Local First, including selection attachment where required.
-  Keep integrations thin and review remaining differences against the shared
-  implementation requirement above.
+- Production workspace selection/access leases now use the same Local First
+  resource owner in Finance and Clipper. Keep integrations thin and review
+  remaining differences against the shared implementation requirement above.
 - Confirm the effect of Clipper's accepted disposable development-data policy on
   the final schema plan. No data reset is authorized by this specification.
 - Resolve whether cross-app workspace linking is desired. Shared lifecycle does
