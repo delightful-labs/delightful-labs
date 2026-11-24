@@ -1014,3 +1014,20 @@ worker/extension type checks pass with zero Svelte errors or warnings; scoped
 formatting, lint and diff checks pass. The final held-write/refused-surface and
 native diagnostic changes pass the 43 owner/readiness cases. No timeout, retry or
 weaker native assertion was introduced.
+
+## Independent native canonical startup
+
+The new `workspace-startup.spec.ts` qualifies the production Clipper initializer
+with two independent native browser replicas, not multiple actors over one Db.
+A third disposable context provisions the identity without running application
+bootstrap, then closes its SDK session. Each empty replica restores that identity
+into its own context/store. A barrier holds both actual native root reads at
+missing before either initializer may write. Both production initializer actors
+then persist the same canonical root locally; both exact global write receipts
+settle. Independent remote-tier queries each return exactly one root with the
+original identity ID, owner and bootstrap version. The test passes against a real
+disposable authority; source/test types and scoped formatting pass.
+
+This proves the concurrent missing-root case for Clipper's canonical adapter.
+It does not substitute for partial-replica, unanswered-connection or later
+permission-rejection cases, nor claim all native schedules are explored.
