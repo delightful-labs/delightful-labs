@@ -342,3 +342,38 @@ immediately. This also rejects late A reports after A → B → A or revocation/
 without confusing a route revision with a lease epoch. Publication compares exact
 fact references to avoid an observation/view feedback loop. Resource commands with
 owned file/transfer payloads use the shared owner's app-supplied refusal cleanup.
+
+## Production admission and publication qualification
+
+The production forms composition now invokes the shared DLF selected-resource
+owner, with identity controls alongside it. The application no longer invokes
+content queries directly. Access evidence stays native-bound and independent.
+Finance's existing membership predicate is shared by navigation and lease mapping;
+an explicit, locally permitted target does not wait for directory loading.
+Unscoped default resolution still needs its catalog, and read/access failures
+retain their existing failure boundary.
+
+The native composition records the exact observation it has sent for each lease.
+Comparing only child-reported observations amplified duplicate commands while
+older child reports were still queued. The sent record is evidence of an issued
+command, not a readiness flag; the shared owner still decides admission. Current
+publications retain exact lease and read-binding checks. A loading forms report
+can retain existing DOM only while its lease is unchanged. Revocation and a new
+lease must withdraw old views. Identity startup feedback remains visible without
+requiring any financial resource. Native cleanup failure takes precedence over
+later failed group views.
+
+Existing A → B → A tests now wait for actual replacement construction after the
+old group's receipt. The held-write case asserts that neither B nor a new A can
+construct early; after settlement, only the latest A may construct. New production
+cases cover unknown access with live identity controls, local explicit content
+before the directory answers, retained lease/controllers during route changes,
+and revocation/regrant with held writes and rejected old lease/fact envelopes.
+
+A remaining transport qualification must carry activation identity on delayed
+UI/worker requests, in addition to the existing native lease envelope. Existing
+UI session/selection revisions reject changed routes and identities, but a same-
+route revocation/regrant can retain those revisions while changing the lease.
+Do not claim end-to-end retired-command protection until those delayed request
+origins are correlated with the current attachment and epoch. Keep identity-only
+commands independent of financial admission and preserve owned-payload refusal.

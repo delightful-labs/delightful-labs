@@ -1,3 +1,5 @@
+import type { FinanceContentCapabilities, FinanceContentFacts } from './worker-queries.js'
+import type { WorkspaceLease } from 'delightful-local-first/workspace/contracts'
 import type { Db as JazzDb } from 'jazz-tools'
 import type { TransferMutationGateway } from '../transfers/internal-transfer-mutation-request.js'
 import { type createAccountDeleteGrantMachine } from '../accounts/account-delete-grants.js'
@@ -18,6 +20,9 @@ export type FinanceFormsDependencies = Omit<
 	Parameters<typeof createAccountCreationFormOptions>[0],
 	'observe'
 > & {
+	content: FinanceContentCapabilities
+	contentObserved: (lease: WorkspaceLease, facts: FinanceContentFacts) => void
+	reportDisposalFailure: () => void
 	accountOrderStorage: AccountOrderStorage
 	transferDispatch: TransferMutationGateway['send']
 	creationKey: string
@@ -53,9 +58,23 @@ export type FinanceFormsDependencies = Omit<
 
 export type FinanceIdentityDependencies = Pick<
 	FinanceFormsDependencies,
-	'binding' | 'db' | 'creationKey' | 'profile' | 'navigation' | 'initialization'
+	| 'binding'
+	| 'db'
+	| 'creationKey'
+	| 'profile'
+	| 'navigation'
+	| 'initialization'
+	| 'content'
+	| 'contentObserved'
+	| 'reportDisposalFailure'
 >
 export type FinanceFinancialDependencies = Omit<
 	FinanceFormsDependencies,
-	'creationKey' | 'profile' | 'navigation' | 'initialization'
+	| 'creationKey'
+	| 'profile'
+	| 'navigation'
+	| 'initialization'
+	| 'content'
+	| 'contentObserved'
+	| 'reportDisposalFailure'
 >

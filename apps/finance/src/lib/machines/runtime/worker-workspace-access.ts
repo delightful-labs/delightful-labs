@@ -132,3 +132,25 @@ export function selectFinanceWorkspaceAccessFacts(
 		membership: rows.membership
 	}
 }
+
+/** Existing Finance membership predicate, shared by navigation and lease evidence. */
+export function financeMembershipAccess(
+	identityId: string | null | undefined,
+	workspaceId: string | null | undefined,
+	membership: WorkspaceAccessRows['membership']
+): 'ready' | 'waiting' | 'denied' {
+	if (membership === undefined) return 'waiting'
+	if (!membership || !identityId || !workspaceId) return 'denied'
+	return membership?.userId === identityId && membership?.organizationId === workspaceId
+		? 'ready'
+		: 'denied'
+}
+export function financeWorkspaceAccess(
+	identityId: string | null | undefined,
+	workspaceId: string | null,
+	access: WorkspaceAccessFacts | undefined
+): 'allowed' | 'denied' | 'unknown' | 'failed' {
+	if (access?.status === 'failed') return 'failed'
+	const membership = financeMembershipAccess(identityId, workspaceId, access?.membership)
+	return membership === 'ready' ? 'allowed' : membership === 'waiting' ? 'unknown' : 'denied'
+}

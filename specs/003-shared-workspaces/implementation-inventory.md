@@ -24,11 +24,10 @@ Two original extraction candidates are no longer production integration points:
 - `apps/finance/src/lib/machines/workspaces/workspace-startup.ts` has no other
   production source caller found. Production `worker-forms.ts` invokes
   `workspaceInitialization` directly and coordinates seeding separately.
-- `apps/finance/src/lib/machines/runtime/workspace-selection-attachment.ts` has
-  only its adjacent test as a consumer found in the app. Production
-  `worker-application.ts` handles `SELECT_CONTEXT`, scope revisions and resource
-  replacement directly. Moving this older machine alone would not converge the
-  running apps.
+- `apps/finance/src/lib/machines/runtime/workspace-selection-attachment.ts` was
+  unused outside its adjacent test at the baseline. Both are now removed after
+  qualifying production use of the shared resource owner; moving that older
+  wrapper alone would not have converged the running apps.
 
 The old observation/drain files named in the original research are absent from
 the current source. Use the production owners below as the baseline.
@@ -841,3 +840,57 @@ it cannot replace the full invocation type because the pinned actor scope retain
 that internal protocol. The checked packed consumer includes a real internal event
 and rejects attempts to send it through the lease envelope. No casts or framework
 patches are used.
+
+
+## Finance production lease adoption
+
+`worker-forms.ts` now invokes the shared DLF resource owner, with identity controls
+alongside it. The owner invokes the concrete financial/query resource group for
+an admitted lease; `worker-application.ts` no longer invokes content queries or
+restarts them directly. Native access observation remains outside that group.
+The native producer supplies the eleven existing content capabilities and its
+current cleanup-failure boundary. Apps still own domain policies, writes and
+financial drain receipts; no domain statechart moved into the generic owner.
+
+Public content facts are consumed only for the current native binding, actual
+public forms lease, target, read binding and locally allowed access. Revocation
+withdraws rows and views immediately. Same-workspace route reads retain both the
+lease and financial controllers. Unknown access allocates no content resources,
+while profile/creation/navigation remain usable. A known, permitted explicit
+workspace no longer waits for the directory response; unscoped catalog resolution
+and read/access failures retain their own gates. Startup feedback likewise remains
+independent of financial construction.
+
+A correlated sent-observation record prevents queued old child reports from
+resending an already-issued observation. The first integration run exposed that
+amplification; the corrected original URL-read regression and complete affected
+suite pass. Loading reports retain existing forms only within an unchanged lease.
+Cleanup failure has priority over later failed group reports. The obsolete unused
+selection-attachment wrapper and its private tests are retired in favor of the
+qualified shared owner and production-parent coverage.
+
+Qualification passes: 161 worker/query/navigation cases, complete source/Svelte/
+test types with zero diagnostics, scoped formatting, and all 62 native Finance
+browser cases. Native coverage includes 49 workspace/permission/form cases, nine
+worker cases across Chromium/Firefox/WebKit, and four cold/offline/unanswered-
+authority/later-permission-rejection cases. No retries, longer timeouts or weaker
+assertions were used. Existing held-write A → B → A coverage now proves no pending
+workspace constructs before the original receipt, then only the latest A starts.
+New parent cases exercise unknown/partial catalog evidence, same-workspace lease
+retention and revocation/regrant with held writes and rejected retired facts and
+lease commands. Full Local First formatting also passes after correcting the
+new public documentation example's indentation, the sole failure in the previous
+head's hosted Foundation run; hosted Finance and Clipper passed on that head.
+
+This establishes production Finance lease/resource ownership. Activation origin
+correlation for delayed UI/worker requests remains explicitly tracked in
+`selection-integration.md`, alongside Clipper adoption and independent-replica
+native qualification. The feature and draft PR remain incomplete until those
+requirements are satisfied. Production build qualification is recorded below.
+
+Final qualification after retiring the obsolete wrapper: all 1,840 Finance unit
+tests across 138 files pass, along with the production build, final source/test
+types and workspace dependency links. The targeted 161 cases and native 62-case
+run above retain their separate scope. Shared library runtime source is unchanged
+in this adoption slice; its full formatting check passes with the documentation
+example correction.

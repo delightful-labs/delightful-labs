@@ -412,7 +412,9 @@ export function combineFinanceQueryFacts(
 		status:
 			content.status === 'failed' || access?.status === 'failed'
 				? 'failed'
-				: !access || access.workspaces === null || content.status === 'loading'
+				: !access ||
+					  (access.workspaces === null && access.membership === undefined) ||
+					  content.status === 'loading'
 					? 'loading'
 					: 'ready',
 		profile: access?.profile,

@@ -230,3 +230,10 @@ web/extension convergence; and denied cross-workspace child references. Qualify
 library exports and packed consumers, both production worker bundles, and actual
 backend/native storage behavior. Source inspection alone does not establish
 these runtime guarantees.
+
+
+The fixed-scope attachment candidate above is historical. Production Finance now
+uses the shared `workspace/resource` owner around `worker-workspace-resources.ts`,
+with native identity/access outside it; its unused attachment wrapper and test
+were removed after native qualification. See the implementation inventory and
+selection integration record for the current boundaries and remaining work.

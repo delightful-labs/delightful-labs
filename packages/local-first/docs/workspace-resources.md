@@ -23,7 +23,7 @@ const owner = createWorkspaceResourceOwner<
 	EventFromLogic<typeof resource>,
 	SnapshotFrom<typeof resource>,
 	ResourceView,
- SendableEventFromLogic<typeof resource>
+	SendableEventFromLogic<typeof resource>
 >({
 	resource,
 	input: (lease, binding) => ({ lease, binding }),

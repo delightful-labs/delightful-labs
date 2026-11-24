@@ -168,7 +168,7 @@ export function createWorkspaceNavigationMachine(
 					if (['/account', '/login'].includes(context.facts.pathname)) {
 						return { target: 'global' }
 					}
-					if (context.facts.loading) {
+					if (context.facts.loading && !workspaceRoute(context.facts.search).scoped) {
 						return { target: 'waiting' }
 					}
 					if (context.facts.error != null) {

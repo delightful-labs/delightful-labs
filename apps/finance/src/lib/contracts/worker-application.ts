@@ -609,7 +609,9 @@ export type FinanceWorkerCapabilities = {
 		navigate: WorkspaceNavigate,
 		accountOrderStorage: AccountOrderStorage,
 		transferDispatch: TransferMutationGateway['send'],
-		routeObserved: boolean
+		routeObserved: boolean,
+		contentObserved: import('../machines/runtime/worker-form-dependencies.js').FinanceFormsDependencies['contentObserved'],
+		reportDisposalFailure: () => void
 	): ReturnType<typeof createFinanceFormsMachine>
 }
 export type FinanceWorkerSession = SessionRuntimeConnection<FinanceWorkerCapabilities>

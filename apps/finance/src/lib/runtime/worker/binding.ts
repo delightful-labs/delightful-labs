@@ -57,7 +57,7 @@ export function createFinanceWorkerBinding({
 	binding: object
 	recovery: { source: RecoveryScopeSource; capability: RecoveryPhraseCapability }
 }): FinanceWorkerCapabilities {
-	return {
+	const capabilities: FinanceWorkerCapabilities = {
 		prepareWorkspaceRestore: (file, password) => {
 			if (!isCurrent()) throw new Error('Finance restoration binding retired')
 			const config = db.getConfig()
@@ -486,9 +486,14 @@ export function createFinanceWorkerBinding({
 			navigate,
 			accountOrderStorage,
 			transferDispatch,
-			routeObserved
+			routeObserved,
+			contentObserved,
+			reportDisposalFailure
 		) =>
 			createFinanceFormsMachine({
+				content: capabilities,
+				contentObserved,
+				reportDisposalFailure,
 				transferDispatch,
 				binding,
 				db,
@@ -627,4 +632,5 @@ export function createFinanceWorkerBinding({
 				}
 			})
 	}
+	return capabilities
 }

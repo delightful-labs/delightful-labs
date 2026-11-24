@@ -283,10 +283,10 @@ describe('workspace navigation public contract', () => {
 			expect(f.one).not.toHaveBeenCalled()
 		}
 	)
-	it('keeps ledger routes gated by catalog loading and failure', () => {
+	it('admits a known explicit scope during catalog loading and retains the read-failure boundary', () => {
 		const input = { ...facts, pathname: '/expenses', search: `?workspace=${scope.organizationId}` }
 		const f = fixture({ ...input, loading: true })
-		expect(f.reports().at(-1)?.report.status).toBe('waiting')
+		expect(f.reports().at(-1)?.report.status).toBe('scoped')
 		f.actor.send({
 			type: 'OBSERVED',
 			facts: { ...input, generation: 1, error: new Error('Catalog failed') }

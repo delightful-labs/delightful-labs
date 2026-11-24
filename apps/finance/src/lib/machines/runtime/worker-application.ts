@@ -1,3 +1,4 @@
+import type { WorkspaceLease } from 'delightful-local-first/workspace/contracts'
 import { createOrderedSignOutMachine } from 'delightful-local-first/session/sign-out/workflow'
 import {
 	financeAtprotoMachine,
@@ -78,7 +79,11 @@ import type {
 } from '../../contracts/worker-application.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 import { projectAccountArchiveFeedback } from '../../contracts/account-archive-feedback.js'
-import { createFinanceFormsMachine, selectFinanceFormsView } from './worker-forms.js'
+import {
+	createFinanceFormsMachine,
+	selectFinanceFormsView,
+	selectFinanceFormsLease
+} from './worker-forms.js'
 import type { AccountCreationObservation } from '../../contracts/account-creation-contract.js'
 import type { WorkerFormCommand, FinanceFormsObservation } from '../../contracts/worker-forms.js'
 import { EXPENSE, type TransactionKind } from '../../domain/transaction-kind.js'
@@ -92,8 +97,6 @@ import { emptyLedgerFilters, selectWorkerLedger } from './worker-ledger.js'
 import type { TransactionListFilters } from '../../filters/transaction-list-filters.js'
 import { defaultTransactionCategory } from '../../validation/transactions.js'
 import {
-	financeQueriesMachine,
-	selectFinanceQueryFacts,
 	combineFinanceQueryFacts,
 	emptyFinanceContentFacts,
 	type FinanceContentFacts,
@@ -102,6 +105,8 @@ import {
 import {
 	financeWorkspaceAccessMachine,
 	selectFinanceWorkspaceAccessFacts,
+	financeMembershipAccess,
+	financeWorkspaceAccess,
 	type WorkspaceAccessFacts
 } from './worker-workspace-access.js'
 
@@ -238,12 +243,7 @@ function navigationObservation(context: Context): WorkspaceNavigationFacts {
 			? 'failed'
 			: selected.scoped && !selected.workspaceId
 				? 'denied'
-				: member === undefined
-					? 'waiting'
-					: member?.userId === context.ready?.identityId &&
-						  member?.organizationId === selected.workspaceId
-						? 'ready'
-						: 'denied'
+				: financeMembershipAccess(context.ready?.identityId, selected.workspaceId, member)
 	return {
 		...route,
 		generation: context.selection.revision,
@@ -375,6 +375,31 @@ function formsObservation(context: Context): FinanceFormsObservation {
 	}
 }
 
+function formsInput(context: Context) {
+	return {
+		observation: formsObservation(context),
+		selectionRevision: context.selection.revision,
+		read: {
+			binding: required(context.readBinding),
+			selection: context.selection,
+			transactionId: context.transactionId
+		},
+		access: context.accessFacts
+	}
+}
+function contentForAccess(context: Context, access: WorkspaceAccessFacts): FinanceContentFacts {
+	const status = financeWorkspaceAccess(
+		context.ready?.identityId,
+		context.selection.workspaceId,
+		access
+	)
+	if (status === 'failed') return emptyFinanceContentFacts(required(context.readBinding), 'failed')
+	if (!context.selection.workspaceId || status === 'denied')
+		return emptyFinanceContentFacts(required(context.readBinding), 'ready')
+	if (status !== 'allowed') return emptyFinanceContentFacts(required(context.readBinding))
+	return context.contentFacts ?? emptyFinanceContentFacts(required(context.readBinding))
+}
+
 function transactionContextForRoute(route: WorkspaceRoute | undefined) {
 	const location = route ? transactionListLocation(route.search) : undefined
 	return {
@@ -503,6 +528,11 @@ export function createFinanceWorkerMachine({
 				FORMS_VIEW: types<{ binding: object; view: ReturnType<typeof selectFinanceFormsView> }>(),
 				FORMS_CLOSED: types<{ binding: object }>(),
 				FORMS_FAILED: types<{ binding: object }>(),
+				CONTENT_FACTS: types<{
+					binding: object
+					lease: WorkspaceLease
+					facts: FinanceContentFacts
+				}>(),
 				OPEN_TRANSACTION: types<WorkerCommandScope & { transactionId: string | null }>(),
 				SET_ACCOUNT_SELECTED: types<WorkerCommandScope & { accountId: string; checked: boolean }>(),
 				SET_ALL_ACCOUNTS_SELECTED: types<WorkerCommandScope & { checked: boolean }>(),
@@ -512,11 +542,9 @@ export function createFinanceWorkerMachine({
 				NATIVE_FAILED: types(),
 				READ_DISPOSAL_FAILED: types()
 			},
-			internalEvents: { RESTART_FINANCIAL_READS: types() },
 			children: {
 				oauth: types<ActorRefFrom<typeof financeAtprotoMachine>>(),
 				sessionObservation: types<ActorRefFrom<typeof observeSession>>(),
-				queries: types<ActorRefFrom<typeof financeQueriesMachine>>(),
 				workspaceAccess: types<ActorRefFrom<typeof financeWorkspaceAccessMachine>>(),
 				forms: types<ActorRefFrom<ReturnType<typeof createFinanceFormsMachine>>>()
 			}
@@ -526,7 +554,6 @@ export function createFinanceWorkerMachine({
 			navigateProvider,
 			signOut: financeSignOutMachine,
 			observeSession,
-			queries: financeQueriesMachine,
 			workspaceAccess: financeWorkspaceAccessMachine,
 			closeSession: sessionCloseMachine,
 			retrySession: createSessionChangeMachine<SessionRuntimeChangeInput>((input) => input),
@@ -770,7 +797,9 @@ export function createFinanceWorkerMachine({
 							}
 						: event.view.status === 'loading' &&
 							  context.formsView?.status === 'ready' &&
-							  context.formsView.selectionRevision === event.view.selectionRevision
+							  context.formsView.selectionRevision === event.view.selectionRevision &&
+							  event.view.workspaceLease !== undefined &&
+							  event.view.workspaceLease === context.formsView.workspaceLease
 							? // Keep the current scope's form DOM mounted while its fixed children publish updates.
 								// Commands still go through the latest observations and native admission guards.
 								undefined
@@ -1008,12 +1037,10 @@ export function createFinanceWorkerMachine({
 						if (context.forms)
 							enq.sendTo(context.forms.owner, {
 								type: 'OBSERVE',
-								observation: formsObservation(next),
-								selectionRevision: next.selection.revision
+								...formsInput(next)
 							})
 						if (retainReads) return { context: next }
 						if (retainAccess) {
-							enq.raise({ type: 'RESTART_FINANCIAL_READS' })
 							return { context: { ...next, formsView: undefined } }
 						}
 						return {
@@ -1397,14 +1424,15 @@ export function createFinanceWorkerMachine({
 									context.navigate,
 									context.accountOrderStorage,
 									(event) => self.send(event),
-									context.route !== undefined
+									context.route !== undefined,
+									(lease, facts) => self.send({ type: 'CONTENT_FACTS', binding, lease, facts }),
+									() => self.send({ type: 'READ_DISPOSAL_FAILED' })
 								),
 								{
 									id: 'forms',
 									input: {
-										observation: formsObservation(context),
-										offline: context.offline,
-										selectionRevision: context.selection.revision
+										...formsInput(context),
+										offline: context.offline
 									}
 								}
 							)
@@ -1420,7 +1448,34 @@ export function createFinanceWorkerMachine({
 							return { context: { forms: { binding, owner, observer }, formsView: undefined } }
 						},
 						initial: 'reading',
-						on: { RESTART_FINANCIAL_READS: { target: '.reading' } },
+						on: {
+							CONTENT_FACTS: ({ context, event }, enq) => {
+								if (
+									!context.forms ||
+									event.binding !== context.ready?.binding ||
+									event.lease !== selectFinanceFormsLease(context.forms.owner.getSnapshot()) ||
+									event.facts.binding !== context.readBinding ||
+									event.lease.request.workspaceId !== context.selection.workspaceId ||
+									financeWorkspaceAccess(
+										context.ready?.identityId,
+										context.selection.workspaceId,
+										context.accessFacts
+									) !== 'allowed'
+								)
+									return
+								const contentFacts = event.facts
+								const facts = combineFinanceQueryFacts(contentFacts, context.accessFacts)
+								if (context.forms)
+									enq.sendTo(context.forms.owner, {
+										type: 'OBSERVE',
+										...formsInput({ ...context, facts, contentFacts })
+									})
+								return {
+									target: facts.status === 'failed' ? '.readFailed' : '.reading',
+									context: { facts, contentFacts }
+								}
+							}
+						},
 						invoke: {
 							id: 'workspaceAccess',
 							src: 'workspaceAccess',
@@ -1435,21 +1490,16 @@ export function createFinanceWorkerMachine({
 							onSnapshot: ({ context, event }, enq) => {
 								const accessFacts = selectFinanceWorkspaceAccessFacts(event.snapshot)
 								if (accessFacts.binding !== context.accessBinding) return
-								const contentFacts =
-									accessFacts.status === 'failed'
-										? emptyFinanceContentFacts(required(context.readBinding), 'failed')
-										: (context.contentFacts ??
-											emptyFinanceContentFacts(required(context.readBinding)))
+								const contentFacts = contentForAccess(context, accessFacts)
 								const facts = combineFinanceQueryFacts(contentFacts, accessFacts)
 								if (context.forms)
 									enq.sendTo(context.forms.owner, {
 										type: 'OBSERVE',
-										observation: formsObservation({ ...context, facts, accessFacts }),
-										selectionRevision: context.selection.revision
+										...formsInput({ ...context, facts, contentFacts, accessFacts })
 									})
 								return accessFacts.status === 'failed'
 									? { target: '.readFailed', context: { accessFacts, contentFacts, facts } }
-									: { context: { accessFacts, facts } }
+									: { context: { accessFacts, facts, contentFacts } }
 							},
 							onError: ({ context }, enq) => {
 								const accessFacts: WorkspaceAccessFacts = {
@@ -1468,55 +1518,13 @@ export function createFinanceWorkerMachine({
 								if (context.forms)
 									enq.sendTo(context.forms.owner, {
 										type: 'OBSERVE',
-										observation: formsObservation({ ...context, facts, accessFacts }),
-										selectionRevision: context.selection.revision
+										...formsInput({ ...context, facts, contentFacts, accessFacts })
 									})
 								return { target: '.readFailed', context: { facts, contentFacts, accessFacts } }
 							}
 						},
 						states: {
-							reading: {
-								invoke: {
-									id: 'queries',
-									src: 'queries',
-									input: ({ context, self }) => ({
-										ready: required(context.ready),
-										selection: context.selection,
-										transactionId: context.transactionId,
-										binding: required(context.readBinding),
-										reportDisposalFailure: () => self.send({ type: 'READ_DISPOSAL_FAILED' })
-									}),
-									onSnapshot: ({ context, event }, enq) => {
-										const contentFacts = selectFinanceQueryFacts(event.snapshot)
-										const facts = combineFinanceQueryFacts(contentFacts, context.accessFacts)
-										if (facts.binding !== context.readBinding) return
-										const next = { ...context, facts }
-										if (context.forms)
-											enq.sendTo(context.forms.owner, {
-												type: 'OBSERVE',
-												observation: formsObservation(next),
-												selectionRevision: context.selection.revision
-											})
-										return facts.status === 'failed'
-											? { target: 'readFailed', context: { facts, contentFacts } }
-											: { context: { facts, contentFacts } }
-									},
-									onError: ({ context }, enq) => {
-										const contentFacts = emptyFinanceContentFacts(
-											required(context.readBinding),
-											'failed'
-										)
-										const facts = combineFinanceQueryFacts(contentFacts, context.accessFacts)
-										if (context.forms)
-											enq.sendTo(context.forms.owner, {
-												type: 'OBSERVE',
-												observation: formsObservation({ ...context, facts }),
-												selectionRevision: context.selection.revision
-											})
-										return { target: 'readFailed', context: { contentFacts, facts } }
-									}
-								}
-							},
+							reading: {},
 							readFailed: {
 								on: {
 									RETRY_WORKSPACE_NAVIGATION: ({ context, event }) =>
@@ -1944,7 +1952,7 @@ export function createFinanceWorkerMachine({
 							: undefined
 				}
 			},
-			cleanupFailed: { on: { CLOSE: {}, NATIVE_FAILED: {} } },
+			cleanupFailed: { on: { CLOSE: {}, NATIVE_FAILED: {}, FORMS_VIEW: {}, FORMS_FAILED: {} } },
 			failed: {
 				on: {
 					SELECT_CONTEXT: ({ context, event }) =>
@@ -2136,7 +2144,7 @@ export function selectFinanceWorkerView(
 			snapshot.status === 'active' && archive && archive.binding === context.readBinding
 				? projectAccountArchiveFeedback(archive.view.feedback)
 				: null,
-		workspaceStartup: forms?.initialization ?? null,
+		workspaceStartup: group?.initialization ?? null,
 		accountCreation: forms?.creation ?? null,
 		accountArchive: archive
 			? {
