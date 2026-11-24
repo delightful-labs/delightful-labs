@@ -12,7 +12,10 @@ and pending-content subscriptions; all affected final suites pass. Actual
 schema-driven handover passes in both apps, and current-main
 local Finance/Clipper data passes exact comparisons and snapshot recovery. The user
 excluded the older alpha.60 annotations store from migration; its original and
-complete snapshot are preserved. Hosted production, retained browser profiles and
+complete snapshot are preserved. The first hosted qualification found Finance
+startup, transfer-feedback and workspace-browser failures; their investigation
+and corrective qualification are recorded below. Hosted production, retained
+browser profiles and
 external chunk recovery remain release gates. No production deployment has been made.
 
 **Input**: Upgrade the Delightful Labs monorepo to Jazz beta, using Jazz as
@@ -606,7 +609,7 @@ and verification reported here. No release authorization is inferred.
 | Clipper native worker suite | Combined `test:worker` passes all 33 existing worker cases plus six actual schema-driven handover cases across the three engines. Covers broker-owner proof expiry, refused proofs, visible retry, late-port cleanup, resource release, descendant delivery and cached-old-build loops. |
 | Clipper production offline suite | Final implementation: all 12 cases pass, including source edits through complete offline restarts, HTTP-cache-cleared readers with endpoints down, existing/restored/expired identities, shell updates, native annotations and restored-profile reconciliation. The captured reverse-metadata failure is corrected by native query selection; no original assertion or timeout was weakened. |
 | Packaged Clipper extension | Build and all 12 Chromium cases pass, including offline capture/browser restart, explicit restoration, hostile messages, stale account connections and repeated settings teardown. |
-| Production builds | Final Finance production build passes locally. Both Clipper production offline builds pass with the Netlify adapter; the extension test build passes. No deployment occurred. |
+| Production builds | Final Finance production build passes locally. Both Clipper production offline builds pass with the Netlify adapter; the extension test build passes. Subsequent preview evidence is recorded below; no production deployment occurred. |
 | Native backup/export | All 20 cases pass. |
 | Backup/restore | All 72 functional cases pass; seven existing opt-in performance measurements are skipped. Exact fields, relationships, full object sets and attachment bytes are covered. |
 | IndexedDB account store | Packaging/types and all 60 native browser cases pass. |
@@ -680,8 +683,10 @@ instructions. B4 passes the selected local suites, including actual schema-drive
 handover in both apps, native capture-metadata arrival, persistent offline restart
 and restored-profile reconciliation, and packaged extension checks. B5's
 current-main local-store comparisons and snapshot recovery are complete with
-explicit snapshot authorization. Hosted production/preview destinations, retained
-browser profiles and external chunks remain open. The user explicitly excluded
+explicit snapshot authorization. Preview project/namespace/region, private worker
+transport and fresh-profile save/reload checks pass. Production destinations,
+retained browser profiles and external chunks remain open. The user explicitly
+excluded
 the older annotations store's migration. B6 has not started; production deployment
 is not authorized.
 
@@ -721,6 +726,84 @@ Remaining release work:
 4. Review deployment compatibility, same namespace/identity/region and the complete
    recovery evidence before requesting production authorization. Migrating the
    excluded alpha.60 annotations experiment requires separately scoped work.
+
+### Hosted PR qualification and corrections
+
+Draft [PR #56](https://github.com/delightful-labs/delightful-labs/pull/56) was
+opened from `feat/jazz-beta-upgrade` at `743c6926`, after the user's explicit
+commit/push/draft-PR authorization. Main was fetched again and remains `9344dff2`.
+The first hosted runs passed all Foundation and Clipper jobs, including Local
+First consumers/browser qualification, UI, website, Clipper web, packaged
+extension, workers/offline/sample data and tooling. Finance's types/unit/build,
+PWA, restore, feature flags, authentication, permissions, application-1 and
+presentation passed. Application-2 failed two unlink-feedback assertions;
+startup failed one stalled-connection save; workspace failed three account cases.
+These failures remain qualification evidence, not green checks inferred from
+local runs. The original artifacts were retained and inspected before changes.
+
+The stalled-connection test reproduced with its unchanged 15-second success
+assertion. Temporary stage-only diagnostics showed the edit stopped at its
+transaction reads, before commit. Beta's published `ReadTierOptions` and
+`resolveEffectiveQueryExecutionOptions` document a five-second initial remote
+preference for implicit browser reads; explicit `local-first` reads default to
+zero initial remote wait. The ordinary save's transaction-local edit/tag/check
+reads now select this supported option explicitly. See the
+[pinned SDK read-option lowering](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/packages/jazz-tools/src/runtime/client.ts).
+Transaction ownership, eligibility checks, atomic writes, local durability and later rejection tracking
+are unchanged. The original stalled-connection scenario then passed, as did its
+17 persistence unit cases. The complete seven-case production-startup suite also
+passes, including full browser restart, silent established/new connections,
+offline saves, later authority rejection and retained bank history. No SDK patch
+or timeout increase was introduced.
+
+The unlink artifacts showed the transaction already unlinked and the suggestions
+panel absent. Its existing machine retained `transferSaved`, but the component
+hid the panel whenever the editor became `unselected`. Keep the machine's
+selected feedback visible even after linked-only controls disappear. Both
+original failing browser scenarios pass with their success and persistence
+assertions intact. No new copy or domain state was added.
+
+Account permissions passed sequentially, then reproduced a timeout under the
+hosted two-worker setting. Full sanitized machine diagnostics distinguish the
+expected member `partial/profileLink` assessment from an SDK exception: all
+three record counts were one and no error was present. The shared selection
+helper always dispatched `selectOption`, including an already-selected workspace,
+then accepted an already-matching URL without waiting for the resulting history
+commit. It now avoids that artificial same-value change event and, when a change
+is needed, waits for its actual main-frame navigation commit. The unchanged five
+permission scenarios pass with two workers, as do all 55 cases in the complete
+workspace scope. All 1,849 Finance unit/native cases pass again with disposable
+listener access. A sandboxed run could not bind its native fixture listeners;
+it was stopped and diagnosed before the permitted run. This does not establish
+a cause for every earlier save or browser teardown failure. Account cases retain
+sanitized diagnostic attachments.
+
+Both Vercel deployments are READY previews for the exact PR head and verified
+project/team. Runtime logs show `iad1` and native namespace
+`preview-feat-jazz-beta-upgrade-ed86022e`, separate per project. Existing private
+CLI OIDC authentication supplies the documented Trusted Sources header. The
+connector's share-link operation was rejected by automatic approval review
+because it would grant publicly shareable access; no such link was created and
+no protection or Trusted Sources setting was changed. The installed native CLI
+misparsed `env run` child arguments, so its installed JavaScript CLI was used.
+Fresh disposable browser profiles and origin-restricted requests were used.
+
+Browser context headers did not reach Jazz's SharedWorker WebSocket: observed
+handshakes returned protection's 302 while account HTTP responses were 200.
+Applying the same private authentication to the verified same-origin worker via
+CDP produced 101 handshakes, Finance's Overview and Clipper's Saved articles with
+`Private library synced.`. Hidden sidebar controls and an incorrect generic
+Library heading were corrected in the temporary verification harness. These were
+harness failures, not app fixes. Keeping a debugger attached also kept the old
+broker alive during a hard navigation and prevented a normal reopen. Detaching
+after the authenticated handshake restored native worker lifetime. With that
+harness correction, a synthetic Finance account save/reload and a Clipper
+example.com capture/reload both passed. Clipper's real resolve/extract API
+responses were 200 and each reopen negotiated a new 101 connection. No page
+exceptions or foreign-origin requests were observed. These preview checks used
+new disposable identities; the profiles were removed. No user browser or
+production store was used. This is hosted startup/transport and fresh-profile
+write/reload evidence, not complete production or retained-profile qualification.
 
 The maintained fixture commands run from `apps/finance`:
 

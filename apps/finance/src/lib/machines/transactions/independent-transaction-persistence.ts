@@ -144,21 +144,30 @@ function planTransaction(
 const read = createAsyncLogic({
 	run: ({ input }: { input: { tx: Transaction; values: IndependentTransaction } }) =>
 		input.tx.all(
-			app.tags.where({ organizationId: input.values.organizationId, kind: input.values.kind })
+			app.tags.where({ organizationId: input.values.organizationId, kind: input.values.kind }),
+			{ tier: 'local-first' }
 		)
 })
 const readEdit = createAsyncLogic({
 	run: async ({ input }: { input: { tx: Transaction; id: string } }) => {
 		const results = await Promise.allSettled([
-			Promise.resolve().then(() => input.tx.all(app.transactions.where({ id: input.id }))),
 			Promise.resolve().then(() =>
-				input.tx.all(app.transactionTags.where({ transactionId: input.id }))
+				input.tx.all(app.transactions.where({ id: input.id }), { tier: 'local-first' })
 			),
 			Promise.resolve().then(() =>
-				input.tx.all(app.internalTransfers.where({ expenseTransactionId: input.id }))
+				input.tx.all(app.transactionTags.where({ transactionId: input.id }), {
+					tier: 'local-first'
+				})
 			),
 			Promise.resolve().then(() =>
-				input.tx.all(app.internalTransfers.where({ incomeTransactionId: input.id }))
+				input.tx.all(app.internalTransfers.where({ expenseTransactionId: input.id }), {
+					tier: 'local-first'
+				})
+			),
+			Promise.resolve().then(() =>
+				input.tx.all(app.internalTransfers.where({ incomeTransactionId: input.id }), {
+					tier: 'local-first'
+				})
 			)
 		])
 		const [rows, links, expenseTransfers, incomeTransfers] = results
@@ -186,7 +195,7 @@ function editable(existing: TransactionRow | undefined, values: IndependentTrans
 }
 const readMoveCheck = createAsyncLogic({
 	run: ({ input }: { input: { tx: Transaction; id: string } }) =>
-		input.tx.all(app.checks.where({ id: input.id }))
+		input.tx.all(app.checks.where({ id: input.id }), { tier: 'local-first' })
 })
 const prepare = createAsyncLogic({
 	run: ({

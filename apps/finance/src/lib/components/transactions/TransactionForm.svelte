@@ -366,7 +366,7 @@
 						{m['transfers.convert_to_transfer']()}
 					</label>
 				{/if}
-				{#if mode === 'edit' && onLinkCounterpart && transferEditorState !== 'unselected'}
+				{#if mode === 'edit' && onLinkCounterpart && (transferEditorState !== 'unselected' || transferStatusLabel !== null)}
 					<InternalTransferSuggestions
 						suggestions={transferSuggestions}
 						writableSuggestionIds={writableTransferSuggestionIds}
