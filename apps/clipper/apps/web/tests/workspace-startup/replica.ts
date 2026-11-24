@@ -1,5 +1,5 @@
 import { createActor, toPromise, type OutputFrom } from 'xstate'
-import { ReadTier } from 'jazz-tools'
+import { ReadTier, PersistedWriteRejectedError } from 'jazz-tools'
 import { createJazzClient } from 'jazz-tools/client'
 import { browserAccountStore, fixtureServerUrl } from '../browser-account-store.js'
 import { jazzRuntimeSources } from '../../src/lib/backend/jazz/runtime-sources.js'
@@ -17,6 +17,8 @@ let completion: Promise<OutputFrom<typeof rootBootstrapMachine>> | undefined
 let discovery: Awaited<ReturnType<RootAccess['read']>> | undefined
 let barrier = Promise.withResolvers<void>()
 const writes: Pick<RootWrite, 'global'>[] = []
+const accessHistory: string[] = []
+let stopAccess: (() => void) | undefined
 
 function current() {
 	const snapshot = session?.getSnapshot()
@@ -116,6 +118,26 @@ export async function accepted() {
 	await Promise.all(writes.map((write) => write.global()))
 	return remoteRoots()
 }
+export function observeAccess() {
+	if (stopAccess) throw new Error('Native access observation already started')
+	stopAccess = nativeBinding().access.subscribe(
+		(access) => accessHistory.push(access),
+		() => accessHistory.push('failed')
+	)
+}
+export function access() {
+	return accessHistory.at(-1)
+}
+export async function acceptanceOutcome() {
+	try {
+		await Promise.all(writes.map((write) => write.global()))
+		return 'accepted'
+	} catch (error) {
+		if (error instanceof PersistedWriteRejectedError && error.code === 'permission_denied')
+			return 'rejected'
+		throw error
+	}
+}
 export async function save(url: string) {
 	const records = nativeBinding().createRecords()
 	const result = await toPromise(
@@ -145,6 +167,9 @@ export async function documents(remote = false) {
 	).map((row) => ({ libraryId: row.libraryId, sourceUrl: row.sourceUrl }))
 }
 export async function close() {
+	stopAccess?.()
+	stopAccess = undefined
+	accessHistory.length = 0
 	barrier.resolve()
 	if (initializer?.getSnapshot().status === 'active') initializer.send({ type: 'SHUTDOWN' })
 	await completion

@@ -4,6 +4,10 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSilentJazzProxy } from '../../../../../scripts/testing/silent-jazz-proxy.js'
+import { createJazz, remote, acceptDeviceAccounts } from 'jazz-tools/backend'
+import { app } from '../src/lib/backend/jazz/jazz.generated.js'
+import permissions from '../src/lib/backend/jazz/jazz.permissions.json' with { type: 'json' }
+import { browserCoreSecret } from './browser-core.js'
 
 let authority: Awaited<ReturnType<typeof startLocalJazzServer>>
 let dataDir: string
@@ -108,6 +112,102 @@ for (const connection of ['offline', 'unanswered']) {
 		}
 	})
 }
+test('a locally successful native save is rejected after server access changes and withdraws native access', async ({
+	browser
+}) => {
+	const context = await browser.newContext()
+	let proxy: ReturnType<typeof createSilentJazzProxy> | undefined
+	let audit: ReturnType<typeof createJazz> | undefined
+	let page: Page | undefined
+	try {
+		page = await blank(context)
+		const identity = await page.evaluate(async () => {
+			const path = '/tests/workspace-startup/replica.ts'
+			const replica = await import(/* @vite-ignore */ path)
+			const identity = await replica.open()
+			replica.start()
+			replica.releaseDiscovery()
+			await replica.result()
+			if ((await replica.save('https://example.com/before-native-rejection')) !== 'saved')
+				throw new Error('Baseline content was not saved')
+			await replica.accepted()
+			replica.observeAccess()
+			return identity.identityId
+		})
+		const active = page
+		await expect
+			.poll(() =>
+				active.evaluate(async () => {
+					const path = '/tests/workspace-startup/replica.ts'
+					return (await import(/* @vite-ignore */ path)).access()
+				})
+			)
+			.toBe('allowed')
+		// Keep the browser on its production same-origin endpoint. Only its
+		// backend-to-core transport goes through the shared native proxy.
+		await authority.stop()
+		authority = await startLocalJazzServer({
+			host: '127.0.0.1',
+			port: 0,
+			dataDir,
+			appId: '2db98ae3-fcf1-41e8-b7d3-9818496bde60'
+		})
+		proxy = createSilentJazzProxy(authority.url)
+		proxy.silence()
+		await proxy.listen(5181)
+		audit = createJazz({
+			app,
+			permissions,
+			store: remote({ url: authority.url, appId: authority.appId, secret: browserCoreSecret }),
+			authenticate: acceptDeviceAccounts
+		})
+		await audit.ready()
+		// Change the serving permission predicate through a real backend write.
+		// The disconnected client still has its old owned root locally.
+		const owner = crypto.randomUUID()
+		await audit.db.update(app.libraries, identity, { ownerId: owner }).wait({ tier: 'global' })
+		expect(
+			await page.evaluate(async () => {
+				const path = '/tests/workspace-startup/replica.ts'
+				return (await import(/* @vite-ignore */ path)).save(
+					'https://example.com/after-native-rejection'
+				)
+			})
+		).toBe('saved')
+		const query = app.libraryDocuments.where({ libraryId: identity })
+		expect((await audit.db.all(query, { tier: 'remote' })).map((row) => row.sourceUrl)).toEqual([
+			'https://example.com/before-native-rejection'
+		])
+		proxy.resume()
+		expect(
+			await page.evaluate(async () => {
+				const path = '/tests/workspace-startup/replica.ts'
+				return (await import(/* @vite-ignore */ path)).acceptanceOutcome()
+			})
+		).toBe('rejected')
+		await expect
+			.poll(() =>
+				active.evaluate(async () => {
+					const path = '/tests/workspace-startup/replica.ts'
+					return (await import(/* @vite-ignore */ path)).access()
+				})
+			)
+			.toBe('unknown')
+		expect((await audit.db.all(query, { tier: 'remote' })).map((row) => row.sourceUrl)).toEqual([
+			'https://example.com/before-native-rejection'
+		])
+		expect(
+			(await audit.db.one(app.libraries.where({ id: identity }), { tier: 'remote' }))?.ownerId
+		).toBe(owner)
+	} finally {
+		if (page && !page.isClosed()) await close(page)
+		await context.close()
+		await proxy?.close()
+		await audit?.close()
+		await authority.stop()
+		await startAuthority()
+	}
+})
 test.afterAll(async () => {
 	await authority?.stop()
 	if (dataDir) await rm(dataDir, { recursive: true, force: true })

@@ -1080,3 +1080,24 @@ Clipper startup cases and Finance's existing fully negotiated stalled-connection
 save case pass with this shared fixture. Both consumer test types and monorepo
 tooling tests pass. The helper is explicitly verification-only for deployment
 selection; CI selection remains conservative.
+
+## Native later permission rejection
+
+The Clipper native startup fixture now qualifies a real stale-access write, using
+the unchanged same-origin browser endpoint. A proxy pauses only the app backend's
+connection to the serving core. A separate native backend changes the canonical
+root's owner, making the serving permission predicate false while the disconnected
+replica retains its old allowed root. The existing domain save completes locally.
+After reconnection its exact global receipt rejects with the SDK's
+`PersistedWriteRejectedError`/`permission_denied`; unrelated errors and timeouts
+fail the test. The ongoing native access capability withdraws allowed evidence.
+Independent backend queries retain the original clip and exclude the rejected
+one, with the changed owner still authoritative. This is a disposable server-side
+permission mutation, not a product ownership-transfer feature or schema change.
+
+All four native Clipper startup cases pass together: independent concurrent
+initialization, partial offline, partial unanswered and later rejection. This
+qualifies native adapter facts and write settlement, alongside the previously
+qualified production owner/reader drain cases; it does not claim to enumerate all
+browser schedules. Finance's independent concurrent adapter case and final
+new-head hosted qualification remain open.
