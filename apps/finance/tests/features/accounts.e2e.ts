@@ -200,7 +200,9 @@ for (const scenario of archiveScenarios) {
 				const subject = await subjectContext.newPage()
 				subject.on('console', (message) => {
 					if (message.text().startsWith('[state-machine]'))
-						diagnostics.push(Promise.all(message.args().map((argument) => argument.jsonValue())))
+						diagnostics.push(
+							Promise.allSettled(message.args().map((argument) => argument.jsonValue()))
+						)
 				})
 				await start(subject)
 				const subjectId = await financeFixture(subject, 'features/accounts.e2e:303')

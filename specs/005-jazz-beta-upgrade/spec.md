@@ -812,8 +812,13 @@ Clipper source was unchanged by that commit; its qualified preview remains
 `dpl_F489SGH4T4d3Yw1bNNjr44BfzViy`. Unaffected Clipper/website rebuilds were
 canceled by the existing deployment selector. Current hosted evidence is linked
 from the [PR checks](https://github.com/delightful-labs/delightful-labs/pull/56/checks).
-Only this spec was reconciled after the corrective source commit; its code,
-dependencies, schemas and tests are unchanged by that documentation update.
+After that source commit, this spec was reconciled and the test-only diagnostic
+collector was hardened to settle console-handle failures immediately if its
+worker disappears. Product code, dependencies and schemas are unchanged. The
+collector preserves partial diagnostic results without an unhandled rejection.
+Test TypeScript and the five permission cases with two workers pass after that
+test-only change. On the corrective source commit, Foundation and Clipper have
+passed again; Finance's hosted startup and complete workspace scopes also pass.
 
 The maintained fixture commands run from `apps/finance`:
 
