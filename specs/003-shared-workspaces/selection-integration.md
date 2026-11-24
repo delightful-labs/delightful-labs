@@ -418,3 +418,28 @@ while restarting the access source. The source's initial loading snapshot is not
 new denial evidence. Actual absence or failure still withdraws that knowledge;
 new native bindings and targets do not inherit it. This avoids constructing and
 immediately draining an unnecessary first lease during controller reattachment.
+
+## Clipper native access boundary
+
+The native library builder now requires separate `identityId` and `workspaceId`
+inputs. Its root, records and library capabilities use that explicit target;
+the account producer supplies the identity ID as the canonical workspace by
+current Clipper policy. Compatibility still requires the canonical ID, native
+owner and bootstrap version. This does not add arbitrary-workspace creation.
+
+The builder also supplies an ongoing local root-access subscription. Empty local
+results remain unknown, native compatible rows allow access, incompatible rows
+deny it, and native errors have a distinct callback. No bootstrap result, directory
+completion or remote connection status produces that evidence. The native client
+retains ownership; the caller owns the returned subscription disposer. This
+boundary is qualified but not yet consumed by application readiness.
+
+The next production composition must keep that observer and identity/startup
+outside the DLF selected library owner. Before switching readiness to that owner,
+the library must consume an explicit native collection-release receipt, as Finance
+queries already do, rather than classifying completion before a stop-time disposer
+runs. Clean domain drains and that receipt permit terminal release. Disposal
+failure retains unresolved custody, blocks native client closure and cannot admit
+a replacement. Shared-owner admission must disappear before the existing capture,
+reader, image, search and write descendants receive shutdown. Their issued work
+remains bound to the original resources until real settlement.

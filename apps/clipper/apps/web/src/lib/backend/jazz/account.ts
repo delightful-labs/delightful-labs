@@ -21,6 +21,7 @@ function nativeAccount(config: JazzClientConfig, libraryFactory: LibraryFactory)
 				const domain = createLibraryBinding({
 					db,
 					identityId,
+					workspaceId: identityId,
 					isCurrent,
 					libraryFactory,
 					cacheNamespace

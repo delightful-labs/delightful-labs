@@ -13,6 +13,14 @@ export type RootAccess = Readonly<{
 	read: () => Promise<'compatible' | 'missing' | 'incompatible'>
 	ensure: () => RootWrite
 }>
+/** Ongoing local native evidence; bootstrap completion is not an access grant. */
+export type WorkspaceAccess = Readonly<{
+	workspaceId: string
+	subscribe: (
+		publish: (access: 'allowed' | 'unknown' | 'denied') => void,
+		failed: () => void
+	) => () => void
+}>
 export type RecoveryBinding = Readonly<{
 	source: RecoveryScopeSource
 	capability: RecoveryPhraseCapability

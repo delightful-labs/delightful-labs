@@ -923,3 +923,19 @@ native row counts still prove the write was not retargeted. This corrects the so
 Finance hosted failure on `209a2905`; Foundation and Clipper passed on that head.
 Source/Svelte/test types and scoped formatting pass. Clipper lease adoption and
 independent-replica qualification remain open.
+
+## Clipper explicit native target and ongoing access capability
+
+`createLibraryBinding` now separates identity and workspace inputs; the production
+account producer passes the canonical identity ID explicitly. Native root queries,
+records and library construction use the workspace input. A local native root
+subscription supplies ongoing allowed/unknown/denied facts and a distinct error
+callback for the upcoming shared resource-owner integration. Its disposer does
+not own the underlying identity client. Application readiness does not consume
+this capability yet, so this slice does not claim production lease adoption.
+
+All 75 affected library/readiness/native-binding/worker-binding cases pass,
+including two new real-policy fixture cases: unknown empty-root evidence becomes
+allowed after actual local persistence without a startup report, and a different
+explicit target never falls back to an existing identity root. Full coordinator,
+web, service-worker and extension type checks pass with zero Svelte diagnostics.
