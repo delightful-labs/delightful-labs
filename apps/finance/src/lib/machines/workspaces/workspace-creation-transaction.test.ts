@@ -3,9 +3,8 @@ import { app } from '../../queries.js'
 import { creationFixture, attempt, workspace } from './workspace-creation.fixture.js'
 import { waitFor } from 'xstate'
 
-describe.each(['native', 'shared'])('%s workspace transaction ownership', (owner) => {
-	const transaction = (f: ReturnType<typeof creationFixture>) =>
-		owner === 'native' ? f.transaction() : f.additionalTransaction()
+describe('shared workspace transaction ownership', () => {
+	const transaction = (f: ReturnType<typeof creationFixture>) => f.additionalTransaction()
 	it('stages one complete workspace and reports success only after local persistence', async () => {
 		const f = creationFixture()
 		const pending = Promise.withResolvers<void>()
@@ -31,10 +30,8 @@ describe.each(['native', 'shared'])('%s workspace transaction ownership', (owner
 			{ id: attempt.membershipId }
 		)
 		expect(f.wait).toHaveBeenCalledExactlyOnceWith({ tier: 'local' })
-		if (owner === 'shared') {
-			expect(f.one.mock.calls.every((call) => call[1]?.tier === 'local-first')).toBe(true)
-			expect(f.all.mock.calls.every((call) => call[1]?.tier === 'local-first')).toBe(true)
-		}
+		expect(f.one.mock.calls.every((call) => call[1]?.tier === 'local-first')).toBe(true)
+		expect(f.all.mock.calls.every((call) => call[1]?.tier === 'local-first')).toBe(true)
 		pending.resolve()
 		const done = await waitFor(actor, (s) => s.status === 'done')
 		expect(done.output).toEqual({ outcome: 'succeeded', settlement: 'locallyPersisted', workspace })

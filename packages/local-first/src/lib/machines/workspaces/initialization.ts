@@ -60,7 +60,7 @@ export type InitializationOutcome<Persistence> =
 	  }
 	| {
 			outcome: 'closed' | 'cancelled'
-			settlement: 'notStarted' | 'locallyPersisted'
+			settlement: 'notStarted' | 'locallyPersisted' | 'rejected'
 			persistence?: Persistence
 	  }
 export type BootstrapLogic<
@@ -98,6 +98,10 @@ export function createWorkspaceInitialization<
 		workspaceId: string
 	}
 	transaction: BootstrapLogic<Db, Attempt, S, Events>
+	/** Only definitive concurrency outcomes permit one authority rediscovery. Never reissue a write. */
+	reconcileBootstrap?: (
+		persistence: NonNullable<S['output']>
+	) => 'notStarted' | 'rejected' | undefined
 }) {
 	type Input = {
 		db: Db
@@ -127,6 +131,7 @@ export function createWorkspaceInitialization<
 			attempt: WorkspaceCreationAttempt | undefined
 			target: { identityId: string; workspaceId: string } | undefined
 			persistence: Persistence | undefined
+			reconciliation: 'notStarted' | 'rejected' | undefined
 			result: WorkspaceInitializationResult | undefined
 		}
 	}
@@ -252,7 +257,10 @@ export function createWorkspaceInitialization<
 						..._args.context.operation,
 						result: {
 							outcome: 'cancelled',
-							settlement: 'notStarted'
+							settlement: _args.context.operation.reconciliation ?? 'notStarted',
+							...(_args.context.operation.persistence === undefined
+								? {}
+								: { persistence: _args.context.operation.persistence })
 						}
 					}
 				} satisfies Partial<Context>
@@ -265,7 +273,10 @@ export function createWorkspaceInitialization<
 						..._args.context.operation,
 						result: {
 							outcome: 'closed',
-							settlement: 'notStarted'
+							settlement: _args.context.operation.reconciliation ?? 'notStarted',
+							...(_args.context.operation.persistence === undefined
+								? {}
+								: { persistence: _args.context.operation.persistence })
 						}
 					}
 				} satisfies Partial<Context>
@@ -291,6 +302,7 @@ export function createWorkspaceInitialization<
 				attempt: undefined,
 				target: undefined,
 				persistence: undefined,
+				reconciliation: undefined,
 				result: undefined
 			}
 		}),
@@ -472,6 +484,31 @@ export function createWorkspaceInitialization<
 					}
 				})
 			},
+			reconcilingBootstrap: {
+				invoke: completionModel.createInvoke<typeof discover, Context>({
+					src: discover,
+					input: ({ context }) => ({
+						db: context.operation.db,
+						userId: context.userId,
+						tier: options.tiers.authority
+					}),
+					onDone: ({ context, event }) => {
+						const target = required(context.operation.target)
+						const records = event.output
+						const root = records.canonicalRoot
+						const profile = records.identities?.[0]
+						const matching = root
+							? root.status === 'compatible' &&
+								root.id === target.identityId &&
+								root.id === target.workspaceId
+							: records.identities?.length === 1 &&
+								profile?.id === target.identityId &&
+								profile.initialWorkspaceId === target.workspaceId
+						return { target: matching ? 'ready' : 'completed', context: { records } }
+					},
+					onError: () => ({ target: 'completed' })
+				})
+			},
 			bootstrapping: {
 				initial: 'active',
 				states: {
@@ -524,6 +561,25 @@ export function createWorkspaceInitialization<
 								context: {
 									operation: { ...args.context.operation, persistence: event.output }
 								} satisfies Partial<Context>
+							}
+						}
+						const reconciliation =
+							event.output === undefined ||
+							event.output === null ||
+							!matchesState({ bootstrapping: 'active' }, args.value)
+								? undefined
+								: options.reconcileBootstrap?.(event.output)
+						if (reconciliation !== undefined) {
+							return {
+								target: 'reconcilingBootstrap',
+								context: {
+									operation: {
+										...args.context.operation,
+										reconciliation,
+										persistence: event.output,
+										result: event.output
+									}
+								}
 							}
 						}
 						return {

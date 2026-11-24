@@ -18,8 +18,16 @@ type Input = { userId: string }
 type Result =
 	| { outcome: 'ready'; identityId: string; workspaceId: string }
 	| { outcome: 'unavailable'; reason: 'authorityUnavailable' }
-	| { outcome: 'failed'; settlement: 'notStarted' | 'unresolved' }
-	| { outcome: 'closed'; settlement: 'notStarted' | 'locallyPersisted' | 'unresolved' }
+	| { outcome: 'failed'; settlement: 'notStarted' | 'rejected' | 'unresolved' }
+	| {
+			outcome: 'closed'
+			settlement:
+				| 'notStarted'
+				| 'locallyPersisted'
+				| 'authorityAccepted'
+				| 'rejected'
+				| 'unresolved'
+	  }
 type Report = WorkspaceInitializationReport<Result>
 const actors = new Set<{ stop(): void }>()
 afterEach(() => {
@@ -122,7 +130,9 @@ describe('fixed-binding workspace startup', () => {
 
 	it.each<Result>([
 		{ outcome: 'unavailable', reason: 'authorityUnavailable' },
-		{ outcome: 'failed', settlement: 'notStarted' }
+		{ outcome: 'failed', settlement: 'notStarted' },
+		{ outcome: 'failed', settlement: 'rejected' },
+		{ outcome: 'closed', settlement: 'authorityAccepted' }
 	])('retains $outcome independently of workspace usability', async (result) => {
 		const f = fixture()
 		f.completion.resolve(result)

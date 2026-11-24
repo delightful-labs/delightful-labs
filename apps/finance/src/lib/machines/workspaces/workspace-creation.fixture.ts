@@ -1,6 +1,6 @@
 import { afterEach, vi } from 'vitest'
 import { Transaction } from 'jazz-tools'
-import { workspaceCreationTransaction } from './workspace-creation-transaction.js'
+import { workspaceBootstrapTransaction } from './workspace-bootstrap-transaction.js'
 import { createAdditionalWorkspaceTransaction } from './workspace-additional-creation-transaction.js'
 import { workspaceInitialization } from './workspace-initialization.js'
 import { createWorkspacePersistence } from './workspace-creation-persistence.js'
@@ -55,20 +55,27 @@ export function creationFixture() {
 	const update = vi.spyOn(tx, 'update').mockImplementation(() => {})
 	const rollback = vi.spyOn(tx, 'rollback').mockResolvedValue(true)
 	// The SDK commit handle is opaque; mock this I/O boundary, not the machine states.
-	const wait = vi.fn(async (_options: { tier: 'local' }) => {})
-	const commit = vi.spyOn(tx, 'commit').mockImplementation(vi.fn().mockReturnValue({ wait }))
+	const wait = vi.fn(async (_options?: { tier: 'local' }) => {})
+	const commit = vi.fn().mockReturnValue({ wait })
+	vi.spyOn(tx, 'commit').mockImplementation(commit)
 	const beginTransaction = vi.fn(() => tx)
-	const beginSerializableTransaction = vi.fn(() => {
-		throw new Error('Automatic fake data must be disabled in workspace fixtures')
+	const serializable = new Transaction('serializable', () => {
+		throw new Error('Unit fixture must not open a Jazz runtime')
 	})
+	vi.spyOn(serializable, 'one').mockImplementation(one)
+	vi.spyOn(serializable, 'all').mockImplementation(all)
+	vi.spyOn(serializable, 'insert').mockImplementation(insert)
+	vi.spyOn(serializable, 'rollback').mockImplementation(rollback)
+	vi.spyOn(serializable, 'commit').mockImplementation(commit)
+	const beginSerializableTransaction = vi.fn(() => serializable)
 	const readScope = new Transaction('mergeable', () => {
 		throw new Error('Unit fixture must not open a Jazz runtime')
 	})
 	const hydrate = vi.spyOn(readScope, 'all').mockResolvedValue([])
 	hydrate.mockResolvedValueOnce([{ id: profileId, userId }])
 	const db = { beginTransaction, beginSerializableTransaction, all: readScope.all.bind(readScope) }
-	function transaction(purpose: 'additional' | 'bootstrap' = 'additional') {
-		const actor = createActor(workspaceCreationTransaction, { input: { db, attempt, purpose } })
+	function bootstrapTransaction() {
+		const actor = createActor(workspaceBootstrapTransaction, { input: { db, attempt } })
 		cleanups.push(() => actor.stop())
 		actor.start()
 		return actor
@@ -92,7 +99,7 @@ export function creationFixture() {
 		const getConfig = vi.fn().mockReturnValue({ serverUrl: 'https://unused.invalid' })
 		const actor = createActor(workspaceInitialization, {
 			input: {
-				db: { beginTransaction, all: discover, getConfig },
+				db: { beginSerializableTransaction, all: discover, getConfig },
 				userId
 			}
 		})
@@ -111,9 +118,10 @@ export function creationFixture() {
 		wait,
 		commit,
 		beginTransaction,
+		beginSerializableTransaction,
 		hydrate,
 		db,
-		transaction,
+		bootstrapTransaction,
 		additionalTransaction,
 		persistence
 	}

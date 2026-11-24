@@ -146,14 +146,22 @@ that root locally; this mode does not authorize creating an arbitrary replacemen
 Apps using directory/provenance discovery retain the conservative authority behavior.
 Qualify actual storage convergence before claiming the canonical mode is safe for an app.
 
-A ready result includes `persistence` only when bootstrap issued a successful write. Keep
-its native receipt for app-specific remote-status observation; an existing-root result has
-no new receipt. Shutdown/cancellation during bootstrap retains the invocation until settlement
+A ready result includes `persistence` when bootstrap was attempted. Preserve its actual
+outcome and native receipt for app-specific status observation; opening an existing marker
+without attempting bootstrap has no new receipt. Shutdown/cancellation during bootstrap retains the invocation until settlement
 and cannot publish ready afterward, even if a noncancelable write leaf finishes successfully.
 When the initializer maps that successful completion to closed/cancelled, it retains the
 persistence receipt; a child's own interruption result is preserved verbatim. A concrete
 bootstrap actor with a larger event protocol can supply its full event type as the factory's
 last generic parameter; do not narrow its actor logic through a cast or an app supervisor.
+
+An authority-required adapter may supply `reconcileBootstrap` to classify a definitive
+concurrency outcome as `notStarted` or `rejected`. The initializer then performs exactly one
+authority discovery and accepts only its original canonical target. It never reissues the
+write or adopts another marker. Uncertain writes and permission failures must not be classified
+as concurrency recovery. If rediscovery succeeds, `persistence` still contains the original
+attempt's result; it does not become a successful-write receipt. Shutdown preserves that result
+and its rejection settlement while refusing a late discovery answer.
 
 `createWorkspaceStartupOwner` from `workspace/startup` owns initialization for one native
 session binding. Supply the existing initializer and a pure provenance projection; actor input
@@ -185,6 +193,15 @@ For explicit additional creation, compose:
    atomic transaction actor. `workspace/creation/workflow` supplies reusable transaction ownership.
 4. `workspace/creation-owner`: owns binding replacement, explicit retry/new commands and draining.
    Project the app's attempt into `WorkspaceCreationDialog` from `workspace`.
+
+`workspace/creation/workflow` also owns transactions requiring authority confirmation.
+Supply either the existing `persistLocal` leaf or `authority: { confirm, isRejected }`.
+The latter waits for the exact native global receipt and reports `authorityAccepted` or a
+definitive `rejected` settlement. A timeout/transport failure remains unresolved custody;
+`isRejected` must identify an actual rejection receipt. Cancellation and shutdown wait through
+confirmation. `open(attempt)` and `retainDetached(receipt, attempt)` receive the original
+immutable attempt so scoped capabilities can retain uncertain resources with their native Db.
+Existing zero-argument acquisition and single-argument retainers remain valid callbacks.
 
 `workspace/workflow` supplies selection and resource-release ownership; compose your selected
 resource actors underneath it. Routes and workspace URLs stay app-owned. Naming uses

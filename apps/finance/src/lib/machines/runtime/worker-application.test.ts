@@ -390,7 +390,13 @@ function fixture(
 					navigation: createWorkspaceNavigationMachine({ one: async () => null }, navigate),
 					db: formDb,
 					initialization: {
-						db: initialization ?? { ...transactionDb.db, getConfig: () => ({ serverUrl: '' }) },
+						db: initialization ?? {
+							...transactionDb.db,
+							beginSerializableTransaction: () => {
+								throw new Error('Unconfigured initialization must not bootstrap')
+							},
+							getConfig: () => ({ serverUrl: '' })
+						},
 						userId
 					}
 				})

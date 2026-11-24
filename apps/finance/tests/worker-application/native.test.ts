@@ -128,6 +128,8 @@ beforeAll(async () => {
 					},
 					transform(code, id) {
 						if (!/\/runtime\/worker\/application\.worker\.ts$/.test(id)) return
+						const inspection = /application = createActor\(machine, \{\s*inspect,/
+						if (!inspection.test(code)) throw new Error('Native worker inspection hook missing')
 						return code
 							.replace(
 								'import { createFinanceWorkerBinding }',
@@ -135,8 +137,8 @@ beforeAll(async () => {
 							)
 							.replace('input: native', 'input: traceSessionInput(native)')
 							.replace(
-								'application = createActor(machine, {',
-								'application = createActor(machine, { inspect: inspectWorkerFailure,'
+								inspection,
+								'application = createActor(machine, { inspect: event => { inspect(event); inspectWorkerFailure(event) },'
 							)
 					},
 					generateBundle() {
@@ -317,6 +319,13 @@ async function archiveAccountUI(page: Page, name: string) {
 }
 async function createAccountUI(page: Page, name: string) {
 	await route(page, '/accounts')
+	// Wait for scoped navigation after the Window route has reached its worker.
+	// Startup can still be replacing the automatic workspace selection here.
+	await browserExpect
+		.poll(() =>
+			page.evaluate(() => window.financeWorkerReadFixture.state().workspaceNavigation?.status)
+		)
+		.toBe('scoped')
 	await openDrawerSection(page, 'Accounts')
 	await page
 		.locator('aside')

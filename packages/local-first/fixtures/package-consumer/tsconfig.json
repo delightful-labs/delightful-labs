@@ -45,6 +45,7 @@
 		"./workspace-seed.ts",
 		"./workspace-startup.ts",
 		"./workspace-initialization.ts",
+		"./workspace-authority-transaction.ts",
 		"./bound-observation.ts",
 		"./workspace-resource.ts"
 	],

@@ -5,7 +5,12 @@ export type WorkspaceInitializationProvenance = Readonly<{
 	identityId: string
 	initialWorkspaceId: string
 }>
-export type WorkspaceInitializationSettlement = 'notStarted' | 'locallyPersisted' | 'unresolved'
+export type WorkspaceInitializationSettlement =
+	| 'notStarted'
+	| 'locallyPersisted'
+	| 'authorityAccepted'
+	| 'rejected'
+	| 'unresolved'
 export type WorkspaceInitializationReport<Result> = Readonly<{
 	type: 'WORKSPACE_INITIALIZATION_RESULT'
 	binding: object

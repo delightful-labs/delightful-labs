@@ -534,3 +534,47 @@ then verifies successful hiding, same-identity invalid restoration/reopening and
 rejection after identity replacement. Native worker restoration fixtures now
 correlate recovery availability with the identity scope while still requiring a
 new library UI scope after restoration.
+
+## Independent Finance bootstrap and authoritative settlement
+
+The new native regression opens two real SDK clients with separate memory
+drivers/account stores, restores one provisioned identity into both, and holds
+their actual empty remote profile/workspace reads before either initializer can
+write. The regression first reproduced both initializers reporting local readiness
+while native upload settlement rejected one mergeable insert as `object already
+exists`. Canonical IDs alone did not establish conflict-free bootstrap.
+
+Finance's first bootstrap now uses the native SDK's serializable transaction and
+actual authority confirmation. Both transactions can read the canonical private
+profile reservation missing before either stages a write. Its absence is the
+serializable guard; native atomic insertion protects every graph ID. Native
+validation protects the profile, workspace, membership and starter-category graph,
+including edits committed after
+empty discovery. A second native schedule changes the first creator's workspace
+name and profile display name before releasing the second transaction; both edits
+survive and both initializers resolve to one canonical workspace.
+
+The occupied-workspace schedule separately seeds a canonical root without its
+profile reservation. Both attempts fail, leaving the root unchanged and creating
+no profile, membership or starter category. Thus the private reservation does not
+authorize overwriting other existing graph records. The browser adapter reads
+only that directly owned reservation inside the initial serializable transaction;
+fresh permission-dependent empty graph reads do not complete on the pinned browser
+runtime. No SDK patch, new endpoint or extra SDK session is introduced.
+
+The same Local First creation owner acquires, stages, commits and drains both
+confirmation modes. Ordinary additional creation keeps local durability; the
+authority mode explicitly distinguishes `authorityAccepted`, definitive `rejected`
+and unresolved confirmation. Definitive rejection releases custody; an unknown
+transport failure retains it. Acquisition and detached custody receive the original
+attempt, allowing the app adapter to keep unresolved receipts with its actual Db.
+
+Shared initialization owns one post-conflict authority rediscovery. Finance
+classifies an unissued conflict or the SDK's definitive serializable-conflict
+receipt. Only the original canonical marker can establish readiness; another
+target, missing evidence, permission failure or uncertain write cannot trigger
+another write. Shutdown during rediscovery preserves the actual rejected receipt
+and ignores late answers. The 556-line Finance transaction statechart is removed;
+Finance retains graph assessment/staging and the native serializable capability.
+Existing local markers still open without authority, and serializable bootstrap
+does not claim local-only acceptance while offline.

@@ -4,7 +4,7 @@
 
 **Branch**: `feat/shared-workspace-initialization`
 
-**Status**: Shared initialization/startup and production selection/leases adopted in both apps; remaining native acceptance and hosted qualification pending
+**Status**: Shared initialization/startup and production selection/leases adopted in both apps; local qualification complete, latest-head hosted qualification pending
 
 Every Delightful app should have a workspace concept backed by reusable Local
 First lifecycle behavior. Finance already exposes workspaces. Clipper will begin
@@ -93,24 +93,26 @@ does not authorize publication or changes to production data.
    app-specific workspace behavior. Matching interfaces alone do not satisfy
    convergence while duplicate lifecycle implementations remain.
 
-## Design work remaining
+## Qualification and compatibility
 
 The [production selection integration design](selection-integration.md) records
 the identity/access/resource boundary required by Finance's active worker before
 both apps can consume the same selection and drain implementation.
 
-- Extend canonical-root qualification to independent concurrent native replicas,
-  unanswered connections, partial replicas and later permission rejection.
-  Same-Db concurrent initialization, restoration and full offline restart are
-  qualified in the implementation inventory. Device identity kind alone still
-  does not prove that an identity was freshly created.
-- Production workspace selection/access leases now use the same Local First
-  resource owner in Finance and Clipper. Keep integrations thin and review
-  remaining differences against the shared implementation requirement above.
-- Confirm the effect of Clipper's accepted disposable development-data policy on
-  the final schema plan. No data reset is authorized by this specification.
-- Resolve whether cross-app workspace linking is desired. Shared lifecycle does
-  not establish common cross-app membership or a single workspace database.
+- Independent Clipper browser replicas qualify concurrent initialization, partial
+  offline/unanswered replicas and later native permission rejection. Finance's
+  independent native SDK replicas qualify concurrent bootstrap, preservation of
+  later edits and refusal of an occupied canonical root. Full offline restart,
+  restoration and selected-resource drain evidence are in the implementation
+  inventory; final browser results and new-head hosted results remain separately tracked.
+- Production workspace selection/access leases use the same Local First resource
+  owner in both apps. The inventory records the removed orchestration and domain
+  reasons for remaining app bindings.
+- Storage compatibility requires no schema change or data reset. Finance retains
+  stable graph IDs; Clipper retains its existing private identity-ID root,
+  bootstrap version and child references. Development data is preserved.
+- Cross-app workspace linking is outside initial adoption and remains a separate
+  future feature. Shared lifecycle does not imply a common database or membership.
 
 ## Scope boundaries and related plans
 

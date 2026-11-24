@@ -1,5 +1,5 @@
 import { fakeDataSetup, type FakeDataDb, type FakeDataResult } from '../samples/fake-data.js'
-import type { WorkspacePersistenceEvent } from './workspace-creation-transaction.js'
+import type { WorkspacePersistenceEvent } from './workspace-creation-contracts.js'
 import { setup, types, type SnapshotFrom } from 'xstate'
 import { createWorkspaceSeedOwner } from 'delightful-local-first/workspace/startup'
 import type { EventPayload } from '../../contracts/event-payload.js'

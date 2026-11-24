@@ -2,8 +2,24 @@
 
 Source baseline: fetched `origin/main` at `e7b8f5e7` (2026-11-23).
 This updates the 2026-11-14 research against the merged production worker code.
-It records source findings and the proposed ownership design; it does not claim
-new runtime qualification or authorize publication or data changes.
+The baseline inventory and design are retained below; later sections record
+implementation and scoped qualification. Nothing here authorizes publication or
+data changes.
+
+## Current production responsibility map
+
+| Shared implementation | Finance binding | Clipper binding |
+| --- | --- | --- |
+| `workspace/initialization` | `workspace-initialization.ts`: profile/workspace discovery, stable IDs and native serializable bootstrap capability | `root-bootstrap.ts`: canonical private-root facts and existing root-write receipts |
+| `workspace/startup` | `worker-identity-controls.ts`: initializer lifetime and optional financial seed owner | `root-bootstrap.ts`: initializer lifetime without a seed actor |
+| `workspace/resource` over the existing `workspace/workflow` selector | `worker-forms.ts` and `worker-workspace-resources.ts`: financial/query resource construction, domain commands and drain receipts | `workspace-library.ts`: existing capture/reader/content library, domain commands and drain receipts |
+| `data/observation-workflow` | `worker-query-observation.ts`: native query/access observation acquisition and disposal | `workspace-library.ts`: native ongoing private-root access and disposal |
+| `workspace/creation/workflow` | Additional and initial creation: local durability or native authority confirmation, with domain graph staging | Canonical initializer supplies its existing root upsert receipts; no independent generic transaction chart |
+
+Identity/session ownership is already shared through the native session/runtime
+APIs. Route resolution, authorization policy and domain resource implementations
+remain in their owning apps. The historical “today” inventory below describes the
+fetched main baseline, not a second retained production implementation.
 
 ## Changes since the original research
 
@@ -1101,3 +1117,71 @@ qualifies native adapter facts and write settlement, alongside the previously
 qualified production owner/reader drain cases; it does not claim to enumerate all
 browser schedules. Finance's independent concurrent adapter case and final
 new-head hosted qualification remain open.
+
+
+## Finance canonical reservation and shared authority receipts
+
+The independent-replica regression reproduced a real bootstrap race: both
+mergeable transactions reported local readiness, then one upload failed because
+the canonical profile already existed. Finance now supplies a native serializable
+transaction to the same Local First creation owner used for additional creation.
+The canonical private profile is the transaction's absence reservation; native
+atomic inserts protect the workspace, owner membership and starter categories.
+Bootstrap waits for the actual authority receipt. Existing local markers and
+ordinary additional creation retain their existing local behavior.
+
+The library owns acquisition, assessment, staging, commit, settlement and drain.
+Its authority mode distinguishes acceptance, definitive rejection and unresolved
+confirmation. Shutdown retains issued receipts; unresolved custody remains bound
+to the original attempt and native Db. Shared initialization permits one authority
+rediscovery after a definitive concurrency result, accepting only the original
+canonical marker and never issuing a replacement write. Cancellation/shutdown
+before rejection settlement prevents that rediscovery altogether; controlled
+regressions first reproduced the unnecessary query. The superseded 556-line
+Finance transaction statechart is deleted. Finance retains its native transaction
+capability, graph staging and domain result contracts.
+
+Three actual SDK schedules use independent restored clients/account stores:
+concurrent missing reservation, an edited workspace/profile/starter category
+between creators, and an occupied canonical workspace without a profile. They
+prove one canonical graph, preservation of later edits, all eight starter
+categories (five expense and three income), and refusal without partial graph
+creation or overwriting the occupied root. Fresh browser bootstrap reads only the
+directly owned profile inside its serializable transaction; permission-dependent
+empty graph reads stall on the pinned browser SDK. No SDK patch, extra native
+session, endpoint or weaker write primitive is introduced.
+
+Qualification for this slice: 1,846 Finance unit cases across 140 files, 1,359
+Local First cases across 66 files, 1,024 Clipper unit cases and 34 jsdom component
+cases pass. The Finance count consolidates thirteen duplicated transaction cases
+and adds three native race schedules; no covered lifecycle branch was removed.
+Source/test types, package/publint and public consumers pass. The packed tarball
+now executes all workspace/lifecycle consumers in both Node and native ES-module
+Node workers, in addition to checking self-contained browser worker builds.
+These are distinct from browser execution. All 128 Clipper native cases pass on
+the changed library: 71 web, 33 worker, 12 production offline and 12 packaged
+extension cases, with matching production builds. Finance passes all 75 application
+browser cases across Chromium, Firefox and
+WebKit plus five production profile/permission cases with the matching build.
+The account-creation fixture waits for actual scoped worker navigation before
+clicking; Window route changes alone do not acknowledge financial admission.
+New-head hosted qualification remains separately tracked until complete.
+
+## Storage compatibility audit
+
+No schema or persisted ID changes are needed. Finance retains its stable profile,
+initial workspace and membership IDs. Clipper retains the existing private
+identity-ID root, bootstrap version and child references; production construction
+and ongoing access both validate that canonical relationship. Its existing
+highlight-anchor authorization relies on this private-root invariant. Separating
+identity and workspace capability inputs does not admit arbitrary root IDs or
+change storage policy. Existing retained data remains in place; the disposable
+development-data policy does not require or authorize a reset here.
+
+Both apps now consume the shared initializer/startup, bound observation and
+selected-resource owner. Finance retains route resolution, financial/membership
+policy and financial drains. Clipper retains its content graph, reader/capture
+operations, private-root policy and explicit extension connection requirement.
+These are domain bindings rather than competing workspace lifecycle charts.
+Cross-app workspace linking remains a separate future feature, explicitly outside
+initial adoption; shared behavior does not imply a common database or membership.
